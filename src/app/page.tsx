@@ -1,20 +1,35 @@
+import Link from "next/link";
 import { getCurrentBd, listContacts } from "@/lib/queries";
 import { UploadForm } from "./UploadForm";
 import { SignOutButton } from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 20;
+
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ company?: string; position?: string }>;
+  searchParams: Promise<{ company?: string; position?: string; page?: string }>;
 }) {
   const sp = await searchParams;
   const me = await getCurrentBd();
-  const contacts = await listContacts(me.id, {
-    company: sp.company,
-    position: sp.position,
-  });
+  const page = Math.max(1, Number(sp.page) || 1);
+  const filters = { company: sp.company, position: sp.position };
+  const { rows, total, page: current, totalPages } = await listContacts(
+    me.id,
+    filters,
+    page,
+    PAGE_SIZE,
+  );
+
+  const qs = (p: number) => {
+    const params = new URLSearchParams();
+    if (sp.company) params.set("company", sp.company);
+    if (sp.position) params.set("position", sp.position);
+    params.set("page", String(p));
+    return `/?${params.toString()}`;
+  };
 
   return (
     <main>
@@ -70,8 +85,7 @@ export default async function Home({
       <section className="panel">
         <div className="eyebrow">// contacts</div>
         <p className="soft" style={{ marginTop: 0 }}>
-          {contacts.length}
-          {contacts.length === 500 ? "+" : ""} shown
+          {total} total · page {current} of {totalPages}
         </p>
         <div className="table-wrap">
           <table>
@@ -84,10 +98,13 @@ export default async function Home({
               </tr>
             </thead>
             <tbody>
-              {contacts.map((c) => (
+              {rows.map((c) => (
                 <tr key={c.id}>
                   <td>
-                    {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
+                    <Link className="rowlink" href={`/contact/${c.id}`}>
+                      {[c.firstName, c.lastName].filter(Boolean).join(" ") ||
+                        "—"}
+                    </Link>
                   </td>
                   <td>{c.company ?? "—"}</td>
                   <td>{c.position ?? "—"}</td>
@@ -102,7 +119,7 @@ export default async function Home({
                   </td>
                 </tr>
               ))}
-              {!contacts.length && (
+              {!rows.length && (
                 <tr>
                   <td colSpan={4} className="muted">
                     No contacts yet. Import your Connections.csv above.
@@ -112,6 +129,28 @@ export default async function Home({
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="pager">
+            {current > 1 ? (
+              <Link className="secondary-btn" href={qs(current - 1)}>
+                ← prev
+              </Link>
+            ) : (
+              <span className="secondary-btn disabled">← prev</span>
+            )}
+            <span className="soft">
+              {current} / {totalPages}
+            </span>
+            {current < totalPages ? (
+              <Link className="secondary-btn" href={qs(current + 1)}>
+                next →
+              </Link>
+            ) : (
+              <span className="secondary-btn disabled">next →</span>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );

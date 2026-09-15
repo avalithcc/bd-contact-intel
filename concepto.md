@@ -3,6 +3,10 @@
 > Status: framing / not yet scoped for build. Owner: Cristian (COO).
 > Started 2026-09-15. Separate initiative from the YPF strategy.
 
+## Language constraint (locked 2026-09-15)
+The product is **full English** — all UI copy, labels, code, comments, and docs. No Spanish in the product surface.
+- **v2 nuance to decide:** AI-generated *outreach messages* target real contacts (many Argentine, e.g. YPF), so the message BODY may need to be written in the contact's language (Spanish) even though the product UI stays English. This is a per-message content decision, separate from the product-language rule.
+
 ## Problem
 Avalith's sales area needs to turn the collective LinkedIn network of its Business Developers into a usable prospecting asset — today that network is scattered across individual accounts and invisible as a whole.
 

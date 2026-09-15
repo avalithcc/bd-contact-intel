@@ -190,3 +190,76 @@ th {
 .soft {
   color: var(--soft);
 }
+
+/* ---- row links ---- */
+.rowlink {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+.rowlink:hover {
+  color: var(--red);
+}
+tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+a {
+  color: var(--red);
+}
+
+/* ---- link styled as secondary button ---- */
+.secondary-btn {
+  display: inline-block;
+  background: var(--card);
+  color: var(--soft);
+  border: 1px solid var(--lineh);
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.secondary-btn:hover {
+  color: var(--ink);
+}
+.secondary-btn.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ---- pager ---- */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+/* ---- detail fields ---- */
+.field {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.field:last-child {
+  border-bottom: none;
+}
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--soft);
+}
+.field-value {
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+.field-value.empty {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
