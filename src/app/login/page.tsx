@@ -12,11 +12,23 @@ export default function LoginPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function validate(): boolean {
+    if (!email.trim() || !password) {
+      setMsg("Enter your email and password first.");
+      return false;
+    }
+    return true;
+  }
+
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
+    if (!validate()) return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
     setBusy(false);
     if (error) {
       setMsg(error.message);
@@ -27,9 +39,13 @@ export default function LoginPage() {
   }
 
   async function signUp() {
+    if (!validate()) return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
     setBusy(false);
     setMsg(
       error
