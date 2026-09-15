@@ -52,16 +52,22 @@ export default function LoginPage() {
     }
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     });
     setBusy(false);
-    setMsg(
-      error
-        ? error.message
-        : "Account created. If email confirmation is enabled, check your inbox — otherwise sign in now.",
-    );
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+    if (data.session) {
+      // email confirmation disabled → already signed in
+      router.push("/");
+      router.refresh();
+      return;
+    }
+    setMsg("Account created. Check your inbox to confirm, then sign in.");
   }
 
   return (
