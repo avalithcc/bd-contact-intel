@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const ALLOWED_DOMAIN = "@avalith.net";
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -40,6 +42,14 @@ export default function LoginPage() {
 
   async function signUp() {
     if (!validate()) return;
+    if (!email.trim().toLowerCase().endsWith(ALLOWED_DOMAIN)) {
+      setMsg(`Accounts are limited to ${ALLOWED_DOMAIN} emails.`);
+      return;
+    }
+    if (password.length < 8) {
+      setMsg("Use at least 8 characters for your password.");
+      return;
+    }
     setBusy(true);
     setMsg(null);
     const { error } = await supabase.auth.signUp({
@@ -65,6 +75,10 @@ export default function LoginPage() {
       <h1>
         sign in<span className="dot">.</span>
       </h1>
+      <p className="soft">
+        New here? Create an account with your <strong>@avalith.net</strong>{" "}
+        email.
+      </p>
       <form className="panel" style={{ marginTop: "1.25rem" }} onSubmit={signIn}>
         <div style={{ marginBottom: "1rem" }}>
           <label htmlFor="email">Work email</label>
