@@ -160,12 +160,10 @@ td {
   border-bottom: 1px solid var(--line);
 }
 th {
-  font-family: var(--font-mono);
   color: var(--soft);
-  font-weight: 700;
-  font-size: 0.7rem;
-  text-transform: lowercase;
-  letter-spacing: 0.03em;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
 }
 
 /* ---- badges ---- */
@@ -249,8 +247,8 @@ a {
   border-bottom: none;
 }
 .field-label {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: var(--soft);
 }
 .field-value {

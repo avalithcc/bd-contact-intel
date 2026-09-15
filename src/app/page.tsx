@@ -91,10 +91,10 @@ export default async function Home({
           <table>
             <thead>
               <tr>
-                <th>name</th>
-                <th>company</th>
-                <th>position</th>
-                <th>team_overlap</th>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Position</th>
+                <th>Team overlap</th>
               </tr>
             </thead>
             <tbody>

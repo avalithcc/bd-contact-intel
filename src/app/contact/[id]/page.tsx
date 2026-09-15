@@ -49,15 +49,15 @@ export default async function ContactDetail({
       </div>
 
       <section className="panel">
-        <Field label="first_name" value={c.firstName} />
-        <Field label="last_name" value={c.lastName} />
-        <Field label="company" value={c.company} />
-        <Field label="position" value={c.position} />
-        <Field label="industry" value={c.industry} />
-        <Field label="email" value={c.email} />
-        <Field label="connected_on" value={c.connectedOn} />
+        <Field label="First name" value={c.firstName} />
+        <Field label="Last name" value={c.lastName} />
+        <Field label="Company" value={c.company} />
+        <Field label="Position" value={c.position} />
+        <Field label="Industry" value={c.industry} />
+        <Field label="Email" value={c.email} />
+        <Field label="Connected on" value={c.connectedOn} />
         <Field
-          label="linkedin_profile"
+          label="LinkedIn profile"
           value={
             c.profileKey ? (
               <a href={profileUrl} target="_blank" rel="noopener noreferrer">
@@ -67,7 +67,7 @@ export default async function ContactDetail({
           }
         />
         <Field
-          label="team_overlap"
+          label="Team overlap"
           value={
             c.overlapWith.length ? (
               <span className="badge">also in {c.overlapWith.join(", ")}</span>
@@ -75,7 +75,7 @@ export default async function ContactDetail({
           }
         />
         <Field
-          label="added_to_base"
+          label="Added on"
           value={new Date(c.createdAt).toLocaleDateString()}
         />
       </section>
