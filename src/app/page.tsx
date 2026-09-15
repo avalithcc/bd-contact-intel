@@ -1,5 +1,6 @@
 import { getCurrentBd, listContacts } from "@/lib/queries";
 import { UploadForm } from "./UploadForm";
+import { SignOutButton } from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,16 @@ export default async function Home({
 
   return (
     <main>
-      <h1>BD Contact Intelligence</h1>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <h1>BD Contact Intelligence</h1>
+        <SignOutButton />
+      </div>
       <p className="muted">
         Signed in as <strong>{me.name}</strong> ({me.email})
       </p>

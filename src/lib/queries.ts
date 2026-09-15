@@ -1,21 +1,27 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, contact, type NewContact } from "@/db/schema";
+import { createClient } from "@/lib/supabase/server";
 
 /**
- * v1 stand-in for the authenticated user. Resolves the "current" BD by
- * CURRENT_BD_EMAIL (if set) or falls back to the first BD, creating a
- * default one if the table is empty. Replace with Supabase auth in v2.
+ * Resolves the current BD from the authenticated Supabase user, creating the
+ * `bd` row on first sign-in. Callers run behind middleware that redirects
+ * unauthenticated requests to /login, so a missing user is an error here.
  */
 export async function getCurrentBd() {
-  const email = process.env.CURRENT_BD_EMAIL ?? "demo@avalith.net";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) throw new Error("Not authenticated");
+
   const existing = await db.query.bd.findFirst({
-    where: eq(bd.email, email),
+    where: eq(bd.email, user.email),
   });
   if (existing) return existing;
   const [created] = await db
     .insert(bd)
-    .values({ name: email.split("@")[0], email })
+    .values({ name: user.email.split("@")[0], email: user.email })
     .returning();
   return created;
 }
