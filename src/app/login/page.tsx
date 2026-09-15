@@ -55,9 +55,17 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: 380 }}>
-      <h1>BD Contact Intelligence</h1>
-      <form className="panel" onSubmit={signIn}>
+    <main style={{ maxWidth: 400 }}>
+      <div className="header">
+        <span className="logo">
+          avalith<span className="dot">.</span>
+        </span>
+      </div>
+      <div className="eyebrow">// bd_contact_intelligence</div>
+      <h1>
+        sign in<span className="dot">.</span>
+      </h1>
+      <form className="panel" style={{ marginTop: "1.25rem" }} onSubmit={signIn}>
         <div style={{ marginBottom: "1rem" }}>
           <label htmlFor="email">Work email</label>
           <input
@@ -85,9 +93,9 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
+            className="secondary"
             onClick={signUp}
             disabled={busy}
-            style={{ background: "transparent", border: "1px solid var(--border)" }}
           >
             Create account
           </button>

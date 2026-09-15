@@ -1,10 +1,18 @@
 :root {
-  --bg: #0b0d12;
-  --panel: #151922;
-  --border: #262c3a;
-  --text: #e6e9ef;
-  --muted: #8b93a7;
-  --accent: #4f8cff;
+  --bg: #0b0a11;
+  --card: #0e0d15;
+  --panel: #131119;
+  --warm: #1d1215;
+  --red: #d5252f;
+  --green: #3ecf8e;
+  --ink: #ffffff;
+  --soft: #8e8c99;
+  --muted: #56545f;
+  --line: rgba(255, 255, 255, 0.08);
+  --lineh: rgba(255, 255, 255, 0.18);
+
+  --font-body: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
 }
 
 * {
@@ -13,100 +21,172 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 main {
-  max-width: 1000px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 2rem 1.25rem;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+/* ---- brand marks ---- */
+.logo {
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.logo .dot,
+h1 .dot,
+h2 .dot {
+  color: var(--red);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--red);
+  margin-bottom: 0.5rem;
 }
 
 h1 {
-  font-size: 1.5rem;
-  margin: 0 0 1.5rem;
+  font-weight: 800;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.35rem;
+}
+h2 {
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
 }
 
+/* ---- panels & cards ---- */
 .panel {
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.15rem 1.35rem;
   margin-bottom: 1.5rem;
 }
 
+/* ---- form controls ---- */
 label {
   display: block;
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--soft);
+  margin-bottom: 0.4rem;
 }
 
 input[type="text"],
+input[type="password"],
 input[type="file"] {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  color: var(--text);
-  padding: 0.5rem 0.6rem;
+  color: var(--ink);
+  padding: 0.55rem 0.7rem;
   font-size: 0.9rem;
+  font-family: var(--font-body);
   width: 100%;
+  transition: border-color 0.15s;
+}
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="file"]:focus {
+  outline: none;
+  border-color: var(--red);
 }
 
+/* ---- buttons ---- */
 button {
-  background: var(--accent);
-  color: white;
+  background: var(--red);
+  color: var(--ink);
   border: none;
   border-radius: 6px;
-  padding: 0.55rem 1rem;
-  font-size: 0.9rem;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
+  font-weight: 600;
   cursor: pointer;
+  transition: filter 0.15s;
 }
-
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
+button.secondary {
+  background: var(--card);
+  color: var(--soft);
+  border: 1px solid var(--lineh);
+}
 
+/* ---- layout helpers ---- */
 .row {
   display: flex;
   gap: 1rem;
   align-items: flex-end;
   flex-wrap: wrap;
 }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.75rem;
+}
 
+/* ---- table ---- */
+.table-wrap {
+  overflow-x: auto;
+}
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
 }
-
 th,
 td {
   text-align: left;
-  padding: 0.6rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.55rem;
+  border-bottom: 1px solid var(--line);
 }
-
 th {
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 0.78rem;
-  text-transform: uppercase;
+  font-family: var(--font-mono);
+  color: var(--soft);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: lowercase;
   letter-spacing: 0.03em;
 }
 
+/* ---- badges ---- */
 .badge {
   display: inline-block;
-  background: rgba(79, 140, 255, 0.15);
-  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: rgba(213, 37, 47, 0.12);
+  color: var(--red);
   border-radius: 999px;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.75rem;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.72rem;
+}
+.badge.green {
+  background: rgba(62, 207, 142, 0.12);
+  color: var(--green);
 }
 
 .muted {
   color: var(--muted);
+}
+.soft {
+  color: var(--soft);
 }

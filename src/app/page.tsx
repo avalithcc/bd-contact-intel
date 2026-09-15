@@ -18,25 +18,30 @@ export default async function Home({
 
   return (
     <main>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <h1>BD Contact Intelligence</h1>
+      <div className="header">
+        <span className="logo">
+          avalith<span className="dot">.</span>
+        </span>
         <SignOutButton />
       </div>
-      <p className="muted">
-        Signed in as <strong>{me.name}</strong> ({me.email})
-      </p>
+
+      <div style={{ marginBottom: "1.75rem" }}>
+        <div className="eyebrow">// bd_contact_intelligence</div>
+        <h1>
+          contact base<span className="dot">.</span>
+        </h1>
+        <p className="soft" style={{ margin: 0 }}>
+          Signed in as <strong>{me.name}</strong> ({me.email})
+        </p>
+      </div>
 
       <section className="panel">
+        <div className="eyebrow">// import</div>
         <UploadForm />
       </section>
 
       <section className="panel">
+        <div className="eyebrow">// filter</div>
         <form method="get" className="row">
           <div>
             <label htmlFor="company">Company</label>
@@ -63,44 +68,50 @@ export default async function Home({
       </section>
 
       <section className="panel">
-        <p className="muted">{contacts.length} contacts</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Company</th>
-              <th>Position</th>
-              <th>Team overlap</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
-                </td>
-                <td>{c.company ?? "—"}</td>
-                <td>{c.position ?? "—"}</td>
-                <td>
-                  {c.overlapWith.length ? (
-                    <span className="badge">
-                      also in {c.overlapWith.join(", ")}
-                    </span>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {!contacts.length && (
+        <div className="eyebrow">// contacts</div>
+        <p className="soft" style={{ marginTop: 0 }}>
+          {contacts.length}
+          {contacts.length === 500 ? "+" : ""} shown
+        </p>
+        <div className="table-wrap">
+          <table>
+            <thead>
               <tr>
-                <td colSpan={4} className="muted">
-                  No contacts yet. Import your Connections.csv above.
-                </td>
+                <th>name</th>
+                <th>company</th>
+                <th>position</th>
+                <th>team_overlap</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {contacts.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
+                  </td>
+                  <td>{c.company ?? "—"}</td>
+                  <td>{c.position ?? "—"}</td>
+                  <td>
+                    {c.overlapWith.length ? (
+                      <span className="badge">
+                        also in {c.overlapWith.join(", ")}
+                      </span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!contacts.length && (
+                <tr>
+                  <td colSpan={4} className="muted">
+                    No contacts yet. Import your Connections.csv above.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   );
