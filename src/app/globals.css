@@ -76,6 +76,44 @@ h2 {
   margin-bottom: 1.5rem;
 }
 
+/* ---- compact collapsible import ---- */
+.import-block {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  max-width: 340px;
+}
+.import-block summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  color: var(--soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+  list-style: none;
+  user-select: none;
+}
+.import-block summary::-webkit-details-marker {
+  display: none;
+}
+.import-block summary::before {
+  content: "+";
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+.import-block[open] summary::before {
+  content: "−";
+}
+.import-block[open] summary {
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.import-block .import-body {
+  padding: 0.9rem;
+}
+
 /* ---- form controls ---- */
 label {
   display: block;

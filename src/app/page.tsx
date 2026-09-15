@@ -50,10 +50,12 @@ export default async function Home({
         </p>
       </div>
 
-      <section className="panel">
-        <div className="eyebrow">// import</div>
-        <UploadForm />
-      </section>
+      <details className="import-block">
+        <summary>Import LinkedIn database</summary>
+        <div className="import-body">
+          <UploadForm />
+        </div>
+      </details>
 
       <section className="panel">
         <div className="eyebrow">// filter</div>
