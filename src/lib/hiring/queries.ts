@@ -97,7 +97,10 @@ export async function getCompanyHiringSummaries(
         .select({
           companyKey: contact.companyKey,
           count: sql<number>`count(*)::int`,
-          leadershipCount: sql<number>`count(*) filter (where ${contact.roleGroup} = any(${LEADERSHIP_ROLE_GROUPS}::text[]))::int`,
+          // `inArray` renders an IN (...) list; interpolating the array
+          // directly would render a record literal, which Postgres cannot
+          // cast to text[].
+          leadershipCount: sql<number>`count(*) filter (where ${inArray(contact.roleGroup, LEADERSHIP_ROLE_GROUPS)})::int`,
         })
         .from(contact)
         .where(and(eq(contact.bdId, bdId), inArray(contact.companyKey, allMatchKeys)))
