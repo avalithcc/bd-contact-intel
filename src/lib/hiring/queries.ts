@@ -26,39 +26,42 @@ export interface CompanyHiringSummary {
 
 // Role groups considered "leadership" for the hiring crossover — the
 // contacts most worth reaching out to at a company that's actively hiring.
-const LEADERSHIP_ROLE_GROUPS: RoleGroupKey[] = [
+// Exported so other views built on the same signal (see
+// src/lib/outreach/queries.ts) use the identical definition instead of
+// re-declaring it.
+export const LEADERSHIP_ROLE_GROUPS: RoleGroupKey[] = [
   "c_level_tech",
   "c_level_business",
   "eng_leadership",
   "engineering_manager",
 ];
 
+interface ResolvedHiringCompany {
+  companyKey: string;
+  displayName: string;
+  postings: OpenPosting[];
+  // Every contact.company_key value that should count as "works there":
+  // the target company's own key plus any company_alias rows pointing at
+  // it.
+  matchKeys: Set<string>;
+}
+
 /**
- * Target companies that currently have at least one open IT posting, along
- * with those postings for the expandable detail list on /hiring, and — for
- * the given BD — how many of their contacts work there and how many of
- * those are in a leadership role group (see LEADERSHIP_ROLE_GROUPS).
- *
- * Matching a contact to a target company goes through `contact.company_key`
- * (normalized at import/backfill time, see src/lib/queries.ts#upsertContacts
- * and scripts/backfill-company-keys.ts) against EITHER the target's own
- * `company_key` OR any row in `company_alias` pointing at it — a contact's
+ * Shared alias-resolution step for hiring signals: which target companies
+ * currently have at least one open IT posting, those postings, and every
+ * `company_alias` key that should count as "the same company" for matching
+ * a contact's `company_key` against it (see matchKeys above) — a contact's
  * LinkedIn company name doesn't always normalize to the same key as the
  * target company (e.g. a legal entity vs. the brand name), and aliases
- * bridge that gap without needing per-row fuzzy matching in the query.
+ * bridge that gap without per-row fuzzy matching.
  *
- * The number of target companies is expected to stay small (tens), so this
- * is three fixed queries regardless of how many companies/postings/contacts
- * exist: (1) open IT postings joined with their target company's display
- * name, (2) the aliases for those companies, (3) one GROUP BY over `contact`
- * for every key (canonical + alias) that resolves to any of those
- * companies. No per-company query loop (no N+1).
+ * Two fixed queries regardless of caller — (1) open IT postings joined with
+ * their target company's display name, (2) the aliases for those
+ * companies — factored out here so getCompanyHiringSummaries (/hiring) and
+ * getHiringMatchIndex (/outreach) both reuse it instead of each running
+ * their own alias lookup.
  */
-export async function getCompanyHiringSummaries(
-  bdId: string,
-): Promise<CompanyHiringSummary[]> {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
+async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiringCompany>> {
   const openPostings = await db
     .select({
       id: jobPosting.id,
@@ -75,22 +78,59 @@ export async function getCompanyHiringSummaries(
     .where(and(eq(jobPosting.isIt, true), isNull(jobPosting.closedAt)))
     .orderBy(desc(jobPosting.postedAt));
 
-  if (!openPostings.length) return [];
+  const byCompany = new Map<string, ResolvedHiringCompany>();
+  if (!openPostings.length) return byCompany;
 
-  const companyKeys = [...new Set(openPostings.map((p) => p.companyKey))];
+  for (const p of openPostings) {
+    const entry = byCompany.get(p.companyKey) ?? {
+      companyKey: p.companyKey,
+      displayName: p.displayName,
+      postings: [],
+      matchKeys: new Set([p.companyKey]),
+    };
+    entry.postings.push({
+      id: p.id,
+      title: p.title,
+      location: p.location,
+      url: p.url,
+      postedAt: p.postedAt,
+      firstSeen: p.firstSeen,
+    });
+    byCompany.set(p.companyKey, entry);
+  }
 
+  const companyKeys = [...byCompany.keys()];
   const aliases = await db
     .select({ aliasKey: companyAlias.aliasKey, companyKey: companyAlias.companyKey })
     .from(companyAlias)
     .where(inArray(companyAlias.companyKey, companyKeys));
+  for (const a of aliases) byCompany.get(a.companyKey)?.matchKeys.add(a.aliasKey);
 
-  // For each target company, the full set of contact.company_key values
-  // that should count as "works there": its own key plus any aliases.
-  const matchKeysByCompany = new Map<string, Set<string>>();
-  for (const key of companyKeys) matchKeysByCompany.set(key, new Set([key]));
-  for (const a of aliases) matchKeysByCompany.get(a.companyKey)?.add(a.aliasKey);
+  return byCompany;
+}
 
-  const allMatchKeys = [...new Set([...companyKeys, ...aliases.map((a) => a.aliasKey)])];
+/**
+ * Target companies that currently have at least one open IT posting, along
+ * with those postings for the expandable detail list on /hiring, and — for
+ * the given BD — how many of their contacts work there and how many of
+ * those are in a leadership role group (see LEADERSHIP_ROLE_GROUPS).
+ *
+ * Three fixed queries regardless of how many companies/postings/contacts
+ * exist: the two behind resolveHiringCompanies() above, plus one GROUP BY
+ * over `contact` for every key (canonical + alias) that resolves to any
+ * hiring company. No per-company query loop (no N+1).
+ */
+export async function getCompanyHiringSummaries(
+  bdId: string,
+): Promise<CompanyHiringSummary[]> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const companies = await resolveHiringCompanies();
+  if (!companies.size) return [];
+
+  const allMatchKeys = [
+    ...new Set([...companies.values()].flatMap((c) => [...c.matchKeys])),
+  ];
 
   const contactStats = allMatchKeys.length
     ? await db
@@ -112,47 +152,63 @@ export async function getCompanyHiringSummaries(
       .map((s) => [s.companyKey, s]),
   );
 
-  const byCompany = new Map<string, CompanyHiringSummary>();
-  for (const p of openPostings) {
-    const summary = byCompany.get(p.companyKey) ?? {
-      companyKey: p.companyKey,
-      displayName: p.displayName,
-      openItCount: 0,
-      newLast7Days: 0,
-      postings: [],
+  const summaries: CompanyHiringSummary[] = [];
+  for (const c of companies.values()) {
+    const summary: CompanyHiringSummary = {
+      companyKey: c.companyKey,
+      displayName: c.displayName,
+      openItCount: c.postings.length,
+      newLast7Days: c.postings.filter((p) => p.firstSeen >= sevenDaysAgo).length,
+      postings: c.postings,
       contactCount: 0,
       leadershipContactCount: 0,
     };
-    summary.openItCount += 1;
-    if (p.firstSeen >= sevenDaysAgo) summary.newLast7Days += 1;
-    summary.postings.push({
-      id: p.id,
-      title: p.title,
-      location: p.location,
-      url: p.url,
-      postedAt: p.postedAt,
-      firstSeen: p.firstSeen,
-    });
-    byCompany.set(p.companyKey, summary);
-  }
-
-  for (const [companyKey, summary] of byCompany) {
-    for (const key of matchKeysByCompany.get(companyKey) ?? [companyKey]) {
+    for (const key of c.matchKeys) {
       const stats = statsByKey.get(key);
       if (!stats) continue;
       summary.contactCount += stats.count;
       summary.leadershipContactCount += stats.leadershipCount;
     }
+    summaries.push(summary);
   }
 
   // Companies where the BD already has contacts are the actionable
   // signal — surface those first, then by open IT posting count.
-  return [...byCompany.values()].sort((a, b) => {
+  return summaries.sort((a, b) => {
     const aHas = a.contactCount > 0 ? 1 : 0;
     const bHas = b.contactCount > 0 ? 1 : 0;
     if (aHas !== bHas) return bHas - aHas;
     return b.openItCount - a.openItCount;
   });
+}
+
+export interface HiringMatch {
+  companyKey: string;
+  displayName: string;
+  openItCount: number;
+}
+
+/**
+ * Company-key -> hiring info, keyed by every key that should count as "this
+ * company" (canonical `target_company.company_key` plus every
+ * `company_alias` pointing at it) — reuses the same alias resolution as
+ * getCompanyHiringSummaries (via resolveHiringCompanies) rather than
+ * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup.
+ * Not BD-scoped — job postings/target companies are shared data. Two fixed
+ * queries regardless of caller.
+ */
+export async function getHiringMatchIndex(): Promise<Map<string, HiringMatch>> {
+  const companies = await resolveHiringCompanies();
+  const index = new Map<string, HiringMatch>();
+  for (const c of companies.values()) {
+    const match: HiringMatch = {
+      companyKey: c.companyKey,
+      displayName: c.displayName,
+      openItCount: c.postings.length,
+    };
+    for (const key of c.matchKeys) index.set(key, match);
+  }
+  return index;
 }
 
 /**

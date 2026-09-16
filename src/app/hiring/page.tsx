@@ -14,9 +14,14 @@ export default async function HiringPage() {
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <Link className="secondary-btn" href="/">
-          ← contacts
-        </Link>
+        <div className="row" style={{ gap: "0.75rem" }}>
+          <Link className="secondary-btn" href="/">
+            ← contacts
+          </Link>
+          <Link className="secondary-btn" href="/outreach">
+            priority outreach →
+          </Link>
+        </div>
       </div>
 
       <div style={{ marginBottom: "1.75rem" }}>

@@ -67,7 +67,10 @@ export const RELATIONSHIP_FILTERS = [
 ] as const;
 export type RelationshipFilterKey = (typeof RELATIONSHIP_FILTERS)[number]["key"];
 
-const DORMANT_MONTHS = 12;
+// Exported so other views that need the same "reciprocal but gone quiet"
+// signal (see src/lib/outreach/queries.ts) compute it identically instead of
+// re-deriving their own threshold.
+export const DORMANT_MONTHS = 12;
 
 export interface ContactFilters {
   company?: string;
@@ -99,7 +102,7 @@ export interface ContactRow {
   dormant: boolean;
 }
 
-function isDormant(reciprocal: boolean, lastMessageAt: Date | null): boolean {
+export function isDormant(reciprocal: boolean, lastMessageAt: Date | null): boolean {
   if (!reciprocal || !lastMessageAt) return false;
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - DORMANT_MONTHS);

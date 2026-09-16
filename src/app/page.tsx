@@ -146,6 +146,9 @@ export default async function Home({
           avalith<span className="dot">.</span>
         </span>
         <div className="row" style={{ gap: "0.75rem" }}>
+          <Link className="secondary-btn" href="/outreach">
+            priority outreach →
+          </Link>
           <Link className="secondary-btn" href="/hiring">
             hiring signals →
           </Link>
