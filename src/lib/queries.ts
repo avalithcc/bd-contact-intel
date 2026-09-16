@@ -1,6 +1,14 @@
-import { and, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, companyAlias, companyCategory, contact, type NewContact } from "@/db/schema";
+import {
+  bd,
+  companyAlias,
+  companyCategory,
+  contact,
+  conversation,
+  message,
+  type NewContact,
+} from "@/db/schema";
 import { createClient } from "@/lib/supabase/server";
 import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import {
@@ -8,6 +16,7 @@ import {
   type CompanyCategoryKey,
 } from "@/lib/companyCategories";
 import { bucketTopN } from "@/lib/bucketing";
+import type { ParseMessagesResult } from "@/lib/messagesCsv";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
@@ -32,6 +41,34 @@ export async function getCurrentBd() {
   return created;
 }
 
+/**
+ * The authenticated Supabase auth user's id — distinct from `bd.id` (a
+ * separate, app-level uuid). Used to validate that a Storage object path
+ * uploaded by the browser (see src/app/actions.ts#uploadMessagesCsv)
+ * actually belongs to the caller before the server touches it.
+ */
+export async function getCurrentAuthUserId(): Promise<string> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  return user.id;
+}
+
+// Relationship signal derived from imported LinkedIn messages (see
+// src/lib/messagesCsv.ts and #recomputeMessageSignals below). "dormant" is
+// computed in JS at read time (reciprocal + no message in DORMANT_MONTHS)
+// rather than stored, since "now" moves — see isDormant().
+export const RELATIONSHIP_FILTERS = [
+  { key: "reciprocal", label: "Reciprocal" },
+  { key: "dormant", label: "Dormant (12mo+)" },
+  { key: "never", label: "Never messaged" },
+] as const;
+export type RelationshipFilterKey = (typeof RELATIONSHIP_FILTERS)[number]["key"];
+
+const DORMANT_MONTHS = 12;
+
 export interface ContactFilters {
   company?: string;
   position?: string;
@@ -42,6 +79,7 @@ export interface ContactFilters {
   // "N contacts" link to jump straight to a specific company's contacts
   // rather than relying on free-text `company` matching.
   companyKey?: string;
+  relationship?: RelationshipFilterKey;
 }
 
 export interface ContactRow {
@@ -53,6 +91,35 @@ export interface ContactRow {
   companyKey: string | null;
   profileKey: string;
   overlapWith: string[]; // names of other BDs who also hold this contact
+  // Denormalized message signals (see #recomputeMessageSignals) — already
+  // on the `contact` row, so the home list needs no extra per-row query.
+  messageCount: number;
+  lastMessageAt: Date | null;
+  reciprocal: boolean;
+  dormant: boolean;
+}
+
+function isDormant(reciprocal: boolean, lastMessageAt: Date | null): boolean {
+  if (!reciprocal || !lastMessageAt) return false;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - DORMANT_MONTHS);
+  return lastMessageAt < cutoff;
+}
+
+function relationshipFilterCondition(key: RelationshipFilterKey) {
+  switch (key) {
+    case "reciprocal":
+      return eq(contact.reciprocal, true);
+    case "never":
+      return eq(contact.messageCount, 0);
+    case "dormant": {
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - DORMANT_MONTHS);
+      // Composed as one SQL fragment: `and()` is typed as possibly
+      // undefined, which does not fit the non-optional filter list.
+      return sql`${contact.reciprocal} = true and ${contact.lastMessageAt} < ${cutoff}`;
+    }
+  }
 }
 
 export interface ContactsPage {
@@ -121,6 +188,7 @@ export async function listContacts(
   if (filters.companyCategory)
     where.push(eq(contact.companyCategory, filters.companyCategory));
   if (filters.companyKey) where.push(companyKeyFilter(filters.companyKey));
+  if (filters.relationship) where.push(relationshipFilterCondition(filters.relationship));
 
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -139,6 +207,9 @@ export async function listContacts(
       position: contact.position,
       companyKey: contact.companyKey,
       profileKey: contact.profileKey,
+      messageCount: contact.messageCount,
+      lastMessageAt: contact.lastMessageAt,
+      reciprocal: contact.reciprocal,
     })
     .from(contact)
     .where(and(...where))
@@ -152,7 +223,11 @@ export async function listContacts(
   );
 
   return {
-    rows: rows.map((r) => ({ ...r, overlapWith: overlap.get(r.profileKey) ?? [] })),
+    rows: rows.map((r) => ({
+      ...r,
+      overlapWith: overlap.get(r.profileKey) ?? [],
+      dormant: isDormant(r.reciprocal, r.lastMessageAt),
+    })),
     total,
     page: safePage,
     pageSize,
@@ -172,6 +247,14 @@ export interface ContactDetail {
   profileKey: string;
   createdAt: Date;
   overlapWith: string[];
+  messageCount: number;
+  sentCount: number;
+  receivedCount: number;
+  firstMessageAt: Date | null;
+  lastMessageAt: Date | null;
+  initiatedByMe: boolean | null;
+  reciprocal: boolean;
+  dormant: boolean;
 }
 
 const UUID_RE =
@@ -203,6 +286,14 @@ export async function getContactById(
     profileKey: row.profileKey,
     createdAt: row.createdAt,
     overlapWith: overlap.get(row.profileKey) ?? [],
+    messageCount: row.messageCount,
+    sentCount: row.sentCount,
+    receivedCount: row.receivedCount,
+    firstMessageAt: row.firstMessageAt,
+    lastMessageAt: row.lastMessageAt,
+    initiatedByMe: row.initiatedByMe,
+    reciprocal: row.reciprocal,
+    dormant: isDormant(row.reciprocal, row.lastMessageAt),
   };
 }
 
@@ -427,4 +518,274 @@ export async function getCompanyCategorySummaries(
     });
   }
   return result;
+}
+
+/**
+ * Import a parsed messages.csv (see src/lib/messagesCsv.ts#parseMessagesCsv)
+ * into one BD's private base:
+ *  1. Upsert conversations (chunked), keyed on (bd_id, external_id).
+ *  2. Look up the external-id -> uuid mapping once (one query, not per row).
+ *  3. Insert messages (chunked), idempotent via
+ *     `ON CONFLICT (bd_id, content_hash) DO NOTHING` so re-importing the
+ *     same export never duplicates rows.
+ *  4. Recompute conversation and contact aggregates in bulk (see
+ *     #recomputeMessageSignals) — never per row.
+ *
+ * Messages whose conversation failed to upsert (shouldn't happen, but keeps
+ * this defensive) are skipped rather than throwing.
+ */
+export async function importMessages(
+  bdId: string,
+  parsed: ParseMessagesResult,
+): Promise<{ conversations: number; messages: number }> {
+  const { conversations: convRows, messages: msgRows } = parsed;
+  if (!convRows.length) return { conversations: 0, messages: 0 };
+
+  const CHUNK = 500;
+
+  for (let i = 0; i < convRows.length; i += CHUNK) {
+    const chunk = convRows.slice(i, i + CHUNK).map((c) => ({
+      bdId,
+      externalId: c.externalId,
+      title: c.title,
+      peerProfileKey: c.peerProfileKey,
+    }));
+    await db
+      .insert(conversation)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [conversation.bdId, conversation.externalId],
+        set: {
+          title: sql`excluded.title`,
+          peerProfileKey: sql`excluded.peer_profile_key`,
+        },
+      });
+  }
+
+  const idRows = await db
+    .select({ id: conversation.id, externalId: conversation.externalId })
+    .from(conversation)
+    .where(eq(conversation.bdId, bdId));
+  const idByExternal = new Map(idRows.map((r) => [r.externalId, r.id]));
+
+  let inserted = 0;
+  for (let i = 0; i < msgRows.length; i += CHUNK) {
+    const chunk = msgRows
+      .slice(i, i + CHUNK)
+      .map((m) => {
+        const conversationId = idByExternal.get(m.externalConversationId);
+        if (!conversationId) return null;
+        return {
+          bdId,
+          conversationId,
+          senderProfileKey: m.senderProfileKey,
+          senderName: m.senderName,
+          sentAt: m.sentAt,
+          subject: m.subject,
+          content: m.content,
+          folder: m.folder,
+          isDraft: m.isDraft,
+          contentHash: m.contentHash,
+        };
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+
+    if (!chunk.length) continue;
+    const result = await db
+      .insert(message)
+      .values(chunk)
+      .onConflictDoNothing({ target: [message.bdId, message.contentHash] })
+      .returning({ id: message.id });
+    inserted += result.length;
+  }
+
+  await recomputeMessageSignals(bdId);
+
+  return { conversations: convRows.length, messages: inserted };
+}
+
+/**
+ * Recompute conversation and contact message signals for one BD, in two
+ * bulk statements (one per aggregate level) rather than per row/per
+ * conversation. Idempotent — safe to call after every import, including
+ * partial/no-op ones.
+ *
+ * Sent vs. received is derived from `conversation.peer_profile_key` rather
+ * than a stored "own profile" column: in a 1:1 thread there are only two
+ * parties, so any non-draft message NOT sent by the peer was sent by the
+ * BD. This is also why group threads (peer_profile_key IS NULL) are
+ * excluded from contact aggregation — they can't be attributed to a single
+ * contact.
+ */
+export async function recomputeMessageSignals(bdId: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE conversation c
+    SET
+      message_count = agg.message_count,
+      received_count = agg.received_count,
+      sent_count = agg.message_count - agg.received_count,
+      first_message_at = agg.first_message_at,
+      last_message_at = agg.last_message_at
+    FROM (
+      SELECT
+        m.conversation_id,
+        count(*)::int AS message_count,
+        count(*) FILTER (
+          WHERE m.sender_profile_key IS NOT NULL
+            AND m.sender_profile_key = c2.peer_profile_key
+        )::int AS received_count,
+        min(m.sent_at) AS first_message_at,
+        max(m.sent_at) AS last_message_at
+      FROM message m
+      JOIN conversation c2 ON c2.id = m.conversation_id
+      WHERE m.bd_id = ${bdId} AND m.is_draft = false
+      GROUP BY m.conversation_id
+    ) agg
+    WHERE c.id = agg.conversation_id AND c.bd_id = ${bdId}
+  `);
+
+  await db.execute(sql`
+    WITH first_msg AS (
+      SELECT DISTINCT ON (c.peer_profile_key)
+        c.peer_profile_key,
+        (m.sender_profile_key IS DISTINCT FROM c.peer_profile_key) AS initiated_by_me
+      FROM message m
+      JOIN conversation c ON c.id = m.conversation_id
+      WHERE m.bd_id = ${bdId} AND m.is_draft = false AND c.peer_profile_key IS NOT NULL
+      ORDER BY c.peer_profile_key, m.sent_at ASC
+    ),
+    peer_agg AS (
+      SELECT
+        peer_profile_key,
+        sum(message_count)::int AS message_count,
+        sum(sent_count)::int AS sent_count,
+        sum(received_count)::int AS received_count,
+        min(first_message_at) AS first_message_at,
+        max(last_message_at) AS last_message_at
+      FROM conversation
+      WHERE bd_id = ${bdId} AND peer_profile_key IS NOT NULL
+      GROUP BY peer_profile_key
+    )
+    UPDATE contact ct
+    SET
+      message_count = pa.message_count,
+      sent_count = pa.sent_count,
+      received_count = pa.received_count,
+      first_message_at = pa.first_message_at,
+      last_message_at = pa.last_message_at,
+      initiated_by_me = fm.initiated_by_me,
+      reciprocal = (pa.sent_count > 0 AND pa.received_count > 0)
+    FROM peer_agg pa
+    LEFT JOIN first_msg fm ON fm.peer_profile_key = pa.peer_profile_key
+    WHERE ct.bd_id = ${bdId} AND ct.profile_key = pa.peer_profile_key
+  `);
+}
+
+export interface MessageRow {
+  id: string;
+  senderProfileKey: string | null;
+  senderName: string | null;
+  sentAt: Date;
+  subject: string | null;
+  content: string;
+}
+
+export interface ConversationThread {
+  id: string;
+  title: string | null;
+  messageCount: number;
+  lastMessageAt: Date | null;
+  messages: MessageRow[];
+}
+
+export interface ConversationThreadsResult {
+  threads: ConversationThread[];
+  /** True if this peer has more conversations than `conversationLimit`. */
+  moreConversations: boolean;
+  /** True if the shown conversations have more messages than `messagesLimit` in total. */
+  moreMessages: boolean;
+}
+
+/**
+ * Conversation thread(s) with one peer, most recent conversation first,
+ * scoped to the signed-in BD. Message content is sensitive, so both the
+ * conversation and message lookups filter on `bdId` — never trust
+ * `peerProfileKey` alone.
+ *
+ * Exactly 2 queries, no N+1 per conversation: the message query fetches the
+ * `messagesLimit` most recent (non-draft) messages across all shown
+ * conversations in one `IN (...)` lookup, then groups/re-sorts them in JS
+ * (oldest -> newest within each thread). Both `conversationLimit` and
+ * `messagesLimit` are fetched one row over the cap to detect truncation
+ * without an extra count query.
+ */
+export async function getConversationThreads(
+  bdId: string,
+  peerProfileKey: string,
+  opts: { conversationLimit?: number; messagesLimit?: number } = {},
+): Promise<ConversationThreadsResult> {
+  const conversationLimit = opts.conversationLimit ?? 3;
+  const messagesLimit = opts.messagesLimit ?? 100;
+
+  const conversationRows = await db
+    .select({
+      id: conversation.id,
+      title: conversation.title,
+      messageCount: conversation.messageCount,
+      lastMessageAt: conversation.lastMessageAt,
+    })
+    .from(conversation)
+    .where(
+      and(eq(conversation.bdId, bdId), eq(conversation.peerProfileKey, peerProfileKey)),
+    )
+    .orderBy(desc(conversation.lastMessageAt))
+    .limit(conversationLimit + 1);
+
+  const moreConversations = conversationRows.length > conversationLimit;
+  const conversations = conversationRows.slice(0, conversationLimit);
+  if (!conversations.length) {
+    return { threads: [], moreConversations: false, moreMessages: false };
+  }
+
+  const conversationIds = conversations.map((c) => c.id);
+  const messageRows = await db
+    .select({
+      id: message.id,
+      conversationId: message.conversationId,
+      senderProfileKey: message.senderProfileKey,
+      senderName: message.senderName,
+      sentAt: message.sentAt,
+      subject: message.subject,
+      content: message.content,
+    })
+    .from(message)
+    .where(
+      and(
+        eq(message.bdId, bdId),
+        inArray(message.conversationId, conversationIds),
+        eq(message.isDraft, false),
+      ),
+    )
+    .orderBy(desc(message.sentAt))
+    .limit(messagesLimit + 1);
+
+  const moreMessages = messageRows.length > messagesLimit;
+  const shownMessages = messageRows.slice(0, messagesLimit);
+
+  // Group by conversation, preserving desc order, then reverse per group so
+  // each thread reads oldest -> newest.
+  const byConversation = new Map<string, MessageRow[]>();
+  for (const { conversationId, ...row } of shownMessages) {
+    const list = byConversation.get(conversationId) ?? [];
+    list.push(row);
+    byConversation.set(conversationId, list);
+  }
+  for (const list of byConversation.values()) list.reverse();
+
+  const threads: ConversationThread[] = conversations.map((c) => ({
+    ...c,
+    messages: byConversation.get(c.id) ?? [],
+  }));
+
+  return { threads, moreConversations, moreMessages };
 }

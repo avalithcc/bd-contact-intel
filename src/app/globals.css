@@ -441,3 +441,77 @@ a {
   color: var(--muted);
   font-style: italic;
 }
+
+/* ---- conversation history (contact detail) ---- */
+.thread-notice {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.55rem 0.8rem;
+  margin: 0 0 1rem;
+}
+.thread {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.thread:last-child {
+  margin-bottom: 0;
+}
+.thread-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0.9rem;
+}
+.thread-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.thread-meta {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.thread-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.9rem;
+}
+.message {
+  min-width: 0;
+}
+.message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.message-sender {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.message-time {
+  font-size: 0.75rem;
+}
+.message-content {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 560px) {
+  .thread-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

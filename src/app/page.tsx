@@ -4,11 +4,13 @@ import {
   getCurrentBd,
   getRoleGroupSummaries,
   listContacts,
+  RELATIONSHIP_FILTERS,
+  type RelationshipFilterKey,
 } from "@/lib/queries";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
-import { UploadForm } from "./UploadForm";
+import { UploadForm, UploadMessagesForm } from "./UploadForm";
 import { SignOutButton } from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +18,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 20;
 const ROLE_GROUP_KEYS = new Set(ROLE_GROUPS.map((g) => g.key));
 const COMPANY_CATEGORY_KEYS = new Set(COMPANY_CATEGORIES.map((c) => c.key));
+const RELATIONSHIP_KEYS = new Set(RELATIONSHIP_FILTERS.map((r) => r.key));
 
 function isRoleGroupKey(v: string | undefined): v is RoleGroupKey {
   return !!v && ROLE_GROUP_KEYS.has(v as RoleGroupKey);
@@ -23,6 +26,21 @@ function isRoleGroupKey(v: string | undefined): v is RoleGroupKey {
 
 function isCompanyCategoryKey(v: string | undefined): v is CompanyCategoryKey {
   return !!v && COMPANY_CATEGORY_KEYS.has(v as CompanyCategoryKey);
+}
+
+function isRelationshipKey(v: string | undefined): v is RelationshipFilterKey {
+  return !!v && RELATIONSHIP_KEYS.has(v as RelationshipFilterKey);
+}
+
+/** "8mo ago" / "3d ago" — coarse, human relative time for the contacts list. */
+function relativeTime(date: Date): string {
+  const ms = Date.now() - date.getTime();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 24) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
 }
 
 export default async function Home({
@@ -34,6 +52,7 @@ export default async function Home({
     roleGroup?: string;
     companyCategory?: string;
     companyKey?: string;
+    relationship?: string;
     page?: string;
   }>;
 }) {
@@ -44,12 +63,14 @@ export default async function Home({
   const companyCategory = isCompanyCategoryKey(sp.companyCategory)
     ? sp.companyCategory
     : undefined;
+  const relationship = isRelationshipKey(sp.relationship) ? sp.relationship : undefined;
   const filters = {
     company: sp.company,
     position: sp.position,
     roleGroup,
     companyCategory,
     companyKey: sp.companyKey,
+    relationship,
   };
   const [
     { rows, total, page: current, totalPages },
@@ -76,12 +97,19 @@ export default async function Home({
     if (roleGroup) params.set("roleGroup", roleGroup);
     if (companyCategory) params.set("companyCategory", companyCategory);
     if (sp.companyKey) params.set("companyKey", sp.companyKey);
+    if (relationship) params.set("relationship", relationship);
     params.set("page", String(p));
     return `/?${params.toString()}`;
   };
 
   const qsWithout = (
-    field: "company" | "position" | "roleGroup" | "companyCategory" | "companyKey",
+    field:
+      | "company"
+      | "position"
+      | "roleGroup"
+      | "companyCategory"
+      | "companyKey"
+      | "relationship",
   ) => {
     const params = new URLSearchParams();
     if (sp.company && field !== "company") params.set("company", sp.company);
@@ -90,6 +118,7 @@ export default async function Home({
     if (companyCategory && field !== "companyCategory")
       params.set("companyCategory", companyCategory);
     if (sp.companyKey && field !== "companyKey") params.set("companyKey", sp.companyKey);
+    if (relationship && field !== "relationship") params.set("relationship", relationship);
     const qsStr = params.toString();
     return qsStr ? `/?${qsStr}` : "/";
   };
@@ -138,6 +167,13 @@ export default async function Home({
         <summary>Import LinkedIn database</summary>
         <div className="import-body">
           <UploadForm />
+        </div>
+      </details>
+
+      <details className="import-block">
+        <summary>Import LinkedIn messages</summary>
+        <div className="import-body">
+          <UploadMessagesForm />
         </div>
       </details>
 
@@ -190,12 +226,28 @@ export default async function Home({
               placeholder="e.g. Engineering"
             />
           </div>
+          <div className="filter-field">
+            <label htmlFor="relationship">Relationship</label>
+            <select id="relationship" name="relationship" defaultValue={relationship ?? ""}>
+              <option value="">Any</option>
+              {RELATIONSHIP_FILTERS.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <button type="submit" className="filter-submit">
             Filter
           </button>
         </form>
 
-        {(sp.company || roleGroup || companyCategory || sp.position || sp.companyKey) && (
+        {(sp.company ||
+          roleGroup ||
+          companyCategory ||
+          sp.position ||
+          sp.companyKey ||
+          relationship) && (
           <div className="active-filters">
             {sp.companyKey && (
               <span className="chip">
@@ -238,6 +290,16 @@ export default async function Home({
               <span className="chip">
                 Position: {sp.position}
                 <Link href={qsWithout("position")} aria-label="Remove position filter">
+                  ×
+                </Link>
+              </span>
+            )}
+            {relationship && (
+              <span className="chip">
+                Relationship:{" "}
+                {RELATIONSHIP_FILTERS.find((r) => r.key === relationship)?.label ??
+                  relationship}
+                <Link href={qsWithout("relationship")} aria-label="Remove relationship filter">
                   ×
                 </Link>
               </span>
@@ -314,6 +376,7 @@ export default async function Home({
                 <th>Name</th>
                 <th>Company</th>
                 <th>Position</th>
+                <th>Relationship</th>
                 <th>Team overlap</th>
               </tr>
             </thead>
@@ -334,6 +397,19 @@ export default async function Home({
                   </td>
                   <td>{c.position ?? "—"}</td>
                   <td>
+                    {c.messageCount > 0 ? (
+                      <span className="relationship">
+                        {c.messageCount} msgs
+                        {c.lastMessageAt && (
+                          <> · {relativeTime(new Date(c.lastMessageAt))}</>
+                        )}
+                        {c.dormant && <span className="badge dormant">dormant</span>}
+                      </span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>
                     {c.overlapWith.length ? (
                       <span className="badge">
                         also in {c.overlapWith.join(", ")}
@@ -346,7 +422,7 @@ export default async function Home({
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan={4} className="muted">
+                  <td colSpan={5} className="muted">
                     No contacts yet. Import your Connections.csv above.
                   </td>
                 </tr>

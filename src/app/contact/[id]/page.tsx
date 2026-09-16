@@ -1,8 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getContactById, getCurrentBd } from "@/lib/queries";
+import { getContactById, getConversationThreads, getCurrentBd } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+
+function formatDateTime(d: Date): string {
+  return new Date(d).toLocaleString();
+}
+
+/** "8mo ago" / "3d ago" — same coarse relative time as the contacts list (see src/app/page.tsx). */
+function relativeTime(date: Date): string {
+  const ms = Date.now() - date.getTime();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 24) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   const empty = value === null || value === undefined || value === "";
@@ -28,6 +43,10 @@ export default async function ContactDetail({
 
   const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ");
   const profileUrl = `https://${c.profileKey}`;
+  const { threads, moreConversations, moreMessages } =
+    c.messageCount > 0
+      ? await getConversationThreads(me.id, c.profileKey)
+      : { threads: [], moreConversations: false, moreMessages: false };
 
   return (
     <main style={{ maxWidth: 720 }}>
@@ -79,6 +98,117 @@ export default async function ContactDetail({
           value={new Date(c.createdAt).toLocaleDateString()}
         />
       </section>
+
+      <section className="panel">
+        <h2>Relationship signals</h2>
+        {c.messageCount > 0 ? (
+          <>
+            <Field label="Messages" value={`${c.messageCount} total`} />
+            <Field
+              label="Sent / received"
+              value={`${c.sentCount} sent · ${c.receivedCount} received`}
+            />
+            <Field
+              label="First contact"
+              value={
+                c.firstMessageAt ? (
+                  <>
+                    {formatDateTime(c.firstMessageAt)}{" "}
+                    <span className="soft">
+                      ({relativeTime(new Date(c.firstMessageAt))})
+                    </span>
+                  </>
+                ) : null
+              }
+            />
+            <Field
+              label="Last contact"
+              value={
+                c.lastMessageAt ? (
+                  <>
+                    {formatDateTime(c.lastMessageAt)}{" "}
+                    <span className="soft">
+                      ({relativeTime(new Date(c.lastMessageAt))})
+                    </span>
+                  </>
+                ) : null
+              }
+            />
+            <Field
+              label="Started by"
+              value={
+                c.initiatedByMe === null
+                  ? null
+                  : c.initiatedByMe
+                    ? "Me"
+                    : "Them"
+              }
+            />
+            <Field
+              label="Reciprocal"
+              value={
+                <span className={`badge ${c.reciprocal ? "green" : ""}`}>
+                  {c.reciprocal ? "yes" : "no"}
+                </span>
+              }
+            />
+            {c.dormant && (
+              <Field
+                label="Status"
+                value={<span className="badge dormant">dormant</span>}
+              />
+            )}
+          </>
+        ) : (
+          <p className="muted">No messages recorded with this contact yet.</p>
+        )}
+      </section>
+
+      {threads.length > 0 && (
+        <section className="panel">
+          <h2>Conversation history</h2>
+          {moreConversations && (
+            <p className="thread-notice">
+              Showing the {threads.length} most recent conversations — older
+              conversations with this contact are not shown.
+            </p>
+          )}
+          {moreMessages && (
+            <p className="thread-notice">
+              Showing the most recent 100 messages across the conversations
+              below — older messages are not shown.
+            </p>
+          )}
+          {threads.map((t) => (
+            <div key={t.id} className="thread">
+              <div className="thread-header">
+                <span className="thread-title">{t.title || "Untitled conversation"}</span>
+                <span className="soft thread-meta">
+                  {t.messageCount} messages
+                  {t.lastMessageAt && (
+                    <> · last {relativeTime(new Date(t.lastMessageAt))}</>
+                  )}
+                </span>
+              </div>
+              <div className="thread-messages">
+                {t.messages.map((m) => (
+                  <div key={m.id} className="message">
+                    <div className="message-meta">
+                      <span className="message-sender">
+                        {m.senderName || "Unknown sender"}
+                      </span>
+                      <span className="soft message-time">
+                        {formatDateTime(m.sentAt)}
+                      </span>
+                    </div>
+                    <div className="message-content">{m.content}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
     </main>
   );
 }
