@@ -74,6 +74,33 @@ export default async function Home({
     return `/?${params.toString()}`;
   };
 
+  const qsWithout = (field: "company" | "position" | "roleGroup" | "companyCategory") => {
+    const params = new URLSearchParams();
+    if (sp.company && field !== "company") params.set("company", sp.company);
+    if (sp.position && field !== "position") params.set("position", sp.position);
+    if (roleGroup && field !== "roleGroup") params.set("roleGroup", roleGroup);
+    if (companyCategory && field !== "companyCategory")
+      params.set("companyCategory", companyCategory);
+    const qsStr = params.toString();
+    return qsStr ? `/?${qsStr}` : "/";
+  };
+
+  const selectedRoleGroup = roleGroup ? ROLE_GROUPS.find((g) => g.key === roleGroup) : undefined;
+  const roleGroupExamples = roleGroup ? roleGroupSummaries.get(roleGroup) : undefined;
+  const roleGroupTitlesRemaining = roleGroupExamples
+    ? roleGroupExamples.totalDistinctTitles - roleGroupExamples.titles.length
+    : 0;
+
+  const selectedCompanyCategory = companyCategory
+    ? COMPANY_CATEGORIES.find((c) => c.key === companyCategory)
+    : undefined;
+  const companyCategoryExamples = companyCategory
+    ? companyCategorySummaries.get(companyCategory)
+    : undefined;
+  const companyCategoryCompaniesRemaining = companyCategoryExamples
+    ? companyCategoryExamples.totalDistinctCompanies - companyCategoryExamples.companies.length
+    : 0;
+
   return (
     <main>
       <div className="header">
@@ -102,18 +129,18 @@ export default async function Home({
 
       <section className="panel">
         <div className="eyebrow">// filter</div>
-        <form method="get" className="row">
-          <div>
+        <form method="get" className="filter-toolbar">
+          <div className="filter-field">
             <label htmlFor="company">Company</label>
             <input
               id="company"
               name="company"
               type="text"
               defaultValue={sp.company ?? ""}
-              placeholder="e.g. YPF"
+              placeholder="e.g. Acme"
             />
           </div>
-          <div>
+          <div className="filter-field">
             <label htmlFor="roleGroup">Role group</label>
             <select id="roleGroup" name="roleGroup" defaultValue={roleGroup ?? ""}>
               <option value="">All groups</option>
@@ -124,7 +151,7 @@ export default async function Home({
               ))}
             </select>
           </div>
-          <div>
+          <div className="filter-field">
             <label htmlFor="companyCategory">Company category</label>
             <select
               id="companyCategory"
@@ -139,8 +166,8 @@ export default async function Home({
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="position">Position (free text)</label>
+          <div className="filter-field">
+            <label htmlFor="position">Position</label>
             <input
               id="position"
               name="position"
@@ -149,70 +176,108 @@ export default async function Home({
               placeholder="e.g. Engineering"
             />
           </div>
-          <button type="submit">Filter</button>
+          <button type="submit" className="filter-submit">
+            Filter
+          </button>
         </form>
 
-        <div style={{ marginTop: "1rem" }}>
-          {ROLE_GROUPS.map((g) => {
-            const examples = roleGroupSummaries.get(g.key);
-            if (!examples || !examples.titles.length) return null;
-            const shown = examples.titles.length;
-            const remaining = examples.totalDistinctTitles - shown;
-            return (
-              <details key={g.key} className="import-block">
-                <summary>
-                  {g.label} — {countByGroup.get(g.key) ?? 0} contacts,{" "}
-                  {examples.totalDistinctTitles} distinct titles
-                </summary>
-                <div className="import-body">
-                  <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-                    {examples.titles.map((t) => (
-                      <li key={t.position}>
-                        {t.position} <span className="muted">({t.count})</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {remaining > 0 && (
-                    <p className="muted" style={{ margin: "0.5rem 0 0" }}>
-                      +{remaining} more title{remaining === 1 ? "" : "s"}
-                    </p>
-                  )}
-                </div>
-              </details>
-            );
-          })}
-        </div>
+        {(sp.company || roleGroup || companyCategory || sp.position) && (
+          <div className="active-filters">
+            {sp.company && (
+              <span className="chip">
+                Company: {sp.company}
+                <Link href={qsWithout("company")} aria-label="Remove company filter">
+                  ×
+                </Link>
+              </span>
+            )}
+            {roleGroup && (
+              <span className="chip">
+                Role: {ROLE_GROUPS.find((g) => g.key === roleGroup)?.label ?? roleGroup}
+                <Link href={qsWithout("roleGroup")} aria-label="Remove role group filter">
+                  ×
+                </Link>
+              </span>
+            )}
+            {companyCategory && (
+              <span className="chip">
+                Category:{" "}
+                {COMPANY_CATEGORIES.find((c) => c.key === companyCategory)?.label ??
+                  companyCategory}
+                <Link
+                  href={qsWithout("companyCategory")}
+                  aria-label="Remove company category filter"
+                >
+                  ×
+                </Link>
+              </span>
+            )}
+            {sp.position && (
+              <span className="chip">
+                Position: {sp.position}
+                <Link href={qsWithout("position")} aria-label="Remove position filter">
+                  ×
+                </Link>
+              </span>
+            )}
+            <Link href="/" className="clear-all">
+              Clear all
+            </Link>
+          </div>
+        )}
 
-        <div style={{ marginTop: "1rem" }}>
-          {COMPANY_CATEGORIES.map((c) => {
-            const examples = companyCategorySummaries.get(c.key);
-            if (!examples || !examples.companies.length) return null;
-            const shown = examples.companies.length;
-            const remaining = examples.totalDistinctCompanies - shown;
-            return (
-              <details key={c.key} className="import-block">
-                <summary>
-                  {c.label} — {countByCategory.get(c.key) ?? 0} contacts,{" "}
-                  {examples.totalDistinctCompanies} distinct companies
-                </summary>
-                <div className="import-body">
-                  <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-                    {examples.companies.map((co) => (
-                      <li key={co.company}>
-                        {co.company} <span className="muted">({co.count})</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {remaining > 0 && (
-                    <p className="muted" style={{ margin: "0.5rem 0 0" }}>
-                      +{remaining} more compan{remaining === 1 ? "y" : "ies"}
-                    </p>
-                  )}
-                </div>
-              </details>
-            );
-          })}
-        </div>
+        {selectedRoleGroup && roleGroupExamples && roleGroupExamples.titles.length > 0 && (
+          <details className="filter-helper">
+            <summary>
+              {selectedRoleGroup.label} — {countByGroup.get(selectedRoleGroup.key) ?? 0}{" "}
+              contacts · {roleGroupExamples.totalDistinctTitles} distinct titles
+              <span className="filter-helper-hint">show example titles</span>
+            </summary>
+            <div className="filter-helper-body">
+              <ul className="example-list">
+                {roleGroupExamples.titles.map((t) => (
+                  <li key={t.position}>
+                    {t.position} <span className="muted">({t.count})</span>
+                  </li>
+                ))}
+              </ul>
+              {roleGroupTitlesRemaining > 0 && (
+                <p className="muted example-more">
+                  +{roleGroupTitlesRemaining} more title
+                  {roleGroupTitlesRemaining === 1 ? "" : "s"}
+                </p>
+              )}
+            </div>
+          </details>
+        )}
+
+        {selectedCompanyCategory &&
+          companyCategoryExamples &&
+          companyCategoryExamples.companies.length > 0 && (
+            <details className="filter-helper">
+              <summary>
+                {selectedCompanyCategory.label} —{" "}
+                {countByCategory.get(selectedCompanyCategory.key) ?? 0} contacts ·{" "}
+                {companyCategoryExamples.totalDistinctCompanies} distinct companies
+                <span className="filter-helper-hint">show example companies</span>
+              </summary>
+              <div className="filter-helper-body">
+                <ul className="example-list">
+                  {companyCategoryExamples.companies.map((co) => (
+                    <li key={co.company}>
+                      {co.company} <span className="muted">({co.count})</span>
+                    </li>
+                  ))}
+                </ul>
+                {companyCategoryCompaniesRemaining > 0 && (
+                  <p className="muted example-more">
+                    +{companyCategoryCompaniesRemaining} more compan
+                    {companyCategoryCompaniesRemaining === 1 ? "y" : "ies"}
+                  </p>
+                )}
+              </div>
+            </details>
+          )}
       </section>
 
       <section className="panel">

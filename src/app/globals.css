@@ -273,6 +273,142 @@ a {
   margin-top: 1.25rem;
 }
 
+/* ---- filter toolbar ---- */
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+.filter-field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.filter-field label {
+  margin-bottom: 0.35rem;
+}
+.filter-submit {
+  flex: 0 0 auto;
+}
+@media (max-width: 560px) {
+  .filter-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-field,
+  .filter-submit {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+/* ---- active filter chips ---- */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.28rem 0.4rem 0.28rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--soft);
+}
+.chip a {
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  line-height: 1;
+  padding: 0 0.3rem;
+}
+.chip a:hover {
+  color: var(--red);
+}
+.clear-all {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.clear-all:hover {
+  text-decoration: underline;
+}
+
+/* ---- contextual filter helper (role group / company category) ---- */
+.filter-helper {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+.filter-helper summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  color: var(--soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.filter-helper summary::-webkit-details-marker {
+  display: none;
+}
+.filter-helper summary::before {
+  content: "+";
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  margin-right: 0.1rem;
+}
+.filter-helper[open] summary::before {
+  content: "−";
+}
+.filter-helper[open] summary {
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.filter-helper-hint {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+}
+.filter-helper-body {
+  padding: 0.9rem;
+}
+.example-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* Fill the available width instead of a fixed column count, so a 50-item
+     list stays short rather than scrolling on wide screens. */
+  columns: 220px auto;
+  column-gap: 1.5rem;
+  font-size: 0.85rem;
+}
+.example-list li {
+  break-inside: avoid;
+  padding: 0.15rem 0;
+}
+.example-more {
+  margin: 0.6rem 0 0;
+}
+@media (max-width: 560px) {
+  .example-list {
+    columns: 1;
+  }
+}
+
 /* ---- detail fields ---- */
 .field {
   display: grid;
