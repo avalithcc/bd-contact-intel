@@ -35,8 +35,16 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAuthRoute = path.startsWith("/login") || path.startsWith("/auth");
+  // Authenticated via CRON_SECRET bearer token instead of a Supabase
+  // session — see src/app/api/hiring/sync/route.ts. Exact allowlist (not a
+  // bare prefix) so future routes like /api/hiring-admin don't silently
+  // bypass the session gate.
+  const CRON_ROUTES = ["/api/hiring/sync"];
+  const isCronRoute = CRON_ROUTES.some(
+    (route) => path === route || path.startsWith(`${route}/`),
+  );
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isCronRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

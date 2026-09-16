@@ -17,6 +17,10 @@ npm run db:push           # create tables
 npm run dev               # http://localhost:3000
 ```
 
+Also set `CRON_SECRET` (a random string) as an env var in the deployment
+environment (e.g. Vercel project settings) — it authenticates the
+`/api/hiring/sync` cron endpoint. That route fails closed if it's unset.
+
 ## Getting the input file
 LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data →
 select **Connections** only → Request archive. Import the resulting

@@ -5,6 +5,9 @@ import {
   timestamp,
   index,
   unique,
+  boolean,
+  jsonb,
+  integer,
 } from "drizzle-orm/pg-core";
 
 // A Business Developer. In v1 this stands in for the authenticated user;
@@ -80,3 +83,89 @@ export const companyCategory = pgTable("company_category", {
 
 export type CompanyCategoryRow = typeof companyCategory.$inferSelect;
 export type NewCompanyCategoryRow = typeof companyCategory.$inferInsert;
+
+// A company whose public job board is polled for hiring signals. Shared
+// across BDs (public job data, no BD ownership), same rationale as
+// `companyCategory` above — so no bd_id here.
+export const targetCompany = pgTable("target_company", {
+  // Normalized company key (see
+  // src/lib/companyCategories.ts#normalizeCompanyKey), so hiring signals can
+  // later be joined against contact.company / contact.companyCategory by
+  // the same key.
+  companyKey: text("company_key").primaryKey(),
+  displayName: text("display_name").notNull(),
+  // Applicant tracking system this company's postings are fetched from. See
+  // src/lib/hiring/registry.ts for the adapter registered per value.
+  ats: text("ats").notNull(),
+  // Adapter-specific config, e.g. { slug: "acme" } for Lever.
+  config: jsonb("config").notNull(),
+  // Optional country-code filter (e.g. "AR"); when set, only postings whose
+  // location matches (see src/lib/hiring/countryFilter.ts) are stored.
+  countryFilter: text("country_filter"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type TargetCompany = typeof targetCompany.$inferSelect;
+export type NewTargetCompany = typeof targetCompany.$inferInsert;
+
+// One job posting seen on a target company's public job board. Rows persist
+// across sync runs — a posting that disappears is marked closed rather than
+// deleted, so "postings closed over time" stays queryable.
+export const jobPosting = pgTable(
+  "job_posting",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyKey: text("company_key")
+      .notNull()
+      .references(() => targetCompany.companyKey, { onDelete: "cascade" }),
+    // The ATS's own id for this posting; used with companyKey for dedup.
+    externalId: text("external_id").notNull(),
+    title: text("title").notNull(),
+    location: text("location").notNull(),
+    url: text("url").notNull(),
+    department: text("department"),
+    postedAt: timestamp("posted_at"),
+    // Computed from `title` via classifyPosition (see
+    // src/lib/hiring/classify.ts).
+    isIt: boolean("is_it").notNull(),
+    firstSeen: timestamp("first_seen").notNull().defaultNow(),
+    lastSeen: timestamp("last_seen").notNull().defaultNow(),
+    closedAt: timestamp("closed_at"),
+  },
+  (t) => ({
+    companyExternalUnique: unique("job_posting_company_external_unique").on(
+      t.companyKey,
+      t.externalId,
+    ),
+    byCompanyClosed: index("job_posting_company_closed_idx").on(
+      t.companyKey,
+      t.closedAt,
+    ),
+    byIsItClosed: index("job_posting_is_it_closed_idx").on(
+      t.isIt,
+      t.closedAt,
+    ),
+  }),
+);
+
+export type JobPosting = typeof jobPosting.$inferSelect;
+export type NewJobPosting = typeof jobPosting.$inferInsert;
+
+// One sync attempt for one target company, for observability/debugging.
+export const syncRun = pgTable("sync_run", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyKey: text("company_key")
+    .notNull()
+    .references(() => targetCompany.companyKey, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull(), // 'ok' | 'error'
+  fetched: integer("fetched").notNull().default(0),
+  created: integer("created").notNull().default(0),
+  closed: integer("closed").notNull().default(0),
+  error: text("error"),
+});
+
+export type SyncRun = typeof syncRun.$inferSelect;
+export type NewSyncRun = typeof syncRun.$inferInsert;

@@ -107,7 +107,12 @@ export default async function Home({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <SignOutButton />
+        <div className="row" style={{ gap: "0.75rem" }}>
+          <Link className="secondary-btn" href="/hiring">
+            hiring signals →
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
 
       <div style={{ marginBottom: "1.75rem" }}>
