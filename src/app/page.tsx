@@ -5,6 +5,7 @@ import {
   getRoleGroupSummaries,
   listContacts,
 } from "@/lib/queries";
+import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
 import { UploadForm } from "./UploadForm";
@@ -32,6 +33,7 @@ export default async function Home({
     position?: string;
     roleGroup?: string;
     companyCategory?: string;
+    companyKey?: string;
     page?: string;
   }>;
 }) {
@@ -47,15 +49,18 @@ export default async function Home({
     position: sp.position,
     roleGroup,
     companyCategory,
+    companyKey: sp.companyKey,
   };
   const [
     { rows, total, page: current, totalPages },
     roleGroupSummaries,
     companyCategorySummaries,
+    hiringCompanyKeys,
   ] = await Promise.all([
     listContacts(me.id, filters, page, PAGE_SIZE),
     getRoleGroupSummaries(me.id),
     getCompanyCategorySummaries(me.id),
+    getHiringCompanyKeys(),
   ]);
   const countByGroup = new Map(
     [...roleGroupSummaries.entries()].map(([key, s]) => [key, s.count]),
@@ -70,17 +75,21 @@ export default async function Home({
     if (sp.position) params.set("position", sp.position);
     if (roleGroup) params.set("roleGroup", roleGroup);
     if (companyCategory) params.set("companyCategory", companyCategory);
+    if (sp.companyKey) params.set("companyKey", sp.companyKey);
     params.set("page", String(p));
     return `/?${params.toString()}`;
   };
 
-  const qsWithout = (field: "company" | "position" | "roleGroup" | "companyCategory") => {
+  const qsWithout = (
+    field: "company" | "position" | "roleGroup" | "companyCategory" | "companyKey",
+  ) => {
     const params = new URLSearchParams();
     if (sp.company && field !== "company") params.set("company", sp.company);
     if (sp.position && field !== "position") params.set("position", sp.position);
     if (roleGroup && field !== "roleGroup") params.set("roleGroup", roleGroup);
     if (companyCategory && field !== "companyCategory")
       params.set("companyCategory", companyCategory);
+    if (sp.companyKey && field !== "companyKey") params.set("companyKey", sp.companyKey);
     const qsStr = params.toString();
     return qsStr ? `/?${qsStr}` : "/";
   };
@@ -186,8 +195,16 @@ export default async function Home({
           </button>
         </form>
 
-        {(sp.company || roleGroup || companyCategory || sp.position) && (
+        {(sp.company || roleGroup || companyCategory || sp.position || sp.companyKey) && (
           <div className="active-filters">
+            {sp.companyKey && (
+              <span className="chip">
+                Company (from hiring): {sp.companyKey}
+                <Link href={qsWithout("companyKey")} aria-label="Remove company key filter">
+                  ×
+                </Link>
+              </span>
+            )}
             {sp.company && (
               <span className="chip">
                 Company: {sp.company}
@@ -309,7 +326,12 @@ export default async function Home({
                         "—"}
                     </Link>
                   </td>
-                  <td>{c.company ?? "—"}</td>
+                  <td>
+                    {c.company ?? "—"}
+                    {c.companyKey && hiringCompanyKeys.has(c.companyKey) && (
+                      <span className="badge hiring">hiring</span>
+                    )}
+                  </td>
                   <td>{c.position ?? "—"}</td>
                   <td>
                     {c.overlapWith.length ? (

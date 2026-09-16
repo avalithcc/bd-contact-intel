@@ -219,6 +219,12 @@ th {
   background: rgba(62, 207, 142, 0.12);
   color: var(--green);
 }
+/* Marks a contact whose company is currently hiring IT (see /hiring). */
+.badge.hiring {
+  background: rgba(62, 207, 142, 0.12);
+  color: var(--green);
+  margin-left: 0.4rem;
+}
 
 .muted {
   color: var(--muted);

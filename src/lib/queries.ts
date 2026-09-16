@@ -1,6 +1,6 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, companyCategory, contact, type NewContact } from "@/db/schema";
+import { bd, companyAlias, companyCategory, contact, type NewContact } from "@/db/schema";
 import { createClient } from "@/lib/supabase/server";
 import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import {
@@ -37,6 +37,11 @@ export interface ContactFilters {
   position?: string;
   roleGroup?: RoleGroupKey;
   companyCategory?: CompanyCategoryKey;
+  // Exact match on the normalized company key (see
+  // src/lib/companyCategories.ts#normalizeCompanyKey), used by the /hiring
+  // "N contacts" link to jump straight to a specific company's contacts
+  // rather than relying on free-text `company` matching.
+  companyKey?: string;
 }
 
 export interface ContactRow {
@@ -45,6 +50,7 @@ export interface ContactRow {
   lastName: string | null;
   company: string | null;
   position: string | null;
+  companyKey: string | null;
   profileKey: string;
   overlapWith: string[]; // names of other BDs who also hold this contact
 }
@@ -79,6 +85,28 @@ async function overlapByProfileKey(
   return overlap;
 }
 
+/**
+ * Alias-aware `companyKey` filter. The `/hiring` page's "N contacts" count
+ * includes contacts matched via `company_alias` (see
+ * src/lib/hiring/queries.ts#getCompanyHiringSummaries), so the deep link's
+ * contact list must match on the same set or the two numbers disagree.
+ *
+ * `key` may itself be a canonical `target_company.company_key` or a
+ * `company_alias.alias_key` (both link shapes should behave the same), so
+ * this first resolves it to its canonical key, then matches
+ * `contact.company_key` against that canonical key plus every alias of it —
+ * all via one `IN (SELECT ...)` subquery folded into the caller's query, so
+ * it doesn't add a round trip.
+ */
+function companyKeyFilter(key: string) {
+  const canonicalKey = sql`coalesce((select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = ${key}), ${key})`;
+  return sql`${contact.companyKey} in (
+    select ${companyAlias.aliasKey} from ${companyAlias} where ${companyAlias.companyKey} = (${canonicalKey})
+    union
+    select (${canonicalKey})
+  )`;
+}
+
 export async function listContacts(
   bdId: string,
   filters: ContactFilters = {},
@@ -92,6 +120,7 @@ export async function listContacts(
   if (filters.roleGroup) where.push(eq(contact.roleGroup, filters.roleGroup));
   if (filters.companyCategory)
     where.push(eq(contact.companyCategory, filters.companyCategory));
+  if (filters.companyKey) where.push(companyKeyFilter(filters.companyKey));
 
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -108,6 +137,7 @@ export async function listContacts(
       lastName: contact.lastName,
       company: contact.company,
       position: contact.position,
+      companyKey: contact.companyKey,
       profileKey: contact.profileKey,
     })
     .from(contact)
@@ -244,12 +274,16 @@ export async function upsertContacts(
     const categories = await resolveCompanyCategories(
       rowsChunk.map((r) => r.company),
     );
-    const chunk = rowsChunk.map((r) => ({
-      ...r,
-      bdId,
-      roleGroup: classifyPosition(r.position),
-      companyCategory: categories.get(r.company) ?? "unclassified",
-    }));
+    const chunk = rowsChunk.map((r) => {
+      const trimmedCompany = r.company?.trim();
+      return {
+        ...r,
+        bdId,
+        roleGroup: classifyPosition(r.position),
+        companyCategory: categories.get(r.company) ?? "unclassified",
+        companyKey: trimmedCompany ? normalizeCompanyKey(trimmedCompany) : null,
+      };
+    });
     await db
       .insert(contact)
       .values(chunk)
@@ -262,6 +296,7 @@ export async function upsertContacts(
           position: sql`excluded.position`,
           roleGroup: sql`excluded.role_group`,
           companyCategory: sql`excluded.company_category`,
+          companyKey: sql`excluded.company_key`,
           email: sql`excluded.email`,
           connectedOn: sql`excluded.connected_on`,
         },

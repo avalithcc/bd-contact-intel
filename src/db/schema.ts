@@ -42,6 +42,13 @@ export const contact = pgTable(
     // up from the `company_category` table at import/backfill time (see
     // src/lib/companyCategories.ts and scripts/backfill-company-categories.ts).
     companyCategory: text("company_category"),
+    // Normalized key for `company` (see
+    // src/lib/companyCategories.ts#normalizeCompanyKey), computed at
+    // import/backfill time (see scripts/backfill-company-keys.ts). Used to
+    // match a contact's employer against `target_company.company_key` (or
+    // `company_alias.alias_key`) for the hiring-signals crossover — see
+    // src/lib/hiring/queries.ts.
+    companyKey: text("company_key"),
     email: text("email"),
     industry: text("industry"), // derived later (v2 enrichment)
     connectedOn: text("connected_on"),
@@ -60,6 +67,10 @@ export const contact = pgTable(
     byBdCompanyCategory: index("contact_bd_company_category_idx").on(
       t.bdId,
       t.companyCategory,
+    ),
+    byBdCompanyKey: index("contact_bd_company_key_idx").on(
+      t.bdId,
+      t.companyKey,
     ),
     // powers the cross-BD overlap lookup ("also in María's base")
     byProfileKey: index("contact_profile_key_idx").on(t.profileKey),
@@ -108,6 +119,30 @@ export const targetCompany = pgTable("target_company", {
 
 export type TargetCompany = typeof targetCompany.$inferSelect;
 export type NewTargetCompany = typeof targetCompany.$inferInsert;
+
+// Alternate normalized company keys that resolve to a given target company,
+// for matching contacts whose `company` free text normalizes to a
+// different key than the target company's own (e.g. a legal entity name vs.
+// the brand name used on LinkedIn). Seeded via the optional `aliases` field
+// in scripts/seed-target-companies.ts. Shared across BDs, same rationale as
+// `targetCompany`.
+export const companyAlias = pgTable(
+  "company_alias",
+  {
+    // Normalized key as it appears in contact.company_key.
+    aliasKey: text("alias_key").primaryKey(),
+    companyKey: text("company_key")
+      .notNull()
+      .references(() => targetCompany.companyKey, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byCompanyKey: index("company_alias_company_key_idx").on(t.companyKey),
+  }),
+);
+
+export type CompanyAlias = typeof companyAlias.$inferSelect;
+export type NewCompanyAlias = typeof companyAlias.$inferInsert;
 
 // One job posting seen on a target company's public job board. Rows persist
 // across sync runs — a posting that disappears is marked closed rather than

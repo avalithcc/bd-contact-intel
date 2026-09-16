@@ -8,17 +8,26 @@
  *       "displayName": "Acme Corp",
  *       "ats": "lever",
  *       "config": { "slug": "acme" },
- *       "countryFilter": "AR"
+ *       "countryFilter": "AR",
+ *       "aliases": ["acme-corp-sa", "acme-argentina"]
  *     },
  *     ...
  *   ]
  *
  * `countryFilter` is optional — omit it or set it to null to track postings
- * in any location. The file path is a CLI argument, never hardcoded, so no
- * target-company list needs to live in this (public) repository.
+ * in any location. `aliases` is optional — a list of normalized company
+ * keys (see src/lib/companyCategories.ts#normalizeCompanyKey) that should
+ * also resolve to this target company for the contacts<->hiring crossover
+ * (e.g. a legal entity name a contact's LinkedIn company normalizes to,
+ * distinct from the brand name used as `companyKey`). The file path is a
+ * CLI argument, never hardcoded, so no target-company list needs to live in
+ * this (public) repository.
  *
- * Idempotent: safe to re-run after editing the source file, upserts by
- * primary key (`company_key`).
+ * Idempotent: safe to re-run after editing the source file. Target
+ * companies upsert by primary key (`company_key`); aliases upsert by
+ * primary key (`alias_key`) and are only ever added or repointed, never
+ * removed — deleting an alias from the source file does NOT delete it from
+ * the database (remove it manually if that's ever needed).
  *
  * Usage (do NOT run automatically — this touches the real database):
  *   npx tsx scripts/seed-target-companies.ts /path/to/target_companies.json
@@ -28,7 +37,7 @@
 import fs from "node:fs";
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { targetCompany } from "../src/db/schema";
+import { companyAlias, targetCompany } from "../src/db/schema";
 
 interface SeedRow {
   companyKey: string;
@@ -36,6 +45,7 @@ interface SeedRow {
   ats: string;
   config: Record<string, unknown>;
   countryFilter?: string | null;
+  aliases?: string[];
 }
 
 async function main() {
@@ -72,6 +82,17 @@ async function main() {
         },
       });
     console.log(`  upserted ${row.companyKey}`);
+
+    if (row.aliases?.length) {
+      await db
+        .insert(companyAlias)
+        .values(row.aliases.map((aliasKey) => ({ aliasKey, companyKey: row.companyKey })))
+        .onConflictDoUpdate({
+          target: companyAlias.aliasKey,
+          set: { companyKey: sql`excluded.company_key` },
+        });
+      console.log(`    upserted ${row.aliases.length} alias(es) for ${row.companyKey}`);
+    }
   }
 
   console.log("Done.");
