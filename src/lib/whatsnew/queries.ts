@@ -87,10 +87,13 @@ interface SyncStatus {
  * query with three scalar subqueries instead of three round trips.
  */
 async function getSyncStatus(): Promise<SyncStatus> {
+  // Raw `db.execute` skips drizzle's column mappers, so a timestamp comes
+  // back as a string (or a Date, depending on the driver) — it must be
+  // normalized here, or Intl formatting throws "Invalid time value".
   const rows = await db.execute<{
     monitoredCompanyCount: number;
     totalSyncRuns: number;
-    lastSuccessfulSyncAt: Date | null;
+    lastSuccessfulSyncAt: Date | string | null;
   }>(sql`
     select
       (select count(*)::int from ${targetCompany} where ${targetCompany.active} = true) as "monitoredCompanyCount",
@@ -98,9 +101,12 @@ async function getSyncStatus(): Promise<SyncStatus> {
       (select max(${syncRun.finishedAt}) from ${syncRun} where ${syncRun.status} = 'ok') as "lastSuccessfulSyncAt"
   `);
   const row = rows[0];
+  const lastSync = row?.lastSuccessfulSyncAt ?? null;
+  const lastSyncDate = lastSync ? new Date(lastSync) : null;
   return {
     hasAnySyncRun: (row?.totalSyncRuns ?? 0) > 0,
-    lastSuccessfulSyncAt: row?.lastSuccessfulSyncAt ?? null,
+    lastSuccessfulSyncAt:
+      lastSyncDate && !Number.isNaN(lastSyncDate.getTime()) ? lastSyncDate : null,
     monitoredCompanyCount: row?.monitoredCompanyCount ?? 0,
   };
 }
