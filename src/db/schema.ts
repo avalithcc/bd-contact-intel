@@ -134,8 +134,15 @@ export const targetCompany = pgTable("target_company", {
   ats: text("ats").notNull(),
   // Adapter-specific config, e.g. { slug: "acme" } for Lever.
   config: jsonb("config").notNull(),
-  // Optional country-code filter (e.g. "AR"); when set, only postings whose
-  // location matches (see src/lib/hiring/countryFilter.ts) are stored.
+  // DEPRECATED: was an optional country-code filter (e.g. "AR") that
+  // caused sync.ts to silently DROP every posting whose location didn't
+  // match, so a US-market opening at a LATAM-flagged company was lost at
+  // import and unrecoverable. sync.ts no longer reads this column — every
+  // posting the ATS returns is now stored and classified into
+  // `job_posting.market` instead (see src/lib/hiring/markets.ts). Column
+  // kept (not dropped) so existing rows aren't destructively migrated;
+  // revisit only if a genuinely useful "restrict this company to market X"
+  // per-company feature is built on top of the market column.
   countryFilter: text("country_filter"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -188,6 +195,13 @@ export const jobPosting = pgTable(
     // Computed from `title` via classifyPosition (see
     // src/lib/hiring/classify.ts).
     isIt: boolean("is_it").notNull(),
+    // Coarse geography bucket ("latam" | "us" | "other") classified from
+    // `location` via src/lib/hiring/markets.ts#classifyMarket, computed at
+    // sync time (see src/lib/hiring/sync.ts) and backfilled for older rows
+    // via scripts/backfill-posting-markets.ts. Nullable only so a freshly
+    // added column doesn't require a same-transaction backfill; a null
+    // value is functionally "other" (unclassified) until backfilled.
+    market: text("market"),
     firstSeen: timestamp("first_seen").notNull().defaultNow(),
     lastSeen: timestamp("last_seen").notNull().defaultNow(),
     closedAt: timestamp("closed_at"),
@@ -203,6 +217,10 @@ export const jobPosting = pgTable(
     ),
     byIsItClosed: index("job_posting_is_it_closed_idx").on(
       t.isIt,
+      t.closedAt,
+    ),
+    byMarketClosed: index("job_posting_market_closed_idx").on(
+      t.market,
       t.closedAt,
     ),
   }),

@@ -20,6 +20,8 @@ export const es: typeof en = {
     filter: "Filtrar",
     roleGroupLabel: "Grupo de rol",
     allGroups: "Todos los grupos",
+    marketLabel: "Mercado",
+    allMarkets: "Todos los mercados",
     clearAll: "Limpiar todo",
     pageOf: (current, total) => `${current} / ${total}`,
     totalPage: (total, current, totalPages) =>
@@ -72,6 +74,12 @@ export const es: typeof en = {
     reciprocal: "Recíproco",
     dormant: "Inactivo (12+ meses)",
     never: "Nunca contactado",
+  },
+
+  markets: {
+    latam: "LATAM",
+    us: "Estados Unidos",
+    other: "Otros",
   },
 
   home: {
@@ -153,6 +161,8 @@ export const es: typeof en = {
     tableBoard: "ATS / slug",
     tableJobs: "Cantidad de puestos",
     tableSampleTitles: "Títulos de ejemplo",
+    tableMarkets: "Mercados",
+    marketsUnknown: "—",
     tableContacts: "Contactos del equipo",
     tableActions: "Decisión",
     // Deliberadamente dice "del equipo": es un agregado entre todos los BD,

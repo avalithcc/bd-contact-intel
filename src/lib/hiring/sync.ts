@@ -9,7 +9,7 @@ import {
 import { JOB_SOURCES } from "./registry";
 import type { AtsKey } from "./registry";
 import { isItPosting } from "./classify";
-import { matchesCountry } from "./countryFilter";
+import { classifyMarket } from "./markets";
 
 export interface SyncResult {
   companyKey: string;
@@ -38,11 +38,20 @@ async function recordSyncRun(
 }
 
 /**
- * Sync one target company: fetch postings from its ATS, filter to IT +
- * country, upsert them, and close postings no longer seen. Idempotent and
- * safe to re-run — never throws; failures are captured in the returned
- * result and in a sync_run row so one company's failure doesn't affect the
- * others (see syncAllCompanies).
+ * Sync one target company: fetch postings from its ATS, classify each into
+ * IT/non-IT and a market bucket, upsert ALL of them, and close postings no
+ * longer seen. Idempotent and safe to re-run — never throws; failures are
+ * captured in the returned result and in a sync_run row so one company's
+ * failure doesn't affect the others (see syncAllCompanies).
+ *
+ * Previously this filtered postings by `company.countryFilter` (see
+ * countryFilter.ts) and silently DROPPED anything that didn't match — a US
+ * opening at an Argentina-flagged company was lost at import and
+ * unrecoverable. `country_filter` is now deprecated (see the comment on
+ * target_company.countryFilter in src/db/schema.ts) and ignored here: every
+ * posting the ATS returns is stored, tagged with its `market` (see
+ * src/lib/hiring/markets.ts) so the UI can filter by market instead of the
+ * pipeline silently discarding data at import time.
  */
 export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
   const startedAt = new Date();
@@ -62,17 +71,14 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
 
   try {
     const raw = await source.fetchPostings(company.config);
-    // Track every externalId actually returned by the ATS this run, before
-    // the country filter runs. Closing is keyed off this set (see below) so
-    // postings that are filtered out (e.g. blank/foreign location) are never
-    // closed just because they didn't make it into `filtered` — they're
-    // still live upstream, we just don't display them.
+    // Every externalId the ATS returned this run. Closing is keyed off this
+    // set (see below) — with no country filter left to drop postings before
+    // insert, this is now also exactly the set of postings upserted.
     const seenExternalIds = new Set(raw.map((p) => p.externalId));
-    const filtered = raw.filter((p) => matchesCountry(p.location, company.countryFilter));
 
     let created = 0;
-    if (filtered.length) {
-      const externalIds = filtered.map((p) => p.externalId);
+    if (raw.length) {
+      const externalIds = raw.map((p) => p.externalId);
       const existing = await db
         .select({ externalId: jobPosting.externalId })
         .from(jobPosting)
@@ -83,9 +89,9 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
           ),
         );
       const existingIds = new Set(existing.map((e) => e.externalId));
-      created = filtered.filter((p) => !existingIds.has(p.externalId)).length;
+      created = raw.filter((p) => !existingIds.has(p.externalId)).length;
 
-      const rows = filtered.map((p) => ({
+      const rows = raw.map((p) => ({
         companyKey: company.companyKey,
         externalId: p.externalId,
         title: p.title,
@@ -94,6 +100,7 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
         department: p.department ?? null,
         postedAt: p.postedAt ?? null,
         isIt: isItPosting(p.title),
+        market: classifyMarket(p.location),
         lastSeen: startedAt,
       }));
 
@@ -109,6 +116,7 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
             department: sql`excluded.department`,
             postedAt: sql`excluded.posted_at`,
             isIt: sql`excluded.is_it`,
+            market: sql`excluded.market`,
             lastSeen: sql`excluded.last_seen`,
             // A posting that reappears after being marked closed is reopened.
             closedAt: sql`null`,
@@ -116,13 +124,11 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
         });
     }
 
-    // Closing is keyed off `seenExternalIds` (the raw ATS response), NOT off
-    // the country-filtered list — a posting that got filtered out (e.g.
-    // blank location) is still live upstream and must not be closed, only
-    // skipped for insert/update above. An empty raw response is almost
-    // always a transient fetch problem on the ATS side rather than "this
-    // company closed every posting", so we never close anything in that
-    // case — doing so would mass-close every open posting for the company.
+    // Closing is keyed off `seenExternalIds` (the raw ATS response) — an
+    // empty raw response is almost always a transient fetch problem on the
+    // ATS side rather than "this company closed every posting", so we never
+    // close anything in that case — doing so would mass-close every open
+    // posting for the company.
     let closedCount = 0;
     let note: string | undefined;
     if (raw.length === 0) {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { listOutreachCandidates, outreachReasons } from "@/lib/outreach/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
+import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
@@ -21,6 +22,7 @@ export default async function OutreachPage({
 }: {
   searchParams: Promise<{
     roleGroup?: string;
+    market?: string;
     excludeNever?: string;
     page?: string;
   }>;
@@ -32,6 +34,7 @@ export default async function OutreachPage({
   const me = await getCurrentBd();
   const page = Math.max(1, Number(sp.page) || 1);
   const roleGroup = isRoleGroupKey(sp.roleGroup) ? sp.roleGroup : undefined;
+  const market = isMarketKey(sp.market) ? sp.market : undefined;
   // A GET checkbox that's unchecked is simply omitted from the submitted
   // query string, indistinguishable from "form never submitted" — so the
   // control is phrased as an opt-in "exclude" checkbox (default unchecked)
@@ -41,11 +44,12 @@ export default async function OutreachPage({
   const includeNeverMessaged = !excludeNeverMessaged;
 
   const { rows, total, page: current, totalPages, hiringCompanyCount } =
-    await listOutreachCandidates(me.id, { roleGroup, includeNeverMessaged }, page, PAGE_SIZE);
+    await listOutreachCandidates(me.id, { roleGroup, market, includeNeverMessaged }, page, PAGE_SIZE);
 
   const qs = (p: number) => {
     const params = new URLSearchParams();
     if (roleGroup) params.set("roleGroup", roleGroup);
+    if (market) params.set("market", market);
     if (excludeNeverMessaged) params.set("excludeNever", "on");
     params.set("page", String(p));
     return `/outreach?${params.toString()}`;
@@ -92,6 +96,17 @@ export default async function OutreachPage({
               {ROLE_GROUPS.map((g) => (
                 <option key={g.key} value={g.key}>
                   {dict.roleGroups[g.key]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-field">
+            <label htmlFor="market">{dict.common.marketLabel}</label>
+            <select id="market" name="market" defaultValue={market ?? ""}>
+              <option value="">{dict.common.allMarkets}</option>
+              {MARKETS.map((m) => (
+                <option key={m} value={m}>
+                  {dict.markets[m]}
                 </option>
               ))}
             </select>

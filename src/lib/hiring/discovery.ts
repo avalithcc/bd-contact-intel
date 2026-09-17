@@ -7,7 +7,7 @@ import { greenhouseSource } from "./greenhouse";
 import { leverSource } from "./lever";
 import { ashbySource } from "./ashby";
 import { smartRecruitersSource } from "./smartrecruiters";
-import { matchesCountry } from "./countryFilter";
+import { classifyMarket, type MarketKey } from "./markets";
 
 /**
  * Automated ATS board discovery: scans company keys that show up in BDs'
@@ -82,9 +82,10 @@ const DEFAULT_MAX_DURATION_MS = 50_000;
 // to risk polluting target_company with a wrong-company board.
 const AUTO_APPROVE_MIN_JOB_COUNT = 5;
 
-// Country a discovered board must be hiring in for auto-approval (same code
-// space as target_company.country_filter, see src/lib/hiring/countryFilter.ts).
-const DISCOVERY_COUNTRY_FILTER = "AR";
+// Markets the team actually sells into (see src/lib/hiring/markets.ts). A
+// discovered board must be hiring in one of them to auto-approve: a board
+// that only posts elsewhere is either the wrong company or irrelevant.
+const DISCOVERY_MARKETS: MarketKey[] = ["latam", "us"];
 
 // Per-request timeout for a single ATS probe. Short, because a wrong slug
 // guess is the overwhelmingly common case (see the ~11% hit rate above) and
@@ -394,7 +395,9 @@ export async function approveAsTargetCompany(
       displayName,
       ats,
       config: { slug },
-      countryFilter: DISCOVERY_COUNTRY_FILTER,
+      // Deprecated column: sync stores every posting now and labels its
+      // market instead of dropping by country (see sync.ts).
+      countryFilter: null,
       active: true,
     })
     .onConflictDoUpdate({
@@ -439,7 +442,7 @@ async function upsertBoardCandidate(
   // Requiring a posting in the target country is what separates "same name"
   // from "same company" for a network built on local contacts.
   const hasLocalPosting = hit.samples.some((sample) =>
-    matchesCountry(sample.location, DISCOVERY_COUNTRY_FILTER),
+    DISCOVERY_MARKETS.includes(classifyMarket(sample.location)),
   );
   const isStrongMatch =
     slug === company.companyKey &&

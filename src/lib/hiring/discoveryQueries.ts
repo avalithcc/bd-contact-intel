@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { boardCandidate, discoveryRun, type DiscoveryRun } from "@/db/schema";
 import type { ProbeAts } from "./discovery";
+import { classifyMarket, type MarketKey } from "./markets";
 
 /**
  * Where a human reviewer can click through to look at a candidate board.
@@ -37,6 +38,12 @@ export interface DiscoveryQueueItem {
   slug: string;
   jobCount: number;
   sampleTitles: string[];
+  // Markets this candidate board appears to be hiring in, derived from the
+  // locations of its (up to 3) sample postings captured as evidence during
+  // probing (see upsertBoardCandidate in ./discovery.ts) — NOT a stored
+  // column, so no schema change or extra query is needed for this. Empty
+  // when no sample carried a location at all.
+  markets: MarketKey[];
   // Aggregate across ALL BDs, snapshotted when this candidate was
   // discovered/last re-hit — NOT the viewing BD's own contact count. See
   // the table comment on board_candidate in src/db/schema.ts.
@@ -46,9 +53,21 @@ export interface DiscoveryQueueItem {
 }
 
 /**
+ * Best-effort read of `board_candidate.evidence.locations` (see
+ * upsertBoardCandidate in ./discovery.ts for the exact shape written) — a
+ * jsonb column with no schema-level guarantee, so every layer here is
+ * defensive about a shape mismatch rather than throwing.
+ */
+function evidenceLocations(evidence: unknown): string[] {
+  const locations = (evidence as { locations?: unknown } | null)?.locations;
+  return Array.isArray(locations) ? locations.filter((l): l is string => typeof l === "string") : [];
+}
+
+/**
  * Pending candidates for human review, highest team contact-count first —
  * shared data (public company boards), not scoped to the viewing BD. One
- * fixed query.
+ * fixed query; `markets` is derived in JS from the row's own `evidence`
+ * (already fetched by that one query), so it never adds a query.
  */
 export async function getPendingCandidates(): Promise<DiscoveryQueueItem[]> {
   const rows = await db
@@ -65,6 +84,7 @@ export async function getPendingCandidates(): Promise<DiscoveryQueueItem[]> {
     slug: r.slug,
     jobCount: r.jobCount,
     sampleTitles: Array.isArray(r.sampleTitles) ? (r.sampleTitles as string[]) : [],
+    markets: [...new Set(evidenceLocations(r.evidence).map((loc) => classifyMarket(loc)))],
     contactCount: r.contactCount,
     boardUrl: boardUrlFor(r.ats, r.slug),
     discoveredAt: r.discoveredAt,

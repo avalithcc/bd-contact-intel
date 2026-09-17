@@ -2,11 +2,13 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyAlias, contact, jobPosting, targetCompany } from "@/db/schema";
 import type { RoleGroupKey } from "@/lib/roleGroups";
+import type { MarketKey } from "@/lib/hiring/markets";
 
 export interface OpenPosting {
   id: string;
   title: string;
   location: string;
+  market: MarketKey;
   url: string;
   postedAt: Date | null;
   firstSeen: Date;
@@ -60,8 +62,15 @@ interface ResolvedHiringCompany {
  * companies — factored out here so getCompanyHiringSummaries (/hiring),
  * getHiringMatchIndex (/outreach) and getWhatsNewFeed (/whats-new) all
  * reuse it instead of each running their own alias lookup.
+ *
+ * `market` narrows query (1) to postings in that market bucket via a SQL
+ * WHERE condition — not a post-fetch JS filter — so passing it never
+ * changes the query count and never fetches rows outside the selected
+ * market. Omitted/undefined means "all markets" (today's behavior).
  */
-export async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiringCompany>> {
+export async function resolveHiringCompanies(
+  market?: MarketKey,
+): Promise<Map<string, ResolvedHiringCompany>> {
   const openPostings = await db
     .select({
       id: jobPosting.id,
@@ -69,13 +78,20 @@ export async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiri
       displayName: targetCompany.displayName,
       title: jobPosting.title,
       location: jobPosting.location,
+      market: jobPosting.market,
       url: jobPosting.url,
       postedAt: jobPosting.postedAt,
       firstSeen: jobPosting.firstSeen,
     })
     .from(jobPosting)
     .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
-    .where(and(eq(jobPosting.isIt, true), isNull(jobPosting.closedAt)))
+    .where(
+      and(
+        eq(jobPosting.isIt, true),
+        isNull(jobPosting.closedAt),
+        market ? eq(jobPosting.market, market) : undefined,
+      ),
+    )
     .orderBy(desc(jobPosting.postedAt));
 
   const byCompany = new Map<string, ResolvedHiringCompany>();
@@ -92,6 +108,10 @@ export async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiri
       id: p.id,
       title: p.title,
       location: p.location,
+      // Rows synced before the market column was backfilled are null;
+      // treat those as "other" rather than crashing the UI on an
+      // unclassified value (see scripts/backfill-posting-markets.ts).
+      market: (p.market as MarketKey | null) ?? "other",
       url: p.url,
       postedAt: p.postedAt,
       firstSeen: p.firstSeen,
@@ -119,13 +139,17 @@ export async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiri
  * exist: the two behind resolveHiringCompanies() above, plus one GROUP BY
  * over `contact` for every key (canonical + alias) that resolves to any
  * hiring company. No per-company query loop (no N+1).
+ *
+ * `market`, when set, flows straight into resolveHiringCompanies' SQL WHERE
+ * clause — same query count either way.
  */
 export async function getCompanyHiringSummaries(
   bdId: string,
+  market?: MarketKey,
 ): Promise<CompanyHiringSummary[]> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const companies = await resolveHiringCompanies();
+  const companies = await resolveHiringCompanies(market);
   if (!companies.size) return [];
 
   const allMatchKeys = [
@@ -195,10 +219,11 @@ export interface HiringMatch {
  * getCompanyHiringSummaries (via resolveHiringCompanies) rather than
  * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup.
  * Not BD-scoped — job postings/target companies are shared data. Two fixed
- * queries regardless of caller.
+ * queries regardless of caller. `market` flows into resolveHiringCompanies'
+ * SQL WHERE clause, same as getCompanyHiringSummaries above.
  */
-export async function getHiringMatchIndex(): Promise<Map<string, HiringMatch>> {
-  const companies = await resolveHiringCompanies();
+export async function getHiringMatchIndex(market?: MarketKey): Promise<Map<string, HiringMatch>> {
+  const companies = await resolveHiringCompanies(market);
   const index = new Map<string, HiringMatch>();
   for (const c of companies.values()) {
     const match: HiringMatch = {

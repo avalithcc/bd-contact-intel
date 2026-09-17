@@ -5,6 +5,7 @@ import {
   parseWhatsNewWindow,
   WHATS_NEW_WINDOWS,
 } from "@/lib/whatsnew/queries";
+import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime } from "@/lib/i18n/format";
@@ -20,14 +21,25 @@ export const dynamic = "force-dynamic";
 export default async function WhatsNewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ window?: string; market?: string }>;
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
   const dict = t(locale);
   const me = await getCurrentBd();
   const windowDays = parseWhatsNewWindow(sp.window);
-  const feed = await getWhatsNewFeed(me.id, windowDays);
+  const market = isMarketKey(sp.market) ? sp.market : undefined;
+  const feed = await getWhatsNewFeed(me.id, windowDays, market);
+
+  // Composes the window + market filters into one query string so neither
+  // Link-button group clobbers the other's current selection.
+  const qs = (overrides: { window?: number; market?: string | null }) => {
+    const params = new URLSearchParams();
+    params.set("window", String(overrides.window ?? windowDays));
+    const nextMarket = overrides.market !== undefined ? overrides.market : market;
+    if (nextMarket) params.set("market", nextMarket);
+    return `/whats-new?${params.toString()}`;
+  };
 
   return (
     <main>
@@ -68,10 +80,30 @@ export default async function WhatsNewPage({
               {WHATS_NEW_WINDOWS.map((w) => (
                 <Link
                   key={w}
-                  href={`/whats-new?window=${w}`}
+                  href={qs({ window: w })}
                   className={w === windowDays ? "secondary-btn active" : "secondary-btn"}
                 >
                   {dict.whatsNew.windowDays(w)}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="whats-new-window-select">
+            <span className="soft">{dict.common.marketLabel}</span>
+            <div className="whats-new-window-options">
+              <Link
+                href={qs({ market: null })}
+                className={!market ? "secondary-btn active" : "secondary-btn"}
+              >
+                {dict.common.allMarkets}
+              </Link>
+              {MARKETS.map((m) => (
+                <Link
+                  key={m}
+                  href={qs({ market: m })}
+                  className={m === market ? "secondary-btn active" : "secondary-btn"}
+                >
+                  {dict.markets[m]}
                 </Link>
               ))}
             </div>

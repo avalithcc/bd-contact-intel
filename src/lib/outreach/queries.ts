@@ -7,6 +7,7 @@ import {
   LEADERSHIP_ROLE_GROUPS,
   type HiringMatch,
 } from "@/lib/hiring/queries";
+import type { MarketKey } from "@/lib/hiring/markets";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
@@ -45,6 +46,10 @@ export interface OutreachFilters {
   // Whether "never messaged" contacts are included at all (they always
   // rank last when they are). Default true.
   includeNeverMessaged?: boolean;
+  // Restricts the hiring crossover to one market bucket (see
+  // src/lib/hiring/markets.ts). Flows into getHiringMatchIndex's SQL WHERE
+  // clause — undefined means "all markets" (today's behavior).
+  market?: MarketKey;
 }
 
 export interface OutreachRow {
@@ -125,6 +130,8 @@ export function isLeadershipRoleGroup(roleGroup: string | null): boolean {
  * open IT posting, so the row count stays bounded by the hiring crossover
  * rather than the full contact base. Scoring, sorting and pagination happen
  * in JS over that single fetched set — no per-row or per-page query.
+ * `filters.market` narrows queries (1)-(2) via getHiringMatchIndex's SQL
+ * WHERE clause, so the query count stays exactly 3 whether or not it's set.
  */
 export async function listOutreachCandidates(
   bdId: string,
@@ -134,7 +141,7 @@ export async function listOutreachCandidates(
 ): Promise<OutreachPage> {
   const includeNeverMessaged = filters.includeNeverMessaged ?? true;
 
-  const hiringIndex = await getHiringMatchIndex(); // queries 1-2
+  const hiringIndex = await getHiringMatchIndex(filters.market); // queries 1-2
   const matchKeys = [...hiringIndex.keys()];
   const hiringCompanyCount = new Set(
     [...hiringIndex.values()].map((m) => m.companyKey),

@@ -13,8 +13,15 @@ const COUNTRY_MATCH_RULES: Record<string, { phrases: string[]; tokens: string[] 
   },
 };
 
-/** Splits a location into lowercase word tokens, dropping punctuation. */
-function tokenize(location: string): string[] {
+/**
+ * Splits a location into lowercase word tokens, dropping punctuation.
+ * Exported so other location-classification logic (see
+ * src/lib/hiring/markets.ts) reuses this exact tokenizer instead of writing
+ * a second one — a naive substring match on a short code/word (e.g. "ar",
+ * "us") would false-positive on unrelated words ("Paraguay", "Australia",
+ * "Belarus"), which is exactly the trap this tokenizer avoids.
+ */
+export function tokenize(location: string): string[] {
   return location
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)

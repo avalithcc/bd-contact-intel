@@ -1,6 +1,7 @@
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { CompanyCategoryKey } from "@/lib/companyCategories";
 import type { RelationshipFilterKey } from "@/lib/queries";
+import type { MarketKey } from "@/lib/hiring/markets";
 
 // Display labels for the role-group taxonomy. Keys are defined once in
 // src/lib/roleGroups.ts (ROLE_GROUPS) and stored/queried by key — only the
@@ -49,6 +50,14 @@ const relationshipFilters: Record<RelationshipFilterKey, string> = {
   never: "Never messaged",
 };
 
+// Display labels for the market taxonomy. Keys are defined once in
+// src/lib/hiring/markets.ts (MARKETS).
+const markets: Record<MarketKey, string> = {
+  latam: "LATAM",
+  us: "United States",
+  other: "Other",
+};
+
 export const en = {
   localeName: { en: "EN", es: "ES" },
 
@@ -66,6 +75,8 @@ export const en = {
     filter: "Filter",
     roleGroupLabel: "Role group",
     allGroups: "All groups",
+    marketLabel: "Market",
+    allMarkets: "All markets",
     clearAll: "Clear all",
     pageOf: (current: number, total: number) => `${current} / ${total}`,
     totalPage: (total: number, current: number, totalPages: number) =>
@@ -83,6 +94,7 @@ export const en = {
   roleGroups,
   companyCategories,
   relationshipFilters,
+  markets,
 
   home: {
     title: "contact base",
@@ -163,6 +175,8 @@ export const en = {
     tableBoard: "ATS / slug",
     tableJobs: "Job count",
     tableSampleTitles: "Sample titles",
+    tableMarkets: "Markets",
+    marketsUnknown: "—",
     tableContacts: "Team contacts",
     tableActions: "Decision",
     // Deliberately phrased as "team" — this is an aggregate across every

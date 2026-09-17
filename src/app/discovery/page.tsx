@@ -103,6 +103,7 @@ export default async function DiscoveryPage() {
                   <th>{dict.discovery.tableBoard}</th>
                   <th>{dict.discovery.tableJobs}</th>
                   <th>{dict.discovery.tableSampleTitles}</th>
+                  <th>{dict.discovery.tableMarkets}</th>
                   <th>{dict.discovery.tableContacts}</th>
                   <th>{dict.discovery.tableActions}</th>
                 </tr>
@@ -127,6 +128,11 @@ export default async function DiscoveryPage() {
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td>
+                      {c.markets.length
+                        ? c.markets.map((m) => dict.markets[m]).join(" / ")
+                        : dict.discovery.marketsUnknown}
                     </td>
                     <td>{dict.discovery.teamContactCount(c.contactCount)}</td>
                     <td>

@@ -85,6 +85,28 @@ LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data →
 select **Connections** only → Request archive. Import the resulting
 `Connections.csv` from the app.
 
+## Hiring signals: markets (LATAM / US / other)
+
+`job_posting.market` classifies each synced posting's `location` into a
+coarse geography bucket (`latam` | `us` | `other`) via
+`src/lib/hiring/markets.ts#classifyMarket`, and drives the market filter on
+`/hiring`, `/outreach` and `/whats-new`. `target_company.country_filter` is
+**deprecated**: `syncCompany` (`src/lib/hiring/sync.ts`) used to silently
+DROP every posting whose location didn't match that per-company filter — a
+US opening at an Argentina-flagged company was lost at import and
+unrecoverable. It no longer does; every posting the ATS returns is now
+stored and tagged with its `market` instead. The `country_filter` column is
+left in place (not dropped) but ignored by sync.
+
+After pulling this change, run in order:
+1. `npm run db:push` (or apply `drizzle/0006_job_posting_market.sql`
+   manually) — adds `job_posting.market` + its index.
+2. `npx tsx scripts/backfill-posting-markets.ts` — classifies `market` for
+   every existing row.
+3. Trigger a sync (`/api/hiring/sync` or `syncAllCompanies()`) — re-fetches
+   from each ATS so postings previously dropped by the old country filter
+   (e.g. US openings at LATAM-flagged companies) are picked up.
+
 ## v1 scope
 - BD identity (env stand-in; Supabase Auth comes in v2)
 - CSV import → parse → upsert into the BD's private base

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCompanyHiringSummaries } from "@/lib/hiring/queries";
+import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getCurrentBd } from "@/lib/queries";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
@@ -8,11 +9,17 @@ import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
 
 export const dynamic = "force-dynamic";
 
-export default async function HiringPage() {
+export default async function HiringPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ market?: string }>;
+}) {
+  const sp = await searchParams;
   const locale = await getLocale();
   const dict = t(locale);
   const me = await getCurrentBd();
-  const summaries = await getCompanyHiringSummaries(me.id);
+  const market = isMarketKey(sp.market) ? sp.market : undefined;
+  const summaries = await getCompanyHiringSummaries(me.id, market);
 
   return (
     <main>
@@ -46,6 +53,26 @@ export default async function HiringPage() {
       </div>
 
       <section className="panel">
+        <div className="eyebrow">{dict.common.filterEyebrow}</div>
+        <form method="get" className="filter-toolbar">
+          <div className="filter-field">
+            <label htmlFor="market">{dict.common.marketLabel}</label>
+            <select id="market" name="market" defaultValue={market ?? ""}>
+              <option value="">{dict.common.allMarkets}</option>
+              {MARKETS.map((m) => (
+                <option key={m} value={m}>
+                  {dict.markets[m]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className="filter-submit">
+            {dict.common.filter}
+          </button>
+        </form>
+      </section>
+
+      <section className="panel">
         <div className="eyebrow">{dict.hiring.companiesEyebrow}</div>
         {!summaries.length && <p className="muted">{dict.hiring.empty}</p>}
         {summaries.map((s) => (
@@ -66,7 +93,7 @@ export default async function HiringPage() {
                         {p.title}
                       </a>{" "}
                       <span className="muted">
-                        — {p.location || dict.hiring.locationNA}
+                        — {p.location || dict.hiring.locationNA} · {dict.markets[p.market]}
                         {p.postedAt ? ` ${dict.hiring.postedOn(formatDate(p.postedAt, locale))}` : ""}
                       </span>
                     </li>
