@@ -9,6 +9,7 @@ export const es: typeof en = {
   common: {
     signOut: "Cerrar sesión",
     priorityOutreach: "contacto prioritario →",
+    whatsNew: "novedades →",
     hiringSignals: "señales de contratación →",
     boardDiscovery: "descubrimiento de portales →",
     backToContacts: "← contactos",
@@ -197,6 +198,36 @@ export const es: typeof en = {
     reasonNeverMessaged: "Nunca contactado",
     companyFallback: "empresa",
     reasonOpenRoles: (company, n) => `${company} tiene ${n} rol${n === 1 ? "" : "es"} de IT abierto${n === 1 ? "" : "s"}`,
+  },
+
+  whatsNew: {
+    eyebrow: "// novedades",
+    title: "novedades",
+    subtitle:
+      "Publicaciones de IT que aparecieron o se cerraron recientemente en las empresas que sigues, con la actividad más reciente primero.",
+    windowLabel: "Ventana",
+    windowDays: (n) => `${n} días`,
+    lastSyncAt: (date) => `Última sincronización exitosa: ${date}`,
+    neverSynced: "Todavía no se completó ninguna sincronización exitosa.",
+    noMonitoredCompaniesPrefix:
+      "Todavía no hay empresas objetivo en seguimiento. Carga las empresas objetivo (ver ",
+    noMonitoredCompaniesLinkText: "señales de contratación",
+    noMonitoredCompaniesSuffix: ") antes de que haya novedades para mostrar aquí.",
+    noSyncYet:
+      "El proceso de sincronización todavía no se ejecutó, por lo que no hay actividad de publicaciones para mostrar. Vuelve a revisar después de la próxima sincronización.",
+    noNewPostings: (n) =>
+      `No hay publicaciones de IT nuevas en los últimos ${n} días. Intenta con una ventana más amplia.`,
+    companiesEyebrow: "// publicaciones_nuevas",
+    newPostingsCount: (n) => `${n} publicación${n === 1 ? "" : "es"} nueva${n === 1 ? "" : "s"}`,
+    restContactCount: (n) => `· ${n} otro${n === 1 ? "" : "s"}`,
+    suggestedContactsLabel: "Contactos sugeridos",
+    showPostings: "ver publicaciones",
+    firstSeenOn: (date) => `· visto por primera vez ${date}`,
+    closuresEyebrow: "// cierres",
+    closuresTitle: "Cerradas recientemente",
+    closuresSubtitle:
+      "Publicaciones que se cerraron en esta ventana en empresas donde tienes contactos.",
+    closedOn: (date) => `cerrada ${date}`,
   },
 
   contact: {

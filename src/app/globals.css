@@ -459,6 +459,80 @@ a {
   }
 }
 
+/* ---- whats-new (/whats-new) ---- */
+.whats-new-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.whats-new-window-select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.whats-new-window-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.secondary-btn.active {
+  color: var(--ink);
+  border-color: var(--red);
+}
+.whats-new-sync-status {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.whats-new-company {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.9rem;
+}
+.whats-new-company:last-child {
+  margin-bottom: 0;
+}
+.whats-new-company-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.whats-new-company-name {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+.whats-new-suggested {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+}
+.whats-new-suggested-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.whats-new-closures {
+  background: var(--card);
+}
+.whats-new-closures ul.example-list {
+  columns: 1;
+}
+@media (max-width: 560px) {
+  .whats-new-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ---- detail fields ---- */
 .field {
   display: grid;

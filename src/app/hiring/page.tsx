@@ -27,6 +27,9 @@ export default async function HiringPage() {
           <Link className="secondary-btn" href="/outreach">
             {dict.common.priorityOutreach}
           </Link>
+          <Link className="secondary-btn" href="/whats-new">
+            {dict.common.whatsNew}
+          </Link>
           <LocaleSwitcher locale={locale} />
         </div>
       </div>

@@ -55,6 +55,7 @@ export const en = {
   common: {
     signOut: "Sign out",
     priorityOutreach: "priority outreach →",
+    whatsNew: "what's new →",
     hiringSignals: "hiring signals →",
     boardDiscovery: "board discovery →",
     backToContacts: "← contacts",
@@ -208,6 +209,36 @@ export const en = {
     companyFallback: "company",
     reasonOpenRoles: (company: string, n: number) =>
       `${company} has ${n} open IT role${n === 1 ? "" : "s"}`,
+  },
+
+  whatsNew: {
+    eyebrow: "// whats_new",
+    title: "what's new",
+    subtitle:
+      "IT postings that appeared or closed recently at companies you track, newest activity first.",
+    windowLabel: "Window",
+    windowDays: (n: number) => `${n} days`,
+    lastSyncAt: (date: string) => `Last successful sync: ${date}`,
+    neverSynced: "No successful sync has completed yet.",
+    noMonitoredCompaniesPrefix:
+      "No target companies are being tracked yet. Seed target companies (see ",
+    noMonitoredCompaniesLinkText: "hiring signals",
+    noMonitoredCompaniesSuffix: ") before there is anything new to show here.",
+    noSyncYet:
+      "The sync job hasn't run yet, so there is no posting activity to show. Check back after the next sync.",
+    noNewPostings: (n: number) =>
+      `No new IT postings in the last ${n} days. Try a wider window.`,
+    companiesEyebrow: "// new_postings",
+    newPostingsCount: (n: number) => `${n} new posting${n === 1 ? "" : "s"}`,
+    restContactCount: (n: number) => `· ${n} other${n === 1 ? "" : "s"}`,
+    suggestedContactsLabel: "Suggested contacts",
+    showPostings: "show postings",
+    firstSeenOn: (date: string) => `· first seen ${date}`,
+    closuresEyebrow: "// closures",
+    closuresTitle: "Recently closed",
+    closuresSubtitle:
+      "Postings that closed in this window at companies where you have contacts.",
+    closedOn: (date: string) => `closed ${date}`,
   },
 
   contact: {

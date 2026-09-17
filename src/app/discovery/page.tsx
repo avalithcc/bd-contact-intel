@@ -37,6 +37,9 @@ export default async function DiscoveryPage() {
           <Link className="secondary-btn" href="/">
             {dict.common.backToContacts}
           </Link>
+          <Link className="secondary-btn" href="/whats-new">
+            {dict.common.whatsNew}
+          </Link>
           <Link className="secondary-btn" href="/hiring">
             {dict.common.hiringSignals}
           </Link>

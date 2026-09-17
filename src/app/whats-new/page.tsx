@@ -1,0 +1,185 @@
+import Link from "next/link";
+import { getCurrentBd } from "@/lib/queries";
+import {
+  getWhatsNewFeed,
+  parseWhatsNewWindow,
+  WHATS_NEW_WINDOWS,
+} from "@/lib/whatsnew/queries";
+import { getLocale } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/dictionaries";
+import { formatDate, formatDateTime } from "@/lib/i18n/format";
+import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
+
+export const dynamic = "force-dynamic";
+
+// Everything on this page is server-rendered from src/lib/whatsnew/queries.ts
+// (getWhatsNewFeed — see that file for the exact query count and BD-scoping
+// notes). Job postings, target companies and closures are shared, cross-BD
+// data; contact counts and suggested contacts are scoped to the signed-in
+// BD via getCurrentBd().
+export default async function WhatsNewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ window?: string }>;
+}) {
+  const sp = await searchParams;
+  const locale = await getLocale();
+  const dict = t(locale);
+  const me = await getCurrentBd();
+  const windowDays = parseWhatsNewWindow(sp.window);
+  const feed = await getWhatsNewFeed(me.id, windowDays);
+
+  return (
+    <main>
+      <div className="header">
+        <span className="logo">
+          avalith<span className="dot">.</span>
+        </span>
+        <div className="row" style={{ gap: "0.75rem" }}>
+          <Link className="secondary-btn" href="/">
+            {dict.common.backToContacts}
+          </Link>
+          <Link className="secondary-btn" href="/outreach">
+            {dict.common.priorityOutreach}
+          </Link>
+          <Link className="secondary-btn" href="/hiring">
+            {dict.common.hiringSignals}
+          </Link>
+          <LocaleSwitcher locale={locale} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "1.75rem" }}>
+        <div className="eyebrow">{dict.whatsNew.eyebrow}</div>
+        <h1>
+          {dict.whatsNew.title}
+          <span className="dot">.</span>
+        </h1>
+        <p className="soft" style={{ margin: 0 }}>
+          {dict.whatsNew.subtitle}
+        </p>
+      </div>
+
+      <section className="panel">
+        <div className="whats-new-toolbar">
+          <div className="whats-new-window-select">
+            <span className="soft">{dict.whatsNew.windowLabel}</span>
+            <div className="whats-new-window-options">
+              {WHATS_NEW_WINDOWS.map((w) => (
+                <Link
+                  key={w}
+                  href={`/whats-new?window=${w}`}
+                  className={w === windowDays ? "secondary-btn active" : "secondary-btn"}
+                >
+                  {dict.whatsNew.windowDays(w)}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <p className="whats-new-sync-status">
+            {feed.lastSuccessfulSyncAt
+              ? dict.whatsNew.lastSyncAt(formatDateTime(feed.lastSuccessfulSyncAt, locale))
+              : dict.whatsNew.neverSynced}
+          </p>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="eyebrow">{dict.whatsNew.companiesEyebrow}</div>
+
+        {feed.monitoredCompanyCount === 0 && (
+          <p className="muted">
+            {dict.whatsNew.noMonitoredCompaniesPrefix}
+            <Link href="/hiring">{dict.whatsNew.noMonitoredCompaniesLinkText}</Link>
+            {dict.whatsNew.noMonitoredCompaniesSuffix}
+          </p>
+        )}
+
+        {feed.monitoredCompanyCount > 0 && !feed.hasAnySyncRun && (
+          <p className="muted">{dict.whatsNew.noSyncYet}</p>
+        )}
+
+        {feed.monitoredCompanyCount > 0 && feed.hasAnySyncRun && feed.companies.length === 0 && (
+          <p className="muted">{dict.whatsNew.noNewPostings(windowDays)}</p>
+        )}
+
+        {feed.companies.map((c) => (
+          <div key={c.companyKey} className="whats-new-company">
+            <div className="whats-new-company-head">
+              <span className="whats-new-company-name">{c.displayName}</span>
+              <span className="badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
+              <span className="soft">{dict.hiring.postingCount(c.openItCount)}</span>
+              {c.contactCount > 0 && (
+                <span className="soft">
+                  {dict.hiring.contactCount(c.contactCount)}
+                  {c.leadershipContactCount > 0 &&
+                    ` ${dict.hiring.leadershipCount(c.leadershipContactCount)}`}
+                  {c.restContactCount > 0 && ` ${dict.whatsNew.restContactCount(c.restContactCount)}`}
+                </span>
+              )}
+            </div>
+
+            {c.suggestedContacts.length > 0 && (
+              <div className="whats-new-suggested">
+                <span className="soft">{dict.whatsNew.suggestedContactsLabel}:</span>
+                {c.suggestedContacts.map((sc) => (
+                  <span key={sc.id} className="whats-new-suggested-item">
+                    <Link className="rowlink" href={`/contact/${sc.id}`}>
+                      {sc.name ?? dict.contact.unnamed}
+                    </Link>
+                    {sc.roleGroup && (
+                      <span className={sc.isLeadership ? "badge green" : "badge"}>
+                        {dict.roleGroups[sc.roleGroup]}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <details className="filter-helper">
+              <summary>{dict.whatsNew.showPostings}</summary>
+              <div className="filter-helper-body">
+                <ul className="example-list">
+                  {c.newPostings.map((p) => (
+                    <li key={p.id}>
+                      <a href={p.url} target="_blank" rel="noopener noreferrer">
+                        {p.title}
+                      </a>{" "}
+                      <span className="muted">
+                        — {p.location || dict.hiring.locationNA}
+                        {p.postedAt
+                          ? ` ${dict.hiring.postedOn(formatDate(p.postedAt, locale))}`
+                          : ` ${dict.whatsNew.firstSeenOn(formatDate(p.firstSeen, locale))}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          </div>
+        ))}
+      </section>
+
+      {feed.closures.length > 0 && (
+        <section className="panel whats-new-closures">
+          <div className="eyebrow">{dict.whatsNew.closuresEyebrow}</div>
+          <h2>{dict.whatsNew.closuresTitle}</h2>
+          <p className="soft" style={{ marginTop: 0 }}>
+            {dict.whatsNew.closuresSubtitle}
+          </p>
+          <ul className="example-list">
+            {feed.closures.map((cl) => (
+              <li key={cl.id}>
+                <span className="muted">
+                  {cl.displayName} — {cl.title} ({cl.location || dict.hiring.locationNA}) ·{" "}
+                  {dict.whatsNew.closedOn(formatDate(cl.closedAt, locale))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </main>
+  );
+}

@@ -144,6 +144,9 @@ export default async function Home({
           <Link className="secondary-btn" href="/outreach">
             {dict.common.priorityOutreach}
           </Link>
+          <Link className="secondary-btn" href="/whats-new">
+            {dict.common.whatsNew}
+          </Link>
           <Link className="secondary-btn" href="/hiring">
             {dict.common.hiringSignals}
           </Link>

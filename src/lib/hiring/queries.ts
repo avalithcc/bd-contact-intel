@@ -57,11 +57,11 @@ interface ResolvedHiringCompany {
  *
  * Two fixed queries regardless of caller — (1) open IT postings joined with
  * their target company's display name, (2) the aliases for those
- * companies — factored out here so getCompanyHiringSummaries (/hiring) and
- * getHiringMatchIndex (/outreach) both reuse it instead of each running
- * their own alias lookup.
+ * companies — factored out here so getCompanyHiringSummaries (/hiring),
+ * getHiringMatchIndex (/outreach) and getWhatsNewFeed (/whats-new) all
+ * reuse it instead of each running their own alias lookup.
  */
-async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiringCompany>> {
+export async function resolveHiringCompanies(): Promise<Map<string, ResolvedHiringCompany>> {
   const openPostings = await db
     .select({
       id: jobPosting.id,

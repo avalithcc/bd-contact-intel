@@ -22,7 +22,7 @@ export const RELATIONSHIP_TIERS = [
 ] as const;
 export type RelationshipTier = (typeof RELATIONSHIP_TIERS)[number];
 
-function relationshipTierOf(
+export function relationshipTierOf(
   reciprocal: boolean,
   dormant: boolean,
   messageCount: number,
@@ -78,7 +78,15 @@ export interface OutreachPage {
   hiringCompanyCount: number;
 }
 
-function compareOutreachRows(a: OutreachRow, b: OutreachRow): number {
+/**
+ * Shared ranking rule for "who to contact at this company": dormant
+ * reciprocal contacts first, then active reciprocal, then leadership
+ * seniority, then hiring urgency — see the numbered steps below. Exported
+ * so other views that need the same "who to suggest" idea (see
+ * src/lib/whatsnew/queries.ts) sort with this comparator directly instead
+ * of re-deriving a second scoring rule.
+ */
+export function compareOutreachRows(a: OutreachRow, b: OutreachRow): number {
   // 1. Relationship tier: dormant reciprocal contacts first, cold
   // never-messaged contacts last.
   const tierDiff = TIER_RANK[a.relationshipTier] - TIER_RANK[b.relationshipTier];
@@ -101,7 +109,7 @@ function compareOutreachRows(a: OutreachRow, b: OutreachRow): number {
   return (a.lastName ?? "").localeCompare(b.lastName ?? "");
 }
 
-function isLeadershipRoleGroup(roleGroup: string | null): boolean {
+export function isLeadershipRoleGroup(roleGroup: string | null): boolean {
   return !!roleGroup && (LEADERSHIP_ROLE_GROUPS as readonly string[]).includes(roleGroup);
 }
 
