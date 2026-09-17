@@ -7,6 +7,7 @@ import { greenhouseSource } from "./greenhouse";
 import { leverSource } from "./lever";
 import { ashbySource } from "./ashby";
 import { smartRecruitersSource } from "./smartrecruiters";
+import { matchesCountry } from "./countryFilter";
 
 /**
  * Automated ATS board discovery: scans company keys that show up in BDs'
@@ -80,6 +81,10 @@ const DEFAULT_MAX_DURATION_MS = 50_000;
 // auto-approve and let a human clear the (much larger) 'pending' queue than
 // to risk polluting target_company with a wrong-company board.
 const AUTO_APPROVE_MIN_JOB_COUNT = 5;
+
+// Country a discovered board must be hiring in for auto-approval (same code
+// space as target_company.country_filter, see src/lib/hiring/countryFilter.ts).
+const DISCOVERY_COUNTRY_FILTER = "AR";
 
 // Per-request timeout for a single ATS probe. Short, because a wrong slug
 // guess is the overwhelmingly common case (see the ~11% hit rate above) and
@@ -389,7 +394,7 @@ export async function approveAsTargetCompany(
       displayName,
       ats,
       config: { slug },
-      countryFilter: "AR",
+      countryFilter: DISCOVERY_COUNTRY_FILTER,
       active: true,
     })
     .onConflictDoUpdate({
@@ -428,7 +433,18 @@ async function upsertBoardCandidate(
   hit: ProbeHit,
 ): Promise<void> {
   const now = new Date();
-  const isStrongMatch = slug === company.companyKey && hit.jobCount >= AUTO_APPROVE_MIN_JOB_COUNT;
+  // A matching slug is NOT evidence of identity: the first real run
+  // auto-approved a board whose slug matched a monitored company's name but
+  // belonged to an unrelated foreign company, because both share an acronym.
+  // Requiring a posting in the target country is what separates "same name"
+  // from "same company" for a network built on local contacts.
+  const hasLocalPosting = hit.samples.some((sample) =>
+    matchesCountry(sample.location, DISCOVERY_COUNTRY_FILTER),
+  );
+  const isStrongMatch =
+    slug === company.companyKey &&
+    hit.jobCount >= AUTO_APPROVE_MIN_JOB_COUNT &&
+    hasLocalPosting;
   const status: "pending" | "auto_approved" | "rejected" = isDemoBoard(hit)
     ? "rejected"
     : isStrongMatch
