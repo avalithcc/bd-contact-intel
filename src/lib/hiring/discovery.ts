@@ -139,7 +139,8 @@ export async function getCandidateCompanies(
       )
       and not exists (
         select 1 from company_probe cp
-        where cp.company_key = c.company_key and cp.last_probed_at >= ${cooldownDate}
+        where cp.company_key = c.company_key
+          and cp.last_probed_at >= ${cooldownDate.toISOString()}::timestamp
       )
     group by c.company_key
     having min(coalesce(c.company_category, 'unclassified')) not in (${excluded})
