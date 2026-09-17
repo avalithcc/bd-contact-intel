@@ -12,6 +12,10 @@ import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
 import { UploadForm, UploadMessagesForm } from "./UploadForm";
 import { SignOutButton } from "./SignOutButton";
+import { getLocale } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/dictionaries";
+import { relativeTime } from "@/lib/i18n/format";
+import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
 
 export const dynamic = "force-dynamic";
 
@@ -32,17 +36,6 @@ function isRelationshipKey(v: string | undefined): v is RelationshipFilterKey {
   return !!v && RELATIONSHIP_KEYS.has(v as RelationshipFilterKey);
 }
 
-/** "8mo ago" / "3d ago" — coarse, human relative time for the contacts list. */
-function relativeTime(date: Date): string {
-  const ms = Date.now() - date.getTime();
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-  if (days < 1) return "today";
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 24) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
-}
-
 export default async function Home({
   searchParams,
 }: {
@@ -57,6 +50,8 @@ export default async function Home({
   }>;
 }) {
   const sp = await searchParams;
+  const locale = await getLocale();
+  const dict = t(locale);
   const me = await getCurrentBd();
   const page = Math.max(1, Number(sp.page) || 1);
   const roleGroup = isRoleGroupKey(sp.roleGroup) ? sp.roleGroup : undefined;
@@ -147,101 +142,103 @@ export default async function Home({
         </span>
         <div className="row" style={{ gap: "0.75rem" }}>
           <Link className="secondary-btn" href="/outreach">
-            priority outreach →
+            {dict.common.priorityOutreach}
           </Link>
           <Link className="secondary-btn" href="/hiring">
-            hiring signals →
+            {dict.common.hiringSignals}
           </Link>
-          <SignOutButton />
+          <SignOutButton locale={locale} />
+          <LocaleSwitcher locale={locale} />
         </div>
       </div>
 
       <div style={{ marginBottom: "1.75rem" }}>
-        <div className="eyebrow">// bd_contact_intelligence</div>
+        <div className="eyebrow">{dict.common.brandEyebrow}</div>
         <h1>
-          contact base<span className="dot">.</span>
+          {dict.home.title}
+          <span className="dot">.</span>
         </h1>
         <p className="soft" style={{ margin: 0 }}>
-          Signed in as <strong>{me.name}</strong> ({me.email})
+          {dict.home.signedInAs(me.name, me.email)}
         </p>
       </div>
 
       <details className="import-block">
-        <summary>Import LinkedIn database</summary>
+        <summary>{dict.home.importConnectionsSummary}</summary>
         <div className="import-body">
-          <UploadForm />
+          <UploadForm locale={locale} />
         </div>
       </details>
 
       <details className="import-block">
-        <summary>Import LinkedIn messages</summary>
+        <summary>{dict.home.importMessagesSummary}</summary>
         <div className="import-body">
-          <UploadMessagesForm />
+          <UploadMessagesForm locale={locale} />
         </div>
       </details>
 
       <section className="panel">
-        <div className="eyebrow">// filter</div>
+        <div className="eyebrow">{dict.common.filterEyebrow}</div>
         <form method="get" className="filter-toolbar">
           <div className="filter-field">
-            <label htmlFor="company">Company</label>
+            <label htmlFor="company">{dict.home.companyLabel}</label>
             <input
               id="company"
               name="company"
               type="text"
               defaultValue={sp.company ?? ""}
-              placeholder="e.g. Acme"
+              placeholder={dict.home.companyPlaceholder}
             />
           </div>
           <div className="filter-field">
-            <label htmlFor="roleGroup">Role group</label>
+            <label htmlFor="roleGroup">{dict.common.roleGroupLabel}</label>
             <select id="roleGroup" name="roleGroup" defaultValue={roleGroup ?? ""}>
-              <option value="">All groups</option>
+              <option value="">{dict.common.allGroups}</option>
               {ROLE_GROUPS.map((g) => (
                 <option key={g.key} value={g.key}>
-                  {g.label} ({countByGroup.get(g.key) ?? 0})
+                  {dict.roleGroups[g.key]} ({countByGroup.get(g.key) ?? 0})
                 </option>
               ))}
             </select>
           </div>
           <div className="filter-field">
-            <label htmlFor="companyCategory">Company category</label>
+            <label htmlFor="companyCategory">{dict.home.companyCategoryLabel}</label>
             <select
               id="companyCategory"
               name="companyCategory"
               defaultValue={companyCategory ?? ""}
             >
-              <option value="">All categories</option>
+              <option value="">{dict.home.allCategories}</option>
               {COMPANY_CATEGORIES.map((c) => (
                 <option key={c.key} value={c.key}>
-                  {c.label} ({countByCategory.get(c.key) ?? 0})
+                  {dict.companyCategories[c.key]} ({countByCategory.get(c.key) ?? 0})
                 </option>
               ))}
             </select>
           </div>
           <div className="filter-field">
-            <label htmlFor="position">Position</label>
+            <label htmlFor="position">{dict.home.positionLabel}</label>
             <input
               id="position"
               name="position"
               type="text"
               defaultValue={sp.position ?? ""}
-              placeholder="e.g. Engineering"
+              placeholder={dict.home.positionPlaceholder}
             />
           </div>
           <div className="filter-field">
-            <label htmlFor="relationship">Relationship</label>
+            <label htmlFor="relationship">{dict.home.relationshipLabel}</label>
             <select id="relationship" name="relationship" defaultValue={relationship ?? ""}>
-              <option value="">Any</option>
+              <option value="">{dict.home.anyRelationship}</option>
               {RELATIONSHIP_FILTERS.map((r) => (
                 <option key={r.key} value={r.key}>
-                  {r.label}
+                  {dict.relationshipFilters[r.key]}
                 </option>
               ))}
             </select>
           </div>
           <button type="submit" className="filter-submit">
-            Filter
+            {dict.common.filter}
           </button>
         </form>
 
@@ -254,36 +251,34 @@ export default async function Home({
           <div className="active-filters">
             {sp.companyKey && (
               <span className="chip">
-                Company (from hiring): {sp.companyKey}
-                <Link href={qsWithout("companyKey")} aria-label="Remove company key filter">
+                {dict.home.companyFromHiringChip(sp.companyKey)}
+                <Link href={qsWithout("companyKey")} aria-label={dict.home.removeCompanyKeyFilter}>
                   ×
                 </Link>
               </span>
             )}
             {sp.company && (
               <span className="chip">
-                Company: {sp.company}
-                <Link href={qsWithout("company")} aria-label="Remove company filter">
+                {dict.home.companyChip(sp.company)}
+                <Link href={qsWithout("company")} aria-label={dict.home.removeCompanyFilter}>
                   ×
                 </Link>
               </span>
             )}
             {roleGroup && (
               <span className="chip">
-                Role: {ROLE_GROUPS.find((g) => g.key === roleGroup)?.label ?? roleGroup}
-                <Link href={qsWithout("roleGroup")} aria-label="Remove role group filter">
+                {dict.home.roleChip(dict.roleGroups[roleGroup])}
+                <Link href={qsWithout("roleGroup")} aria-label={dict.home.removeRoleGroupFilter}>
                   ×
                 </Link>
               </span>
             )}
             {companyCategory && (
               <span className="chip">
-                Category:{" "}
-                {COMPANY_CATEGORIES.find((c) => c.key === companyCategory)?.label ??
-                  companyCategory}
+                {dict.home.categoryChip(dict.companyCategories[companyCategory])}
                 <Link
                   href={qsWithout("companyCategory")}
-                  aria-label="Remove company category filter"
+                  aria-label={dict.home.removeCompanyCategoryFilter}
                 >
                   ×
                 </Link>
@@ -291,24 +286,25 @@ export default async function Home({
             )}
             {sp.position && (
               <span className="chip">
-                Position: {sp.position}
-                <Link href={qsWithout("position")} aria-label="Remove position filter">
+                {dict.home.positionChip(sp.position)}
+                <Link href={qsWithout("position")} aria-label={dict.home.removePositionFilter}>
                   ×
                 </Link>
               </span>
             )}
             {relationship && (
               <span className="chip">
-                Relationship:{" "}
-                {RELATIONSHIP_FILTERS.find((r) => r.key === relationship)?.label ??
-                  relationship}
-                <Link href={qsWithout("relationship")} aria-label="Remove relationship filter">
+                {dict.home.relationshipChip(dict.relationshipFilters[relationship])}
+                <Link
+                  href={qsWithout("relationship")}
+                  aria-label={dict.home.removeRelationshipFilter}
+                >
                   ×
                 </Link>
               </span>
             )}
             <Link href="/" className="clear-all">
-              Clear all
+              {dict.common.clearAll}
             </Link>
           </div>
         )}
@@ -316,23 +312,23 @@ export default async function Home({
         {selectedRoleGroup && roleGroupExamples && roleGroupExamples.titles.length > 0 && (
           <details className="filter-helper">
             <summary>
-              {selectedRoleGroup.label} — {countByGroup.get(selectedRoleGroup.key) ?? 0}{" "}
-              contacts · {roleGroupExamples.totalDistinctTitles} distinct titles
-              <span className="filter-helper-hint">show example titles</span>
+              {dict.home.roleGroupSummary(
+                dict.roleGroups[selectedRoleGroup.key],
+                countByGroup.get(selectedRoleGroup.key) ?? 0,
+                roleGroupExamples.totalDistinctTitles,
+              )}
+              <span className="filter-helper-hint">{dict.home.showExampleTitles}</span>
             </summary>
             <div className="filter-helper-body">
               <ul className="example-list">
-                {roleGroupExamples.titles.map((t) => (
-                  <li key={t.position}>
-                    {t.position} <span className="muted">({t.count})</span>
+                {roleGroupExamples.titles.map((title) => (
+                  <li key={title.position}>
+                    {title.position} <span className="muted">({title.count})</span>
                   </li>
                 ))}
               </ul>
               {roleGroupTitlesRemaining > 0 && (
-                <p className="muted example-more">
-                  +{roleGroupTitlesRemaining} more title
-                  {roleGroupTitlesRemaining === 1 ? "" : "s"}
-                </p>
+                <p className="muted example-more">{dict.home.moreTitles(roleGroupTitlesRemaining)}</p>
               )}
             </div>
           </details>
@@ -343,10 +339,12 @@ export default async function Home({
           companyCategoryExamples.companies.length > 0 && (
             <details className="filter-helper">
               <summary>
-                {selectedCompanyCategory.label} —{" "}
-                {countByCategory.get(selectedCompanyCategory.key) ?? 0} contacts ·{" "}
-                {companyCategoryExamples.totalDistinctCompanies} distinct companies
-                <span className="filter-helper-hint">show example companies</span>
+                {dict.home.companyCategorySummary(
+                  dict.companyCategories[selectedCompanyCategory.key],
+                  countByCategory.get(selectedCompanyCategory.key) ?? 0,
+                  companyCategoryExamples.totalDistinctCompanies,
+                )}
+                <span className="filter-helper-hint">{dict.home.showExampleCompanies}</span>
               </summary>
               <div className="filter-helper-body">
                 <ul className="example-list">
@@ -358,8 +356,7 @@ export default async function Home({
                 </ul>
                 {companyCategoryCompaniesRemaining > 0 && (
                   <p className="muted example-more">
-                    +{companyCategoryCompaniesRemaining} more compan
-                    {companyCategoryCompaniesRemaining === 1 ? "y" : "ies"}
+                    {dict.home.moreCompanies(companyCategoryCompaniesRemaining)}
                   </p>
                 )}
               </div>
@@ -368,19 +365,19 @@ export default async function Home({
       </section>
 
       <section className="panel">
-        <div className="eyebrow">// contacts</div>
+        <div className="eyebrow">{dict.home.contactsEyebrow}</div>
         <p className="soft" style={{ marginTop: 0 }}>
-          {total} total · page {current} of {totalPages}
+          {dict.common.totalPage(total, current, totalPages)}
         </p>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Company</th>
-                <th>Position</th>
-                <th>Relationship</th>
-                <th>Team overlap</th>
+                <th>{dict.home.tableName}</th>
+                <th>{dict.home.tableCompany}</th>
+                <th>{dict.home.tablePosition}</th>
+                <th>{dict.home.tableRelationship}</th>
+                <th>{dict.home.tableTeamOverlap}</th>
               </tr>
             </thead>
             <tbody>
@@ -395,18 +392,18 @@ export default async function Home({
                   <td>
                     {c.company ?? "—"}
                     {c.companyKey && hiringCompanyKeys.has(c.companyKey) && (
-                      <span className="badge hiring">hiring</span>
+                      <span className="badge hiring">{dict.common.hiringBadge}</span>
                     )}
                   </td>
                   <td>{c.position ?? "—"}</td>
                   <td>
                     {c.messageCount > 0 ? (
                       <span className="relationship">
-                        {c.messageCount} msgs
+                        {dict.home.msgsCount(c.messageCount)}
                         {c.lastMessageAt && (
-                          <> · {relativeTime(new Date(c.lastMessageAt))}</>
+                          <> · {relativeTime(new Date(c.lastMessageAt), locale)}</>
                         )}
-                        {c.dormant && <span className="badge dormant">dormant</span>}
+                        {c.dormant && <span className="badge dormant">{dict.common.dormantBadge}</span>}
                       </span>
                     ) : (
                       <span className="muted">—</span>
@@ -414,9 +411,7 @@ export default async function Home({
                   </td>
                   <td>
                     {c.overlapWith.length ? (
-                      <span className="badge">
-                        also in {c.overlapWith.join(", ")}
-                      </span>
+                      <span className="badge">{dict.common.alsoIn(c.overlapWith.join(", "))}</span>
                     ) : (
                       <span className="muted">—</span>
                     )}
@@ -426,7 +421,7 @@ export default async function Home({
               {!rows.length && (
                 <tr>
                   <td colSpan={5} className="muted">
-                    No contacts yet. Import your Connections.csv above.
+                    {dict.home.noContacts}
                   </td>
                 </tr>
               )}
@@ -438,20 +433,18 @@ export default async function Home({
           <div className="pager">
             {current > 1 ? (
               <Link className="secondary-btn" href={qs(current - 1)}>
-                ← prev
+                {dict.common.prev}
               </Link>
             ) : (
-              <span className="secondary-btn disabled">← prev</span>
+              <span className="secondary-btn disabled">{dict.common.prev}</span>
             )}
-            <span className="soft">
-              {current} / {totalPages}
-            </span>
+            <span className="soft">{dict.common.pageOf(current, totalPages)}</span>
             {current < totalPages ? (
               <Link className="secondary-btn" href={qs(current + 1)}>
-                next →
+                {dict.common.next}
               </Link>
             ) : (
-              <span className="secondary-btn disabled">next →</span>
+              <span className="secondary-btn disabled">{dict.common.next}</span>
             )}
           </div>
         )}

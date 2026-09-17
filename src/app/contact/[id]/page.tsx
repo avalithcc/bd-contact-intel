@@ -1,31 +1,29 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContactById, getConversationThreads, getCurrentBd } from "@/lib/queries";
+import { getLocale } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/dictionaries";
+import { formatDate, formatDateTime, relativeTime } from "@/lib/i18n/format";
+import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
 
-function formatDateTime(d: Date): string {
-  return new Date(d).toLocaleString();
-}
-
-/** "8mo ago" / "3d ago" — same coarse relative time as the contacts list (see src/app/page.tsx). */
-function relativeTime(date: Date): string {
-  const ms = Date.now() - date.getTime();
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-  if (days < 1) return "today";
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 24) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+function Field({
+  label,
+  value,
+  emptyLabel,
+}: {
+  label: string;
+  value: React.ReactNode;
+  emptyLabel: string;
+}) {
   const empty = value === null || value === undefined || value === "";
   return (
     <div className="field">
       <div className="field-label">{label}</div>
       <div className={empty ? "field-value empty" : "field-value"}>
-        {empty ? "empty" : value}
+        {empty ? emptyLabel : value}
       </div>
     </div>
   );
@@ -37,6 +35,8 @@ export default async function ContactDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const locale = await getLocale();
+  const dict: Dictionary = t(locale);
   const me = await getCurrentBd();
   const c = await getContactById(me.id, id);
   if (!c) notFound();
@@ -54,29 +54,33 @@ export default async function ContactDetail({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <Link className="secondary-btn" href="/">
-          ← back
-        </Link>
+        <div className="row" style={{ gap: "0.75rem" }}>
+          <Link className="secondary-btn" href="/">
+            {dict.common.back}
+          </Link>
+          <LocaleSwitcher locale={locale} />
+        </div>
       </div>
 
       <div style={{ marginBottom: "1.5rem" }}>
-        <div className="eyebrow">// contact</div>
+        <div className="eyebrow">{dict.contact.eyebrow}</div>
         <h1>
-          {fullName || "unnamed"}
+          {fullName || dict.contact.unnamed}
           <span className="dot">.</span>
         </h1>
       </div>
 
       <section className="panel">
-        <Field label="First name" value={c.firstName} />
-        <Field label="Last name" value={c.lastName} />
-        <Field label="Company" value={c.company} />
-        <Field label="Position" value={c.position} />
-        <Field label="Industry" value={c.industry} />
-        <Field label="Email" value={c.email} />
-        <Field label="Connected on" value={c.connectedOn} />
+        <Field label={dict.contact.fieldFirstName} value={c.firstName} emptyLabel={dict.contact.empty} />
+        <Field label={dict.contact.fieldLastName} value={c.lastName} emptyLabel={dict.contact.empty} />
+        <Field label={dict.contact.fieldCompany} value={c.company} emptyLabel={dict.contact.empty} />
+        <Field label={dict.contact.fieldPosition} value={c.position} emptyLabel={dict.contact.empty} />
+        <Field label={dict.contact.fieldIndustry} value={c.industry} emptyLabel={dict.contact.empty} />
+        <Field label={dict.contact.fieldEmail} value={c.email} emptyLabel={dict.contact.empty} />
+        <Field label={dict.contact.fieldConnectedOn} value={c.connectedOn} emptyLabel={dict.contact.empty} />
         <Field
-          label="LinkedIn profile"
+          label={dict.contact.fieldLinkedinProfile}
+          emptyLabel={dict.contact.empty}
           value={
             c.profileKey ? (
               <a href={profileUrl} target="_blank" rel="noopener noreferrer">
@@ -86,119 +90,127 @@ export default async function ContactDetail({
           }
         />
         <Field
-          label="Team overlap"
+          label={dict.contact.fieldTeamOverlap}
+          emptyLabel={dict.contact.empty}
           value={
             c.overlapWith.length ? (
-              <span className="badge">also in {c.overlapWith.join(", ")}</span>
+              <span className="badge">{dict.common.alsoIn(c.overlapWith.join(", "))}</span>
             ) : null
           }
         />
         <Field
-          label="Added on"
-          value={new Date(c.createdAt).toLocaleDateString()}
+          label={dict.contact.fieldAddedOn}
+          emptyLabel={dict.contact.empty}
+          value={formatDate(c.createdAt, locale)}
         />
       </section>
 
       <section className="panel">
-        <h2>Relationship signals</h2>
+        <h2>{dict.contact.relationshipSignals}</h2>
         {c.messageCount > 0 ? (
           <>
-            <Field label="Messages" value={`${c.messageCount} total`} />
             <Field
-              label="Sent / received"
-              value={`${c.sentCount} sent · ${c.receivedCount} received`}
+              label={dict.contact.fieldMessages}
+              emptyLabel={dict.contact.empty}
+              value={dict.contact.messagesTotal(c.messageCount)}
             />
             <Field
-              label="First contact"
+              label={dict.contact.fieldSentReceived}
+              emptyLabel={dict.contact.empty}
+              value={dict.contact.sentReceived(c.sentCount, c.receivedCount)}
+            />
+            <Field
+              label={dict.contact.fieldFirstContact}
+              emptyLabel={dict.contact.empty}
               value={
                 c.firstMessageAt ? (
                   <>
-                    {formatDateTime(c.firstMessageAt)}{" "}
+                    {formatDateTime(c.firstMessageAt, locale)}{" "}
                     <span className="soft">
-                      ({relativeTime(new Date(c.firstMessageAt))})
+                      ({relativeTime(new Date(c.firstMessageAt), locale)})
                     </span>
                   </>
                 ) : null
               }
             />
             <Field
-              label="Last contact"
+              label={dict.contact.fieldLastContact}
+              emptyLabel={dict.contact.empty}
               value={
                 c.lastMessageAt ? (
                   <>
-                    {formatDateTime(c.lastMessageAt)}{" "}
+                    {formatDateTime(c.lastMessageAt, locale)}{" "}
                     <span className="soft">
-                      ({relativeTime(new Date(c.lastMessageAt))})
+                      ({relativeTime(new Date(c.lastMessageAt), locale)})
                     </span>
                   </>
                 ) : null
               }
             />
             <Field
-              label="Started by"
+              label={dict.contact.fieldStartedBy}
+              emptyLabel={dict.contact.empty}
               value={
                 c.initiatedByMe === null
                   ? null
                   : c.initiatedByMe
-                    ? "Me"
-                    : "Them"
+                    ? dict.contact.startedByMe
+                    : dict.contact.startedByThem
               }
             />
             <Field
-              label="Reciprocal"
+              label={dict.contact.fieldReciprocal}
+              emptyLabel={dict.contact.empty}
               value={
                 <span className={`badge ${c.reciprocal ? "green" : ""}`}>
-                  {c.reciprocal ? "yes" : "no"}
+                  {c.reciprocal ? dict.common.yes : dict.common.no}
                 </span>
               }
             />
             {c.dormant && (
               <Field
-                label="Status"
-                value={<span className="badge dormant">dormant</span>}
+                label={dict.contact.fieldStatus}
+                emptyLabel={dict.contact.empty}
+                value={<span className="badge dormant">{dict.common.dormantBadge}</span>}
               />
             )}
           </>
         ) : (
-          <p className="muted">No messages recorded with this contact yet.</p>
+          <p className="muted">{dict.contact.noMessages}</p>
         )}
       </section>
 
       {threads.length > 0 && (
         <section className="panel">
-          <h2>Conversation history</h2>
+          <h2>{dict.contact.conversationHistory}</h2>
           {moreConversations && (
             <p className="thread-notice">
-              Showing the {threads.length} most recent conversations — older
-              conversations with this contact are not shown.
+              {dict.contact.moreConversationsNotice(threads.length)}
             </p>
           )}
-          {moreMessages && (
-            <p className="thread-notice">
-              Showing the most recent 100 messages across the conversations
-              below — older messages are not shown.
-            </p>
-          )}
-          {threads.map((t) => (
-            <div key={t.id} className="thread">
+          {moreMessages && <p className="thread-notice">{dict.contact.moreMessagesNotice}</p>}
+          {threads.map((thread) => (
+            <div key={thread.id} className="thread">
               <div className="thread-header">
-                <span className="thread-title">{t.title || "Untitled conversation"}</span>
+                <span className="thread-title">
+                  {thread.title || dict.contact.untitledConversation}
+                </span>
                 <span className="soft thread-meta">
-                  {t.messageCount} messages
-                  {t.lastMessageAt && (
-                    <> · last {relativeTime(new Date(t.lastMessageAt))}</>
+                  {dict.contact.messageCountLabel(thread.messageCount)}
+                  {thread.lastMessageAt && (
+                    <> {dict.contact.lastMessageTime(relativeTime(new Date(thread.lastMessageAt), locale))}</>
                   )}
                 </span>
               </div>
               <div className="thread-messages">
-                {t.messages.map((m) => (
+                {thread.messages.map((m) => (
                   <div key={m.id} className="message">
                     <div className="message-meta">
                       <span className="message-sender">
-                        {m.senderName || "Unknown sender"}
+                        {m.senderName || dict.contact.unknownSender}
                       </span>
                       <span className="soft message-time">
-                        {formatDateTime(m.sentAt)}
+                        {formatDateTime(m.sentAt, locale)}
                       </span>
                     </div>
                     <div className="message-content">{m.content}</div>

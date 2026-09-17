@@ -60,10 +60,13 @@ export async function getCurrentAuthUserId(): Promise<string> {
 // src/lib/messagesCsv.ts and #recomputeMessageSignals below). "dormant" is
 // computed in JS at read time (reciprocal + no message in DORMANT_MONTHS)
 // rather than stored, since "now" moves — see isDormant().
+// Display labels are localized — see src/lib/i18n/dictionaries/{en,es}.ts
+// (`relationshipFilters` record), keyed by the same key so the key list
+// lives in exactly one place.
 export const RELATIONSHIP_FILTERS = [
-  { key: "reciprocal", label: "Reciprocal" },
-  { key: "dormant", label: "Dormant (12mo+)" },
-  { key: "never", label: "Never messaged" },
+  { key: "reciprocal" },
+  { key: "dormant" },
+  { key: "never" },
 ] as const;
 export type RelationshipFilterKey = (typeof RELATIONSHIP_FILTERS)[number]["key"];
 

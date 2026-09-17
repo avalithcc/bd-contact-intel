@@ -7,7 +7,8 @@ import {
   LEADERSHIP_ROLE_GROUPS,
   type HiringMatch,
 } from "@/lib/hiring/queries";
-import { ROLE_GROUP_LABELS, type RoleGroupKey } from "@/lib/roleGroups";
+import type { RoleGroupKey } from "@/lib/roleGroups";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 // Relationship tiers, highest outreach priority first. Kept as an explicit
 // enum (rather than a single opaque "score") so every row's rank traces
@@ -196,40 +197,47 @@ export async function listOutreachCandidates(
 }
 
 /** Human-readable reason chips for why a row is ranked where it is. */
-export function outreachReasons(row: OutreachRow, relativeTime: (d: Date) => string): string[] {
+export function outreachReasons(
+  row: OutreachRow,
+  relativeTime: (d: Date) => string,
+  t: Dictionary,
+): string[] {
   const reasons: string[] = [];
 
   switch (row.relationshipTier) {
     case "dormant":
       reasons.push(
         row.lastMessageAt
-          ? `Dormant since ${relativeTime(row.lastMessageAt)} (${DORMANT_MONTHS}mo+ quiet)`
-          : "Dormant",
+          ? t.outreach.reasonDormantSince(relativeTime(row.lastMessageAt), DORMANT_MONTHS)
+          : t.outreach.reasonDormant,
       );
       break;
     case "reciprocal_recent":
       reasons.push(
-        row.lastMessageAt ? `Reciprocal · active ${relativeTime(row.lastMessageAt)}` : "Reciprocal",
+        row.lastMessageAt
+          ? t.outreach.reasonReciprocalActive(relativeTime(row.lastMessageAt))
+          : t.outreach.reasonReciprocal,
       );
       break;
     case "contacted_no_reply":
       reasons.push(
         row.lastMessageAt
-          ? `Contacted ${relativeTime(row.lastMessageAt)}, no reply yet`
-          : "Contacted, no reply yet",
+          ? t.outreach.reasonContactedNoReply(relativeTime(row.lastMessageAt))
+          : t.outreach.reasonContactedNoReplyGeneric,
       );
       break;
     case "never_messaged":
-      reasons.push("Never messaged");
+      reasons.push(t.outreach.reasonNeverMessaged);
       break;
   }
 
-  if (row.roleGroup) reasons.push(ROLE_GROUP_LABELS[row.roleGroup]);
+  if (row.roleGroup) reasons.push(t.roleGroups[row.roleGroup]);
 
   reasons.push(
-    `${row.companyDisplayName || row.company || "company"} has ${row.openItCount} open IT role${
-      row.openItCount === 1 ? "" : "s"
-    }`,
+    t.outreach.reasonOpenRoles(
+      row.companyDisplayName || row.company || t.outreach.companyFallback,
+      row.openItCount,
+    ),
   );
 
   return reasons;

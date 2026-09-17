@@ -4,8 +4,11 @@ import { useActionState } from "react";
 import { uploadCsv, uploadMessagesCsv, type UploadResult, type UploadMessagesResult } from "./actions";
 import { createClient } from "@/lib/supabase/client";
 import { MESSAGES_IMPORT_BUCKET } from "@/lib/storage";
+import { t } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locales";
 
-export function UploadForm() {
+export function UploadForm({ locale }: { locale: Locale }) {
+  const dict = t(locale);
   const [state, action, pending] = useActionState<UploadResult | null, FormData>(
     uploadCsv,
     null,
@@ -15,20 +18,23 @@ export function UploadForm() {
     <form action={action}>
       <div className="row">
         <div style={{ flex: 1, minWidth: 240 }}>
-          <label htmlFor="file">LinkedIn Connections.csv</label>
+          <label htmlFor="file">{dict.upload.connectionsLabel}</label>
           <input id="file" name="file" type="file" accept=".csv" required />
         </div>
         <button type="submit" disabled={pending}>
-          {pending ? "Importing…" : "Import"}
+          {pending ? dict.upload.importing : dict.upload.import}
         </button>
       </div>
       {state?.ok && (
         <p className="muted" style={{ marginBottom: 0 }}>
-          Imported {state.imported} contacts.
+          {dict.upload.importedContacts(state.imported ?? 0)}
         </p>
       )}
       {state && !state.ok && (
-        <p style={{ color: "#ff6b6b", marginBottom: 0 }}>{state.error}</p>
+        <p style={{ color: "#ff6b6b", marginBottom: 0 }}>
+          {state.errorKey ? dict.upload.connectionsErrors[state.errorKey] : null}
+          {state.errorDetail ? ` ${state.errorDetail}` : ""}
+        </p>
       )}
     </form>
   );
@@ -48,39 +54,50 @@ export function UploadForm() {
  * resulting storage path — a short string with no body-size problem. See
  * src/lib/storage.ts and README.md for the required bucket + RLS setup.
  */
-async function uploadMessagesViaStorage(
-  _prev: UploadMessagesResult | null,
-  formData: FormData,
-): Promise<UploadMessagesResult> {
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Choose a messages.csv file first." };
-  }
+function makeUploadMessagesViaStorage(locale: Locale) {
+  const dict = t(locale);
+  return async function uploadMessagesViaStorage(
+    _prev: UploadMessagesResult | null,
+    formData: FormData,
+  ): Promise<UploadMessagesResult> {
+    // These three checks never reach the server action, so there is no
+    // language-neutral boundary to cross — this closure already has the
+    // resolved dictionary, so it builds the final text directly instead of
+    // going through an errorKey.
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      return { ok: false, errorDetail: dict.upload.messagesErrors.missingFile };
+    }
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { ok: false, error: "Not authenticated. Please sign in again." };
-  }
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { ok: false, errorDetail: dict.upload.messagesErrors.notAuthenticated };
+    }
 
-  const path = `${user.id}/messages-${Date.now()}.csv`;
-  const { error: uploadError } = await supabase.storage
-    .from(MESSAGES_IMPORT_BUCKET)
-    .upload(path, file, { contentType: "text/csv" });
-  if (uploadError) {
-    return { ok: false, error: `Upload failed: ${uploadError.message}` };
-  }
+    const path = `${user.id}/messages-${Date.now()}.csv`;
+    const { error: uploadError } = await supabase.storage
+      .from(MESSAGES_IMPORT_BUCKET)
+      .upload(path, file, { contentType: "text/csv" });
+    if (uploadError) {
+      return {
+        ok: false,
+        errorDetail: `${dict.upload.messagesErrors.storageUploadFailedPrefix}${uploadError.message}`,
+      };
+    }
 
-  const serverFormData = new FormData();
-  serverFormData.set("path", path);
-  return uploadMessagesCsv(_prev, serverFormData);
+    const serverFormData = new FormData();
+    serverFormData.set("path", path);
+    return uploadMessagesCsv(_prev, serverFormData);
+  };
 }
 
-export function UploadMessagesForm() {
+export function UploadMessagesForm({ locale }: { locale: Locale }) {
+  const dict = t(locale);
   const [state, action, pending] = useActionState<UploadMessagesResult | null, FormData>(
-    uploadMessagesViaStorage,
+    makeUploadMessagesViaStorage(locale),
     null,
   );
 
@@ -88,31 +105,38 @@ export function UploadMessagesForm() {
     <form action={action}>
       <div className="row">
         <div style={{ flex: 1, minWidth: 240 }}>
-          <label htmlFor="messagesFile">LinkedIn messages.csv</label>
+          <label htmlFor="messagesFile">{dict.upload.messagesLabel}</label>
           <input id="messagesFile" name="file" type="file" accept=".csv" required />
         </div>
         <button type="submit" disabled={pending}>
-          {pending ? "Importing…" : "Import"}
+          {pending ? dict.upload.importing : dict.upload.import}
         </button>
       </div>
       {state?.ok && (
         <>
           <p className="muted" style={{ marginBottom: 0 }}>
-            Imported {state.messages} messages across {state.conversations} conversations
-            {state.ownProfileKey ? ` (detected sender: ${state.ownProfileKey}` : ""}
-            {state.confidence != null ? `, confidence ${Math.round(state.confidence * 100)}%)` : state.ownProfileKey ? ")" : ""}
+            {dict.upload.importedMessages(state.messages ?? 0, state.conversations ?? 0)}
+            {state.ownProfileKey ? dict.upload.detectedSender(state.ownProfileKey) : ""}
+            {state.confidence != null
+              ? dict.upload.withConfidence(Math.round(state.confidence * 100))
+              : state.ownProfileKey
+                ? dict.upload.closeParen
+                : ""}
             .
           </p>
           {state.ownProfileWarning && (
             <p style={{ color: "#e6a23c", marginBottom: 0 }}>{state.ownProfileWarning}</p>
           )}
-          {state.cleanupWarning && (
-            <p style={{ color: "#e6a23c", marginBottom: 0 }}>{state.cleanupWarning}</p>
+          {state.cleanupFailed && (
+            <p style={{ color: "#e6a23c", marginBottom: 0 }}>{dict.upload.cleanupWarning}</p>
           )}
         </>
       )}
       {state && !state.ok && (
-        <p style={{ color: "#ff6b6b", marginBottom: 0 }}>{state.error}</p>
+        <p style={{ color: "#ff6b6b", marginBottom: 0 }}>
+          {state.errorKey ? dict.upload.messagesErrors[state.errorKey] : state.errorDetail}
+          {state.errorKey === "genericFailed" && state.errorDetail ? ` ${state.errorDetail}` : ""}
+        </p>
       )}
     </form>
   );

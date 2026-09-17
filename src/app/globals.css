@@ -271,6 +271,21 @@ a {
   cursor: default;
 }
 
+/* ---- locale switcher ---- */
+.locale-switcher {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin: 0;
+}
+.locale-btn {
+  padding: 0.5rem 0.65rem;
+  font-family: var(--font-mono);
+}
+.locale-btn.active {
+  color: var(--ink);
+  border-color: var(--red);
+}
+
 /* ---- pager ---- */
 .pager {
   display: flex;

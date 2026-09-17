@@ -29,35 +29,33 @@ export type CompanyCategoryKey =
 
 export interface CompanyCategoryDef {
   key: CompanyCategoryKey;
-  label: string;
 }
 
 // Ordered for display. `unclassified` (company present but its normalized
 // key isn't in the company_category table — e.g. future imports from other
 // BDs whose network hasn't been mapped yet) and `no_company` (blank/null
 // company) are synthetic buckets not present in the mapping table itself.
+//
+// Display labels are localized — see src/lib/i18n/dictionaries/{en,es}.ts
+// (`companyCategories` record), keyed by the same CompanyCategoryKey so the
+// key list lives in exactly one place.
 export const COMPANY_CATEGORIES: CompanyCategoryDef[] = [
-  { key: "fintech_payments", label: "Fintech & Payments" },
-  { key: "banking_insurance", label: "Banking & Insurance" },
-  { key: "software_services", label: "Software Services (competitors)" },
-  { key: "consulting_big4", label: "Consulting & Big 4" },
-  { key: "product_saas", label: "Product & SaaS" },
-  { key: "ecommerce_retail", label: "E-commerce & Retail" },
-  { key: "telecom_media", label: "Telecom & Media" },
-  { key: "travel_logistics", label: "Travel & Logistics" },
-  { key: "energy_industry", label: "Energy & Industry" },
-  { key: "health", label: "Health" },
-  { key: "government_education", label: "Government & Education" },
-  { key: "independent", label: "Independent" },
-  { key: "other", label: "Other" },
-  { key: "unclassified", label: "Unclassified" },
-  { key: "no_company", label: "No company" },
+  { key: "fintech_payments" },
+  { key: "banking_insurance" },
+  { key: "software_services" },
+  { key: "consulting_big4" },
+  { key: "product_saas" },
+  { key: "ecommerce_retail" },
+  { key: "telecom_media" },
+  { key: "travel_logistics" },
+  { key: "energy_industry" },
+  { key: "health" },
+  { key: "government_education" },
+  { key: "independent" },
+  { key: "other" },
+  { key: "unclassified" },
+  { key: "no_company" },
 ];
-
-export const COMPANY_CATEGORY_LABELS: Record<CompanyCategoryKey, string> =
-  Object.fromEntries(
-    COMPANY_CATEGORIES.map((c) => [c.key, c.label]),
-  ) as Record<CompanyCategoryKey, string>;
 
 // Legal-suffix / entity-type words stripped from company names before
 // normalization, matched on (ASCII) word boundaries. Ported 1:1 from the

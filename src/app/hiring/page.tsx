@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { getCompanyHiringSummaries } from "@/lib/hiring/queries";
 import { getCurrentBd } from "@/lib/queries";
+import { getLocale } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/dictionaries";
+import { formatDate } from "@/lib/i18n/format";
+import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
 
 export const dynamic = "force-dynamic";
 
 export default async function HiringPage() {
+  const locale = await getLocale();
+  const dict = t(locale);
   const me = await getCurrentBd();
   const summaries = await getCompanyHiringSummaries(me.id);
 
@@ -16,39 +22,38 @@ export default async function HiringPage() {
         </span>
         <div className="row" style={{ gap: "0.75rem" }}>
           <Link className="secondary-btn" href="/">
-            ← contacts
+            {dict.common.backToContacts}
           </Link>
           <Link className="secondary-btn" href="/outreach">
-            priority outreach →
+            {dict.common.priorityOutreach}
           </Link>
+          <LocaleSwitcher locale={locale} />
         </div>
       </div>
 
       <div style={{ marginBottom: "1.75rem" }}>
-        <div className="eyebrow">// hiring_signals</div>
+        <div className="eyebrow">{dict.hiring.eyebrow}</div>
         <h1>
-          open IT roles<span className="dot">.</span>
+          {dict.hiring.title}
+          <span className="dot">.</span>
         </h1>
         <p className="soft" style={{ margin: 0 }}>
-          Target companies currently hiring for IT roles, tracked from their public job boards.
+          {dict.hiring.subtitle}
         </p>
       </div>
 
       <section className="panel">
-        <div className="eyebrow">// companies</div>
-        {!summaries.length && (
-          <p className="muted">
-            No open IT postings tracked yet. Seed target companies (see
-            scripts/seed-target-companies.ts) and run a sync.
-          </p>
-        )}
+        <div className="eyebrow">{dict.hiring.companiesEyebrow}</div>
+        {!summaries.length && <p className="muted">{dict.hiring.empty}</p>}
         {summaries.map((s) => (
           <div key={s.companyKey} style={{ marginBottom: "0.75rem" }}>
             <details className="filter-helper">
               <summary>
-                {s.displayName} — {s.openItCount} open IT posting{s.openItCount === 1 ? "" : "s"}
-                {s.newLast7Days > 0 && <span className="badge green">{s.newLast7Days} new</span>}
-                <span className="filter-helper-hint">show postings</span>
+                {s.displayName} — {dict.hiring.postingCount(s.openItCount)}
+                {s.newLast7Days > 0 && (
+                  <span className="badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
+                )}
+                <span className="filter-helper-hint">{dict.hiring.showPostings}</span>
               </summary>
               <div className="filter-helper-body">
                 <ul className="example-list">
@@ -58,8 +63,8 @@ export default async function HiringPage() {
                         {p.title}
                       </a>{" "}
                       <span className="muted">
-                        — {p.location || "location n/a"}
-                        {p.postedAt ? ` · posted ${p.postedAt.toLocaleDateString()}` : ""}
+                        — {p.location || dict.hiring.locationNA}
+                        {p.postedAt ? ` ${dict.hiring.postedOn(formatDate(p.postedAt, locale))}` : ""}
                       </span>
                     </li>
                   ))}
@@ -71,8 +76,8 @@ export default async function HiringPage() {
               href={`/?companyKey=${encodeURIComponent(s.companyKey)}`}
               style={{ display: "inline-block", marginTop: "0.35rem" }}
             >
-              {s.contactCount} contact{s.contactCount === 1 ? "" : "s"}
-              {s.leadershipContactCount > 0 && ` · ${s.leadershipContactCount} leadership`} →
+              {dict.hiring.contactCount(s.contactCount)}
+              {s.leadershipContactCount > 0 && ` ${dict.hiring.leadershipCount(s.leadershipContactCount)}`} →
             </Link>
           </div>
         ))}

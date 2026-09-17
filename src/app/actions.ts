@@ -12,10 +12,25 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { MESSAGES_IMPORT_BUCKET } from "@/lib/storage";
 
+// Stable keys, not translated text — the server action must not decide the
+// visitor's language. The UI (src/app/UploadForm.tsx) maps these to
+// localized copy at render time via src/lib/i18n/dictionaries.
+export type UploadErrorKey = "missingFile" | "noConnectionsFound" | "genericFailed";
+export type UploadMessagesErrorKey =
+  | "missingFileRef"
+  | "invalidFileRef"
+  | "downloadFailed"
+  | "noMessagesFound"
+  | "genericFailed";
+
 export interface UploadResult {
   ok: boolean;
   imported?: number;
-  error?: string;
+  errorKey?: UploadErrorKey;
+  // Raw message from an unexpected (not specifically handled) exception —
+  // technical/diagnostic only, intentionally left untranslated like any
+  // other caught error detail. See errorKey for the localized headline.
+  errorDetail?: string;
 }
 
 export interface UploadMessagesResult {
@@ -26,12 +41,17 @@ export interface UploadMessagesResult {
   // Coverage ratio (0-1) of the detected own profile — see
   // src/lib/messagesCsv.ts#detectOwnProfileKey.
   confidence?: number | null;
-  // Set when detection confidence is low; the UI MUST surface this.
+  // Set when detection confidence is low; the UI MUST surface this. Left
+  // untranslated: it's produced deep inside the CSV parser (messagesCsv.ts)
+  // and shared verbatim with scripts/import-messages.ts's console output —
+  // restructuring it into a translatable key would change that parser's
+  // return shape beyond a string swap, which is out of scope here.
   ownProfileWarning?: string | null;
   // Set when the import succeeded but deleting the staged upload from
   // Storage failed — the import itself is not affected.
-  cleanupWarning?: string;
-  error?: string;
+  cleanupFailed?: boolean;
+  errorKey?: UploadMessagesErrorKey;
+  errorDetail?: string;
 }
 
 export async function uploadCsv(
@@ -40,24 +60,24 @@ export async function uploadCsv(
 ): Promise<UploadResult> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Choose a Connections.csv file first." };
+    return { ok: false, errorKey: "missingFile" };
   }
   try {
     const text = await file.text();
     const parsed = parseConnectionsCsv(text);
     if (!parsed.length) {
-      return {
-        ok: false,
-        error:
-          "No connections found. Make sure this is the LinkedIn Connections.csv export.",
-      };
+      return { ok: false, errorKey: "noConnectionsFound" };
     }
     const me = await getCurrentBd();
     const imported = await upsertContacts(me.id, parsed);
     revalidatePath("/");
     return { ok: true, imported };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Upload failed." };
+    return {
+      ok: false,
+      errorKey: "genericFailed",
+      errorDetail: err instanceof Error ? err.message : undefined,
+    };
   }
 }
 
@@ -76,7 +96,7 @@ export async function uploadMessagesCsv(
 ): Promise<UploadMessagesResult> {
   const path = formData.get("path");
   if (typeof path !== "string" || !path) {
-    return { ok: false, error: "Missing uploaded file reference." };
+    return { ok: false, errorKey: "missingFileRef" };
   }
 
   try {
@@ -86,7 +106,7 @@ export async function uploadMessagesCsv(
     // is the one line standing between a BD and reading another BD's
     // staged upload.
     if (!path.startsWith(`${authUserId}/`)) {
-      return { ok: false, error: "Invalid file reference." };
+      return { ok: false, errorKey: "invalidFileRef" };
     }
 
     const supabase = await createClient();
@@ -94,16 +114,13 @@ export async function uploadMessagesCsv(
       .from(MESSAGES_IMPORT_BUCKET)
       .download(path);
     if (downloadError || !fileData) {
-      return { ok: false, error: "Could not read the uploaded file. Please try again." };
+      return { ok: false, errorKey: "downloadFailed" };
     }
 
     const text = await fileData.text();
     const parsed = parseMessagesCsv(text);
     if (!parsed.messages.length) {
-      return {
-        ok: false,
-        error: "No messages found. Make sure this is the LinkedIn messages.csv export.",
-      };
+      return { ok: false, errorKey: "noMessagesFound" };
     }
 
     const me = await getCurrentBd();
@@ -124,11 +141,13 @@ export async function uploadMessagesCsv(
       ownProfileKey: parsed.ownProfileKey,
       confidence: parsed.ownProfileConfidence,
       ownProfileWarning: parsed.ownProfileWarning,
-      cleanupWarning: removeError
-        ? "Import succeeded, but the staged upload could not be deleted from storage. Please remove it manually."
-        : undefined,
+      cleanupFailed: Boolean(removeError),
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Upload failed." };
+    return {
+      ok: false,
+      errorKey: "genericFailed",
+      errorDetail: err instanceof Error ? err.message : undefined,
+    };
   }
 }

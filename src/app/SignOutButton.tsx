@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { t } from "@/lib/i18n/dictionaries";
+import type { Locale } from "@/lib/i18n/locales";
 
-export function SignOutButton() {
+export function SignOutButton({ locale }: { locale: Locale }) {
   const router = useRouter();
   async function signOut() {
     await createClient().auth.signOut();
@@ -12,7 +14,7 @@ export function SignOutButton() {
   }
   return (
     <button type="button" className="secondary" onClick={signOut}>
-      Sign out
+      {t(locale).common.signOut}
     </button>
   );
 }

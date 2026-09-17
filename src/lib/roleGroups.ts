@@ -30,7 +30,6 @@ export type RoleGroupKey =
 
 export interface RoleGroupDef {
   key: RoleGroupKey;
-  label: string;
 }
 
 // Ordered for display; classification order is defined separately by RULES
@@ -38,25 +37,25 @@ export interface RoleGroupDef {
 // engineering_manager, tech_lead_architect, product, project_delivery,
 // developers, hr_recruiting, sales_bd, operations, other; no_position is
 // the null/blank fallback and is checked before any rule).
+//
+// Display labels are localized — see src/lib/i18n/dictionaries/{en,es}.ts
+// (`roleGroups` record), keyed by the same RoleGroupKey so the key list
+// lives in exactly one place.
 export const ROLE_GROUPS: RoleGroupDef[] = [
-  { key: "c_level_tech", label: "C-Level Tech" },
-  { key: "c_level_business", label: "C-Level / Founders" },
-  { key: "eng_leadership", label: "Engineering Leadership" },
-  { key: "engineering_manager", label: "Engineering Managers" },
-  { key: "tech_lead_architect", label: "Tech Leads & Architects" },
-  { key: "product", label: "Product" },
-  { key: "project_delivery", label: "Project & Delivery" },
-  { key: "developers", label: "Developers" },
-  { key: "hr_recruiting", label: "HR & Recruiting" },
-  { key: "sales_bd", label: "Sales & BD" },
-  { key: "operations", label: "Operations" },
-  { key: "other", label: "Other" },
-  { key: "no_position", label: "No position" },
+  { key: "c_level_tech" },
+  { key: "c_level_business" },
+  { key: "eng_leadership" },
+  { key: "engineering_manager" },
+  { key: "tech_lead_architect" },
+  { key: "product" },
+  { key: "project_delivery" },
+  { key: "developers" },
+  { key: "hr_recruiting" },
+  { key: "sales_bd" },
+  { key: "operations" },
+  { key: "other" },
+  { key: "no_position" },
 ];
-
-export const ROLE_GROUP_LABELS: Record<RoleGroupKey, string> = Object.fromEntries(
-  ROLE_GROUPS.map((g) => [g.key, g.label]),
-) as Record<RoleGroupKey, string>;
 
 // Unicode-aware "word" character class: letters (incl. accented), digits, underscore.
 const WORD_CHAR = "\\p{L}\\p{N}_";

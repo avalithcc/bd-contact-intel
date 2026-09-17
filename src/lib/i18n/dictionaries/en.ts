@@ -1,0 +1,278 @@
+import type { RoleGroupKey } from "@/lib/roleGroups";
+import type { CompanyCategoryKey } from "@/lib/companyCategories";
+import type { RelationshipFilterKey } from "@/lib/queries";
+
+// Display labels for the role-group taxonomy. Keys are defined once in
+// src/lib/roleGroups.ts (ROLE_GROUPS) and stored/queried by key — only the
+// label shown to the user is localized here.
+const roleGroups: Record<RoleGroupKey, string> = {
+  c_level_tech: "C-Level Tech",
+  c_level_business: "C-Level / Founders",
+  eng_leadership: "Engineering Leadership",
+  engineering_manager: "Engineering Managers",
+  tech_lead_architect: "Tech Leads & Architects",
+  product: "Product",
+  project_delivery: "Project & Delivery",
+  developers: "Developers",
+  hr_recruiting: "HR & Recruiting",
+  sales_bd: "Sales & BD",
+  operations: "Operations",
+  other: "Other",
+  no_position: "No position",
+};
+
+// Display labels for the company-category taxonomy. Keys are defined once
+// in src/lib/companyCategories.ts (COMPANY_CATEGORIES).
+const companyCategories: Record<CompanyCategoryKey, string> = {
+  fintech_payments: "Fintech & Payments",
+  banking_insurance: "Banking & Insurance",
+  software_services: "Software Services (competitors)",
+  consulting_big4: "Consulting & Big 4",
+  product_saas: "Product & SaaS",
+  ecommerce_retail: "E-commerce & Retail",
+  telecom_media: "Telecom & Media",
+  travel_logistics: "Travel & Logistics",
+  energy_industry: "Energy & Industry",
+  health: "Health",
+  government_education: "Government & Education",
+  independent: "Independent",
+  other: "Other",
+  unclassified: "Unclassified",
+  no_company: "No company",
+};
+
+// Display labels for the relationship-filter taxonomy. Keys are defined
+// once in src/lib/queries.ts (RELATIONSHIP_FILTERS).
+const relationshipFilters: Record<RelationshipFilterKey, string> = {
+  reciprocal: "Reciprocal",
+  dormant: "Dormant (12mo+)",
+  never: "Never messaged",
+};
+
+export const en = {
+  localeName: { en: "EN", es: "ES" },
+
+  common: {
+    signOut: "Sign out",
+    priorityOutreach: "priority outreach →",
+    hiringSignals: "hiring signals →",
+    backToContacts: "← contacts",
+    back: "← back",
+    prev: "← prev",
+    next: "next →",
+    filterEyebrow: "// filter",
+    filter: "Filter",
+    roleGroupLabel: "Role group",
+    allGroups: "All groups",
+    clearAll: "Clear all",
+    pageOf: (current: number, total: number) => `${current} / ${total}`,
+    totalPage: (total: number, current: number, totalPages: number) =>
+      `${total} total · page ${current} of ${totalPages}`,
+    dormantBadge: "dormant",
+    hiringBadge: "hiring",
+    alsoIn: (companies: string) => `also in ${companies}`,
+    yes: "yes",
+    no: "no",
+    never: "never",
+    ellipsis: "…",
+    brandEyebrow: "// bd_contact_intelligence",
+  },
+
+  roleGroups,
+  companyCategories,
+  relationshipFilters,
+
+  home: {
+    title: "contact base",
+    signedInAs: (name: string, email: string) => `Signed in as ${name} (${email})`,
+    importConnectionsSummary: "Import LinkedIn database",
+    importMessagesSummary: "Import LinkedIn messages",
+    companyLabel: "Company",
+    companyPlaceholder: "e.g. Acme",
+    companyCategoryLabel: "Company category",
+    allCategories: "All categories",
+    positionLabel: "Position",
+    positionPlaceholder: "e.g. Engineering",
+    relationshipLabel: "Relationship",
+    anyRelationship: "Any",
+    companyFromHiringChip: (key: string) => `Company (from hiring): ${key}`,
+    companyChip: (value: string) => `Company: ${value}`,
+    roleChip: (value: string) => `Role: ${value}`,
+    categoryChip: (value: string) => `Category: ${value}`,
+    positionChip: (value: string) => `Position: ${value}`,
+    relationshipChip: (value: string) => `Relationship: ${value}`,
+    removeCompanyKeyFilter: "Remove company key filter",
+    removeCompanyFilter: "Remove company filter",
+    removeRoleGroupFilter: "Remove role group filter",
+    removeCompanyCategoryFilter: "Remove company category filter",
+    removePositionFilter: "Remove position filter",
+    removeRelationshipFilter: "Remove relationship filter",
+    roleGroupSummary: (label: string, count: number, distinctTitles: number) =>
+      `${label} — ${count} contacts · ${distinctTitles} distinct titles`,
+    showExampleTitles: "show example titles",
+    moreTitles: (n: number) => `+${n} more title${n === 1 ? "" : "s"}`,
+    companyCategorySummary: (label: string, count: number, distinctCompanies: number) =>
+      `${label} — ${count} contacts · ${distinctCompanies} distinct companies`,
+    showExampleCompanies: "show example companies",
+    moreCompanies: (n: number) => `+${n} more compan${n === 1 ? "y" : "ies"}`,
+    contactsEyebrow: "// contacts",
+    tableName: "Name",
+    tableCompany: "Company",
+    tablePosition: "Position",
+    tableRelationship: "Relationship",
+    tableTeamOverlap: "Team overlap",
+    msgsCount: (n: number) => `${n} msgs`,
+    noContacts: "No contacts yet. Import your Connections.csv above.",
+  },
+
+  hiring: {
+    eyebrow: "// hiring_signals",
+    title: "open IT roles",
+    subtitle:
+      "Target companies currently hiring for IT roles, tracked from their public job boards.",
+    companiesEyebrow: "// companies",
+    empty:
+      "No open IT postings tracked yet. Seed target companies (see scripts/seed-target-companies.ts) and run a sync.",
+    postingCount: (n: number) => `${n} open IT posting${n === 1 ? "" : "s"}`,
+    newBadge: (n: number) => `${n} new`,
+    showPostings: "show postings",
+    locationNA: "location n/a",
+    postedOn: (date: string) => `· posted ${date}`,
+    contactCount: (n: number) => `${n} contact${n === 1 ? "" : "s"}`,
+    leadershipCount: (n: number) => `· ${n} leadership`,
+  },
+
+  outreach: {
+    eyebrow: "// priority_outreach",
+    title: "who to message this week",
+    subtitle:
+      "Your contacts at companies currently hiring IT, ranked by relationship strength and seniority.",
+    excludeNeverMessaged: "Exclude never-messaged contacts",
+    candidatesEyebrow: "// candidates",
+    noHiringCompaniesPrefix: "No hiring companies synced yet. Seed target companies and run a sync (see ",
+    noHiringCompaniesLinkText: "hiring signals",
+    noHiringCompaniesSuffix: ") before priority outreach has anything to rank.",
+    noMatchingContacts: (
+      hiringCompanyCount: number,
+      roleGroupFilterActive: boolean,
+      messageHistoryFilterActive: boolean,
+    ) =>
+      `${hiringCompanyCount} compan${hiringCompanyCount === 1 ? "y is" : "ies are"} hiring IT, but none of your contacts work there${
+        roleGroupFilterActive ? " in this role group" : ""
+      }${messageHistoryFilterActive ? " with a message history" : ""}. Try clearing the filter above.`,
+    tableName: "Name",
+    tablePosition: "Position",
+    tableCompany: "Company",
+    tableRoleGroup: "Role group",
+    tableOpenRoles: "Open IT roles",
+    tableLastContact: "Last contact",
+    tableWhy: "Why",
+    reasonDormantSince: (relTime: string, months: number) =>
+      `Dormant since ${relTime} (${months}mo+ quiet)`,
+    reasonDormant: "Dormant",
+    reasonReciprocalActive: (relTime: string) => `Reciprocal · active ${relTime}`,
+    reasonReciprocal: "Reciprocal",
+    reasonContactedNoReply: (relTime: string) => `Contacted ${relTime}, no reply yet`,
+    reasonContactedNoReplyGeneric: "Contacted, no reply yet",
+    reasonNeverMessaged: "Never messaged",
+    companyFallback: "company",
+    reasonOpenRoles: (company: string, n: number) =>
+      `${company} has ${n} open IT role${n === 1 ? "" : "s"}`,
+  },
+
+  contact: {
+    eyebrow: "// contact",
+    unnamed: "unnamed",
+    fieldFirstName: "First name",
+    fieldLastName: "Last name",
+    fieldCompany: "Company",
+    fieldPosition: "Position",
+    fieldIndustry: "Industry",
+    fieldEmail: "Email",
+    fieldConnectedOn: "Connected on",
+    fieldLinkedinProfile: "LinkedIn profile",
+    fieldTeamOverlap: "Team overlap",
+    fieldAddedOn: "Added on",
+    empty: "empty",
+    relationshipSignals: "Relationship signals",
+    fieldMessages: "Messages",
+    messagesTotal: (n: number) => `${n} total`,
+    fieldSentReceived: "Sent / received",
+    sentReceived: (sent: number, received: number) => `${sent} sent · ${received} received`,
+    fieldFirstContact: "First contact",
+    fieldLastContact: "Last contact",
+    fieldStartedBy: "Started by",
+    startedByMe: "Me",
+    startedByThem: "Them",
+    fieldReciprocal: "Reciprocal",
+    fieldStatus: "Status",
+    noMessages: "No messages recorded with this contact yet.",
+    conversationHistory: "Conversation history",
+    moreConversationsNotice: (shown: number) =>
+      `Showing the ${shown} most recent conversations — older conversations with this contact are not shown.`,
+    moreMessagesNotice:
+      "Showing the most recent 100 messages across the conversations below — older messages are not shown.",
+    untitledConversation: "Untitled conversation",
+    messageCountLabel: (n: number) => `${n} messages`,
+    lastMessageTime: (relTime: string) => `· last ${relTime}`,
+    unknownSender: "Unknown sender",
+  },
+
+  login: {
+    title: "sign in",
+    signUpIntro: "New here?",
+    signUpHintPrefix: "Create an account with your ",
+    signUpHintSuffix: " email.",
+    workEmail: "Work email",
+    password: "Password",
+    signIn: "Sign in",
+    createAccount: "Create account",
+    enterEmailPassword: "Enter your email and password first.",
+    domainRestricted: (domain: string) => `Accounts are limited to ${domain} emails.`,
+    passwordTooShort: "Use at least 8 characters for your password.",
+    accountCreated: "Account created. Check your inbox to confirm, then sign in.",
+  },
+
+  account: {
+    eyebrow: "// welcome",
+    title: "Set your password",
+    subtitle: "Choose a password to finish setting up your account.",
+    newPassword: "New password",
+    confirmPassword: "Confirm password",
+    saveAndContinue: "Save and continue",
+    passwordTooShort: "Use at least 8 characters.",
+    passwordsDontMatch: "Passwords don't match.",
+  },
+
+  upload: {
+    connectionsLabel: "LinkedIn Connections.csv",
+    import: "Import",
+    importing: "Importing…",
+    importedContacts: (n: number) => `Imported ${n} contacts.`,
+    messagesLabel: "LinkedIn messages.csv",
+    importedMessages: (messages: number, conversations: number) =>
+      `Imported ${messages} messages across ${conversations} conversations`,
+    detectedSender: (profileKey: string) => ` (detected sender: ${profileKey}`,
+    withConfidence: (pct: number) => `, confidence ${pct}%)`,
+    closeParen: ")",
+    cleanupWarning:
+      "Import succeeded, but the staged upload could not be deleted from storage. Please remove it manually.",
+    connectionsErrors: {
+      missingFile: "Choose a Connections.csv file first.",
+      noConnectionsFound:
+        "No connections found. Make sure this is the LinkedIn Connections.csv export.",
+      genericFailed: "Upload failed.",
+    },
+    messagesErrors: {
+      missingFile: "Choose a messages.csv file first.",
+      notAuthenticated: "Not authenticated. Please sign in again.",
+      storageUploadFailedPrefix: "Upload failed: ",
+      missingFileRef: "Missing uploaded file reference.",
+      invalidFileRef: "Invalid file reference.",
+      downloadFailed: "Could not read the uploaded file. Please try again.",
+      noMessagesFound:
+        "No messages found. Make sure this is the LinkedIn messages.csv export.",
+      genericFailed: "Upload failed.",
+    },
+  },
+};
