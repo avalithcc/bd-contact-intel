@@ -23,6 +23,7 @@ export default async function OutreachPage({
   searchParams: Promise<{
     roleGroup?: string;
     market?: string;
+    miamiOnly?: string;
     excludeNever?: string;
     page?: string;
   }>;
@@ -35,6 +36,11 @@ export default async function OutreachPage({
   const page = Math.max(1, Number(sp.page) || 1);
   const roleGroup = isRoleGroupKey(sp.roleGroup) ? sp.roleGroup : undefined;
   const market = isMarketKey(sp.market) ? sp.market : undefined;
+  // Only meaningful (and only rendered as a control below) when the market
+  // filter is exactly "us" — validated server-side here so a URL crafted
+  // with e.g. market=latam&miamiOnly=on can never mean "Miami postings in
+  // LATAM"; it's simply ignored.
+  const miamiOnly = market === "us" && sp.miamiOnly === "on";
   // A GET checkbox that's unchecked is simply omitted from the submitted
   // query string, indistinguishable from "form never submitted" — so the
   // control is phrased as an opt-in "exclude" checkbox (default unchecked)
@@ -44,12 +50,18 @@ export default async function OutreachPage({
   const includeNeverMessaged = !excludeNeverMessaged;
 
   const { rows, total, page: current, totalPages, hiringCompanyCount } =
-    await listOutreachCandidates(me.id, { roleGroup, market, includeNeverMessaged }, page, PAGE_SIZE);
+    await listOutreachCandidates(
+      me.id,
+      { roleGroup, market, miamiOnly, includeNeverMessaged },
+      page,
+      PAGE_SIZE,
+    );
 
   const qs = (p: number) => {
     const params = new URLSearchParams();
     if (roleGroup) params.set("roleGroup", roleGroup);
     if (market) params.set("market", market);
+    if (miamiOnly) params.set("miamiOnly", "on");
     if (excludeNeverMessaged) params.set("excludeNever", "on");
     params.set("page", String(p));
     return `/outreach?${params.toString()}`;
@@ -111,6 +123,19 @@ export default async function OutreachPage({
               ))}
             </select>
           </div>
+          {market === "us" && (
+            <div className="filter-field filter-field-checkbox">
+              <label htmlFor="miamiOnly" className="checkbox-label">
+                <input
+                  id="miamiOnly"
+                  name="miamiOnly"
+                  type="checkbox"
+                  defaultChecked={miamiOnly}
+                />
+                {dict.common.miamiOnlyLabel}
+              </label>
+            </div>
+          )}
           <div className="filter-field filter-field-checkbox">
             <label htmlFor="excludeNever" className="checkbox-label">
               <input

@@ -12,14 +12,19 @@ export const dynamic = "force-dynamic";
 export default async function HiringPage({
   searchParams,
 }: {
-  searchParams: Promise<{ market?: string }>;
+  searchParams: Promise<{ market?: string; miamiOnly?: string }>;
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
   const dict = t(locale);
   const me = await getCurrentBd();
   const market = isMarketKey(sp.market) ? sp.market : undefined;
-  const summaries = await getCompanyHiringSummaries(me.id, market);
+  // Only meaningful (and only rendered as a control below) when the market
+  // filter is exactly "us" — validated server-side here so a URL crafted
+  // with e.g. market=latam&miamiOnly=on can never mean "Miami postings in
+  // LATAM"; it's simply ignored.
+  const miamiOnly = market === "us" && sp.miamiOnly === "on";
+  const summaries = await getCompanyHiringSummaries(me.id, market, miamiOnly);
 
   return (
     <main>
@@ -66,6 +71,19 @@ export default async function HiringPage({
               ))}
             </select>
           </div>
+          {market === "us" && (
+            <div className="filter-field filter-field-checkbox">
+              <label htmlFor="miamiOnly" className="checkbox-label">
+                <input
+                  id="miamiOnly"
+                  name="miamiOnly"
+                  type="checkbox"
+                  defaultChecked={miamiOnly}
+                />
+                {dict.common.miamiOnlyLabel}
+              </label>
+            </div>
+          )}
           <button type="submit" className="filter-submit">
             {dict.common.filter}
           </button>

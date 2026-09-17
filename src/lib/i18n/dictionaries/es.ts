@@ -22,6 +22,7 @@ export const es: typeof en = {
     allGroups: "Todos los grupos",
     marketLabel: "Mercado",
     allMarkets: "Todos los mercados",
+    miamiOnlyLabel: "Solo área de Miami",
     clearAll: "Limpiar todo",
     pageOf: (current, total) => `${current} / ${total}`,
     totalPage: (total, current, totalPages) =>

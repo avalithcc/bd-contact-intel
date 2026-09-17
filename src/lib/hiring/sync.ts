@@ -9,7 +9,7 @@ import {
 import { JOB_SOURCES } from "./registry";
 import type { AtsKey } from "./registry";
 import { isItPosting } from "./classify";
-import { classifyMarket } from "./markets";
+import { classifyMarket, isMiamiArea } from "./markets";
 
 export interface SyncResult {
   companyKey: string;
@@ -39,8 +39,9 @@ async function recordSyncRun(
 
 /**
  * Sync one target company: fetch postings from its ATS, classify each into
- * IT/non-IT and a market bucket, upsert ALL of them, and close postings no
- * longer seen. Idempotent and safe to re-run — never throws; failures are
+ * IT/non-IT, a market bucket and the Miami sub-flag, upsert ALL of them,
+ * and close postings no longer seen. Idempotent and safe to re-run — never
+ * throws; failures are
  * captured in the returned result and in a sync_run row so one company's
  * failure doesn't affect the others (see syncAllCompanies).
  *
@@ -101,6 +102,7 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
         postedAt: p.postedAt ?? null,
         isIt: isItPosting(p.title),
         market: classifyMarket(p.location),
+        isMiami: isMiamiArea(p.location),
         lastSeen: startedAt,
       }));
 
@@ -117,6 +119,7 @@ export async function syncCompany(company: TargetCompany): Promise<SyncResult> {
             postedAt: sql`excluded.posted_at`,
             isIt: sql`excluded.is_it`,
             market: sql`excluded.market`,
+            isMiami: sql`excluded.is_miami`,
             lastSeen: sql`excluded.last_seen`,
             // A posting that reappears after being marked closed is reopened.
             closedAt: sql`null`,

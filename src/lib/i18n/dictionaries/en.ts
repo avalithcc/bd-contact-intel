@@ -77,6 +77,12 @@ export const en = {
     allGroups: "All groups",
     marketLabel: "Market",
     allMarkets: "All markets",
+    // Sub-filter within the "us" market only — matches
+    // src/lib/hiring/markets.ts#isMiamiArea, which is Miami metro
+    // (Miami/Miami Beach/Fort Lauderdale/Coral Gables/Doral/Hialeah), NOT
+    // all of Florida (e.g. Orlando/Tampa don't match). Keep this label in
+    // sync with that function's actual matching set.
+    miamiOnlyLabel: "Miami area only",
     clearAll: "Clear all",
     pageOf: (current: number, total: number) => `${current} / ${total}`,
     totalPage: (total: number, current: number, totalPages: number) =>

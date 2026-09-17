@@ -67,9 +67,16 @@ interface ResolvedHiringCompany {
  * WHERE condition — not a post-fetch JS filter — so passing it never
  * changes the query count and never fetches rows outside the selected
  * market. Omitted/undefined means "all markets" (today's behavior).
+ *
+ * `miamiOnly` further narrows query (1) to `is_miami = true` (see
+ * src/lib/hiring/markets.ts#isMiamiArea), same SQL-WHERE approach — no
+ * query count change. It's a sub-filter of "us", but this function doesn't
+ * enforce that pairing itself (callers only ever pass it alongside
+ * `market: "us"` — see the page components under src/app/*).
  */
 export async function resolveHiringCompanies(
   market?: MarketKey,
+  miamiOnly?: boolean,
 ): Promise<Map<string, ResolvedHiringCompany>> {
   const openPostings = await db
     .select({
@@ -90,6 +97,7 @@ export async function resolveHiringCompanies(
         eq(jobPosting.isIt, true),
         isNull(jobPosting.closedAt),
         market ? eq(jobPosting.market, market) : undefined,
+        miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
       ),
     )
     .orderBy(desc(jobPosting.postedAt));
@@ -140,16 +148,17 @@ export async function resolveHiringCompanies(
  * over `contact` for every key (canonical + alias) that resolves to any
  * hiring company. No per-company query loop (no N+1).
  *
- * `market`, when set, flows straight into resolveHiringCompanies' SQL WHERE
- * clause — same query count either way.
+ * `market` and `miamiOnly`, when set, flow straight into
+ * resolveHiringCompanies' SQL WHERE clause — same query count either way.
  */
 export async function getCompanyHiringSummaries(
   bdId: string,
   market?: MarketKey,
+  miamiOnly?: boolean,
 ): Promise<CompanyHiringSummary[]> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const companies = await resolveHiringCompanies(market);
+  const companies = await resolveHiringCompanies(market, miamiOnly);
   if (!companies.size) return [];
 
   const allMatchKeys = [
@@ -219,11 +228,15 @@ export interface HiringMatch {
  * getCompanyHiringSummaries (via resolveHiringCompanies) rather than
  * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup.
  * Not BD-scoped — job postings/target companies are shared data. Two fixed
- * queries regardless of caller. `market` flows into resolveHiringCompanies'
- * SQL WHERE clause, same as getCompanyHiringSummaries above.
+ * queries regardless of caller. `market` and `miamiOnly` flow into
+ * resolveHiringCompanies' SQL WHERE clause, same as
+ * getCompanyHiringSummaries above.
  */
-export async function getHiringMatchIndex(market?: MarketKey): Promise<Map<string, HiringMatch>> {
-  const companies = await resolveHiringCompanies(market);
+export async function getHiringMatchIndex(
+  market?: MarketKey,
+  miamiOnly?: boolean,
+): Promise<Map<string, HiringMatch>> {
+  const companies = await resolveHiringCompanies(market, miamiOnly);
   const index = new Map<string, HiringMatch>();
   for (const c of companies.values()) {
     const match: HiringMatch = {

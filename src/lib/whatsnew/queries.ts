@@ -188,20 +188,21 @@ function buildSuggestedContacts(
  *     via `eq(contact.bdId, bdId)`.
  * Grouping, the leadership/rest split, and the suggested-contacts ranking
  * all happen in JS over those five result sets — no per-company or
- * per-posting query. `market`, when set, narrows queries 2-3 (via
- * resolveHiringCompanies) and query 4 with a SQL WHERE condition each — the
- * query count stays exactly 5 either way.
+ * per-posting query. `market` and `miamiOnly`, when set, narrow queries 2-3
+ * (via resolveHiringCompanies) and query 4 with a SQL WHERE condition each
+ * — the query count stays exactly 5 either way.
  */
 export async function getWhatsNewFeed(
   bdId: string,
   windowDays: WhatsNewWindow,
   market?: MarketKey,
+  miamiOnly?: boolean,
 ): Promise<WhatsNewFeed> {
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
   const [syncStatus, openCompanies, closedRows] = await Promise.all([
     getSyncStatus(), // query 1
-    resolveHiringCompanies(market), // queries 2-3 (shared, not BD-scoped)
+    resolveHiringCompanies(market, miamiOnly), // queries 2-3 (shared, not BD-scoped)
     db // query 4 (shared, not BD-scoped)
       .select({
         id: jobPosting.id,
@@ -219,6 +220,7 @@ export async function getWhatsNewFeed(
           isNotNull(jobPosting.closedAt),
           gte(jobPosting.closedAt, cutoff),
           market ? eq(jobPosting.market, market) : undefined,
+          miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
         ),
       )
       .orderBy(desc(jobPosting.closedAt)),

@@ -1,0 +1,22 @@
+-- Hand-written incremental migration, same rationale as 0002-0006 (see
+-- those files): this project historically used `drizzle-kit push` directly
+-- against the DB, so a freshly generated migration would emit baseline DDL
+-- that silently no-ops rather than adding the new column/index. Both
+-- statements here are additive and idempotent (IF NOT EXISTS).
+--
+-- Adds a Miami-metro sub-filter within the "us" market to job_posting: a
+-- boolean flag classified from `location` at sync time (see
+-- src/lib/hiring/markets.ts#isMiamiArea and src/lib/hiring/sync.ts).
+-- Unlike `market` (drizzle/0006), this defaults to false rather than being
+-- left NULL — false is already the correct "unknown/not Miami" value for
+-- existing rows until they're reclassified, so no NULL sentinel is needed.
+-- Run scripts/backfill-posting-miami.ts after this migration to classify
+-- existing rows.
+ALTER TABLE "job_posting" ADD COLUMN IF NOT EXISTS "is_miami" boolean NOT NULL DEFAULT false;
+--> statement-breakpoint
+-- Serves the market="us" AND is_miami=true AND closed_at IS NULL filter
+-- used by /hiring, /outreach and /whats-new. Kept separate from the
+-- existing job_posting_market_closed_idx (market, closed_at) rather than
+-- folding is_miami into it, since that index still best serves the
+-- far more common "market only" (no Miami sub-filter) query shape.
+CREATE INDEX IF NOT EXISTS "job_posting_market_miami_closed_idx" ON "job_posting" USING btree ("market","is_miami","closed_at");

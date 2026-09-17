@@ -202,6 +202,15 @@ export const jobPosting = pgTable(
     // added column doesn't require a same-transaction backfill; a null
     // value is functionally "other" (unclassified) until backfilled.
     market: text("market"),
+    // Miami-metro sub-filter within the "us" market, per
+    // src/lib/hiring/markets.ts#isMiamiArea (Miami/Miami Beach/Fort
+    // Lauderdale/Coral Gables/Doral/Hialeah — NOT all of Florida; e.g.
+    // Orlando/Tampa are "us" but not `is_miami`). Computed at sync time
+    // (see src/lib/hiring/sync.ts) alongside `market`, and backfilled for
+    // older rows via scripts/backfill-posting-miami.ts. Not nullable —
+    // unlike `market`, false is already the correct "unknown/not Miami"
+    // default, so newly added rows don't need a NULL sentinel.
+    isMiami: boolean("is_miami").notNull().default(false),
     firstSeen: timestamp("first_seen").notNull().defaultNow(),
     lastSeen: timestamp("last_seen").notNull().defaultNow(),
     closedAt: timestamp("closed_at"),
@@ -221,6 +230,15 @@ export const jobPosting = pgTable(
     ),
     byMarketClosed: index("job_posting_market_closed_idx").on(
       t.market,
+      t.closedAt,
+    ),
+    // Serves the /hiring, /outreach and /whats-new "Miami area only"
+    // sub-filter (market="us" AND is_miami=true AND closed_at IS NULL)
+    // without a redundant scan of job_posting_market_closed_idx above —
+    // that one stays for plain market filtering (no is_miami predicate).
+    byMarketMiamiClosed: index("job_posting_market_miami_closed_idx").on(
+      t.market,
+      t.isMiami,
       t.closedAt,
     ),
   }),

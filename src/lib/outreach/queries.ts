@@ -50,6 +50,10 @@ export interface OutreachFilters {
   // src/lib/hiring/markets.ts). Flows into getHiringMatchIndex's SQL WHERE
   // clause — undefined means "all markets" (today's behavior).
   market?: MarketKey;
+  // Miami-metro sub-filter, only meaningful alongside `market: "us"` (see
+  // src/lib/hiring/markets.ts#isMiamiArea). Flows into getHiringMatchIndex's
+  // SQL WHERE clause — same query count either way.
+  miamiOnly?: boolean;
 }
 
 export interface OutreachRow {
@@ -141,7 +145,7 @@ export async function listOutreachCandidates(
 ): Promise<OutreachPage> {
   const includeNeverMessaged = filters.includeNeverMessaged ?? true;
 
-  const hiringIndex = await getHiringMatchIndex(filters.market); // queries 1-2
+  const hiringIndex = await getHiringMatchIndex(filters.market, filters.miamiOnly); // queries 1-2
   const matchKeys = [...hiringIndex.keys()];
   const hiringCompanyCount = new Set(
     [...hiringIndex.values()].map((m) => m.companyKey),

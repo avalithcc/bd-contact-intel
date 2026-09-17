@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function WhatsNewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string; market?: string }>;
+  searchParams: Promise<{ window?: string; market?: string; miamiOnly?: string }>;
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
@@ -29,15 +29,27 @@ export default async function WhatsNewPage({
   const me = await getCurrentBd();
   const windowDays = parseWhatsNewWindow(sp.window);
   const market = isMarketKey(sp.market) ? sp.market : undefined;
-  const feed = await getWhatsNewFeed(me.id, windowDays, market);
+  // Only meaningful when the market filter is exactly "us" — validated
+  // server-side here so a URL crafted with e.g. market=latam&miamiOnly=on
+  // can never mean "Miami postings in LATAM"; it's simply ignored. The `qs`
+  // helper below also actively drops `miamiOnly` from generated links the
+  // moment `market` isn't "us", so switching markets can't carry it along.
+  const miamiOnly = market === "us" && sp.miamiOnly === "on";
+  const feed = await getWhatsNewFeed(me.id, windowDays, market, miamiOnly);
 
-  // Composes the window + market filters into one query string so neither
-  // Link-button group clobbers the other's current selection.
-  const qs = (overrides: { window?: number; market?: string | null }) => {
+  // Composes the window + market + miamiOnly filters into one query string
+  // so neither Link-button group clobbers the others' current selection.
+  const qs = (overrides: {
+    window?: number;
+    market?: string | null;
+    miamiOnly?: boolean;
+  }) => {
     const params = new URLSearchParams();
     params.set("window", String(overrides.window ?? windowDays));
     const nextMarket = overrides.market !== undefined ? overrides.market : market;
     if (nextMarket) params.set("market", nextMarket);
+    const nextMiamiOnly = overrides.miamiOnly !== undefined ? overrides.miamiOnly : miamiOnly;
+    if (nextMarket === "us" && nextMiamiOnly) params.set("miamiOnly", "on");
     return `/whats-new?${params.toString()}`;
   };
 
@@ -108,6 +120,19 @@ export default async function WhatsNewPage({
               ))}
             </div>
           </div>
+          {market === "us" && (
+            <div className="whats-new-window-select">
+              <span className="soft">{dict.common.miamiOnlyLabel}</span>
+              <div className="whats-new-window-options">
+                <Link
+                  href={qs({ miamiOnly: !miamiOnly })}
+                  className={miamiOnly ? "secondary-btn active" : "secondary-btn"}
+                >
+                  {dict.common.miamiOnlyLabel}
+                </Link>
+              </div>
+            </div>
+          )}
           <p className="whats-new-sync-status">
             {feed.lastSuccessfulSyncAt
               ? dict.whatsNew.lastSyncAt(formatDateTime(feed.lastSuccessfulSyncAt, locale))
