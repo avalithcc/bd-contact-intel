@@ -46,7 +46,15 @@ const PROBE_COOLDOWN_DAYS = 30;
 // only excluded if EVERY contact row sharing its key falls in one of these
 // buckets (see the `having` clause in getCandidateCompanies) — a company
 // with any better-classified contact is still worth probing.
-const EXCLUDED_CATEGORIES: CompanyCategoryKey[] = ["independent", "other", "unclassified"];
+const EXCLUDED_CATEGORIES: CompanyCategoryKey[] = [
+  "independent",
+  "other",
+  "unclassified",
+  // Software factories are competitors, not prospects: their openings are a
+  // hiring signal for the wrong side of the market, and they flooded the
+  // review queue on the first real run.
+  "software_services",
+];
 
 export const DEFAULT_DISCOVERY_LIMIT = 25;
 
@@ -400,6 +408,19 @@ export async function approveAsTargetCompany(
 // Probing + persistence
 // ---------------------------------------------------------------------
 
+// ATS vendors ship demo/sandbox boards under obvious slugs (a big brand's
+// name often resolves to one), and their postings are placeholders rather
+// than real openings. Every observed case so far carried a marker like
+// "(Sample)" or "Test" in the title, so a board whose visible postings are
+// all markers is rejected without human review.
+const DEMO_TITLE_PATTERNS = [/\(sample\)/i, /\btest\b/i, /\bdemo\b/i, /\bejemplo\b/i];
+
+function isDemoBoard(hit: ProbeHit): boolean {
+  const titles = hit.samples.map((s) => s.title).filter(Boolean);
+  if (!titles.length) return false;
+  return titles.every((t) => DEMO_TITLE_PATTERNS.some((p) => p.test(t)));
+}
+
 async function upsertBoardCandidate(
   company: CandidateCompany,
   ats: ProbeAts,
@@ -408,7 +429,11 @@ async function upsertBoardCandidate(
 ): Promise<void> {
   const now = new Date();
   const isStrongMatch = slug === company.companyKey && hit.jobCount >= AUTO_APPROVE_MIN_JOB_COUNT;
-  const status: "pending" | "auto_approved" = isStrongMatch ? "auto_approved" : "pending";
+  const status: "pending" | "auto_approved" | "rejected" = isDemoBoard(hit)
+    ? "rejected"
+    : isStrongMatch
+      ? "auto_approved"
+      : "pending";
 
   const evidence = {
     locations: [...new Set(hit.samples.map((s) => s.location).filter((l): l is string => Boolean(l)))],
