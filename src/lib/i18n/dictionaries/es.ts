@@ -10,6 +10,7 @@ export const es: typeof en = {
     signOut: "Cerrar sesión",
     priorityOutreach: "contacto prioritario →",
     hiringSignals: "señales de contratación →",
+    boardDiscovery: "descubrimiento de portales →",
     backToContacts: "← contactos",
     back: "← volver",
     prev: "← anterior",
@@ -130,6 +131,35 @@ export const es: typeof en = {
     postedOn: (date) => `· publicado ${date}`,
     contactCount: (n) => `${n} contacto${n === 1 ? "" : "s"}`,
     leadershipCount: (n) => `· ${n} liderazgo`,
+  },
+
+  discovery: {
+    eyebrow: "// descubrimiento_de_portales",
+    title: "cola de descubrimiento de portales",
+    subtitle:
+      "Empresas de la base de contactos del equipo con un posible portal de empleo público, encontradas automáticamente — revisá y aprobá para empezar a seguir sus publicaciones.",
+    lastRunEyebrow: "// última ejecución",
+    noRunsYet: "Todavía no hay ninguna ejecución. Iniciá una manualmente o esperá al cron semanal.",
+    lastRunSummary: (when, probed, hits) =>
+      `${when} — ${probed} empresa${probed === 1 ? "" : "s"} evaluada${probed === 1 ? "" : "s"}, ${hits} resultado${hits === 1 ? "" : "s"}`,
+    lastRunFailed: "falló",
+    lastRunUnfinished: "no terminó",
+    statusCounts: (pending, approved, rejected) =>
+      `${pending} pendiente${pending === 1 ? "" : "s"} · ${approved} aprobada${approved === 1 ? "" : "s"} · ${rejected} rechazada${rejected === 1 ? "" : "s"}`,
+    queueEyebrow: "// pendientes de revisión",
+    queueEmpty: "No hay candidatos pendientes. Por ahora no hay nada para revisar.",
+    tableCompany: "Empresa",
+    tableBoard: "ATS / slug",
+    tableJobs: "Cantidad de puestos",
+    tableSampleTitles: "Títulos de ejemplo",
+    tableContacts: "Contactos del equipo",
+    tableActions: "Decisión",
+    // Deliberadamente dice "del equipo": es un agregado entre todos los BD,
+    // no el conteo propio del BD que inició sesión. Ver el comentario de la
+    // tabla board_candidate en src/db/schema.ts.
+    teamContactCount: (n) => `${n} contacto${n === 1 ? "" : "s"} del equipo`,
+    approve: "Aprobar",
+    reject: "Rechazar",
   },
 
   outreach: {

@@ -56,6 +56,7 @@ export const en = {
     signOut: "Sign out",
     priorityOutreach: "priority outreach →",
     hiringSignals: "hiring signals →",
+    boardDiscovery: "board discovery →",
     backToContacts: "← contacts",
     back: "← back",
     prev: "← prev",
@@ -140,6 +141,35 @@ export const en = {
     postedOn: (date: string) => `· posted ${date}`,
     contactCount: (n: number) => `${n} contact${n === 1 ? "" : "s"}`,
     leadershipCount: (n: number) => `· ${n} leadership`,
+  },
+
+  discovery: {
+    eyebrow: "// board_discovery",
+    title: "board discovery queue",
+    subtitle:
+      "Companies from the team's contact base with a likely public ATS board, found automatically — review and approve to start tracking their postings.",
+    lastRunEyebrow: "// last run",
+    noRunsYet: "No discovery run yet. Trigger one manually or wait for the weekly cron.",
+    lastRunSummary: (when: string, probed: number, hits: number) =>
+      `${when} — ${probed} compan${probed === 1 ? "y" : "ies"} probed, ${hits} hit${hits === 1 ? "" : "s"}`,
+    lastRunFailed: "failed",
+    lastRunUnfinished: "did not finish",
+    statusCounts: (pending: number, approved: number, rejected: number) =>
+      `${pending} pending · ${approved} approved · ${rejected} rejected`,
+    queueEyebrow: "// pending review",
+    queueEmpty: "No pending candidates. Nothing left to review right now.",
+    tableCompany: "Company",
+    tableBoard: "ATS / slug",
+    tableJobs: "Job count",
+    tableSampleTitles: "Sample titles",
+    tableContacts: "Team contacts",
+    tableActions: "Decision",
+    // Deliberately phrased as "team" — this is an aggregate across every
+    // BD's contacts, not the signed-in BD's own count. See the table
+    // comment on board_candidate in src/db/schema.ts.
+    teamContactCount: (n: number) => `${n} team contact${n === 1 ? "" : "s"}`,
+    approve: "Approve",
+    reject: "Reject",
   },
 
   outreach: {

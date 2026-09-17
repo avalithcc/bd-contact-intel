@@ -147,6 +147,9 @@ export default async function Home({
           <Link className="secondary-btn" href="/hiring">
             {dict.common.hiringSignals}
           </Link>
+          <Link className="secondary-btn" href="/discovery">
+            {dict.common.boardDiscovery}
+          </Link>
           <SignOutButton locale={locale} />
           <LocaleSwitcher locale={locale} />
         </div>

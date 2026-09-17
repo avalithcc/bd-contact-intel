@@ -316,3 +316,93 @@ export const message = pgTable(
 
 export type Message = typeof message.$inferSelect;
 export type NewMessage = typeof message.$inferInsert;
+
+// A candidate ATS job board discovered for a company key seen in some BD's
+// contact base but not yet a `target_company` — see src/lib/hiring/discovery.ts.
+// Shared across BDs (public company-board data, no BD ownership), same
+// rationale as `targetCompany`. `contactCount` is a snapshot aggregate
+// (across ALL BDs) taken when the candidate was discovered/last updated —
+// it is NOT the viewing BD's own contact count and must never be presented
+// as such (see getPendingCandidates in src/lib/hiring/discoveryQueries.ts).
+export const boardCandidate = pgTable(
+  "board_candidate",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Normalized company key (see
+    // src/lib/companyCategories.ts#normalizeCompanyKey) this candidate was
+    // discovered for. Deliberately NOT a foreign key to target_company: a
+    // candidate exists precisely because the company key is *not yet* a
+    // target company.
+    companyKey: text("company_key").notNull(),
+    displayName: text("display_name").notNull(),
+    // Applicant tracking system this candidate board was found on. See
+    // src/lib/hiring/discovery.ts for the probes registered per value.
+    ats: text("ats").notNull(),
+    slug: text("slug").notNull(),
+    // 'pending' | 'approved' | 'rejected' | 'auto_approved' — see
+    // src/lib/hiring/discovery.ts for the auto-approve rule.
+    status: text("status").notNull().default("pending"),
+    jobCount: integer("job_count").notNull().default(0),
+    // Up to 3 sample posting titles captured as evidence for human review.
+    sampleTitles: jsonb("sample_titles").notNull().default([]),
+    // Whatever else was captured during the probe (locations seen, first
+    // job URLs) — see src/lib/hiring/discovery.ts for the exact shape.
+    evidence: jsonb("evidence").notNull().default({}),
+    // Aggregate across ALL BDs — see table comment above.
+    contactCount: integer("contact_count").notNull().default(0),
+    discoveredAt: timestamp("discovered_at").notNull().defaultNow(),
+    decidedAt: timestamp("decided_at"),
+    // The bd's email, or "system:auto_approve" for the auto-approve rule.
+    // Not a foreign key: kept as a plain denormalized string so a bd row
+    // being renamed/removed later doesn't retroactively rewrite history.
+    decidedBy: text("decided_by"),
+  },
+  (t) => ({
+    atsSlugUnique: unique("board_candidate_ats_slug_unique").on(t.ats, t.slug),
+    byStatus: index("board_candidate_status_idx").on(t.status),
+  }),
+);
+
+export type BoardCandidate = typeof boardCandidate.$inferSelect;
+export type NewBoardCandidate = typeof boardCandidate.$inferInsert;
+
+// One discovery run attempt, for observability — mirrors `syncRun` but at
+// the run level (one row per whole run, not per company) since a discovery
+// run probes many companies that aren't target companies yet and so have no
+// natural per-company row to attach a per-company outcome to. A silent
+// failure (e.g. the run crashing before probing anything) is visible here
+// via `status`/`error` rather than just... not showing up.
+export const discoveryRun = pgTable("discovery_run", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  companiesProbed: integer("companies_probed").notNull().default(0),
+  hits: integer("hits").notNull().default(0),
+  status: text("status").notNull(), // 'ok' | 'error'
+  error: text("error"),
+});
+
+export type DiscoveryRun = typeof discoveryRun.$inferSelect;
+export type NewDiscoveryRun = typeof discoveryRun.$inferInsert;
+
+// Tracks which normalized company keys have already been probed for a
+// board, and when — so a discovery run moves forward through the candidate
+// universe instead of re-guessing the same slugs every run. A dedicated
+// table (rather than a `probed_at`/`probe_attempts` pair bolted onto
+// `board_candidate`) because a probe attempt and a board candidate are
+// different things with different cardinality: a company can be probed
+// exactly once per run regardless of how many (ats, slug) combinations were
+// tried, and a *miss* (the common case — see src/lib/hiring/discovery.ts)
+// has no natural board_candidate row to attach "we tried and found
+// nothing" to without inventing a fake ats/slug pair that would collide
+// with the real `(ats, slug)` unique constraint used for actual hits.
+export const companyProbe = pgTable("company_probe", {
+  companyKey: text("company_key").primaryKey(),
+  lastProbedAt: timestamp("last_probed_at").notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(1),
+  // Whether the most recent probe found at least one board_candidate.
+  hit: boolean("hit").notNull().default(false),
+});
+
+export type CompanyProbe = typeof companyProbe.$inferSelect;
+export type NewCompanyProbe = typeof companyProbe.$inferInsert;
