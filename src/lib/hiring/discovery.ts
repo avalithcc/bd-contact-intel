@@ -48,7 +48,7 @@ const PROBE_COOLDOWN_DAYS = 30;
 // with any better-classified contact is still worth probing.
 const EXCLUDED_CATEGORIES: CompanyCategoryKey[] = ["independent", "other", "unclassified"];
 
-export const DEFAULT_DISCOVERY_LIMIT = 120;
+export const DEFAULT_DISCOVERY_LIMIT = 25;
 
 // Wall-clock budget for one runDiscovery() call, comfortably under the
 // route's `maxDuration` (see src/app/api/hiring/discover/route.ts) so a
@@ -59,7 +59,7 @@ export const DEFAULT_DISCOVERY_LIMIT = 120;
 // Companies not reached in time are simply not recorded in company_probe,
 // so they're picked up first by the next run (still the highest
 // contact-count candidates not yet probed).
-const DEFAULT_MAX_DURATION_MS = 240_000;
+const DEFAULT_MAX_DURATION_MS = 50_000;
 
 // Auto-approve rule: only when the evidence is strong enough that a human
 // glance would almost certainly rubber-stamp it anyway. `slug === company

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // DEFAULT_MAX_DURATION_MS in src/lib/hiring/discovery.ts) is set well
 // under this so the discovery_run row is always finalized before the
 // platform would kill the function.
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
