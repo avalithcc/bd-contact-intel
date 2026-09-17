@@ -12,7 +12,20 @@ const globalForDb = globalThis as unknown as {
   client?: ReturnType<typeof postgres>;
 };
 
-const client = globalForDb.client ?? postgres(connectionString, { max: 5 });
+// Each serverless instance gets its own pool, and many instances can be warm
+// at once, so a generous `max` exhausts the database's connection budget
+// (Supabase's session-mode pooler caps at 15 by default). One connection per
+// instance plus a short idle timeout keeps that under control; `prepare:
+// false` is required if DATABASE_URL points at a transaction-mode pooler and
+// is harmless otherwise.
+const client =
+  globalForDb.client ??
+  postgres(connectionString, {
+    max: process.env.NODE_ENV === "production" ? 1 : 5,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+  });
 if (process.env.NODE_ENV !== "production") globalForDb.client = client;
 
 export const db = drizzle(client, { schema });
