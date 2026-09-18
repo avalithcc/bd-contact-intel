@@ -585,13 +585,24 @@ a:hover {
 }
 
 /* ---- checkbox filter control (e.g. /outreach's "exclude never-messaged") ---- */
-/* Checkbox fields have no label row above them, so give them the control
-   height and center the checkbox on the same line as inputs and selects. */
-.filter-field-checkbox {
+/* Toggles in a filter toolbar are stacked in one column instead of each
+   taking a slot in the row, so long labels don't push the toolbar onto
+   several lines. The group sits at the end of the row next to Filter. */
+.filter-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.filter-checkbox {
   display: flex;
   align-items: center;
-  height: var(--control-height);
-  flex: 0 0 auto;
+  min-height: 1.5rem;
+}
+.filter-checkbox .checkbox-label {
+  margin-bottom: 0;
 }
 .checkbox-label {
   display: flex;

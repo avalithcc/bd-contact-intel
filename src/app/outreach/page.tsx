@@ -137,40 +137,42 @@ export default async function OutreachPage({
               ))}
             </select>
           </div>
-          {market === "us" && (
-            <div className="filter-field filter-field-checkbox">
-              <label htmlFor="miamiOnly" className="checkbox-label">
+          <div className="filter-checkbox-group" role="group">
+            {market === "us" && (
+              <div className="filter-checkbox">
+                <label htmlFor="miamiOnly" className="checkbox-label">
+                  <input
+                    id="miamiOnly"
+                    name="miamiOnly"
+                    type="checkbox"
+                    defaultChecked={miamiOnly}
+                  />
+                  {dict.common.miamiOnlyLabel}
+                </label>
+              </div>
+            )}
+            <div className="filter-checkbox">
+              <label htmlFor="excludeNever" className="checkbox-label">
                 <input
-                  id="miamiOnly"
-                  name="miamiOnly"
+                  id="excludeNever"
+                  name="excludeNever"
                   type="checkbox"
-                  defaultChecked={miamiOnly}
+                  defaultChecked={excludeNeverMessaged}
                 />
-                {dict.common.miamiOnlyLabel}
+                {dict.outreach.excludeNeverMessaged}
               </label>
             </div>
-          )}
-          <div className="filter-field filter-field-checkbox">
-            <label htmlFor="excludeNever" className="checkbox-label">
-              <input
-                id="excludeNever"
-                name="excludeNever"
-                type="checkbox"
-                defaultChecked={excludeNeverMessaged}
-              />
-              {dict.outreach.excludeNeverMessaged}
-            </label>
-          </div>
-          <div className="filter-field filter-field-checkbox">
-            <label htmlFor="hideOffshore" className="checkbox-label">
-              <input
-                id="hideOffshore"
-                name="hideOffshore"
-                type="checkbox"
-                defaultChecked={hideOffshore}
-              />
-              {dict.common.hideOffshoreLabel}
-            </label>
+            <div className="filter-checkbox">
+              <label htmlFor="hideOffshore" className="checkbox-label">
+                <input
+                  id="hideOffshore"
+                  name="hideOffshore"
+                  type="checkbox"
+                  defaultChecked={hideOffshore}
+                />
+                {dict.common.hideOffshoreLabel}
+              </label>
+            </div>
           </div>
           <button type="submit" className="filter-submit">
             {dict.common.filter}

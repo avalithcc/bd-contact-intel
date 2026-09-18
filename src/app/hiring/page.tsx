@@ -84,29 +84,31 @@ export default async function HiringPage({
               ))}
             </select>
           </div>
-          {market === "us" && (
-            <div className="filter-field filter-field-checkbox">
-              <label htmlFor="miamiOnly" className="checkbox-label">
+          <div className="filter-checkbox-group" role="group">
+            {market === "us" && (
+              <div className="filter-checkbox">
+                <label htmlFor="miamiOnly" className="checkbox-label">
+                  <input
+                    id="miamiOnly"
+                    name="miamiOnly"
+                    type="checkbox"
+                    defaultChecked={miamiOnly}
+                  />
+                  {dict.common.miamiOnlyLabel}
+                </label>
+              </div>
+            )}
+            <div className="filter-checkbox">
+              <label htmlFor="hideOffshore" className="checkbox-label">
                 <input
-                  id="miamiOnly"
-                  name="miamiOnly"
+                  id="hideOffshore"
+                  name="hideOffshore"
                   type="checkbox"
-                  defaultChecked={miamiOnly}
+                  defaultChecked={hideOffshore}
                 />
-                {dict.common.miamiOnlyLabel}
+                {dict.common.hideOffshoreLabel}
               </label>
             </div>
-          )}
-          <div className="filter-field filter-field-checkbox">
-            <label htmlFor="hideOffshore" className="checkbox-label">
-              <input
-                id="hideOffshore"
-                name="hideOffshore"
-                type="checkbox"
-                defaultChecked={hideOffshore}
-              />
-              {dict.common.hideOffshoreLabel}
-            </label>
           </div>
           <button type="submit" className="filter-submit">
             {dict.common.filter}

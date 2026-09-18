@@ -207,6 +207,7 @@ The app is a dense, dark, data-first internal tool (a Business Developer contact
 ### Inputs & Selects
 - `input[type=text|password|file]` and `select` (select styling added in this pass — it was previously unstyled and fell back to the browser default) share one spec: `--color-canvas` background, 1px `--color-border`, `border-radius: 6px`, `--color-ink` text. Hover → border brightens to `--color-border-strong`. Focus → border to `--color-accent`. Disabled → `opacity: .55`.
 - Every control in a filter row — text input, select, submit button, checkbox row — is exactly `--control-height` (2.5rem) tall, so toolbars align on one line. Selects use `appearance: none` with a custom chevron; never rely on native select metrics. File inputs are the only exception (natural height).
+- Checkboxes in a filter toolbar never take a slot of their own: they stack in one `.filter-checkbox-group` column at the end of the row, next to the submit button. Keep their labels short (2–4 words).
 - Checkboxes use `accent-color: var(--color-accent)` (native control tinting, no custom widget).
 
 ### Tables

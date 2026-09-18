@@ -97,7 +97,7 @@ export const en = {
     // `hideOffshore` param in src/lib/hiring/queries.ts). Hides only
     // offshore-heavy companies, not every company with any offshore
     // posting.
-    hideOffshoreLabel: "Hide offshore-heavy companies",
+    hideOffshoreLabel: "Hide offshore-heavy",
     clearAll: "Clear all",
     pageOf: (current: number, total: number) => `${current} / ${total}`,
     totalPage: (total: number, current: number, totalPages: number) =>
@@ -209,7 +209,7 @@ export const en = {
     title: "who to message this week",
     subtitle:
       "Your contacts at companies currently hiring IT, ranked by relationship strength and seniority.",
-    excludeNeverMessaged: "Exclude never-messaged contacts",
+    excludeNeverMessaged: "Exclude never messaged",
     candidatesEyebrow: "// candidates",
     noHiringCompaniesPrefix: "No hiring companies synced yet. Seed target companies and run a sync (see ",
     noHiringCompaniesLinkText: "open roles",

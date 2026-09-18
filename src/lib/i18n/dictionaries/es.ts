@@ -27,7 +27,7 @@ export const es: typeof en = {
     miamiOnlyLabel: "Solo Florida",
     offshoreBadge: (offshoreItCount, latamItCount) =>
       `offshore ${offshoreItCount} · LATAM ${latamItCount}`,
-    hideOffshoreLabel: "Ocultar empresas con contratación mayormente offshore",
+    hideOffshoreLabel: "Ocultar mayormente offshore",
     clearAll: "Limpiar todo",
     pageOf: (current, total) => `${current} / ${total}`,
     totalPage: (total, current, totalPages) =>
@@ -180,7 +180,7 @@ export const es: typeof en = {
     title: "a quién contactar esta semana",
     subtitle:
       "Tus contactos en empresas que actualmente contratan IT, ordenados por fuerza de relación y seniority.",
-    excludeNeverMessaged: "Excluir contactos nunca contactados",
+    excludeNeverMessaged: "Excluir nunca contactados",
     candidatesEyebrow: "// candidatos",
     noHiringCompaniesPrefix:
       "Todavía no hay empresas contratando sincronizadas. Carga las empresas objetivo y ejecuta una sincronización (ver ",
