@@ -401,6 +401,9 @@ a {
   flex: 1 1 180px;
   min-width: 0;
 }
+.filter-field-search {
+  flex: 2 1 280px;
+}
 .filter-field label {
   margin-bottom: 0.35rem;
 }

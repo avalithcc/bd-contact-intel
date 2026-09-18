@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bd,
@@ -76,8 +76,10 @@ export type RelationshipFilterKey = (typeof RELATIONSHIP_FILTERS)[number]["key"]
 export const DORMANT_MONTHS = 12;
 
 export interface ContactFilters {
-  company?: string;
-  position?: string;
+  // Single free-text search box on the home page (param `q`), matching
+  // "anything" about the contact — see searchCondition() below for the
+  // exact semantics.
+  q?: string;
   roleGroup?: RoleGroupKey;
   companyCategory?: CompanyCategoryKey;
   // Exact match on the normalized company key (see
@@ -180,6 +182,46 @@ function companyKeyFilter(key: string) {
   )`;
 }
 
+// Cap on whitespace-separated search tokens in `q`, so a pathological
+// paste-in doesn't blow up the query into dozens of OR'd conditions.
+const MAX_SEARCH_TOKENS = 5;
+
+// Escapes LIKE/ILIKE wildcard characters (and the escape character itself)
+// so literal `%`, `_`, or `\` in a user's search term are matched as-is
+// instead of behaving as wildcards.
+const LIKE_WILDCARD_RE = /[%_\\]/g;
+function escapeLikeWildcards(value: string): string {
+  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
+}
+
+/**
+ * Builds the home page's single-box `q` search filter: every
+ * whitespace-separated token in `q` (trimmed, capped at
+ * MAX_SEARCH_TOKENS) must match SOME searchable column (AND across
+ * tokens, OR across columns) — first name, last name, company, position,
+ * email, industry. A query like "juan perez" therefore matches first and
+ * last name separately. Returns undefined when `q` has no tokens
+ * (e.g. blank/whitespace-only), so callers can skip pushing a filter.
+ */
+function searchCondition(q: string) {
+  const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
+  if (!tokens.length) return undefined;
+
+  const tokenConditions = tokens.map((token) => {
+    const pattern = `%${escapeLikeWildcards(token)}%`;
+    return or(
+      ilike(contact.firstName, pattern),
+      ilike(contact.lastName, pattern),
+      ilike(contact.company, pattern),
+      ilike(contact.position, pattern),
+      ilike(contact.email, pattern),
+      ilike(contact.industry, pattern),
+    );
+  });
+
+  return and(...tokenConditions);
+}
+
 export async function listContacts(
   bdId: string,
   filters: ContactFilters = {},
@@ -187,9 +229,10 @@ export async function listContacts(
   pageSize = 20,
 ): Promise<ContactsPage> {
   const where = [eq(contact.bdId, bdId)];
-  if (filters.company) where.push(ilike(contact.company, `%${filters.company}%`));
-  if (filters.position)
-    where.push(ilike(contact.position, `%${filters.position}%`));
+  if (filters.q) {
+    const q = searchCondition(filters.q);
+    if (q) where.push(q);
+  }
   if (filters.roleGroup) where.push(eq(contact.roleGroup, filters.roleGroup));
   if (filters.companyCategory)
     where.push(eq(contact.companyCategory, filters.companyCategory));

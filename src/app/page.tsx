@@ -41,8 +41,7 @@ export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{
-    company?: string;
-    position?: string;
+    q?: string;
     roleGroup?: string;
     companyCategory?: string;
     companyKey?: string;
@@ -61,8 +60,7 @@ export default async function Home({
     : undefined;
   const relationship = isRelationshipKey(sp.relationship) ? sp.relationship : undefined;
   const filters = {
-    company: sp.company,
-    position: sp.position,
+    q: sp.q,
     roleGroup,
     companyCategory,
     companyKey: sp.companyKey,
@@ -88,8 +86,7 @@ export default async function Home({
 
   const qs = (p: number) => {
     const params = new URLSearchParams();
-    if (sp.company) params.set("company", sp.company);
-    if (sp.position) params.set("position", sp.position);
+    if (sp.q) params.set("q", sp.q);
     if (roleGroup) params.set("roleGroup", roleGroup);
     if (companyCategory) params.set("companyCategory", companyCategory);
     if (sp.companyKey) params.set("companyKey", sp.companyKey);
@@ -99,17 +96,10 @@ export default async function Home({
   };
 
   const qsWithout = (
-    field:
-      | "company"
-      | "position"
-      | "roleGroup"
-      | "companyCategory"
-      | "companyKey"
-      | "relationship",
+    field: "q" | "roleGroup" | "companyCategory" | "companyKey" | "relationship",
   ) => {
     const params = new URLSearchParams();
-    if (sp.company && field !== "company") params.set("company", sp.company);
-    if (sp.position && field !== "position") params.set("position", sp.position);
+    if (sp.q && field !== "q") params.set("q", sp.q);
     if (roleGroup && field !== "roleGroup") params.set("roleGroup", roleGroup);
     if (companyCategory && field !== "companyCategory")
       params.set("companyCategory", companyCategory);
@@ -192,14 +182,14 @@ export default async function Home({
       <section className="panel">
         <div className="eyebrow">{dict.common.filterEyebrow}</div>
         <form method="get" className="filter-toolbar">
-          <div className="filter-field">
-            <label htmlFor="company">{dict.home.companyLabel}</label>
+          <div className="filter-field filter-field-search">
+            <label htmlFor="q">{dict.home.searchLabel}</label>
             <input
-              id="company"
-              name="company"
+              id="q"
+              name="q"
               type="text"
-              defaultValue={sp.company ?? ""}
-              placeholder={dict.home.companyPlaceholder}
+              defaultValue={sp.q ?? ""}
+              placeholder={dict.home.searchPlaceholder}
             />
           </div>
           <div className="filter-field">
@@ -229,16 +219,6 @@ export default async function Home({
             </select>
           </div>
           <div className="filter-field">
-            <label htmlFor="position">{dict.home.positionLabel}</label>
-            <input
-              id="position"
-              name="position"
-              type="text"
-              defaultValue={sp.position ?? ""}
-              placeholder={dict.home.positionPlaceholder}
-            />
-          </div>
-          <div className="filter-field">
             <label htmlFor="relationship">{dict.home.relationshipLabel}</label>
             <select id="relationship" name="relationship" defaultValue={relationship ?? ""}>
               <option value="">{dict.home.anyRelationship}</option>
@@ -254,12 +234,7 @@ export default async function Home({
           </button>
         </form>
 
-        {(sp.company ||
-          roleGroup ||
-          companyCategory ||
-          sp.position ||
-          sp.companyKey ||
-          relationship) && (
+        {(sp.q || roleGroup || companyCategory || sp.companyKey || relationship) && (
           <div className="active-filters">
             {sp.companyKey && (
               <span className="chip">
@@ -269,10 +244,10 @@ export default async function Home({
                 </Link>
               </span>
             )}
-            {sp.company && (
+            {sp.q && (
               <span className="chip">
-                {dict.home.companyChip(sp.company)}
-                <Link href={qsWithout("company")} aria-label={dict.home.removeCompanyFilter}>
+                {dict.home.searchChip(sp.q)}
+                <Link href={qsWithout("q")} aria-label={dict.home.removeSearchFilter}>
                   ×
                 </Link>
               </span>
@@ -292,14 +267,6 @@ export default async function Home({
                   href={qsWithout("companyCategory")}
                   aria-label={dict.home.removeCompanyCategoryFilter}
                 >
-                  ×
-                </Link>
-              </span>
-            )}
-            {sp.position && (
-              <span className="chip">
-                {dict.home.positionChip(sp.position)}
-                <Link href={qsWithout("position")} aria-label={dict.home.removePositionFilter}>
                   ×
                 </Link>
               </span>
