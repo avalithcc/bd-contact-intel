@@ -318,9 +318,7 @@ a {
   color: var(--soft);
   border: 1px solid var(--lineh);
   border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
+  gap: 0.3rem;
   cursor: pointer;
 }
 .user-menu-trigger:hover,
@@ -342,6 +340,16 @@ a {
   border: 1px solid var(--lineh);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.user-menu-name {
+  padding: 0.1rem 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .user-menu-locale {
   display: flex;
