@@ -5,6 +5,8 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/i18n/format";
 import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
+import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
+import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../../SignOutButton";
 import { UserMenu } from "../../UserMenu";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -38,6 +40,7 @@ export default async function ContactDetail({
 }) {
   const { id } = await params;
   const locale = await getLocale();
+  const theme = await getTheme();
   const dict: Dictionary = t(locale);
   const me = await getCurrentBd();
   const c = await getContactById(me.id, id);
@@ -65,6 +68,8 @@ export default async function ContactDetail({
             changePasswordHref="/account/password"
             changePasswordLabel={dict.common.changePassword}
             localeSwitcher={<LocaleSwitcher locale={locale} />}
+            themeSwitcher={<ThemeSwitcher theme={theme} locale={locale} />}
+            themeLabel={dict.common.themeLabel}
             signOutButton={<SignOutButton locale={locale} />}
           />
         </div>

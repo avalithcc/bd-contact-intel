@@ -17,6 +17,8 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
 import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
+import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
+import { getTheme } from "@/lib/theme/server";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,7 @@ export default async function Home({
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
+  const theme = await getTheme();
   const dict = t(locale);
   const me = await getCurrentBd();
   const page = Math.max(1, Number(sp.page) || 1);
@@ -149,6 +152,8 @@ export default async function Home({
             changePasswordHref="/account/password"
             changePasswordLabel={dict.common.changePassword}
             localeSwitcher={<LocaleSwitcher locale={locale} />}
+            themeSwitcher={<ThemeSwitcher theme={theme} locale={locale} />}
+            themeLabel={dict.common.themeLabel}
             signOutButton={<SignOutButton locale={locale} />}
           />
         </div>
