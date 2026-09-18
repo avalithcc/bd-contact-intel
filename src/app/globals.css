@@ -150,10 +150,10 @@
    defined exactly once:
      - `[data-theme="light"]` — explicit choice, set as an attribute on
        <html> server-side from the `theme` cookie (see layout.tsx). Read
-       this file top-down: `:root` above is dark-by-default, so `light` and
-       `dark` are both *overrides* of it — `dark` is listed here only so an
-       explicit `data-theme="dark"` always wins over the OS preference
-       media query below, even though its values equal :root's.
+       this file top-down: `:root` above is dark-by-default, so only `light`
+       needs an override. An explicit `data-theme="dark"` needs no rule: it
+       stays dark because the OS media query below is guarded by
+       `:not([data-theme])` and never matches once the attribute is set.
      - `:root:not([data-theme]) { @media (prefers-color-scheme: light) }` —
        theme=system with no data-theme attribute rendered: falls through to
        the OS/browser preference.
