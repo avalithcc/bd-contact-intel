@@ -143,7 +143,6 @@ export default async function WhatsNewPage({
           </div>
           {market === "us" && (
             <div className="whats-new-window-select">
-              <span className="soft">{dict.common.miamiOnlyLabel}</span>
               <div className="whats-new-window-options">
                 <Link
                   href={qs({ miamiOnly: !miamiOnly })}
@@ -155,7 +154,6 @@ export default async function WhatsNewPage({
             </div>
           )}
           <div className="whats-new-window-select">
-            <span className="soft">{dict.common.hideOffshoreLabel}</span>
             <div className="whats-new-window-options">
               <Link
                 href={qs({ hideOffshore: !hideOffshore })}
