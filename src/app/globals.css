@@ -1,18 +1,87 @@
+/* =========================================================================
+   Avalith design tokens
+   Structural layer adapted from awesome-design-md's Linear DESIGN.md
+   (color roles, type scale, spacing scale, radii, elevation, component
+   states). Brand identity — the red accent, dark palette, Inter +
+   JetBrains Mono, "avalith." wordmark — is Avalith's own and unchanged.
+   See /DESIGN.md at the repo root for the full system reference.
+   ========================================================================= */
 :root {
-  --bg: #0b0a11;
-  --card: #0e0d15;
-  --panel: #131119;
-  --warm: #1d1215;
-  --red: #d5252f;
-  --green: #3ecf8e;
-  --ink: #ffffff;
-  --soft: #8e8c99;
-  --muted: #56545f;
-  --line: rgba(255, 255, 255, 0.08);
-  --lineh: rgba(255, 255, 255, 0.18);
+  /* ---- surfaces (dark canvas + lift ladder) ---- */
+  --color-canvas: #0b0a11;
+  --color-surface-1: #0e0d15;
+  --color-surface-2: #131119;
+  /* Neutral warm tint, reserved for the "offshore" signal badge only — not
+     a general surface step (see .badge.offshore below). */
+  --color-surface-tint: #1d1215;
 
+  /* ---- brand accent (red — Avalith's identity, replaces Linear's lavender) ---- */
+  --color-accent: #d5252f;
+  --color-accent-hover: #e6434c;
+  --color-accent-focus: #b81f27;
+
+  /* ---- text hierarchy ---- */
+  --color-ink: #ffffff;
+  --color-ink-soft: #8e8c99;
+  --color-ink-muted: #56545f;
+
+  /* ---- borders ---- */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+
+  /* ---- semantic (distinct from the brand accent, as in the Linear source) ---- */
+  --color-success: #3ecf8e;
+  --color-warn: #e6a23c;
+  --color-danger: #ff6b6b;
+
+  /* ---- type scale ---- */
+  --text-xs: 0.72rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.85rem;
+  --text-md: 0.9rem;
+  --text-lg: 1.05rem;
+  --text-xl: 1.15rem;
+  --text-2xl: 1.6rem;
+
+  /* ---- spacing scale ---- */
+  --space-2xs: 0.35rem;
+  --space-xs: 0.4rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.25rem;
+  --space-2xl: 1.5rem;
+  --space-3xl: 1.75rem;
+
+  /* ---- radii ---- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-pill: 999px;
+
+  /* ---- elevation ---- */
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* ---- motion ---- */
+  --transition-fast: 0.15s ease;
+
+  /* ---- fonts (loaded via next/font in layout.tsx) ---- */
   --font-body: var(--font-inter), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, monospace;
+
+  /* Back-compat aliases: the token names above are the source of truth;
+     these keep any external references (e.g. inline `style` in TSX using
+     CSS custom properties) working without a second migration pass. */
+  --bg: var(--color-canvas);
+  --card: var(--color-surface-1);
+  --panel: var(--color-surface-2);
+  --warm: var(--color-surface-tint);
+  --red: var(--color-accent);
+  --green: var(--color-success);
+  --ink: var(--color-ink);
+  --soft: var(--color-ink-soft);
+  --muted: var(--color-ink-muted);
+  --line: var(--color-border);
+  --lineh: var(--color-border-strong);
 }
 
 * {
@@ -22,8 +91,8 @@
 body {
   margin: 0;
   font-family: var(--font-body);
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--color-canvas);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -36,60 +105,60 @@ main {
 /* ---- brand marks ---- */
 .logo {
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   letter-spacing: -0.02em;
 }
 .logo .dot,
 h1 .dot,
 h2 .dot {
-  color: var(--red);
+  color: var(--color-accent);
 }
 
 .eyebrow {
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.04em;
-  color: var(--red);
-  margin-bottom: 0.5rem;
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
 }
 
 h1 {
   font-weight: 800;
-  font-size: 1.6rem;
+  font-size: var(--text-2xl);
   letter-spacing: -0.02em;
   margin: 0 0 0.35rem;
 }
 h2 {
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: var(--text-xl);
   letter-spacing: -0.01em;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-lg);
 }
 
 /* ---- panels & cards ---- */
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: 1.15rem 1.35rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-2xl);
 }
 
 /* ---- compact collapsible import ---- */
 .import-block {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2xl);
   max-width: 340px;
 }
 .import-block summary {
   cursor: pointer;
   padding: 0.6rem 0.9rem;
-  color: var(--soft);
+  color: var(--color-ink-soft);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   list-style: none;
   user-select: none;
 }
@@ -98,17 +167,17 @@ h2 {
 }
 .import-block summary::before {
   content: "+";
-  color: var(--red);
+  color: var(--color-accent);
   font-family: var(--font-mono);
   font-weight: 700;
-  margin-right: 0.5rem;
+  margin-right: var(--space-sm);
 }
 .import-block[open] summary::before {
   content: "−";
 }
 .import-block[open] summary {
-  color: var(--ink);
-  border-bottom: 1px solid var(--line);
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-border);
 }
 .import-block .import-body {
   padding: 0.9rem;
@@ -117,61 +186,118 @@ h2 {
 /* ---- form controls ---- */
 label {
   display: block;
-  font-size: 0.75rem;
-  color: var(--soft);
-  margin-bottom: 0.4rem;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  margin-bottom: var(--space-xs);
 }
 
 input[type="text"],
 input[type="password"],
-input[type="file"] {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--ink);
+input[type="file"],
+select {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
   padding: 0.55rem 0.7rem;
-  font-size: 0.9rem;
+  font-size: var(--text-md);
   font-family: var(--font-body);
   width: 100%;
-  transition: border-color 0.15s;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="file"]:hover,
+select:hover {
+  border-color: var(--color-border-strong);
 }
 input[type="text"]:focus,
 input[type="password"]:focus,
-input[type="file"]:focus {
+input[type="file"]:focus,
+select:focus {
   outline: none;
-  border-color: var(--red);
+  border-color: var(--color-accent);
+}
+input[type="text"]:disabled,
+input[type="password"]:disabled,
+input[type="file"]:disabled,
+select:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+select {
+  cursor: pointer;
+}
+
+/* ---- focus-visible ring (keyboard navigation) ----
+   Applied on top of each control's own :focus treatment so mouse/touch
+   focus stays quiet while keyboard focus stays clearly visible. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
 }
 
 /* ---- buttons ---- */
 button {
-  background: var(--red);
-  color: var(--ink);
+  background: var(--color-accent);
+  color: var(--color-ink);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0.55rem 1.1rem;
-  font-size: 0.88rem;
+  font-size: var(--text-base);
   font-family: var(--font-body);
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.15s;
+  transition:
+    background-color var(--transition-fast),
+    filter var(--transition-fast);
 }
 button:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: var(--color-accent-hover);
+  filter: none;
+}
+button:active:not(:disabled) {
+  background: var(--color-accent-focus);
 }
 button:disabled {
   opacity: 0.55;
   cursor: default;
 }
 button.secondary {
-  background: var(--card);
-  color: var(--soft);
-  border: 1px solid var(--lineh);
+  background: var(--color-surface-1);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-border-strong);
+}
+button.secondary:hover:not(:disabled) {
+  background: var(--color-surface-1);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
+/* Ghost button — transparent, text-only. Not wired to any screen yet, kept
+   available for future secondary/tertiary actions (e.g. row-level actions
+   inside dense tables) without introducing another one-off style. */
+.ghost {
+  background: transparent;
+  color: var(--color-ink-soft);
+  border: 1px solid transparent;
+}
+.ghost:hover:not(:disabled) {
+  color: var(--color-ink);
+  background: var(--color-surface-1);
 }
 
 /* ---- layout helpers ---- */
 .row {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-lg);
   align-items: flex-end;
   flex-wrap: wrap;
 }
@@ -180,8 +306,8 @@ button.secondary {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1.75rem;
+  gap: var(--space-md);
+  margin-bottom: var(--space-3xl);
 }
 .header .row {
   flex-wrap: wrap;
@@ -195,18 +321,18 @@ button.secondary {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--text-md);
 }
 th,
 td {
   text-align: left;
   padding: 0.65rem 0.55rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--color-border);
 }
 th {
-  color: var(--soft);
+  color: var(--color-ink-soft);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.01em;
 }
 
@@ -216,81 +342,90 @@ th {
   font-family: var(--font-mono);
   font-weight: 700;
   background: rgba(213, 37, 47, 0.12);
-  color: var(--red);
-  border-radius: 999px;
+  color: var(--color-accent);
+  border-radius: var(--radius-pill);
   padding: 0.12rem 0.55rem;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 .badge.green {
   background: rgba(62, 207, 142, 0.12);
-  color: var(--green);
+  color: var(--color-success);
 }
 /* Marks a contact whose company is currently hiring IT (see /hiring). */
 .badge.hiring {
   background: rgba(62, 207, 142, 0.12);
-  color: var(--green);
-  margin-left: 0.4rem;
+  color: var(--color-success);
+  margin-left: var(--space-xs);
 }
 /* Marks a company that also hires in an offshore delivery hub (India,
  * Philippines, etc. — see src/lib/hiring/markets.ts#isOffshoreHub). A
  * factual, deprioritizing signal, not a danger or a positive one, so it
  * deliberately does NOT reuse .badge's red or .badge.green's green — it
- * uses --warm (an otherwise-unused neutral-warm token) with --soft text. */
+ * uses --color-surface-tint (an otherwise-unused neutral-warm token) with
+ * --color-ink-soft text. */
 .badge.offshore {
-  background: var(--warm);
-  color: var(--soft);
-  margin-left: 0.4rem;
+  background: var(--color-surface-tint);
+  color: var(--color-ink-soft);
+  margin-left: var(--space-xs);
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--color-ink-muted);
 }
 .soft {
-  color: var(--soft);
+  color: var(--color-ink-soft);
 }
 
 /* ---- row links ---- */
 .rowlink {
-  color: var(--ink);
+  color: var(--color-ink);
   text-decoration: none;
   font-weight: 500;
 }
 .rowlink:hover {
-  color: var(--red);
+  color: var(--color-accent);
 }
 tbody tr:hover td {
   background: rgba(255, 255, 255, 0.02);
 }
 
 a {
-  color: var(--red);
+  color: var(--color-accent);
+}
+a:hover {
+  color: var(--color-accent-hover);
 }
 
 /* ---- link styled as secondary button ---- */
 .secondary-btn {
   display: inline-block;
-  background: var(--card);
-  color: var(--soft);
-  border: 1px solid var(--lineh);
-  border-radius: 6px;
+  background: var(--color-surface-1);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 .secondary-btn:hover {
-  color: var(--ink);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
 }
 .secondary-btn.disabled {
   opacity: 0.4;
   cursor: default;
+  pointer-events: none;
 }
 
 /* ---- locale switcher ---- */
 .locale-switcher {
   display: inline-flex;
-  gap: 0.35rem;
+  gap: var(--space-2xs);
   margin: 0;
 }
 .locale-btn {
@@ -298,8 +433,8 @@ a {
   font-family: var(--font-mono);
 }
 .locale-btn.active {
-  color: var(--ink);
-  border-color: var(--red);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
 }
 
 /* ---- user menu ---- */
@@ -313,39 +448,42 @@ a {
   justify-content: center;
   min-width: 2.25rem;
   height: 2.25rem;
-  padding: 0 0.5rem;
-  background: var(--card);
-  color: var(--soft);
-  border: 1px solid var(--lineh);
-  border-radius: 6px;
+  padding: 0 var(--space-sm);
+  background: var(--color-surface-1);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   gap: 0.3rem;
   cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 .user-menu-trigger:hover,
 .user-menu-trigger[aria-expanded="true"] {
-  color: var(--ink);
-  border-color: var(--red);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
 }
 .user-menu-dropdown {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + var(--space-sm));
   right: 0;
   z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   min-width: 11rem;
   padding: 0.65rem;
-  background: var(--card);
-  border: 1px solid var(--lineh);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
 }
 .user-menu-name {
-  padding: 0.1rem 0.5rem 0.5rem;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 0.85rem;
+  padding: 0.1rem var(--space-sm) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink);
+  font-size: var(--text-base);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -360,17 +498,18 @@ a {
   width: 100%;
   text-align: left;
   background: transparent;
-  color: var(--soft);
+  color: var(--color-ink-soft);
   border: none;
-  border-radius: 6px;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem var(--space-sm);
+  font-size: var(--text-base);
   text-decoration: none;
   cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 .user-menu-item:hover {
-  color: var(--ink);
-  background: var(--panel);
+  color: var(--color-ink);
+  background: var(--color-surface-2);
 }
 .user-menu-signout {
   padding: 0;
@@ -378,23 +517,23 @@ a {
 .user-menu-signout button {
   width: 100%;
   text-align: left;
-  border-radius: 6px;
-  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem var(--space-sm);
 }
 
 /* ---- pager ---- */
 .pager {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 1.25rem;
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
 }
 
 /* ---- filter toolbar ---- */
 .filter-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-lg);
   align-items: flex-end;
 }
 .filter-field {
@@ -405,7 +544,7 @@ a {
   flex: 2 1 280px;
 }
 .filter-field label {
-  margin-bottom: 0.35rem;
+  margin-bottom: var(--space-2xs);
 }
 .filter-submit {
   flex: 0 0 auto;
@@ -430,16 +569,16 @@ a {
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--soft);
-  font-size: 0.85rem;
+  gap: var(--space-sm);
+  color: var(--color-ink-soft);
+  font-size: var(--text-base);
   cursor: pointer;
   white-space: nowrap;
 }
 .checkbox-label input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
-  accent-color: var(--red);
+  accent-color: var(--color-accent);
   cursor: pointer;
 }
 
@@ -447,7 +586,7 @@ a {
 .reason-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--space-2xs);
   max-width: 320px;
 }
 
@@ -456,32 +595,32 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
 }
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  gap: var(--space-xs);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
   padding: 0.28rem 0.4rem 0.28rem 0.7rem;
-  font-size: 0.78rem;
-  color: var(--soft);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
 }
 .chip a {
-  color: var(--muted);
+  color: var(--color-ink-muted);
   text-decoration: none;
   font-family: var(--font-mono);
   line-height: 1;
   padding: 0 0.3rem;
 }
 .chip a:hover {
-  color: var(--red);
+  color: var(--color-accent);
 }
 .clear-all {
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-decoration: none;
 }
@@ -491,17 +630,17 @@ a {
 
 /* ---- contextual filter helper (role group / company category) ---- */
 .filter-helper {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-top: 1rem;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-lg);
 }
 .filter-helper summary {
   cursor: pointer;
   padding: 0.6rem 0.9rem;
-  color: var(--soft);
+  color: var(--color-ink-soft);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   list-style: none;
   user-select: none;
   display: flex;
@@ -514,7 +653,7 @@ a {
 }
 .filter-helper summary::before {
   content: "+";
-  color: var(--red);
+  color: var(--color-accent);
   font-family: var(--font-mono);
   font-weight: 700;
   margin-right: 0.1rem;
@@ -523,13 +662,13 @@ a {
   content: "−";
 }
 .filter-helper[open] summary {
-  color: var(--ink);
-  border-bottom: 1px solid var(--line);
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-border);
 }
 .filter-helper-hint {
   font-weight: 400;
-  font-size: 0.72rem;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
   font-style: italic;
 }
 .filter-helper-body {
@@ -542,8 +681,8 @@ a {
   /* Fill the available width instead of a fixed column count, so a 50-item
      list stays short rather than scrolling on wide screens. */
   columns: 220px auto;
-  column-gap: 1.5rem;
-  font-size: 0.85rem;
+  column-gap: var(--space-2xl);
+  font-size: var(--text-base);
 }
 .example-list li {
   break-inside: avoid;
@@ -564,7 +703,7 @@ a {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-md);
 }
 .whats-new-window-select {
   display: flex;
@@ -575,20 +714,20 @@ a {
 .whats-new-window-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 .secondary-btn.active {
-  color: var(--ink);
-  border-color: var(--red);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
 }
 .whats-new-sync-status {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 .whats-new-company {
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: 0.9rem 1rem;
   margin-bottom: 0.9rem;
 }
@@ -599,8 +738,8 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 .whats-new-company-name {
   font-weight: 700;
@@ -610,9 +749,9 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   margin-bottom: 0.6rem;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
 }
 .whats-new-suggested-item {
   display: inline-flex;
@@ -620,7 +759,7 @@ a {
   gap: 0.3rem;
 }
 .whats-new-closures {
-  background: var(--card);
+  background: var(--color-surface-1);
 }
 .whats-new-closures ul.example-list {
   columns: 1;
@@ -636,17 +775,17 @@ a {
 .field {
   display: grid;
   grid-template-columns: 180px 1fr;
-  gap: 1rem;
+  gap: var(--space-lg);
   padding: 0.7rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--color-border);
 }
 .field:last-child {
   border-bottom: none;
 }
 .field-label {
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   font-weight: 500;
-  color: var(--soft);
+  color: var(--color-ink-soft);
 }
 .field-value {
   font-size: 0.92rem;
@@ -654,26 +793,26 @@ a {
 }
 .field-value.empty {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--muted);
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
   font-style: italic;
 }
 
 /* ---- conversation history (contact detail) ---- */
 .thread-notice {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--muted);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   padding: 0.55rem 0.8rem;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-lg);
 }
 .thread {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-bottom: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
   overflow: hidden;
 }
 .thread:last-child {
@@ -684,17 +823,17 @@ a {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
+  gap: var(--space-sm);
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-border);
   padding: 0.6rem 0.9rem;
 }
 .thread-title {
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 .thread-meta {
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .thread-messages {
@@ -710,18 +849,18 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   margin-bottom: 0.25rem;
 }
 .message-sender {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
 }
 .message-time {
   font-size: 0.75rem;
 }
 .message-content {
-  font-size: 0.9rem;
+  font-size: var(--text-md);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
@@ -731,4 +870,75 @@ a {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* =========================================================================
+   Layout & spacing utilities
+   Small, composable classes that replace one-off inline `style={{...}}`
+   spacing/layout across src/app/**. Each maps directly to a token above —
+   add new values to the spacing/text scale rather than a new hardcoded
+   utility when a page needs something these don't cover.
+   ========================================================================= */
+.m-0 {
+  margin: 0;
+}
+.mt-0 {
+  margin-top: 0;
+}
+.mb-0 {
+  margin-bottom: 0;
+}
+.mt-2xs {
+  margin-top: var(--space-2xs);
+}
+.mt-md {
+  margin-top: var(--space-md);
+}
+.mt-xl {
+  margin-top: var(--space-xl);
+}
+.mb-md {
+  margin-bottom: var(--space-md);
+}
+.mb-lg {
+  margin-bottom: var(--space-lg);
+}
+.mb-2xl {
+  margin-bottom: var(--space-2xl);
+}
+.mb-3xl {
+  margin-bottom: var(--space-3xl);
+}
+.ml-sm {
+  margin-left: var(--space-sm);
+}
+
+.row-md {
+  gap: var(--space-md);
+}
+.row-xs {
+  gap: var(--space-xs);
+}
+
+.field-grow {
+  flex: 1 1 240px;
+  min-width: 240px;
+}
+
+.form-narrow {
+  max-width: 25rem; /* 400px */
+}
+.detail-narrow {
+  max-width: 45rem; /* 720px */
+}
+
+.inline-block {
+  display: inline-block;
+}
+
+.text-danger {
+  color: var(--color-danger);
+}
+.text-warn {
+  color: var(--color-warn);
 }
