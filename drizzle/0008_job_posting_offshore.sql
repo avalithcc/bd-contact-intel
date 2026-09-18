@@ -1,0 +1,21 @@
+-- Hand-written incremental migration, same rationale as 0002-0007 (see
+-- those files): this project historically used `drizzle-kit push` directly
+-- against the DB, so a freshly generated migration would emit baseline DDL
+-- that silently no-ops rather than adding the new column. This statement is
+-- additive and idempotent (IF NOT EXISTS).
+--
+-- Adds the offshore-hub sub-signal to job_posting: a boolean flag for
+-- whether a posting's location is in an offshore delivery hub (India,
+-- Philippines, Vietnam, Sri Lanka, Bangladesh, Pakistan) that competes with
+-- LATAM nearshore for the same kind of engineering work — see
+-- src/lib/hiring/markets.ts#isOffshoreHub and src/lib/hiring/sync.ts.
+-- Defaults to false, same rationale as `is_miami` (drizzle/0007): false is
+-- already the correct "unknown/not offshore" value for existing rows until
+-- they're reclassified, so no NULL sentinel is needed.
+-- Run scripts/backfill-posting-offshore.ts after this migration to classify
+-- existing rows.
+--
+-- No new index here — see the comment above the `job_posting` indexes in
+-- src/db/schema.ts for why the existing (company_key, closed_at) index
+-- already serves the one query that filters on this column.
+ALTER TABLE "job_posting" ADD COLUMN IF NOT EXISTS "is_offshore_hub" boolean NOT NULL DEFAULT false;

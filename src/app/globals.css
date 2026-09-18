@@ -225,6 +225,16 @@ th {
   color: var(--green);
   margin-left: 0.4rem;
 }
+/* Marks a company that also hires in an offshore delivery hub (India,
+ * Philippines, etc. — see src/lib/hiring/markets.ts#isOffshoreHub). A
+ * factual, deprioritizing signal, not a danger or a positive one, so it
+ * deliberately does NOT reuse .badge's red or .badge.green's green — it
+ * uses --warm (an otherwise-unused neutral-warm token) with --soft text. */
+.badge.offshore {
+  background: var(--warm);
+  color: var(--soft);
+  margin-left: 0.4rem;
+}
 
 .muted {
   color: var(--muted);

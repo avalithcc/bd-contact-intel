@@ -333,3 +333,68 @@ export function isMiamiArea(location: string | null | undefined): boolean {
 export function isMarketKey(value: string | null | undefined): value is MarketKey {
   return !!value && (MARKETS as readonly string[]).includes(value);
 }
+
+// Offshore delivery hubs that compete with LATAM nearshore for the same
+// kind of engineering work: a company already staffing here has partly
+// solved the same need elsewhere, so it's a WEAKER — but not worthless —
+// prospect for LATAM nearshore (some such companies still carry many open
+// LATAM roles). See `job_posting.is_offshore_hub` in src/db/schema.ts for
+// how this is persisted and used downstream.
+//
+// Deliberately does NOT include Eastern Europe (Poland, Romania, Ukraine,
+// etc.) — whether that region competes with LATAM nearshore the same way
+// is a separate business decision nobody has made yet. Do not extend this
+// list to cover it without that decision being made explicitly.
+//
+// Every entry here is a country/city NAME — no bare ISO country codes,
+// unlike LATAM_RULES/US_RULES above. India's own code ("in") would collide,
+// as a bare token, with the US state abbreviation for Indiana
+// ("Indianapolis, IN" must NOT classify as an offshore hub), and nothing
+// downstream needs offshore matching on a bare code.
+//
+// "india" itself is a TOKEN, not a phrase: matched as a substring it would
+// false-positive inside "Indiana"/"Indianapolis" — exactly the trap
+// documented on the shared tokenizer in countryFilter.ts. Every other
+// single-word country/city name below is a token for the same reason; only
+// genuinely multi-word names ("sri lanka", "ho chi minh") are phrases,
+// since the tokenizer splits on word boundaries and can never match a
+// phrase spanning more than one token.
+const OFFSHORE_HUB_RULES: MarketRules = {
+  phrases: ["sri lanka", "ho chi minh"],
+  tokens: [
+    "india",
+    "philippines",
+    "vietnam",
+    "bangladesh",
+    "pakistan",
+    // India's main tech cities.
+    "bangalore",
+    "bengaluru",
+    "hyderabad",
+    "pune",
+    "chennai",
+    "gurgaon",
+    "gurugram",
+    "noida",
+    "mumbai",
+    "delhi",
+    "kolkata",
+    "ahmedabad",
+    // Philippines.
+    "manila",
+    "cebu",
+    // Vietnam.
+    "hanoi",
+  ],
+};
+
+/**
+ * Whether a location falls in one of the offshore delivery hubs that
+ * compete with LATAM nearshore (see OFFSHORE_HUB_RULES above). Independent
+ * of `classifyMarket`/`isMiamiArea` — a posting can be "other" market and
+ * still be an offshore-hub posting (e.g. plain "Bangalore, India").
+ */
+export function isOffshoreHub(location: string | null | undefined): boolean {
+  if (!location) return false;
+  return matchesRules(normalizeText(location), OFFSHORE_HUB_RULES);
+}

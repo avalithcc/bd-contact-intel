@@ -25,6 +25,7 @@ export default async function OutreachPage({
     market?: string;
     miamiOnly?: string;
     excludeNever?: string;
+    hideOffshore?: string;
     page?: string;
   }>;
 }) {
@@ -48,11 +49,15 @@ export default async function OutreachPage({
   // required default); present -> excluded.
   const excludeNeverMessaged = sp.excludeNever === "on";
   const includeNeverMessaged = !excludeNeverMessaged;
+  // Opt-in hide, off by default — same "on" convention as excludeNever
+  // above (see resolveHiringCompanies' `hideOffshore` param in
+  // src/lib/hiring/queries.ts).
+  const hideOffshore = sp.hideOffshore === "on";
 
   const { rows, total, page: current, totalPages, hiringCompanyCount } =
     await listOutreachCandidates(
       me.id,
-      { roleGroup, market, miamiOnly, includeNeverMessaged },
+      { roleGroup, market, miamiOnly, includeNeverMessaged, hideOffshore },
       page,
       PAGE_SIZE,
     );
@@ -63,6 +68,7 @@ export default async function OutreachPage({
     if (market) params.set("market", market);
     if (miamiOnly) params.set("miamiOnly", "on");
     if (excludeNeverMessaged) params.set("excludeNever", "on");
+    if (hideOffshore) params.set("hideOffshore", "on");
     params.set("page", String(p));
     return `/outreach?${params.toString()}`;
   };
@@ -147,6 +153,17 @@ export default async function OutreachPage({
               {dict.outreach.excludeNeverMessaged}
             </label>
           </div>
+          <div className="filter-field filter-field-checkbox">
+            <label htmlFor="hideOffshore" className="checkbox-label">
+              <input
+                id="hideOffshore"
+                name="hideOffshore"
+                type="checkbox"
+                defaultChecked={hideOffshore}
+              />
+              {dict.common.hideOffshoreLabel}
+            </label>
+          </div>
           <button type="submit" className="filter-submit">
             {dict.common.filter}
           </button>
@@ -200,7 +217,12 @@ export default async function OutreachPage({
                       </Link>
                     </td>
                     <td>{r.position ?? "—"}</td>
-                    <td>{r.company ?? "—"}</td>
+                    <td>
+                      {r.company ?? "—"}
+                      {r.hiresOffshore && (
+                        <span className="badge offshore">{dict.common.offshoreBadge}</span>
+                      )}
+                    </td>
                     <td>{r.roleGroup ? dict.roleGroups[r.roleGroup] : "—"}</td>
                     <td>{r.openItCount}</td>
                     <td>{r.lastMessageAt ? relTime(new Date(r.lastMessageAt)) : dict.common.never}</td>

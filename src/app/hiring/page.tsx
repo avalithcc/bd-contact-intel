@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function HiringPage({
   searchParams,
 }: {
-  searchParams: Promise<{ market?: string; miamiOnly?: string }>;
+  searchParams: Promise<{ market?: string; miamiOnly?: string; hideOffshore?: string }>;
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
@@ -24,7 +24,12 @@ export default async function HiringPage({
   // with e.g. market=latam&miamiOnly=on can never mean "Miami postings in
   // LATAM"; it's simply ignored.
   const miamiOnly = market === "us" && sp.miamiOnly === "on";
-  const summaries = await getCompanyHiringSummaries(me.id, market, miamiOnly);
+  // Opt-in hide, off by default — an absent/unchecked checkbox is
+  // indistinguishable from "form never submitted", so "on" is the only
+  // value that means "hide" (see resolveHiringCompanies' `hideOffshore`
+  // param in src/lib/hiring/queries.ts).
+  const hideOffshore = sp.hideOffshore === "on";
+  const summaries = await getCompanyHiringSummaries(me.id, market, miamiOnly, hideOffshore);
 
   return (
     <main>
@@ -84,6 +89,17 @@ export default async function HiringPage({
               </label>
             </div>
           )}
+          <div className="filter-field filter-field-checkbox">
+            <label htmlFor="hideOffshore" className="checkbox-label">
+              <input
+                id="hideOffshore"
+                name="hideOffshore"
+                type="checkbox"
+                defaultChecked={hideOffshore}
+              />
+              {dict.common.hideOffshoreLabel}
+            </label>
+          </div>
           <button type="submit" className="filter-submit">
             {dict.common.filter}
           </button>
@@ -100,6 +116,9 @@ export default async function HiringPage({
                 {s.displayName} — {dict.hiring.postingCount(s.openItCount)}
                 {s.newLast7Days > 0 && (
                   <span className="badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
+                )}
+                {s.hiresOffshore && (
+                  <span className="badge offshore">{dict.common.offshoreBadge}</span>
                 )}
                 <span className="filter-helper-hint">{dict.hiring.showPostings}</span>
               </summary>

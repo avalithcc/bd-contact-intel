@@ -83,6 +83,14 @@ export const en = {
     // all of Florida (e.g. Orlando/Tampa don't match). Keep this label in
     // sync with that function's actual matching set.
     miamiOnlyLabel: "Florida only",
+    // Compact badge on a company that currently has at least one open IT
+    // posting in an offshore delivery hub (see
+    // src/lib/hiring/markets.ts#isOffshoreHub) — factual, not judgmental:
+    // it's a deprioritizing signal, not a disqualifying one.
+    offshoreBadge: "hires offshore",
+    // Opt-in filter, off by default (see resolveHiringCompanies'
+    // `hideOffshore` param in src/lib/hiring/queries.ts).
+    hideOffshoreLabel: "Hide companies that hire offshore",
     clearAll: "Clear all",
     pageOf: (current: number, total: number) => `${current} / ${total}`,
     totalPage: (total: number, current: number, totalPages: number) =>

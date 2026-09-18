@@ -54,6 +54,10 @@ export interface WhatsNewCompanyGroup {
   restContactCount: number;
   newPostings: WhatsNewPosting[];
   suggestedContacts: SuggestedContact[];
+  // See CompanyHiringSummary.hiresOffshore in src/lib/hiring/queries.ts —
+  // same derived signal, carried through resolveHiringCompanies (no extra
+  // query).
+  hiresOffshore: boolean;
 }
 
 export interface WhatsNewClosure {
@@ -129,13 +133,14 @@ interface ContactForRanking {
  * with the exact same rule /outreach uses (see compareOutreachRows in
  * src/lib/outreach/queries.ts) rather than a second scoring rule: dormant
  * reciprocal first, then active reciprocal, then leadership seniority, then
- * hiring urgency (constant across this group, since it's one company) as a
- * tiebreak.
+ * hiring urgency, then the offshore-hub tiebreak (all constant across this
+ * group, since it's one company).
  */
 function buildSuggestedContacts(
   companyContacts: ContactForRanking[],
   companyDisplayName: string,
   openItCount: number,
+  hiresOffshore: boolean,
   limit = 3,
 ): SuggestedContact[] {
   const ranked: OutreachRow[] = companyContacts.map((c) => {
@@ -156,6 +161,7 @@ function buildSuggestedContacts(
       relationshipTier: relationshipTierOf(c.reciprocal, dormant, c.messageCount),
       companyDisplayName,
       openItCount,
+      hiresOffshore,
     };
   });
   ranked.sort(compareOutreachRows);
@@ -189,20 +195,23 @@ function buildSuggestedContacts(
  * Grouping, the leadership/rest split, and the suggested-contacts ranking
  * all happen in JS over those five result sets — no per-company or
  * per-posting query. `market` and `miamiOnly`, when set, narrow queries 2-3
- * (via resolveHiringCompanies) and query 4 with a SQL WHERE condition each
- * — the query count stays exactly 5 either way.
+ * (via resolveHiringCompanies) and query 4 with a SQL WHERE condition each;
+ * `hideOffshore` narrows queries 2-3 the same way (it only ever means
+ * "currently has an open offshore posting", which doesn't apply to already
+ * -closed rows in query 4) — the query count stays exactly 5 either way.
  */
 export async function getWhatsNewFeed(
   bdId: string,
   windowDays: WhatsNewWindow,
   market?: MarketKey,
   miamiOnly?: boolean,
+  hideOffshore?: boolean,
 ): Promise<WhatsNewFeed> {
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
   const [syncStatus, openCompanies, closedRows] = await Promise.all([
     getSyncStatus(), // query 1
-    resolveHiringCompanies(market, miamiOnly), // queries 2-3 (shared, not BD-scoped)
+    resolveHiringCompanies(market, miamiOnly, hideOffshore), // queries 2-3 (shared, not BD-scoped)
     db // query 4 (shared, not BD-scoped)
       .select({
         id: jobPosting.id,
@@ -228,7 +237,12 @@ export async function getWhatsNewFeed(
 
   const newByCompany = new Map<
     string,
-    { displayName: string; openItCount: number; newPostings: WhatsNewPosting[] }
+    {
+      displayName: string;
+      openItCount: number;
+      newPostings: WhatsNewPosting[];
+      hiresOffshore: boolean;
+    }
   >();
   for (const c of openCompanies.values()) {
     const newPostings = c.postings.filter((p) => p.firstSeen >= cutoff);
@@ -237,6 +251,7 @@ export async function getWhatsNewFeed(
       displayName: c.displayName,
       openItCount: c.postings.length,
       newPostings,
+      hiresOffshore: c.hiresOffshore,
     });
   }
 
@@ -297,19 +312,25 @@ export async function getWhatsNewFeed(
           companyContacts,
           info.displayName,
           info.openItCount,
+          info.hiresOffshore,
         ),
+        hiresOffshore: info.hiresOffshore,
       };
     },
   );
 
   // Companies where the BD already has contacts first (the actionable
   // signal), then by how much is new there — mirrors the ordering rule in
-  // getCompanyHiringSummaries (src/lib/hiring/queries.ts).
+  // getCompanyHiringSummaries (src/lib/hiring/queries.ts). A company that
+  // also hires offshore is the lowest-priority tiebreak, same rationale as
+  // there.
   companies.sort((a, b) => {
     const aHas = a.contactCount > 0 ? 1 : 0;
     const bHas = b.contactCount > 0 ? 1 : 0;
     if (aHas !== bHas) return bHas - aHas;
-    return b.newPostingCount - a.newPostingCount;
+    if (a.newPostingCount !== b.newPostingCount) return b.newPostingCount - a.newPostingCount;
+    if (a.hiresOffshore !== b.hiresOffshore) return a.hiresOffshore ? 1 : -1;
+    return 0;
   });
 
   // Secondary signal: only surface closures at companies where the BD has

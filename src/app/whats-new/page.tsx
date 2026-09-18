@@ -21,7 +21,12 @@ export const dynamic = "force-dynamic";
 export default async function WhatsNewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string; market?: string; miamiOnly?: string }>;
+  searchParams: Promise<{
+    window?: string;
+    market?: string;
+    miamiOnly?: string;
+    hideOffshore?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
@@ -35,14 +40,19 @@ export default async function WhatsNewPage({
   // helper below also actively drops `miamiOnly` from generated links the
   // moment `market` isn't "us", so switching markets can't carry it along.
   const miamiOnly = market === "us" && sp.miamiOnly === "on";
-  const feed = await getWhatsNewFeed(me.id, windowDays, market, miamiOnly);
+  // Opt-in hide, off by default (see resolveHiringCompanies' `hideOffshore`
+  // param in src/lib/hiring/queries.ts).
+  const hideOffshore = sp.hideOffshore === "on";
+  const feed = await getWhatsNewFeed(me.id, windowDays, market, miamiOnly, hideOffshore);
 
-  // Composes the window + market + miamiOnly filters into one query string
-  // so neither Link-button group clobbers the others' current selection.
+  // Composes the window + market + miamiOnly + hideOffshore filters into one
+  // query string so neither Link-button group clobbers the others' current
+  // selection.
   const qs = (overrides: {
     window?: number;
     market?: string | null;
     miamiOnly?: boolean;
+    hideOffshore?: boolean;
   }) => {
     const params = new URLSearchParams();
     params.set("window", String(overrides.window ?? windowDays));
@@ -50,6 +60,9 @@ export default async function WhatsNewPage({
     if (nextMarket) params.set("market", nextMarket);
     const nextMiamiOnly = overrides.miamiOnly !== undefined ? overrides.miamiOnly : miamiOnly;
     if (nextMarket === "us" && nextMiamiOnly) params.set("miamiOnly", "on");
+    const nextHideOffshore =
+      overrides.hideOffshore !== undefined ? overrides.hideOffshore : hideOffshore;
+    if (nextHideOffshore) params.set("hideOffshore", "on");
     return `/whats-new?${params.toString()}`;
   };
 
@@ -133,6 +146,17 @@ export default async function WhatsNewPage({
               </div>
             </div>
           )}
+          <div className="whats-new-window-select">
+            <span className="soft">{dict.common.hideOffshoreLabel}</span>
+            <div className="whats-new-window-options">
+              <Link
+                href={qs({ hideOffshore: !hideOffshore })}
+                className={hideOffshore ? "secondary-btn active" : "secondary-btn"}
+              >
+                {dict.common.hideOffshoreLabel}
+              </Link>
+            </div>
+          </div>
           <p className="whats-new-sync-status">
             {feed.lastSuccessfulSyncAt
               ? dict.whatsNew.lastSyncAt(formatDateTime(feed.lastSuccessfulSyncAt, locale))
@@ -165,6 +189,9 @@ export default async function WhatsNewPage({
             <div className="whats-new-company-head">
               <span className="whats-new-company-name">{c.displayName}</span>
               <span className="badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
+              {c.hiresOffshore && (
+                <span className="badge offshore">{dict.common.offshoreBadge}</span>
+              )}
               <span className="soft">{dict.hiring.postingCount(c.openItCount)}</span>
               {c.contactCount > 0 && (
                 <span className="soft">

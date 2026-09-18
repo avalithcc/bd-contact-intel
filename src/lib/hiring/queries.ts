@@ -24,6 +24,12 @@ export interface CompanyHiringSummary {
   // getCompanyHiringSummaries below).
   contactCount: number;
   leadershipContactCount: number;
+  // Whether this company currently has at least one open IT posting in an
+  // offshore delivery hub (see src/lib/hiring/markets.ts#isOffshoreHub) —
+  // computed below from the same postings already fetched, no extra query.
+  // A deprioritizing signal, not a disqualifying one (see the comment on
+  // resolveHiringCompanies below).
+  hiresOffshore: boolean;
 }
 
 // Role groups considered "leadership" for the hiring crossover — the
@@ -46,6 +52,12 @@ interface ResolvedHiringCompany {
   // the target company's own key plus any company_alias rows pointing at
   // it.
   matchKeys: Set<string>;
+  // True when at least one of `postings` is in an offshore delivery hub.
+  // Derived, not stored: recomputed from the open postings already in this
+  // map every time they're fetched, so it stays truthful as postings open
+  // and close rather than going stale like a cached column on
+  // target_company would.
+  hiresOffshore: boolean;
 }
 
 /**
@@ -73,10 +85,20 @@ interface ResolvedHiringCompany {
  * query count change. It's a sub-filter of "us", but this function doesn't
  * enforce that pairing itself (callers only ever pass it alongside
  * `market: "us"` — see the page components under src/app/*).
+ *
+ * `hideOffshore`, when true, excludes companies that have at least one open
+ * posting in an offshore delivery hub (see
+ * src/lib/hiring/markets.ts#isOffshoreHub) entirely from the result — via a
+ * correlated `NOT EXISTS` subquery in query (1)'s SQL WHERE clause, not a
+ * post-fetch JS filter, so it never changes the query count. This is an
+ * opt-in hide, off by default: such companies are a weaker but not
+ * worthless prospect (see the `hiresOffshore` field below), so the default
+ * behavior is to show and deprioritize them, never to drop them silently.
  */
 export async function resolveHiringCompanies(
   market?: MarketKey,
   miamiOnly?: boolean,
+  hideOffshore?: boolean,
 ): Promise<Map<string, ResolvedHiringCompany>> {
   const openPostings = await db
     .select({
@@ -86,6 +108,7 @@ export async function resolveHiringCompanies(
       title: jobPosting.title,
       location: jobPosting.location,
       market: jobPosting.market,
+      isOffshoreHub: jobPosting.isOffshoreHub,
       url: jobPosting.url,
       postedAt: jobPosting.postedAt,
       firstSeen: jobPosting.firstSeen,
@@ -98,6 +121,14 @@ export async function resolveHiringCompanies(
         isNull(jobPosting.closedAt),
         market ? eq(jobPosting.market, market) : undefined,
         miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
+        hideOffshore
+          ? sql`not exists (
+              select 1 from job_posting jp2
+              where jp2.company_key = ${jobPosting.companyKey}
+                and jp2.is_offshore_hub = true
+                and jp2.closed_at is null
+            )`
+          : undefined,
       ),
     )
     .orderBy(desc(jobPosting.postedAt));
@@ -111,6 +142,7 @@ export async function resolveHiringCompanies(
       displayName: p.displayName,
       postings: [],
       matchKeys: new Set([p.companyKey]),
+      hiresOffshore: false,
     };
     entry.postings.push({
       id: p.id,
@@ -124,6 +156,7 @@ export async function resolveHiringCompanies(
       postedAt: p.postedAt,
       firstSeen: p.firstSeen,
     });
+    if (p.isOffshoreHub) entry.hiresOffshore = true;
     byCompany.set(p.companyKey, entry);
   }
 
@@ -148,17 +181,18 @@ export async function resolveHiringCompanies(
  * over `contact` for every key (canonical + alias) that resolves to any
  * hiring company. No per-company query loop (no N+1).
  *
- * `market` and `miamiOnly`, when set, flow straight into
+ * `market`, `miamiOnly` and `hideOffshore`, when set, flow straight into
  * resolveHiringCompanies' SQL WHERE clause — same query count either way.
  */
 export async function getCompanyHiringSummaries(
   bdId: string,
   market?: MarketKey,
   miamiOnly?: boolean,
+  hideOffshore?: boolean,
 ): Promise<CompanyHiringSummary[]> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const companies = await resolveHiringCompanies(market, miamiOnly);
+  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore);
   if (!companies.size) return [];
 
   const allMatchKeys = [
@@ -195,6 +229,7 @@ export async function getCompanyHiringSummaries(
       postings: c.postings,
       contactCount: 0,
       leadershipContactCount: 0,
+      hiresOffshore: c.hiresOffshore,
     };
     for (const key of c.matchKeys) {
       const stats = statsByKey.get(key);
@@ -206,12 +241,17 @@ export async function getCompanyHiringSummaries(
   }
 
   // Companies where the BD already has contacts are the actionable
-  // signal — surface those first, then by open IT posting count.
+  // signal — surface those first, then by open IT posting count. A company
+  // that also hires offshore is the lowest-priority tiebreak — it only
+  // decides the order between two otherwise-equivalent companies, never
+  // overriding the contact-crossover or posting-count signals above.
   return summaries.sort((a, b) => {
     const aHas = a.contactCount > 0 ? 1 : 0;
     const bHas = b.contactCount > 0 ? 1 : 0;
     if (aHas !== bHas) return bHas - aHas;
-    return b.openItCount - a.openItCount;
+    if (a.openItCount !== b.openItCount) return b.openItCount - a.openItCount;
+    if (a.hiresOffshore !== b.hiresOffshore) return a.hiresOffshore ? 1 : -1;
+    return 0;
   });
 }
 
@@ -219,6 +259,10 @@ export interface HiringMatch {
   companyKey: string;
   displayName: string;
   openItCount: number;
+  // See CompanyHiringSummary.hiresOffshore above — same derived signal,
+  // carried through the alias-aware index so /outreach can rank on it
+  // without a second lookup.
+  hiresOffshore: boolean;
 }
 
 /**
@@ -228,21 +272,23 @@ export interface HiringMatch {
  * getCompanyHiringSummaries (via resolveHiringCompanies) rather than
  * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup.
  * Not BD-scoped — job postings/target companies are shared data. Two fixed
- * queries regardless of caller. `market` and `miamiOnly` flow into
- * resolveHiringCompanies' SQL WHERE clause, same as
+ * queries regardless of caller. `market`, `miamiOnly` and `hideOffshore`
+ * flow into resolveHiringCompanies' SQL WHERE clause, same as
  * getCompanyHiringSummaries above.
  */
 export async function getHiringMatchIndex(
   market?: MarketKey,
   miamiOnly?: boolean,
+  hideOffshore?: boolean,
 ): Promise<Map<string, HiringMatch>> {
-  const companies = await resolveHiringCompanies(market, miamiOnly);
+  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore);
   const index = new Map<string, HiringMatch>();
   for (const c of companies.values()) {
     const match: HiringMatch = {
       companyKey: c.companyKey,
       displayName: c.displayName,
       openItCount: c.postings.length,
+      hiresOffshore: c.hiresOffshore,
     };
     for (const key of c.matchKeys) index.set(key, match);
   }

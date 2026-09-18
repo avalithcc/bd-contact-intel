@@ -211,6 +211,17 @@ export const jobPosting = pgTable(
     // unlike `market`, false is already the correct "unknown/not Miami"
     // default, so newly added rows don't need a NULL sentinel.
     isMiami: boolean("is_miami").notNull().default(false),
+    // Whether this posting is in an offshore delivery hub (India,
+    // Philippines, Vietnam, Sri Lanka, Bangladesh, Pakistan — see
+    // src/lib/hiring/markets.ts#isOffshoreHub) that competes with LATAM
+    // nearshore. Independent of `market`: an offshore-hub posting is
+    // usually `market = "other"`, but this is its own dimension rather than
+    // a fourth market bucket, since it's a deprioritizing signal on the
+    // *company*, not a geography the business sells into. Computed at sync
+    // time (see src/lib/hiring/sync.ts) and backfilled for older rows via
+    // scripts/backfill-posting-offshore.ts. Not nullable, same rationale as
+    // `isMiami` above: false is already the correct default for new rows.
+    isOffshoreHub: boolean("is_offshore_hub").notNull().default(false),
     firstSeen: timestamp("first_seen").notNull().defaultNow(),
     lastSeen: timestamp("last_seen").notNull().defaultNow(),
     closedAt: timestamp("closed_at"),
@@ -241,6 +252,18 @@ export const jobPosting = pgTable(
       t.isMiami,
       t.closedAt,
     ),
+    // No dedicated index for `is_offshore_hub`, deliberately: the only query
+    // that filters on it is the "hide companies that hire offshore" opt-in
+    // (see resolveHiringCompanies in src/lib/hiring/queries.ts), which uses
+    // a correlated `NOT EXISTS (... WHERE company_key = ... AND
+    // is_offshore_hub = true AND closed_at IS NULL)` subquery. That
+    // subquery is already served well by `job_posting_company_closed_idx`
+    // above (company_key, closed_at) — it narrows to one company's open
+    // postings (a handful to a few dozen rows even for a heavy offshore
+    // hirer) and then filters `is_offshore_hub` as a cheap residual check
+    // over that small row set. Add a composite (company_key, is_offshore_hub,
+    // closed_at) index only if that subquery shows up as a real cost in
+    // practice.
   }),
 );
 
