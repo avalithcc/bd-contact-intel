@@ -6,6 +6,8 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate } from "@/lib/i18n/format";
 import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
+import { SignOutButton } from "../SignOutButton";
+import { UserMenu } from "../UserMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,13 @@ export default async function HiringPage({
           <Link className="secondary-btn" href="/whats-new">
             {dict.common.whatsNew}
           </Link>
-          <LocaleSwitcher locale={locale} />
+          <UserMenu
+            label={me.name || dict.common.account}
+            changePasswordHref="/account/password"
+            changePasswordLabel={dict.common.changePassword}
+            localeSwitcher={<LocaleSwitcher locale={locale} />}
+            signOutButton={<SignOutButton locale={locale} />}
+          />
         </div>
       </div>
 

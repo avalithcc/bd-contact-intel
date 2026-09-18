@@ -12,6 +12,7 @@ import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
 import { UploadForm, UploadMessagesForm } from "./UploadForm";
 import { SignOutButton } from "./SignOutButton";
+import { UserMenu } from "./UserMenu";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
@@ -153,8 +154,13 @@ export default async function Home({
           <Link className="secondary-btn" href="/discovery">
             {dict.common.boardDiscovery}
           </Link>
-          <SignOutButton locale={locale} />
-          <LocaleSwitcher locale={locale} />
+          <UserMenu
+            label={me.name || dict.common.account}
+            changePasswordHref="/account/password"
+            changePasswordLabel={dict.common.changePassword}
+            localeSwitcher={<LocaleSwitcher locale={locale} />}
+            signOutButton={<SignOutButton locale={locale} />}
+          />
         </div>
       </div>
 

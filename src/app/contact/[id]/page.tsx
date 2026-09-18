@@ -5,6 +5,8 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/i18n/format";
 import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
+import { SignOutButton } from "../../SignOutButton";
+import { UserMenu } from "../../UserMenu";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +60,13 @@ export default async function ContactDetail({
           <Link className="secondary-btn" href="/">
             {dict.common.back}
           </Link>
-          <LocaleSwitcher locale={locale} />
+          <UserMenu
+            label={me.name || dict.common.account}
+            changePasswordHref="/account/password"
+            changePasswordLabel={dict.common.changePassword}
+            localeSwitcher={<LocaleSwitcher locale={locale} />}
+            signOutButton={<SignOutButton locale={locale} />}
+          />
         </div>
       </div>
 
