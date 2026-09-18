@@ -82,7 +82,7 @@ export const en = {
     // (Miami/Miami Beach/Fort Lauderdale/Coral Gables/Doral/Hialeah), NOT
     // all of Florida (e.g. Orlando/Tampa don't match). Keep this label in
     // sync with that function's actual matching set.
-    miamiOnlyLabel: "Miami area only",
+    miamiOnlyLabel: "Florida only",
     clearAll: "Clear all",
     pageOf: (current: number, total: number) => `${current} / ${total}`,
     totalPage: (total: number, current: number, totalPages: number) =>

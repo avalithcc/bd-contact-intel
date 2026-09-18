@@ -271,11 +271,34 @@ const US_RULES: MarketRules = {
   ],
 };
 
-// Phrases that indicate the Miami metro area specifically — a finer hint on
-// top of the "us" market bucket for the team's stated Miami focus. Does NOT
-// change classifyMarket's output (Miami postings are still just "us"); use
-// this only where a Miami-specific callout is cheap to add.
-const MIAMI_PHRASES = ["miami", "fort lauderdale", "coral gables", "doral", "hialeah"];
+// Florida, as a finer cut on top of the "us" market bucket: the team sells
+// into the state from Miami, and Miami-metro alone matched too few postings
+// to work with. Does NOT change classifyMarket's output (Florida postings
+// are still just "us"). "fl" is matched as a whole token, never a substring,
+// for the same reason as the country codes above.
+const FLORIDA_PHRASES = [
+  "florida",
+  "miami",
+  "fort lauderdale",
+  "coral gables",
+  "doral",
+  "hialeah",
+  "orlando",
+  "tampa",
+  "jacksonville",
+  "st petersburg",
+  "saint petersburg",
+  "boca raton",
+  "west palm beach",
+  "tallahassee",
+  "sarasota",
+  "naples",
+  "gainesville",
+  "clearwater",
+  "cape coral",
+  "fort myers",
+];
+const FLORIDA_TOKENS = ["fl"];
 
 /**
  * Classifies a job posting's free-text location into a market bucket.
@@ -293,11 +316,18 @@ export function classifyMarket(location: string | null | undefined): MarketKey {
   return "other";
 }
 
-/** Whether a location falls in the Miami metro area (see MIAMI_PHRASES). */
+/**
+ * Whether a location falls in Florida (see FLORIDA_PHRASES). Kept under the
+ * historical name so callers and the persisted `job_posting.is_miami` column
+ * stay stable; the label shown to users says Florida, which is what this
+ * actually matches.
+ */
 export function isMiamiArea(location: string | null | undefined): boolean {
   if (!location) return false;
   const normalized = normalizeText(location);
-  return MIAMI_PHRASES.some((phrase) => normalized.includes(phrase));
+  if (FLORIDA_PHRASES.some((phrase) => normalized.includes(phrase))) return true;
+  const tokens = new Set(tokenize(location));
+  return FLORIDA_TOKENS.some((token) => tokens.has(token));
 }
 
 export function isMarketKey(value: string | null | undefined): value is MarketKey {
