@@ -58,6 +58,12 @@
   --radius-md: 8px;
   --radius-pill: 999px;
 
+  /* ---- controls ----
+     One height for every form control (text inputs, selects, submit
+     buttons, checkbox rows) so filter toolbars line up on one baseline
+     regardless of each browser's native select/input metrics. */
+  --control-height: 2.5rem;
+
   /* ---- elevation ---- */
   --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
 
@@ -199,9 +205,11 @@ select {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   color: var(--color-ink);
-  padding: 0.55rem 0.7rem;
+  height: var(--control-height);
+  padding: 0 0.7rem;
   font-size: var(--text-md);
   font-family: var(--font-body);
+  line-height: 1.2;
   width: 100%;
   transition:
     border-color var(--transition-fast),
@@ -227,8 +235,20 @@ select:disabled {
   opacity: 0.55;
   cursor: default;
 }
+input[type="file"] {
+  height: auto;
+  padding: 0.55rem 0.7rem;
+}
+/* Native selects render with browser-specific padding and height; strip
+   the native chrome and draw our own chevron so they match text inputs. */
 select {
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
 }
 
 /* ---- focus-visible ring (keyboard navigation) ----
@@ -548,6 +568,9 @@ a:hover {
 }
 .filter-submit {
   flex: 0 0 auto;
+  height: var(--control-height);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 @media (max-width: 560px) {
   .filter-toolbar {
@@ -562,9 +585,13 @@ a:hover {
 }
 
 /* ---- checkbox filter control (e.g. /outreach's "exclude never-messaged") ---- */
+/* Checkbox fields have no label row above them, so give them the control
+   height and center the checkbox on the same line as inputs and selects. */
 .filter-field-checkbox {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  height: var(--control-height);
+  flex: 0 0 auto;
 }
 .checkbox-label {
   display: flex;
