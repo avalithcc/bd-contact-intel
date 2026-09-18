@@ -39,7 +39,7 @@ export default async function HiringPage({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row row-md">
           <Link className="secondary-btn" href="/">
             {dict.common.backToContacts}
           </Link>
@@ -59,13 +59,13 @@ export default async function HiringPage({
         </div>
       </div>
 
-      <div style={{ marginBottom: "1.75rem" }}>
+      <div className="mb-3xl">
         <div className="eyebrow">{dict.hiring.eyebrow}</div>
         <h1>
           {dict.hiring.title}
           <span className="dot">.</span>
         </h1>
-        <p className="soft" style={{ margin: 0 }}>
+        <p className="soft m-0">
           {dict.hiring.subtitle}
         </p>
       </div>
@@ -118,7 +118,7 @@ export default async function HiringPage({
         <div className="eyebrow">{dict.hiring.companiesEyebrow}</div>
         {!summaries.length && <p className="muted">{dict.hiring.empty}</p>}
         {summaries.map((s) => (
-          <div key={s.companyKey} style={{ marginBottom: "0.75rem" }}>
+          <div key={s.companyKey} className="mb-md">
             <details className="filter-helper">
               <summary>
                 {s.displayName} — {dict.hiring.postingCount(s.openItCount)}
@@ -149,9 +149,8 @@ export default async function HiringPage({
               </div>
             </details>
             <Link
-              className="soft"
+              className="soft inline-block mt-2xs"
               href={`/?companyKey=${encodeURIComponent(s.companyKey)}`}
-              style={{ display: "inline-block", marginTop: "0.35rem" }}
             >
               {dict.hiring.contactCount(s.contactCount)}
               {s.leadershipContactCount > 0 && ` ${dict.hiring.leadershipCount(s.leadershipContactCount)}`} →

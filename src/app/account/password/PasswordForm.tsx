@@ -44,7 +44,7 @@ export function PasswordForm({
   }
 
   return (
-    <main style={{ maxWidth: 400 }}>
+    <main className="form-narrow">
       <div className="header">
         <span className="logo">
           avalith<span className="dot">.</span>
@@ -58,8 +58,8 @@ export function PasswordForm({
       </h1>
       <p className="soft">{dict.account.subtitle}</p>
 
-      <form className="panel" style={{ marginTop: "1.25rem" }} onSubmit={submit}>
-        <div style={{ marginBottom: "1rem" }}>
+      <form className="panel mt-xl" onSubmit={submit}>
+        <div className="mb-lg">
           <label htmlFor="password">{dict.account.newPassword}</label>
           <input
             id="password"
@@ -69,7 +69,7 @@ export function PasswordForm({
             required
           />
         </div>
-        <div style={{ marginBottom: "1rem" }}>
+        <div className="mb-lg">
           <label htmlFor="confirm">{dict.account.confirmPassword}</label>
           <input
             id="confirm"
@@ -83,7 +83,7 @@ export function PasswordForm({
           {busy ? dict.common.ellipsis : dict.account.saveAndContinue}
         </button>
         {msg && (
-          <p className="soft" style={{ marginBottom: 0, marginTop: "0.75rem" }}>
+          <p className="soft mb-0 mt-md">
             {msg}
           </p>
         )}

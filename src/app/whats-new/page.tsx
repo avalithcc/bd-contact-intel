@@ -74,7 +74,7 @@ export default async function WhatsNewPage({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row row-md">
           <Link className="secondary-btn" href="/">
             {dict.common.backToContacts}
           </Link>
@@ -94,13 +94,13 @@ export default async function WhatsNewPage({
         </div>
       </div>
 
-      <div style={{ marginBottom: "1.75rem" }}>
+      <div className="mb-3xl">
         <div className="eyebrow">{dict.whatsNew.eyebrow}</div>
         <h1>
           {dict.whatsNew.title}
           <span className="dot">.</span>
         </h1>
-        <p className="soft" style={{ margin: 0 }}>
+        <p className="soft m-0">
           {dict.whatsNew.subtitle}
         </p>
       </div>
@@ -259,7 +259,7 @@ export default async function WhatsNewPage({
         <section className="panel whats-new-closures">
           <div className="eyebrow">{dict.whatsNew.closuresEyebrow}</div>
           <h2>{dict.whatsNew.closuresTitle}</h2>
-          <p className="soft" style={{ marginTop: 0 }}>
+          <p className="soft mt-0">
             {dict.whatsNew.closuresSubtitle}
           </p>
           <ul className="example-list">

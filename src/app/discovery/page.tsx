@@ -38,7 +38,7 @@ export default async function DiscoveryPage() {
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row row-md">
           <Link className="secondary-btn" href="/">
             {dict.common.backToContacts}
           </Link>
@@ -58,13 +58,13 @@ export default async function DiscoveryPage() {
         </div>
       </div>
 
-      <div style={{ marginBottom: "1.75rem" }}>
+      <div className="mb-3xl">
         <div className="eyebrow">{dict.discovery.eyebrow}</div>
         <h1>
           {dict.discovery.title}
           <span className="dot">.</span>
         </h1>
-        <p className="soft" style={{ margin: 0 }}>
+        <p className="soft m-0">
           {dict.discovery.subtitle}
         </p>
       </div>
@@ -73,30 +73,30 @@ export default async function DiscoveryPage() {
         <div className="eyebrow">{dict.discovery.lastRunEyebrow}</div>
         {!lastRun && <p className="muted">{dict.discovery.noRunsYet}</p>}
         {lastRun && (
-          <p className="soft" style={{ margin: 0 }}>
+          <p className="soft m-0">
             {dict.discovery.lastRunSummary(
               formatDateTime(lastRun.startedAt, locale),
               lastRun.companiesProbed,
               lastRun.hits,
             )}
             {lastRun.status === "error" && (
-              <span className="badge" style={{ marginLeft: "0.5rem" }}>
+              <span className="badge ml-sm">
                 {dict.discovery.lastRunFailed}
               </span>
             )}
             {!lastRun.finishedAt && (
-              <span className="badge" style={{ marginLeft: "0.5rem" }}>
+              <span className="badge ml-sm">
                 {dict.discovery.lastRunUnfinished}
               </span>
             )}
           </p>
         )}
         {lastRun?.error && (
-          <p className="muted" style={{ marginTop: "0.35rem" }}>
+          <p className="muted mt-2xs">
             {lastRun.error}
           </p>
         )}
-        <p className="soft" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+        <p className="soft mt-md mb-0">
           {dict.discovery.statusCounts(counts.pending, counts.approved, counts.rejected)}
         </p>
       </section>
@@ -147,7 +147,7 @@ export default async function DiscoveryPage() {
                     </td>
                     <td>{dict.discovery.teamContactCount(c.contactCount)}</td>
                     <td>
-                      <div className="row" style={{ gap: "0.4rem" }}>
+                      <div className="row row-xs">
                         <form action={approveCandidate}>
                           <input type="hidden" name="id" value={c.id} />
                           <button type="submit" className="secondary-btn">

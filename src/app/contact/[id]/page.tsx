@@ -51,12 +51,12 @@ export default async function ContactDetail({
       : { threads: [], moreConversations: false, moreMessages: false };
 
   return (
-    <main style={{ maxWidth: 720 }}>
+    <main className="detail-narrow">
       <div className="header">
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row row-md">
           <Link className="secondary-btn" href="/">
             {dict.common.back}
           </Link>
@@ -70,7 +70,7 @@ export default async function ContactDetail({
         </div>
       </div>
 
-      <div style={{ marginBottom: "1.5rem" }}>
+      <div className="mb-2xl">
         <div className="eyebrow">{dict.contact.eyebrow}</div>
         <h1>
           {fullName || dict.contact.unnamed}

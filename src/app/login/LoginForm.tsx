@@ -80,7 +80,7 @@ export function LoginForm({
   }
 
   return (
-    <main style={{ maxWidth: 400 }}>
+    <main className="form-narrow">
       <div className="header">
         <span className="logo">
           avalith<span className="dot">.</span>
@@ -97,8 +97,8 @@ export function LoginForm({
         <strong>{ALLOWED_DOMAIN}</strong>
         {dict.login.signUpHintSuffix}
       </p>
-      <form className="panel" style={{ marginTop: "1.25rem" }} onSubmit={signIn}>
-        <div style={{ marginBottom: "1rem" }}>
+      <form className="panel mt-xl" onSubmit={signIn}>
+        <div className="mb-lg">
           <label htmlFor="email">{dict.login.workEmail}</label>
           <input
             id="email"
@@ -109,7 +109,7 @@ export function LoginForm({
             required
           />
         </div>
-        <div style={{ marginBottom: "1rem" }}>
+        <div className="mb-lg">
           <label htmlFor="password">{dict.login.password}</label>
           <input
             id="password"
@@ -133,7 +133,7 @@ export function LoginForm({
           </button>
         </div>
         {msg && (
-          <p className="muted" style={{ marginBottom: 0, marginTop: "0.75rem" }}>
+          <p className="muted mb-0 mt-md">
             {msg}
           </p>
         )}

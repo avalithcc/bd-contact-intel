@@ -17,7 +17,7 @@ export function UploadForm({ locale }: { locale: Locale }) {
   return (
     <form action={action}>
       <div className="row">
-        <div style={{ flex: 1, minWidth: 240 }}>
+        <div className="field-grow">
           <label htmlFor="file">{dict.upload.connectionsLabel}</label>
           <input id="file" name="file" type="file" accept=".csv" required />
         </div>
@@ -26,12 +26,12 @@ export function UploadForm({ locale }: { locale: Locale }) {
         </button>
       </div>
       {state?.ok && (
-        <p className="muted" style={{ marginBottom: 0 }}>
+        <p className="muted mb-0">
           {dict.upload.importedContacts(state.imported ?? 0)}
         </p>
       )}
       {state && !state.ok && (
-        <p style={{ color: "#ff6b6b", marginBottom: 0 }}>
+        <p className="text-danger mb-0">
           {state.errorKey ? dict.upload.connectionsErrors[state.errorKey] : null}
           {state.errorDetail ? ` ${state.errorDetail}` : ""}
         </p>
@@ -104,7 +104,7 @@ export function UploadMessagesForm({ locale }: { locale: Locale }) {
   return (
     <form action={action}>
       <div className="row">
-        <div style={{ flex: 1, minWidth: 240 }}>
+        <div className="field-grow">
           <label htmlFor="messagesFile">{dict.upload.messagesLabel}</label>
           <input id="messagesFile" name="file" type="file" accept=".csv" required />
         </div>
@@ -114,7 +114,7 @@ export function UploadMessagesForm({ locale }: { locale: Locale }) {
       </div>
       {state?.ok && (
         <>
-          <p className="muted" style={{ marginBottom: 0 }}>
+          <p className="muted mb-0">
             {dict.upload.importedMessages(state.messages ?? 0, state.conversations ?? 0)}
             {state.ownProfileKey ? dict.upload.detectedSender(state.ownProfileKey) : ""}
             {state.confidence != null
@@ -125,15 +125,15 @@ export function UploadMessagesForm({ locale }: { locale: Locale }) {
             .
           </p>
           {state.ownProfileWarning && (
-            <p style={{ color: "#e6a23c", marginBottom: 0 }}>{state.ownProfileWarning}</p>
+            <p className="text-warn mb-0">{state.ownProfileWarning}</p>
           )}
           {state.cleanupFailed && (
-            <p style={{ color: "#e6a23c", marginBottom: 0 }}>{dict.upload.cleanupWarning}</p>
+            <p className="text-warn mb-0">{dict.upload.cleanupWarning}</p>
           )}
         </>
       )}
       {state && !state.ok && (
-        <p style={{ color: "#ff6b6b", marginBottom: 0 }}>
+        <p className="text-danger mb-0">
           {state.errorKey ? dict.upload.messagesErrors[state.errorKey] : state.errorDetail}
           {state.errorKey === "genericFailed" && state.errorDetail ? ` ${state.errorDetail}` : ""}
         </p>

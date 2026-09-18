@@ -81,7 +81,7 @@ export default async function OutreachPage({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row row-md">
           <Link className="secondary-btn" href="/">
             {dict.common.backToContacts}
           </Link>
@@ -101,13 +101,13 @@ export default async function OutreachPage({
         </div>
       </div>
 
-      <div style={{ marginBottom: "1.75rem" }}>
+      <div className="mb-3xl">
         <div className="eyebrow">{dict.outreach.eyebrow}</div>
         <h1>
           {dict.outreach.title}
           <span className="dot">.</span>
         </h1>
-        <p className="soft" style={{ margin: 0 }}>
+        <p className="soft m-0">
           {dict.outreach.subtitle}
         </p>
       </div>
@@ -180,7 +180,7 @@ export default async function OutreachPage({
 
       <section className="panel">
         <div className="eyebrow">{dict.outreach.candidatesEyebrow}</div>
-        <p className="soft" style={{ marginTop: 0 }}>
+        <p className="soft mt-0">
           {dict.common.totalPage(total, current, totalPages)}
         </p>
 
