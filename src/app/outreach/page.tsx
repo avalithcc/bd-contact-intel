@@ -219,8 +219,10 @@ export default async function OutreachPage({
                     <td>{r.position ?? "—"}</td>
                     <td>
                       {r.company ?? "—"}
-                      {r.hiresOffshore && (
-                        <span className="badge offshore">{dict.common.offshoreBadge}</span>
+                      {r.offshoreHeavy && (
+                        <span className="badge offshore">
+                          {dict.common.offshoreBadge(r.offshoreItCount, r.latamItCount)}
+                        </span>
                       )}
                     </td>
                     <td>{r.roleGroup ? dict.roleGroups[r.roleGroup] : "—"}</td>

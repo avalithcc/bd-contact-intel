@@ -253,17 +253,18 @@ export const jobPosting = pgTable(
       t.closedAt,
     ),
     // No dedicated index for `is_offshore_hub`, deliberately: the only query
-    // that filters on it is the "hide companies that hire offshore" opt-in
-    // (see resolveHiringCompanies in src/lib/hiring/queries.ts), which uses
-    // a correlated `NOT EXISTS (... WHERE company_key = ... AND
-    // is_offshore_hub = true AND closed_at IS NULL)` subquery. That
-    // subquery is already served well by `job_posting_company_closed_idx`
-    // above (company_key, closed_at) — it narrows to one company's open
-    // postings (a handful to a few dozen rows even for a heavy offshore
-    // hirer) and then filters `is_offshore_hub` as a cheap residual check
-    // over that small row set. Add a composite (company_key, is_offshore_hub,
-    // closed_at) index only if that subquery shows up as a real cost in
-    // practice.
+    // that filters on it is the "hide offshore-heavy companies" opt-in (see
+    // resolveHiringCompanies in src/lib/hiring/queries.ts), which compares
+    // two correlated scalar counts — `count(...WHERE is_offshore_hub = true)`
+    // vs. `count(...WHERE market = 'latam')`, each `WHERE company_key = ...
+    // AND is_it = true AND closed_at IS NULL` — rather than a plain presence
+    // check. Both subqueries are already served well by
+    // `job_posting_company_closed_idx` above (company_key, closed_at) — each
+    // narrows to one company's open postings (a handful to a few dozen rows
+    // even for a heavy offshore hirer) and then filters `is_offshore_hub` or
+    // `market` as a cheap residual check over that small row set. Add a
+    // composite (company_key, is_offshore_hub, closed_at) index only if
+    // these subqueries show up as a real cost in practice.
   }),
 );
 

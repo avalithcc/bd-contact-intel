@@ -54,11 +54,11 @@ export interface OutreachFilters {
   // src/lib/hiring/markets.ts#isMiamiArea). Flows into getHiringMatchIndex's
   // SQL WHERE clause — same query count either way.
   miamiOnly?: boolean;
-  // Opt-in hide for contacts whose company also hires in an offshore
-  // delivery hub (see src/lib/hiring/markets.ts#isOffshoreHub). Off by
-  // default — see the comment on resolveHiringCompanies' `hideOffshore`
-  // param in src/lib/hiring/queries.ts. Flows into getHiringMatchIndex's SQL
-  // WHERE clause — same query count either way.
+  // Opt-in hide for contacts whose company is offshore-heavy (see
+  // src/lib/hiring/markets.ts#isOffshoreHeavy). Off by default — see the
+  // comment on resolveHiringCompanies' `hideOffshore` param in
+  // src/lib/hiring/queries.ts. Flows into getHiringMatchIndex's SQL WHERE
+  // clause — same query count either way.
   hideOffshore?: boolean;
 }
 
@@ -79,11 +79,15 @@ export interface OutreachRow {
   // alias-aware match used on /hiring (see getHiringMatchIndex).
   companyDisplayName: string;
   openItCount: number;
-  // Whether this contact's company also hires in an offshore delivery hub
-  // (see HiringMatch.hiresOffshore) — resolved via the same alias-aware
-  // match as openItCount above. A deprioritizing signal only (see
-  // compareOutreachRows), never used to drop the row.
-  hiresOffshore: boolean;
+  // This contact's company's open offshore vs. LATAM IT posting counts, and
+  // the offshore-heavy verdict derived from them (see
+  // HiringMatch.offshoreItCount/latamItCount/offshoreHeavy) — resolved via
+  // the same alias-aware match as openItCount above. offshoreHeavy is a
+  // deprioritizing signal only (see compareOutreachRows), never used to
+  // drop the row; the two counts exist so the badge can show its basis.
+  offshoreItCount: number;
+  latamItCount: number;
+  offshoreHeavy: boolean;
 }
 
 export interface OutreachPage {
@@ -126,12 +130,13 @@ export function compareOutreachRows(a: OutreachRow, b: OutreachRow): number {
   const bt = b.lastMessageAt?.getTime() ?? 0;
   if (at !== bt) return a.relationshipTier === "dormant" ? at - bt : bt - at;
 
-  // 5. Lowest-priority tiebreak: a contact whose company also hires
-  // offshore (see src/lib/hiring/markets.ts#isOffshoreHub) sorts after an
-  // otherwise-identical one. Deliberately last among the substantive
-  // criteria — it must never outrank relationship strength, seniority or
-  // hiring urgency above, only break a tie once those are all equal.
-  if (a.hiresOffshore !== b.hiresOffshore) return a.hiresOffshore ? 1 : -1;
+  // 5. Lowest-priority tiebreak: a contact whose company is offshore-heavy
+  // (see src/lib/hiring/markets.ts#isOffshoreHeavy — strictly more open
+  // offshore postings than LATAM ones) sorts after an otherwise-identical
+  // one. Deliberately last among the substantive criteria — it must never
+  // outrank relationship strength, seniority or hiring urgency above, only
+  // break a tie once those are all equal.
+  if (a.offshoreHeavy !== b.offshoreHeavy) return a.offshoreHeavy ? 1 : -1;
 
   return (a.lastName ?? "").localeCompare(b.lastName ?? "");
 }
@@ -217,7 +222,9 @@ export async function listOutreachCandidates(
       relationshipTier: relationshipTierOf(r.reciprocal, dormant, r.messageCount),
       companyDisplayName: hiring?.displayName ?? r.company ?? "",
       openItCount: hiring?.openItCount ?? 0,
-      hiresOffshore: hiring?.hiresOffshore ?? false,
+      offshoreItCount: hiring?.offshoreItCount ?? 0,
+      latamItCount: hiring?.latamItCount ?? 0,
+      offshoreHeavy: hiring?.offshoreHeavy ?? false,
     };
   });
 

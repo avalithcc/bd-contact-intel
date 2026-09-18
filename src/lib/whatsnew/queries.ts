@@ -54,10 +54,12 @@ export interface WhatsNewCompanyGroup {
   restContactCount: number;
   newPostings: WhatsNewPosting[];
   suggestedContacts: SuggestedContact[];
-  // See CompanyHiringSummary.hiresOffshore in src/lib/hiring/queries.ts —
-  // same derived signal, carried through resolveHiringCompanies (no extra
-  // query).
-  hiresOffshore: boolean;
+  // See CompanyHiringSummary.offshoreItCount/latamItCount/offshoreHeavy in
+  // src/lib/hiring/queries.ts — same derived signal, carried through
+  // resolveHiringCompanies (no extra query, no re-derivation).
+  offshoreItCount: number;
+  latamItCount: number;
+  offshoreHeavy: boolean;
 }
 
 export interface WhatsNewClosure {
@@ -133,14 +135,16 @@ interface ContactForRanking {
  * with the exact same rule /outreach uses (see compareOutreachRows in
  * src/lib/outreach/queries.ts) rather than a second scoring rule: dormant
  * reciprocal first, then active reciprocal, then leadership seniority, then
- * hiring urgency, then the offshore-hub tiebreak (all constant across this
- * group, since it's one company).
+ * hiring urgency, then the offshore-heavy tiebreak (all constant across
+ * this group, since it's one company).
  */
 function buildSuggestedContacts(
   companyContacts: ContactForRanking[],
   companyDisplayName: string,
   openItCount: number,
-  hiresOffshore: boolean,
+  offshoreItCount: number,
+  latamItCount: number,
+  offshoreHeavy: boolean,
   limit = 3,
 ): SuggestedContact[] {
   const ranked: OutreachRow[] = companyContacts.map((c) => {
@@ -161,7 +165,9 @@ function buildSuggestedContacts(
       relationshipTier: relationshipTierOf(c.reciprocal, dormant, c.messageCount),
       companyDisplayName,
       openItCount,
-      hiresOffshore,
+      offshoreItCount,
+      latamItCount,
+      offshoreHeavy,
     };
   });
   ranked.sort(compareOutreachRows);
@@ -241,7 +247,9 @@ export async function getWhatsNewFeed(
       displayName: string;
       openItCount: number;
       newPostings: WhatsNewPosting[];
-      hiresOffshore: boolean;
+      offshoreItCount: number;
+      latamItCount: number;
+      offshoreHeavy: boolean;
     }
   >();
   for (const c of openCompanies.values()) {
@@ -251,7 +259,9 @@ export async function getWhatsNewFeed(
       displayName: c.displayName,
       openItCount: c.postings.length,
       newPostings,
-      hiresOffshore: c.hiresOffshore,
+      offshoreItCount: c.offshoreItCount,
+      latamItCount: c.latamItCount,
+      offshoreHeavy: c.offshoreHeavy,
     });
   }
 
@@ -312,24 +322,28 @@ export async function getWhatsNewFeed(
           companyContacts,
           info.displayName,
           info.openItCount,
-          info.hiresOffshore,
+          info.offshoreItCount,
+          info.latamItCount,
+          info.offshoreHeavy,
         ),
-        hiresOffshore: info.hiresOffshore,
+        offshoreItCount: info.offshoreItCount,
+        latamItCount: info.latamItCount,
+        offshoreHeavy: info.offshoreHeavy,
       };
     },
   );
 
   // Companies where the BD already has contacts first (the actionable
   // signal), then by how much is new there — mirrors the ordering rule in
-  // getCompanyHiringSummaries (src/lib/hiring/queries.ts). A company that
-  // also hires offshore is the lowest-priority tiebreak, same rationale as
-  // there.
+  // getCompanyHiringSummaries (src/lib/hiring/queries.ts). An offshore-heavy
+  // company (see isOffshoreHeavy in src/lib/hiring/markets.ts) is the
+  // lowest-priority tiebreak, same rationale as there.
   companies.sort((a, b) => {
     const aHas = a.contactCount > 0 ? 1 : 0;
     const bHas = b.contactCount > 0 ? 1 : 0;
     if (aHas !== bHas) return bHas - aHas;
     if (a.newPostingCount !== b.newPostingCount) return b.newPostingCount - a.newPostingCount;
-    if (a.hiresOffshore !== b.hiresOffshore) return a.hiresOffshore ? 1 : -1;
+    if (a.offshoreHeavy !== b.offshoreHeavy) return a.offshoreHeavy ? 1 : -1;
     return 0;
   });
 

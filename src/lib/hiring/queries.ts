@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyAlias, contact, jobPosting, targetCompany } from "@/db/schema";
 import type { RoleGroupKey } from "@/lib/roleGroups";
-import type { MarketKey } from "@/lib/hiring/markets";
+import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
 
 export interface OpenPosting {
   id: string;
@@ -24,12 +24,20 @@ export interface CompanyHiringSummary {
   // getCompanyHiringSummaries below).
   contactCount: number;
   leadershipContactCount: number;
-  // Whether this company currently has at least one open IT posting in an
-  // offshore delivery hub (see src/lib/hiring/markets.ts#isOffshoreHub) —
-  // computed below from the same postings already fetched, no extra query.
-  // A deprioritizing signal, not a disqualifying one (see the comment on
-  // resolveHiringCompanies below).
-  hiresOffshore: boolean;
+  // Open IT postings in an offshore delivery hub vs. in LATAM (see
+  // src/lib/hiring/markets.ts#isOffshoreHub and the "latam" MarketKey) —
+  // both counted below from the same postings already fetched, no extra
+  // query. Shown on the badge so the offshoreHeavy judgment below is
+  // inspectable, not an unexplained mark.
+  offshoreItCount: number;
+  latamItCount: number;
+  // Whether this company's open IT hiring is offshore-heavy: strictly more
+  // open offshore postings than LATAM ones (see
+  // src/lib/hiring/markets.ts#isOffshoreHeavy). A deprioritizing signal,
+  // not a disqualifying one (see the comment on resolveHiringCompanies
+  // below) — a company with offshore postings but an equal-or-larger LATAM
+  // footprint is a normal prospect, not flagged at all.
+  offshoreHeavy: boolean;
 }
 
 // Role groups considered "leadership" for the hiring crossover — the
@@ -52,12 +60,15 @@ interface ResolvedHiringCompany {
   // the target company's own key plus any company_alias rows pointing at
   // it.
   matchKeys: Set<string>;
-  // True when at least one of `postings` is in an offshore delivery hub.
-  // Derived, not stored: recomputed from the open postings already in this
-  // map every time they're fetched, so it stays truthful as postings open
-  // and close rather than going stale like a cached column on
-  // target_company would.
-  hiresOffshore: boolean;
+  // Open IT postings in an offshore delivery hub vs. in LATAM, and the
+  // offshore-heavy verdict derived from them (see isOffshoreHeavy in
+  // src/lib/hiring/markets.ts). All three are derived, not stored:
+  // recomputed from the open postings already in this map every time
+  // they're fetched, so they stay truthful as postings open and close
+  // rather than going stale like a cached column on target_company would.
+  offshoreItCount: number;
+  latamItCount: number;
+  offshoreHeavy: boolean;
 }
 
 /**
@@ -86,14 +97,18 @@ interface ResolvedHiringCompany {
  * enforce that pairing itself (callers only ever pass it alongside
  * `market: "us"` — see the page components under src/app/*).
  *
- * `hideOffshore`, when true, excludes companies that have at least one open
- * posting in an offshore delivery hub (see
- * src/lib/hiring/markets.ts#isOffshoreHub) entirely from the result — via a
- * correlated `NOT EXISTS` subquery in query (1)'s SQL WHERE clause, not a
- * post-fetch JS filter, so it never changes the query count. This is an
- * opt-in hide, off by default: such companies are a weaker but not
- * worthless prospect (see the `hiresOffshore` field below), so the default
- * behavior is to show and deprioritize them, never to drop them silently.
+ * `hideOffshore`, when true, excludes companies whose open IT hiring is
+ * offshore-heavy (see src/lib/hiring/markets.ts#isOffshoreHeavy: strictly
+ * more open postings in an offshore delivery hub than in LATAM) entirely
+ * from the result — via two correlated scalar-count subqueries in query
+ * (1)'s SQL WHERE clause comparing the two counts directly in Postgres, not
+ * a post-fetch JS filter, so it never changes the query count (still one
+ * round trip). This is an opt-in hide, off by default: an offshore-heavy
+ * company is a weaker but not worthless prospect (see the `offshoreHeavy`
+ * field below), so the default behavior is to show and deprioritize them,
+ * never to drop them silently. A company with offshore postings but an
+ * equal-or-larger LATAM footprint is never hidden — it isn't offshore-heavy
+ * at all, see isOffshoreHeavy.
  */
 export async function resolveHiringCompanies(
   market?: MarketKey,
@@ -121,11 +136,24 @@ export async function resolveHiringCompanies(
         isNull(jobPosting.closedAt),
         market ? eq(jobPosting.market, market) : undefined,
         miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
+        // Offshore-heavy = strictly more open offshore postings than open
+        // LATAM postings for the same company (see isOffshoreHeavy). Two
+        // correlated scalar-count subqueries compared directly, rather than
+        // a single NOT EXISTS, because this is now a comparison between two
+        // aggregates, not a presence check — still one SQL statement, same
+        // query count as before.
         hideOffshore
-          ? sql`not exists (
-              select 1 from job_posting jp2
+          ? sql`(
+              select count(*) filter (where jp2.is_offshore_hub = true)
+              from job_posting jp2
               where jp2.company_key = ${jobPosting.companyKey}
-                and jp2.is_offshore_hub = true
+                and jp2.is_it = true
+                and jp2.closed_at is null
+            ) <= (
+              select count(*) filter (where jp2.market = 'latam')
+              from job_posting jp2
+              where jp2.company_key = ${jobPosting.companyKey}
+                and jp2.is_it = true
                 and jp2.closed_at is null
             )`
           : undefined,
@@ -142,22 +170,35 @@ export async function resolveHiringCompanies(
       displayName: p.displayName,
       postings: [],
       matchKeys: new Set([p.companyKey]),
-      hiresOffshore: false,
+      offshoreItCount: 0,
+      latamItCount: 0,
+      offshoreHeavy: false,
     };
+    // Rows synced before the market column was backfilled are null; treat
+    // those as "other" rather than crashing the UI on an unclassified value
+    // (see scripts/backfill-posting-markets.ts).
+    const market = (p.market as MarketKey | null) ?? "other";
     entry.postings.push({
       id: p.id,
       title: p.title,
       location: p.location,
-      // Rows synced before the market column was backfilled are null;
-      // treat those as "other" rather than crashing the UI on an
-      // unclassified value (see scripts/backfill-posting-markets.ts).
-      market: (p.market as MarketKey | null) ?? "other",
+      market,
       url: p.url,
       postedAt: p.postedAt,
       firstSeen: p.firstSeen,
     });
-    if (p.isOffshoreHub) entry.hiresOffshore = true;
+    if (p.isOffshoreHub) entry.offshoreItCount++;
+    if (market === "latam") entry.latamItCount++;
     byCompany.set(p.companyKey, entry);
+  }
+
+  // A company's postings can arrive interleaved with other companies'
+  // (query (1) is ordered by postedAt, not grouped), so offshoreItCount and
+  // latamItCount above are only final once the loop above has finished —
+  // offshoreHeavy is derived in a second, single pass over the now-final
+  // per-company counts, still no extra query.
+  for (const entry of byCompany.values()) {
+    entry.offshoreHeavy = isOffshoreHeavy(entry.offshoreItCount, entry.latamItCount);
   }
 
   const companyKeys = [...byCompany.keys()];
@@ -229,7 +270,9 @@ export async function getCompanyHiringSummaries(
       postings: c.postings,
       contactCount: 0,
       leadershipContactCount: 0,
-      hiresOffshore: c.hiresOffshore,
+      offshoreItCount: c.offshoreItCount,
+      latamItCount: c.latamItCount,
+      offshoreHeavy: c.offshoreHeavy,
     };
     for (const key of c.matchKeys) {
       const stats = statsByKey.get(key);
@@ -242,7 +285,8 @@ export async function getCompanyHiringSummaries(
 
   // Companies where the BD already has contacts are the actionable
   // signal — surface those first, then by open IT posting count. A company
-  // that also hires offshore is the lowest-priority tiebreak — it only
+  // that is offshore-heavy (see isOffshoreHeavy in
+  // src/lib/hiring/markets.ts) is the lowest-priority tiebreak — it only
   // decides the order between two otherwise-equivalent companies, never
   // overriding the contact-crossover or posting-count signals above.
   return summaries.sort((a, b) => {
@@ -250,7 +294,7 @@ export async function getCompanyHiringSummaries(
     const bHas = b.contactCount > 0 ? 1 : 0;
     if (aHas !== bHas) return bHas - aHas;
     if (a.openItCount !== b.openItCount) return b.openItCount - a.openItCount;
-    if (a.hiresOffshore !== b.hiresOffshore) return a.hiresOffshore ? 1 : -1;
+    if (a.offshoreHeavy !== b.offshoreHeavy) return a.offshoreHeavy ? 1 : -1;
     return 0;
   });
 }
@@ -259,10 +303,13 @@ export interface HiringMatch {
   companyKey: string;
   displayName: string;
   openItCount: number;
-  // See CompanyHiringSummary.hiresOffshore above — same derived signal,
-  // carried through the alias-aware index so /outreach can rank on it
-  // without a second lookup.
-  hiresOffshore: boolean;
+  // See CompanyHiringSummary.offshoreItCount/latamItCount/offshoreHeavy
+  // above — same derived signal, carried through the alias-aware index so
+  // /outreach can rank on it and show the same badge without a second
+  // lookup or a second computation.
+  offshoreItCount: number;
+  latamItCount: number;
+  offshoreHeavy: boolean;
 }
 
 /**
@@ -288,7 +335,9 @@ export async function getHiringMatchIndex(
       companyKey: c.companyKey,
       displayName: c.displayName,
       openItCount: c.postings.length,
-      hiresOffshore: c.hiresOffshore,
+      offshoreItCount: c.offshoreItCount,
+      latamItCount: c.latamItCount,
+      offshoreHeavy: c.offshoreHeavy,
     };
     for (const key of c.matchKeys) index.set(key, match);
   }

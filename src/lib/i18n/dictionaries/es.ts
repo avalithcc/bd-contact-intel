@@ -23,8 +23,9 @@ export const es: typeof en = {
     marketLabel: "Mercado",
     allMarkets: "Todos los mercados",
     miamiOnlyLabel: "Solo Florida",
-    offshoreBadge: "contrata offshore",
-    hideOffshoreLabel: "Ocultar empresas que contratan offshore",
+    offshoreBadge: (offshoreItCount, latamItCount) =>
+      `offshore ${offshoreItCount} · LATAM ${latamItCount}`,
+    hideOffshoreLabel: "Ocultar empresas con contratación mayormente offshore",
     clearAll: "Limpiar todo",
     pageOf: (current, total) => `${current} / ${total}`,
     totalPage: (total, current, totalPages) =>

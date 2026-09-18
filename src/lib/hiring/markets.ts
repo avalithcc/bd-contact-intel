@@ -398,3 +398,24 @@ export function isOffshoreHub(location: string | null | undefined): boolean {
   if (!location) return false;
   return matchesRules(normalizeText(location), OFFSHORE_HUB_RULES);
 }
+
+/**
+ * Whether a company's engineering hiring is "offshore-heavy": strictly more
+ * open IT postings in an offshore delivery hub (see isOffshoreHub above)
+ * than in LATAM. This is the proportional refinement of the old
+ * presence-based rule (any offshore posting at all) — a company with a
+ * handful of offshore roles alongside a much larger LATAM footprint is
+ * still a live LATAM prospect, not a lost one.
+ *
+ * A tie (equal counts, including 0-0) resolves to `false`, deliberately in
+ * the prospect's favor: a company investing in LATAM at least as much as
+ * offshore has not shown a preference for offshore delivery.
+ *
+ * This is the single place this comparison is made — see resolveHiringCompanies
+ * in src/lib/hiring/queries.ts, which calls this once per company and
+ * threads the resulting boolean (plus the two counts, for the UI badge)
+ * everywhere else; other modules must not re-derive it.
+ */
+export function isOffshoreHeavy(offshoreItCount: number, latamItCount: number): boolean {
+  return offshoreItCount > latamItCount;
+}

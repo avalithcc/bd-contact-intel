@@ -83,14 +83,19 @@ export const en = {
     // all of Florida (e.g. Orlando/Tampa don't match). Keep this label in
     // sync with that function's actual matching set.
     miamiOnlyLabel: "Florida only",
-    // Compact badge on a company that currently has at least one open IT
-    // posting in an offshore delivery hub (see
-    // src/lib/hiring/markets.ts#isOffshoreHub) — factual, not judgmental:
-    // it's a deprioritizing signal, not a disqualifying one.
-    offshoreBadge: "hires offshore",
+    // Compact badge on a company whose open IT hiring is offshore-heavy —
+    // strictly more open postings in an offshore delivery hub than in LATAM
+    // (see src/lib/hiring/markets.ts#isOffshoreHeavy). Shows both counts so
+    // the judgment is inspectable rather than an unexplained mark —
+    // factual, not disqualifying: it's a deprioritizing signal, not a
+    // disqualifying one.
+    offshoreBadge: (offshoreItCount: number, latamItCount: number) =>
+      `offshore ${offshoreItCount} · LATAM ${latamItCount}`,
     // Opt-in filter, off by default (see resolveHiringCompanies'
-    // `hideOffshore` param in src/lib/hiring/queries.ts).
-    hideOffshoreLabel: "Hide companies that hire offshore",
+    // `hideOffshore` param in src/lib/hiring/queries.ts). Hides only
+    // offshore-heavy companies, not every company with any offshore
+    // posting.
+    hideOffshoreLabel: "Hide offshore-heavy companies",
     clearAll: "Clear all",
     pageOf: (current: number, total: number) => `${current} / ${total}`,
     totalPage: (total: number, current: number, totalPages: number) =>

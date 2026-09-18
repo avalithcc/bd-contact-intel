@@ -117,8 +117,10 @@ export default async function HiringPage({
                 {s.newLast7Days > 0 && (
                   <span className="badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
                 )}
-                {s.hiresOffshore && (
-                  <span className="badge offshore">{dict.common.offshoreBadge}</span>
+                {s.offshoreHeavy && (
+                  <span className="badge offshore">
+                    {dict.common.offshoreBadge(s.offshoreItCount, s.latamItCount)}
+                  </span>
                 )}
                 <span className="filter-helper-hint">{dict.hiring.showPostings}</span>
               </summary>

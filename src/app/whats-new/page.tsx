@@ -189,8 +189,10 @@ export default async function WhatsNewPage({
             <div className="whats-new-company-head">
               <span className="whats-new-company-name">{c.displayName}</span>
               <span className="badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
-              {c.hiresOffshore && (
-                <span className="badge offshore">{dict.common.offshoreBadge}</span>
+              {c.offshoreHeavy && (
+                <span className="badge offshore">
+                  {dict.common.offshoreBadge(c.offshoreItCount, c.latamItCount)}
+                </span>
               )}
               <span className="soft">{dict.hiring.postingCount(c.openItCount)}</span>
               {c.contactCount > 0 && (
