@@ -7,7 +7,11 @@
    See /DESIGN.md at the repo root for the full system reference.
    ========================================================================= */
 :root {
-  /* ---- surfaces (dark canvas + lift ladder) ---- */
+  /* ---- surfaces (dark canvas + lift ladder) ----
+     Dark is the default token set — unauthenticated/no-cookie visitors and
+     anyone with theme=dark see exactly what shipped before theming existed.
+     Light overrides live in the shared selector list below (see
+     "[data-theme='light'], ..."). */
   --color-canvas: #0b0a11;
   --color-surface-1: #0e0d15;
   --color-surface-2: #131119;
@@ -15,7 +19,10 @@
      a general surface step (see .badge.offshore below). */
   --color-surface-tint: #1d1215;
 
-  /* ---- brand accent (red — Avalith's identity, replaces Linear's lavender) ---- */
+  /* ---- brand accent (red — Avalith's identity, replaces Linear's lavender) ----
+     Unchanged across themes: #d5252f on white is ~5.1:1 contrast, so the
+     brand red stays the single chromatic accent (text, fills, focus) in
+     both light and dark — no separate light-theme accent needed. */
   --color-accent: #d5252f;
   --color-accent-hover: #e6434c;
   --color-accent-focus: #b81f27;
@@ -29,10 +36,29 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.18);
 
-  /* ---- semantic (distinct from the brand accent, as in the Linear source) ---- */
+  /* ---- semantic (distinct from the brand accent, as in the Linear source) ----
+     These are darkened in the light theme override below: the dark-theme
+     values are legible on a near-black canvas but drop under WCAG AA
+     (4.5:1) as text on a white/near-white one. */
   --color-success: #3ecf8e;
   --color-warn: #e6a23c;
   --color-danger: #ff6b6b;
+
+  /* ---- translucent fills (badges, row hover) ----
+     Same value in both themes — a translucent tint composited over either
+     a near-black or near-white surface stays legible; only the *opaque*
+     tokens above need per-theme overrides. Tokenized here so no hex/rgba
+     literal remains inline in a component rule. */
+  --color-badge-accent-bg: rgba(213, 37, 47, 0.12);
+  --color-badge-success-bg: rgba(62, 207, 142, 0.12);
+  --color-row-hover: rgba(255, 255, 255, 0.02);
+
+  /* ---- select chevron (theme-aware data-URI icon) ----
+     Stroke color is baked into the SVG data URI, so it can't consume
+     currentColor — instead the whole background-image is a token,
+     re-pointed at a same-shaped SVG with the light-theme ink-soft hex in
+     the light override below. */
+  --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 
   /* ---- type scale ---- */
   --text-xs: 0.72rem;
@@ -64,15 +90,21 @@
      regardless of each browser's native select/input metrics. */
   --control-height: 2.5rem;
 
-  /* ---- elevation ---- */
+  /* ---- elevation ----
+     Softer/lighter in the light theme override below — a shadow this dark
+     reads as a heavy black smudge on a near-white canvas. */
   --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
 
   /* ---- motion ---- */
   --transition-fast: 0.15s ease;
 
-  /* ---- fonts (loaded via next/font in layout.tsx) ---- */
+  /* ---- fonts (loaded via next/font in layout.tsx) ----
+     --font-jetbrains is next/font's CSS variable (see layout.tsx); naming
+     it separately from --font-mono keeps this declaration from being
+     self-referential (var(--font-mono) inside the definition of
+     --font-mono is invalid and silently drops the whole property). */
   --font-body: var(--font-inter), system-ui, -apple-system, sans-serif;
-  --font-mono: var(--font-mono), ui-monospace, monospace;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
   /* Back-compat aliases: the token names above are the source of truth;
      these keep any external references (e.g. inline `style` in TSX using
@@ -88,6 +120,82 @@
   --muted: var(--color-ink-muted);
   --line: var(--color-border);
   --lineh: var(--color-border-strong);
+
+  /* ---- light palette constants ----
+     Defined exactly once, here. The two theme-activation rules below
+     ("[data-theme='light']" and the prefers-color-scheme media query) each
+     just repoint the real color/shadow/icon tokens at these — neither
+     rule duplicates a color value by hand, so light and dark can never
+     drift out of sync by editing one trigger and not the other. */
+  --light-canvas: #f5f4f7;
+  --light-surface-1: #fbfafc;
+  --light-surface-2: #ffffff;
+  --light-surface-tint: #f3e9ea;
+  --light-ink: #17151c;
+  --light-ink-soft: #5b5865; /* ~6.9:1 on --light-canvas/-surface-* */
+  --light-ink-muted: #8b8894;
+  --light-border: rgba(0, 0, 0, 0.08);
+  --light-border-strong: rgba(0, 0, 0, 0.16);
+  --light-success: #15803d; /* ~5.0:1 on white (dark #3ecf8e is ~2.0:1) */
+  --light-warn: #b45309; /* ~5.0:1 on white (dark #e6a23c is ~2.2:1) */
+  --light-danger: #dc2626; /* ~4.8:1 on white (dark #ff6b6b is ~2.8:1) */
+  --light-shadow-dropdown: 0 8px 24px rgba(23, 21, 28, 0.12);
+  --light-row-hover: rgba(0, 0, 0, 0.03);
+  --light-icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b5865' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* =========================================================================
+   Light theme
+   One override block feeds both trigger paths so the light palette is
+   defined exactly once:
+     - `[data-theme="light"]` — explicit choice, set as an attribute on
+       <html> server-side from the `theme` cookie (see layout.tsx). Read
+       this file top-down: `:root` above is dark-by-default, so `light` and
+       `dark` are both *overrides* of it — `dark` is listed here only so an
+       explicit `data-theme="dark"` always wins over the OS preference
+       media query below, even though its values equal :root's.
+     - `:root:not([data-theme]) { @media (prefers-color-scheme: light) }` —
+       theme=system with no data-theme attribute rendered: falls through to
+       the OS/browser preference.
+   ========================================================================= */
+[data-theme="light"] {
+  --color-canvas: var(--light-canvas);
+  --color-surface-1: var(--light-surface-1);
+  --color-surface-2: var(--light-surface-2);
+  --color-surface-tint: var(--light-surface-tint);
+  --color-ink: var(--light-ink);
+  --color-ink-soft: var(--light-ink-soft);
+  --color-ink-muted: var(--light-ink-muted);
+  --color-border: var(--light-border);
+  --color-border-strong: var(--light-border-strong);
+  --color-success: var(--light-success);
+  --color-warn: var(--light-warn);
+  --color-danger: var(--light-danger);
+  --shadow-dropdown: var(--light-shadow-dropdown);
+  --color-row-hover: var(--light-row-hover);
+  --icon-select-chevron: var(--light-icon-select-chevron);
+}
+
+/* theme=system with no data-theme attribute rendered (see layout.tsx):
+   follow the OS/browser preference instead of an explicit choice. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --color-canvas: var(--light-canvas);
+    --color-surface-1: var(--light-surface-1);
+    --color-surface-2: var(--light-surface-2);
+    --color-surface-tint: var(--light-surface-tint);
+    --color-ink: var(--light-ink);
+    --color-ink-soft: var(--light-ink-soft);
+    --color-ink-muted: var(--light-ink-muted);
+    --color-border: var(--light-border);
+    --color-border-strong: var(--light-border-strong);
+    --color-success: var(--light-success);
+    --color-warn: var(--light-warn);
+    --color-danger: var(--light-danger);
+    --shadow-dropdown: var(--light-shadow-dropdown);
+    --color-row-hover: var(--light-row-hover);
+    --icon-select-chevron: var(--light-icon-select-chevron);
+  }
 }
 
 * {
@@ -246,7 +354,7 @@ select {
   appearance: none;
   -webkit-appearance: none;
   padding-right: 2rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: var(--icon-select-chevron);
   background-repeat: no-repeat;
   background-position: right 0.7rem center;
 }
@@ -361,19 +469,19 @@ th {
   display: inline-block;
   font-family: var(--font-mono);
   font-weight: 700;
-  background: rgba(213, 37, 47, 0.12);
+  background: var(--color-badge-accent-bg);
   color: var(--color-accent);
   border-radius: var(--radius-pill);
   padding: 0.12rem 0.55rem;
   font-size: var(--text-xs);
 }
 .badge.green {
-  background: rgba(62, 207, 142, 0.12);
+  background: var(--color-badge-success-bg);
   color: var(--color-success);
 }
 /* Marks a contact whose company is currently hiring IT (see /hiring). */
 .badge.hiring {
-  background: rgba(62, 207, 142, 0.12);
+  background: var(--color-badge-success-bg);
   color: var(--color-success);
   margin-left: var(--space-xs);
 }
@@ -406,7 +514,7 @@ th {
   color: var(--color-accent);
 }
 tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-row-hover);
 }
 
 a {
@@ -453,6 +561,21 @@ a:hover {
   font-family: var(--font-mono);
 }
 .locale-btn.active {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
+/* ---- theme switcher (Light / Dark / System, in the user menu) ---- */
+.theme-switcher {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin: 0;
+}
+.theme-btn {
+  padding: 0.5rem 0.65rem;
+}
+.theme-btn.active {
   color: var(--color-ink);
   border-color: var(--color-accent);
 }
@@ -512,6 +635,17 @@ a:hover {
 .user-menu-locale {
   display: flex;
   justify-content: flex-start;
+}
+.user-menu-theme {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.user-menu-section-label {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .user-menu-item {
   display: block;
