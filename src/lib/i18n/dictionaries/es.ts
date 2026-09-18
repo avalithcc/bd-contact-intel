@@ -10,12 +10,12 @@ export const es: typeof en = {
     signOut: "Cerrar sesión",
     account: "cuenta",
     changePassword: "Cambiar contraseña",
-    priorityOutreach: "contacto prioritario",
-    whatsNew: "novedades",
-    hiringSignals: "señales de contratación",
-    boardDiscovery: "descubrimiento de portales",
-    backToContacts: "contactos",
-    back: "volver",
+    priorityOutreach: "Contactos Prioritarios",
+    whatsNew: "Oportunidades en Mis Clientes",
+    hiringSignals: "Vacantes Abiertas",
+    boardDiscovery: "Descubrimiento de Portales",
+    backToContacts: "Contactos",
+    back: "Volver",
     prev: "← anterior",
     next: "siguiente →",
     filterEyebrow: "// filtro",
@@ -132,7 +132,7 @@ export const es: typeof en = {
   },
 
   hiring: {
-    eyebrow: "// señales_de_contratación",
+    eyebrow: "// vacantes_abiertas",
     title: "roles de IT abiertos",
     subtitle:
       "Empresas objetivo que actualmente contratan para roles de IT, según sus portales de empleo públicos.",
@@ -180,7 +180,7 @@ export const es: typeof en = {
   },
 
   outreach: {
-    eyebrow: "// contacto_prioritario",
+    eyebrow: "// contactos_prioritarios",
     title: "a quién contactar esta semana",
     subtitle:
       "Tus contactos en empresas que actualmente contratan IT, ordenados por fuerza de relación y seniority.",
@@ -188,7 +188,7 @@ export const es: typeof en = {
     candidatesEyebrow: "// candidatos",
     noHiringCompaniesPrefix:
       "Todavía no hay empresas contratando sincronizadas. Carga las empresas objetivo y ejecuta una sincronización (ver ",
-    noHiringCompaniesLinkText: "señales de contratación",
+    noHiringCompaniesLinkText: "vacantes abiertas",
     noHiringCompaniesSuffix:
       ") antes de que el contacto prioritario tenga algo para ordenar.",
     noMatchingContacts: (hiringCompanyCount, roleGroupFilterActive, messageHistoryFilterActive) =>
@@ -217,8 +217,8 @@ export const es: typeof en = {
   },
 
   whatsNew: {
-    eyebrow: "// novedades",
-    title: "novedades",
+    eyebrow: "// oportunidades_en_mis_clientes",
+    title: "oportunidades en mis clientes",
     subtitle:
       "Publicaciones de IT que aparecieron o se cerraron recientemente en las empresas que sigues, con la actividad más reciente primero.",
     windowLabel: "Ventana",
@@ -227,7 +227,7 @@ export const es: typeof en = {
     neverSynced: "Todavía no se completó ninguna sincronización exitosa.",
     noMonitoredCompaniesPrefix:
       "Todavía no hay empresas objetivo en seguimiento. Carga las empresas objetivo (ver ",
-    noMonitoredCompaniesLinkText: "señales de contratación",
+    noMonitoredCompaniesLinkText: "vacantes abiertas",
     noMonitoredCompaniesSuffix: ") antes de que haya novedades para mostrar aquí.",
     noSyncYet:
       "El proceso de sincronización todavía no se ejecutó, por lo que no hay actividad de publicaciones para mostrar. Vuelve a revisar después de la próxima sincronización.",

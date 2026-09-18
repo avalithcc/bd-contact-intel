@@ -65,12 +65,12 @@ export const en = {
     signOut: "Sign out",
     account: "account",
     changePassword: "Change password",
-    priorityOutreach: "priority outreach",
-    whatsNew: "what's new",
-    hiringSignals: "hiring signals",
-    boardDiscovery: "board discovery",
-    backToContacts: "contacts",
-    back: "back",
+    priorityOutreach: "Priority Contacts",
+    whatsNew: "Client Opportunities",
+    hiringSignals: "Open Roles",
+    boardDiscovery: "Job Board Discovery",
+    backToContacts: "Contacts",
+    back: "Back",
     prev: "← prev",
     next: "next →",
     filterEyebrow: "// filter",
@@ -161,7 +161,7 @@ export const en = {
   },
 
   hiring: {
-    eyebrow: "// hiring_signals",
+    eyebrow: "// open_roles",
     title: "open IT roles",
     subtitle:
       "Target companies currently hiring for IT roles, tracked from their public job boards.",
@@ -178,7 +178,7 @@ export const en = {
   },
 
   discovery: {
-    eyebrow: "// board_discovery",
+    eyebrow: "// job_board_discovery",
     title: "board discovery queue",
     subtitle:
       "Companies from the team's contact base with a likely public ATS board, found automatically — review and approve to start tracking their postings.",
@@ -209,15 +209,15 @@ export const en = {
   },
 
   outreach: {
-    eyebrow: "// priority_outreach",
+    eyebrow: "// priority_contacts",
     title: "who to message this week",
     subtitle:
       "Your contacts at companies currently hiring IT, ranked by relationship strength and seniority.",
     excludeNeverMessaged: "Exclude never-messaged contacts",
     candidatesEyebrow: "// candidates",
     noHiringCompaniesPrefix: "No hiring companies synced yet. Seed target companies and run a sync (see ",
-    noHiringCompaniesLinkText: "hiring signals",
-    noHiringCompaniesSuffix: ") before priority outreach has anything to rank.",
+    noHiringCompaniesLinkText: "open roles",
+    noHiringCompaniesSuffix: ") before priority contacts has anything to rank.",
     noMatchingContacts: (
       hiringCompanyCount: number,
       roleGroupFilterActive: boolean,
@@ -247,8 +247,8 @@ export const en = {
   },
 
   whatsNew: {
-    eyebrow: "// whats_new",
-    title: "what's new",
+    eyebrow: "// client_opportunities",
+    title: "client opportunities",
     subtitle:
       "IT postings that appeared or closed recently at companies you track, newest activity first.",
     windowLabel: "Window",
@@ -257,7 +257,7 @@ export const en = {
     neverSynced: "No successful sync has completed yet.",
     noMonitoredCompaniesPrefix:
       "No target companies are being tracked yet. Seed target companies (see ",
-    noMonitoredCompaniesLinkText: "hiring signals",
+    noMonitoredCompaniesLinkText: "open roles",
     noMonitoredCompaniesSuffix: ") before there is anything new to show here.",
     noSyncYet:
       "The sync job hasn't run yet, so there is no posting activity to show. Check back after the next sync.",
