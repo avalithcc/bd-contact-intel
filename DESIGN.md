@@ -20,6 +20,23 @@ colors:
   semantic-warn: "#e6a23c"
   semantic-danger: "#ff6b6b"
 
+colors-light:
+  accent: "#d5252f"
+  accent-hover: "#e6434c"
+  accent-focus: "#b81f27"
+  ink: "#17151c"
+  ink-soft: "#5b5865"
+  ink-muted: "#8b8894"
+  canvas: "#f5f4f7"
+  surface-1: "#fbfafc"
+  surface-2: "#ffffff"
+  surface-tint: "#f3e9ea"
+  border: "rgba(0,0,0,0.08)"
+  border-strong: "rgba(0,0,0,0.16)"
+  semantic-success: "#15803d"
+  semantic-warn: "#b45309"
+  semantic-danger: "#dc2626"
+
 typography:
   h1:
     fontFamily: Inter
@@ -176,10 +193,42 @@ The app is a dense, dark, data-first internal tool (a Business Developer contact
 | `--color-warn` | `#e6a23c` | Non-blocking warnings (e.g. upload sender-detection notices) |
 | `--color-danger` | `#ff6b6b` | Form/import errors — intentionally distinct from the brand accent red |
 
+Dark is the default palette above (`:root`, unauthenticated/no-cookie visitors and `theme=dark` see this unchanged). The light palette — same roles, different values — is documented in **Theming** below.
+
+## Theming
+
+The app ships three themes: **Light**, **Dark** (the original, still the fallback for anyone without a saved preference) and **System** (follows the OS/browser preference). Implementation:
+
+- **Preference storage:** a `theme` cookie (`light | dark | system`; missing/invalid → `dark`), set via a `"use server"` action (`src/lib/theme/actions.ts`) invoked by a plain `<form>` POST — no client JS required to switch themes, same pattern as the locale switcher (`src/lib/i18n/`).
+- **SSR, no flash:** `src/app/layout.tsx` reads the cookie server-side (`getTheme()`) and sets `data-theme="light"` / `data-theme="dark"` on `<html>` before any paint. For `system` it omits the attribute entirely, deferring to CSS. `color-scheme` is set alongside so native controls/scrollbars match.
+- **CSS activation (`src/app/globals.css`):** `:root` holds the dark values (the default token set). A `[data-theme="light"]` selector and an `@media (prefers-color-scheme: light) { :root:not([data-theme]) { ... } }` block both activate the light palette — but neither hardcodes it a second time: the actual light hex/rgba values are defined exactly **once**, as a `--light-*` constant set inside `:root` (e.g. `--light-canvas`, `--light-ink-soft`), and both trigger rules just repoint the real `--color-*` tokens at those constants. Edit a light value once; both triggers stay in sync.
+- **UI:** `ThemeSwitcher` (`src/lib/theme/ThemeSwitcher.tsx`) — three segmented buttons (Light/Dark/System), same visual language as `LocaleSwitcher` — rendered in the `UserMenu` dropdown below the language switcher, on every authenticated page. Login and account/password pages have no switcher (they still respect the cookie/system default).
+
+### Light Palette & Roles
+
+| Token | Hex / Value | Role (same as the dark-theme row above) |
+|---|---|---|
+| `--color-canvas` (light) | `#f5f4f7` | Page background — near-white, not pure white |
+| `--color-surface-1` (light) | `#fbfafc` | Cards, import blocks, table hover rows' containers, dropdown menu |
+| `--color-surface-2` (light) | `#ffffff` | Panels (main content container) — the brightest/most prominent surface, mirroring how `surface-2` is the brightest step in dark |
+| `--color-surface-tint` (light) | `#f3e9ea` | Offshore badge only, same as dark's role |
+| `--color-ink` (light) | `#17151c` | Primary text, headings |
+| `--color-ink-soft` (light) | `#5b5865` | Secondary text, labels — **~6.9:1 contrast on white** (AA requires 4.5:1) |
+| `--color-ink-muted` (light) | `#8b8894` | Tertiary/disabled text (no AA requirement — see Do/Don't) |
+| `--color-border` (light) | `rgba(0,0,0,.08)` | Default hairline borders |
+| `--color-border-strong` (light) | `rgba(0,0,0,.16)` | Emphasized borders |
+| `--color-success` (light) | `#15803d` | **~5.0:1 on white** (the dark-theme `#3ecf8e` is only ~2.0:1 on white — fails AA, so light gets its own darker green) |
+| `--color-warn` (light) | `#b45309` | **~5.0:1 on white** (dark-theme `#e6a23c` is ~2.2:1 — fails AA) |
+| `--color-danger` (light) | `#dc2626` | **~4.8:1 on white** (dark-theme `#ff6b6b` is ~2.8:1 — fails AA) |
+
+`--color-accent` (`#d5252f`) is **unchanged** across themes — it measures ~5.1:1 on white, comfortably clearing AA (4.5:1) for normal text, so the same brand red serves as fill, link, and focus color in both themes. No separate light-theme accent was needed.
+
+Two more tokens are theme-aware: `--shadow-dropdown` (a lighter, softer shadow in light — the dark theme's `rgba(0,0,0,.35)` reads as a heavy smudge on a near-white canvas) and `--icon-select-chevron` (the select's chevron is a data-URI SVG with its stroke color baked in, so it can't use `currentColor`; the whole `background-image` is a token, re-pointed at a same-shaped SVG using the light-theme `ink-soft` hex). `--color-row-hover` and the two badge-tint tokens (`--color-badge-accent-bg`, `--color-badge-success-bg`) keep the **same** rgba value in both themes — a translucent tint composited over either a near-black or near-white surface stays legible on its own, so no override was needed; they were tokenized anyway so no rgba literal remains inline in a component rule.
+
 ## Typography
 
 - **Body/display family:** Inter (400/500/600/700/800), loaded via `next/font/google` in `src/app/layout.tsx` as `--font-inter`.
-- **Mono family:** JetBrains Mono (400/700), loaded as `--font-mono`. Used only for the `// eyebrow` label, badges, and mono status strings — never for body copy.
+- **Mono family:** JetBrains Mono (400/700), loaded via `next/font/google` in `src/app/layout.tsx` as `--font-jetbrains`, then consumed by the `--font-mono` token (`--font-mono: var(--font-jetbrains), ...`). It is named `--font-jetbrains` rather than `--font-mono` specifically to avoid a self-referential custom property — `--font-mono: var(--font-mono), ...` is invalid CSS and silently drops the whole declaration. Used only for the `// eyebrow` label, badges, and mono status strings — never for body copy.
 - No Linear typefaces are used anywhere.
 
 | Token | Size | Weight | Use |
@@ -266,6 +315,7 @@ No gradients, no glow, no multi-layer shadows — matching Linear's "surface lad
 - Don't add drop shadows outside the dropdown menu.
 - Don't hardcode hex colors, spacing, or radii in component CSS — consume the tokens in `:root`.
 - Don't reach for inline `style={{...}}` for spacing/layout that a utility class already covers.
+- **Never hardcode a color outside the token layer.** Every hex/rgba value belongs in `:root` (or a `--light-*` constant referenced by the theme-activation rules) in `src/app/globals.css` — never inline in a component rule, never in a TSX `style={{}}`, never baked into an SVG's `stroke`/`fill` (use `currentColor`, or — if the icon is a data-URI that can't use `currentColor` — put the whole `background-image`/`mask-image` behind a token and give it a light-theme override, as `--icon-select-chevron` does).
 
 ## Responsive
 
