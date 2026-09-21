@@ -19,7 +19,21 @@
  */
 import { resolveMx } from "node:dns/promises";
 
-export type LookupStatus = "ok" | "no-mx" | "error";
+/**
+ * "ok"        — MX records found, the domain receives mail.
+ * "no-mx"     — the domain resolves but publishes no MX record.
+ * "no-domain" — NXDOMAIN, the domain itself does not exist.
+ * "error"     — timeout or resolver failure; nothing is confirmed either way.
+ *
+ * Both "no-mx" and "no-domain" are CONFIRMED dead ends: callers must not
+ * suggest an address on such a domain. "error" means unconfirmed, not bad.
+ */
+export type LookupStatus = "ok" | "no-mx" | "no-domain" | "error";
+
+/** Confirmed answers, safe to cache and to suppress a suggestion on. */
+export function isDeadDomain(status: LookupStatus): boolean {
+  return status === "no-mx" || status === "no-domain";
+}
 
 export type MailProvider =
   | "google"
@@ -42,6 +56,16 @@ const LOOKUP_TIMEOUT_MS = 3000;
 // Matchers checked in order against each MX hostname (lowercased). The first
 // match wins. Kept as one table, each row commented with why the provider
 // matters for confidence scoring downstream:
+/**
+ * Suffix match on a DNS label boundary. A plain substring test would let a
+ * lookalike host ("mx.attacker-outlook.com.evil.net") claim a provider it
+ * has nothing to do with, which would show — or hide — the wrong caveat in
+ * the UI.
+ */
+function hostMatches(host: string, root: string): boolean {
+  return host === root || host.endsWith(`.${root}`);
+}
+
 const PROVIDER_MATCHERS: { provider: MailProvider; test: (host: string) => boolean }[] = [
   {
     // Google Workspace / Gmail. Google rejects RCPT-TO for unknown
@@ -49,7 +73,7 @@ const PROVIDER_MATCHERS: { provider: MailProvider; test: (host: string) => boole
     // MX-only signal here is reasonably informative, though this module
     // still never tries a handshake.
     provider: "google",
-    test: (h) => h.endsWith(".google.com") || h.includes("googlemail.com"),
+    test: (h) => hostMatches(h, "google.com") || hostMatches(h, "googlemail.com"),
   },
   {
     // Microsoft 365 / Exchange Online. IMPORTANT: M365 by default accepts
@@ -59,13 +83,13 @@ const PROVIDER_MATCHERS: { provider: MailProvider; test: (host: string) => boole
     // "microsoft" domain must say so explicitly in the UI — see
     // emailSuggestion.ts and the contact detail page.
     provider: "microsoft",
-    test: (h) => h.endsWith(".mail.protection.outlook.com") || h.includes("outlook.com"),
+    test: (h) => hostMatches(h, "mail.protection.outlook.com") || hostMatches(h, "outlook.com"),
   },
   {
     // Zoho Mail — small/mid-size company suite, common enough to call out
     // by name rather than bucket into "other".
     provider: "zoho",
-    test: (h) => h.includes("zoho.com") || h.includes("zohomail.com"),
+    test: (h) => hostMatches(h, "zoho.com") || hostMatches(h, "zohomail.com"),
   },
   {
     // Proofpoint — an inbound email SECURITY gateway sitting in front of the
@@ -74,13 +98,13 @@ const PROVIDER_MATCHERS: { provider: MailProvider; test: (host: string) => boole
     // whatever Proofpoint's filtering policy decides, which we can't see
     // from MX alone.
     provider: "proofpoint",
-    test: (h) => h.includes("pphosted.com"),
+    test: (h) => hostMatches(h, "pphosted.com"),
   },
   {
     // Mimecast — same situation as Proofpoint: a security gateway in front
     // of the real mailbox, not the mailbox provider.
     provider: "mimecast",
-    test: (h) => h.includes("mimecast.com"),
+    test: (h) => hostMatches(h, "mimecast.com"),
   },
 ];
 
@@ -94,7 +118,7 @@ function detectProvider(mxHosts: string[]): MailProvider {
 
 /**
  * Look up MX records for a domain with a short timeout. Never throws — any
- * failure (NXDOMAIN, timeout, network error) is reported as
+ * transient failure (timeout, network error) is reported as
  * `{ status: "error", hasMx: false, provider: "unknown" }`, which the caller
  * MUST treat as "unconfirmed", not as "confirmed no mail" (that's
  * `status: "no-mx"`, a successful lookup that returned zero MX records).
@@ -131,11 +155,17 @@ export async function lookupDomain(domain: string): Promise<DomainLookupResult> 
     // records" case must be told apart here, not above:
     //   - ENODATA: the domain resolved but has no MX records — a CONFIRMED
     //     "does not receive mail" answer, same as an empty array would be.
-    //   - anything else (ENOTFOUND/NXDOMAIN, timeout, network error, ...):
-    //     the domain's mail status is UNCONFIRMED, not known-bad.
+    //   - ENOTFOUND: NXDOMAIN, the domain itself does not exist — an even
+    //     stronger CONFIRMED "no mail possible" than ENODATA, since there is
+    //     no A record to fall back to either.
+    //   - anything else (timeout, resolver error, ...): the domain's mail
+    //     status is UNCONFIRMED, not known-bad.
     const code = (err as NodeJS.ErrnoException)?.code;
     if (code === "ENODATA") {
       return { status: "no-mx", hasMx: false, provider: "unknown", mxHosts: [] };
+    }
+    if (code === "ENOTFOUND") {
+      return { status: "no-domain", hasMx: false, provider: "unknown", mxHosts: [] };
     }
     return { status: "error", hasMx: false, provider: "unknown", mxHosts: [] };
   }
