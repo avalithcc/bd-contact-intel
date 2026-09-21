@@ -236,6 +236,10 @@ export const es: typeof en = {
     },
     generateMessageHistoryHintOne: "Tiene en cuenta 1 mensaje anterior",
     generateMessageHistoryHintMany: "Tiene en cuenta {n} mensajes anteriores",
+    chooseMessageLanguage: "Elige el idioma del mensaje",
+    messageLanguageEs: "Español",
+    messageLanguageEn: "English",
+    cancelChooseLanguage: "Cancelar",
   },
 
   whatsNew: {

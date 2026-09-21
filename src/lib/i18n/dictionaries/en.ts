@@ -276,6 +276,14 @@ export const en = {
     // messageLabels.ts) — the client swaps "{n}" itself.
     generateMessageHistoryHintOne: "Takes into account 1 previous message",
     generateMessageHistoryHintMany: "Takes into account {n} previous messages",
+    // Inline language picker shown before generating (or regenerating) a
+    // message — see GenerateMessageButton.tsx. The chosen value is submitted
+    // as the "messageLanguage" form field and decides the generated
+    // message's language, independent of the UI locale.
+    chooseMessageLanguage: "Choose the message language",
+    messageLanguageEs: "Español",
+    messageLanguageEn: "English",
+    cancelChooseLanguage: "Cancel",
   },
 
   whatsNew: {

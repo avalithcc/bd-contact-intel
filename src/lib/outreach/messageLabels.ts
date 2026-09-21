@@ -12,6 +12,10 @@ export type GenerateMessageLabels = Pick<
   | "generateMessageErrors"
   | "generateMessageHistoryHintOne"
   | "generateMessageHistoryHintMany"
+  | "chooseMessageLanguage"
+  | "messageLanguageEs"
+  | "messageLanguageEn"
+  | "cancelChooseLanguage"
 >;
 
 export function pickGenerateMessageLabels(dict: Dictionary): GenerateMessageLabels {
@@ -25,5 +29,9 @@ export function pickGenerateMessageLabels(dict: Dictionary): GenerateMessageLabe
     generateMessageErrors: o.generateMessageErrors,
     generateMessageHistoryHintOne: o.generateMessageHistoryHintOne,
     generateMessageHistoryHintMany: o.generateMessageHistoryHintMany,
+    chooseMessageLanguage: o.chooseMessageLanguage,
+    messageLanguageEs: o.messageLanguageEs,
+    messageLanguageEn: o.messageLanguageEn,
+    cancelChooseLanguage: o.cancelChooseLanguage,
   };
 }

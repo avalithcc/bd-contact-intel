@@ -10,7 +10,7 @@ import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { getRecentOutreachHistory, isLeadershipRoleGroup } from "@/lib/outreach/queries";
 import { buildOutreachMessagePrompt } from "@/lib/outreach/messagePrompt";
 import type { RoleGroupKey } from "@/lib/roleGroups";
-import type { Locale } from "@/lib/i18n/locales";
+import { isLocale, type Locale } from "@/lib/i18n/locales";
 
 // Model id verified against the live AI Gateway catalog
 // (https://ai-gateway.vercel.sh/v1/models) at implementation time — highest
@@ -35,15 +35,25 @@ export type GenerateOutreachMessageResult =
  *
  * Bound with (contactId, locale) from the client (see
  * GenerateMessageButton.tsx) so useActionState's (prevState, formData)
- * signature is all that's left for the form to supply.
+ * signature is all that's left for the form to supply. `locale` here is
+ * only the UI-locale fallback: the actual message language comes from the
+ * "messageLanguage" field the client submits (the inline language choice in
+ * GenerateMessageButton), validated server-side against LOCALES and falling
+ * back to `locale` if it's missing or invalid.
  */
 export async function generateOutreachMessage(
   contactId: string,
   locale: Locale,
   _prevState: GenerateOutreachMessageResult | null,
-  _formData: FormData,
+  formData: FormData,
 ): Promise<GenerateOutreachMessageResult> {
   const me = await getCurrentBd();
+
+  const rawMessageLanguage = formData.get("messageLanguage");
+  const messageLanguage: Locale =
+    typeof rawMessageLanguage === "string" && isLocale(rawMessageLanguage)
+      ? rawMessageLanguage
+      : locale;
 
   const row = await db.query.contact.findFirst({
     where: and(eq(contact.id, contactId), eq(contact.bdId, me.id)),
@@ -74,7 +84,7 @@ export async function generateOutreachMessage(
     history,
     senderName,
     senderTitle,
-    locale,
+    locale: messageLanguage,
   });
 
   try {

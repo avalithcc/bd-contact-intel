@@ -1212,3 +1212,68 @@ a:hover {
   margin: 0;
   font-size: var(--text-sm);
 }
+
+/* Inline "Español"/"English" choice shown before generating/regenerating —
+   replaces the button in place, same row height as .secondary-btn so the
+   layout doesn't jump. */
+.generate-message-language-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.generate-message-language-btn {
+  padding: 0.5rem 0.75rem;
+}
+.generate-message-language-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  background: transparent;
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.generate-message-language-cancel:hover {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
+/* "Generating…" indicator shown in place of the button while the server
+   action is pending. */
+.generate-message-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-base);
+}
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Respect reduced-motion: no spinning animation — a static ring plus the
+   "Generating…" text label still communicates the busy state. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
