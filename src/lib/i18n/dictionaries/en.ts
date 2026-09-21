@@ -68,7 +68,7 @@ export const en = {
     changePassword: "Change password",
     themeLabel: "Theme",
     priorityOutreach: "Priority Contacts",
-    whatsNew: "Client Opportunities",
+    whatsNew: "Contact Opportunities",
     hiringSignals: "Open Roles",
     boardDiscovery: "Job Board Discovery",
     backToContacts: "Contacts",
@@ -245,8 +245,8 @@ export const en = {
   },
 
   whatsNew: {
-    eyebrow: "// client_opportunities",
-    title: "client opportunities",
+    eyebrow: "// contact_opportunities",
+    title: "contact opportunities",
     subtitle:
       "IT postings that appeared or closed recently at companies you track, newest activity first.",
     windowLabel: "Window",

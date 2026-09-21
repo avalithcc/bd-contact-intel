@@ -13,7 +13,7 @@ export const es: typeof en = {
     changePassword: "Cambiar contraseña",
     themeLabel: "Tema",
     priorityOutreach: "Contactos Prioritarios",
-    whatsNew: "Oportunidades en Mis Clientes",
+    whatsNew: "Oportunidades en Mis Contactos",
     hiringSignals: "Vacantes Abiertas",
     boardDiscovery: "Descubrimiento de Portales",
     backToContacts: "Contactos",
@@ -215,8 +215,8 @@ export const es: typeof en = {
   },
 
   whatsNew: {
-    eyebrow: "// oportunidades_en_mis_clientes",
-    title: "oportunidades en mis clientes",
+    eyebrow: "// oportunidades_en_mis_contactos",
+    title: "oportunidades en mis contactos",
     subtitle:
       "Publicaciones de IT que aparecieron o se cerraron recientemente en las empresas que sigues, con la actividad más reciente primero.",
     windowLabel: "Ventana",
