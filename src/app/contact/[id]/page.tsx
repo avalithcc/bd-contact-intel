@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContactById, getConversationThreads, getCurrentBd } from "@/lib/queries";
 import { suggestEmailForContact } from "@/lib/emailSuggestion";
-import { isFreeMailDomain } from "@/lib/emailPatterns";
+import { isFreeMailDomain, splitEmail } from "@/lib/emailPatterns";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/i18n/format";
@@ -56,7 +56,9 @@ export default async function ContactDetail({
   // useless for BD outreach that wants to reach someone at their company.
   // The stored email itself is never touched: the suggestion is always a
   // separate, clearly-labelled field, never a replacement for c.email.
-  const storedEmailDomain = c.email?.split("@")[1]?.trim().toLowerCase();
+  // splitEmail (not split("@")[1]) so a malformed stored address is read the
+  // same way the pattern detector reads every other address.
+  const storedEmailDomain = c.email ? splitEmail(c.email)?.domain : undefined;
   const needsSuggestion = !c.email || (!!storedEmailDomain && isFreeMailDomain(storedEmailDomain));
   const suggestion = needsSuggestion
     ? await suggestEmailForContact(me.id, {

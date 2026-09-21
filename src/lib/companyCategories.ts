@@ -60,7 +60,13 @@ export const COMPANY_CATEGORIES: CompanyCategoryDef[] = [
 // Legal-suffix / entity-type words stripped from company names before
 // normalization, matched on (ASCII) word boundaries. Ported 1:1 from the
 // Python prototype's regex.
-const SUFFIX_RE = /\b(inc|llc|ltd|s ?a|s ?r ?l|s ?a ?s|corp|corporation|gmbh)\b/g;
+/**
+ * Legal-entity suffixes stripped before a company name is used as a key.
+ * Exported so every normalizer in the app (company keys, domain guessing)
+ * strips the SAME set — a second, narrower copy silently produced different
+ * names for the same company.
+ */
+export const COMPANY_SUFFIX_RE = /\b(inc|llc|ltd|s ?a|s ?r ?l|s ?a ?s|corp|corporation|gmbh)\b/g;
 
 /**
  * Normalize a raw company name into the lookup key used by the
@@ -87,6 +93,6 @@ export function normalizeCompanyKey(name: string): string {
     .replace(/[^\x00-\x7F]/g, "")
     .toLowerCase();
   const noPunct = ascii.replace(/[.,]/g, " ");
-  const noSuffix = noPunct.replace(SUFFIX_RE, " ");
+  const noSuffix = noPunct.replace(COMPANY_SUFFIX_RE, " ");
   return noSuffix.replace(/\s+/g, " ").trim();
 }

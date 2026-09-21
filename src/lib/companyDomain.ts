@@ -20,11 +20,13 @@
  * WHY MX presence is the acceptance filter: a domain that is merely
  * registered but not actively used for a business (a parked domain, a
  * placeholder, a name squatted by someone unrelated) typically has NO MX
- * record — nothing is configured to receive mail for it. Requiring MX
- * (plus a real, named mail provider — see ACCEPTED_PROVIDERS below) is what
- * makes this filter meaningful: it rejects the vast majority of wrong
- * guesses (typos, unrelated registrants, generic placeholder domains)
- * before they ever reach the UI as a suggestion.
+ * record — nothing is configured to receive mail for it. That, plus the
+ * parking-host blocklist below, is the whole acceptance bar. Be clear-eyed
+ * about its strength: ANY domain with a working mail setup passes, because
+ * detectProvider() labels every unrecognized-but-present MX as "other".
+ * It rejects typos and unregistered names, NOT a live domain belonging to
+ * an unrelated company with the same name — which is why the UI must always
+ * present this as an unconfirmed guess.
  *
  * WHY confidence is always "low" and source is "guessed-domain": this is an
  * identity guess about which real-world company the contact's employer
@@ -37,6 +39,7 @@
  * please eyeball it."
  */
 import { isFreeMailDomain } from "@/lib/emailPatterns";
+import { COMPANY_SUFFIX_RE } from "@/lib/companyCategories";
 import { isDeadDomain, getDomainCheck, type MailProvider } from "@/lib/domainCheckCache";
 
 // TLDs to try, ordered by likelihood for this (LATAM-heavy) user base —
@@ -66,7 +69,10 @@ const MAX_CANDIDATES = 12;
 // round trips added to one contact-detail page render.
 const MAX_LOOKUPS = 6;
 
-// Wall-clock budget for the whole guess. MAX_LOOKUPS alone bounds the number
+// Wall-clock budget for the whole guess. Checked BEFORE each lookup, so a
+// lookup that starts just inside the budget can still run to the 3s DNS
+// timeout — worst case is therefore ~LOOKUP_BUDGET_MS + LOOKUP_TIMEOUT_MS
+// for one call, not a hard 2.5s. MAX_LOOKUPS alone bounds the number
 // of queries, not the time they take: six candidates that each hit the 3s DNS
 // timeout would stall a contact-detail render for ~18s. Once this budget is
 // spent the guess gives up and the page renders without a suggestion —
@@ -75,10 +81,10 @@ const MAX_LOOKUPS = 6;
 const LOOKUP_BUDGET_MS = 2500;
 
 // Only these MX-detected providers (see src/lib/emailDomain.ts) count as
-// "a real mail provider is configured here". Deliberately EXCLUDES
-// "unknown" (MX records present but not matching any known provider is too
-// weak a signal to build a guess on) — see the module doc comment above for
-// why MX + a real provider, not MX alone, is the acceptance bar.
+// Providers we accept a guess on. "unknown" (no MX at all) is excluded, but
+// note that "other" — any working mail setup we don't recognize — IS
+// accepted: most company domains run something other than the five named
+// providers, and rejecting them would throw away most real hits.
 const ACCEPTED_PROVIDERS: ReadonlySet<MailProvider> = new Set([
   "google",
   "microsoft",
@@ -87,6 +93,28 @@ const ACCEPTED_PROVIDERS: ReadonlySet<MailProvider> = new Set([
   "mimecast",
   "other",
 ]);
+
+// MX hosts that mean "this domain is parked / for sale / only forwarding",
+// not "a company reads mail here". These are the one class of live-MX domain
+// worth rejecting outright, since they are precisely the squatted names a
+// generated candidate is most likely to hit.
+const PARKING_MX_HOSTS = [
+  "parkingcrew.net",
+  "sedoparking.com",
+  "bodis.com",
+  "above.com",
+  "dan.com",
+  "afternic.com",
+  "hugedomains.com",
+  "domaincontrol.email",
+];
+
+function isParkedMx(mxHosts: string[]): boolean {
+  return mxHosts.some((host) => {
+    const h = host.trim().toLowerCase().replace(/\.$/, "");
+    return PARKING_MX_HOSTS.some((root) => h === root || h.endsWith(`.${root}`));
+  });
+}
 
 // Company names that carry no real corporate identity to guess a domain
 // for — LinkedIn "company" free text is full of these for self-employed /
@@ -107,7 +135,8 @@ const STOP_LIST = new Set(
  * Strip a company display name down to the bare ascii-lowercase
  * letters/digits used to build a domain candidate: normalize accents away,
  * drop punctuation, remove common legal-entity suffixes (matched as whole
- * words, same approach as src/lib/companyCategories.ts#normalizeCompanyKey),
+ * words, sharing COMPANY_SUFFIX_RE with
+ * src/lib/companyCategories.ts#normalizeCompanyKey),
  * then collapse everything else (remaining spaces/punctuation) so "Banco
  * Macro S.A." -> "bancomacro".
  */
@@ -118,7 +147,7 @@ function normalizeForDomain(name: string): string {
     .replace(/[^\x00-\x7F]/g, "")
     .toLowerCase();
   const noPunct = ascii.replace(/[.,]/g, " ");
-  const noSuffix = noPunct.replace(/\b(s ?a|s ?r ?l|inc|llc|ltd|corp)\b/g, " ");
+  const noSuffix = noPunct.replace(COMPANY_SUFFIX_RE, " ");
   return noSuffix.replace(/[^a-z0-9]/g, "");
 }
 
@@ -166,6 +195,7 @@ export async function guessCompanyDomain(companyName: string | null): Promise<Gu
     if (check.status !== "ok" || !check.hasMx) continue; // unconfirmed (error) — not good enough to guess on
     if (isFreeMailDomain(candidate)) continue; // can't happen for a generated domain in practice, but stay consistent with every other domain check in the app
     if (!ACCEPTED_PROVIDERS.has(check.provider)) continue; // rejects "unknown" — see module doc comment
+    if (isParkedMx(check.mxHosts)) continue; // domain is parked or for sale, nobody reads mail there
 
     return { domain: candidate, provider: check.provider };
   }

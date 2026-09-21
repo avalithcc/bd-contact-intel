@@ -159,7 +159,7 @@ export interface DetectedPattern {
 // src/lib/emailSuggestion.ts's fallback path).
 export const DEFAULT_PATTERN_ID: PatternId = "first.last";
 
-function splitEmail(email: string): { localPart: string; domain: string } | null {
+export function splitEmail(email: string): { localPart: string; domain: string } | null {
   const trimmed = email.trim().toLowerCase();
   const at = trimmed.lastIndexOf("@");
   if (at <= 0 || at === trimmed.length - 1) return null;

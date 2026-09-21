@@ -165,13 +165,14 @@ export async function suggestEmailForContact(
 
     const domainCheck = await getDomainCheck(detected.domain);
 
-    // A CONFIRMED non-receiving domain (successful DNS lookup, zero MX
-    // records) means no address at this domain can ever be delivered — don't
-    // show a suggestion at all rather than one guaranteed to bounce.
-    // A domain that provably cannot receive mail (no MX, or no domain at
-    // all) makes any suggested address worthless — show nothing rather than
-    // a plausible-looking guess.
-    if (isDeadDomain(domainCheck.status)) return null;
+    // A CONFIRMED non-receiving domain (successful DNS lookup with zero MX
+    // records, or no such domain) means no address here can ever be
+    // delivered. Don't return a suggestion guaranteed to bounce — but don't
+    // give up either: a company that migrated domains still has colleagues
+    // on the OLD one in our base, and the guessed-domain path below may find
+    // the live one. Falling through is exactly the churn case the fallback
+    // chain exists for.
+    if (isDeadDomain(domainCheck.status)) return guessFromCompanyName(target);
 
     let confidence: SuggestionConfidence = "low";
     if (domainCheck.hasMx && detected.agreeCount >= HIGH_CONFIDENCE_MIN_AGREE) {
@@ -215,9 +216,9 @@ export async function suggestEmailForContact(
 
     const domainCheck = await getDomainCheck(domainGuess.domain);
 
-    // Same dead-domain suppression as the detected path: an assumed address
-    // at a domain confirmed to never receive mail is worthless to show.
-    if (isDeadDomain(domainCheck.status)) return null;
+    // Same as the detected path: a dead domain falls through to the
+    // name-based guess rather than ending the search.
+    if (isDeadDomain(domainCheck.status)) return guessFromCompanyName(target);
 
     // Confidence is ALWAYS "low" for an assumed suggestion, even when the
     // domain has confirmed MX records. Unlike the detected path, no
@@ -247,6 +248,17 @@ export async function suggestEmailForContact(
   // company name can collide with an unrelated homonym (a US "Flexibility
   // Inc" vs. the user's local one), so confidence is always forced to "low"
   // and the UI must say the company could not be confirmed.
+  return guessFromCompanyName(target);
+}
+
+/**
+ * Last-resort suggestion built on a domain guessed from the company NAME.
+ * Extracted so the detected/assumed paths can fall through to it when the
+ * domain their colleagues use turns out to be dead.
+ */
+async function guessFromCompanyName(target: SuggestionTarget): Promise<EmailSuggestion | null> {
+  if (!target.firstName || !target.lastName) return null;
+
   const guessedDomain = await guessCompanyDomain(target.company);
   if (!guessedDomain) return null;
 
