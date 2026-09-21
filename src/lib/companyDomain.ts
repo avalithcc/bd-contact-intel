@@ -282,9 +282,13 @@ function stripGenericLeadingWord(tokens: string[]): string[] | null {
 }
 
 function isUsableBase(base: string): boolean {
-  // Same guard the single-variant version always applied: too short to be a
-  // plausible business name, or a known generic/non-company placeholder.
-  return base.length >= 3 && !STOP_LIST.has(base);
+  // Too short to be a plausible business name, or a known generic/non-company
+  // placeholder. The generic/country checks matter for STRIPPED variants:
+  // "Grupo Mexico" loses its trailing country word and would otherwise leave
+  // the bare stub "grupo", which resolves to a live domain belonging to
+  // nobody in particular.
+  if (base.length < 3 || STOP_LIST.has(base)) return false;
+  return !GENERIC_LEADING_WORDS.includes(base) && !COUNTRY_WORDS.includes(base);
 }
 
 /**
