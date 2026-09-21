@@ -8,14 +8,18 @@ import { useRouter } from "next/navigation";
  * came from (a filtered list, a search result, another detail page) rather
  * than a fixed route.
  *
- * Dead-end guard: `router.back()` is a no-op (or leaves the app entirely)
- * when there is no in-app history to go back to — e.g. the user opened the
- * URL directly, followed an external link, or opened this page in a new
- * tab. `window.history.length <= 1` is a reliable client-side signal for
- * "this tab has no history to go back to" in that case, so we fall back to
- * `fallbackHref` instead. This check runs inside the click handler, not at
- * render time, so the server-rendered markup and the post-hydration markup
- * are identical — no layout shift, no flash of a different button state.
+ * Dead-end guard: `router.back()` is a no-op — or worse, leaves the app —
+ * when there is no in-app entry behind this one: the URL was opened
+ * directly, in a new tab, or followed from an external link. `history.length`
+ * cannot tell us that, since it also counts entries that belong to whatever
+ * site the user came from. Next's App Router instead stamps an incrementing
+ * `idx` on every history entry it creates, so `idx > 0` means "there is an
+ * earlier entry of THIS app to return to". Anything else falls back to
+ * `fallbackHref`, which keeps the user inside the app.
+ *
+ * The check runs inside the click handler, not at render time, so the
+ * server-rendered markup and the post-hydration markup are identical — no
+ * layout shift, no flash of a different button state.
  */
 export function BackButton({
   label,
@@ -27,11 +31,12 @@ export function BackButton({
   const router = useRouter();
 
   function handleClick() {
-    if (window.history.length <= 1) {
-      router.push(fallbackHref);
+    const idx = (window.history.state as { idx?: number } | null)?.idx;
+    if (typeof idx === "number" && idx > 0) {
+      router.back();
       return;
     }
-    router.back();
+    router.push(fallbackHref);
   }
 
   return (
