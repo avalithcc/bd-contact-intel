@@ -173,7 +173,7 @@ async function overlapByProfileKey(
  * all via one `IN (SELECT ...)` subquery folded into the caller's query, so
  * it doesn't add a round trip.
  */
-function companyKeyFilter(key: string) {
+export function companyKeyFilter(key: string) {
   const canonicalKey = sql`coalesce((select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = ${key}), ${key})`;
   return sql`${contact.companyKey} in (
     select ${companyAlias.aliasKey} from ${companyAlias} where ${companyAlias.companyKey} = (${canonicalKey})

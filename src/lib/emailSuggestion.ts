@@ -1,6 +1,7 @@
 import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { contact } from "@/db/schema";
+import { companyKeyFilter } from "@/lib/queries";
 import { detectPattern, buildEmail, type PatternId } from "@/lib/emailPatterns";
 
 // Cap on how many colleague samples we pull to infer a company's email
@@ -55,7 +56,10 @@ export async function suggestEmailForContact(
     .where(
       and(
         eq(contact.bdId, bdId),
-        eq(contact.companyKey, target.companyKey),
+        // Alias-aware, like every other company filter in the app: a
+        // company reached through company_alias (e.g. "Globant S.A." vs
+        // "Globant") must contribute its colleagues' emails too.
+        companyKeyFilter(target.companyKey),
         isNotNull(contact.email),
         ne(contact.id, target.id),
       ),
@@ -70,7 +74,14 @@ export async function suggestEmailForContact(
   const detected = detectPattern(usableSamples);
   if (!detected) return null;
 
-  const email = buildEmail(detected.patternId, detected.domain, target.firstName, target.lastName);
+  const email = buildEmail(
+    detected.patternId,
+    detected.domain,
+    target.firstName,
+    target.lastName,
+    detected.firstVariant,
+    detected.lastVariant,
+  );
   if (!email) return null;
 
   return {

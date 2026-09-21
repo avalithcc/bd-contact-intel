@@ -95,11 +95,20 @@ export interface EmailSample {
   email: string;
 }
 
+/** Which normalized candidate of a name a company's addresses actually use. */
+export type NameVariant = "full" | "first";
+
 export interface DetectedPattern {
   patternId: PatternId;
   domain: string;
   agreeCount: number;
   sampleCount: number;
+  // Compound names ("Ana María", "De La Cruz") normalize to two candidates,
+  // and a company consistently uses one of them. These record which one the
+  // samples agreed on, so buildEmail() reproduces the same choice instead of
+  // defaulting to the compound form.
+  firstVariant: NameVariant;
+  lastVariant: NameVariant;
 }
 
 function splitEmail(email: string): { localPart: string; domain: string } | null {
@@ -144,8 +153,14 @@ function buildLocalPart(patternId: PatternId, first: string, last: string): stri
   }
 }
 
-function uniqueNonEmpty(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
+interface PatternMatch {
+  firstVariants: Set<NameVariant>;
+  lastVariants: Set<NameVariant>;
+}
+
+/** Majority variant across the samples that agreed on the winning pattern. */
+function majorityVariant(counts: Map<NameVariant, number>): NameVariant {
+  return (counts.get("first") ?? 0) > (counts.get("full") ?? 0) ? "first" : "full";
 }
 
 /**
@@ -154,26 +169,36 @@ function uniqueNonEmpty(values: string[]): string[] {
  * both the first and last name (a compound surname like "De La Cruz" is
  * just as plausible as a compound given name).
  */
-function matchPatterns(sample: EmailSample): Set<PatternId> {
+function matchPatterns(sample: EmailSample): Map<PatternId, PatternMatch> {
   const split = splitEmail(sample.email);
-  if (!split) return new Set();
+  if (!split) return new Map();
   const { localPart } = split;
 
-  const firstCandidates = uniqueNonEmpty([
-    normalizeNamePart(sample.firstName).full,
-    normalizeNamePart(sample.firstName).first,
-  ]);
-  const lastCandidates = uniqueNonEmpty([
-    normalizeNamePart(sample.lastName).full,
-    normalizeNamePart(sample.lastName).first,
-  ]);
+  const first = normalizeNamePart(sample.firstName);
+  const last = normalizeNamePart(sample.lastName);
+  const firstCandidates: [NameVariant, string][] = [
+    ["full", first.full],
+    ["first", first.first],
+  ];
+  const lastCandidates: [NameVariant, string][] = [
+    ["full", last.full],
+    ["first", last.first],
+  ];
 
-  const matched = new Set<PatternId>();
-  for (const first of firstCandidates.length ? firstCandidates : [""]) {
-    for (const last of lastCandidates.length ? lastCandidates : [""]) {
+  const matched = new Map<PatternId, PatternMatch>();
+  for (const [firstVariant, firstValue] of firstCandidates) {
+    for (const [lastVariant, lastValue] of lastCandidates) {
+      if (!firstValue && !lastValue) continue;
       for (const patternId of PATTERN_IDS) {
-        const built = buildLocalPart(patternId, first, last);
-        if (built !== null && built === localPart) matched.add(patternId);
+        const built = buildLocalPart(patternId, firstValue, lastValue);
+        if (built === null || built !== localPart) continue;
+        const entry = matched.get(patternId) ?? {
+          firstVariants: new Set<NameVariant>(),
+          lastVariants: new Set<NameVariant>(),
+        };
+        entry.firstVariants.add(firstVariant);
+        entry.lastVariants.add(lastVariant);
+        matched.set(patternId, entry);
       }
     }
   }
@@ -189,15 +214,36 @@ export function detectPattern(samples: EmailSample[]): DetectedPattern | null {
   const usable = samples.filter(isUsableSample);
   if (usable.length < MIN_SUPPORT) return null;
 
-  const votes = new Map<PatternId, { count: number; domainCounts: Map<string, number> }>();
+  const votes = new Map<
+    PatternId,
+    {
+      count: number;
+      domainCounts: Map<string, number>;
+      firstVariants: Map<NameVariant, number>;
+      lastVariants: Map<NameVariant, number>;
+    }
+  >();
   for (const sample of usable) {
     const split = splitEmail(sample.email);
     if (!split) continue;
-    const matched = matchPatterns(sample);
-    for (const patternId of matched) {
-      const entry = votes.get(patternId) ?? { count: 0, domainCounts: new Map<string, number>() };
+    for (const [patternId, match] of matchPatterns(sample)) {
+      const entry = votes.get(patternId) ?? {
+        count: 0,
+        domainCounts: new Map<string, number>(),
+        firstVariants: new Map<NameVariant, number>(),
+        lastVariants: new Map<NameVariant, number>(),
+      };
       entry.count += 1;
       entry.domainCounts.set(split.domain, (entry.domainCounts.get(split.domain) ?? 0) + 1);
+      // A sample whose compound and first-token candidates both match (a
+      // single-token name) votes for both, so neither variant is favoured
+      // by names that can't distinguish them.
+      for (const variant of match.firstVariants) {
+        entry.firstVariants.set(variant, (entry.firstVariants.get(variant) ?? 0) + 1);
+      }
+      for (const variant of match.lastVariants) {
+        entry.lastVariants.set(variant, (entry.lastVariants.get(variant) ?? 0) + 1);
+      }
       votes.set(patternId, entry);
     }
   }
@@ -230,16 +276,22 @@ export function detectPattern(samples: EmailSample[]): DetectedPattern | null {
     }
   }
 
-  return { patternId: winner, domain, agreeCount: winnerCount, sampleCount: usable.length };
+  return {
+    patternId: winner,
+    domain,
+    agreeCount: winnerCount,
+    sampleCount: usable.length,
+    firstVariant: majorityVariant(entry.firstVariants),
+    lastVariant: majorityVariant(entry.lastVariants),
+  };
 }
 
 /**
  * Build the suggested address for one contact given a detected pattern.
- * Uses the FULL (compound-joined) candidate for both names — detectPattern
- * already validated the pattern against real samples, so this is the
- * best-effort default; for patterns that only use an initial (f.last,
- * flast, first.l, lastfirst, firstl) the result is identical either way
- * since the initial is the same regardless of which candidate is used.
+ * `firstVariant`/`lastVariant` come from detectPattern() and say whether
+ * this company's addresses spell a compound name out in full
+ * ("ana.maria.gomez") or keep only its leading token ("ana.gomez"); both
+ * default to the compound form when the caller has no detection to pass.
  * Returns null when firstName/lastName normalize to insufficient characters
  * for the pattern (e.g. empty after stripping non-letters).
  */
@@ -248,9 +300,11 @@ export function buildEmail(
   domain: string,
   firstName: string,
   lastName: string,
+  firstVariant: NameVariant = "full",
+  lastVariant: NameVariant = "full",
 ): string | null {
-  const first = normalizeNamePart(firstName).full;
-  const last = normalizeNamePart(lastName).full;
+  const first = normalizeNamePart(firstName)[firstVariant];
+  const last = normalizeNamePart(lastName)[lastVariant];
   const localPart = buildLocalPart(patternId, first, last);
   if (!localPart || !domain) return null;
   return `${localPart}@${domain}`;
