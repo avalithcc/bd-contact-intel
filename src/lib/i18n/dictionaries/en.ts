@@ -300,6 +300,16 @@ export const en = {
     // colleague addresses, not a pattern this company was observed to use.
     suggestedEmailAssumedNote: (colleagueCount: number) =>
       `Convention not confirmed — assuming the common "first.last" pattern at the domain used by ${colleagueCount} colleague${colleagueCount === 1 ? "" : "s"} at this company. This is a guess, not an observed pattern.`,
+    // Shown ONLY for a "guessed-domain" suggestion (source: "guessed-domain"
+    // — see src/lib/emailSuggestion.ts and src/lib/companyDomain.ts), the
+    // weakest of the three levels: no colleague at this company has ANY
+    // corporate email on file, so even the domain itself is a guess derived
+    // from the company's name and confirmed only by public DNS. Must say
+    // plainly that the company could not be confirmed and that BOTH the
+    // domain and the local-part pattern are guesses — never present this
+    // like a detected convention or even like the "assumed" level above.
+    guessedDomainNote: (domain: string) =>
+      `Company not confirmed — no colleague email on file for this company at all. Domain "${domain}" was guessed from the company name, and the address uses the common "first.last" pattern. Both are guesses — please verify manually before using this address; company names can collide with unrelated businesses.`,
     // Confidence chip shown next to a suggested email — see
     // src/lib/emailSuggestion.ts#SuggestionConfidence. Always paired with
     // suggestedEmailNote/domainReason so the wording stays honest: this is
@@ -316,6 +326,14 @@ export const en = {
     // (not the same as a confirmed "no mail" — that case hides the
     // suggestion entirely, see suggestEmailForContact).
     domainUnconfirmedReason: "Domain's ability to receive mail could not be confirmed.",
+    // Shown instead of domainReason/domainUnconfirmedReason for a
+    // "guessed-domain" suggestion. hasMx is always true here (that's the
+    // acceptance bar in companyDomain.ts), but unlike the detected/assumed
+    // paths, no colleague ever confirmed this domain belongs to the
+    // company — so this must NOT claim colleague evidence, only that the
+    // guessed domain itself is technically capable of receiving mail.
+    guessedDomainReason:
+      "Guessed domain accepts mail, but nothing here confirms it actually belongs to this company — a different, unrelated company could share the same name.",
     // Shown only when provider is "microsoft" — Microsoft 365 accepts mail
     // for unknown recipients by default, so even a paid SMTP-verification
     // service cannot confirm this specific mailbox exists.

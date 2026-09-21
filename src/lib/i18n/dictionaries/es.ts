@@ -259,6 +259,8 @@ export const es: typeof en = {
       `No verificado — estimado a partir de ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"} de esta empresa (patrón "${patternId}").`,
     suggestedEmailAssumedNote: (colleagueCount) =>
       `No se pudo confirmar la convención — se asume el patrón habitual "first.last" en el dominio utilizado por ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"} de esta empresa. Esto es una suposición, no un patrón observado.`,
+    guessedDomainNote: (domain) =>
+      `Empresa no confirmada — no hay ningún correo de un colega registrado para esta empresa. El dominio "${domain}" se dedujo a partir del nombre de la empresa, y la dirección usa el patrón habitual "first.last". Ambos son suposiciones — verificar manualmente antes de usar esta dirección; el nombre de una empresa puede coincidir con el de otra empresa no relacionada.`,
     confidenceLabel: (confidence) =>
       confidence === "high"
         ? "Confianza alta"
@@ -268,6 +270,8 @@ export const es: typeof en = {
     domainReason: (colleagueCount) =>
       `El dominio acepta correo · inferido a partir de ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"}.`,
     domainUnconfirmedReason: "No se pudo confirmar si el dominio recibe correo.",
+    guessedDomainReason:
+      "El dominio deducido acepta correo, pero nada confirma que pertenezca realmente a esta empresa — podría tratarse de otra empresa no relacionada con el mismo nombre.",
     microsoftProviderNote:
       "Este dominio usa Microsoft 365, que por defecto acepta correo para direcciones desconocidas — ningún método de verificación, ni siquiera uno pago, puede confirmar que esta casilla en particular exista.",
     fieldConnectedOn: "Conectado el",
