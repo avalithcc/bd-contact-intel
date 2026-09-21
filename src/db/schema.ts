@@ -466,3 +466,24 @@ export const companyProbe = pgTable("company_probe", {
 
 export type CompanyProbe = typeof companyProbe.$inferSelect;
 export type NewCompanyProbe = typeof companyProbe.$inferInsert;
+
+// Cached MX-lookup result for one email domain (see
+// src/lib/emailDomain.ts#lookupDomain). Rows hold PUBLIC DNS facts about a
+// domain (does it receive mail, and via which provider) — not contact data,
+// and a domain's MX configuration is not owned by any one BD, so this is
+// shared across BDs like `companyCategory`/`targetCompany` above (no bd_id).
+// Refreshed on a ~30 day TTL by the caller (see
+// src/lib/emailSuggestion.ts) rather than on every read, since MX records
+// change rarely and a fresh DNS lookup has real latency.
+export const emailDomainCheck = pgTable("email_domain_check", {
+  domain: text("domain").primaryKey(),
+  hasMx: boolean("has_mx").notNull(),
+  // MailProvider from src/lib/emailDomain.ts, stored as plain text (no DB
+  // enum) so adding a new provider matcher never needs a migration.
+  provider: text("provider").notNull(),
+  mxHosts: jsonb("mx_hosts").notNull().default([]),
+  checkedAt: timestamp("checked_at").notNull().defaultNow(),
+});
+
+export type EmailDomainCheck = typeof emailDomainCheck.$inferSelect;
+export type NewEmailDomainCheck = typeof emailDomainCheck.$inferInsert;
