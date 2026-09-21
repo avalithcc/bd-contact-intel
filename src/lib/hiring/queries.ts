@@ -344,6 +344,36 @@ export async function getHiringMatchIndex(
   return index;
 }
 
+export interface CompanyPostingsForMessage {
+  companyKey: string;
+  displayName: string;
+  postings: OpenPosting[];
+}
+
+/**
+ * Full open-IT-posting detail (titles, locations, markets) for whichever
+ * hiring company a single contact's `company_key` resolves to — including
+ * via a `company_alias` match, same alias resolution as
+ * getCompanyHiringSummaries/getHiringMatchIndex above. Used by the outreach
+ * message generator (see src/app/outreach/actions.ts), which needs the
+ * actual posting titles/locations rather than just the aggregate counts
+ * HiringMatch carries. Not BD-scoped — job postings/target companies are
+ * shared data. Two fixed queries (via resolveHiringCompanies), regardless of
+ * caller. Returns null if the key doesn't resolve to any company currently
+ * hiring IT.
+ */
+export async function getCompanyPostingsForKey(
+  companyKey: string,
+): Promise<CompanyPostingsForMessage | null> {
+  const companies = await resolveHiringCompanies();
+  for (const c of companies.values()) {
+    if (c.matchKeys.has(companyKey)) {
+      return { companyKey: c.companyKey, displayName: c.displayName, postings: c.postings };
+    }
+  }
+  return null;
+}
+
 /**
  * The set of normalized company keys (canonical `target_company.company_key`
  * values plus any `company_alias` rows pointing at them) that currently have

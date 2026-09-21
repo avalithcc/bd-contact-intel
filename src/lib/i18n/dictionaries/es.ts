@@ -202,6 +202,7 @@ export const es: typeof en = {
     tableOpenRoles: "Roles de IT abiertos",
     tableLastContact: "Último contacto",
     tableWhy: "Por qué",
+    tableMessage: "Mensaje",
     reasonDormantSince: (relTime, months) =>
       `Inactivo desde ${relTime} (${months}+ meses sin actividad)`,
     reasonDormant: "Inactivo",
@@ -212,6 +213,17 @@ export const es: typeof en = {
     reasonNeverMessaged: "Nunca contactado",
     companyFallback: "empresa",
     reasonOpenRoles: (company, n) => `${company} tiene ${n} rol${n === 1 ? "" : "es"} de IT abierto${n === 1 ? "" : "s"}`,
+    generateMessage: "Generar mensaje",
+    generatingMessage: "Generando…",
+    regenerateMessage: "Regenerar",
+    copyMessage: "Copiar",
+    copiedMessage: "¡Copiado!",
+    generateMessageErrors: {
+      notFound: "No se encontró el contacto.",
+      gatewayNotConfigured:
+        "El AI Gateway todavía no está configurado — configurá AI_GATEWAY_API_KEY (o iniciá sesión con Vercel OIDC) e intentá de nuevo.",
+      generationFailed: "No se pudo generar el mensaje ahora. Probá de nuevo en un momento.",
+    },
   },
 
   whatsNew: {

@@ -12,6 +12,7 @@ import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
+import { GenerateMessageButton } from "./GenerateMessageButton";
 
 export const dynamic = "force-dynamic";
 
@@ -220,6 +221,7 @@ export default async function OutreachPage({
                   <th>{dict.outreach.tableOpenRoles}</th>
                   <th>{dict.outreach.tableLastContact}</th>
                   <th>{dict.outreach.tableWhy}</th>
+                  <th>{dict.outreach.tableMessage}</th>
                 </tr>
               </thead>
               <tbody>
@@ -259,6 +261,9 @@ export default async function OutreachPage({
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td>
+                      <GenerateMessageButton contactId={r.id} locale={locale} dict={dict} />
                     </td>
                   </tr>
                 ))}

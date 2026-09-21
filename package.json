@@ -2,6 +2,9 @@
   "name": "bd-contact-intel",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,8 +15,10 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^4.0.87",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "ai": "^7.0.107",
     "csv-parse": "^5.5.6",
     "drizzle-orm": "^0.36.4",
     "next": "^15.1.3",

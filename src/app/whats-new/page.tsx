@@ -15,6 +15,7 @@ import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
+import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 
 export const dynamic = "force-dynamic";
 
@@ -228,6 +229,7 @@ export default async function WhatsNewPage({
                         {dict.roleGroups[sc.roleGroup]}
                       </span>
                     )}
+                    <GenerateMessageButton contactId={sc.id} locale={locale} dict={dict} />
                   </span>
                 ))}
               </div>

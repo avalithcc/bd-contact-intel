@@ -231,6 +231,7 @@ export const en = {
     tableOpenRoles: "Open IT roles",
     tableLastContact: "Last contact",
     tableWhy: "Why",
+    tableMessage: "Message",
     reasonDormantSince: (relTime: string, months: number) =>
       `Dormant since ${relTime} (${months}mo+ quiet)`,
     reasonDormant: "Dormant",
@@ -242,6 +243,17 @@ export const en = {
     companyFallback: "company",
     reasonOpenRoles: (company: string, n: number) =>
       `${company} has ${n} open IT role${n === 1 ? "" : "s"}`,
+    generateMessage: "Generate message",
+    generatingMessage: "Generating…",
+    regenerateMessage: "Regenerate",
+    copyMessage: "Copy",
+    copiedMessage: "Copied!",
+    generateMessageErrors: {
+      notFound: "Contact not found.",
+      gatewayNotConfigured:
+        "The AI Gateway isn't configured yet — set AI_GATEWAY_API_KEY (or sign in with Vercel OIDC) and try again.",
+      generationFailed: "Couldn't generate a message right now. Try again in a moment.",
+    },
   },
 
   whatsNew: {

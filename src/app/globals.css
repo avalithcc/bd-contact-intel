@@ -1165,3 +1165,31 @@ a:hover {
 .text-warn {
   color: var(--color-warn);
 }
+
+/* ---- outreach message generator (GenerateMessageButton.tsx) ---- */
+.generate-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 220px;
+  max-width: 320px;
+}
+.generate-message-result {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.generate-message-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+}
+.generate-message-error {
+  margin: 0;
+  font-size: var(--text-sm);
+}
