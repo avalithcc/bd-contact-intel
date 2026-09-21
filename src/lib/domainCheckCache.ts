@@ -46,6 +46,12 @@ export async function getDomainCheck(domain: string) {
       hasMx: cached.hasMx,
       provider: cached.provider as MailProvider,
       mxHosts: cached.mxHosts as string[],
+      // Answered from the DB, no live DNS round trip. Callers that budget a
+      // bounded number of LIVE lookups (src/lib/companyDomain.ts's
+      // MAX_LOOKUPS) must not charge a cache hit against that budget — a
+      // company whose candidates are all already warm in the cache should
+      // get to try every candidate, not just the first MAX_LOOKUPS of them.
+      fromCache: true,
     };
   }
 
@@ -59,7 +65,7 @@ export async function getDomainCheck(domain: string) {
     await cacheDomainCheck(result, domain);
   }
 
-  return result;
+  return { ...result, fromCache: false };
 }
 
 async function selectCachedDomain(domain: string) {
