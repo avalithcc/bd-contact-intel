@@ -15,7 +15,9 @@ import { isValidBearer } from "@/lib/cronAuth";
 //   curl -H "Authorization: Bearer $CRON_SECRET" \
 //     https://<your-deployment>.vercel.app/api/hiring/sync
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Vercel Hobby with Fluid Compute allows up to 300s. The ATS sync of every
+// target company alone takes ~60s, and startup classification runs after it.
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
