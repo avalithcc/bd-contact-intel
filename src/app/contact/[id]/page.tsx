@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContactById, getConversationThreads, getCurrentBd } from "@/lib/queries";
+import { suggestEmailForContact } from "@/lib/emailSuggestion";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/i18n/format";
@@ -48,6 +49,15 @@ export default async function ContactDetail({
 
   const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ");
   const profileUrl = `https://${c.profileKey}`;
+  // Only worth inferring when the contact has no stored email at all.
+  const suggestion = c.email
+    ? null
+    : await suggestEmailForContact(me.id, {
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        companyKey: c.companyKey,
+      });
   const { threads, moreConversations, moreMessages } =
     c.messageCount > 0
       ? await getConversationThreads(me.id, c.profileKey)
@@ -90,6 +100,20 @@ export default async function ContactDetail({
         <Field label={dict.contact.fieldPosition} value={c.position} emptyLabel={dict.contact.empty} />
         <Field label={dict.contact.fieldIndustry} value={c.industry} emptyLabel={dict.contact.empty} />
         <Field label={dict.contact.fieldEmail} value={c.email} emptyLabel={dict.contact.empty} />
+        {suggestion && (
+          <Field
+            label={dict.contact.fieldSuggestedEmail}
+            emptyLabel={dict.contact.empty}
+            value={
+              <>
+                <span className="suggestion-value">{suggestion.email}</span>
+                <span className="suggestion-note">
+                  {dict.contact.suggestedEmailNote(suggestion.patternId, suggestion.agreeCount)}
+                </span>
+              </>
+            }
+          />
+        )}
         <Field label={dict.contact.fieldConnectedOn} value={c.connectedOn} emptyLabel={dict.contact.empty} />
         <Field
           label={dict.contact.fieldLinkedinProfile}

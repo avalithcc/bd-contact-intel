@@ -970,6 +970,25 @@ a:hover {
   font-style: italic;
 }
 
+/* Suggested (unverified) email on the contact detail page — see
+ * src/lib/emailSuggestion.ts. Reuses --color-accent/--color-badge-accent-bg
+ * (same tokens as .badge) so it reads as "flagged, not confirmed" rather
+ * than a real value, consistently in both light and dark themes. */
+.suggestion-value {
+  font-family: var(--font-mono);
+  color: var(--color-accent);
+  background: var(--color-badge-accent-bg);
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.4rem;
+  display: inline-block;
+}
+.suggestion-note {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+
 /* ---- conversation history (contact detail) ---- */
 .thread-notice {
   font-family: var(--font-mono);

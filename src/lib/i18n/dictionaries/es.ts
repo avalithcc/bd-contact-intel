@@ -254,6 +254,9 @@ export const es: typeof en = {
     fieldPosition: "Cargo",
     fieldIndustry: "Industria",
     fieldEmail: "Correo electrónico",
+    fieldSuggestedEmail: "Correo sugerido",
+    suggestedEmailNote: (patternId, colleagueCount) =>
+      `No verificado — estimado a partir de ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"} de esta empresa (patrón "${patternId}").`,
     fieldConnectedOn: "Conectado el",
     fieldLinkedinProfile: "Perfil de LinkedIn",
     fieldTeamOverlap: "Superposición de equipo",

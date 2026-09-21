@@ -284,6 +284,13 @@ export const en = {
     fieldPosition: "Position",
     fieldIndustry: "Industry",
     fieldEmail: "Email",
+    fieldSuggestedEmail: "Suggested email",
+    // Shown ONLY when the contact has no stored email and a pattern was
+    // detected from the BD's own contacts at the same company (see
+    // src/lib/emailSuggestion.ts) — must make clear this is an unverified
+    // guess, not a confirmed address.
+    suggestedEmailNote: (patternId: string, colleagueCount: number) =>
+      `Not verified — guessed from ${colleagueCount} colleague${colleagueCount === 1 ? "" : "s"} at this company (pattern "${patternId}").`,
     fieldConnectedOn: "Connected on",
     fieldLinkedinProfile: "LinkedIn profile",
     fieldTeamOverlap: "Team overlap",
