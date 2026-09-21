@@ -290,6 +290,7 @@ export interface ContactDetail {
   lastName: string | null;
   company: string | null;
   position: string | null;
+  companyKey: string | null;
   email: string | null;
   industry: string | null;
   connectedOn: string | null;
@@ -329,6 +330,7 @@ export async function getContactById(
     lastName: row.lastName,
     company: row.company,
     position: row.position,
+    companyKey: row.companyKey,
     email: row.email,
     industry: row.industry,
     connectedOn: row.connectedOn,
