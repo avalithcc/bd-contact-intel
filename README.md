@@ -107,6 +107,21 @@ After pulling this change, run in order:
    from each ATS so postings previously dropped by the old country filter
    (e.g. US openings at LATAM-flagged companies) are picked up.
 
+## Migrations gotcha: `drizzle/meta/` is gitignored
+
+`drizzle-kit migrate` decides what to run from `drizzle/meta/_journal.json`,
+comparing each entry's `when` timestamp against the last one recorded in the
+database. That journal is gitignored, so a fresh checkout regenerates it —
+and a newly generated entry can end up with a `when` EARLIER than the last
+applied migration (the older entries in this repo carry hand-written,
+future-dated timestamps). When that happens `migrate` silently skips the new
+migration and still prints "migrations applied successfully".
+
+If a migration reports success but its table/column is missing, check that
+its `when` in `_journal.json` is greater than every applied one, bump it, and
+re-run. Always verify the object exists afterwards, e.g.
+`select to_regclass('public.<table>')`.
+
 ## v1 scope
 - BD identity (env stand-in; Supabase Auth comes in v2)
 - CSV import → parse → upsert into the BD's private base
