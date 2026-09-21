@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { contact } from "@/db/schema";
 import { getCurrentBd } from "@/lib/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { isLeadershipRoleGroup } from "@/lib/outreach/queries";
+import { getRecentOutreachHistory, isLeadershipRoleGroup } from "@/lib/outreach/queries";
 import { buildOutreachMessagePrompt } from "@/lib/outreach/messagePrompt";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { Locale } from "@/lib/i18n/locales";
@@ -19,7 +19,7 @@ import type { Locale } from "@/lib/i18n/locales";
 const OUTREACH_MODEL = "anthropic/claude-sonnet-5";
 
 export type GenerateOutreachMessageResult =
-  | { ok: true; message: string }
+  | { ok: true; message: string; historyCount: number }
   | {
       ok: false;
       errorKey: "notFound" | "gatewayNotConfigured" | "generationFailed";
@@ -51,6 +51,7 @@ export async function generateOutreachMessage(
   if (!row) return { ok: false, errorKey: "notFound" };
 
   const company = row.companyKey ? await getCompanyPostingsForKey(row.companyKey) : null;
+  const history = await getRecentOutreachHistory(me.id, row.profileKey);
 
   // "Display name if the app has one, otherwise Cristian Civita, COO" — this
   // app's `bd.name` defaults to the email's local part at first sign-in (see
@@ -70,6 +71,7 @@ export async function generateOutreachMessage(
       connectedOn: row.connectedOn,
     },
     company,
+    history,
     senderName,
     senderTitle,
     locale,
@@ -80,15 +82,15 @@ export async function generateOutreachMessage(
       model: OUTREACH_MODEL,
       system,
       prompt,
-      // The prompt caps the message at ~120-170 words (well under 300
+      // The prompt caps the message at ~60-100 words (well under 150
       // tokens); this is a hard ceiling against a misbehaving/looping
       // generation blowing up latency and Gateway spend, not the expected
       // output size.
-      maxOutputTokens: 600,
+      maxOutputTokens: 350,
     });
     const message = text.trim();
     if (!message) return { ok: false, errorKey: "generationFailed" };
-    return { ok: true, message };
+    return { ok: true, message, historyCount: history.length };
   } catch (error) {
     // Missing/invalid AI Gateway credentials (no AI_GATEWAY_API_KEY locally,
     // no OIDC token on Vercel) surface as an authentication failure from the

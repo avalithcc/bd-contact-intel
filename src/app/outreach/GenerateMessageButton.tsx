@@ -58,6 +58,14 @@ export function GenerateMessageButton({
 
       {state?.ok && (
         <div className="generate-message-result">
+          {state.historyCount > 0 && (
+            <p className="soft generate-message-history-hint">
+              {(state.historyCount === 1
+                ? labels.generateMessageHistoryHintOne
+                : labels.generateMessageHistoryHintMany
+              ).replace("{n}", String(state.historyCount))}
+            </p>
+          )}
           <p className="generate-message-text">{state.message}</p>
           <button type="button" className="secondary-btn" onClick={handleCopy}>
             {copied ? labels.copiedMessage : labels.copyMessage}

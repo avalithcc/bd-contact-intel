@@ -1198,6 +1198,10 @@ a:hover {
   flex-direction: column;
   gap: var(--space-xs);
 }
+.generate-message-history-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+}
 .generate-message-text {
   margin: 0;
   white-space: pre-wrap;

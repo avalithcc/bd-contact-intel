@@ -266,6 +266,16 @@ export const en = {
         "The AI Gateway isn't configured yet — set AI_GATEWAY_API_KEY (or sign in with Vercel OIDC) and try again.",
       generationFailed: "Couldn't generate a message right now. Try again in a moment.",
     },
+    // Shown above the generated message when prior LinkedIn history was fed
+    // into the prompt (see historyCount in
+    // src/app/outreach/actions.ts#generateOutreachMessage) — 0 means no
+    // prior conversation, so the hint isn't shown at all (see
+    // GenerateMessageButton.tsx). Kept as two plain-string templates rather
+    // than a formatter function: the labels object crosses the server ->
+    // client boundary as a prop, and React can't serialize functions (see
+    // messageLabels.ts) — the client swaps "{n}" itself.
+    generateMessageHistoryHintOne: "Takes into account 1 previous message",
+    generateMessageHistoryHintMany: "Takes into account {n} previous messages",
   },
 
   whatsNew: {

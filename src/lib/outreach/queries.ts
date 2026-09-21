@@ -1,6 +1,6 @@
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { contact } from "@/db/schema";
+import { contact, conversation, message } from "@/db/schema";
 import { DORMANT_MONTHS, isDormant } from "@/lib/queries";
 import {
   getHiringMatchIndex,
@@ -11,6 +11,7 @@ import type { MarketKey } from "@/lib/hiring/markets";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { CompanyCategoryKey } from "@/lib/companyCategories";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { OutreachHistoryMessage } from "./messagePrompt";
 
 // Relationship tiers, highest outreach priority first. Kept as an explicit
 // enum (rather than a single opaque "score") so every row's rank traces
@@ -162,6 +163,51 @@ export function compareOutreachRows(a: OutreachRow, b: OutreachRow): number {
 
 export function isLeadershipRoleGroup(roleGroup: string | null): boolean {
   return !!roleGroup && (LEADERSHIP_ROLE_GROUPS as readonly string[]).includes(roleGroup);
+}
+
+// Fetched one row over messagePrompt's own MAX_HISTORY_MESSAGES cap, so a
+// thread with more history than the prompt actually uses is still detected
+// (harmless slack, not a truncation signal surfaced anywhere today).
+const HISTORY_FETCH_LIMIT = 20;
+
+/**
+ * Most recent LinkedIn messages with one contact, oldest-to-newest, scoped
+ * to the signed-in BD — feeds buildOutreachMessagePrompt's history-aware
+ * rules (see src/lib/outreach/messagePrompt.ts). Direction is derived the
+ * same way recomputeMessageSignals derives sent/received (see
+ * src/lib/queries.ts): in a 1:1 thread, any non-draft message NOT sent by
+ * the peer was sent by the BD. Both `message` and `conversation` are
+ * filtered on `bdId` — message content is sensitive, never trust
+ * `peerProfileKey` alone (same rule as getConversationThreads).
+ */
+export async function getRecentOutreachHistory(
+  bdId: string,
+  peerProfileKey: string,
+): Promise<OutreachHistoryMessage[]> {
+  const rows = await db
+    .select({
+      senderProfileKey: message.senderProfileKey,
+      sentAt: message.sentAt,
+      content: message.content,
+    })
+    .from(message)
+    .innerJoin(conversation, eq(conversation.id, message.conversationId))
+    .where(
+      and(
+        eq(message.bdId, bdId),
+        eq(conversation.bdId, bdId),
+        eq(conversation.peerProfileKey, peerProfileKey),
+        eq(message.isDraft, false),
+      ),
+    )
+    .orderBy(desc(message.sentAt))
+    .limit(HISTORY_FETCH_LIMIT);
+
+  return rows.reverse().map((r) => ({
+    sentAt: r.sentAt,
+    direction: r.senderProfileKey === peerProfileKey ? "received" : "sent",
+    content: r.content,
+  }));
 }
 
 /**

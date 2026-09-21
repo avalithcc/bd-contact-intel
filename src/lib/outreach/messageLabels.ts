@@ -10,6 +10,8 @@ export type GenerateMessageLabels = Pick<
   | "copyMessage"
   | "copiedMessage"
   | "generateMessageErrors"
+  | "generateMessageHistoryHintOne"
+  | "generateMessageHistoryHintMany"
 >;
 
 export function pickGenerateMessageLabels(dict: Dictionary): GenerateMessageLabels {
@@ -21,5 +23,7 @@ export function pickGenerateMessageLabels(dict: Dictionary): GenerateMessageLabe
     copyMessage: o.copyMessage,
     copiedMessage: o.copiedMessage,
     generateMessageErrors: o.generateMessageErrors,
+    generateMessageHistoryHintOne: o.generateMessageHistoryHintOne,
+    generateMessageHistoryHintMany: o.generateMessageHistoryHintMany,
   };
 }

@@ -234,6 +234,8 @@ export const es: typeof en = {
         "El AI Gateway todavía no está configurado — configurá AI_GATEWAY_API_KEY (o iniciá sesión con Vercel OIDC) e intentá de nuevo.",
       generationFailed: "No se pudo generar el mensaje ahora. Probá de nuevo en un momento.",
     },
+    generateMessageHistoryHintOne: "Tiene en cuenta 1 mensaje anterior",
+    generateMessageHistoryHintMany: "Tiene en cuenta {n} mensajes anteriores",
   },
 
   whatsNew: {
