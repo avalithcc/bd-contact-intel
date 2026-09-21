@@ -1,8 +1,9 @@
-import { and, eq, isNotNull, ne } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { contact } from "@/db/schema";
+import { contact, emailDomainCheck } from "@/db/schema";
 import { companyKeyFilter } from "@/lib/queries";
 import { detectPattern, buildEmail, type PatternId } from "@/lib/emailPatterns";
+import { lookupDomain, type MailProvider, type LookupStatus } from "@/lib/emailDomain";
 
 // Cap on how many colleague samples we pull to infer a company's email
 // convention. A BD's contacts at one company can occasionally run into the
@@ -10,12 +11,84 @@ import { detectPattern, buildEmail, type PatternId } from "@/lib/emailPatterns";
 // without letting one huge company dominate a single query's cost.
 const SAMPLE_CAP = 200;
 
+// How long a cached MX lookup (email_domain_check) stays fresh before we
+// re-resolve it. MX records change rarely, so 30 days keeps DNS traffic low
+// while still catching a domain that migrated mail providers.
+const DOMAIN_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Confidence thresholds. Both require a CONFIRMED receiving domain (hasMx),
+// since a domain that can't be confirmed to receive mail at all can never
+// be more than "low" regardless of how many colleagues agreed on the
+// pattern. Above that, more agreeing colleague samples = more confidence
+// the pattern is a real company convention rather than coincidence.
+const HIGH_CONFIDENCE_MIN_AGREE = 5;
+const MEDIUM_CONFIDENCE_MIN_AGREE = 3;
+
+export type SuggestionConfidence = "high" | "medium" | "low";
+
 export interface EmailSuggestion {
   email: string;
   patternId: PatternId;
   domain: string;
   sampleCount: number;
   agreeCount: number;
+  hasMx: boolean;
+  provider: MailProvider;
+  domainStatus: LookupStatus;
+  confidence: SuggestionConfidence;
+}
+
+/**
+ * Read the cached MX check for `domain` if fresh, otherwise look it up via
+ * DNS (src/lib/emailDomain.ts) and upsert the cache. Shared across BDs — a
+ * domain's MX is public DNS data, not contact data (see
+ * src/db/schema.ts#emailDomainCheck).
+ */
+async function getDomainCheck(domain: string) {
+  const [cached] = await db
+    .select()
+    .from(emailDomainCheck)
+    .where(eq(emailDomainCheck.domain, domain))
+    .limit(1);
+
+  const isFresh = cached && Date.now() - cached.checkedAt.getTime() < DOMAIN_CACHE_TTL_MS;
+  if (isFresh) {
+    return {
+      status: (cached.hasMx ? "ok" : "no-mx") as LookupStatus,
+      hasMx: cached.hasMx,
+      provider: cached.provider as MailProvider,
+      mxHosts: cached.mxHosts as string[],
+    };
+  }
+
+  const result = await lookupDomain(domain);
+
+  // Only persist a definitive DNS answer ("ok" or confirmed "no-mx"). A
+  // transient lookup "error" (timeout, resolver hiccup) is NOT cached, so
+  // the next request retries instead of freezing an unconfirmed result for
+  // 30 days.
+  if (result.status !== "error") {
+    await db
+      .insert(emailDomainCheck)
+      .values({
+        domain,
+        hasMx: result.hasMx,
+        provider: result.provider,
+        mxHosts: result.mxHosts,
+        checkedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: emailDomainCheck.domain,
+        set: {
+          hasMx: sql`excluded.has_mx`,
+          provider: sql`excluded.provider`,
+          mxHosts: sql`excluded.mx_hosts`,
+          checkedAt: sql`excluded.checked_at`,
+        },
+      });
+  }
+
+  return result;
 }
 
 export interface SuggestionTarget {
@@ -84,11 +157,32 @@ export async function suggestEmailForContact(
   );
   if (!email) return null;
 
+  const domainCheck = await getDomainCheck(detected.domain);
+
+  // A CONFIRMED non-receiving domain (successful DNS lookup, zero MX
+  // records) means no address at this domain can ever be delivered — don't
+  // show a suggestion at all rather than one guaranteed to bounce.
+  if (domainCheck.status === "no-mx") return null;
+
+  let confidence: SuggestionConfidence = "low";
+  if (domainCheck.hasMx && detected.agreeCount >= HIGH_CONFIDENCE_MIN_AGREE) {
+    confidence = "high";
+  } else if (domainCheck.hasMx && detected.agreeCount >= MEDIUM_CONFIDENCE_MIN_AGREE) {
+    confidence = "medium";
+  }
+  // Everything else (no MX confirmation yet, a lookup error, or too few
+  // agreeing colleagues) stays "low" — including a lookup "error", where
+  // the domain is unconfirmed rather than known-bad.
+
   return {
     email,
     patternId: detected.patternId,
     domain: detected.domain,
     sampleCount: detected.sampleCount,
     agreeCount: detected.agreeCount,
+    hasMx: domainCheck.hasMx,
+    provider: domainCheck.provider,
+    domainStatus: domainCheck.status,
+    confidence,
   };
 }

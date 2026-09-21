@@ -107,9 +107,28 @@ export default async function ContactDetail({
             value={
               <>
                 <span className="suggestion-value">{suggestion.email}</span>
+                <span
+                  className={`badge ${
+                    suggestion.confidence === "high"
+                      ? "green"
+                      : suggestion.confidence === "medium"
+                        ? "warn"
+                        : ""
+                  }`}
+                >
+                  {dict.contact.confidenceLabel(suggestion.confidence)}
+                </span>
                 <span className="suggestion-note">
                   {dict.contact.suggestedEmailNote(suggestion.patternId, suggestion.agreeCount)}
                 </span>
+                <span className="suggestion-note">
+                  {suggestion.hasMx
+                    ? dict.contact.domainReason(suggestion.agreeCount)
+                    : dict.contact.domainUnconfirmedReason}
+                </span>
+                {suggestion.provider === "microsoft" && (
+                  <span className="suggestion-note">{dict.contact.microsoftProviderNote}</span>
+                )}
               </>
             }
           />

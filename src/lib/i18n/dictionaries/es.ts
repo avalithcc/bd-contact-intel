@@ -257,6 +257,17 @@ export const es: typeof en = {
     fieldSuggestedEmail: "Correo sugerido",
     suggestedEmailNote: (patternId, colleagueCount) =>
       `No verificado — estimado a partir de ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"} de esta empresa (patrón "${patternId}").`,
+    confidenceLabel: (confidence) =>
+      confidence === "high"
+        ? "Confianza alta"
+        : confidence === "medium"
+          ? "Confianza media"
+          : "Confianza baja",
+    domainReason: (colleagueCount) =>
+      `El dominio acepta correo · inferido a partir de ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"}.`,
+    domainUnconfirmedReason: "No se pudo confirmar si el dominio recibe correo.",
+    microsoftProviderNote:
+      "Este dominio usa Microsoft 365, que por defecto acepta correo para direcciones desconocidas — ningún método de verificación, ni siquiera uno pago, puede confirmar que esta casilla en particular exista.",
     fieldConnectedOn: "Conectado el",
     fieldLinkedinProfile: "Perfil de LinkedIn",
     fieldTeamOverlap: "Superposición de equipo",

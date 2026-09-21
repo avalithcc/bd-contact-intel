@@ -291,6 +291,27 @@ export const en = {
     // guess, not a confirmed address.
     suggestedEmailNote: (patternId: string, colleagueCount: number) =>
       `Not verified — guessed from ${colleagueCount} colleague${colleagueCount === 1 ? "" : "s"} at this company (pattern "${patternId}").`,
+    // Confidence chip shown next to a suggested email — see
+    // src/lib/emailSuggestion.ts#SuggestionConfidence. Always paired with
+    // suggestedEmailNote/domainReason so the wording stays honest: this is
+    // an inferred address whose DOMAIN was checked for mail delivery, never
+    // a verified mailbox.
+    confidenceLabel: (confidence: "high" | "medium" | "low"): string =>
+      confidence === "high" ? "High confidence" : confidence === "medium" ? "Medium confidence" : "Low confidence",
+    // One-line reason shown under the suggestion when the domain is
+    // confirmed to accept mail (MX records found via DNS — see
+    // src/lib/emailDomain.ts). Never claims the specific mailbox exists.
+    domainReason: (colleagueCount: number) =>
+      `Domain accepts mail · inferred from ${colleagueCount} colleague${colleagueCount === 1 ? "" : "s"}.`,
+    // Shown instead of domainReason when the MX lookup failed or timed out
+    // (not the same as a confirmed "no mail" — that case hides the
+    // suggestion entirely, see suggestEmailForContact).
+    domainUnconfirmedReason: "Domain's ability to receive mail could not be confirmed.",
+    // Shown only when provider is "microsoft" — Microsoft 365 accepts mail
+    // for unknown recipients by default, so even a paid SMTP-verification
+    // service cannot confirm this specific mailbox exists.
+    microsoftProviderNote:
+      "This domain uses Microsoft 365, which accepts mail for unknown addresses by default — no verification method, including paid ones, can confirm this specific mailbox exists.",
     fieldConnectedOn: "Connected on",
     fieldLinkedinProfile: "LinkedIn profile",
     fieldTeamOverlap: "Team overlap",

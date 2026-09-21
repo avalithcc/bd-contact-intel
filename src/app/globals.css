@@ -51,6 +51,10 @@
      literal remains inline in a component rule. */
   --color-badge-accent-bg: rgba(213, 37, 47, 0.12);
   --color-badge-success-bg: rgba(62, 207, 142, 0.12);
+  /* Used only by the "medium" email-suggestion confidence chip below —
+     translucent version of --color-warn, same rationale as the other
+     --color-badge-*-bg tokens. */
+  --color-badge-warn-bg: rgba(230, 162, 60, 0.12);
   --color-row-hover: rgba(255, 255, 255, 0.02);
 
   /* ---- select chevron (theme-aware data-URI icon) ----
@@ -478,6 +482,13 @@ th {
 .badge.green {
   background: var(--color-badge-success-bg);
   color: var(--color-success);
+}
+/* "medium" confidence chip on a suggested email (see
+ * src/lib/emailSuggestion.ts#SuggestionConfidence) — "high" reuses
+ * .badge.green above, "low" reuses the default .badge (accent) styling. */
+.badge.warn {
+  background: var(--color-badge-warn-bg);
+  color: var(--color-warn);
 }
 /* Marks a contact whose company is currently hiring IT (see /hiring). */
 .badge.hiring {
