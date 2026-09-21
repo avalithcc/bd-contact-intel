@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { generateOutreachMessage, type GenerateOutreachMessageResult } from "./actions";
 import type { Locale } from "@/lib/i18n/locales";
-import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 /**
  * "Generate message" control for one contact — calls the
@@ -18,11 +18,11 @@ import type { Dictionary } from "@/lib/i18n/dictionaries";
 export function GenerateMessageButton({
   contactId,
   locale,
-  dict,
+  labels,
 }: {
   contactId: string;
   locale: Locale;
-  dict: Dictionary;
+  labels: GenerateMessageLabels;
 }) {
   const boundAction = generateOutreachMessage.bind(null, contactId, locale);
   const [state, formAction, pending] = useActionState<
@@ -49,10 +49,10 @@ export function GenerateMessageButton({
       <form action={formAction}>
         <button type="submit" className="secondary-btn" disabled={pending}>
           {pending
-            ? dict.outreach.generatingMessage
+            ? labels.generatingMessage
             : state?.ok
-              ? dict.outreach.regenerateMessage
-              : dict.outreach.generateMessage}
+              ? labels.regenerateMessage
+              : labels.generateMessage}
         </button>
       </form>
 
@@ -60,14 +60,14 @@ export function GenerateMessageButton({
         <div className="generate-message-result">
           <p className="generate-message-text">{state.message}</p>
           <button type="button" className="secondary-btn" onClick={handleCopy}>
-            {copied ? dict.outreach.copiedMessage : dict.outreach.copyMessage}
+            {copied ? labels.copiedMessage : labels.copyMessage}
           </button>
         </div>
       )}
 
       {state && !state.ok && (
         <p className="text-danger generate-message-error">
-          {dict.outreach.generateMessageErrors[state.errorKey]}
+          {labels.generateMessageErrors[state.errorKey]}
         </p>
       )}
     </div>

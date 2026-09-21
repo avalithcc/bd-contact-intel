@@ -16,6 +16,7 @@ import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
+import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function WhatsNewPage({
   const locale = await getLocale();
   const theme = await getTheme();
   const dict = t(locale);
+  const messageLabels = pickGenerateMessageLabels(dict);
   const me = await getCurrentBd();
   const windowDays = parseWhatsNewWindow(sp.window);
   const market = isMarketKey(sp.market) ? sp.market : undefined;
@@ -229,7 +231,7 @@ export default async function WhatsNewPage({
                         {dict.roleGroups[sc.roleGroup]}
                       </span>
                     )}
-                    <GenerateMessageButton contactId={sc.id} locale={locale} dict={dict} />
+                    <GenerateMessageButton contactId={sc.id} locale={locale} labels={messageLabels} />
                   </span>
                 ))}
               </div>

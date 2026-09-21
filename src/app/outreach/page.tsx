@@ -13,6 +13,7 @@ import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
 import { GenerateMessageButton } from "./GenerateMessageButton";
+import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function OutreachPage({
   const locale = await getLocale();
   const theme = await getTheme();
   const dict = t(locale);
+  const messageLabels = pickGenerateMessageLabels(dict);
   const relTime = (d: Date) => relativeTime(d, locale);
   const me = await getCurrentBd();
   const page = Math.max(1, Number(sp.page) || 1);
@@ -263,7 +265,7 @@ export default async function OutreachPage({
                       </div>
                     </td>
                     <td>
-                      <GenerateMessageButton contactId={r.id} locale={locale} dict={dict} />
+                      <GenerateMessageButton contactId={r.id} locale={locale} labels={messageLabels} />
                     </td>
                   </tr>
                 ))}
