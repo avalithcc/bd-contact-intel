@@ -191,6 +191,7 @@ export const en = {
     queueEyebrow: "// pending review",
     queueEmpty: "No pending candidates. Nothing left to review right now.",
     tableCompany: "Company",
+    openOnLinkedIn: "Open on LinkedIn",
     tableBoard: "ATS / slug",
     tableJobs: "Job count",
     tableSampleTitles: "Sample titles",

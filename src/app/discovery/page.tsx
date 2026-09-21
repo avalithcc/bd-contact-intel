@@ -5,6 +5,7 @@ import {
   getPendingCandidates,
 } from "@/lib/hiring/discoveryQueries";
 import { getCurrentBd } from "@/lib/queries";
+import { linkedinCompanySearchUrl } from "@/lib/links";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDateTime } from "@/lib/i18n/format";
@@ -127,7 +128,16 @@ export default async function DiscoveryPage() {
               <tbody>
                 {candidates.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.displayName}</td>
+                    <td>
+                      <a
+                        href={linkedinCompanySearchUrl(c.displayName)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={dict.discovery.openOnLinkedIn}
+                      >
+                        {c.displayName}
+                      </a>
+                    </td>
                     <td>
                       <a href={c.boardUrl} target="_blank" rel="noopener noreferrer">
                         {c.ats}/{c.slug}

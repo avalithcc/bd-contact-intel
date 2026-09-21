@@ -162,6 +162,7 @@ export const es: typeof en = {
     queueEyebrow: "// pendientes de revisión",
     queueEmpty: "No hay candidatos pendientes. Por ahora no hay nada para revisar.",
     tableCompany: "Empresa",
+    openOnLinkedIn: "Abrir en LinkedIn",
     tableBoard: "ATS / slug",
     tableJobs: "Cantidad de puestos",
     tableSampleTitles: "Títulos de ejemplo",
