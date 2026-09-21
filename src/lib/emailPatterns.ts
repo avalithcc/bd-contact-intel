@@ -56,6 +56,46 @@ const FREE_MAIL_DOMAINS = new Set([
   "zoho.com",
 ]);
 
+// The same providers also run country domains (outlook.com.ar, hotmail.es,
+// yahoo.com.br, live.com.mx…), which are just as personal as the .com ones.
+// Matching the FIRST label instead of the full domain catches every country
+// variant without listing them one by one, at the cost of also excluding a
+// company that literally named itself "gmail" or "yahoo" — a trade worth
+// making, since a LATAM contact base is full of these.
+const FREE_MAIL_ROOTS = new Set([
+  "gmail",
+  "googlemail",
+  "hotmail",
+  "outlook",
+  "live",
+  "msn",
+  "yahoo",
+  "ymail",
+  "icloud",
+  "proton",
+  "protonmail",
+  "aol",
+  "gmx",
+  "yandex",
+  "terra",
+  "uol",
+  "bol",
+  "speedy",
+  "fibertel",
+  "arnet",
+]);
+
+/**
+ * True when a domain belongs to a consumer mail provider, and so reveals
+ * nothing about a COMPANY's address convention.
+ */
+export function isFreeMailDomain(domain: string): boolean {
+  const lowered = domain.trim().toLowerCase();
+  if (FREE_MAIL_DOMAINS.has(lowered)) return true;
+  const firstLabel = lowered.split(".")[0] ?? "";
+  return FREE_MAIL_ROOTS.has(firstLabel);
+}
+
 // A single winning pattern needs at least this many agreeing samples. One
 // match could just be a coincidence (e.g. a person whose email happens to
 // look like first.last purely by luck) — it isn't yet evidence of a
@@ -122,7 +162,7 @@ function isUsableSample(sample: EmailSample): boolean {
   if (!sample.firstName?.trim() || !sample.lastName?.trim()) return false;
   const split = splitEmail(sample.email);
   if (!split) return false;
-  return !FREE_MAIL_DOMAINS.has(split.domain);
+  return !isFreeMailDomain(split.domain);
 }
 
 // Builds the local part (before @) for one pattern given already-normalized
