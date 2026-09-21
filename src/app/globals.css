@@ -591,6 +591,27 @@ a:hover {
   border-color: var(--color-accent);
 }
 
+/* ---- back button (header, icon-only "go back") ---- */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--color-surface-1);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.back-btn:hover {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
 /* ---- user menu ---- */
 .user-menu {
   position: relative;

@@ -11,6 +11,7 @@ import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
 import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
+import { BackButton } from "../BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -85,9 +86,7 @@ export default async function OutreachPage({
           avalith<span className="dot">.</span>
         </span>
         <div className="row row-md">
-          <Link className="secondary-btn" href="/">
-            {dict.common.backToContacts}
-          </Link>
+          <BackButton label={dict.common.goBack} fallbackHref="/" />
           <Link className="secondary-btn" href="/whats-new">
             {dict.common.whatsNew}
           </Link>

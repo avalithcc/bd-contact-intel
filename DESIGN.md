@@ -272,7 +272,8 @@ Two more tokens are theme-aware: `--shadow-dropdown` (a lighter, softer shadow i
 - `.import-block`, `.filter-helper`, `.whats-new-company`, `.thread`: secondary containers at `--color-surface-1`, same border/radius language, used for collapsible or nested content.
 
 ### Navigation
-- `.header`: flex row, logo left, actions right (nav links as `.secondary-btn`, then `.user-menu`).
+- `.header`: flex row, logo left, actions right (`.back-btn` first, then nav links as `.secondary-btn`, then `.user-menu`).
+- `.back-btn`: icon-only "go back" control (`BackButton.tsx`) — same height/radius/border language as `.secondary-btn` and `.user-menu-trigger`, navigates browser history via `router.back()` with a `fallbackHref` for dead-end history.
 - `.user-menu`: icon trigger (`.user-menu-trigger`) opening a `.user-menu-dropdown` — `--color-surface-1`, `--color-border-strong` border, drop shadow (`--shadow-dropdown`), containing the account name, locale switcher, "change password" and sign-out.
 
 ### Dropdown Menu

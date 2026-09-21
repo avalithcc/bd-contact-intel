@@ -11,6 +11,7 @@ import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
 import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../../SignOutButton";
 import { UserMenu } from "../../UserMenu";
+import { BackButton } from "../../BackButton";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 export const dynamic = "force-dynamic";
@@ -81,9 +82,7 @@ export default async function ContactDetail({
           avalith<span className="dot">.</span>
         </span>
         <div className="row row-md">
-          <Link className="secondary-btn" href="/">
-            {dict.common.back}
-          </Link>
+          <BackButton label={dict.common.goBack} fallbackHref="/" />
           <UserMenu
             label={me.name || dict.common.account}
             changePasswordHref="/account/password"

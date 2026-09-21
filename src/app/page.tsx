@@ -13,6 +13,7 @@ import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCatego
 import { UploadForm, UploadMessagesForm } from "./UploadForm";
 import { SignOutButton } from "./SignOutButton";
 import { UserMenu } from "./UserMenu";
+import { BackButton } from "./BackButton";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
@@ -135,6 +136,7 @@ export default async function Home({
           avalith<span className="dot">.</span>
         </span>
         <div className="row row-md">
+          <BackButton label={dict.common.goBack} fallbackHref="/" />
           <Link className="secondary-btn" href="/outreach">
             {dict.common.priorityOutreach}
           </Link>
