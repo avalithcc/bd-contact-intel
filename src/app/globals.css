@@ -496,6 +496,16 @@ th {
   color: var(--color-success);
   margin-left: var(--space-xs);
 }
+/* Marks a contact's company classified as a startup (see
+ * src/lib/hiring/startupClassification.ts) — a positive prospecting signal,
+ * so it reuses .badge.hiring's success green rather than inventing a new
+ * color, with the same margin-left spacing as the other company-cell
+ * badges above/below. */
+.badge.startup {
+  background: var(--color-badge-success-bg);
+  color: var(--color-success);
+  margin-left: var(--space-xs);
+}
 /* Marks a company that also hires in an offshore delivery hub (India,
  * Philippines, etc. — see src/lib/hiring/markets.ts#isOffshoreHub). A
  * factual, deprioritizing signal, not a danger or a positive one, so it

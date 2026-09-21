@@ -168,6 +168,12 @@ function buildSuggestedContacts(
       offshoreItCount,
       latamItCount,
       offshoreHeavy,
+      // /whats-new doesn't surface the startup signal (no UI for it here),
+      // but OutreachRow/compareOutreachRows are shared with /outreach — see
+      // the function comment above — so these are just unused nulls, not a
+      // real lookup.
+      isStartup: null,
+      startupReason: null,
     };
   });
   ranked.sort(compareOutreachRows);

@@ -146,6 +146,26 @@ export const targetCompany = pgTable("target_company", {
   countryFilter: text("country_filter"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Startup classification for the /outreach "Startups only" filter — is
+  // this a venture-backed or founder-led tech company in growth stage,
+  // rather than a large public incumbent, a consultancy/agency, or a
+  // traditional non-tech corporation? See
+  // src/lib/hiring/startupClassification.ts for the exact prompt and the
+  // classifier that populates these three columns. Nullable: NULL means
+  // "not classified yet" (a distinct state from "classified as not a
+  // startup"), so the /outreach filter can exclude unclassified companies
+  // instead of guessing. Classified lazily, in small capped batches, from
+  // the hiring-sync cron route (src/app/api/hiring/sync/route.ts) rather
+  // than at company-seed time, since it costs an AI Gateway call per
+  // company.
+  isStartup: boolean("is_startup"),
+  startupClassifiedAt: timestamp("startup_classified_at"),
+  // Short, human-readable justification from the model — shown as a
+  // tooltip on the "Startup" badge (see outreachReasons in
+  // src/lib/outreach/queries.ts) so the classification is inspectable
+  // rather than an unexplained mark. Null until classified, same as the two
+  // columns above.
+  startupReason: text("startup_reason"),
 });
 
 export type TargetCompany = typeof targetCompany.$inferSelect;

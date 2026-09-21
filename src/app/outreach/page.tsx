@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { listOutreachCandidates, outreachReasons } from "@/lib/outreach/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
+import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
 import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
@@ -19,9 +20,14 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 25;
 const ROLE_GROUP_KEYS = new Set(ROLE_GROUPS.map((g) => g.key));
+const COMPANY_CATEGORY_KEYS = new Set(COMPANY_CATEGORIES.map((c) => c.key));
 
 function isRoleGroupKey(v: string | undefined): v is RoleGroupKey {
   return !!v && ROLE_GROUP_KEYS.has(v as RoleGroupKey);
+}
+
+function isCompanyCategoryKey(v: string | undefined): v is CompanyCategoryKey {
+  return !!v && COMPANY_CATEGORY_KEYS.has(v as CompanyCategoryKey);
 }
 
 export default async function OutreachPage({
@@ -29,10 +35,12 @@ export default async function OutreachPage({
 }: {
   searchParams: Promise<{
     roleGroup?: string;
+    companyCategory?: string;
     market?: string;
     miamiOnly?: string;
     excludeNever?: string;
     hideOffshore?: string;
+    startupsOnly?: string;
     page?: string;
   }>;
 }) {
@@ -45,6 +53,7 @@ export default async function OutreachPage({
   const me = await getCurrentBd();
   const page = Math.max(1, Number(sp.page) || 1);
   const roleGroup = isRoleGroupKey(sp.roleGroup) ? sp.roleGroup : undefined;
+  const companyCategory = isCompanyCategoryKey(sp.companyCategory) ? sp.companyCategory : undefined;
   const market = isMarketKey(sp.market) ? sp.market : undefined;
   // Only meaningful (and only rendered as a control below) when the market
   // filter is exactly "us" — validated server-side here so a URL crafted
@@ -62,11 +71,15 @@ export default async function OutreachPage({
   // above (see resolveHiringCompanies' `hideOffshore` param in
   // src/lib/hiring/queries.ts).
   const hideOffshore = sp.hideOffshore === "on";
+  // Opt-in filter, off by default — same "on" convention as excludeNever /
+  // hideOffshore above (see resolveHiringCompanies' `startupsOnly` param in
+  // src/lib/hiring/queries.ts).
+  const startupsOnly = sp.startupsOnly === "on";
 
   const { rows, total, page: current, totalPages, hiringCompanyCount } =
     await listOutreachCandidates(
       me.id,
-      { roleGroup, market, miamiOnly, includeNeverMessaged, hideOffshore },
+      { roleGroup, companyCategory, market, miamiOnly, includeNeverMessaged, hideOffshore, startupsOnly },
       page,
       PAGE_SIZE,
     );
@@ -74,10 +87,12 @@ export default async function OutreachPage({
   const qs = (p: number) => {
     const params = new URLSearchParams();
     if (roleGroup) params.set("roleGroup", roleGroup);
+    if (companyCategory) params.set("companyCategory", companyCategory);
     if (market) params.set("market", market);
     if (miamiOnly) params.set("miamiOnly", "on");
     if (excludeNeverMessaged) params.set("excludeNever", "on");
     if (hideOffshore) params.set("hideOffshore", "on");
+    if (startupsOnly) params.set("startupsOnly", "on");
     params.set("page", String(p));
     return `/outreach?${params.toString()}`;
   };
@@ -134,6 +149,21 @@ export default async function OutreachPage({
             </select>
           </div>
           <div className="filter-field">
+            <label htmlFor="companyCategory">{dict.home.companyCategoryLabel}</label>
+            <select
+              id="companyCategory"
+              name="companyCategory"
+              defaultValue={companyCategory ?? ""}
+            >
+              <option value="">{dict.home.allCategories}</option>
+              {COMPANY_CATEGORIES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {dict.companyCategories[c.key]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-field">
             <label htmlFor="market">{dict.common.marketLabel}</label>
             <select id="market" name="market" defaultValue={market ?? ""}>
               <option value="">{dict.common.allMarkets}</option>
@@ -180,6 +210,17 @@ export default async function OutreachPage({
                 {dict.common.hideOffshoreLabel}
               </label>
             </div>
+            <div className="filter-checkbox">
+              <label htmlFor="startupsOnly" className="checkbox-label">
+                <input
+                  id="startupsOnly"
+                  name="startupsOnly"
+                  type="checkbox"
+                  defaultChecked={startupsOnly}
+                />
+                {dict.outreach.startupsOnlyLabel}
+              </label>
+            </div>
           </div>
           <button type="submit" className="filter-submit">
             {dict.common.filter}
@@ -207,6 +248,8 @@ export default async function OutreachPage({
               hiringCompanyCount,
               Boolean(roleGroup),
               !includeNeverMessaged,
+              Boolean(companyCategory),
+              startupsOnly,
             )}
           </p>
         )}
@@ -237,6 +280,11 @@ export default async function OutreachPage({
                     <td>{r.position ?? "—"}</td>
                     <td>
                       {r.company ?? "—"}
+                      {r.isStartup && (
+                        <span className="badge startup" title={r.startupReason ?? undefined}>
+                          {dict.outreach.startupBadge}
+                        </span>
+                      )}
                       {r.offshoreHeavy && (
                         <span className="badge offshore">
                           {dict.common.offshoreBadge(r.offshoreItCount, r.latamItCount)}

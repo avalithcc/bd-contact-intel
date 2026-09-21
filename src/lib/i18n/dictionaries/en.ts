@@ -212,6 +212,14 @@ export const en = {
     subtitle:
       "Your contacts at companies currently hiring IT, ranked by relationship strength and seniority.",
     excludeNeverMessaged: "Exclude never messaged",
+    // Opt-in filter, off by default (see resolveHiringCompanies'
+    // `startupsOnly` param in src/lib/hiring/queries.ts). Excludes
+    // unclassified companies, same as ones confirmed not a startup.
+    startupsOnlyLabel: "Startups only",
+    // Compact badge on a contact's company classified as a startup (see
+    // src/lib/hiring/startupClassification.ts) — the row's `title`
+    // attribute carries the model's own short justification as a tooltip.
+    startupBadge: "startup",
     candidatesEyebrow: "// candidates",
     noHiringCompaniesPrefix: "No hiring companies synced yet. Seed target companies and run a sync (see ",
     noHiringCompaniesLinkText: "open roles",
@@ -220,10 +228,14 @@ export const en = {
       hiringCompanyCount: number,
       roleGroupFilterActive: boolean,
       messageHistoryFilterActive: boolean,
+      companyCategoryFilterActive: boolean,
+      startupsOnlyFilterActive: boolean,
     ) =>
       `${hiringCompanyCount} compan${hiringCompanyCount === 1 ? "y is" : "ies are"} hiring IT, but none of your contacts work there${
         roleGroupFilterActive ? " in this role group" : ""
-      }${messageHistoryFilterActive ? " with a message history" : ""}. Try clearing the filter above.`,
+      }${companyCategoryFilterActive ? " in this industry" : ""}${
+        messageHistoryFilterActive ? " with a message history" : ""
+      }${startupsOnlyFilterActive ? " at a company classified as a startup" : ""}. Try clearing the filter above.`,
     tableName: "Name",
     tablePosition: "Position",
     tableCompany: "Company",

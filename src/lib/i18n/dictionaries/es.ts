@@ -183,18 +183,28 @@ export const es: typeof en = {
     subtitle:
       "Tus contactos en empresas que actualmente contratan IT, ordenados por fuerza de relación y seniority.",
     excludeNeverMessaged: "Excluir nunca contactados",
+    startupsOnlyLabel: "Solo startups",
+    startupBadge: "startup",
     candidatesEyebrow: "// candidatos",
     noHiringCompaniesPrefix:
       "Todavía no hay empresas contratando sincronizadas. Carga las empresas objetivo y ejecuta una sincronización (ver ",
     noHiringCompaniesLinkText: "vacantes abiertas",
     noHiringCompaniesSuffix:
       ") antes de que el contacto prioritario tenga algo para ordenar.",
-    noMatchingContacts: (hiringCompanyCount, roleGroupFilterActive, messageHistoryFilterActive) =>
+    noMatchingContacts: (
+      hiringCompanyCount,
+      roleGroupFilterActive,
+      messageHistoryFilterActive,
+      companyCategoryFilterActive,
+      startupsOnlyFilterActive,
+    ) =>
       `${hiringCompanyCount} empresa${hiringCompanyCount === 1 ? "" : "s"} est${
         hiringCompanyCount === 1 ? "á" : "án"
       } contratando IT, pero ninguno de tus contactos trabaja ahí${
         roleGroupFilterActive ? " en este grupo de rol" : ""
-      }${messageHistoryFilterActive ? " con historial de mensajes" : ""}. Intenta limpiar el filtro de arriba.`,
+      }${companyCategoryFilterActive ? " en esta industria" : ""}${
+        messageHistoryFilterActive ? " con historial de mensajes" : ""
+      }${startupsOnlyFilterActive ? " en una empresa clasificada como startup" : ""}. Intenta limpiar el filtro de arriba.`,
     tableName: "Nombre",
     tablePosition: "Cargo",
     tableCompany: "Empresa",

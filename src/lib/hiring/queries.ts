@@ -69,6 +69,13 @@ interface ResolvedHiringCompany {
   offshoreItCount: number;
   latamItCount: number;
   offshoreHeavy: boolean;
+  // Startup classification carried straight through from `target_company`
+  // (see src/lib/hiring/startupClassification.ts) — null means "not
+  // classified yet", distinct from a confirmed `false`. Same rationale as
+  // offshoreItCount/latamItCount above: derived from data already joined in
+  // query (1) below, never a separate lookup.
+  isStartup: boolean | null;
+  startupReason: string | null;
 }
 
 /**
@@ -109,11 +116,21 @@ interface ResolvedHiringCompany {
  * never to drop them silently. A company with offshore postings but an
  * equal-or-larger LATAM footprint is never hidden — it isn't offshore-heavy
  * at all, see isOffshoreHeavy.
+ *
+ * `startupsOnly`, when true, further narrows query (1) to
+ * `target_company.is_startup = true` (see
+ * src/lib/hiring/startupClassification.ts) — same SQL-WHERE approach as the
+ * filters above, no query count change. A company that hasn't been
+ * classified yet (`is_startup IS NULL`) is excluded, same as one confirmed
+ * `false`: this is an opt-in "show me startups" filter, not a "hide
+ * confirmed non-startups" one, so an unclassified company is "not (yet) a
+ * match" rather than shown.
  */
 export async function resolveHiringCompanies(
   market?: MarketKey,
   miamiOnly?: boolean,
   hideOffshore?: boolean,
+  startupsOnly?: boolean,
 ): Promise<Map<string, ResolvedHiringCompany>> {
   const openPostings = await db
     .select({
@@ -127,6 +144,8 @@ export async function resolveHiringCompanies(
       url: jobPosting.url,
       postedAt: jobPosting.postedAt,
       firstSeen: jobPosting.firstSeen,
+      isStartup: targetCompany.isStartup,
+      startupReason: targetCompany.startupReason,
     })
     .from(jobPosting)
     .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
@@ -136,6 +155,7 @@ export async function resolveHiringCompanies(
         isNull(jobPosting.closedAt),
         market ? eq(jobPosting.market, market) : undefined,
         miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
+        startupsOnly ? eq(targetCompany.isStartup, true) : undefined,
         // Offshore-heavy = strictly more open offshore postings than open
         // LATAM postings for the same company (see isOffshoreHeavy). Two
         // correlated scalar-count subqueries compared directly, rather than
@@ -173,6 +193,8 @@ export async function resolveHiringCompanies(
       offshoreItCount: 0,
       latamItCount: 0,
       offshoreHeavy: false,
+      isStartup: p.isStartup,
+      startupReason: p.startupReason,
     };
     // Rows synced before the market column was backfilled are null; treat
     // those as "other" rather than crashing the UI on an unclassified value
@@ -310,6 +332,12 @@ export interface HiringMatch {
   offshoreItCount: number;
   latamItCount: number;
   offshoreHeavy: boolean;
+  // See ResolvedHiringCompany.isStartup/startupReason above — same derived
+  // signal (well, not derived, straight from target_company), carried
+  // through the alias-aware index so /outreach can filter/badge on it
+  // without a second lookup.
+  isStartup: boolean | null;
+  startupReason: string | null;
 }
 
 /**
@@ -319,16 +347,17 @@ export interface HiringMatch {
  * getCompanyHiringSummaries (via resolveHiringCompanies) rather than
  * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup.
  * Not BD-scoped — job postings/target companies are shared data. Two fixed
- * queries regardless of caller. `market`, `miamiOnly` and `hideOffshore`
- * flow into resolveHiringCompanies' SQL WHERE clause, same as
+ * queries regardless of caller. `market`, `miamiOnly`, `hideOffshore` and
+ * `startupsOnly` flow into resolveHiringCompanies' SQL WHERE clause, same as
  * getCompanyHiringSummaries above.
  */
 export async function getHiringMatchIndex(
   market?: MarketKey,
   miamiOnly?: boolean,
   hideOffshore?: boolean,
+  startupsOnly?: boolean,
 ): Promise<Map<string, HiringMatch>> {
-  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore);
+  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore, startupsOnly);
   const index = new Map<string, HiringMatch>();
   for (const c of companies.values()) {
     const match: HiringMatch = {
@@ -337,6 +366,8 @@ export async function getHiringMatchIndex(
       openItCount: c.postings.length,
       offshoreItCount: c.offshoreItCount,
       latamItCount: c.latamItCount,
+      isStartup: c.isStartup,
+      startupReason: c.startupReason,
       offshoreHeavy: c.offshoreHeavy,
     };
     for (const key of c.matchKeys) index.set(key, match);

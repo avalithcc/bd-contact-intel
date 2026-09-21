@@ -9,6 +9,7 @@ import {
 } from "@/lib/hiring/queries";
 import type { MarketKey } from "@/lib/hiring/markets";
 import type { RoleGroupKey } from "@/lib/roleGroups";
+import type { CompanyCategoryKey } from "@/lib/companyCategories";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 // Relationship tiers, highest outreach priority first. Kept as an explicit
@@ -43,6 +44,10 @@ const TIER_RANK: Record<RelationshipTier, number> = {
 
 export interface OutreachFilters {
   roleGroup?: RoleGroupKey;
+  // Restricts to contacts whose company falls in this industry category
+  // (see src/lib/companyCategories.ts). Applied as a plain SQL WHERE on
+  // `contact.company_category`, same as roleGroup below — no extra query.
+  companyCategory?: CompanyCategoryKey;
   // Whether "never messaged" contacts are included at all (they always
   // rank last when they are). Default true.
   includeNeverMessaged?: boolean;
@@ -60,6 +65,13 @@ export interface OutreachFilters {
   // src/lib/hiring/queries.ts. Flows into getHiringMatchIndex's SQL WHERE
   // clause — same query count either way.
   hideOffshore?: boolean;
+  // Opt-in filter to only companies classified as startups (see
+  // src/lib/hiring/startupClassification.ts). Off by default. Flows into
+  // getHiringMatchIndex's SQL WHERE clause (via resolveHiringCompanies'
+  // `startupsOnly` param) — same query count either way. An unclassified
+  // company (is_startup IS NULL) is excluded when this is on, same as one
+  // confirmed not a startup.
+  startupsOnly?: boolean;
 }
 
 export interface OutreachRow {
@@ -88,6 +100,13 @@ export interface OutreachRow {
   offshoreItCount: number;
   latamItCount: number;
   offshoreHeavy: boolean;
+  // Startup classification for this contact's company (see
+  // src/lib/hiring/startupClassification.ts), resolved via the same
+  // alias-aware match as openItCount above. Null means "not classified
+  // yet", distinct from a confirmed `false`. Shown as the "Startup" badge
+  // on /outreach, with startupReason as its tooltip.
+  isStartup: boolean | null;
+  startupReason: string | null;
 }
 
 export interface OutreachPage {
@@ -157,8 +176,11 @@ export function isLeadershipRoleGroup(roleGroup: string | null): boolean {
  * open IT posting, so the row count stays bounded by the hiring crossover
  * rather than the full contact base. Scoring, sorting and pagination happen
  * in JS over that single fetched set — no per-row or per-page query.
- * `filters.market` narrows queries (1)-(2) via getHiringMatchIndex's SQL
- * WHERE clause, so the query count stays exactly 3 whether or not it's set.
+ * `filters.market` and `filters.startupsOnly` narrow queries (1)-(2) via
+ * getHiringMatchIndex's SQL WHERE clause, so the query count stays exactly
+ * 3 whether or not they're set. `filters.companyCategory` narrows query (3)
+ * the same way `filters.roleGroup` does — a plain `contact` column, no
+ * extra query either.
  */
 export async function listOutreachCandidates(
   bdId: string,
@@ -172,6 +194,7 @@ export async function listOutreachCandidates(
     filters.market,
     filters.miamiOnly,
     filters.hideOffshore,
+    filters.startupsOnly,
   ); // queries 1-2
   const matchKeys = [...hiringIndex.keys()];
   const hiringCompanyCount = new Set(
@@ -184,6 +207,7 @@ export async function listOutreachCandidates(
 
   const where = [eq(contact.bdId, bdId), inArray(contact.companyKey, matchKeys)];
   if (filters.roleGroup) where.push(eq(contact.roleGroup, filters.roleGroup));
+  if (filters.companyCategory) where.push(eq(contact.companyCategory, filters.companyCategory));
   if (!includeNeverMessaged) where.push(gt(contact.messageCount, 0));
 
   const rows = await db // query 3
@@ -222,6 +246,8 @@ export async function listOutreachCandidates(
       relationshipTier: relationshipTierOf(r.reciprocal, dormant, r.messageCount),
       companyDisplayName: hiring?.displayName ?? r.company ?? "",
       openItCount: hiring?.openItCount ?? 0,
+      isStartup: hiring?.isStartup ?? null,
+      startupReason: hiring?.startupReason ?? null,
       offshoreItCount: hiring?.offshoreItCount ?? 0,
       latamItCount: hiring?.latamItCount ?? 0,
       offshoreHeavy: hiring?.offshoreHeavy ?? false,
