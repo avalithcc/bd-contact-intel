@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContactById, getConversationThreads, getCurrentBd } from "@/lib/queries";
 import { suggestEmailForContact } from "@/lib/emailSuggestion";
+import { isFreeMailDomain } from "@/lib/emailPatterns";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/i18n/format";
@@ -49,15 +50,23 @@ export default async function ContactDetail({
 
   const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ");
   const profileUrl = `https://${c.profileKey}`;
-  // Only worth inferring when the contact has no stored email at all.
-  const suggestion = c.email
-    ? null
-    : await suggestEmailForContact(me.id, {
+  // Worth inferring when the contact has NO email on file, OR when the only
+  // email on file is personal (free-mail) — that's exactly the case where a
+  // corporate address is actually needed, since a free-mail address is
+  // useless for BD outreach that wants to reach someone at their company.
+  // The stored email itself is never touched: the suggestion is always a
+  // separate, clearly-labelled field, never a replacement for c.email.
+  const storedEmailDomain = c.email?.split("@")[1]?.trim().toLowerCase();
+  const needsSuggestion = !c.email || (!!storedEmailDomain && isFreeMailDomain(storedEmailDomain));
+  const suggestion = needsSuggestion
+    ? await suggestEmailForContact(me.id, {
         id: c.id,
         firstName: c.firstName,
         lastName: c.lastName,
         companyKey: c.companyKey,
-      });
+        company: c.company,
+      })
+    : null;
   const { threads, moreConversations, moreMessages } =
     c.messageCount > 0
       ? await getConversationThreads(me.id, c.profileKey)
@@ -119,14 +128,18 @@ export default async function ContactDetail({
                   {dict.contact.confidenceLabel(suggestion.confidence)}
                 </span>
                 <span className="suggestion-note">
-                  {suggestion.source === "assumed"
-                    ? dict.contact.suggestedEmailAssumedNote(suggestion.agreeCount)
-                    : dict.contact.suggestedEmailNote(suggestion.patternId, suggestion.agreeCount)}
+                  {suggestion.source === "guessed-domain"
+                    ? dict.contact.guessedDomainNote(suggestion.domain)
+                    : suggestion.source === "assumed"
+                      ? dict.contact.suggestedEmailAssumedNote(suggestion.agreeCount)
+                      : dict.contact.suggestedEmailNote(suggestion.patternId, suggestion.agreeCount)}
                 </span>
                 <span className="suggestion-note">
-                  {suggestion.hasMx
-                    ? dict.contact.domainReason(suggestion.agreeCount)
-                    : dict.contact.domainUnconfirmedReason}
+                  {suggestion.source === "guessed-domain"
+                    ? dict.contact.guessedDomainReason
+                    : suggestion.hasMx
+                      ? dict.contact.domainReason(suggestion.agreeCount)
+                      : dict.contact.domainUnconfirmedReason}
                 </span>
                 {suggestion.provider === "microsoft" && (
                   <span className="suggestion-note">{dict.contact.microsoftProviderNote}</span>
