@@ -66,6 +66,14 @@ const MAX_CANDIDATES = 12;
 // round trips added to one contact-detail page render.
 const MAX_LOOKUPS = 6;
 
+// Wall-clock budget for the whole guess. MAX_LOOKUPS alone bounds the number
+// of queries, not the time they take: six candidates that each hit the 3s DNS
+// timeout would stall a contact-detail render for ~18s. Once this budget is
+// spent the guess gives up and the page renders without a suggestion —
+// a missing guess is cheap, a page that hangs is not. Cached candidates cost
+// a local DB read, so a warm company still gets through every candidate.
+const LOOKUP_BUDGET_MS = 2500;
+
 // Only these MX-detected providers (see src/lib/emailDomain.ts) count as
 // "a real mail provider is configured here". Deliberately EXCLUDES
 // "unknown" (MX records present but not matching any known provider is too
@@ -129,7 +137,8 @@ export interface GuessedDomain {
  * candidate — this both minimizes DNS round trips for the common case (a
  * hit on the first try) and enforces MAX_LOOKUPS as a hard cap on how many
  * live lookups one call can ever issue, so a contact-detail page render can
- * never fan out unboundedly.
+ * never fan out unboundedly. LOOKUP_BUDGET_MS bounds the time those lookups
+ * may take, which MAX_LOOKUPS on its own does not.
  */
 export async function guessCompanyDomain(companyName: string | null): Promise<GuessedDomain | null> {
   if (!companyName) return null;
@@ -141,9 +150,10 @@ export async function guessCompanyDomain(companyName: string | null): Promise<Gu
 
   const candidates = CANDIDATE_TLDS.map((tld) => `${base}${tld}`).slice(0, MAX_CANDIDATES);
 
+  const deadline = Date.now() + LOOKUP_BUDGET_MS;
   let lookupsUsed = 0;
   for (const candidate of candidates) {
-    if (lookupsUsed >= MAX_LOOKUPS) break;
+    if (lookupsUsed >= MAX_LOOKUPS || Date.now() >= deadline) break;
     lookupsUsed += 1;
 
     // Goes through the same cached lookup path as the rest of the app (see
