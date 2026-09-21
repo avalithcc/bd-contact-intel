@@ -39,6 +39,16 @@ export function GenerateMessageButton({
   // click, so the language can be switched each time rather than only once.
   const [choosingLanguage, setChoosingLanguage] = useState(false);
 
+  // Close the language chooser from inside the form action, not from the
+  // submit buttons' onClick: an onClick state update unmounts the clicked
+  // submitter before the browser dispatches `submit`, which silently cancels
+  // the submission. By the time this runs, FormData already holds the
+  // submitter's messageLanguage value.
+  const submitWithLanguage = (formData: FormData) => {
+    setChoosingLanguage(false);
+    formAction(formData);
+  };
+
   const handleCopy = async () => {
     if (!state?.ok) return;
     try {
@@ -54,7 +64,7 @@ export function GenerateMessageButton({
 
   return (
     <div className="generate-message">
-      <form action={formAction} aria-busy={pending}>
+      <form action={submitWithLanguage} aria-busy={pending}>
         {pending ? (
           <span className="generate-message-pending" role="status">
             <span className="spinner" aria-hidden="true" />
@@ -72,7 +82,6 @@ export function GenerateMessageButton({
               value="es"
               className="secondary-btn generate-message-language-btn"
               aria-label={labels.messageLanguageEs}
-              onClick={() => setChoosingLanguage(false)}
             >
               {labels.messageLanguageEs}
             </button>
@@ -82,7 +91,6 @@ export function GenerateMessageButton({
               value="en"
               className="secondary-btn generate-message-language-btn"
               aria-label={labels.messageLanguageEn}
-              onClick={() => setChoosingLanguage(false)}
             >
               {labels.messageLanguageEn}
             </button>
