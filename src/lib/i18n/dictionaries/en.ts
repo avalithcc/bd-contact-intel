@@ -291,6 +291,15 @@ export const en = {
     // guess, not a confirmed address.
     suggestedEmailNote: (patternId: string, colleagueCount: number) =>
       `Not verified — guessed from ${colleagueCount} colleague${colleagueCount === 1 ? "" : "s"} at this company (pattern "${patternId}").`,
+    // Shown ONLY for an "assumed" suggestion (source: "assumed" — see
+    // src/lib/emailSuggestion.ts), i.e. when no company-specific convention
+    // could be confirmed from colleagues on file. Distinct from — and
+    // visibly more tentative than — suggestedEmailNote above: it must say
+    // plainly that the convention was NOT confirmed, and that "first.last"
+    // is an industry-default ASSUMPTION applied to a domain seen on N
+    // colleague addresses, not a pattern this company was observed to use.
+    suggestedEmailAssumedNote: (colleagueCount: number) =>
+      `Convention not confirmed — assuming the common "first.last" pattern at the domain used by ${colleagueCount} colleague${colleagueCount === 1 ? "" : "s"} at this company. This is a guess, not an observed pattern.`,
     // Confidence chip shown next to a suggested email — see
     // src/lib/emailSuggestion.ts#SuggestionConfidence. Always paired with
     // suggestedEmailNote/domainReason so the wording stays honest: this is

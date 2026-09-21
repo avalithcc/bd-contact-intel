@@ -2,7 +2,13 @@ import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { contact, emailDomainCheck } from "@/db/schema";
 import { companyKeyFilter } from "@/lib/queries";
-import { detectPattern, buildEmail, type PatternId } from "@/lib/emailPatterns";
+import {
+  detectPattern,
+  detectDomain,
+  buildEmail,
+  DEFAULT_PATTERN_ID,
+  type PatternId,
+} from "@/lib/emailPatterns";
 import {
   isDeadDomain,
   lookupDomain,
@@ -37,11 +43,26 @@ export interface EmailSuggestion {
   patternId: PatternId;
   domain: string;
   sampleCount: number;
+  // Number of colleague samples that back this suggestion. For a
+  // "detected" suggestion this is the count of samples that AGREED on the
+  // winning pattern (as before). For an "assumed" suggestion, no pattern
+  // was ever agreed on — there's nothing to "agree" — so this instead holds
+  // detectDomain()'s support count (how many colleagues share the assumed
+  // domain). Reusing the same field (rather than adding a separate
+  // domainSupport field) keeps the UI's existing colleague-count copy
+  // (suggestedEmailNote/domainReason) working unmodified for both paths.
   agreeCount: number;
   hasMx: boolean;
   provider: MailProvider;
   domainStatus: LookupStatus;
   confidence: SuggestionConfidence;
+  // "detected": a company-specific convention was confirmed by >=2 agreeing
+  // colleague samples (existing behavior, unchanged).
+  // "assumed": no convention could be confirmed; this is an industry-default
+  // "first.last" guess applied to a company domain revealed by at least one
+  // colleague's email. Must be labeled as an assumption in the UI, never
+  // presented as a detected convention.
+  source: "detected" | "assumed";
 }
 
 /**
@@ -132,9 +153,28 @@ export interface SuggestionTarget {
  * email on file. Nothing here calls an external API or scraping service —
  * the "signal" is entirely the BD's own imported contacts.
  *
+ * Two-path behavior:
+ *  1) DETECTED (source: "detected"): tried first, unchanged from before this
+ *     fallback was added. detectPattern() requires >=2 colleague samples to
+ *     AGREE on the same local-part convention (e.g. everyone uses
+ *     first.last@...). Confidence can be "high"/"medium"/"low" depending on
+ *     MX confirmation and how many samples agreed.
+ *  2) ASSUMED (source: "assumed"), only tried when (1) finds nothing:
+ *     detectDomain() looks for the company's corporate domain from as
+ *     little as ONE colleague sample (no pattern agreement required), and
+ *     if found, we build the industry-default DEFAULT_PATTERN_ID
+ *     ("first.last") address at that domain. This is a GUESS, not a
+ *     detected convention — confidence is always forced to "low" (see
+ *     below) and the UI must label it as an assumption.
+ *
+ * This fallback exists because measured against real data, requiring a
+ * confirmed pattern left coverage near zero — the overwhelming majority of
+ * companies in this contact base never accumulate 2+ agreeing colleague
+ * samples, but a corporate domain is often visible from just one.
+ *
  * Returns null when the target has no company key / name to work with, or
- * when no pattern with enough support is found (see
- * src/lib/emailPatterns.ts#detectPattern).
+ * when neither a pattern nor a domain can be found (see
+ * src/lib/emailPatterns.ts#detectPattern / #detectDomain).
  */
 export async function suggestEmailForContact(
   bdId: string,
@@ -173,47 +213,90 @@ export async function suggestEmailForContact(
   );
 
   const detected = detectPattern(usableSamples);
-  if (!detected) return null;
+  if (detected) {
+    const email = buildEmail(
+      detected.patternId,
+      detected.domain,
+      target.firstName,
+      target.lastName,
+      detected.firstVariant,
+      detected.lastVariant,
+    );
+    if (!email) return null;
 
-  const email = buildEmail(
-    detected.patternId,
-    detected.domain,
-    target.firstName,
-    target.lastName,
-    detected.firstVariant,
-    detected.lastVariant,
-  );
-  if (!email) return null;
+    const domainCheck = await getDomainCheck(detected.domain);
 
-  const domainCheck = await getDomainCheck(detected.domain);
+    // A CONFIRMED non-receiving domain (successful DNS lookup, zero MX
+    // records) means no address at this domain can ever be delivered — don't
+    // show a suggestion at all rather than one guaranteed to bounce.
+    // A domain that provably cannot receive mail (no MX, or no domain at
+    // all) makes any suggested address worthless — show nothing rather than
+    // a plausible-looking guess.
+    if (isDeadDomain(domainCheck.status)) return null;
 
-  // A CONFIRMED non-receiving domain (successful DNS lookup, zero MX
-  // records) means no address at this domain can ever be delivered — don't
-  // show a suggestion at all rather than one guaranteed to bounce.
-  // A domain that provably cannot receive mail (no MX, or no domain at all)
-  // makes any suggested address worthless — show nothing rather than a
-  // plausible-looking guess.
+    let confidence: SuggestionConfidence = "low";
+    if (domainCheck.hasMx && detected.agreeCount >= HIGH_CONFIDENCE_MIN_AGREE) {
+      confidence = "high";
+    } else if (domainCheck.hasMx && detected.agreeCount >= MEDIUM_CONFIDENCE_MIN_AGREE) {
+      confidence = "medium";
+    }
+    // Everything else (no MX confirmation yet, a lookup error, or too few
+    // agreeing colleagues) stays "low" — including a lookup "error", where
+    // the domain is unconfirmed rather than known-bad.
+
+    return {
+      email,
+      patternId: detected.patternId,
+      domain: detected.domain,
+      sampleCount: detected.sampleCount,
+      agreeCount: detected.agreeCount,
+      hasMx: domainCheck.hasMx,
+      provider: domainCheck.provider,
+      domainStatus: domainCheck.status,
+      confidence,
+      source: "detected",
+    };
+  }
+
+  // FALLBACK PATH: no agreed-upon convention. Reuse the same `usableSamples`
+  // set detectPattern() used — it only requires firstName/lastName/email to
+  // be present (see the filter above), NOT a non-free-mail domain: that
+  // check is detectDomain()'s own job (via its internal
+  // isDomainUsableSample), and it re-applies isFreeMailDomain itself, so
+  // free-mail samples are still correctly excluded from domain detection.
+  // Reusing usableSamples here is a simplification, not a stricter-superset
+  // guarantee: we already need target.firstName/target.lastName to build
+  // the target's OWN address regardless, and requiring names on colleague
+  // samples too costs us little in practice, so re-querying the raw
+  // `samples` array (which only guarantees a non-null email) isn't worth it.
+  const domainGuess = detectDomain(usableSamples);
+  if (!domainGuess) return null;
+
+  const assumedEmail = buildEmail(DEFAULT_PATTERN_ID, domainGuess.domain, target.firstName, target.lastName);
+  if (!assumedEmail) return null;
+
+  const domainCheck = await getDomainCheck(domainGuess.domain);
+
+  // Same dead-domain suppression as the detected path: an assumed address
+  // at a domain confirmed to never receive mail is worthless to show.
   if (isDeadDomain(domainCheck.status)) return null;
 
-  let confidence: SuggestionConfidence = "low";
-  if (domainCheck.hasMx && detected.agreeCount >= HIGH_CONFIDENCE_MIN_AGREE) {
-    confidence = "high";
-  } else if (domainCheck.hasMx && detected.agreeCount >= MEDIUM_CONFIDENCE_MIN_AGREE) {
-    confidence = "medium";
-  }
-  // Everything else (no MX confirmation yet, a lookup error, or too few
-  // agreeing colleagues) stays "low" — including a lookup "error", where
-  // the domain is unconfirmed rather than known-bad.
-
+  // Confidence is ALWAYS "low" for an assumed suggestion, even when the
+  // domain has confirmed MX records. Unlike the detected path, no colleague
+  // ever agreed on this being the actual convention — hasMx only confirms
+  // the DOMAIN accepts mail, not that first.last is the right local-part
+  // guess for it. Upgrading confidence here would overstate evidence we
+  // don't have.
   return {
-    email,
-    patternId: detected.patternId,
-    domain: detected.domain,
-    sampleCount: detected.sampleCount,
-    agreeCount: detected.agreeCount,
+    email: assumedEmail,
+    patternId: DEFAULT_PATTERN_ID,
+    domain: domainGuess.domain,
+    sampleCount: usableSamples.length,
+    agreeCount: domainGuess.support,
     hasMx: domainCheck.hasMx,
     provider: domainCheck.provider,
     domainStatus: domainCheck.status,
-    confidence,
+    confidence: "low",
+    source: "assumed",
   };
 }

@@ -151,6 +151,14 @@ export interface DetectedPattern {
   lastVariant: NameVariant;
 }
 
+// The safe default guess when no company-specific convention can be
+// confirmed at all. "first.last" is the single most common corporate email
+// convention worldwide, so it's the best blind guess available once we know
+// a company's DOMAIN but have no agreeing colleague samples to detect an
+// actual pattern from (see detectDomain() below and
+// src/lib/emailSuggestion.ts's fallback path).
+export const DEFAULT_PATTERN_ID: PatternId = "first.last";
+
 function splitEmail(email: string): { localPart: string; domain: string } | null {
   const trimmed = email.trim().toLowerCase();
   const at = trimmed.lastIndexOf("@");
@@ -324,6 +332,60 @@ export function detectPattern(samples: EmailSample[]): DetectedPattern | null {
     firstVariant: majorityVariant(entry.firstVariants),
     lastVariant: majorityVariant(entry.lastVariants),
   };
+}
+
+/**
+ * Fallback for when detectPattern() finds no CONFIRMED convention (fewer
+ * than MIN_SUPPORT agreeing samples). Even without agreement on a pattern,
+ * a single colleague's corporate email still reveals the company's DOMAIN —
+ * enough to build an industry-default `first.last@<domain>` guess (see
+ * DEFAULT_PATTERN_ID and src/lib/emailSuggestion.ts's assumed-suggestion
+ * path). This exists because measured against real data, requiring an
+ * agreed-upon pattern left coverage near zero (~2 companies out of
+ * thousands) — most companies have too few colleague samples on file to
+ * ever reach MIN_SUPPORT, but frequently have at least ONE.
+ *
+ * Deliberately uses a LOOSER usability bar than isUsableSample(): a sample
+ * only needs a parseable, non-free-mail email domain. Unlike detectPattern,
+ * we are not trying to match a name against a local part here — we only
+ * need the domain itself, so incomplete/missing names must not disqualify
+ * an otherwise-usable domain signal.
+ */
+function isDomainUsableSample(sample: EmailSample): { domain: string } | null {
+  const split = splitEmail(sample.email);
+  if (!split) return null;
+  if (isFreeMailDomain(split.domain)) return null;
+  return { domain: split.domain };
+}
+
+/**
+ * Find the most frequent non-free-mail domain across `samples`, regardless
+ * of whether any email-convention pattern was detected. Returns null when
+ * no sample has a usable (parseable, non-free-mail) domain. On a frequency
+ * tie, picks the alphabetically first domain so the result is deterministic
+ * across runs.
+ */
+export function detectDomain(samples: EmailSample[]): { domain: string; support: number } | null {
+  const domainCounts = new Map<string, number>();
+  for (const sample of samples) {
+    const usable = isDomainUsableSample(sample);
+    if (!usable) continue;
+    domainCounts.set(usable.domain, (domainCounts.get(usable.domain) ?? 0) + 1);
+  }
+  if (domainCounts.size === 0) return null;
+
+  let bestDomain = "";
+  let bestCount = -1;
+  for (const [domain, count] of domainCounts) {
+    if (
+      count > bestCount ||
+      (count === bestCount && domain < bestDomain)
+    ) {
+      bestDomain = domain;
+      bestCount = count;
+    }
+  }
+  return { domain: bestDomain, support: bestCount };
 }
 
 /**

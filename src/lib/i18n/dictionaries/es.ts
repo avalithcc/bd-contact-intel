@@ -257,6 +257,8 @@ export const es: typeof en = {
     fieldSuggestedEmail: "Correo sugerido",
     suggestedEmailNote: (patternId, colleagueCount) =>
       `No verificado — estimado a partir de ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"} de esta empresa (patrón "${patternId}").`,
+    suggestedEmailAssumedNote: (colleagueCount) =>
+      `No se pudo confirmar la convención — se asume el patrón habitual "first.last" en el dominio utilizado por ${colleagueCount} colega${colleagueCount === 1 ? "" : "s"} de esta empresa. Esto es una suposición, no un patrón observado.`,
     confidenceLabel: (confidence) =>
       confidence === "high"
         ? "Confianza alta"

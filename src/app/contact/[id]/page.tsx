@@ -119,7 +119,9 @@ export default async function ContactDetail({
                   {dict.contact.confidenceLabel(suggestion.confidence)}
                 </span>
                 <span className="suggestion-note">
-                  {dict.contact.suggestedEmailNote(suggestion.patternId, suggestion.agreeCount)}
+                  {suggestion.source === "assumed"
+                    ? dict.contact.suggestedEmailAssumedNote(suggestion.agreeCount)
+                    : dict.contact.suggestedEmailNote(suggestion.patternId, suggestion.agreeCount)}
                 </span>
                 <span className="suggestion-note">
                   {suggestion.hasMx
