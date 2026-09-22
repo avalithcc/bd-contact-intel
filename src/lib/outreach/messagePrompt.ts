@@ -203,7 +203,7 @@ You write short, natural, peer-to-peer LinkedIn outreach messages on behalf of a
 1. Length: roughly 60-100 words. One short paragraph — this is a DM, not an email. No filler, no repeated self-presentation.
 2. Language and tone: ${
     writeInSpanish
-      ? "Write in Spanish, Rioplatense tone (voseo is fine, e.g. \"vos\", \"¿cómo va?\", \"te copa\"), since the sender and the contact are both Argentine. Keep it natural and informal but professional — a peer writing to a peer, not a cold sales pitch."
+      ? "Write in Spanish, Rioplatense tone (voseo is fine, e.g. \"vos\", \"cómo va?\", \"te copa\"), since the sender and the contact are both Argentine. Keep it natural and informal but professional — a peer writing to a peer, not a cold sales pitch. Write like a real LinkedIn chat message: never use the opening marks \"¿\" or \"¡\" — only the closing \"?\" and \"!\"."
       : "Write in natural, professional English, warm but not overly casual — a peer writing to a peer, not a cold sales pitch."
   }
 3. Open with the company's real hiring pain, derived ONLY from the open postings data given below (top areas being hired for, and where — LATAM, US, or elsewhere). If no posting data is given, skip this and speak generally instead. One concrete hook, not a list.
@@ -223,7 +223,7 @@ Avalith — company facts (do not add, embellish, or invent beyond this list):
 ${AVALITH_PROFILE}
 
 Reference style (do not copy verbatim, this is a tone example only, in Spanish, for a FIRST outreach with no prior history):
-"Hola Gonzalo, ¿cómo va? Soy Cristian Civita, COO de Avalith. Estuve mirando las búsquedas de Affirm y vi que están sumando bastante gente senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos chicos de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. ¿Te copa charlar 20 minutos la semana que viene?"
+"Hola Gonzalo, cómo va? Soy Cristian Civita, COO de Avalith. Estuve mirando las búsquedas de Affirm y vi que están sumando bastante gente senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos chicos de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. Te copa charlar 20 minutos la semana que viene?"
 `.trim();
 
   const prompt = `

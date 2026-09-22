@@ -98,7 +98,9 @@ export async function generateOutreachMessage(
       // output size.
       maxOutputTokens: 350,
     });
-    const message = text.trim();
+    // Casual Spanish chat drops the opening "¿"/"¡"; the prompt asks for
+    // that, and this guarantees it even if the model slips.
+    const message = (messageLanguage === "es" ? text.replace(/[¿¡]/g, "") : text).trim();
     if (!message) return { ok: false, errorKey: "generationFailed" };
     return { ok: true, message, historyCount: history.length };
   } catch (error) {
