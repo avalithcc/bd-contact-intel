@@ -211,6 +211,8 @@ export const en = {
     title: "who to message this week",
     subtitle:
       "Your contacts at companies currently hiring IT, ranked by relationship strength and seniority.",
+    nameFilterLabel: "Name",
+    nameFilterPlaceholder: "First or last name",
     excludeNeverMessaged: "Exclude never messaged",
     // Opt-in filter, off by default (see resolveHiringCompanies'
     // `startupsOnly` param in src/lib/hiring/queries.ts). Excludes

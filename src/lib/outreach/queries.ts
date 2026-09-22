@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { contact, conversation, message } from "@/db/schema";
 import { DORMANT_MONTHS, isDormant } from "@/lib/queries";
@@ -73,6 +73,10 @@ export interface OutreachFilters {
   // company (is_startup IS NULL) is excluded when this is on, same as one
   // confirmed not a startup.
   startupsOnly?: boolean;
+  // Free-text match on the contact's first or last name (case-insensitive,
+  // substring). Applied as a plain SQL WHERE on `contact`, same as
+  // roleGroup/companyCategory above — no extra query.
+  name?: string;
 }
 
 export interface OutreachRow {
@@ -255,6 +259,13 @@ export async function listOutreachCandidates(
   if (filters.roleGroup) where.push(eq(contact.roleGroup, filters.roleGroup));
   if (filters.companyCategory) where.push(eq(contact.companyCategory, filters.companyCategory));
   if (!includeNeverMessaged) where.push(gt(contact.messageCount, 0));
+  const name = filters.name?.trim();
+  if (name) {
+    const pattern = `%${name}%`;
+    where.push(
+      or(ilike(contact.firstName, pattern), ilike(contact.lastName, pattern))!,
+    );
+  }
 
   const rows = await db // query 3
     .select({

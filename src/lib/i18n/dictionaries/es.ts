@@ -182,6 +182,8 @@ export const es: typeof en = {
     title: "a quién contactar esta semana",
     subtitle:
       "Tus contactos en empresas que actualmente contratan IT, ordenados por fuerza de relación y seniority.",
+    nameFilterLabel: "Nombre",
+    nameFilterPlaceholder: "Nombre o apellido",
     excludeNeverMessaged: "Excluir nunca contactados",
     startupsOnlyLabel: "Solo startups",
     startupBadge: "startup",

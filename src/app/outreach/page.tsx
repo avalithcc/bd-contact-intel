@@ -41,6 +41,7 @@ export default async function OutreachPage({
     excludeNever?: string;
     hideOffshore?: string;
     startupsOnly?: string;
+    name?: string;
     page?: string;
   }>;
 }) {
@@ -75,11 +76,14 @@ export default async function OutreachPage({
   // hideOffshore above (see resolveHiringCompanies' `startupsOnly` param in
   // src/lib/hiring/queries.ts).
   const startupsOnly = sp.startupsOnly === "on";
+  // Free-text name search (first or last name). Empty string means "no
+  // filter", same as an absent param.
+  const name = sp.name?.trim() || undefined;
 
   const { rows, total, page: current, totalPages, hiringCompanyCount } =
     await listOutreachCandidates(
       me.id,
-      { roleGroup, companyCategory, market, miamiOnly, includeNeverMessaged, hideOffshore, startupsOnly },
+      { roleGroup, companyCategory, market, miamiOnly, includeNeverMessaged, hideOffshore, startupsOnly, name },
       page,
       PAGE_SIZE,
     );
@@ -93,6 +97,7 @@ export default async function OutreachPage({
     if (excludeNeverMessaged) params.set("excludeNever", "on");
     if (hideOffshore) params.set("hideOffshore", "on");
     if (startupsOnly) params.set("startupsOnly", "on");
+    if (name) params.set("name", name);
     params.set("page", String(p));
     return `/outreach?${params.toString()}`;
   };
@@ -147,6 +152,16 @@ export default async function OutreachPage({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="filter-field">
+            <label htmlFor="name">{dict.outreach.nameFilterLabel}</label>
+            <input
+              id="name"
+              name="name"
+              type="search"
+              defaultValue={name ?? ""}
+              placeholder={dict.outreach.nameFilterPlaceholder}
+            />
           </div>
           <div className="filter-field">
             <label htmlFor="companyCategory">{dict.home.companyCategoryLabel}</label>
