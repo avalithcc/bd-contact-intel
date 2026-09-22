@@ -158,7 +158,7 @@ export default async function OutreachPage({
             <input
               id="name"
               name="name"
-              type="search"
+              type="text"
               defaultValue={name ?? ""}
               placeholder={dict.outreach.nameFilterPlaceholder}
             />
