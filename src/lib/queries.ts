@@ -34,9 +34,14 @@ export async function getCurrentBd() {
     where: eq(bd.email, user.email),
   });
   if (existing) return existing;
+  // A first visit renders several server components that each call this
+  // concurrently, so two of them can miss the lookup above and race to
+  // insert. The no-op upsert makes the loser return the winner's row
+  // instead of failing on bd_email_unique.
   const [created] = await db
     .insert(bd)
     .values({ name: user.email.split("@")[0], email: user.email })
+    .onConflictDoUpdate({ target: bd.email, set: { email: user.email } })
     .returning();
   return created;
 }
