@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { canGoBackInApp } from "./NavigationTracker";
 
 /**
  * Icon-only "go back" control for page headers. Navigates to the previous
@@ -12,10 +13,10 @@ import { useRouter } from "next/navigation";
  * when there is no in-app entry behind this one: the URL was opened
  * directly, in a new tab, or followed from an external link. `history.length`
  * cannot tell us that, since it also counts entries that belong to whatever
- * site the user came from. Next's App Router instead stamps an incrementing
- * `idx` on every history entry it creates, so `idx > 0` means "there is an
- * earlier entry of THIS app to return to". Anything else falls back to
- * `fallbackHref`, which keeps the user inside the app.
+ * site the user came from, and the App Router stamps no `idx` on
+ * `history.state` (that's the Pages Router). NavigationTracker counts in-app
+ * navigations instead; when it can't vouch for an earlier entry of THIS app,
+ * we fall back to `fallbackHref`, which keeps the user inside the app.
  *
  * The check runs inside the click handler, not at render time, so the
  * server-rendered markup and the post-hydration markup are identical — no
@@ -31,8 +32,7 @@ export function BackButton({
   const router = useRouter();
 
   function handleClick() {
-    const idx = (window.history.state as { idx?: number } | null)?.idx;
-    if (typeof idx === "number" && idx > 0) {
+    if (canGoBackInApp()) {
       router.back();
       return;
     }

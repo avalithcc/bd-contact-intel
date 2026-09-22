@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { getLocale } from "@/lib/i18n/server";
 import { getTheme } from "@/lib/theme/server";
+import { NavigationTracker } from "./NavigationTracker";
 import "./globals.css";
 
 const inter = Inter({
@@ -45,7 +46,10 @@ export default async function RootLayout({
       style={{ colorScheme }}
       className={`${inter.variable} ${jetbrains.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <NavigationTracker />
+        {children}
+      </body>
     </html>
   );
 }
