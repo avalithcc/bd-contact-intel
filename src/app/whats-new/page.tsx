@@ -15,6 +15,7 @@ import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
+import { FilterCheckbox } from "./FilterCheckbox";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
@@ -151,23 +152,23 @@ export default async function WhatsNewPage({
           {market === "us" && (
             <div className="whats-new-window-select">
               <div className="whats-new-window-options">
-                <Link
+                <FilterCheckbox
+                  id="miamiOnly"
+                  label={dict.common.miamiOnlyLabel}
+                  checked={miamiOnly}
                   href={qs({ miamiOnly: !miamiOnly })}
-                  className={miamiOnly ? "secondary-btn active" : "secondary-btn"}
-                >
-                  {dict.common.miamiOnlyLabel}
-                </Link>
+                />
               </div>
             </div>
           )}
           <div className="whats-new-window-select">
             <div className="whats-new-window-options">
-              <Link
+              <FilterCheckbox
+                id="hideOffshore"
+                label={dict.common.hideOffshoreLabel}
+                checked={hideOffshore}
                 href={qs({ hideOffshore: !hideOffshore })}
-                className={hideOffshore ? "secondary-btn active" : "secondary-btn"}
-              >
-                {dict.common.hideOffshoreLabel}
-              </Link>
+              />
             </div>
           </div>
           <p className="whats-new-sync-status">
