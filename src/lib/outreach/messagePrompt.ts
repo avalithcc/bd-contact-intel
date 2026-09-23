@@ -45,7 +45,7 @@ const ROLE_GROUP_LABELS: Record<RoleGroupKey, string> = {
   no_position: "Unknown position",
 };
 
-const AVALITH_PROFILE = `
+export const AVALITH_PROFILE = `
 Avalith — company facts (do not add, embellish, or invent beyond this list):
 - Software engineering company, founded in 2011.
 - Positioning: "human-led, AI-accelerated delivery" — senior engineers design and spec the work; AI agents implement it under human direction.

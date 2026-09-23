@@ -3,6 +3,7 @@ import { getActivitiesByLead } from "@/lib/activity/queries";
 import { ActivityTimeline } from "@/app/ActivityTimeline";
 import { TaskQuickAdd } from "@/app/TaskQuickAdd";
 import { ManualSignal } from "@/app/ManualSignal";
+import { EmailComposer } from "./EmailComposer";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -101,6 +102,11 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
           Activity ({activities.length})
         </h2>
         <ActivityTimeline activities={activities} />
+      </div>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Email</h2>
+        <EmailComposer leadId={id} leadEmail={lead.email} />
       </div>
 
       <div className={styles.section}>
