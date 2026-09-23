@@ -1,0 +1,139 @@
+.header {
+  margin-bottom: var(--space-3xl);
+}
+
+.header h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin: 0 0 var(--space-md);
+  color: var(--color-ink);
+}
+
+.subtitle {
+  color: var(--color-ink-soft);
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.section {
+  margin-bottom: var(--space-3xl);
+}
+
+.sectionTitle {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tasksList {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.taskCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.taskCard:hover {
+  background: var(--color-row-hover);
+  border-color: var(--color-border-strong);
+}
+
+.taskCard.status-overdue {
+  border-left-color: var(--color-danger);
+  background: rgba(220, 38, 38, 0.04);
+}
+
+.taskCard.status-today {
+  border-left-color: var(--color-warn);
+  background: rgba(180, 83, 9, 0.04);
+}
+
+.taskCard.status-tomorrow {
+  border-left-color: var(--color-success);
+}
+
+.taskCard.status-this-week {
+  border-left-color: var(--color-accent);
+}
+
+.taskContent {
+  flex: 1;
+}
+
+.taskTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-sm);
+}
+
+.taskDescription {
+  color: var(--color-ink-soft);
+  font-size: var(--text-md);
+  margin: 0 0 var(--space-md);
+}
+
+.taskMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  font-size: var(--text-base);
+  color: var(--color-ink-muted);
+}
+
+.assignee,
+.dueDate,
+.subject {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  white-space: nowrap;
+}
+
+.completeButton {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--color-border-strong);
+  background: var(--color-surface-1);
+  border-radius: 50%;
+  color: var(--color-ink-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.completeButton:hover {
+  background: var(--color-success);
+  color: white;
+  border-color: var(--color-success);
+}
+
+.emptyState {
+  padding: var(--space-3xl) var(--space-lg);
+  text-align: center;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-1);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border-strong);
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: var(--text-lg);
+}
