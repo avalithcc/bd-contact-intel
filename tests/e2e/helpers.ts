@@ -27,7 +27,11 @@ export async function openFirstOrSkip(page: Page, hrefFragment: string, label: s
   if ((await link.count()) === 0) {
     return { opened: false as const, reason: `No ${label} in the database to open.` };
   }
+  const href = await link.getAttribute('href');
   await link.click();
+  // networkidle resolves before Next finishes a client-side transition, which
+  // leaves the test asserting against the list page it never left.
+  await page.waitForURL(`**${href}`, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
   return { opened: true as const };
 }

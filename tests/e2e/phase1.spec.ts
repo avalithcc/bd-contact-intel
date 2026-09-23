@@ -4,7 +4,7 @@ import { gotoAuthed, openFirstOrSkip } from './helpers';
 test.describe('Phase 1: Core CRM Tracking', () => {
   test('Tasks page lists tasks with a complete control', async ({ page }) => {
     await gotoAuthed(page, '/tasks');
-    await expect(page.locator('h1')).toContainText(/Tasks/i);
+    await expect(page.locator('main h1').first()).toContainText(/Tasks/i);
 
     const cards = page.locator('[class*="taskCard"]');
     if ((await cards.count()) === 0) {
@@ -61,7 +61,7 @@ test.describe('Phase 1: Core CRM Tracking', () => {
 
   test('Companies page lists companies', async ({ page }) => {
     await gotoAuthed(page, '/companies');
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('main h1').first()).toBeVisible();
   });
 
   test('Company detail exposes edit and add-activity controls', async ({ page }) => {
@@ -78,7 +78,8 @@ test.describe('Phase 1: Core CRM Tracking', () => {
     const result = await openFirstOrSkip(page, '/companies/', 'companies');
     test.skip(!result.opened, result.opened ? '' : result.reason);
 
-    const heading = await page.locator('h1').first().innerText();
+    // Scoped to main: the sidebar logo is also an h1.
+    const heading = await page.locator('main h1').first().innerText();
     await page.locator('button', { hasText: /Edit company/i }).click();
 
     await expect(page.locator('text=Edit Company')).toBeVisible();

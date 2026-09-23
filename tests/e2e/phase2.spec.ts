@@ -7,7 +7,7 @@ test.describe('Phase 2: Gmail connection and email composer', () => {
   test('Gmail account page offers a connect or reconnect control', async ({ page }) => {
     await gotoAuthed(page, '/account/email');
 
-    await expect(page.locator('h1')).toContainText(/Gmail/i);
+    await expect(page.locator('main h1').first()).toContainText(/Gmail/i);
     await expect(
       page.locator('button', { hasText: /Connect Gmail|Reconnect Gmail/ }),
     ).toBeVisible();
