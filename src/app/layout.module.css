@@ -1,0 +1,23 @@
+/* Layout container that accounts for fixed sidebar */
+:global(.main-layout) {
+  margin-left: 220px;
+  min-height: 100vh;
+  transition: margin-left var(--transition-fast);
+}
+
+:global(main) {
+  max-width: none;
+  padding: var(--space-2xl) var(--space-3xl);
+  margin: 0;
+}
+
+/* Mobile: adjust for sidebar collapse */
+@media (max-width: 768px) {
+  :global(.main-layout) {
+    margin-left: 0;
+  }
+
+  :global(main) {
+    padding: calc(60px + var(--space-2xl)) var(--space-lg) var(--space-2xl);
+  }
+}

@@ -6,8 +6,8 @@
 export const THEMES = ["light", "dark", "system"] as const;
 export type Theme = (typeof THEMES)[number];
 
-/** Preserves today's dark-only look for anyone without a saved preference. */
-export const DEFAULT_THEME: Theme = "dark";
+/** Light theme is now default, matching Ava Foundry design language. */
+export const DEFAULT_THEME: Theme = "light";
 
 /** Cookie used to persist the visitor's chosen theme across requests. */
 export const THEME_COOKIE = "theme";

@@ -3,7 +3,9 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { getLocale } from "@/lib/i18n/server";
 import { getTheme } from "@/lib/theme/server";
 import { NavigationTracker } from "./NavigationTracker";
+import { Sidebar } from "./Sidebar";
 import "./globals.css";
+import "./layout.module.css";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -48,7 +50,10 @@ export default async function RootLayout({
     >
       <body>
         <NavigationTracker />
-        {children}
+        <Sidebar />
+        <div className="main-layout">
+          {children}
+        </div>
       </body>
     </html>
   );
