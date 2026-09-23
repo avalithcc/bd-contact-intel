@@ -11,15 +11,9 @@ import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
 import { UploadForm, UploadMessagesForm } from "./UploadForm";
-import { SignOutButton } from "./SignOutButton";
-import { UserMenu } from "./UserMenu";
-import { BackButton } from "./BackButton";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
-import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
-import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
-import { getTheme } from "@/lib/theme/server";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +48,6 @@ export default async function Home({
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
-  const theme = await getTheme();
   const dict = t(locale);
   const me = await getCurrentBd();
   const page = Math.max(1, Number(sp.page) || 1);
@@ -131,49 +124,6 @@ export default async function Home({
 
   return (
     <main>
-      <div className="header">
-        <span className="logo">
-          avalith<span className="dot">.</span>
-        </span>
-        <div className="row row-md">
-          <BackButton label={dict.common.goBack} fallbackHref="/" />
-          <Link className="secondary-btn" href="/outreach">
-            {dict.common.priorityOutreach}
-          </Link>
-          <Link className="secondary-btn" href="/whats-new">
-            {dict.common.whatsNew}
-          </Link>
-          <Link className="secondary-btn" href="/hiring">
-            {dict.common.hiringSignals}
-          </Link>
-          <Link className="secondary-btn" href="/leads">
-            {dict.common.leadsNav}
-          </Link>
-          <Link className="secondary-btn" href="/discovery">
-            {dict.common.boardDiscovery}
-          </Link>
-          <UserMenu
-            label={me.name || dict.common.account}
-            changePasswordHref="/account/password"
-            changePasswordLabel={dict.common.changePassword}
-            localeSwitcher={<LocaleSwitcher locale={locale} />}
-            themeSwitcher={<ThemeSwitcher theme={theme} locale={locale} />}
-            themeLabel={dict.common.themeLabel}
-            signOutButton={<SignOutButton locale={locale} />}
-          />
-        </div>
-      </div>
-
-      <div className="mb-3xl">
-        <div className="eyebrow">{dict.common.brandEyebrow}</div>
-        <h1>
-          {dict.home.title}
-          <span className="dot">.</span>
-        </h1>
-        <p className="soft m-0">
-          {dict.home.signedInAs(me.name, me.email)}
-        </p>
-      </div>
 
       <details className="import-block">
         <summary>{dict.home.importConnectionsSummary}</summary>
