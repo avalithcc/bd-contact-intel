@@ -67,7 +67,10 @@ export default async function CompaniesPage({
               {rows.map((company) => (
                 <Link
                   key={company.companyKey}
-                  href={`/companies/${company.companyKey}`}
+                  // Keys are derived from LinkedIn company names and routinely
+                  // contain spaces, pipes and slashes, none of which survive an
+                  // unencoded href — the link silently fails to navigate.
+                  href={`/companies/${encodeURIComponent(company.companyKey)}`}
                   className={styles.companyCard}
                 >
                   <div className={styles.cardContent}>

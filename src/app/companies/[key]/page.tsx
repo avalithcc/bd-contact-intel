@@ -13,7 +13,10 @@ interface CompanyDetailPageProps {
 }
 
 export default async function CompanyDetailPage({ params }: CompanyDetailPageProps) {
-  const { key } = await params;
+  const { key: rawKey } = await params;
+  // Next hands back the raw URL segment, so a key like "mercado libre" arrives
+  // percent-encoded and matches nothing. Most company keys contain a space.
+  const key = decodeURIComponent(rawKey);
 
   const [company, activities] = await Promise.all([
     getCompanyByKey(key),
