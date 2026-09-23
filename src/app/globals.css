@@ -1268,3 +1268,28 @@ a:hover {
     animation: none;
   }
 }
+
+/* =========================================================================
+   Layout with sidebar
+   ========================================================================= */
+.main-layout {
+  margin-left: 220px;
+  min-height: 100vh;
+  transition: margin-left var(--transition-fast);
+}
+
+main {
+  max-width: none;
+  padding: var(--space-2xl) var(--space-3xl);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .main-layout {
+    margin-left: 0;
+  }
+
+  main {
+    padding: calc(60px + var(--space-2xl)) var(--space-lg) var(--space-2xl);
+  }
+}

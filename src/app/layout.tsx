@@ -5,7 +5,6 @@ import { getTheme } from "@/lib/theme/server";
 import { NavigationTracker } from "./NavigationTracker";
 import { Sidebar } from "./Sidebar";
 import "./globals.css";
-import "./layout.module.css";
 
 const inter = Inter({
   subsets: ["latin"],
