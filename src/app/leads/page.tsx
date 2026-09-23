@@ -4,14 +4,9 @@ import { getLeadFilterOptions, listLeads, type OwnerFilterValue } from "@/lib/le
 import { isEmailStatusKey, isLeadStatusKey } from "@/lib/leads/types";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
-import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
-import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
-import { getTheme } from "@/lib/theme/server";
-import { SignOutButton } from "../SignOutButton";
-import { UserMenu } from "../UserMenu";
-import { BackButton } from "../BackButton";
 import { UploadLeadsForm } from "./UploadLeadsForm";
 import { pickLeadsUploadLabels } from "@/lib/leads/labels";
+import { LeadsBoard } from "./LeadsBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -33,14 +28,15 @@ export default async function LeadsPage({
     emailStatus?: string;
     status?: string;
     page?: string;
+    view?: string;
   }>;
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
-  const theme = await getTheme();
   const dict = t(locale);
   const uploadLabels = pickLeadsUploadLabels(dict);
   const me = await getCurrentBd();
+  const view = sp.view === "board" ? "board" : "list";
   const page = Math.max(1, Number(sp.page) || 1);
 
   const name = sp.name?.trim() || undefined;
@@ -79,47 +75,55 @@ export default async function LeadsPage({
 
   return (
     <main>
-      <div className="header">
-        <span className="logo">
-          avalith<span className="dot">.</span>
-        </span>
-        <div className="row row-md">
-          <BackButton label={dict.common.goBack} fallbackHref="/" />
-          <Link className="secondary-btn" href="/outreach">
-            {dict.common.priorityOutreach}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2xl)" }}>
+        <div>
+          <h1 style={{ margin: "0 0 var(--space-md)" }}>Leads</h1>
+          <p style={{ color: "var(--color-ink-soft)", margin: 0 }}>Manage your pipeline</p>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-md)" }}>
+          <Link
+            href="/leads?view=list"
+            style={{
+              padding: "var(--space-md) var(--space-lg)",
+              background: view === "list" ? "var(--color-accent)" : "var(--color-surface-2)",
+              color: view === "list" ? "white" : "var(--color-ink-soft)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
+          >
+            📋 List
           </Link>
-          <Link className="secondary-btn" href="/hiring">
-            {dict.common.hiringSignals}
+          <Link
+            href="/leads?view=board"
+            style={{
+              padding: "var(--space-md) var(--space-lg)",
+              background: view === "board" ? "var(--color-accent)" : "var(--color-surface-2)",
+              color: view === "board" ? "white" : "var(--color-ink-soft)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
+          >
+            🎯 Board
           </Link>
-          <UserMenu
-            label={me.name || dict.common.account}
-            changePasswordHref="/account/password"
-            changePasswordLabel={dict.common.changePassword}
-            localeSwitcher={<LocaleSwitcher locale={locale} />}
-            themeSwitcher={<ThemeSwitcher theme={theme} locale={locale} />}
-            themeLabel={dict.common.themeLabel}
-            signOutButton={<SignOutButton locale={locale} />}
-          />
         </div>
       </div>
 
-      <div className="mb-3xl">
-        <div className="eyebrow">{dict.leads.eyebrow}</div>
-        <h1>
-          {dict.leads.title}
-          <span className="dot">.</span>
-        </h1>
-        <p className="soft m-0">{dict.leads.subtitle}</p>
-      </div>
+      {view === "board" ? (
+        <LeadsBoard leads={rows} />
+      ) : (
+        <>
+          <section className="panel">
+            <div className="eyebrow">{dict.leads.importEyebrow}</div>
+            <h2 className="m-0">{dict.leads.importTitle}</h2>
+            <p className="soft">{dict.leads.importHint}</p>
+            <UploadLeadsForm labels={uploadLabels} />
+          </section>
 
-      <section className="panel">
-        <div className="eyebrow">{dict.leads.importEyebrow}</div>
-        <h2 className="m-0">{dict.leads.importTitle}</h2>
-        <p className="soft">{dict.leads.importHint}</p>
-        <UploadLeadsForm labels={uploadLabels} />
-      </section>
-
-      <section className="panel">
+          <section className="panel">
         <div className="eyebrow">{dict.common.filterEyebrow}</div>
         <form method="get" className="filter-toolbar">
           <div className="filter-field">
@@ -272,7 +276,9 @@ export default async function LeadsPage({
             )}
           </div>
         )}
-      </section>
+          </section>
+        </>
+      )}
     </main>
   );
 }

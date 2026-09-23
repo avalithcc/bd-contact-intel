@@ -1,0 +1,140 @@
+.backLink {
+  display: inline-block;
+  margin-bottom: var(--space-2xl);
+  color: var(--color-ink-soft);
+  text-decoration: none;
+  font-size: var(--text-md);
+  transition: color var(--transition-fast);
+}
+
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.header {
+  margin-bottom: var(--space-3xl);
+  padding-bottom: var(--space-2xl);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.headerTop h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.stageBadge {
+  display: inline-block;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.revenue {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+.revenueLabel {
+  color: var(--color-ink-muted);
+  font-size: var(--text-md);
+}
+
+.revenueValue {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.section {
+  margin-bottom: var(--space-3xl);
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notesBox {
+  padding: var(--space-lg);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-lg);
+  padding-top: var(--space-2xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.primaryButton,
+.secondaryButton {
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.primaryButton {
+  background: var(--color-accent);
+  color: white;
+}
+
+.primaryButton:hover {
+  background: var(--color-accent-hover);
+}
+
+.secondaryButton {
+  background: var(--color-surface-1);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-border);
+}
+
+.secondaryButton:hover {
+  background: var(--color-row-hover);
+  border-color: var(--color-border-strong);
+}
+
+.notFound {
+  padding: var(--space-3xl) var(--space-lg);
+  text-align: center;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-1);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border-strong);
+}
+
+.notFound h1 {
+  color: var(--color-ink);
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-xl);
+}
+
+.notFound p {
+  margin: 0 0 var(--space-lg);
+}
