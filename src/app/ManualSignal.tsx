@@ -1,48 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { createTaskAction } from "@/app/tasks/actions";
-import styles from "./TaskQuickAdd.module.css";
+import styles from "./ManualSignal.module.css";
 
-export interface TaskQuickAddProps {
+interface ManualSignalProps {
   leadId?: string;
   companyKey?: string;
   contactId?: string;
-  onTaskCreated?: () => void;
+  onSignalAdded?: () => void;
 }
 
-export function TaskQuickAdd({
+export function ManualSignal({
   leadId,
   companyKey,
   contactId,
-  onTaskCreated,
-}: TaskQuickAddProps) {
+  onSignalAdded,
+}: ManualSignalProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [signal, setSignal] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!signal.trim()) return;
 
     setIsSubmitting(true);
     setError(null);
     try {
-      await createTaskAction({
-        title,
-        leadId,
-        companyKey,
-        contactId,
-        dueAt: dueDate ? new Date(dueDate) : undefined,
+      const res = await fetch("/api/signals/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signal,
+          leadId,
+          companyKey,
+          contactId,
+        }),
       });
-      setTitle("");
-      setDueDate("");
+
+      if (!res.ok) throw new Error("Failed to save signal");
+
+      setSignal("");
       setIsOpen(false);
-      onTaskCreated?.();
+      onSignalAdded?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create task");
+      setError(err instanceof Error ? err.message : "Failed to save signal");
     } finally {
       setIsSubmitting(false);
     }
@@ -51,7 +54,7 @@ export function TaskQuickAdd({
   if (!isOpen) {
     return (
       <button className={styles.toggle} onClick={() => setIsOpen(true)}>
-        + Add task
+        + Paste signal
       </button>
     );
   }
@@ -59,37 +62,28 @@ export function TaskQuickAdd({
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       {error && <div className={styles.error}>{error}</div>}
-      <input
-        type="text"
-        placeholder="Task title..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className={styles.titleInput}
+      <textarea
+        value={signal}
+        onChange={(e) => setSignal(e.target.value)}
+        placeholder="Paste any signal you found — LinkedIn post, job posting, news, etc."
+        className={styles.textarea}
         autoFocus
-        disabled={isSubmitting}
-      />
-      <input
-        type="date"
-        value={dueDate}
-        onChange={(e) => setDueDate(e.target.value)}
-        className={styles.dateInput}
         disabled={isSubmitting}
       />
       <div className={styles.actions}>
         <button
           type="submit"
           className={styles.submitButton}
-          disabled={!title.trim() || isSubmitting}
+          disabled={!signal.trim() || isSubmitting}
         >
-          {isSubmitting ? "Creating..." : "Create"}
+          {isSubmitting ? "Saving..." : "Save"}
         </button>
         <button
           type="button"
           className={styles.cancelButton}
           onClick={() => {
             setIsOpen(false);
-            setTitle("");
-            setDueDate("");
+            setSignal("");
             setError(null);
           }}
           disabled={isSubmitting}

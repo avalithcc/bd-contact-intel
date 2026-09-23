@@ -1,0 +1,112 @@
+.backLink {
+  display: inline-block;
+  margin-bottom: var(--space-2xl);
+  color: var(--color-ink-soft);
+  text-decoration: none;
+  font-size: var(--text-md);
+  transition: color var(--transition-fast);
+}
+
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.header {
+  margin-bottom: var(--space-3xl);
+  padding-bottom: var(--space-2xl);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.headerTop h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-lg);
+}
+
+.infoRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.infoLabel {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.infoValue {
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.infoValue:hover {
+  color: var(--color-accent);
+}
+
+.seniorityBadge {
+  display: inline-block;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(213, 37, 47, 0.1);
+  color: var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  width: fit-content;
+}
+
+.section {
+  margin-bottom: var(--space-3xl);
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notFound {
+  padding: var(--space-3xl) var(--space-lg);
+  text-align: center;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-1);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border-strong);
+}
+
+.notFound h1 {
+  color: var(--color-ink);
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-xl);
+}
+
+.notFound p {
+  margin: 0 0 var(--space-lg);
+}

@@ -25,41 +25,41 @@
   border-radius: var(--radius-md);
 }
 
+.textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+}
+
+.textarea::placeholder {
+  color: var(--color-ink-muted);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(213, 37, 47, 0.1);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .error {
   padding: var(--space-md);
   background: rgba(220, 38, 38, 0.1);
   color: var(--color-danger);
   border-radius: var(--radius-sm);
   font-size: var(--text-base);
-}
-
-.titleInput,
-.dateInput {
-  padding: var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-body);
-  font-size: var(--text-md);
-  background: var(--color-surface-2);
-  color: var(--color-ink);
-  transition: border-color var(--transition-fast);
-}
-
-.titleInput::placeholder {
-  color: var(--color-ink-muted);
-}
-
-.titleInput:focus,
-.dateInput:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(213, 37, 47, 0.1);
-}
-
-.titleInput:disabled,
-.dateInput:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .actions {
@@ -81,7 +81,7 @@
 
 .submitButton {
   background: var(--color-accent);
-  color: var(--color-ink);
+  color: white;
 }
 
 .submitButton:hover:not(:disabled) {

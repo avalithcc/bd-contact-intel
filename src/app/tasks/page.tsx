@@ -3,6 +3,7 @@ import { getOpenTasks, getOverdueTasks } from "@/lib/tasks/queries";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import { CompleteTaskButton } from "./CompleteTaskButton";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -105,9 +106,7 @@ function TaskCard({ task }: { task: any }) {
           )}
         </div>
       </div>
-      <button className={styles.completeButton} aria-label="Mark complete">
-        ✓
-      </button>
+      <CompleteTaskButton taskId={task.id} />
     </div>
   );
 }

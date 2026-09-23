@@ -1,6 +1,8 @@
 import { getCompanyByKey } from "@/lib/companies/queries";
 import { getActivitiesByCompany } from "@/lib/activity/queries";
 import { ActivityTimeline } from "@/app/ActivityTimeline";
+import { AddActivityButton } from "@/app/companies/AddActivityButton";
+import { EditCompanyButton } from "@/app/companies/EditCompanyButton";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -89,8 +91,14 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.primaryButton}>Edit company</button>
-        <button className={styles.secondaryButton}>Add activity</button>
+        <EditCompanyButton
+          companyKey={key}
+          displayName={company.displayName}
+          relationshipStage={company.relationshipStage}
+          revenuePotential={company.revenuePotential}
+          notes={company.notes}
+        />
+        <AddActivityButton companyKey={key} />
       </div>
     </main>
   );

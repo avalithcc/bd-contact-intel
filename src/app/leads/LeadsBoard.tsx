@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -11,24 +12,33 @@ import {
 } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Lead } from "@/db/schema";
+import { updateLeadStatusAction } from "./actions";
 import styles from "./LeadsBoard.module.css";
 
 interface LeadsBoardProps {
   leads: any[];
-  onDragEnd?: (leadId: string, newStatus: string) => void;
 }
 
 const STATUSES = ["new", "contacted", "replied", "meeting", "discarded"];
 
-export function LeadsBoard({ leads, onDragEnd }: LeadsBoardProps) {
-  const handleDragEnd = (event: DragEndEvent) => {
+export function LeadsBoard({ leads }: LeadsBoardProps) {
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
 
     const leadId = active.id as string;
     const newStatus = over.id as string;
-    onDragEnd?.(leadId, newStatus);
+
+    setIsUpdating(leadId);
+    try {
+      await updateLeadStatusAction(leadId, newStatus as any);
+    } catch (err) {
+      console.error("Failed to update lead status:", err);
+    } finally {
+      setIsUpdating(null);
+    }
   };
 
   return (
@@ -46,7 +56,7 @@ export function LeadsBoard({ leads, onDragEnd }: LeadsBoardProps) {
   );
 }
 
-function Column({ status, leads }: { status: string; leads: Lead[] }) {
+function Column({ status, leads }: { status: string; leads: any[] }) {
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
@@ -70,7 +80,7 @@ function Column({ status, leads }: { status: string; leads: Lead[] }) {
   );
 }
 
-function DraggableCard({ lead }: { lead: Lead }) {
+function DraggableCard({ lead }: { lead: any }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: lead.id });
 
