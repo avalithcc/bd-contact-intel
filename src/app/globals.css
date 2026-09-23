@@ -7,17 +7,15 @@
    See /DESIGN.md at the repo root for the full system reference.
    ========================================================================= */
 :root {
-  /* ---- surfaces (dark canvas + lift ladder) ----
-     Dark is the default token set — unauthenticated/no-cookie visitors and
-     anyone with theme=dark see exactly what shipped before theming existed.
-     Light overrides live in the shared selector list below (see
-     "[data-theme='light'], ..."). */
-  --color-canvas: #0b0a11;
-  --color-surface-1: #0e0d15;
-  --color-surface-2: #131119;
+  /* ---- surfaces (light canvas + lift ladder) ----
+     Light is now the default token set — CRM users see clean, bright UI by default.
+     Dark overrides live in the "[data-theme='dark']" selector below. */
+  --color-canvas: #f5f4f7;
+  --color-surface-1: #fbfafc;
+  --color-surface-2: #ffffff;
   /* Neutral warm tint, reserved for the "offshore" signal badge only — not
      a general surface step (see .badge.offshore below). */
-  --color-surface-tint: #1d1215;
+  --color-surface-tint: #f3e9ea;
 
   /* ---- brand accent (red — Avalith's identity, replaces Linear's lavender) ----
      Unchanged across themes: #d5252f on white is ~5.1:1 contrast, so the
@@ -28,41 +26,30 @@
   --color-accent-focus: #b81f27;
 
   /* ---- text hierarchy ---- */
-  --color-ink: #ffffff;
-  --color-ink-soft: #8e8c99;
-  --color-ink-muted: #56545f;
+  --color-ink: #17151c;
+  --color-ink-soft: #5b5865;
+  --color-ink-muted: #8b8894;
 
   /* ---- borders ---- */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-strong: rgba(0, 0, 0, 0.16);
 
   /* ---- semantic (distinct from the brand accent, as in the Linear source) ----
-     These are darkened in the light theme override below: the dark-theme
-     values are legible on a near-black canvas but drop under WCAG AA
-     (4.5:1) as text on a white/near-white one. */
-  --color-success: #3ecf8e;
-  --color-warn: #e6a23c;
-  --color-danger: #ff6b6b;
+     WCAG AA contrast on light canvas. These are vibrant for progress bars,
+     badges, and status indicators. */
+  --color-success: #15803d;
+  --color-warn: #b45309;
+  --color-danger: #dc2626;
 
-  /* ---- translucent fills (badges, row hover) ----
-     Same value in both themes — a translucent tint composited over either
-     a near-black or near-white surface stays legible; only the *opaque*
-     tokens above need per-theme overrides. Tokenized here so no hex/rgba
-     literal remains inline in a component rule. */
+  /* ---- translucent fills (badges, row hover) ---- */
   --color-badge-accent-bg: rgba(213, 37, 47, 0.12);
-  --color-badge-success-bg: rgba(62, 207, 142, 0.12);
-  /* Used only by the "medium" email-suggestion confidence chip below —
-     translucent version of --color-warn, same rationale as the other
-     --color-badge-*-bg tokens. */
-  --color-badge-warn-bg: rgba(230, 162, 60, 0.12);
-  --color-row-hover: rgba(255, 255, 255, 0.02);
+  --color-badge-success-bg: rgba(21, 128, 61, 0.12);
+  --color-badge-warn-bg: rgba(180, 83, 9, 0.12);
+  --color-row-hover: rgba(0, 0, 0, 0.03);
 
   /* ---- select chevron (theme-aware data-URI icon) ----
-     Stroke color is baked into the SVG data URI, so it can't consume
-     currentColor — instead the whole background-image is a token,
-     re-pointed at a same-shaped SVG with the light-theme ink-soft hex in
-     the light override below. */
-  --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+     Light theme: dark ink-soft stroke. */
+  --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b5865' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 
   /* ---- type scale ---- */
   --text-xs: 0.72rem;
@@ -95,9 +82,8 @@
   --control-height: 2.5rem;
 
   /* ---- elevation ----
-     Softer/lighter in the light theme override below — a shadow this dark
-     reads as a heavy black smudge on a near-white canvas. */
-  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
+     Soft shadow on light canvas. */
+  --shadow-dropdown: 0 8px 24px rgba(23, 21, 28, 0.12);
 
   /* ---- motion ---- */
   --transition-fast: 0.15s ease;
@@ -149,56 +135,51 @@
 }
 
 /* =========================================================================
-   Light theme
-   One override block feeds both trigger paths so the light palette is
-   defined exactly once:
-     - `[data-theme="light"]` — explicit choice, set as an attribute on
-       <html> server-side from the `theme` cookie (see layout.tsx). Read
-       this file top-down: `:root` above is dark-by-default, so only `light`
-       needs an override. An explicit `data-theme="dark"` needs no rule: it
-       stays dark because the OS media query below is guarded by
-       `:not([data-theme])` and never matches once the attribute is set.
-     - `:root:not([data-theme]) { @media (prefers-color-scheme: light) }` —
-       theme=system with no data-theme attribute rendered: falls through to
-       the OS/browser preference.
+   Dark theme (override)
+   Light is now the default. Dark theme is an explicit opt-in via
+   `[data-theme="dark"]` attribute on <html> (set from theme cookie in layout.tsx).
    ========================================================================= */
-[data-theme="light"] {
-  --color-canvas: var(--light-canvas);
-  --color-surface-1: var(--light-surface-1);
-  --color-surface-2: var(--light-surface-2);
-  --color-surface-tint: var(--light-surface-tint);
-  --color-ink: var(--light-ink);
-  --color-ink-soft: var(--light-ink-soft);
-  --color-ink-muted: var(--light-ink-muted);
-  --color-border: var(--light-border);
-  --color-border-strong: var(--light-border-strong);
-  --color-success: var(--light-success);
-  --color-warn: var(--light-warn);
-  --color-danger: var(--light-danger);
-  --shadow-dropdown: var(--light-shadow-dropdown);
-  --color-row-hover: var(--light-row-hover);
-  --icon-select-chevron: var(--light-icon-select-chevron);
+[data-theme="dark"] {
+  --color-canvas: #0b0a11;
+  --color-surface-1: #0e0d15;
+  --color-surface-2: #131119;
+  --color-surface-tint: #1d1215;
+  --color-ink: #ffffff;
+  --color-ink-soft: #8e8c99;
+  --color-ink-muted: #56545f;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-success: #3ecf8e;
+  --color-warn: #e6a23c;
+  --color-danger: #ff6b6b;
+  --color-badge-success-bg: rgba(62, 207, 142, 0.12);
+  --color-badge-warn-bg: rgba(230, 162, 60, 0.12);
+  --color-row-hover: rgba(255, 255, 255, 0.02);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 /* theme=system with no data-theme attribute rendered (see layout.tsx):
-   follow the OS/browser preference instead of an explicit choice. */
-@media (prefers-color-scheme: light) {
+   follow the OS/browser preference (light is default). */
+@media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --color-canvas: var(--light-canvas);
-    --color-surface-1: var(--light-surface-1);
-    --color-surface-2: var(--light-surface-2);
-    --color-surface-tint: var(--light-surface-tint);
-    --color-ink: var(--light-ink);
-    --color-ink-soft: var(--light-ink-soft);
-    --color-ink-muted: var(--light-ink-muted);
-    --color-border: var(--light-border);
-    --color-border-strong: var(--light-border-strong);
-    --color-success: var(--light-success);
-    --color-warn: var(--light-warn);
-    --color-danger: var(--light-danger);
-    --shadow-dropdown: var(--light-shadow-dropdown);
-    --color-row-hover: var(--light-row-hover);
-    --icon-select-chevron: var(--light-icon-select-chevron);
+    --color-canvas: #0b0a11;
+    --color-surface-1: #0e0d15;
+    --color-surface-2: #131119;
+    --color-surface-tint: #1d1215;
+    --color-ink: #ffffff;
+    --color-ink-soft: #8e8c99;
+    --color-ink-muted: #56545f;
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-border-strong: rgba(255, 255, 255, 0.18);
+    --color-success: #3ecf8e;
+    --color-warn: #e6a23c;
+    --color-danger: #ff6b6b;
+    --color-badge-success-bg: rgba(62, 207, 142, 0.12);
+    --color-badge-warn-bg: rgba(230, 162, 60, 0.12);
+    --color-row-hover: rgba(255, 255, 255, 0.02);
+    --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
+    --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
 }
 

@@ -1,26 +1,11 @@
 ---
-version: alpha
+version: beta
 name: Avalith-bd-contact-intel-design
-description: "Adapted from awesome-design-md's Linear DESIGN.md (https://github.com/VoltAgent/awesome-design-md, design-md/linear.app/DESIGN.md). STRUCTURE only — color roles, type scale, spacing scale, radii, elevation, component specs and states — is taken from the Linear source. Every color, font, and mark is Avalith's own: a near-black canvas (#0b0a11) with a two-step surface lift, Avalith red (#d5252f) as the single chromatic accent (replacing Linear's lavender-blue), Inter for body/display and JetBrains Mono for mono/eyebrow labels, and the 'avalith.' wordmark with its signature red trailing dot. Reference implementation: src/app/globals.css."
+description: "Light theme with vibrant semantic colors, matching Ava Foundry's visual language. Avalith red (#d5252f) remains the primary accent. Light canvas with semantic success (green), warn (amber), danger (red) for progress bars, badges, and status indicators. Inter + JetBrains Mono typography. Generous spacing for CRM contacts/tasks/activities clarity. Reference implementation: src/app/globals.css."
+
+# DEFAULT: Light theme (not dark)
 
 colors:
-  accent: "#d5252f"
-  accent-hover: "#e6434c"
-  accent-focus: "#b81f27"
-  ink: "#ffffff"
-  ink-soft: "#8e8c99"
-  ink-muted: "#56545f"
-  canvas: "#0b0a11"
-  surface-1: "#0e0d15"
-  surface-2: "#131119"
-  surface-tint: "#1d1215"
-  border: "rgba(255,255,255,0.08)"
-  border-strong: "rgba(255,255,255,0.18)"
-  semantic-success: "#3ecf8e"
-  semantic-warn: "#e6a23c"
-  semantic-danger: "#ff6b6b"
-
-colors-light:
   accent: "#d5252f"
   accent-hover: "#e6434c"
   accent-focus: "#b81f27"
@@ -36,6 +21,30 @@ colors-light:
   semantic-success: "#15803d"
   semantic-warn: "#b45309"
   semantic-danger: "#dc2626"
+  # Avatar palette — distinct colors for contact initials
+  avatar-1: "#6b5b95"
+  avatar-2: "#c5b4a5"
+  avatar-3: "#88398a"
+  avatar-4: "#d4a574"
+  avatar-5: "#5b8e7d"
+  avatar-6: "#a4b5c7"
+
+colors-dark:
+  accent: "#d5252f"
+  accent-hover: "#e6434c"
+  accent-focus: "#b81f27"
+  ink: "#ffffff"
+  ink-soft: "#8e8c99"
+  ink-muted: "#56545f"
+  canvas: "#0b0a11"
+  surface-1: "#0e0d15"
+  surface-2: "#131119"
+  surface-tint: "#1d1215"
+  border: "rgba(255,255,255,0.08)"
+  border-strong: "rgba(255,255,255,0.18)"
+  semantic-success: "#3ecf8e"
+  semantic-warn: "#e6a23c"
+  semantic-danger: "#ff6b6b"
 
 typography:
   h1:
