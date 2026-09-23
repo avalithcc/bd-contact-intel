@@ -134,9 +134,10 @@ export async function importLeads(
           country: sql`excluded.country`,
           attendeeType: sql`excluded.attendee_type`,
           email: sql`excluded.email`,
-          emailStatus: sql`excluded.email_status`,
-          emailConfidence: sql`excluded.email_confidence`,
-          emailSource: sql`excluded.email_source`,
+          // emailStatus/emailConfidence/emailSource deliberately NOT updated:
+          // those are set by live Hunter lookups or manual edits and must survive
+          // re-imports. A routine push_leads.py re-run would silently overwrite
+          // verified email with none, losing a BD's enrichment work.
           // Only overwrite ownerBdId when this import actually resolved one
           // — a stale/garbage owner value in a later re-import must not
           // erase a previously-assigned, possibly manually-corrected owner.

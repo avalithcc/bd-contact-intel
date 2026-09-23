@@ -63,6 +63,13 @@ export const contact = pgTable(
     receivedCount: integer("received_count").notNull().default(0),
     firstMessageAt: timestamp("first_message_at"),
     lastMessageAt: timestamp("last_message_at"),
+    // Email lookup results — persisted from live Hunter.io queries or contact
+    // creation/enrichment. Follows lead.email_status naming: 'verified' | 'probable' | 'none'.
+    emailStatus: text("email_status").notNull().default("none"),
+    // Confidence score from the richest email source (0-100); null when not available.
+    emailConfidence: integer("email_confidence"),
+    // Which source produced the current email (e.g. "linkedin_export", "hunter_finder").
+    emailSource: text("email_source"),
     // Whether the BD sent the first message in the earliest conversation
     // with this contact. Null until at least one message has been imported.
     initiatedByMe: boolean("initiated_by_me"),
@@ -609,3 +616,188 @@ export const lead = pgTable(
 
 export type Lead = typeof lead.$inferSelect;
 export type NewLead = typeof lead.$inferInsert;
+
+// Company entity — team-shared CRM tracking. Keyed by the same companyKey
+// as targetCompany (via normalizeCompanyKey), but separate table so ATS
+// config/columns stay isolated.
+export const company = pgTable("company", {
+  companyKey: text("company_key").primaryKey(),
+  displayName: text("display_name").notNull(),
+  // Free text, app-validated pipeline: 'prospect' | 'qualified' | 'proposal_sent' | 'won' | 'lost'
+  relationshipStage: text("relationship_stage"),
+  // Revenue potential in undefined unit; nullable until estimated. Never
+  // used for calculations in MVP — display-only for now.
+  revenuePotential: integer("revenue_potential"),
+  notes: text("notes"),
+  // These are denormalized (not FKs) to preserve history if the BD is removed.
+  createdByBdId: uuid("created_by_bd_id"),
+  updatedByBdId: uuid("updated_by_bd_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Company = typeof company.$inferSelect;
+export type NewCompany = typeof company.$inferInsert;
+
+// Activity timeline for leads/companies/contacts. Exactly one of (leadId,
+// companyKey, contactId) is set (enforced by CHECK constraint). contactOwnerBdId
+// is denormalized (mirrors message.bdId pattern) so contact-activity reads
+// stay privacy-scoped without a join.
+export const activity = pgTable(
+  "activity",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => lead.id, { onDelete: "cascade" }),
+    companyKey: text("company_key").references(() => company.companyKey, {
+      onDelete: "cascade",
+    }),
+    contactId: uuid("contact_id"),
+    // Denormalized from contact.bd_id for privacy scoping without a join.
+    // Null if activity is company/lead-scoped.
+    contactOwnerBdId: uuid("contact_owner_bd_id"),
+    // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | etc.
+    type: text("type").notNull(),
+    // Metadata keyed by type: { gmailMessageId, gmailThreadId } for email_sent,
+    // { hunterScore, hunterVerified } for hunter_lookup, etc.
+    metadata: jsonb("metadata").notNull().default({}),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // Exactly one subject FK is set — checked at application level, not DB constraint,
+    // since Drizzle doesn't expose PostgreSQL CHECK syntax for composite conditions.
+    byLead: index("activity_lead_idx").on(t.leadId),
+    byCompany: index("activity_company_idx").on(t.companyKey),
+    byContact: index("activity_contact_idx").on(t.contactId),
+    byType: index("activity_type_idx").on(t.type),
+    byCreated: index("activity_created_idx").on(t.createdAt),
+  }),
+);
+
+export type Activity = typeof activity.$inferSelect;
+export type NewActivity = typeof activity.$inferInsert;
+
+// Task list for leads/companies/contacts. Same subject-FK pattern as activity.
+export const task = pgTable(
+  "task",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => lead.id, { onDelete: "cascade" }),
+    companyKey: text("company_key").references(() => company.companyKey, {
+      onDelete: "cascade",
+    }),
+    contactId: uuid("contact_id"),
+    assignedToBdId: uuid("assigned_to_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    description: text("description"),
+    // 'open' | 'done' | 'cancelled'
+    status: text("status").notNull().default("open"),
+    dueAt: timestamp("due_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byLead: index("task_lead_idx").on(t.leadId),
+    byCompany: index("task_company_idx").on(t.companyKey),
+    byContact: index("task_contact_idx").on(t.contactId),
+    byAssignee: index("task_assignee_idx").on(t.assignedToBdId),
+    byStatus: index("task_status_idx").on(t.status),
+    byDue: index("task_due_idx").on(t.dueAt),
+  }),
+);
+
+export type Task = typeof task.$inferSelect;
+export type NewTask = typeof task.$inferInsert;
+
+// Gmail account connection per BD. Refresh token encrypted at rest
+// (AES-256-GCM via GMAIL_TOKEN_ENCRYPTION_KEY env var).
+export const emailAccount = pgTable(
+  "email_account",
+  {
+    bdId: uuid("bd_id")
+      .primaryKey()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    emailAddress: text("email_address").notNull(),
+    // Encrypted refresh token — never decrypt unless sending; always
+    // re-encrypt on update.
+    refreshTokenEncrypted: text("refresh_token_encrypted"),
+    // 'connected' | 'error' | 'revoked'
+    status: text("status").notNull().default("connected"),
+    // Last error message from Gmail API, for debugging reconnection issues.
+    lastErrorMessage: text("last_error_message"),
+    connectedAt: timestamp("connected_at").notNull().defaultNow(),
+    disconnectedAt: timestamp("disconnected_at"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byStatus: index("email_account_status_idx").on(t.status),
+  }),
+);
+
+export type EmailAccount = typeof emailAccount.$inferSelect;
+export type NewEmailAccount = typeof emailAccount.$inferInsert;
+
+// Generic signal/research data for leads/companies/contacts. Discriminated by
+// source ('linkedin_apify' | 'manual_paste' | 'web_research' | etc.) and a
+// single subject FK (leadId | companyKey | contactId). Same privacy/application-level
+// enforcement as activity table.
+export const signal = pgTable(
+  "signal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => lead.id, { onDelete: "cascade" }),
+    companyKey: text("company_key").references(() => company.companyKey, {
+      onDelete: "cascade",
+    }),
+    contactId: uuid("contact_id"),
+    // 'linkedin_apify' | 'manual_paste' | 'web_research'
+    source: text("source").notNull(),
+    // Source-specific data: { profile, headline, connections, headline_history }
+    // for linkedin_apify; { text, pastedAt } for manual_paste; { title, url, snippet,
+    // publishedAt } for web_research.
+    data: jsonb("data").notNull().default({}),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byLead: index("signal_lead_idx").on(t.leadId),
+    byCompany: index("signal_company_idx").on(t.companyKey),
+    byContact: index("signal_contact_idx").on(t.contactId),
+    bySource: index("signal_source_idx").on(t.source),
+  }),
+);
+
+export type Signal = typeof signal.$inferSelect;
+export type NewSignal = typeof signal.$inferInsert;
+
+// One LinkedIn scrape run via Apify, for observability — mirrors syncRun pattern.
+export const linkedinScrapeJob = pgTable(
+  "linkedin_scrape_job",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Null until the run is requested for a specific contact/lead/company;
+    // for now, all runs are ad-hoc, so this is primarily for future batch-job
+    // tracking if needed.
+    contactId: uuid("contact_id"),
+    // Apify's own run ID; used to poll job status and retrieve dataset.
+    apifyRunId: text("apify_run_id").notNull(),
+    // 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out'
+    status: text("status").notNull().default("queued"),
+    // Number of profiles scraped (set when status = 'succeeded').
+    profilesScraped: integer("profiles_scraped").default(0),
+    // Last error or cause if status = 'failed'.
+    errorMessage: text("error_message"),
+    requestedAt: timestamp("requested_at").notNull().defaultNow(),
+    startedAt: timestamp("started_at"),
+    finishedAt: timestamp("finished_at"),
+  },
+  (t) => ({
+    byContact: index("linkedin_scrape_job_contact_idx").on(t.contactId),
+    byApifyRunId: index("linkedin_scrape_job_apify_run_idx").on(t.apifyRunId),
+    byStatus: index("linkedin_scrape_job_status_idx").on(t.status),
+  }),
+);
+
+export type LinkedinScrapeJob = typeof linkedinScrapeJob.$inferSelect;
+export type NewLinkedinScrapeJob = typeof linkedinScrapeJob.$inferInsert;
