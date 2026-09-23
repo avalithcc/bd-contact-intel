@@ -118,7 +118,9 @@ const RULES: Rule[] = [
       "svp",
       "evp",
       "head of (?:engineering|technology|software|tech|development|it|platform|data|infrastructure)",
-      "(?:director|directora)(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
+      // The comma form ("Director, Software Engineering") is how LinkedIn
+      // renders many US titles, and without it these fall through to developers.
+      "(?:director|directora),?(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
       "engineering director",
       "technical director",
       "it director",
@@ -137,6 +139,10 @@ const RULES: Rule[] = [
       "software (?:engineering|development) manager",
       "development manager",
       "dev manager",
+      // Discipline-prefixed managers ("SRE Manager", "QA Manager") are listed
+      // explicitly rather than as a generic "<word> manager", which would
+      // swallow sales, marketing and account managers.
+      "(?:sre|qa|devops|data|platform|infrastructure|mobile|frontend|front-?end|backend|back-?end|cloud|security) manager",
       "l[ií]der de (?:equipo|desarrollo)",
     ),
   ],
@@ -146,11 +152,17 @@ const RULES: Rule[] = [
       "tech(?:nical)? lead(?:er)?",
       "team lead(?:er)?",
       "lead (?:software |backend |frontend |full ?stack )?(?:engineer|developer)",
+      // "Lead" also appears as a suffix ("QA Lead", "Frontend Lead") and with
+      // disciplines the prefix form never covered. Both were landing in
+      // developers, which hid real technical decision-makers from outreach.
+      "(?:qa|devops|sre|data|ai|ml|mobile|frontend|front-?end|backend|back-?end|full ?stack|software|development|automation|cloud|security|platform)(?: automation)? lead(?:er)?",
+      "lead (?:ai|ml|machine learning|data|qa|devops|sre|cloud|security|mobile|platform)(?: \\w+)? (?:engineer|developer)",
+      "(?:software|development) project lead(?:er)?",
       "architect",
       "arquitect[oa]",
       "l[ií]der t[eé]cnico",
-      "staff (?:software )?engineer",
-      "principal (?:software )?engineer",
+      "staff (?:\\w+ )?engineer",
+      "principal (?:\\w+ )?engineer",
     ),
   ],
   [
