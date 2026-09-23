@@ -81,13 +81,13 @@ export function UploadLeadsForm({ labels }: { labels: LeadsUploadLabels }) {
 
       {state?.ok && (
         <>
-          <p className="muted mb-0">{labels.importedSummary(state.upserted ?? 0)}</p>
+          <p className="muted mb-0">{labels.importedSummary.replace("{n}", String(state.upserted ?? 0))}</p>
           {state.matchedOwners && state.matchedOwners.length > 0 && (
-            <p className="muted mb-0">{labels.matchedOwnersSummary(state.matchedOwners.join(", "))}</p>
+            <p className="muted mb-0">{labels.matchedOwnersSummary.replace("{owners}", state.matchedOwners.join(", "))}</p>
           )}
           {state.unmatchedOwners && state.unmatchedOwners.length > 0 && (
             <p className="text-warn mb-0">
-              {labels.unmatchedOwnersSummary(state.unmatchedOwners.join(", "))}
+              {labels.unmatchedOwnersSummary.replace("{owners}", state.unmatchedOwners.join(", "))}
             </p>
           )}
         </>

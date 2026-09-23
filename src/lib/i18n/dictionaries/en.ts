@@ -394,10 +394,13 @@ export const en = {
     columnaCorreosFileLabel: "columna_correos.tsv (optional)",
     import: "Import",
     importing: "Importing…",
-    importedSummary: (n: number) => `Imported/updated ${n} leads.`,
-    matchedOwnersSummary: (owners: string) => `Matched owners: ${owners}.`,
-    unmatchedOwnersSummary: (owners: string) =>
-      `Could not match these owner names to a BD, left unassigned: ${owners}.`,
+    // Placeholder templates, not formatter functions: these cross into a
+    // "use client" component (see src/lib/leads/labels.ts) and React cannot
+    // serialize functions. Substitution happens in UploadLeadsForm.tsx.
+    importedSummary: "Imported/updated {n} leads.",
+    matchedOwnersSummary: "Matched owners: {owners}.",
+    unmatchedOwnersSummary:
+      "Could not match these owner names to a BD, left unassigned: {owners}.",
     importErrors: {
       missingSourceKey: "Enter a source key first.",
       missingFiles: "Choose at least one file to import.",

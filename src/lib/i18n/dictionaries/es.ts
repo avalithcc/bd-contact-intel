@@ -341,10 +341,10 @@ export const es: typeof en = {
     columnaCorreosFileLabel: "columna_correos.tsv (opcional)",
     import: "Importar",
     importing: "Importando…",
-    importedSummary: (n) => `Se importaron/actualizaron ${n} leads.`,
-    matchedOwnersSummary: (owners) => `Responsables asignados: ${owners}.`,
-    unmatchedOwnersSummary: (owners) =>
-      `No se pudieron asignar estos nombres a un BD, quedaron sin asignar: ${owners}.`,
+    importedSummary: "Se importaron/actualizaron {n} leads.",
+    matchedOwnersSummary: "Responsables asignados: {owners}.",
+    unmatchedOwnersSummary:
+      "No se pudieron asignar estos nombres a un BD, quedaron sin asignar: {owners}.",
     importErrors: {
       missingSourceKey: "Ingresa primero una clave de fuente.",
       missingFiles: "Elige al menos un archivo para importar.",
