@@ -312,7 +312,8 @@ label {
 input[type="text"],
 input[type="password"],
 input[type="file"],
-select {
+select,
+textarea {
   background: var(--color-canvas);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -330,22 +331,34 @@ select {
 input[type="text"]:hover,
 input[type="password"]:hover,
 input[type="file"]:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: var(--color-border-strong);
 }
 input[type="text"]:focus,
 input[type="password"]:focus,
 input[type="file"]:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--color-accent);
 }
 input[type="text"]:disabled,
 input[type="password"]:disabled,
 input[type="file"]:disabled,
-select:disabled {
+select:disabled,
+textarea:disabled {
   opacity: 0.55;
   cursor: default;
+}
+/* Multi-line free text (e.g. lead notes) — same skin as the single-line
+   controls above, but height comes from `rows` instead of the shared
+   --control-height, and line spacing needs more room. */
+textarea {
+  height: auto;
+  padding: 0.55rem 0.7rem;
+  line-height: 1.4;
+  resize: vertical;
 }
 input[type="file"] {
   height: auto;
@@ -370,6 +383,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--color-accent-focus);

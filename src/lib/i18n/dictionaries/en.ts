@@ -2,6 +2,7 @@ import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { CompanyCategoryKey } from "@/lib/companyCategories";
 import type { RelationshipFilterKey } from "@/lib/queries";
 import type { MarketKey } from "@/lib/hiring/markets";
+import type { EmailStatusKey, LeadStatusKey } from "@/lib/leads/types";
 
 // Display labels for the role-group taxonomy. Keys are defined once in
 // src/lib/roleGroups.ts (ROLE_GROUPS) and stored/queried by key — only the
@@ -58,6 +59,24 @@ const markets: Record<MarketKey, string> = {
   other: "Other",
 };
 
+// Display labels for a lead's email status. Keys are defined once in
+// src/lib/leads/types.ts (EMAIL_STATUSES).
+const leadEmailStatuses: Record<EmailStatusKey, string> = {
+  verified: "Verified",
+  probable: "Probable",
+  none: "No email",
+};
+
+// Display labels for a lead's pipeline status. Keys are defined once in
+// src/lib/leads/types.ts (LEAD_STATUSES).
+const leadStatuses: Record<LeadStatusKey, string> = {
+  new: "New",
+  contacted: "Contacted",
+  replied: "Replied",
+  meeting: "Meeting",
+  discarded: "Discarded",
+};
+
 export const en = {
   localeName: { en: "EN", es: "ES" },
   themeName: { light: "Light", dark: "Dark", system: "System" },
@@ -71,6 +90,7 @@ export const en = {
     whatsNew: "Contact Opportunities",
     hiringSignals: "Open Roles",
     boardDiscovery: "Job Board Discovery",
+    leadsNav: "Leads",
     goBack: "Go back",
     prev: "← prev",
     next: "next →",
@@ -117,6 +137,8 @@ export const en = {
   companyCategories,
   relationshipFilters,
   markets,
+  leadEmailStatuses,
+  leadStatuses,
 
   home: {
     title: "contact base",
@@ -286,6 +308,101 @@ export const en = {
     messageLanguageEs: "Español",
     messageLanguageEn: "English",
     cancelChooseLanguage: "Cancel",
+  },
+
+  leads: {
+    eyebrow: "// leads",
+    title: "leads",
+    subtitle: "Shared team leads imported from event attendee lists, one owner per lead.",
+    nameFilterLabel: "Name",
+    nameFilterPlaceholder: "First or last name",
+    companyFilterLabel: "Company",
+    companyFilterPlaceholder: "Company name",
+    industryGroupLabel: "Industry",
+    allIndustryGroups: "All industries",
+    seniorityLabel: "Seniority",
+    allSeniorities: "All seniorities",
+    ownerLabel: "Owner",
+    allOwners: "All owners",
+    ownerMine: "Mine",
+    ownerUnassigned: "Unassigned",
+    emailStatusLabel: "Email",
+    allEmailStatuses: "Any email status",
+    statusLabel: "Status",
+    allStatuses: "All statuses",
+    candidatesEyebrow: "// candidates",
+    tableName: "Name",
+    tableJobTitle: "Job title",
+    tableSeniority: "Seniority",
+    tableCompany: "Company",
+    tableIndustry: "Industry",
+    tableEmail: "Email",
+    tableOwner: "Owner",
+    tableStatus: "Status",
+    noLeads: "No leads match this filter.",
+    unassignedOwner: "Unassigned",
+    noEmail: "—",
+
+    // /leads/[id]
+    detailEyebrow: "// lead",
+    backToLeads: "Back to leads",
+    fieldFirstName: "First name",
+    fieldLastName: "Last name",
+    fieldJobTitle: "Job title",
+    fieldSeniority: "Seniority",
+    fieldCompany: "Company",
+    fieldCompanyGroup: "Company group",
+    fieldIndustry: "Industry",
+    fieldIndustryGroup: "Industry group",
+    fieldCity: "City",
+    fieldRegion: "Region",
+    fieldCountry: "Country",
+    fieldAttendeeType: "Attendee type",
+    fieldEmail: "Email",
+    fieldEmailStatus: "Email status",
+    fieldEmailConfidence: "Email confidence",
+    fieldEmailSource: "Email source",
+    fieldOwner: "Owner",
+    fieldStatus: "Status",
+    fieldNotes: "Notes",
+    fieldNotesPlaceholder: "Free-text notes about this lead…",
+    fieldUpdatedBy: (name: string) => `Last updated by ${name}`,
+    fieldUpdatedAt: (date: string) => `on ${date}`,
+    neverUpdated: "Not edited yet.",
+    fieldImportedAt: (date: string) => `Last imported ${date}`,
+    fieldSource: (key: string) => `Source: ${key}`,
+    saveChanges: "Save changes",
+    savingChanges: "Saving…",
+    savedChanges: "Saved.",
+    saveError: "Could not save changes. Try again.",
+    empty: "—",
+
+    // Import controls (see src/app/leads/UploadLeadsForm.tsx)
+    importEyebrow: "// import",
+    importTitle: "Import leads",
+    importHint:
+      "Upload one or more of the event export files below. Files are merged by attendee id — the mails-hunter file wins over mails-probables, which wins over the decisores file, which wins over the plain attendees file.",
+    sourceKeyLabel: "Source key",
+    sourceKeyPlaceholder: "e.g. fi-arg-2026",
+    sourceNameLabel: "Source display name",
+    sourceNamePlaceholder: "e.g. FI ARG 2026",
+    attendeesFileLabel: "Attendees CSV",
+    decisoresFileLabel: "Decisores (bancos/fintech) CSV",
+    hunterFileLabel: "Mails — hunter CSV",
+    probablesFileLabel: "Mails — probables CSV",
+    correosFinalFileLabel: "correos_final.csv (optional)",
+    columnaCorreosFileLabel: "columna_correos.tsv (optional)",
+    import: "Import",
+    importing: "Importing…",
+    importedSummary: (n: number) => `Imported/updated ${n} leads.`,
+    matchedOwnersSummary: (owners: string) => `Matched owners: ${owners}.`,
+    unmatchedOwnersSummary: (owners: string) =>
+      `Could not match these owner names to a BD, left unassigned: ${owners}.`,
+    importErrors: {
+      missingSourceKey: "Enter a source key first.",
+      missingFiles: "Choose at least one file to import.",
+      genericFailed: "Import failed.",
+    },
   },
 
   whatsNew: {

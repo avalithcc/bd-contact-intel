@@ -116,6 +116,9 @@ export default async function OutreachPage({
           <Link className="secondary-btn" href="/hiring">
             {dict.common.hiringSignals}
           </Link>
+          <Link className="secondary-btn" href="/leads">
+            {dict.common.leadsNav}
+          </Link>
           <UserMenu
             label={me.name || dict.common.account}
             changePasswordHref="/account/password"

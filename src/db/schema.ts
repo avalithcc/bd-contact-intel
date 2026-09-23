@@ -507,3 +507,105 @@ export const emailDomainCheck = pgTable("email_domain_check", {
 
 export type EmailDomainCheck = typeof emailDomainCheck.$inferSelect;
 export type NewEmailDomainCheck = typeof emailDomainCheck.$inferInsert;
+
+// One import batch/event that leads are sourced from (e.g. a conference
+// attendee list). `lead.sourceKey` references this so the same event can be
+// re-imported idempotently and multiple events can coexist without their
+// attendee ids colliding. See src/lib/leads/csv.ts for the import/merge
+// logic across the several source files that describe one event.
+export const leadSource = pgTable("lead_source", {
+  key: text("key").primaryKey(),
+  displayName: text("display_name").notNull(),
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+});
+
+export type LeadSource = typeof leadSource.$inferSelect;
+export type NewLeadSource = typeof leadSource.$inferInsert;
+
+// A lead sourced from an external list (e.g. conference attendees).
+// Deliberately NOT scoped to one BD like `contact` is — explicit product
+// decision: every signed-in BD sees every lead, shared across the team,
+// with `ownerBdId` naming who is responsible for following up (distinct
+// from `updatedByBdId`, who last edited the row). See
+// src/lib/leads/csv.ts for the import/merge logic and
+// src/lib/leads/queries.ts for filtering, pagination and edits.
+export const lead = pgTable(
+  "lead",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceKey: text("source_key")
+      .notNull()
+      .references(() => leadSource.key, { onDelete: "cascade" }),
+    // The source's own row id (`attendee_id` in the fi-arg-2026 export),
+    // used with sourceKey for idempotent re-import — see the unique
+    // constraint below.
+    attendeeId: text("attendee_id").notNull(),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    jobTitle: text("job_title"),
+    seniority: text("seniority"),
+    companyRaw: text("company_raw"),
+    // Cleaned-up company name from the richer source files (`company_display`
+    // in fi-arg-2026-decisores-*.csv); falls back to companyRaw when no
+    // source row provides it.
+    companyDisplay: text("company_display"),
+    // Normalized grouping key for the same employer across name variants
+    // (`company_group` in the source files) — independent of companyKey
+    // below, which this app computes itself the same way contact.company_key
+    // is computed.
+    companyGroup: text("company_group"),
+    // Computed via src/lib/companyCategories.ts#normalizeCompanyKey from
+    // companyDisplay (or companyRaw) at import time, for consistent
+    // filtering. NOT a foreign key into target_company — leads are a
+    // separate universe from the hiring-signals company graph.
+    companyKey: text("company_key"),
+    industryRaw: text("industry_raw"),
+    industryGroup: text("industry_group"),
+    city: text("city"),
+    region: text("region"),
+    country: text("country"),
+    attendeeType: text("attendee_type"),
+    email: text("email"),
+    // 'verified' | 'probable' | 'none' — see src/lib/leads/types.ts.
+    emailStatus: text("email_status").notNull().default("none"),
+    // 0-100 confidence score from the richest source that supplied this
+    // email (the hunter file's `score` column); null when not available.
+    emailConfidence: integer("email_confidence"),
+    // Which source file produced the current email (e.g.
+    // "fi-arg-2026-mails-hunter", "correos_final"), for traceability — free
+    // text rather than a DB enum, so a new source file never needs a
+    // migration.
+    emailSource: text("email_source"),
+    ownerBdId: uuid("owner_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    // 'new' | 'contacted' | 'replied' | 'meeting' | 'discarded' — see
+    // src/lib/leads/types.ts.
+    status: text("status").notNull().default("new"),
+    notes: text("notes"),
+    updatedByBdId: uuid("updated_by_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    // Bumped on every (re-)import pass that touches this row, so "still in
+    // the latest export vs. stale" is inspectable without deleting rows.
+    lastImportedAt: timestamp("last_imported_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // one row per (event, attendee) — re-imports upsert instead of duplicating
+    sourceAttendeeUnique: unique("lead_source_attendee_unique").on(
+      t.sourceKey,
+      t.attendeeId,
+    ),
+    byOwner: index("lead_owner_idx").on(t.ownerBdId),
+    byStatus: index("lead_status_idx").on(t.status),
+    byCompanyGroup: index("lead_company_group_idx").on(t.companyGroup),
+    byIndustryGroup: index("lead_industry_group_idx").on(t.industryGroup),
+    byEmailStatus: index("lead_email_status_idx").on(t.emailStatus),
+    bySeniority: index("lead_seniority_idx").on(t.seniority),
+  }),
+);
+
+export type Lead = typeof lead.$inferSelect;
+export type NewLead = typeof lead.$inferInsert;

@@ -51,6 +51,9 @@ export default async function HiringPage({
           <Link className="secondary-btn" href="/whats-new">
             {dict.common.whatsNew}
           </Link>
+          <Link className="secondary-btn" href="/leads">
+            {dict.common.leadsNav}
+          </Link>
           <UserMenu
             label={me.name || dict.common.account}
             changePasswordHref="/account/password"
