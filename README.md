@@ -122,6 +122,84 @@ its `when` in `_journal.json` is greater than every applied one, bump it, and
 re-run. Always verify the object exists afterwards, e.g.
 `select to_regclass('public.<table>')`.
 
+## Leads ingest API (external push from lead_gen)
+
+`POST /api/leads/ingest` lets the sibling `lead_gen` repo push leads
+directly, without going through the `/leads` upload UI. Set
+`LEADS_INGEST_TOKEN` (a random string) as an env var in the deployment
+environment (e.g. Vercel project settings) — this route fails closed if
+it's unset, same as `CRON_SECRET` above.
+
+Auth: `Authorization: Bearer <LEADS_INGEST_TOKEN>` header. Missing or
+invalid → `401 { "error": "Unauthorized" }`.
+
+Request body:
+```json
+{
+  "source": { "key": "fi-arg-2026", "displayName": "FI ARG 2026" },
+  "leads": [
+    {
+      "attendeeId": "12345",
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "jobTitle": "CTO",
+      "seniority": "C-level",
+      "companyRaw": "Acme Inc",
+      "companyDisplay": "Acme",
+      "companyGroup": "Acme Group",
+      "companyKey": null,
+      "industryRaw": "Fintech",
+      "industryGroup": "Financial Services",
+      "city": "Buenos Aires",
+      "region": "CABA",
+      "country": "Argentina",
+      "attendeeType": "Attendee",
+      "email": "ada@acme.com",
+      "emailStatus": "probable",
+      "emailConfidence": 87,
+      "emailSource": "hunter",
+      "owner": "Macarena"
+    }
+  ]
+}
+```
+Field names mirror `LeadDraft` (`src/lib/leads/csv.ts`) and the `lead`
+table (`src/db/schema.ts`) — there's no `phone` field, `firstName`/`lastName`
+instead of a single `name`, `jobTitle` instead of `title`, etc. A `status`
+field is accepted and validated but never written: `importLeads` deliberately
+excludes `status` from its upsert so a BD's status edits in the app survive
+a re-import untouched (see the comment on `importLeads` in
+`src/lib/leads/queries.ts`), and this endpoint honors the same rule.
+
+- `source.key` is required, non-empty.
+- `leads` must be a non-empty array, capped at 2000 items; the request body
+  is capped at 4MB, checked before any parsing/validation work.
+- Each lead needs a stable `attendeeId`. If omitted, it's derived as
+  `sha256(\`${sourceKey}:${normalizedEmail}\`)` (hex) — so the derivation
+  requires an email; a lead with neither `attendeeId` nor `email` is skipped
+  and reported back rather than failing the whole batch.
+- `emailStatus` must be one of `verified` | `probable` | `none` if provided
+  (defaults to `probable` if an `email` is given without an explicit status,
+  `none` otherwise). An invalid value skips just that lead.
+- Upsert is idempotent, keyed on `(source_key, attendee_id)`, via the same
+  `importLeads` path the CSV importer uses — owner strings resolve through
+  `matchOwnersToBd` and a previously-assigned owner is never overwritten by
+  a re-import that doesn't resolve one.
+
+Response (`200`):
+```json
+{
+  "ok": true,
+  "upserted": 812,
+  "matchedOwners": 3,
+  "unmatchedOwners": 1,
+  "skipped": [{ "index": 42, "reason": "invalid emailStatus \"maybe\" (expected one of verified, probable, none)" }]
+}
+```
+`400` on a malformed request (bad JSON, missing `source.key`, empty/oversized
+`leads`, or a batch where every lead was skipped), with an `error` message
+and, where applicable, the same `skipped` array.
+
 ## v1 scope
 - BD identity (env stand-in; Supabase Auth comes in v2)
 - CSV import → parse → upsert into the BD's private base
