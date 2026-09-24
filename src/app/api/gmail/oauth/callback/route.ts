@@ -62,20 +62,27 @@ export async function GET(req: NextRequest) {
     }
 
     const profileRes = await fetch(
-      "https://www.googleapis.com/gmail/v1/users/me/profile",
+      "https://openidconnect.googleapis.com/v1/userinfo",
       { headers: { Authorization: `Bearer ${tokens.access_token}` } },
     );
 
-    if (!profileRes.ok) return back(req, { error: "profile_fetch_failed" });
+    if (!profileRes.ok) {
+      console.error("Gmail OAuth userinfo failed", profileRes.status, await profileRes.text());
+      return back(req, { error: "profile_fetch_failed" });
+    }
 
-    const profile = await profileRes.json();
+    const profile: { email?: string; email_verified?: boolean } = await profileRes.json();
+    if (!profile.email || profile.email_verified === false) {
+      return back(req, { error: "profile_fetch_failed" });
+    }
+    const emailAddress = profile.email;
     const encryptedToken = encryptToken(tokens.refresh_token);
 
     await db
       .insert(emailAccount)
       .values({
         bdId: me.id,
-        emailAddress: profile.emailAddress,
+        emailAddress,
         refreshTokenEncrypted: encryptedToken,
         status: "connected",
         lastErrorMessage: null,
@@ -83,7 +90,7 @@ export async function GET(req: NextRequest) {
       .onConflictDoUpdate({
         target: emailAccount.bdId,
         set: {
-          emailAddress: profile.emailAddress,
+          emailAddress,
           refreshTokenEncrypted: encryptedToken,
           status: "connected",
           lastErrorMessage: null,

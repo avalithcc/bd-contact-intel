@@ -24,7 +24,9 @@ export async function GET(req: Request) {
     client_id: configResult.config.clientId,
     redirect_uri: configResult.config.redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.send",
+    // gmail.send cannot read the mailbox profile, so the address comes from
+    // the OpenID userinfo endpoint (openid + email are non-sensitive scopes).
+    scope: "openid email https://www.googleapis.com/auth/gmail.send",
     access_type: "offline",
     prompt: "consent",
     state,
