@@ -2,6 +2,7 @@ import { getCurrentBd } from "@/lib/queries";
 import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -11,6 +12,10 @@ interface EmailPageProps {
   searchParams: Promise<{ error?: string; success?: string }>;
 }
 
+const ERROR_MESSAGES: Record<string, string> = {
+  not_configured: "Gmail is not configured on the server. Contact an admin.",
+};
+
 export default async function EmailPage({ searchParams }: EmailPageProps) {
   const me = await getCurrentBd();
   const { error, success } = await searchParams;
@@ -19,6 +24,8 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
     .select()
     .from(emailAccount)
     .where(eq(emailAccount.bdId, me.id));
+
+  const configResult = getGmailOAuthConfig();
 
   return (
     <main>
@@ -32,7 +39,13 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
 
           {error && (
             <div className={styles.error}>
-              <p>Error: {error}</p>
+              <p>Error: {ERROR_MESSAGES[error] ?? error}</p>
+            </div>
+          )}
+
+          {!error && account?.status === "error" && account.lastErrorMessage && (
+            <div className={styles.error}>
+              <p>{account.lastErrorMessage}</p>
             </div>
           )}
 
@@ -42,7 +55,13 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
             </div>
           )}
 
-          {account && account.status === "connected" ? (
+          {!configResult.ok ? (
+            <div className={styles.disconnected}>
+              <p className={styles.description}>
+                Gmail is not configured on the server. Contact an admin to set it up.
+              </p>
+            </div>
+          ) : account && account.status === "connected" ? (
             <div className={styles.connected}>
               <div className={styles.status}>
                 <span className={styles.statusBadge}>✓ Connected</span>

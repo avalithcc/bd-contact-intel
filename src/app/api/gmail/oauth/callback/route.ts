@@ -2,6 +2,12 @@ import { getCurrentBd } from "@/lib/queries";
 import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { encryptToken } from "@/lib/gmail/crypto";
+import { getGmailOAuthConfig } from "@/lib/gmail/config";
+import {
+  GMAIL_OAUTH_STATE_COOKIE,
+  GMAIL_OAUTH_STATE_COOKIE_PATH,
+  statesMatch,
+} from "@/lib/gmail/oauthState";
 import { NextRequest, NextResponse } from "next/server";
 
 function back(req: NextRequest, params: Record<string, string>) {
@@ -9,7 +15,11 @@ function back(req: NextRequest, params: Record<string, string>) {
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
-  return NextResponse.redirect(url);
+  const response = NextResponse.redirect(url);
+  // The state cookie is single-use — clear it on every exit from this route,
+  // success or failure.
+  response.cookies.delete({ name: GMAIL_OAUTH_STATE_COOKIE, path: GMAIL_OAUTH_STATE_COOKIE_PATH });
+  return response;
 }
 
 export async function GET(req: NextRequest) {
@@ -18,22 +28,29 @@ export async function GET(req: NextRequest) {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const error = searchParams.get("error");
+    const cookieState = req.cookies.get(GMAIL_OAUTH_STATE_COOKIE)?.value;
 
     if (error) return back(req, { error });
     if (!code || !state) return back(req, { error: "missing_params" });
+    if (!statesMatch(cookieState, state)) return back(req, { error: "invalid_state" });
 
+    // The state nonce only proves this redirect matches the one we issued —
+    // it says nothing about who is making the request, so the session must
+    // still be verified independently.
     const me = await getCurrentBd();
-    if (state !== me.id) return back(req, { error: "invalid_state" });
+
+    const configResult = getGmailOAuthConfig();
+    if (!configResult.ok) return back(req, { error: "not_configured" });
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
+        client_id: configResult.config.clientId,
+        client_secret: configResult.config.clientSecret,
         code,
         grant_type: "authorization_code",
-        redirect_uri: process.env.GOOGLE_OAUTH_REDIRECT_URI!,
+        redirect_uri: configResult.config.redirectUri,
       }).toString(),
     });
 
@@ -61,6 +78,7 @@ export async function GET(req: NextRequest) {
         emailAddress: profile.emailAddress,
         refreshTokenEncrypted: encryptedToken,
         status: "connected",
+        lastErrorMessage: null,
       })
       .onConflictDoUpdate({
         target: emailAccount.bdId,
@@ -68,6 +86,7 @@ export async function GET(req: NextRequest) {
           emailAddress: profile.emailAddress,
           refreshTokenEncrypted: encryptedToken,
           status: "connected",
+          lastErrorMessage: null,
         },
       });
 
