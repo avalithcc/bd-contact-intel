@@ -222,15 +222,38 @@ export function planCollapse(rows: CollapseContactRow[]): CollapsePlan {
     byNameCompany: (key) => byNameCompany.get(key) ?? [],
   };
 
-  function registerPerson(planId: string, person: CollapsePlanPerson, row: CollapseContactRow) {
-    if (person.profileKey) byProfileKey.set(person.profileKey, planId);
-    if (person.merged.emailStatus === "verified" && person.merged.emailNormalized) {
-      byVerifiedEmail.set(person.merged.emailNormalized, planId);
+  /**
+   * Registers `row`'s OWN strong keys (not the plan-person's merged/winning
+   * values) as pointing at `planId` — set-if-absent, NEVER repointing a key
+   * that already maps to a different plan-person.
+   *
+   * This matters for two cases:
+   *  - A "conflicting_strong_keys" review row creates a brand-new plan
+   *    person C, but its profile key and/or email may already be claimed by
+   *    the two persons it conflicts with (A, B). Without the set-if-absent
+   *    guard, registering C would repoint those keys away from A/B, so a
+   *    LATER row carrying only one of those keys would wrongly merge into C
+   *    instead of the person that actually owns it.
+   *  - A row that auto-merges into an existing person via ONE strong key
+   *    (say, verified email) may carry a second strong key (a profile key)
+   *    that isn't indexed yet. Registering it here (also set-if-absent, so
+   *    it can never conflict — see matchIdentity's precedence order, which
+   *    guarantees a truly "auto" match only when the unindexed key is
+   *    genuinely unclaimed) lets a LATER row carrying only that second key
+   *    still find the same person, instead of becoming "new".
+   */
+  function registerRowKeys(planId: string, row: CollapseContactRow) {
+    if (row.profileKey && !byProfileKey.has(row.profileKey)) {
+      byProfileKey.set(row.profileKey, planId);
+    }
+    if (row.emailStatus === "verified" && row.email) {
+      const emailKey = row.email.trim().toLowerCase();
+      if (!byVerifiedEmail.has(emailKey)) byVerifiedEmail.set(emailKey, planId);
     }
     const nameCompanyKey = buildNameCompanyKey(row);
     if (nameCompanyKey) {
       const list = byNameCompany.get(nameCompanyKey) ?? [];
-      list.push(planId);
+      if (!list.includes(planId)) list.push(planId);
       byNameCompany.set(nameCompanyKey, list);
     }
   }
@@ -263,6 +286,10 @@ export function planCollapse(rows: CollapseContactRow[]): CollapsePlan {
         legacyContactId: row.id,
         connectedOn: row.connectedOn,
       });
+      // Learn any strong key this row carries that isn't indexed yet (e.g.
+      // matched via verified email but carries a not-yet-seen profile key)
+      // — see registerRowKeys for why this is always safe.
+      registerRowKeys(result.personId, row);
       autoMergedByProfileKey++;
       continue;
     }
@@ -280,7 +307,7 @@ export function planCollapse(rows: CollapseContactRow[]): CollapsePlan {
       ownerBdId: null,
     };
     personsByPlanId.set(planId, person);
-    registerPerson(planId, person, row);
+    registerRowKeys(planId, row);
 
     if (result.kind === "review") {
       flaggedForReview++;

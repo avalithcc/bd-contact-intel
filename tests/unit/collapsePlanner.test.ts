@@ -146,3 +146,117 @@ test("report buckets are mutually exclusive and sum to rowsRead", () => {
     plan.report.contact;
   assert.equal(ownCompanySkipped + autoMergedByProfileKey + flaggedForReview + newCount, rowsRead);
 });
+
+// --- regression: a "conflicting_strong_keys" review must never repoint an
+// already-claimed index key (fresh-review fix) --------------------------
+
+test("a conflicting-strong-keys review row never steals the profile key or email of the persons it conflicts with", () => {
+  const rows = [
+    // Row 1 creates person A, claiming profile key P.
+    row({
+      id: "c1",
+      profileKey: "linkedin.com/in/p",
+      firstName: "Alice",
+      lastName: "Anderson",
+      company: "AlphaCo",
+    }),
+    // Row 2 creates person B, claiming verified email E (distinct profile
+    // key and name+company so it doesn't accidentally review-match row 1).
+    row({
+      id: "c2",
+      profileKey: "linkedin.com/in/b-only",
+      firstName: "Bob",
+      lastName: "Baker",
+      company: "BetaCo",
+      email: "shared@example.com",
+      emailStatus: "verified",
+    }),
+    // Row 3 carries BOTH P (-> A) and E (-> B): conflicting strong keys,
+    // creates a NEW person C for review — must NOT repoint P or E to C.
+    row({
+      id: "c3",
+      profileKey: "linkedin.com/in/p",
+      firstName: "Carl",
+      lastName: "Carter",
+      company: "GammaCo",
+      email: "shared@example.com",
+      emailStatus: "verified",
+    }),
+    // Row 4 carries ONLY P — must still merge into A, not C.
+    row({
+      id: "c4",
+      profileKey: "linkedin.com/in/p",
+      firstName: "Dana",
+      lastName: "Dean",
+      company: "DeltaCo",
+    }),
+    // Row 5 carries ONLY E — must still merge into B, not C.
+    row({
+      id: "c5",
+      profileKey: "linkedin.com/in/e-only",
+      firstName: "Eve",
+      lastName: "Ellis",
+      company: "EpsilonCo",
+      email: "shared@example.com",
+      emailStatus: "verified",
+    }),
+  ];
+
+  const plan = planCollapse(rows);
+
+  assert.equal(plan.persons.length, 3, "A, B and C — three distinct persons");
+  const byLegacyId = new Map<string, string>();
+  for (const person of plan.persons) {
+    for (const mapping of person.legacyMappings) byLegacyId.set(mapping.legacyContactId, person.planId);
+  }
+
+  const personA = byLegacyId.get("c1");
+  const personB = byLegacyId.get("c2");
+  const personC = byLegacyId.get("c3");
+  assert.ok(personA && personB && personC);
+  assert.notEqual(personA, personC);
+  assert.notEqual(personB, personC);
+
+  assert.equal(byLegacyId.get("c4"), personA, "row carrying only P must merge into A, not C");
+  assert.equal(byLegacyId.get("c5"), personB, "row carrying only E must merge into B, not C");
+});
+
+test("merging into a person via verified email registers the row's own unmapped profile key to that same person", () => {
+  const rows = [
+    row({
+      id: "c1",
+      profileKey: "linkedin.com/in/c1",
+      firstName: "Fay",
+      lastName: "Fisher",
+      company: "FoxCo",
+      email: "merge-follow-on@example.com",
+      emailStatus: "verified",
+    }),
+    // Distinct, previously-unseen profile key; matches only via email.
+    row({
+      id: "c2",
+      profileKey: "linkedin.com/in/c2",
+      firstName: "Fay",
+      lastName: "Fisher",
+      company: "FoxCo",
+      email: "merge-follow-on@example.com",
+      emailStatus: "verified",
+    }),
+    // Carries ONLY c2's (previously unmapped) profile key, no email — must
+    // now merge into the same person if the follow-on registration worked.
+    row({
+      id: "c3",
+      profileKey: "linkedin.com/in/c2",
+      firstName: "Grace",
+      lastName: "Green",
+      company: "GraphiteCo",
+    }),
+  ];
+
+  const plan = planCollapse(rows);
+
+  assert.equal(plan.persons.length, 1);
+  assert.equal(plan.persons[0].legacyMappings.length, 3);
+  assert.equal(plan.report.contact.new, 1);
+  assert.equal(plan.report.contact.autoMergedByProfileKey, 2);
+});
