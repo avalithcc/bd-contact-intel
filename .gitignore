@@ -12,3 +12,8 @@ drizzle/meta/
 playwright-report/
 test-results/
 tests/.auth/
+
+# Pre-execute production backups (scripts/unify-contacts.ts --execute), see
+# src/lib/migration/backup.ts. Never committed — these are pg_dump files of
+# real production data.
+backups/

@@ -3,7 +3,8 @@
  * contact-migration spec). This batch (Phase 3) only implements
  * `--phase=collapse`; `--phase=fold_leads` is Phase 4.
  *
- * Usage (do NOT run automatically — this reads/writes the real database):
+ * Usage (do NOT run automatically — this reads/writes the real database
+ * and, on --execute, shells out to pg_dump/pg_restore):
  *   npx tsx scripts/unify-contacts.ts --phase=collapse --dry-run
  *   npx tsx scripts/unify-contacts.ts --phase=collapse --execute --run=<migration_run id>
  *
@@ -16,20 +17,18 @@
  * `--execute --run=<id>` refuses (via
  * src/lib/migration/executionGuard.ts#assertExecutionAllowed) unless
  * `<id>` is an approved, not-yet-executed run whose `input_hash` still
- * matches the current `contact` table contents. On success it writes the
- * collapse plan, marks the SAME approved `migration_run` row as executed
- * (linking rather than orphaning — see
- * src/lib/migration/collapseRun.ts#ApprovedMigrationRun), and writes one
- * `audit_log(migration_execute)` entry — all in one transaction
- * (src/lib/migration/queries.ts#finalizeExecute).
- *
- * It also refuses to proceed without a production backup — see
- * `snapshotBackup` below, which is NOT implemented yet: wiring it to this
- * project's actual backup mechanism is an infra decision for the owner,
- * out of scope for this commit. Until that's wired, `--execute` always
- * throws — this is a deliberate fail-safe, not an oversight.
+ * matches the current `contact` table contents. Before writing anything it
+ * backs up every involved table via `pg_dump` (see
+ * src/lib/migration/backup.ts — resolves the binary from `PG_DUMP_PATH`,
+ * else `pg_dump` on PATH, else the homebrew libpq install path) and
+ * verifies the dump with `pg_restore --list`; either step failing aborts
+ * before any write. On success it writes the collapse plan, marks the SAME
+ * approved `migration_run` row as executed (linking rather than
+ * orphaning), and writes one `audit_log(migration_execute)` entry — all in
+ * one transaction (src/lib/migration/queries.ts#finalizeExecute).
  */
 import { runCollapseDryRun, runCollapseExecute } from "../src/lib/migration/collapseRun";
+import { snapshotBackup } from "../src/lib/migration/backup";
 import {
   finalizeExecute,
   getMigrationRunForGate,
@@ -56,17 +55,6 @@ function parseArgs(argv: string[]): Args {
   }
   const mode = flags.has("--execute") ? "execute" : "dry_run";
   return { phase, mode, runId: runArg?.slice("--run=".length) ?? null };
-}
-
-/**
- * NOT IMPLEMENTED. Deliberately throws so `--execute` can never run
- * without a real backup wired in first (owner decision — see file header).
- */
-async function snapshotBackup(): Promise<string> {
-  throw new Error(
-    "snapshotBackup() is not implemented — configure a production backup " +
-      "strategy (see scripts/unify-contacts.ts header) before enabling --execute.",
-  );
 }
 
 async function main() {
