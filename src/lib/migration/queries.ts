@@ -6,7 +6,7 @@
  * in the pure modules this file wires: collapsePlanner, collapseRun,
  * executionGuard, inputHash.
  */
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   auditLog,
@@ -164,6 +164,26 @@ export async function approveMigrationRun(runId: string, approvedByBdId: string)
 export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void> {
   const { plan, migrationRunId, actorBdId, backupPath } = input;
   await db.transaction(async (tx) => {
+    // Claim the run first. The conditional UPDATE row-locks it until commit,
+    // so a second concurrent --execute blocks here and then matches zero rows
+    // instead of racing past the pre-transaction guard.
+    const [claimed] = await tx
+      .update(migrationRun)
+      .set({ mode: "execute", executedAt: new Date() })
+      .where(
+        and(
+          eq(migrationRun.id, migrationRunId),
+          isNull(migrationRun.executedAt),
+          isNotNull(migrationRun.approvedAt),
+        ),
+      )
+      .returning({ id: migrationRun.id });
+    if (!claimed) {
+      throw new Error(
+        `migration_run ${migrationRunId} is not an approved, unexecuted run; refusing to execute`,
+      );
+    }
+
     const realIdByPlanId = new Map<string, string>();
 
     for (const p of plan.persons) {
@@ -236,14 +256,10 @@ export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void
     // (re-derived report content is identical to the dry run's, since
     // assertExecutionAllowed already proved the input_hash matches) rather
     // than adding a dedicated schema column for this one field.
-    const [updatedRun] = await tx
+    await tx
       .update(migrationRun)
-      .set({ mode: "execute", executedAt: new Date(), report: { ...plan.report, backupPath } })
-      .where(eq(migrationRun.id, migrationRunId))
-      .returning({ id: migrationRun.id });
-    if (!updatedRun) {
-      throw new Error(`migration_run ${migrationRunId} not found while finalizing --execute`);
-    }
+      .set({ report: { ...plan.report, backupPath } })
+      .where(eq(migrationRun.id, migrationRunId));
 
     await tx.insert(auditLog).values({
       actorBdId,
