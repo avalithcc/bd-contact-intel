@@ -5,6 +5,7 @@ import {
   timestamp,
   index,
   unique,
+  primaryKey,
   boolean,
   jsonb,
   integer,
@@ -17,6 +18,10 @@ export const bd = pgTable("bd", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // 'bd' | 'admin' (design D5, R5). The owner is seeded as the first admin
+  // by drizzle/0013_unified_person.sql. Gated via
+  // src/lib/auth/requireAdmin.ts, never checked ad hoc.
+  role: text("role").notNull().default("bd"),
 });
 
 // A contact, private to exactly one BD.
@@ -617,6 +622,340 @@ export const lead = pgTable(
 export type Lead = typeof lead.$inferSelect;
 export type NewLead = typeof lead.$inferInsert;
 
+// ---------------------------------------------------------------------------
+// Unified Contact model (design.md D1-D8, `openspec/changes/crm-hubspot-ux`).
+// `person` is the UI-facing "Contact": one row per real person, additive
+// alongside the legacy `contact`/`lead` tables (never mutated in place — see
+// design D1, "Additive rollback"). Filled by the identity matcher
+// (src/lib/identity/matcher.ts) through the dry-run-gated migration in
+// scripts/unify-contacts.ts. `contact`/`lead` stay read-only once this ships.
+// ---------------------------------------------------------------------------
+
+export const person = pgTable(
+  "person",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Normalized LinkedIn profile key (src/lib/csv.ts#normalizeProfileKey).
+    // Null for leads with no LinkedIn profile (contact-identity spec).
+    profileKey: text("profile_key"),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    email: text("email"),
+    // Lowercased/trimmed `email`, for exact-match lookups independent of
+    // casing (src/lib/identity/matcher.ts).
+    emailNormalized: text("email_normalized"),
+    // 'verified' | 'probable' | 'none' — same vocabulary as contact/lead.
+    emailStatus: text("email_status").notNull().default("none"),
+    emailConfidence: integer("email_confidence"),
+    emailSource: text("email_source"),
+    company: text("company"),
+    companyKey: text("company_key"),
+    companyCategory: text("company_category"),
+    jobTitle: text("job_title"),
+    roleGroup: text("role_group"),
+    seniority: text("seniority"),
+    industry: text("industry"),
+    city: text("city"),
+    region: text("region"),
+    country: text("country"),
+    ownerBdId: uuid("owner_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    // 'new' | 'contacted' | 'replied' | 'meeting' | 'discarded' — a CACHE
+    // recomputed by deriveStatus() (design D4), never edited directly.
+    status: text("status").notNull().default("new"),
+    // The activity row (or a synthetic connection marker) that produced the
+    // current `status`, for the record page's "why" hint. No DB FK, since
+    // deriveStatus() can point at either kind of event.
+    statusActivityId: uuid("status_activity_id"),
+    // Free-text provenance ("linkedin_import" | "lead_import" | "csv" | …).
+    // Deliberately not an FK — same "don't rewrite history" rationale as
+    // board_candidate.decidedBy above.
+    sourceKey: text("source_key"),
+    // Set when this row lost a merge (design D6); such rows are hidden from
+    // every read. No DB FK (would self-reference at create time) — enforced
+    // by mergeContacts()/unmergeContact() (Phase 6).
+    mergedIntoId: uuid("merged_into_id"),
+    // The migration_run that created this row via the collapse/fold-leads
+    // migration; null for rows created after the migration.
+    migrationRunId: uuid("migration_run_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    updatedByBdId: uuid("updated_by_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    profileKeyUnique: unique("person_profile_key_unique").on(t.profileKey),
+    byOwner: index("person_owner_idx").on(t.ownerBdId),
+    byStatus: index("person_status_idx").on(t.status),
+    byCompanyKey: index("person_company_key_idx").on(t.companyKey),
+    byEmailNormalized: index("person_email_normalized_idx").on(
+      t.emailNormalized,
+    ),
+    // Serves the matcher's name+company review lookup (contact-identity
+    // spec, "Name+company match never auto-merges").
+    byNameCompany: index("person_name_company_idx").on(
+      t.lastName,
+      t.firstName,
+      t.companyKey,
+    ),
+    byMergedInto: index("person_merged_into_idx").on(t.mergedIntoId),
+  }),
+);
+
+export type Person = typeof person.$inferSelect;
+export type NewPerson = typeof person.$inferInsert;
+
+// Per-BD relationship facts for a person (design D2): "connected BDs", each
+// with their own `connectedOn` date and message aggregates (moved here from
+// the legacy per-BD `contact` row — see contact.message_count/etc. above).
+export const personBdConnection = pgTable(
+  "person_bd_connection",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    connectedOn: text("connected_on"),
+    // The legacy contact row this connection was folded from — for
+    // migration-review traceability; person_id_map below is the
+    // authoritative legacy-id -> person-id mapping.
+    legacyContactId: uuid("legacy_contact_id"),
+    messageCount: integer("message_count").notNull().default(0),
+    sentCount: integer("sent_count").notNull().default(0),
+    receivedCount: integer("received_count").notNull().default(0),
+    firstMessageAt: timestamp("first_message_at"),
+    lastMessageAt: timestamp("last_message_at"),
+    initiatedByMe: boolean("initiated_by_me"),
+    reciprocal: boolean("reciprocal").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.personId, t.bdId] }),
+    byBd: index("person_bd_connection_bd_idx").on(t.bdId),
+  }),
+);
+
+export type PersonBdConnection = typeof personBdConnection.$inferSelect;
+export type NewPersonBdConnection = typeof personBdConnection.$inferInsert;
+
+// Property-level change history, feeding the record page's "last updated by
+// X" hint (contact-identity R7).
+export const personPropertyHistory = pgTable(
+  "person_property_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    property: text("property").notNull(),
+    oldValue: text("old_value"),
+    newValue: text("new_value"),
+    changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    // 'edit' | 'merge' | 'import' | 'migration'
+    source: text("source").notNull(),
+    at: timestamp("at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byPerson: index("person_property_history_person_idx").on(t.personId),
+  }),
+);
+
+export type PersonPropertyHistory = typeof personPropertyHistory.$inferSelect;
+export type NewPersonPropertyHistory =
+  typeof personPropertyHistory.$inferInsert;
+
+// Authoritative legacy-id -> person-id mapping (contact-identity spec:
+// "every legacy id resolves"). Own-company rows map to a null personId, and
+// the /leads, /contact redirects (design D8) answer those with a 404.
+export const personIdMap = pgTable(
+  "person_id_map",
+  {
+    // 'contact' | 'lead'
+    legacyTable: text("legacy_table").notNull(),
+    legacyId: uuid("legacy_id").notNull(),
+    personId: uuid("person_id").references(() => person.id, {
+      onDelete: "cascade",
+    }),
+    // 'profile_key' | 'verified_email' | 'review' | 'new' | 'skipped_own_company'
+    method: text("method").notNull(),
+    migrationRunId: uuid("migration_run_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.legacyTable, t.legacyId] }),
+    byPerson: index("person_id_map_person_idx").on(t.personId),
+  }),
+);
+
+export type PersonIdMap = typeof personIdMap.$inferSelect;
+export type NewPersonIdMap = typeof personIdMap.$inferInsert;
+
+// Merge/unmerge trail (design D6): the data half of the audit story. Holds
+// the full pre-merge snapshot (both rows, losing values, re-pointed ids per
+// table) that unmergeContact() (Phase 6) replays in reverse. Distinct from
+// audit_log below, which is the accountability half ("who did what, when").
+export const mergeEvent = pgTable(
+  "merge_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    survivorId: uuid("survivor_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    mergedId: uuid("merged_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    // Null = migration-driven merge (no human actor).
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    snapshot: jsonb("snapshot").notNull().default({}),
+    undoneAt: timestamp("undone_at"),
+    undoneBy: uuid("undone_by").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    bySurvivor: index("merge_event_survivor_idx").on(t.survivorId),
+    byMerged: index("merge_event_merged_idx").on(t.mergedId),
+  }),
+);
+
+export type MergeEvent = typeof mergeEvent.$inferSelect;
+export type NewMergeEvent = typeof mergeEvent.$inferInsert;
+
+// Possible-duplicate review queue (contact-identity spec: name+company match
+// never auto-merges). A `not_duplicate` pair is never proposed again.
+export const duplicateCandidate = pgTable(
+  "duplicate_candidate",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    personAId: uuid("person_a_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    personBId: uuid("person_b_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull().default("name_company"),
+    matchKey: text("match_key").notNull(),
+    // 'open' | 'merged' | 'not_duplicate'
+    status: text("status").notNull().default("open"),
+    decidedByBdId: uuid("decided_by_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // person_a_id < person_b_id is enforced at the application level
+    // (src/lib/identity/matcher.ts) — Drizzle has no composite CHECK helper.
+    pairUnique: unique("duplicate_candidate_pair_unique").on(
+      t.personAId,
+      t.personBId,
+    ),
+    byStatus: index("duplicate_candidate_status_idx").on(t.status),
+  }),
+);
+
+export type DuplicateCandidate = typeof duplicateCandidate.$inferSelect;
+export type NewDuplicateCandidate = typeof duplicateCandidate.$inferInsert;
+
+// Accountability trail (design D6, admin-access-audit spec): who did what,
+// and when, for every admin action — conversation views, merges, unmerges,
+// not-a-duplicate decisions, migration approvals. Append-only, small rows;
+// distinct from merge_event's large mutable snapshot above. A merge/unmerge
+// writes one row here linked to its merge_event via metadata.mergeEventId.
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorBdId: uuid("actor_bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    // 'view_conversation' | 'merge' | 'unmerge' | 'not_duplicate' |
+    // 'migration_approve' | 'migration_execute'
+    action: text("action").notNull(),
+    personId: uuid("person_id").references(() => person.id, {
+      onDelete: "set null",
+    }),
+    targetBdId: uuid("target_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    // e.g. { mergeEventId } linking merge/unmerge rows to merge_event above.
+    metadata: jsonb("metadata").notNull().default({}),
+    at: timestamp("at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byActor: index("audit_log_actor_idx").on(t.actorBdId),
+    byAction: index("audit_log_action_idx").on(t.action),
+    byPerson: index("audit_log_person_idx").on(t.personId),
+  }),
+);
+
+export type AuditLog = typeof auditLog.$inferSelect;
+export type NewAuditLog = typeof auditLog.$inferInsert;
+
+// One dry-run or execute attempt of the collapse/fold-leads migration
+// (design "Migration plan", R10 production-data gate). Holds the report the
+// owner reviews in /admin/migration before --execute is allowed to run.
+export const migrationRun = pgTable(
+  "migration_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // 'collapse' | 'fold_leads'
+    kind: text("kind").notNull(),
+    // 'dry_run' | 'execute'
+    mode: text("mode").notNull(),
+    // Hash of the input row set, so --execute refuses a stale dry run.
+    inputHash: text("input_hash").notNull(),
+    report: jsonb("report").notNull().default({}),
+    approvedByBdId: uuid("approved_by_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    approvedAt: timestamp("approved_at"),
+    executedAt: timestamp("executed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byKind: index("migration_run_kind_idx").on(t.kind),
+  }),
+);
+
+export type MigrationRun = typeof migrationRun.$inferSelect;
+export type NewMigrationRun = typeof migrationRun.$inferInsert;
+
+// BD-created saved views (design D7); system views are code constants in
+// src/lib/contacts/views.ts and never stored here.
+export const savedView = pgTable(
+  "saved_view",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerBdId: uuid("owner_bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    filters: jsonb("filters").notNull().default({}),
+    columns: jsonb("columns").notNull().default([]),
+    sort: jsonb("sort").notNull().default({}),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byOwner: index("saved_view_owner_idx").on(t.ownerBdId),
+  }),
+);
+
+export type SavedView = typeof savedView.$inferSelect;
+export type NewSavedView = typeof savedView.$inferInsert;
+
 // Company entity — team-shared CRM tracking. Keyed by the same companyKey
 // as targetCompany (via normalizeCompanyKey), but separate table so ATS
 // config/columns stay isolated.
@@ -655,6 +994,19 @@ export const activity = pgTable(
     // Denormalized from contact.bd_id for privacy scoping without a join.
     // Null if activity is company/lead-scoped.
     contactOwnerBdId: uuid("contact_owner_bd_id"),
+    // Unified-Contact subject FK (design D1). Once the migration re-points
+    // rows via person_id_map, this replaces contactId as the primary
+    // subject FK for Contact-scoped activity; contactId stays for legacy
+    // read paths until the collapse migration executes.
+    personId: uuid("person_id").references(() => person.id, {
+      onDelete: "cascade",
+    }),
+    // Who performed/logged this activity (design "activity has no author
+    // column today. Derivation and attribution need one."). Null for
+    // system-derived rows (e.g. migration-written status_backfill).
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
     // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | etc.
     type: text("type").notNull(),
     // Metadata keyed by type: { gmailMessageId, gmailThreadId } for email_sent,
@@ -669,6 +1021,7 @@ export const activity = pgTable(
     byLead: index("activity_lead_idx").on(t.leadId),
     byCompany: index("activity_company_idx").on(t.companyKey),
     byContact: index("activity_contact_idx").on(t.contactId),
+    byPerson: index("activity_person_idx").on(t.personId),
     byType: index("activity_type_idx").on(t.type),
     byCreated: index("activity_created_idx").on(t.createdAt),
   }),
@@ -687,6 +1040,14 @@ export const task = pgTable(
       onDelete: "cascade",
     }),
     contactId: uuid("contact_id"),
+    // Unified-Contact subject FK (design D1) — see activity.personId comment.
+    personId: uuid("person_id").references(() => person.id, {
+      onDelete: "cascade",
+    }),
+    // Who created this task, distinct from assignedToBdId ("who owns it").
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
     assignedToBdId: uuid("assigned_to_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
@@ -702,6 +1063,7 @@ export const task = pgTable(
     byLead: index("task_lead_idx").on(t.leadId),
     byCompany: index("task_company_idx").on(t.companyKey),
     byContact: index("task_contact_idx").on(t.contactId),
+    byPerson: index("task_person_idx").on(t.personId),
     byAssignee: index("task_assignee_idx").on(t.assignedToBdId),
     byStatus: index("task_status_idx").on(t.status),
     byDue: index("task_due_idx").on(t.dueAt),
@@ -752,6 +1114,15 @@ export const signal = pgTable(
       onDelete: "cascade",
     }),
     contactId: uuid("contact_id"),
+    // Unified-Contact subject FK (design D1) — see activity.personId comment.
+    personId: uuid("person_id").references(() => person.id, {
+      onDelete: "cascade",
+    }),
+    // Who captured this signal (e.g. who ran manual_paste); null for
+    // system-triggered signals (linkedin_apify, web_research).
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
     // 'linkedin_apify' | 'manual_paste' | 'web_research'
     source: text("source").notNull(),
     // Source-specific data: { profile, headline, connections, headline_history }
@@ -764,6 +1135,7 @@ export const signal = pgTable(
     byLead: index("signal_lead_idx").on(t.leadId),
     byCompany: index("signal_company_idx").on(t.companyKey),
     byContact: index("signal_contact_idx").on(t.contactId),
+    byPerson: index("signal_person_idx").on(t.personId),
     bySource: index("signal_source_idx").on(t.source),
   }),
 );
@@ -780,6 +1152,14 @@ export const linkedinScrapeJob = pgTable(
     // for now, all runs are ad-hoc, so this is primarily for future batch-job
     // tracking if needed.
     contactId: uuid("contact_id"),
+    // Unified-Contact subject FK (design D1) — see activity.personId comment.
+    personId: uuid("person_id").references(() => person.id, {
+      onDelete: "cascade",
+    }),
+    // Who requested this scrape run.
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
     // Apify's own run ID; used to poll job status and retrieve dataset.
     apifyRunId: text("apify_run_id").notNull(),
     // 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out'
@@ -794,6 +1174,7 @@ export const linkedinScrapeJob = pgTable(
   },
   (t) => ({
     byContact: index("linkedin_scrape_job_contact_idx").on(t.contactId),
+    byPerson: index("linkedin_scrape_job_person_idx").on(t.personId),
     byApifyRunId: index("linkedin_scrape_job_apify_run_idx").on(t.apifyRunId),
     byStatus: index("linkedin_scrape_job_status_idx").on(t.status),
   }),
