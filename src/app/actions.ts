@@ -26,6 +26,10 @@ export type UploadMessagesErrorKey =
 export interface UploadResult {
   ok: boolean;
   imported?: number;
+  // Contacts dropped because they belong to Avalith itself (a BD's own
+  // coworker imported alongside their real connections) — see
+  // src/lib/ownCompany.ts and src/lib/queries.ts#upsertContacts.
+  skippedOwnCompany?: number;
   errorKey?: UploadErrorKey;
   // Raw message from an unexpected (not specifically handled) exception —
   // technical/diagnostic only, intentionally left untranslated like any
@@ -69,9 +73,9 @@ export async function uploadCsv(
       return { ok: false, errorKey: "noConnectionsFound" };
     }
     const me = await getCurrentBd();
-    const imported = await upsertContacts(me.id, parsed);
+    const { imported, skippedOwnCompany } = await upsertContacts(me.id, parsed);
     revalidatePath("/");
-    return { ok: true, imported };
+    return { ok: true, imported, skippedOwnCompany };
   } catch (err) {
     return {
       ok: false,

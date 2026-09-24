@@ -562,6 +562,8 @@ export const en = {
     import: "Import",
     importing: "Importing…",
     importedContacts: (n: number) => `Imported ${n} contacts.`,
+    skippedOwnCompany: (n: number) =>
+      `Skipped ${n} Avalith coworker${n === 1 ? "" : "s"}.`,
     messagesLabel: "LinkedIn messages.csv",
     importedMessages: (messages: number, conversations: number) =>
       `Imported ${messages} messages across ${conversations} conversations`,

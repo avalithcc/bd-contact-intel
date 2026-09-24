@@ -28,6 +28,9 @@ export function UploadForm({ locale }: { locale: Locale }) {
       {state?.ok && (
         <p className="muted mb-0">
           {dict.upload.importedContacts(state.imported ?? 0)}
+          {state.skippedOwnCompany
+            ? ` ${dict.upload.skippedOwnCompany(state.skippedOwnCompany)}`
+            : ""}
         </p>
       )}
       {state && !state.ok && (

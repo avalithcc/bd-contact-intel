@@ -16,6 +16,7 @@ import {
   type CompanyCategoryKey,
 } from "@/lib/companyCategories";
 import { bucketTopN } from "@/lib/bucketing";
+import { partitionOwnCompanyRows } from "@/lib/ownCompany";
 import type { ParseMessagesResult } from "@/lib/messagesCsv";
 
 /**
@@ -407,17 +408,37 @@ async function resolveCompanyCategories(
   return result;
 }
 
-/** Upsert a batch of parsed connections into a BD's private base. */
+export interface UpsertContactsResult {
+  imported: number;
+  // Rows dropped because they belong to Avalith itself (a BD's own
+  // coworker, pulled in incidentally by whatever source produced `rows` —
+  // LinkedIn connections today, potentially a scrape or a third-party CSV
+  // tomorrow). See src/lib/ownCompany.ts.
+  skippedOwnCompany: number;
+}
+
+/**
+ * Upsert a batch of contact rows into a BD's private base.
+ *
+ * This is the single insert path every contact-ingestion source (LinkedIn
+ * Connections.csv today; future scrapes or third-party CSV imports) must go
+ * through — so the own-company guard lives here rather than in any one
+ * source's parser, and applies no matter what produces `rows`.
+ */
 export async function upsertContacts(
   bdId: string,
   rows: Omit<NewContact, "bdId">[],
-): Promise<number> {
-  if (!rows.length) return 0;
+): Promise<UpsertContactsResult> {
+  if (!rows.length) return { imported: 0, skippedOwnCompany: 0 };
+  const { kept: filteredRows, skipped: ownRows } = partitionOwnCompanyRows(rows);
+  const skippedOwnCompany = ownRows.length;
+  if (!filteredRows.length) return { imported: 0, skippedOwnCompany };
+
   let count = 0;
   // chunk to keep parameter counts sane
   const chunkSize = 500;
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const rowsChunk = rows.slice(i, i + chunkSize);
+  for (let i = 0; i < filteredRows.length; i += chunkSize) {
+    const rowsChunk = filteredRows.slice(i, i + chunkSize);
     const categories = await resolveCompanyCategories(
       rowsChunk.map((r) => r.company),
     );
@@ -450,7 +471,7 @@ export async function upsertContacts(
       });
     count += chunk.length;
   }
-  return count;
+  return { imported: count, skippedOwnCompany };
 }
 
 export interface PositionTitleCount {

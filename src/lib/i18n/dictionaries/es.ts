@@ -471,6 +471,8 @@ export const es: typeof en = {
     import: "Importar",
     importing: "Importando…",
     importedContacts: (n) => `Se importaron ${n} contactos.`,
+    skippedOwnCompany: (n) =>
+      `Se omitieron ${n} contacto${n === 1 ? "" : "s"} de Avalith.`,
     messagesLabel: "messages.csv de LinkedIn",
     importedMessages: (messages, conversations) =>
       `Se importaron ${messages} mensajes en ${conversations} conversaciones`,
