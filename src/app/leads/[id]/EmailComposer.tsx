@@ -30,8 +30,9 @@ export function EmailComposer({
   const [isSending, setIsSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isWritingManually, setIsWritingManually] = useState(false);
 
-  const hasDraft = subject !== "" || body !== "";
+  const hasDraft = isWritingManually || subject !== "" || body !== "";
 
   const handleDraft = async () => {
     setIsDrafting(true);
@@ -63,6 +64,7 @@ export function EmailComposer({
     setSent(true);
     setSubject("");
     setBody("");
+    setIsWritingManually(false);
   };
 
   if (!leadEmail) {
@@ -97,6 +99,13 @@ export function EmailComposer({
             disabled={isDrafting}
           >
             {isDrafting ? "Drafting..." : "Draft with AI"}
+          </button>
+          <button
+            className={styles.secondaryButton}
+            onClick={() => setIsWritingManually(true)}
+            disabled={isDrafting}
+          >
+            Write it myself
           </button>
         </div>
       ) : (
@@ -146,6 +155,7 @@ export function EmailComposer({
                 setSubject("");
                 setBody("");
                 setError(null);
+                setIsWritingManually(false);
               }}
               disabled={isSending}
             >
