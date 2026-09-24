@@ -40,22 +40,22 @@ Chain strategy: feature-branch-chain
 
 ## Phase 0: Precondition
 
-- [ ] 0.1 Commit or discard the uncommitted dark-mode removal (`src/lib/theme/*` deletions, `UserMenu.tsx`, page/dictionary edits currently in the working tree) on `main`, before creating the tracker branch. Blocks PR 8.
-- [ ] 0.2 Create draft tracker branch `feat/crm-hubspot-ux` off `main` (no-merge until all child PRs land).
+- [x] 0.1 Commit or discard the uncommitted dark-mode removal (`src/lib/theme/*` deletions, `UserMenu.tsx`, page/dictionary edits currently in the working tree) on `main`, before creating the tracker branch. Blocks PR 8. — done in `05bc307 refactor(theme): make the app light mode only` on `main`, prior to this batch.
+- [x] 0.2 Create draft tracker branch `feat/crm-hubspot-ux` off `main` (no-merge until all child PRs land). — already existed, pushed, equal to `main` at `ea8f55e`.
 
 ## Phase 1: Foundation — Schema & Roles (PR 1, base: tracker)
 
-- [ ] 1.1 Write migration `drizzle/0013_unified_person.sql`: `person`, `person_bd_connection`, `person_property_history`, `person_id_map`, `merge_event`, `duplicate_candidate`, `audit_log`, `migration_run`, `saved_view`, plus `person_id`/`actor_bd_id` FK columns on `activity`, `task`, `signal`, `linkedin_scrape_job`.
-- [ ] 1.2 Add `bd.role text not null default 'bd'` column and seed the owner as `admin`.
-- [ ] 1.3 Add `requireAdmin()` guard in `src/lib/auth/` reusing `getCurrentBd()`.
-- [ ] 1.4 Test: `requireAdmin()` rejects non-admin, allows admin (`tests/unit/`).
+- [x] 1.1 Write migration `drizzle/0013_unified_person.sql`: `person`, `person_bd_connection`, `person_property_history`, `person_id_map`, `merge_event`, `duplicate_candidate`, `audit_log`, `migration_run`, `saved_view`, plus `person_id`/`actor_bd_id` FK columns on `activity`, `task`, `signal`, `linkedin_scrape_job`.
+- [x] 1.2 Add `bd.role text not null default 'bd'` column and seed the owner as `admin`.
+- [x] 1.3 Add `requireAdmin()` guard in `src/lib/auth/` reusing `getCurrentBd()`.
+- [x] 1.4 Test: `requireAdmin()` rejects non-admin, allows admin (`tests/unit/`).
 
 ## Phase 2: Identity Matcher (PR 2, base: PR 1)
 
-- [ ] 2.1 RED: write failing tests for `src/lib/identity/matcher.ts` per contact-identity spec scenarios (profile-key auto-merge, verified-email auto-merge, name+company → review, own-company skip, no-email/no-LinkedIn fallback).
-- [ ] 2.2 GREEN: implement `matcher.ts` with `IdentityIndex` interface and `MatchResult` union (design D3).
-- [ ] 2.3 RED/GREEN: `mergeProperties(a, b)` pure function — richer/verified/longer wins, ties go to most recent, losers recorded (contact-identity R7).
-- [ ] 2.4 REFACTOR: extract shared normalization helpers reused from `src/lib/csv.ts` (`normalizeProfileKey`) and `src/lib/ownCompany.ts`.
+- [x] 2.1 RED: write failing tests for `src/lib/identity/matcher.ts` per contact-identity spec scenarios (profile-key auto-merge, verified-email auto-merge, name+company → review, own-company skip, no-email/no-LinkedIn fallback).
+- [x] 2.2 GREEN: implement `matcher.ts` with `IdentityIndex` interface and `MatchResult` union (design D3).
+- [x] 2.3 RED/GREEN: `mergeProperties(a, b)` pure function — richer/verified/longer wins, ties go to most recent, losers recorded (contact-identity R7).
+- [x] 2.4 REFACTOR: extract shared normalization helpers reused from `src/lib/csv.ts` (`normalizeProfileKey`) and `src/lib/ownCompany.ts`.
 
 ## Phase 3: Collapse Migration + Dry-Run Gate (PR 3, base: PR 2)
 
