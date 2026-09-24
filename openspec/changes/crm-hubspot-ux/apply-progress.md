@@ -87,6 +87,19 @@ tasks.md forecast PR 1 at ~220 lines; actual is 781. The gap is structural, not 
 
 **Recommendation to the orchestrator**: grant `size:exception` for PR 1 specifically (schema/migration-only, no business logic, every table has a 1:1 line in design.md's data model table for cross-checking), OR ask me to resubmit PR 1 with comments trimmed to a minimum (I estimate this could get it to roughly 450-500 lines, still over budget, since the SQL boilerplate alone is 324 lines and not compressible without losing the idempotency guards). I did not push either branch or open any PR — both are local commits only, per your instruction, awaiting your review/decision.
 
+## Post-review fixes (PR 2, second commit)
+
+Fresh review found PR 1 safe (no confirmed issues) and PR 2 correct but flagged two gaps, fixed as a new commit `2587a76` on `feat/crm-hubspot-ux-02-matcher` (strict TDD, still not pushed):
+
+1. **Accent folding**: `buildNameCompanyKey` only trimmed/lowercased the name half, so "José García" and "Jose Garcia" at the same company produced different review keys (the company half was already accent-folded via `normalizeCompanyKey`). Fixed by reusing `normalizeNameKey` (`src/lib/leads/csv.ts`, now `export`ed — it already did the exact NFKD accent-fold + whitespace-collapse needed, so no new duplicate helper was added). Added tests for accented names, ñ/ü, and extra internal/trailing whitespace.
+2. **Conflicting strong matches**: `matchIdentity()` previously returned `kind: "auto"` on a profile-key hit even when a verified-email hit on the *same row* pointed at a different Contact (profile key checked first, function returned early). Now both keys are resolved before deciding: same person on both → still `auto` (`key: "profile_key"`); different people → `{ kind: "review", reason: "conflicting_strong_keys", candidates: [profileMatch, emailMatch] }`, routing to the admin duplicate-review queue instead of silently merging. Added tests for the same-person and conflicting-person cases, plus an email-whitespace-trimming test. Updated `specs/contact-identity/spec.md` with a new "Conflicting strong-key matches are never auto-merged" requirement and two scenarios (agree → auto-merge, disagree → review).
+
+RED confirmed before each fix: the conflicting-keys test failed with `actual: { kind: 'auto', ... }` against the old code, and the accent tests failed with the accented string still present in the key, before either fix was implemented.
+
+`npm run test:unit`: 54/54 pass. `npm run typecheck`: clean.
+
+**PR 2 diff grew from 401 to 509 changed lines** (`git diff --stat` vs. `feat/crm-hubspot-ux-01-schema`: 4 files, 507 insertions + 2 deletions) — now also over the 400-line budget, driven by the doc-comment-heavy spec/test additions the fixes required (test file alone is 262 lines added, matching the existing file's one-scenario-per-test style). Flagging for the same `size:exception` decision as PR 1, or a request to trim.
+
 ## Remaining Tasks (next batch)
 
 - [ ] Phase 3 (PR 3): Collapse migration + dry-run gate — `scripts/unify-contacts.ts --phase=collapse --dry-run`, `/admin/migration` page, execute gate.
