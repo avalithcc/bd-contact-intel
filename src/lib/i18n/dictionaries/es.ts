@@ -513,6 +513,8 @@ export const es: typeof en = {
     notExecutedWarning: "No ejecutado. No se modificaron datos de producción.",
     approveButton: "Aprobar simulación",
     approvedBy: (name, date) => `Aprobada por ${name} el ${date}`,
+    executedAt: (date) => `Ejecutada el ${date}`,
+    backupPath: (path) => `Copia de seguridad: ${path}`,
     reportTitle: "Fase 1 · Colapsar contactos de LinkedIn",
     tableRowsRead: "Filas de contacto leídas",
     tableOwnCompanySkipped: "Empresa propia omitida",

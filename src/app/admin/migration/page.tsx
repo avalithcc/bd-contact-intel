@@ -20,6 +20,18 @@ function isCollapseReport(report: unknown): report is CollapseReport {
   return !!report && typeof report === "object" && "contact" in report && "persons" in report;
 }
 
+/**
+ * `finalizeExecute` (queries.ts) folds `backupPath` into the existing
+ * jsonb `report` column rather than adding a dedicated migration_run
+ * column — see that function's comment. Duck-typed here since it's only
+ * present once a run has actually been executed.
+ */
+function backupPathFrom(report: unknown): string | null {
+  if (!report || typeof report !== "object") return null;
+  const path = (report as { backupPath?: unknown }).backupPath;
+  return typeof path === "string" ? path : null;
+}
+
 export default async function MigrationAdminPage() {
   try {
     await requireAdmin();
@@ -116,6 +128,12 @@ export default async function MigrationAdminPage() {
                   {dict.approveButton}
                 </button>
               </form>
+            )}
+            {latest.executedAt && (
+              <p className="soft">{dict.executedAt(formatDateTime(latest.executedAt, "es"))}</p>
+            )}
+            {backupPathFrom(latest.report) && (
+              <p className="muted">{dict.backupPath(backupPathFrom(latest.report)!)}</p>
             )}
           </section>
         </>

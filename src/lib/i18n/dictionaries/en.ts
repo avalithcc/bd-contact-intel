@@ -609,6 +609,8 @@ export const en = {
     notExecutedWarning: "Not executed. No production data was changed.",
     approveButton: "Approve dry run",
     approvedBy: (name: string, date: string) => `Approved by ${name} on ${date}`,
+    executedAt: (date: string) => `Executed on ${date}`,
+    backupPath: (path: string) => `Backup: ${path}`,
     reportTitle: "Phase 1 · Collapse LinkedIn contacts",
     tableRowsRead: "Contact rows read",
     tableOwnCompanySkipped: "Own-company skipped",
