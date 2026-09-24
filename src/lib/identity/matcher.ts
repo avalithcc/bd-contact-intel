@@ -33,17 +33,19 @@ export interface IdentityIndex {
   byNameCompany(key: string): PersonId[];
 }
 
+export type ReviewReason = "name_company" | "conflicting_strong_keys";
+
 export type MatchResult =
   | { kind: "skip_own_company"; reason: "name" | "domain" }
   | { kind: "auto"; personId: PersonId; key: "profile_key" | "verified_email" }
-  | { kind: "review"; personIds: PersonId[]; key: "name_company" }
-  // Strong-key conflict: the profile key and the verified email each match
-  // a DIFFERENT existing Contact. Never auto-merge here — a shared LinkedIn
-  // profile key with a mismatched verified email is more likely a data
-  // error (or two different people) than the same person, so it goes to
-  // the admin duplicate-review queue like a name+company match, but keeps
-  // its own reason/shape so the review UI can explain *why* it's flagged.
-  | { kind: "review"; reason: "conflicting_strong_keys"; candidates: PersonId[] }
+  // Goes to the admin duplicate-review queue, never auto-merged. One shape
+  // for every review case so the queue handles them uniformly; `reason`
+  // tells the review UI why it was flagged:
+  // - "name_company": weak name+company match.
+  // - "conflicting_strong_keys": the profile key and the verified email each
+  //   match a DIFFERENT existing Contact — more likely a data error (or two
+  //   people) than the same person.
+  | { kind: "review"; reason: ReviewReason; personIds: PersonId[] }
   | { kind: "new" };
 
 export interface MatchableRow {
@@ -105,7 +107,7 @@ export function matchIdentity(row: MatchableRow, index: IdentityIndex): MatchRes
     return {
       kind: "review",
       reason: "conflicting_strong_keys",
-      candidates: [profilePersonId, emailPersonId],
+      personIds: [profilePersonId, emailPersonId],
     };
   }
 
@@ -116,7 +118,7 @@ export function matchIdentity(row: MatchableRow, index: IdentityIndex): MatchRes
   if (nameCompanyKey) {
     const candidates = index.byNameCompany(nameCompanyKey);
     if (candidates.length > 0) {
-      return { kind: "review", personIds: candidates, key: "name_company" };
+      return { kind: "review", reason: "name_company", personIds: candidates };
     }
   }
 

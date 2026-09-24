@@ -70,8 +70,8 @@ test("Name+company match never auto-merges — routes to review", () => {
   );
   assert.deepEqual(result, {
     kind: "review",
+    reason: "name_company",
     personIds: ["person-3"],
-    key: "name_company",
   });
 });
 
@@ -145,8 +145,17 @@ test("Profile key and verified email disagreeing on different people never auto-
   assert.deepEqual(result, {
     kind: "review",
     reason: "conflicting_strong_keys",
-    candidates: ["person-from-profile", "person-from-email"],
+    personIds: ["person-from-profile", "person-from-email"],
   });
+});
+
+test("A name with no Latin letters yields no name+company key, so it never matches by name", () => {
+  assert.equal(buildNameCompanyKey({ firstName: "Иван", lastName: "Иванов", company: "Acme" }), null);
+  const result = matchIdentity(
+    { firstName: "Иван", lastName: "Иванов", company: "Acme" },
+    emptyIndex({ byNameCompany: () => ["person-should-not-match"] }),
+  );
+  assert.deepEqual(result, { kind: "new" });
 });
 
 test("Verified email is trimmed before lookup", () => {
