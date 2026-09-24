@@ -59,12 +59,12 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Collapse Migration + Dry-Run Gate (PR 3, base: PR 2)
 
-- [ ] 3.1 RED/GREEN: migration planner (rows → plan + counts) as a pure function, tested against fixtures (3-BDs-1-profile-key scenario).
-- [ ] 3.2 `scripts/unify-contacts.ts --phase=collapse --dry-run`: builds in-memory `IdentityIndex`, writes `migration_run` report (auto-merged/flagged/new counts per table), no writes to `person`/`person_bd_connection` outside dry-run mode.
-- [ ] 3.3 `/admin/migration` page (admin-only, `requireAdmin`): shows latest dry-run report, "Approve dry run" action writing `audit_log(migration_approve)` and `migration_run.approved_by/at`.
-- [ ] 3.4 `--execute --run=<id>`: refuses if `input_hash` changed or run not approved; snapshot production backup first; tags rows with `migration_run_id`.
+- [x] 3.1 RED/GREEN: migration planner (rows → plan + counts) as a pure function, tested against fixtures (3-BDs-1-profile-key scenario).
+- [x] 3.2 `scripts/unify-contacts.ts --phase=collapse --dry-run`: builds in-memory `IdentityIndex`, writes `migration_run` report (auto-merged/flagged/new counts per table), no writes to `person`/`person_bd_connection` outside dry-run mode.
+- [x] 3.3 `/admin/migration` page (admin-only, `requireAdmin`): shows latest dry-run report, "Approve dry run" action writing `audit_log(migration_approve)` and `migration_run.approved_by/at`.
+- [ ] 3.4 `--execute --run=<id>`: refuses if `input_hash` changed or run not approved; snapshot production backup first; tags rows with `migration_run_id`. **Partially done**: the refusal logic (stale hash / missing approval) and the `migration_run_id` tagging are implemented and unit-tested (`executionGuard.ts`, `writeCollapsePlan`). The "snapshot production backup first" step is a deliberate `snapshotBackup()` stub that always throws — wiring a real backup mechanism (Supabase/Postgres PITR or `pg_dump`) is an infra decision left to the owner; `--execute` cannot run until that's resolved.
 - [ ] 3.5 **GATE**: owner reviews the collapse dry-run report in `/admin/migration` (against production data via Vercel preview) and records approval before `--execute` runs.
-- [ ] 3.6 Test: dry-run mode never writes `person` rows; execute mode refuses on stale `input_hash` or missing approval.
+- [x] 3.6 Test: dry-run mode never writes `person` rows; execute mode refuses on stale `input_hash` or missing approval.
 
 ## Phase 4: Fold Leads (PR 4, base: PR 3)
 

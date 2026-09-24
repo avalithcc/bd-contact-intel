@@ -100,9 +100,103 @@ RED confirmed before each fix: the conflicting-keys test failed with `actual: { 
 
 **PR 2 diff grew from 401 to 509 changed lines** (`git diff --stat` vs. `feat/crm-hubspot-ux-01-schema`: 4 files, 507 insertions + 2 deletions) — now also over the 400-line budget, driven by the doc-comment-heavy spec/test additions the fixes required (test file alone is 262 lines added, matching the existing file's one-scenario-per-test style). Flagging for the same `size:exception` decision as PR 1, or a request to trim.
 
+---
+
+# Batch 2 — Phase 3 (PR 3): Collapse Migration + Dry-Run Gate
+
+**Mode**: Strict TDD (`npm run test:unit`, node:test via tsx).
+**Branch**: `feat/crm-hubspot-ux-03-collapse`, created from `feat/crm-hubspot-ux-02-matcher` (head `0555572`). Not pushed; no PR opened.
+**Delivery**: chained PRs, `feature-branch-chain`, per the orchestrator's scoped instruction (PR 3 only, this batch).
+**Hard safety rule followed**: no migration, script, or dry run was executed against any database — the collapse planner is exercised only through in-memory fixtures in `tests/unit/`.
+
+## Completed Tasks
+
+- [x] 3.1 RED/GREEN: `src/lib/migration/collapsePlanner.ts#planCollapse` — pure function, rows → plan + per-table report. Streams rows through the existing `matchIdentity`/`mergeProperty` (`@/lib/identity/matcher`, reused verbatim, no duplicated normalization) over a growing in-memory `IdentityIndex`. Tested against the contact-migration spec's "3-BDs-1-profile-key" scenario plus own-company skip, name+company review, conflicting-key review, and unparseable-`connectedOn` owner-selection fixtures (`tests/unit/collapsePlanner.test.ts`, 8 tests).
+- [x] 3.2 `scripts/unify-contacts.ts --phase=collapse --dry-run`: reads all `contact` rows (keyset-paginated, same pattern as `scripts/backfill-*.ts`), runs `runCollapseDryRun` (`src/lib/migration/collapseRun.ts`), writes one `migration_run` report row. Its ports type (`Pick<CollapseRunPorts, "saveMigrationRun">`) structurally excludes `writePersons`, so a dry run cannot reach the person writer even by mistake — not just "doesn't call it today."
+- [x] 3.3 `/admin/migration` page (`src/app/admin/migration/page.tsx`) — first admin-only route in the app. `requireAdmin()` guard; `AdminRequiredError` → `notFound()` (404, not 403, per design.md "Routes"). Shows the latest collapse report, an "Approve dry run" form (`src/app/admin/migration/actions.ts#approveMigrationRunAction` → `approveMigrationRun` writes `migration_run.approved_by/at` + one `audit_log(migration_approve)` row in a transaction), and run history with the approver's name (left-joined, not a raw bd id).
+- [ ] 3.4 `--execute --run=<id>` — **partially done**, see Deviations below.
+- [ ] 3.5 GATE — owner action against production data (Vercel preview), not something I can do from this batch.
+- [x] 3.6 Test: `tests/unit/collapseRun.test.ts` — dry run never calls `writePersons` (4 tests: dry-run saves+never-writes, execute refuses on stale hash, execute refuses when unapproved, execute writes once approved+hash-matches).
+
+## Files Changed
+
+| File | Action | What Was Done |
+|------|--------|----------------|
+| `src/lib/migration/collapsePlanner.ts` | Created | Pure `planCollapse()` — matcher-driven grouping, property merge (email fields move together as one unit — see file comment), owner selection, per-table report. |
+| `src/lib/migration/connectedOn.ts` | Created | `parseConnectedOnDate()` — parses LinkedIn's `"12 Mar 2021"` text; null (sorts last) for anything else, including impossible calendar dates. |
+| `src/lib/migration/inputHash.ts` | Created | `computeCollapseInputHash()` — sha256 over sorted, field-delimited rows; order-independent, content-sensitive. |
+| `src/lib/migration/executionGuard.ts` | Created | `assertExecutionAllowed()` — the R10/R13 owner gate (not found / not approved / stale hash), each a distinct `MigrationExecutionBlockedError.reason`. |
+| `src/lib/migration/collapseRun.ts` | Created | `runCollapseDryRun`/`runCollapseExecute` — mode-branching orchestration; dry run's ports type excludes `writePersons`. |
+| `src/lib/migration/queries.ts` | Created | DB wiring (not unit-tested — imports `@/db`, same split rationale as `requireAdmin`/`adminRole`): `readAllContactRows`, `saveMigrationRun`, `getMigrationRunForGate`, `listMigrationRuns`/`getLatestMigrationRun` (with approver-name join), `approveMigrationRun`, `writeCollapsePlan`. |
+| `scripts/unify-contacts.ts` | Created | CLI: `--phase=collapse --dry-run` / `--execute --run=<id>`. `--phase=fold_leads` explicitly throws "not implemented yet" (Phase 4). `snapshotBackup()` always throws — see Deviations. |
+| `src/app/admin/migration/page.tsx` | Created | RSC: latest report, approve form, run history. Existing shared classes only (`panel`/`eyebrow`/`soft`/`muted`/`table-wrap`/`filter-submit`) — no new CSS. |
+| `src/app/admin/migration/actions.ts` | Created | `"use server"` `approveMigrationRunAction`. |
+| `src/lib/i18n/dictionaries/es.ts`, `en.ts` | Modified | Added a `migration` section to both (type parity — `Dictionary = typeof en`). The page always renders `es` directly, ignoring the locale cookie (R11: new screens are Spanish-only now, not at the PR 8 cutover). `en`'s copy is unused dead weight until PR 8 removes the dual-dictionary structure — flagged, not hidden. |
+
+## TDD Cycle Evidence
+
+| Task | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| 3.1 `parseConnectedOnDate` | `tests/unit/connectedOn.test.ts` written against non-existent `@/lib/migration/connectedOn` — confirmed `Cannot find module`. | Implemented; all 7 cases passed on first run. | N/A |
+| 3.1 `computeCollapseInputHash` | `tests/unit/migrationInputHash.test.ts` against non-existent module — confirmed `Cannot find module`. | Implemented; all 4 cases passed on first run. | N/A |
+| 3.1/3.6 `assertExecutionAllowed` | `tests/unit/migrationExecutionGuard.test.ts` against non-existent module — confirmed `Cannot find module`. | Implemented; all 4 cases passed on first run. | N/A |
+| 3.1 `planCollapse` | `tests/unit/collapsePlanner.test.ts` (8 cases, including the spec's 3-BD scenario) against non-existent module — confirmed `Cannot find module`. | Implemented; all 8 passed on first run — required one fixture fix mid-authoring (a "report buckets sum to rowsRead" fixture accidentally had two rows collide on name+company across the wrong groups; fixed the fixture, not the implementation, before it was ever run — this was caught while writing the test, not a RED/GREEN cycle against wrong code). | N/A |
+| 3.6 `runCollapseDryRun`/`runCollapseExecute` | `tests/unit/collapseRun.test.ts` (4 cases) against non-existent `@/lib/migration/collapseRun` — confirmed `Cannot find module`. | Implemented; all 4 passed on first run. | N/A |
+
+All five pure modules were written test-first, confirmed failing on `MODULE_NOT_FOUND` before any implementation existed, matching the same evidence pattern as batch 1. `queries.ts`, `scripts/unify-contacts.ts`, and the admin page/action are DB- or Next.js-request-bound and are not unit-tested, consistent with `requireAdmin()`'s precedent and design.md's testing strategy (DB-backed coverage deferred to dry-run-on-snapshot / E2E, neither run in this batch per the hard safety rule).
+
+## Test Results
+
+```
+$ npm run test:unit
+ℹ tests 81
+ℹ pass 81
+ℹ fail 0
+
+$ npm run typecheck
+(no output — clean)
+```
+
+## Deviations from Design
+
+- **Task 3.4, `snapshotBackup()`**: design.md's migration plan says "--execute ... A production backup is taken first," but does not specify a mechanism (Supabase point-in-time recovery? `pg_dump`? something else?), and I have no visibility into this project's actual backup/infra setup. Rather than guess and risk a false sense of safety, `scripts/unify-contacts.ts#snapshotBackup()` is an explicit stub that **always throws** — `--execute` cannot proceed until the owner decides on and wires a real mechanism. This is a deliberate fail-safe, not a missed task. Everything else in 3.4 (the approval/hash gate, `migration_run_id` tagging) is implemented and unit-tested.
+- **Report shape**: contact-migration spec asks for "auto-merged / flagged-for-review / new counts ... per affected table." Since Phase 3 only processes `contact` (Phase 4 adds `lead`), the report is shaped as `{ contact: {...}, persons: {...}, connections: {...} }` rather than a flat count set, so Phase 4 can add a sibling `lead` block without a breaking change. Not explicitly specified in design.md; a reasonable extrapolation, flagged here rather than silently assumed.
+- **Email-field merging**: `mergeProperties` (from the matcher, R7) merges each named property independently. For collapse, `email`/`emailStatus`/`emailConfidence`/`emailSource` are correlated and must move together as one unit (picking `email` from one row and `emailStatus` from another would desync them) — `collapsePlanner.ts#mergeEmailFields` handles this as a dedicated unit keyed on `emailStatusRank`, rather than calling the generic per-field `mergeProperty` for each of the four fields separately. Not a change to the matcher itself, just how the planner composes it.
+- **`person_id_map.method` per legacy row**: design.md's data model lists the method vocabulary (`profile_key`/`verified_email`/`review`/`new`/`skipped_own_company`) but doesn't spell out which method applies to which row in a multi-row collapse group. I record the *actual* match outcome for each individual legacy row (first row of a group → `new` or `review`; later rows → whichever matcher key it matched — `profile_key` or `verified_email`), not a single method for the whole group.
+
+## Issues Found
+
+None beyond the pre-existing PR 1/PR 2 flags already recorded above (migration 0012 ledger, PR budget overages) — both still awaiting your decision, not re-litigated here.
+
+## Review Workload / PR Boundary — flagged, not silently absorbed
+
+**PR 3 forecast in design.md: ~380 lines. Actual, `git diff --stat feat/crm-hubspot-ux-02-matcher...feat/crm-hubspot-ux-03-collapse`: 16 files, 1,499 insertions, 0 deletions.**
+
+Per your standing rule ("the 400-line budget counts production CODE only; tests/docs overage is fine — report the split"):
+
+| Category | Lines | Files |
+|---|---|---|
+| Production code | **1,099** | 11 |
+| Tests | 400 | 5 |
+| Docs | 0 | — |
+
+Production code alone is **~2.7x the 400-line budget.** I did not stop mid-implementation (the work was already committed once I could measure it precisely), but I did NOT push either branch or open a PR, per your instruction — flagging here for your decision before any PR is opened, same as PR 1/PR 2.
+
+**Breakdown by commit** (these 3 commits are already on `feat/crm-hubspot-ux-03-collapse` in this order, and are a natural chained-PR split if you want one):
+
+| Commit | Content | Code lines | Test lines | Total | 400-line risk (code only) |
+|---|---|---|---|---|---|
+| `feat(migration): add pure collapse-phase migration planner` | `collapsePlanner.ts`, `collapseRun.ts`, `connectedOn.ts`, `executionGuard.ts`, `inputHash.ts` + their 5 test files | 526 | 400 | 926 | **Over** — 526 vs 400 (+126, ~31%) |
+| `feat(migration): wire the collapse planner to the database and CLI` | `queries.ts`, `scripts/unify-contacts.ts` | 321 | 0 | 321 | Under budget |
+| `feat(admin): add /admin/migration dry-run review page` | `page.tsx`, `actions.ts`, `en.ts`/`es.ts` dictionary additions | 252 | 0 | 252 | Under budget |
+
+Only the first commit exceeds the code budget, and only by ~31% — driven by `collapsePlanner.ts` itself (341 lines), which is one cohesive pure algorithm (matching loop + property-merge composition + owner selection + report totals) with the same heavy-doc-comment convention flagged as a driver in PR 1. I did not find a clean sub-split: pulling the merge logic or report-building into a separate file would fragment one algorithm across files without reducing total lines. The closest mechanical split — moving `connectedOn.ts` + `executionGuard.ts` + `inputHash.ts` (115 code lines, 146 test lines) into their own commit/PR ahead of `collapsePlanner.ts` + `collapseRun.ts` (411 code lines, 254 test lines) — still leaves the planner slice 11 lines over budget, which is close enough to trivial that I'd call it `size:exception` territory either way.
+
+**Recommendation to the orchestrator**: either (a) accept the 3 commits as-is as one PR under `size:exception` (total 1,099 code lines, but no single commit except the first is far over, and that one is a self-contained, heavily-tested pure-logic module), or (b) split into 3 chained PRs along the existing commit boundaries — PR 3a (planner, needs `size:exception` for +126 lines), PR 3b (DB wiring, in budget), PR 3c (admin page, in budget). I have not pushed anything or opened any PR; both branches/commits are local only, awaiting your decision, consistent with how PR 1/PR 2 were left for your review last batch.
+
 ## Remaining Tasks (next batch)
 
-- [ ] Phase 3 (PR 3): Collapse migration + dry-run gate — `scripts/unify-contacts.ts --phase=collapse --dry-run`, `/admin/migration` page, execute gate.
+- [ ] Phase 3 (PR 3): task 3.4's `snapshotBackup()` (owner infra decision) and task 3.5 (owner GATE against production data) — both blocked on you, not on further implementation.
 - [ ] Phase 4 (PR 4): Fold leads.
 - [ ] Phase 5 (PR 5): Status derivation & re-scope reads.
 - [ ] Phase 6 (PR 6): Merge/unmerge engine.
@@ -111,4 +205,14 @@ RED confirmed before each fix: the conflicting-keys test failed with `actual: { 
 
 ## Status
 
-6/6 tasks in this batch's scope complete (Phase 0: 2/2 preconditions confirmed already satisfied, Phase 1: 4/4, Phase 2: 4/4 — 10/10 counting every checkbox). Not yet pushed; not yet PR'd. **Blocked on your decision**: accept PR 1's `size:exception`, or ask me to attempt a further split, before I push either branch or open PRs. Ready for `sdd-apply` to continue with Phase 3 once PR 1/2 are resolved, or for a fresh-context review of the two branches first.
+**Cumulative across batches 1-2**: Phase 0 (2/2), Phase 1 (4/4), Phase 2 (4/4), Phase 3 (4/6 — 3.1/3.2/3.3/3.6 done; 3.4 partially done pending an owner backup-mechanism decision; 3.5 is an owner GATE against production data). 14/16 checkboxes through Phase 3.
+
+Nothing has been pushed and no PR has been opened for PR 1, PR 2, or PR 3 — all work is local commits on `feat/crm-hubspot-ux-01-schema`, `feat/crm-hubspot-ux-02-matcher`, and `feat/crm-hubspot-ux-03-collapse` (all based off `feat/crm-hubspot-ux`), awaiting your review.
+
+**Blocked on your decisions, in order**:
+1. PR 1's `size:exception` (781 lines, schema/migration) and PR 2's `size:exception` (509 lines, identity matcher) — carried over from batch 1, unresolved.
+2. PR 3's budget: accept `size:exception` for the whole PR (1,099 code lines) or split into 3 chained PRs along the existing commit boundaries (see "Review Workload / PR Boundary" above) — only the first of those three would still need an exception (526 vs 400).
+3. `snapshotBackup()` (task 3.4) — which real backup mechanism to wire in before `--execute` can ever run.
+4. Task 3.5's GATE — reviewing the actual collapse dry-run report against production data (via Vercel preview) once PR 3 is pushed and the dry run is actually executed. Not attempted in this batch per the hard safety rule (no DB access at all, not even dry-run).
+
+Ready for `sdd-apply` to continue with Phase 4 once PR 3 is resolved, or for a fresh-context review of `feat/crm-hubspot-ux-03-collapse` first.
