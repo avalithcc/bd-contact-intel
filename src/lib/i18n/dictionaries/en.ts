@@ -588,4 +588,41 @@ export const en = {
       genericFailed: "Upload failed.",
     },
   },
+
+  // /admin/migration (crm-hubspot-ux Phase 3). This is a NEW admin-only
+  // screen in the R11 Spanish-only design language — the page always
+  // renders `es` regardless of locale (see src/app/admin/migration/page.tsx).
+  // This English copy exists only to satisfy `Dictionary = typeof en`
+  // until PR 8 removes the dual-dictionary structure (design D10).
+  migration: {
+    eyebrow: "Admin · Migration",
+    title: "Contact migration dry run",
+    subtitle: "Review the report before approving the production run.",
+    noRuns: "No dry run has been executed yet.",
+    generatedAt: (date: string) => `Generated ${date}`,
+    inputHash: (hash: string) => `input hash ${hash}`,
+    modeDryRun: "Dry run",
+    modeExecute: "Execute",
+    statusPending: "Pending",
+    statusApproved: "Approved",
+    statusExecuted: "Executed",
+    notExecutedWarning: "Not executed. No production data was changed.",
+    approveButton: "Approve dry run",
+    approvedBy: (name: string, date: string) => `Approved by ${name} on ${date}`,
+    reportTitle: "Phase 1 · Collapse LinkedIn contacts",
+    tableRowsRead: "Contact rows read",
+    tableOwnCompanySkipped: "Own-company skipped",
+    tableAutoMerged: "Auto-merged by LinkedIn profile",
+    tableFlaggedForReview: "Flagged for review (name + company)",
+    tableNewPersons: "New contacts",
+    tableMultiBd: "People connected with 2+ BDs",
+    tableUnparseableDates: "“Connected On” not parseable (sorts last)",
+    tableTotalConnections: "Total connections",
+    historyTitle: "Run history",
+    historyRun: "Run",
+    historyMode: "Mode",
+    historyStatus: "Status",
+    historyApprovedBy: "Approved by",
+    historyWhen: "When",
+  },
 };
