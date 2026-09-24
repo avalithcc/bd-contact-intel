@@ -238,7 +238,7 @@ export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void
     // than adding a dedicated schema column for this one field.
     const [updatedRun] = await tx
       .update(migrationRun)
-      .set({ executedAt: new Date(), report: { ...plan.report, backupPath } })
+      .set({ mode: "execute", executedAt: new Date(), report: { ...plan.report, backupPath } })
       .where(eq(migrationRun.id, migrationRunId))
       .returning({ id: migrationRun.id });
     if (!updatedRun) {
