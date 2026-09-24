@@ -8,8 +8,7 @@
    ========================================================================= */
 :root {
   /* ---- surfaces (light canvas + lift ladder) ----
-     Light is now the default token set — CRM users see clean, bright UI by default.
-     Dark overrides live in the "[data-theme='dark']" selector below. */
+     The app is light mode only; these are the only color values. */
   --color-canvas: #f5f4f7;
   --color-surface-1: #fbfafc;
   --color-surface-2: #ffffff;
@@ -111,76 +110,17 @@
   --line: var(--color-border);
   --lineh: var(--color-border-strong);
 
-  /* ---- light palette constants ----
-     Defined exactly once, here. The two theme-activation rules below
-     ("[data-theme='light']" and the prefers-color-scheme media query) each
-     just repoint the real color/shadow/icon tokens at these — neither
-     rule duplicates a color value by hand, so light and dark can never
-     drift out of sync by editing one trigger and not the other. */
-  --light-canvas: #f5f4f7;
-  --light-surface-1: #fbfafc;
-  --light-surface-2: #ffffff;
-  --light-surface-tint: #f3e9ea;
-  --light-ink: #17151c;
-  --light-ink-soft: #5b5865; /* ~6.9:1 on --light-canvas/-surface-* */
-  --light-ink-muted: #8b8894;
-  --light-border: rgba(0, 0, 0, 0.08);
-  --light-border-strong: rgba(0, 0, 0, 0.16);
-  --light-success: #15803d; /* ~5.0:1 on white (dark #3ecf8e is ~2.0:1) */
-  --light-warn: #b45309; /* ~5.0:1 on white (dark #e6a23c is ~2.2:1) */
-  --light-danger: #dc2626; /* ~4.8:1 on white (dark #ff6b6b is ~2.8:1) */
-  --light-shadow-dropdown: 0 8px 24px rgba(23, 21, 28, 0.12);
-  --light-row-hover: rgba(0, 0, 0, 0.03);
-  --light-icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b5865' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  /* Text placed directly on the brand-accent fill (primary buttons, active
+     badges). White gives ~5.1:1 on --color-accent, vs. ~3.6:1 for
+     --color-ink — the app is light-only, so this is a fixed color, not a
+     token that needs to flip per theme. */
+  --color-accent-fg: #ffffff;
 }
 
-/* =========================================================================
-   Dark theme (override)
-   Light is now the default. Dark theme is an explicit opt-in via
-   `[data-theme="dark"]` attribute on <html> (set from theme cookie in layout.tsx).
-   ========================================================================= */
-[data-theme="dark"] {
-  --color-canvas: #0b0a11;
-  --color-surface-1: #0e0d15;
-  --color-surface-2: #131119;
-  --color-surface-tint: #1d1215;
-  --color-ink: #ffffff;
-  --color-ink-soft: #8e8c99;
-  --color-ink-muted: #56545f;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
-  --color-success: #3ecf8e;
-  --color-warn: #e6a23c;
-  --color-danger: #ff6b6b;
-  --color-badge-success-bg: rgba(62, 207, 142, 0.12);
-  --color-badge-warn-bg: rgba(230, 162, 60, 0.12);
-  --color-row-hover: rgba(255, 255, 255, 0.02);
-  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-
-/* theme=system with no data-theme attribute rendered (see layout.tsx):
-   follow the OS/browser preference (light is default). */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --color-canvas: #0b0a11;
-    --color-surface-1: #0e0d15;
-    --color-surface-2: #131119;
-    --color-surface-tint: #1d1215;
-    --color-ink: #ffffff;
-    --color-ink-soft: #8e8c99;
-    --color-ink-muted: #56545f;
-    --color-border: rgba(255, 255, 255, 0.08);
-    --color-border-strong: rgba(255, 255, 255, 0.18);
-    --color-success: #3ecf8e;
-    --color-warn: #e6a23c;
-    --color-danger: #ff6b6b;
-    --color-badge-success-bg: rgba(62, 207, 142, 0.12);
-    --color-badge-warn-bg: rgba(230, 162, 60, 0.12);
-    --color-row-hover: rgba(255, 255, 255, 0.02);
-    --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.35);
-    --icon-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8c99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  }
+/* The app is light mode only: no dark palette, no OS dark-mode override.
+   This tells the browser not to darken form controls, scrollbars, etc. */
+:root {
+  color-scheme: light;
 }
 
 * {
@@ -370,7 +310,7 @@ summary:focus-visible,
 /* ---- buttons ---- */
 button {
   background: var(--color-accent);
-  color: var(--color-ink);
+  color: var(--color-accent-fg);
   border: none;
   border-radius: var(--radius-sm);
   padding: 0.55rem 1.1rem;

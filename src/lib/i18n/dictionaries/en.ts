@@ -79,13 +79,11 @@ const leadStatuses: Record<LeadStatusKey, string> = {
 
 export const en = {
   localeName: { en: "EN", es: "ES" },
-  themeName: { light: "Light", dark: "Dark", system: "System" },
 
   common: {
     signOut: "Sign out",
     account: "account",
     changePassword: "Change password",
-    themeLabel: "Theme",
     priorityOutreach: "Priority Contacts",
     whatsNew: "Contact Opportunities",
     hiringSignals: "Open Roles",

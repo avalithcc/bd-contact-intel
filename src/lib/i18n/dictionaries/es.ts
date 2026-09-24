@@ -5,13 +5,11 @@ import type { en } from "./en";
 // mistyped key is a compile error.
 export const es: typeof en = {
   localeName: { en: "EN", es: "ES" },
-  themeName: { light: "Claro", dark: "Oscuro", system: "Sistema" },
 
   common: {
     signOut: "Cerrar sesión",
     account: "cuenta",
     changePassword: "Cambiar contraseña",
-    themeLabel: "Tema",
     priorityOutreach: "Contactos Prioritarios",
     whatsNew: "Oportunidades en Mis Contactos",
     hiringSignals: "Vacantes Abiertas",

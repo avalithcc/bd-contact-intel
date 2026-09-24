@@ -10,8 +10,6 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDateTime } from "@/lib/i18n/format";
 import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
-import { ThemeSwitcher } from "@/lib/theme/ThemeSwitcher";
-import { getTheme } from "@/lib/theme/server";
 import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
@@ -27,7 +25,6 @@ export const dynamic = "force-dynamic";
 // viewing BD's own count; see the copy in src/lib/i18n/dictionaries.
 export default async function DiscoveryPage() {
   const locale = await getLocale();
-  const theme = await getTheme();
   const dict = t(locale);
   const me = await getCurrentBd();
 
@@ -59,8 +56,6 @@ export default async function DiscoveryPage() {
             changePasswordHref="/account/password"
             changePasswordLabel={dict.common.changePassword}
             localeSwitcher={<LocaleSwitcher locale={locale} />}
-            themeSwitcher={<ThemeSwitcher theme={theme} locale={locale} />}
-            themeLabel={dict.common.themeLabel}
             signOutButton={<SignOutButton locale={locale} />}
           />
         </div>

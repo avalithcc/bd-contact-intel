@@ -38,16 +38,12 @@ export function UserMenu({
   changePasswordHref,
   changePasswordLabel,
   localeSwitcher,
-  themeSwitcher,
-  themeLabel,
   signOutButton,
 }: {
   label: string;
   changePasswordHref: string;
   changePasswordLabel: string;
   localeSwitcher: ReactNode;
-  themeSwitcher: ReactNode;
-  themeLabel: string;
   signOutButton: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -98,10 +94,6 @@ export function UserMenu({
           </div>
           <div className="user-menu-locale" role="none">
             {localeSwitcher}
-          </div>
-          <div className="user-menu-theme" role="none">
-            <div className="user-menu-section-label">{themeLabel}</div>
-            {themeSwitcher}
           </div>
           <Link
             className="user-menu-item"

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { getLocale } from "@/lib/i18n/server";
-import { getTheme } from "@/lib/theme/server";
 import { NavigationTracker } from "./NavigationTracker";
 import { Sidebar } from "./Sidebar";
 import "./globals.css";
@@ -33,18 +32,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
-  const theme = await getTheme();
-  // "system" omits data-theme entirely: globals.css then falls back to the
-  // `@media (prefers-color-scheme: light)` rule scoped to
-  // `:root:not([data-theme])`, so the OS/browser preference decides.
-  // color-scheme mirrors the same resolution so native controls/scrollbars
-  // (and the browser's own dark-mode UI) match what's rendered.
-  const colorScheme = theme === "system" ? "light dark" : theme;
   return (
     <html
       lang={locale}
-      data-theme={theme === "system" ? undefined : theme}
-      style={{ colorScheme }}
       className={`${inter.variable} ${jetbrains.variable}`}
     >
       <body>
