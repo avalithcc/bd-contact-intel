@@ -52,3 +52,37 @@ test("adding a row changes the hash", () => {
   const withExtra = [row({ id: "c1" }), row({ id: "c2" })];
   assert.notEqual(computeCollapseInputHash(base), computeCollapseInputHash(withExtra));
 });
+
+// --- regression: the hash must cover EVERY field the planner reads
+// (fresh-review fix — a stale-but-undetected mutation on any of these
+// fields would let --execute silently run against changed data) ----------
+
+test("changing ANY field on the row changes the hash — no field is silently ignored", () => {
+  const baseHash = computeCollapseInputHash([row({ id: "c1" })]);
+  const mutations: Partial<CollapseContactRow>[] = [
+    { bdId: "different-bd" },
+    { profileKey: "linkedin.com/in/different" },
+    { firstName: "Different" },
+    { lastName: "Different" },
+    { company: "Different Co" },
+    { companyKey: "different" },
+    { companyCategory: "banking_insurance" },
+    { roleGroup: "sales_bd" },
+    { position: "Different Title" },
+    { industry: "Different Industry" },
+    { email: "different@acme.com" },
+    { emailStatus: "probable" },
+    { emailConfidence: 42 },
+    { emailSource: "different_source" },
+    { connectedOn: "1 Jan 2019" },
+  ];
+
+  for (const mutation of mutations) {
+    const mutatedHash = computeCollapseInputHash([row({ id: "c1", ...mutation })]);
+    assert.notEqual(
+      mutatedHash,
+      baseHash,
+      `expected the hash to change for mutation: ${JSON.stringify(mutation)}`,
+    );
+  }
+});
