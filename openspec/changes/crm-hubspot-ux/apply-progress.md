@@ -194,9 +194,69 @@ Only the first commit exceeds the code budget, and only by ~31% — driven by `c
 
 **Recommendation to the orchestrator**: either (a) accept the 3 commits as-is as one PR under `size:exception` (total 1,099 code lines, but no single commit except the first is far over, and that one is a self-contained, heavily-tested pure-logic module), or (b) split into 3 chained PRs along the existing commit boundaries — PR 3a (planner, needs `size:exception` for +126 lines), PR 3b (DB wiring, in budget), PR 3c (admin page, in budget). I have not pushed anything or opened any PR; both branches/commits are local only, awaiting your decision, consistent with how PR 1/PR 2 were left for your review last batch.
 
+---
+
+# Batch 3 — Owner decisions + fresh review fixes for PR 3
+
+The orchestrator relayed the owner's decision: PR 3 is now **three chained branches**, cut exactly at batch 2's commit boundaries and already split by the orchestrator before this batch started:
+
+- `feat/crm-hubspot-ux-03a-planner` (base: `feat/crm-hubspot-ux-02-matcher`) — `size:exception` **approved** for its ~526 code lines.
+- `feat/crm-hubspot-ux-03b-cli` (base: 03a).
+- `feat/crm-hubspot-ux-03c-admin-page` (base: 03b).
+
+`feat/crm-hubspot-ux-03-collapse` is now obsolete and has been **deleted locally**.
+
+A fresh-context review found 4 issues, fixed in this batch (strict TDD — RED confirmed before every fix), then each chained branch was rebased (`git rebase --onto`) onto the previous branch's new head. No conflicts during any of the three rebases.
+
+## Fixes
+
+1. **CRITICAL (03a)** — `collapsePlanner.ts`'s index registration unconditionally overwrote `byProfileKey`/`byVerifiedEmail` entries. A `conflicting_strong_keys` review row (profile key → person A, verified email → person B) repointed BOTH A's profile key and B's email to the brand-new review person C, so a later row carrying only one of those keys wrongly merged into C instead of the person that actually owned it. Fixed with set-if-absent index writes (`registerRowKeys`, renamed from `registerPerson`), which now also runs on auto-merges so a row that matches via one strong key but carries a second, not-yet-indexed one gets that second key registered too (always safe — `matchIdentity` only returns `auto` when the unindexed key was genuinely unclaimed). 2 new regression tests.
+2. **03a** — `inputHash.ts` hand-picked 10 of `CollapseContactRow`'s 15 fields, silently excluding `companyKey`/`companyCategory`/`roleGroup`/`industry`/`emailConfidence`/`emailSource` from the `--execute` staleness check. Replaced the hand-picked list with a reflective canonical serializer (`Object.keys(row)`, sorted) so there's no second list to drift out of sync. Regression test mutates all 15 non-id fields one at a time and asserts the hash changes for each.
+3. **03b** — Execution bookkeeping: `runCollapseExecute` created a brand-new `migration_run` row on every `--execute`, orphaning the approved dry-run row (`executedAt` stayed null forever) and letting a second `--execute` silently insert yet another row instead of being refused. Fixed: `executionGuard` now checks `executedAt` before the hash comparison (new `already_executed` reason); `collapseRun.runCollapseExecute` takes the full approved run and calls one `finalizeExecute` port that writes the plan, sets `mode='execute'` + `executedAt` on the SAME row, and writes one `audit_log(migration_execute)` entry — all in one transaction. Also refuses up front if the approved run has no `approvedByBdId` (audit_log's actor column is not-null). A follow-up fix in the same branch also flips `mode` to `'execute'` on finalize (missed in the first pass — the history table would otherwise show "Simulación" forever for an executed run).
+4. **03b** — Implemented the owner-approved `snapshotBackup()`: `pg_dump` (custom format, `-Fc`) of every table the migration touches (legacy `contact`/`lead` universe, messaging, `bd`, and every 0013 table) to `backups/<runId>-<ISO timestamp>.dump`, then verifies with `pg_restore --list` plus a minimum-size floor; either failing aborts before any write. Binary resolution: `PG_DUMP_PATH` env, else `pg_dump` on PATH, else the homebrew libpq fallback path; `pg_restore` is derived from whichever `pg_dump` path actually worked (same bin directory) rather than a second independent env var. `backups/` added to `.gitignore`. Only the pure parts (binary resolution, file naming, argument building, the verification decision) are unit-tested — the real process spawn is not, per the review's explicit instruction.
+5. **03c (self-found while integrating)** — Once 03b's execution bookkeeping was fixed, the admin page's existing "not executed" warning and history-table status column were already correct for free (they read `executedAt` off the right row now). Added two lines that were still missing once a run IS executed: "Ejecutada el `<date>`" and the backup file path (duck-typed off `report.backupPath`, which `finalizeExecute` folds into the existing jsonb `report` column rather than a new schema column — a deliberate choice to avoid a schema migration for one field; flagged here in case the owner would prefer a dedicated `migration_run.backup_path` column instead).
+
+## Branches / Commits (final heads)
+
+| Branch | Base | Commits | Final head |
+|---|---|---|---|
+| `feat/crm-hubspot-ux-03a-planner` | `feat/crm-hubspot-ux-02-matcher` | `d610770` (original) → `cef98e3` (fix 1) → `eabb3d0` (fix 2) | `eabb3d0` |
+| `feat/crm-hubspot-ux-03b-cli` | `feat/crm-hubspot-ux-03a-planner` | `173bf99` (original, rebased) → `6117063` (fix 3) → `6b0304f` (fix 4) → `a9ffd9b` (mode-flip follow-up) | `a9ffd9b` |
+| `feat/crm-hubspot-ux-03c-admin-page` | `feat/crm-hubspot-ux-03b-cli` | `69094a5` (original, rebased) → `434f6fc` (fix 5) | `434f6fc` |
+
+No conflicts during either rebase (`03b` onto `03a`'s new head, then `03c` onto `03b`'s new head, redone once more after the mode-flip follow-up commit landed on `03b`). Nothing pushed; no PRs opened, per instruction.
+
+## Test / Typecheck Results (verified independently per branch, after all rebases)
+
+| Branch | `npm run test:unit` | `npm run typecheck` |
+|---|---|---|
+| `feat/crm-hubspot-ux-03a-planner` | 84/84 pass | clean |
+| `feat/crm-hubspot-ux-03b-cli` | 101/101 pass | clean |
+| `feat/crm-hubspot-ux-03c-admin-page` | 101/101 pass | clean |
+
+## Line Split Per Branch vs. Its Own Base
+
+| Branch | Base | Code | Tests | Config | Total (add+del) |
+|---|---|---|---|---|---|
+| 03a | 02-matcher | 555 (+555/-0) | 548 (+548/-0) | — | 1,103 |
+| 03b | 03a | 645 (+612/-33) | 264 (+229/-35) | 5 (`.gitignore`) | 914 |
+| 03c | 03b | 274 (+274/-0) | 0 | — | 274 |
+
+**03a**: code grew from ~526 to 555 (the two fixes' net code additions) — still the `size:exception` the owner already approved covers this; flagging the updated number for the record, not asking again.
+
+**03b**: code is 645 lines vs. the 400 budget — **new overage, not previously flagged**, driven by the real `pg_dump`/`pg_restore` backup implementation (`backup.ts`, 197 lines) plus the execution-bookkeeping rewrite (`queries.ts` 254 lines — this file did not exist on 03a's side of the diff, so it counts in full; `collapseRun.ts`/`executionGuard.ts` modifications; the CLI script). I did not attempt to further split 03b in this batch — the instruction was to fix the review's findings and restack, not re-litigate the workload guard — but flagging it now for the same decision as 03a: `size:exception`, or a further split (e.g. "bookkeeping" vs. "backup" as separate PRs along the two commits already on this branch).
+
+**03c**: 274 lines, within budget, no action needed.
+
+## Deviations / Owner-Visible Decisions
+
+- `backupPath` is stored inside the existing jsonb `migration_run.report` column (merged in at finalize time) rather than a new dedicated column, to avoid an additional schema migration for one field. `audit_log.metadata` also carries it. If the owner prefers a first-class `backup_path` column, that's a follow-up migration, not a rewrite.
+- `pg_restore`'s path is derived from whichever `pg_dump` path resolution actually succeeded (same directory, `pg_dump` → `pg_restore`) rather than a second independent `PG_RESTORE_PATH` env var, since the review only specified resolution for `pg_dump`. Documented in `backup.ts`'s comments.
+- Still not run, not even once: no migration, script, or dry run has touched any database in any batch of this change. Every guarantee above is proven by unit tests against fixtures/fakes, plus `npm run typecheck`.
+
 ## Remaining Tasks (next batch)
 
-- [ ] Phase 3 (PR 3): task 3.4's `snapshotBackup()` (owner infra decision) and task 3.5 (owner GATE against production data) — both blocked on you, not on further implementation.
+- [ ] Phase 3 (PR 3): task 3.5 (owner GATE — reviewing the actual collapse dry-run report against production data via Vercel preview) — requires the branches to be pushed/merged and a real dry run executed first. Not attempted here per the hard safety rule.
 - [ ] Phase 4 (PR 4): Fold leads.
 - [ ] Phase 5 (PR 5): Status derivation & re-scope reads.
 - [ ] Phase 6 (PR 6): Merge/unmerge engine.
@@ -205,14 +265,14 @@ Only the first commit exceeds the code budget, and only by ~31% — driven by `c
 
 ## Status
 
-**Cumulative across batches 1-2**: Phase 0 (2/2), Phase 1 (4/4), Phase 2 (4/4), Phase 3 (4/6 — 3.1/3.2/3.3/3.6 done; 3.4 partially done pending an owner backup-mechanism decision; 3.5 is an owner GATE against production data). 14/16 checkboxes through Phase 3.
+**Cumulative across batches 1-3**: Phase 0 (2/2), Phase 1 (4/4), Phase 2 (4/4), Phase 3 (5/6 — 3.1 through 3.4 and 3.6 done; 3.5 is an owner-only GATE against production data). 15/16 checkboxes through Phase 3.
 
-Nothing has been pushed and no PR has been opened for PR 1, PR 2, or PR 3 — all work is local commits on `feat/crm-hubspot-ux-01-schema`, `feat/crm-hubspot-ux-02-matcher`, and `feat/crm-hubspot-ux-03-collapse` (all based off `feat/crm-hubspot-ux`), awaiting your review.
+Nothing has been pushed and no PR has been opened for PR 1, PR 2, or PR 3 (now 3a/3b/3c) — all work is local commits on `feat/crm-hubspot-ux-01-schema`, `feat/crm-hubspot-ux-02-matcher`, `feat/crm-hubspot-ux-03a-planner`, `feat/crm-hubspot-ux-03b-cli`, and `feat/crm-hubspot-ux-03c-admin-page` (all ultimately based off `feat/crm-hubspot-ux`), awaiting review/push.
 
 **Blocked on your decisions, in order**:
 1. PR 1's `size:exception` (781 lines, schema/migration) and PR 2's `size:exception` (509 lines, identity matcher) — carried over from batch 1, unresolved.
-2. PR 3's budget: accept `size:exception` for the whole PR (1,099 code lines) or split into 3 chained PRs along the existing commit boundaries (see "Review Workload / PR Boundary" above) — only the first of those three would still need an exception (526 vs 400).
-3. `snapshotBackup()` (task 3.4) — which real backup mechanism to wire in before `--execute` can ever run.
-4. Task 3.5's GATE — reviewing the actual collapse dry-run report against production data (via Vercel preview) once PR 3 is pushed and the dry run is actually executed. Not attempted in this batch per the hard safety rule (no DB access at all, not even dry-run).
+2. PR 3a's `size:exception` is already approved (555 lines, updated from the pre-fix 526) — no new decision needed, noted for the record.
+3. PR 3b's budget: 645 code lines vs. 400 — new overage from this batch's fixes (mainly the real backup implementation). Needs the same `size:exception`-or-split decision.
+4. Task 3.5's GATE — reviewing the actual collapse dry-run report against production data once these branches are pushed/merged and a real dry run is executed. Not attempted in this batch per the hard safety rule (no DB access at all, not even dry-run).
 
-Ready for `sdd-apply` to continue with Phase 4 once PR 3 is resolved, or for a fresh-context review of `feat/crm-hubspot-ux-03-collapse` first.
+Ready for `sdd-apply` to continue with Phase 4 once PR 3a/3b/3c are resolved, or for a fresh-context review of the three branches first.
