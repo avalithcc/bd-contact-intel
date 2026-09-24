@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulación de migración · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item active" aria-current="page" href="migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><span>Administración</span><span class="sep">/</span><span>Migración</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-primary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<a class="menu-item" href="contacts.html#new-contact"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacto</a>
+<a class="menu-item" href="tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tarea</a>
+<a class="menu-item" href="contact-record.html#log-note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Nota en un contacto</a>
+<div class="menu-sep"></div>
+<a class="menu-item" href="import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+</div>
+</details>
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a3">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">Administrador</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+<a class="menu-item" href="account-email.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Conexión de Gmail</a>
+<a class="menu-item" href="login.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Cerrar sesión</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Informe de simulación que el responsable revisa antes de cualquier escritura en producción (R10). Los números son ilustrativos. La ejecución queda bloqueada hasta que esta corrida se apruebe y el insumo no haya cambiado desde entonces. <a href="index.html">Todas las pantallas</a></div><span class="tag tag-scope">En alcance: crm-hubspot-ux</span></div>
+<div class="page-header"><div class="titles"><div class="eyebrow">Administración · Migración</div><h1>unificar contactos, simulación<span class="dot">.</span></h1>
+<p class="meta">Corrida <span class="mono">mr_2026-10-05_2231</span> · fases: colapsar + integrar leads · generado 5 oct 2026 22:31 · hash de entrada <span class="mono">9f3c…a41e</span></p></div>
+<div class="actions"><a class="btn btn-secondary" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>Descargar JSON</a><a class="btn btn-primary" href="#approve"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Aprobar simulación</a></div></div>
+
+<div class="alert alert-warn mb-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">No ejecutado. No se modificaron datos de producción.</div>Tras la aprobación, la ejecución corre con <span class="mono">--execute --run=mr_2026-10-05_2231</span> y se rechaza si las tablas de origen cambiaron. Antes se toma una copia de seguridad.</div></div>
+
+<div class="grid-4">
+<div class="stat neutral"><div class="label">Filas heredadas</div><div class="value">22,235</div><div class="foot">20,389 contactos de LinkedIn + 1,846 leads</div></div>
+<div class="stat success"><div class="label">Fusión automática</div><div class="value">5,593</div><div class="foot">5,275 por LinkedIn · 318 por correo verificado</div></div>
+<div class="stat warn"><div class="label">En revisión</div><div class="value">147</div><div class="foot">nombre + empresa · van a la cola de duplicados</div></div>
+<div class="stat info"><div class="label">Contactos finales</div><div class="value">16,642</div><div class="foot">−25 % vs. filas heredadas</div></div>
+</div>
+
+<div class="card mt-xl"><div class="card-header"><h3>Adónde van las filas heredadas</h3></div><div class="card-body">
+<div class="bar-track" role="img" aria-label="Distribución de resultados"><span class="bar-success" style="width:25.2%"></span><span class="bar-info" style="width:74.1%"></span><span class="bar-warn" style="width:0.7%"></span></div>
+<div class="legend"><span><i class="bar-success"></i>Fusionado con un contacto existente 5,593</span><span><i class="bar-info"></i>Se convirtió en contacto 16,495</span><span><i class="bar-warn"></i>Se convirtió en contacto, par marcado 147</span><span><i class="bar-neutral"></i>Empresa propia omitida 0</span></div>
+</div></div>
+
+<div class="grid-2 mt-xl">
+<div class="card"><div class="card-header"><h3>Fase 1 · Colapsar contactos de LinkedIn</h3></div>
+<table class="data compact"><tbody>
+<tr><td>Filas de contacto leídas</td><td class="right num">20,389</td></tr>
+<tr><td>Empresa propia omitida <span class="meta">(ya eliminada por la limpieza)</span></td><td class="right num">0</td></tr>
+<tr><td>Perfiles de LinkedIn distintos → contactos</td><td class="right num strong">15,114</td></tr>
+<tr><td>Filas fusionadas automáticamente por perfil de LinkedIn</td><td class="right num">5,275</td></tr>
+<tr><td>Personas conectadas con 2+ BDs</td><td class="right num">3,611</td></tr>
+<tr><td>Responsable = conexión más antigua</td><td class="right num">15,018</td></tr>
+<tr><td>«Conectado el» no interpretable (se ordena al final)</td><td class="right num"><span class="badge badge-warn no-dot">96</span></td></tr>
+</tbody></table></div>
+<div class="card"><div class="card-header"><h3>Fase 2 · Integrar leads</h3></div>
+<table class="data compact"><tbody>
+<tr><td>Filas de leads leídas</td><td class="right num">1,846</td></tr>
+<tr><td>Fusionados automáticamente por correo verificado (ambos lados)</td><td class="right num">318</td></tr>
+<tr><td>Enviados a revisión (nombre + empresa)</td><td class="right num">147</td></tr>
+<tr><td>Contactos nuevos (se conservan origen y responsable)</td><td class="right num strong">1,381</td></tr>
+<tr><td>Notas de leads → actividades de nota</td><td class="right num">389</td></tr>
+<tr><td>Coincidencias de correo probable <span class="meta">(no se fusionan, por diseño)</span></td><td class="right num">212</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="grid-2 mt-xl">
+<div class="card"><div class="card-header"><h3>Referencias redirigidas</h3><span class="actions"><span class="badge badge-success">0 huérfanos</span></span></div>
+<table class="data compact"><thead><tr><th>Tabla</th><th class="right">Desde contacto</th><th class="right">Desde lead</th><th class="right">Sin resolver</th></tr></thead><tbody>
+<tr><td class="mono">activity</td><td class="right num">1,102</td><td class="right num">1,812</td><td class="right num">0</td></tr>
+<tr><td class="mono">task</td><td class="right num">171</td><td class="right num">315</td><td class="right num">0</td></tr>
+<tr><td class="mono">signal</td><td class="right num">944</td><td class="right num">259</td><td class="right num">0</td></tr>
+<tr><td class="mono">linkedin_scrape_job</td><td class="right num">57</td><td class="right num">—</td><td class="right num">0</td></tr>
+<tr><td class="mono">person_id_map</td><td class="right num">20,389</td><td class="right num">1,846</td><td class="right num">0</td></tr>
+</tbody></table>
+<div class="card-footer meta">Las conversaciones se mantienen por BD y siguen resolviéndose por la clave del perfil de LinkedIn (9,842 hilos).</div></div>
+<div class="card"><div class="card-header"><h3>Actividades de estado retroactivas</h3></div>
+<table class="data compact"><thead><tr><th>Estado registrado</th><th class="right">Leads</th><th>Evidencia registrada</th></tr></thead><tbody>
+<tr><td><span class="badge badge-contacted">Contactado</span></td><td class="right num">112</td><td class="meta">status_backfill</td></tr>
+<tr><td><span class="badge badge-replied">Respondió</span></td><td class="right num">77</td><td class="meta">status_backfill</td></tr>
+<tr><td><span class="badge badge-meeting">Reunión</span></td><td class="right num">41</td><td class="meta">status_backfill</td></tr>
+<tr><td><span class="badge badge-discarded">Descartado</span></td><td class="right num">34</td><td class="meta">descartado (motivo: «Otro · pre-migración»)</td></tr>
+<tr><td class="strong">Total</td><td class="right num strong">264</td><td></td></tr>
+</tbody></table>
+<div class="card-footer meta">Cada una conserva el editor y la marca de tiempo originales, por lo que el estado derivado coincide con el estado actual del 100 % de los leads.</div></div>
+</div>
+
+<details class="card mt-xl"><summary class="card-header"><h3>Muestra: 5 de 147 pares marcados</h3><svg class="icon chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<table class="data compact"><thead><tr><th>Ficha A</th><th>Ficha B</th><th>Clave de coincidencia</th></tr></thead><tbody>
+<tr><td>Mateo Fernández · Globant</td><td>Mateo Fernandez · Globant S.A.</td><td class="mono">mateo fernandez · globant</td></tr>
+<tr><td>Paula Gómez · Nubank</td><td>Paula Gomez · Nu Pagamentos</td><td class="mono">paula gomez · nubank</td></tr>
+<tr><td>Carlos Díaz · Mercado Libre</td><td>Carlos Diaz · MercadoLibre</td><td class="mono">carlos diaz · mercadolibre</td></tr>
+<tr><td>María José López · Bancolombia</td><td>Maria Jose Lopez · Bancolombia</td><td class="mono">maria jose lopez · bancolombia</td></tr>
+<tr><td>Juan Pablo Ruiz · Rappi</td><td>Juan P. Ruiz · Rappi</td><td class="mono">juan pablo ruiz · rappi</td></tr>
+</tbody></table></details>
+
+<div class="card mt-xl"><div class="card-header"><h3>Historial de corridas</h3></div>
+<table class="data compact"><thead><tr><th>Corrida</th><th>Modo</th><th>Estado</th><th>Aprobado por</th><th>Cuándo</th></tr></thead><tbody>
+<tr><td class="mono">mr_2026-10-05_2231</td><td>Simulación</td><td><span class="badge badge-warn">Pendiente</span></td><td class="meta">—</td><td class="meta">5 oct 22:31</td></tr>
+<tr><td class="mono">mr_2026-10-02_1810</td><td>Simulación</td><td><span class="badge badge-neutral">Reemplazada</span></td><td class="meta">—</td><td class="meta">2 oct 18:10</td></tr>
+</tbody></table></div>
+</main>
+</div>
+</div>
+<div class="overlay" id="approve" role="dialog" aria-modal="true" aria-labelledby="ap-title"><div class="dialog">
+<div class="dialog-header"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg><h2 id="ap-title">¿Aprobar esta simulación?</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#" aria-label="Cerrar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body"><p>Aprobar permite que <span class="mono">mr_2026-10-05_2231</span> se ejecute en producción. Por sí sola, la aprobación no ejecuta nada.</p>
+<label class="check"><input type="checkbox"> Revisé los conteos, la muestra marcada y las 96 fechas no interpretables.</label></div>
+<div class="dialog-footer"><a class="btn btn-secondary" href="#">Cancelar</a><button class="btn btn-primary" disabled>Aprobar</button></div></div></div>
+</body>
+</html>

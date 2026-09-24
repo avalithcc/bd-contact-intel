@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Valentina Rojas · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item active" aria-current="page" href="contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16,642</span></a>
+<a class="nav-item" href="companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="contacts.html">Contactos</a><span class="sep">/</span><span>Valentina Rojas</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo electrónico"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-primary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<a class="menu-item" href="contacts.html#new-contact"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacto</a>
+<a class="menu-item" href="tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tarea</a>
+<a class="menu-item" href="contact-record.html#log-note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Nota en un contacto</a>
+<div class="menu-sep"></div>
+<a class="menu-item" href="import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+</div>
+</details>
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a5">MR</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Martín Rivas</strong><br><span class="meta">BD</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+<a class="menu-item" href="account-email.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Conexión de Gmail</a>
+<a class="menu-item" href="login.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Cerrar sesión</a>
+</div>
+</details>
+</div>
+</header>
+<div class="record-note"><div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota de mockup.</strong> Ficha de contacto vista por un <strong>BD</strong> (Martín Rivas, no un administrador). Tres paneles: Datos (el estado es derivado, con el motivo), Actividad (filtrar por tipo, mensaje de hilo de correo, elemento de estado cargado retroactivamente), Asociaciones. Las acciones rápidas abren diálogos: <a href='#meeting'>Reunión</a>, <a href='#discard'>Descartar</a>, <a href='#generate'>Generar mensaje</a>. Las pestañas son clicables. <a href="index.html">Todas las pantallas</a></div><span class="tag tag-scope">En alcance: crm-hubspot-ux</span></div></div>
+<div class="record">
+<aside class="record-left" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-replied">Respondió</span><span class="badge badge-verified">Verificado</span><a class="badge badge-outline no-dot" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>LinkedIn</a></div>
+</div>
+<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas">
+<a class="qa" href="#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
+<a class="qa" href="#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
+<a class="qa" href="#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
+<a class="qa" href="#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
+<a class="qa danger" href="#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
+</div>
+<a class="btn btn-secondary btn-block mt-md" href="#generate"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>Generar mensaje con IA</a>
+<div class="section-title">Sobre este contacto<span class="actions"><a class="btn btn-ghost btn-sm" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Historial</a></span></div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-replied">Respondió</span></dd>
+<dd class="why"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> <strong>Respondió</strong> porque se recibió una respuesta de LinkedIn en la conversación de Juan Martínez el 12 oct. Registrar una reunión para pasar a Reunión.</dd></div>
+<div class="prop"><dt>Responsable</dt><dd><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">AP</span>Ana Pereyra</span><span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd><dd class="hint">Conexión más antigua (14 mar 2019)</dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>v.rojas@mercadolibre.com <span class="badge badge-verified">Verificado</span><span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd><dd class="hint">Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago</dd></div>
+<div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd><dd class="hint">Última actualización por Ana Pereyra · la fusión conservó el valor más específico</dd></div>
+<div class="prop"><dt>Grupo de rol</dt><dd>Liderazgo de ingeniería<span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd></div>
+<div class="prop"><dt>Nivel</dt><dd>VP<span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd></div>
+<div class="prop"><dt>Ubicación</dt><dd>Buenos Aires, Argentina<span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd></div>
+<div class="prop"><dt>Industria</dt><dd>E-commerce / Fintech<span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd></div>
+<div class="prop"><dt>Origen</dt><dd>LinkedIn (3 BDs) · Lista de leads fi-arg-2026</dd></div>
+<div class="prop"><dt>Creado</dt><dd class="soft">6 oct 2026 · unificado por migración</dd></div>
+</dl>
+</aside>
+<main class="record-main"><div class="tabs" role="tablist" aria-label="Secciones de la ficha">
+<button class="tab" role="tab" aria-selected="true" aria-controls="p-activity" id="t-activity">Actividad</button>
+<button class="tab" role="tab" aria-selected="false" aria-controls="p-overview" id="t-overview">Resumen</button>
+</div>
+<section id="p-activity" role="tabpanel" aria-labelledby="t-activity">
+<div class="timeline-toolbar" role="group" aria-label="Filtrar por tipo de actividad">
+<button class="filter-pill on">Todo <span class="n">14</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Notas <span class="n">3</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Correos <span class="n">2</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>LinkedIn <span class="n">4</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Reuniones <span class="n">0</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas <span class="n">2</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Sistema <span class="n">3</span></button>
+<span class="grow"></span><button class="btn btn-ghost btn-sm">Más recientes primero<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+</div>
+<div class="composer" id="log-note"><label class="sr-only" for="note-in">Agregar una nota</label><textarea id="note-in" placeholder="Agregar una nota sobre Valentina… (visible para todo el equipo)"></textarea>
+<div class="bar"><button class="btn btn-ghost btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Agregar tarea de seguimiento</button><span class="grow"></span><button class="btn btn-primary btn-sm">Guardar nota</button></div></div>
+
+<div class="tl-group">Próximas</div>
+<div class="tl">
+<div class="tl-item"><div class="tl-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Tarea: Enviar caso de estudio de Mercado Pago</span><span class="badge badge-warn no-dot">Vence 17 oct</span><span class="when">Asignada a Cristian Civita</span></div>
+<div class="row mt-lg"><button class="btn btn-secondary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Marcar como hecha</button><button class="btn btn-ghost btn-sm">Reprogramar</button></div></div></div>
+</div>
+
+<div class="tl-group">Octubre 2026</div>
+<div class="tl">
+<div class="tl-item"><div class="tl-icon email"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Hilo de correo · Squads nearshore para Mercado Pago</span><span class="badge badge-info no-dot">3 mensajes</span><span class="when">13 oct, 09:12</span></div>
+<div class="tl-body">Enviado por Cristian Civita desde la plataforma. Las respuestas aparecerán aquí cuando se lance la sincronización de correo (backlog).</div>
+<div class="thread">
+<div class="thread-msg"><span class="avatar avatar-sm a3 avatar-bd">CC</span><div><span class="from">Cristian Civita</span> <span class="meta">para v.rojas@mercadolibre.com</span><div class="snippet">Valentina, en seguimiento a la nota de Juan: adjunto nuestro caso de estudio con un equipo de plataforma fintech en LATAM…</div></div><span class="meta">13 oct</span></div>
+<div class="thread-msg"><span class="avatar avatar-sm a1">VR</span><div><span class="from">Valentina Rojas</span> <span class="badge badge-neutral no-dot">vía sincronización de correo · más tarde</span><div class="snippet">Gracias Cristian, sumo a nuestro director de plataforma. ¿Podemos hablar el 21?</div></div><span class="meta">14 oct</span></div>
+<div class="thread-msg"><span class="avatar avatar-sm a3 avatar-bd">CC</span><div><span class="from">Cristian Civita</span><div class="snippet">Perfecto, envío una invitación para el martes 21, 11:00 ART.</div></div><span class="meta">14 oct</span></div>
+</div></div></div>
+<div class="tl-item"><div class="tl-icon reply"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Respuesta de LinkedIn recibida · conversación de Juan Martínez</span><span class="when">12 oct, 18:04</span></div>
+<div class="locked"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Esta conversación pertenece a Juan Martínez. Se puede ver que existe y cuándo ocurrió; su contenido es privado para Juan (y los administradores).</span></div>
+</div></div>
+<div class="tl-item"><div class="tl-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Mensaje de LinkedIn enviado · conversación de Ana Pereyra</span><span class="when">3 oct, 11:30</span></div>
+<div class="locked"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Contenido privado para Ana Pereyra (y los administradores).</span></div>
+</div></div>
+<div class="tl-item"><div class="tl-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Nota · Ana Pereyra</span><span class="when">2 oct, 16:45</span></div>
+<div class="tl-body"><blockquote>La conoció en Nerdearla. Maneja el presupuesto de plataforma para 2027; prefiere correo antes que LinkedIn. Mencionó dificultades para contratar SREs senior en Córdoba.</blockquote></div></div></div>
+<div class="tl-item"><div class="tl-icon system"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg></div><div class="tl-card system">
+<div class="tl-head"><span class="what">Unificado a partir de 4 registros</span><span class="when">6 oct, 03:10 · migración</span></div>
+<div class="tl-body">3 contactos de LinkedIn (Ana, Juan, Cristian) fusionados por perfil de LinkedIn, y el lead <span class="mono">fi-arg-2026 #4471</span> fusionado por correo verificado. Las notas del lead se conservaron como notas.
+</div></div></div>
+</div>
+
+<div class="tl-group">Antes de la migración</div>
+<div class="tl">
+<div class="tl-item"><div class="tl-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Correo encontrado · Hunter</span><span class="when">20 ago 2026 · Cristian Civita</span></div>
+<div class="tl-body">v.rojas@mercadolibre.com · verificado · confianza 96</div></div></div>
+<div class="tl-item"><div class="tl-icon system"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg></div><div class="tl-card system">
+<div class="tl-head"><span class="what">Estado registrado antes de la migración: <span class="badge badge-contacted">Contactado</span></span><span class="when">2 jun 2026</span></div>
+<div class="tl-body">Establecido originalmente a mano por Ana Pereyra en el registro del lead. Cargado retroactivamente durante la migración para que el estado derivado conserve su evidencia.</div></div></div>
+</div>
+</section>
+<section id="p-overview" role="tabpanel" aria-labelledby="t-overview" hidden>
+<div class="grid-2 mt-xl">
+<div class="stat"><div class="label">Última actividad</div><div class="value">2 días</div><div class="foot">Hilo de correo · Cristian</div></div>
+<div class="stat"><div class="label">Puntos de contacto (todos los BDs)</div><div class="value">11</div><div class="foot">6 LinkedIn · 3 correos · 2 notas</div></div>
+</div>
+<div class="card mt-xl"><div class="card-header"><h3>Tareas abiertas</h3></div><div class="card-body soft">Enviar caso de estudio de Mercado Pago · vence 17 oct · Cristian Civita</div></div>
+<div class="card mt-lg"><div class="card-header"><h3>Señales</h3></div><div class="card-body soft">Mercado Libre tiene 38 puestos de IT abiertos (LATAM 31, EE. UU. 7). Publicó 6 nuevos puestos de plataforma esta semana.</div></div>
+</section></main>
+<aside class="record-right" aria-label="Asociaciones">
+<div class="card assoc"><div class="card-header"><h3>Empresa</h3><span class="actions"><a class="btn btn-ghost btn-sm btn-icon" href="#" aria-label="Cambiar empresa"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></a></span></div>
+<div class="card-body"><div class="assoc-row"><span class="company-logo lg" aria-hidden="true">ML</span><div class="grow"><a class="n" href="company-record.html">Mercado Libre</a><div class="s">mercadolibre.com · E-commerce</div></div></div>
+<div class="row wrap mt-lg"><span class="badge badge-success no-dot">Contratando · 38 puestos de IT</span><span class="badge badge-neutral no-dot">Etapa: Calificado</span></div>
+<div class="meta mt-lg">42 contactos en esta empresa</div></div></div>
+
+<div class="card assoc"><div class="card-header"><h3>BDs conectados</h3><span class="meta">3</span></div>
+<div class="card-body">
+<div class="assoc-row"><span class="avatar avatar-sm a1 avatar-bd">AP</span><div class="grow"><div class="n">Ana Pereyra <span class="badge badge-brand no-dot">Responsable</span></div><div class="s">Conectado el 14 mar 2019</div></div></div>
+<div class="assoc-row"><span class="avatar avatar-sm a6 avatar-bd">JM</span><div class="grow"><div class="n">Juan Martínez</div><div class="s">Conectado el 2 ago 2021</div></div></div>
+<div class="assoc-row"><span class="avatar avatar-sm a3 avatar-bd">CC</span><div class="grow"><div class="n">Cristian Civita</div><div class="s">Conectado el 19 ene 2023</div></div></div>
+</div></div>
+
+<div class="card assoc"><div class="card-header"><h3>Historial de conversaciones</h3></div>
+<div class="card-body">
+<p class="small">Existe historial de conversaciones con: <strong>Ana Pereyra</strong>, <strong>Juan Martínez</strong>.</p>
+<div class="assoc-row"><div class="grow"><div class="n">Juan Martínez</div><div class="s">6 mensajes · último 12 oct</div></div><span class="meta"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span></div>
+<div class="assoc-row"><div class="grow"><div class="n">Ana Pereyra</div><div class="s">2 mensajes · último 3 oct</div></div><span class="meta"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span></div>
+<p class="meta mt-lg">El contenido es privado para cada BD.</p>
+</div></div>
+
+<div class="card assoc"><div class="card-header"><h3>Tareas</h3><span class="actions"><a class="btn btn-ghost btn-sm btn-icon" href="#task" aria-label="Agregar tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a></span></div>
+<div class="card-body"><div class="assoc-row"><input type="checkbox" aria-label="Completar tarea"><div class="grow"><div class="n">Enviar caso de estudio de Mercado Pago</div><div class="s">Vence 17 oct · Cristian</div></div></div></div></div>
+</aside>
+</div>
+</div>
+</div>
+<div class="overlay" id="generate" role="dialog" aria-modal="true" aria-labelledby="g-title">
+<div class="dialog wide">
+<div class="dialog-header"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg><h2 id="g-title">Generar mensaje · Valentina Rojas</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#" aria-label="Cerrar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body">
+<div class="form-grid"><div class="field"><label class="label" for="g-ch">Canal</label><select class="select" id="g-ch"><option>Mensaje de LinkedIn</option><option>Correo electrónico</option></select></div>
+<div class="field"><label class="label" for="g-l">Idioma</label><select class="select" id="g-l"><option>Español</option><option>Inglés</option><option>Portugués</option></select></div></div>
+<div class="field"><span class="label">Señales utilizadas</span><div class="row wrap"><span class="chip">Contratando · 38 puestos de IT</span><span class="chip">Liderazgo de ingeniería</span><span class="chip">Respondió en LinkedIn</span><span class="chip">Nota: prefiere correo</span></div></div>
+<div class="field"><label class="label" for="g-out">Borrador</label><textarea class="textarea" id="g-out" rows="7">Hola Valentina, gracias por tu respuesta a Juan. Vimos que Mercado Libre abrió 6 posiciones de plataforma en Córdoba esta semana. En Avalith armamos squads senior nearshore que se integran en 2–3 semanas. ¿Te parece si el 21 revisamos cómo cubrir el plan Q1 sin frenar el roadmap?</textarea><span class="help">Borrador de IA. Revisar antes de enviar. No se registra nada hasta que se envíe o copie.</span></div>
+</div>
+<div class="dialog-footer"><button class="btn btn-ghost left"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>Regenerar</button><a class="btn btn-secondary" href="#">Copiar</a><a class="btn btn-primary" href="#email">Usar en correo</a></div>
+</div></div>
+<div class="overlay" id="meeting" role="dialog" aria-modal="true" aria-labelledby="rm-title"><div class="dialog">
+<div class="dialog-header"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><h2 id="rm-title">Registrar reunión</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#" aria-label="Cerrar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body"><div class="form-grid"><div class="field"><label class="label" for="rm-d">Fecha</label><input class="input" id="rm-d" type="date" value="2026-10-21"></div><div class="field"><label class="label" for="rm-t">Hora</label><input class="input" id="rm-t" type="time" value="11:00"></div></div>
+<div class="field"><label class="label" for="rm-n">Resultado / notas</label><textarea class="textarea" id="rm-n" placeholder="¿Qué se acordó?"></textarea></div>
+<p class="help">Al guardar, el estado derivado pasa a <strong>Reunión</strong>.</p></div>
+<div class="dialog-footer"><a class="btn btn-secondary" href="#">Cancelar</a><a class="btn btn-primary" href="#">Registrar reunión</a></div></div></div>
+<div class="overlay" id="discard" role="dialog" aria-modal="true" aria-labelledby="rd-title"><div class="dialog">
+<div class="dialog-header"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg><h2 id="rd-title">Descartar contacto</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#" aria-label="Cerrar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body"><div class="field"><label class="label" for="rd-r">Motivo (obligatorio)</label><select class="select input is-invalid" id="rd-r"><option>Elegir un motivo…</option><option>No es el perfil adecuado</option><option>Sin interés</option><option>Ya trabaja con otro proveedor</option><option>Dejó la empresa</option><option>Datos incorrectos o desactualizados</option><option>Otro (detalle obligatorio)</option></select><span class="error-text">Seleccionar un motivo para descartar.</span></div>
+<div class="field"><label class="label" for="rd-n">Nota (opcional)</label><textarea class="textarea" id="rd-n"></textarea></div></div>
+<div class="dialog-footer"><a class="btn btn-secondary" href="#">Cancelar</a><button class="btn btn-danger-solid" disabled>Descartar contacto</button></div></div></div>
+<div class="overlay" id="task" role="dialog" aria-modal="true" aria-labelledby="rt-title"><div class="dialog">
+<div class="dialog-header"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg><h2 id="rt-title">Crear tarea</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#" aria-label="Cerrar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body"><div class="field"><label class="label" for="rt-t">Título</label><input class="input" id="rt-t" value="Seguimiento después de la planificación de Q1"></div>
+<div class="form-grid"><div class="field"><label class="label" for="rt-d">Vencimiento</label><input class="input" id="rt-d" type="date" value="2026-10-31"></div><div class="field"><label class="label" for="rt-a">Asignado a</label><select class="select" id="rt-a"><option>Cristian Civita (yo)</option><option>Ana Pereyra (responsable)</option></select></div></div></div>
+<div class="dialog-footer"><a class="btn btn-secondary" href="#">Cancelar</a><a class="btn btn-primary" href="#">Crear tarea</a></div></div></div>
+<div class="overlay" id="email" role="dialog" aria-modal="true" aria-labelledby="re-title"><div class="dialog wide">
+<div class="dialog-header"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg><h2 id="re-title">Enviar correo a Valentina Rojas</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#" aria-label="Cerrar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body"><div class="field"><label class="label" for="re-to">Para</label><input class="input" id="re-to" value="v.rojas@mercadolibre.com" disabled></div>
+<div class="field"><label class="label" for="re-s">Asunto</label><input class="input" id="re-s" value="Squads nearshore para Mercado Pago"></div>
+<div class="field"><label class="label" for="re-b">Mensaje</label><textarea class="textarea" id="re-b" rows="6">Hola Valentina,</textarea></div>
+<p class="help">Enviado desde cristian@avalith.net vía Gmail. Se registra como "Correo enviado", lo que establece el estado como mínimo en Contactado.</p></div>
+<div class="dialog-footer"><a class="btn btn-ghost left" href="#generate"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>Redactar con IA</a><a class="btn btn-secondary" href="#">Cancelar</a><a class="btn btn-primary" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>Enviar</a></div></div></div>
+<script>
+// Mockup-only: tab switching for [role=tablist].
+document.querySelectorAll('[role="tablist"]').forEach(function (list) {
+  list.addEventListener('click', function (e) {
+    var tab = e.target.closest('[role="tab"]'); if (!tab) return;
+    list.querySelectorAll('[role="tab"]').forEach(function (t) {
+      var on = t === tab; t.setAttribute('aria-selected', on);
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  });
+});
+</script>
+</body>
+</html>
