@@ -107,20 +107,27 @@ After pulling this change, run in order:
    from each ATS so postings previously dropped by the old country filter
    (e.g. US openings at LATAM-flagged companies) are picked up.
 
-## Migrations gotcha: `drizzle/meta/` is gitignored
+## Migrations
 
 `drizzle-kit migrate` decides what to run from `drizzle/meta/_journal.json`,
-comparing each entry's `when` timestamp against the last one recorded in the
-database. That journal is gitignored, so a fresh checkout regenerates it —
-and a newly generated entry can end up with a `when` EARLIER than the last
-applied migration (the older entries in this repo carry hand-written,
-future-dated timestamps). When that happens `migrate` silently skips the new
-migration and still prints "migrations applied successfully".
+comparing each entry's `when` timestamp against the latest `created_at` in
+`drizzle.__drizzle_migrations`. It does NOT compare hashes, so a new entry
+whose `when` is earlier than the last applied one is silently skipped while
+`migrate` still prints "migrations applied successfully".
 
-If a migration reports success but its table/column is missing, check that
-its `when` in `_journal.json` is greater than every applied one, bump it, and
-re-run. Always verify the object exists afterwards, e.g.
-`select to_regclass('public.<table>')`.
+`drizzle/meta/` (journal and snapshots) is committed so every checkout shares
+the same journal. Rules:
+
+- Generate migrations with `npm run db:generate` and commit the SQL file
+  together with the updated `drizzle/meta/` files.
+- Check that the new entry's `when` is greater than every previous one (the
+  older entries carry hand-set, future-dated timestamps); bump it if not.
+- Vercel does not run migrations. Apply them by hand with
+  `node --env-file=.env.local node_modules/.bin/drizzle-kit migrate`.
+- Never trust the success message: verify the objects exist afterwards, e.g.
+  `select to_regclass('public.<table>')`.
+- Don't use `drizzle-kit push` against production: it changes the schema
+  without recording anything in the ledger.
 
 ## Leads ingest API (external push from lead_gen)
 
