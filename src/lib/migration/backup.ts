@@ -14,7 +14,7 @@
  * filesystem; it is NOT unit-tested, same rationale as queries.ts.
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync, rmSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 
 /**
@@ -48,15 +48,16 @@ const FALLBACK_PG_DUMP_PATH = "/opt/homebrew/opt/libpq/bin/pg_dump";
 const MIN_BACKUP_SIZE_BYTES = 1024; // 1 KiB — a trivially small dump means an empty/broken backup.
 
 /**
- * Resolution order: `PG_DUMP_PATH` env var, then `pg_dump` (relies on
- * PATH), then the known homebrew libpq install path (client pg_dump 18.6
- * on this project's dev machine; server is Postgres 17.6 via the Supabase
- * pooler, session mode, port 5432). Deduplicated, in priority order — the
- * real spawn logic (in `snapshotBackup`) tries each in turn until one
- * doesn't fail with ENOENT.
+ * Resolution order: `PG_DUMP_PATH` env var, then the homebrew libpq keg
+ * (tracks the newest client — 18.6 on this project's dev machine), then
+ * `pg_dump` on PATH. libpq goes before PATH because PATH can hold an older
+ * server install (e.g. 16.x) that refuses to dump the Postgres 17.6
+ * production server (Supabase pooler, session mode, port 5432).
+ * Deduplicated, in priority order — the real spawn logic (in
+ * `snapshotBackup`) tries each in turn until one doesn't fail with ENOENT.
  */
 export function resolvePgDumpCandidates(env: Record<string, string | undefined>): string[] {
-  const candidates = [env.PG_DUMP_PATH, "pg_dump", FALLBACK_PG_DUMP_PATH];
+  const candidates = [env.PG_DUMP_PATH, FALLBACK_PG_DUMP_PATH, "pg_dump"];
   const seen = new Set<string>();
   const result: string[] = [];
   for (const candidate of candidates) {
@@ -90,6 +91,33 @@ export function buildPgDumpArgs(
   tables: readonly string[] = BACKUP_TABLES,
 ): string[] {
   return ["-Fc", "-f", outputPath, ...tables.flatMap((table) => ["-t", table])];
+}
+
+/**
+ * pg_dump/pg_restore don't read DATABASE_URL — they read libpq's PG* env
+ * vars. Passing the connection this way (not as a --dbname argument) keeps
+ * the password out of the process listing.
+ */
+export function libpqEnvFromDatabaseUrl(databaseUrl: string): Record<string, string> {
+  let url: URL;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    // Node's "Invalid URL" error carries the input (password included); never rethrow it.
+    throw new Error("DATABASE_URL is not a valid URL; it must include a host and database.");
+  }
+  const database = decodeURIComponent(url.pathname.replace(/^\//, ""));
+  if (!url.hostname || !database) {
+    throw new Error("DATABASE_URL must include a host and database for pg_dump.");
+  }
+  return {
+    PGHOST: url.hostname,
+    PGPORT: url.port || "5432",
+    PGUSER: decodeURIComponent(url.username),
+    PGPASSWORD: decodeURIComponent(url.password),
+    PGDATABASE: database,
+    PGSSLMODE: url.searchParams.get("sslmode") ?? "require",
+  };
 }
 
 export function buildPgRestoreListArgs(dumpPath: string): string[] {
@@ -170,27 +198,34 @@ export async function snapshotBackup(runId: string): Promise<string> {
 
   const outputPath = backupFileName(runId, new Date().toISOString());
   mkdirSync(dirname(outputPath), { recursive: true });
+  const env = { ...process.env, ...libpqEnvFromDatabaseUrl(databaseUrl) };
 
-  const dumpCandidates = resolvePgDumpCandidates(process.env);
-  const dumpResult = await runWithFallback(dumpCandidates, buildPgDumpArgs(outputPath), process.env);
-  if (dumpResult.code !== 0) {
-    throw new Error(`pg_dump exited with code ${dumpResult.code}: ${dumpResult.stderr}`);
-  }
+  try {
+    const dumpCandidates = resolvePgDumpCandidates(process.env);
+    const dumpResult = await runWithFallback(dumpCandidates, buildPgDumpArgs(outputPath), env);
+    if (dumpResult.code !== 0) {
+      throw new Error(`pg_dump exited with code ${dumpResult.code}: ${dumpResult.stderr}`);
+    }
 
-  const restorePath = pgRestorePathFor(dumpResult.binaryUsed);
-  const restoreResult = await runWithFallback(
-    [restorePath],
-    buildPgRestoreListArgs(outputPath),
-    process.env,
-  );
-  const fileSizeBytes = statSync(outputPath).size;
-  const verification = evaluateBackupVerification({
-    restoreListExitCode: restoreResult.code,
-    restoreListStdout: restoreResult.stdout,
-    fileSizeBytes,
-  });
-  if (!verification.ok) {
-    throw new Error(`Backup verification failed for ${outputPath}: ${verification.reason}`);
+    const restorePath = pgRestorePathFor(dumpResult.binaryUsed);
+    const restoreResult = await runWithFallback(
+      [restorePath],
+      buildPgRestoreListArgs(outputPath),
+      env,
+    );
+    const fileSizeBytes = statSync(outputPath).size;
+    const verification = evaluateBackupVerification({
+      restoreListExitCode: restoreResult.code,
+      restoreListStdout: restoreResult.stdout,
+      fileSizeBytes,
+    });
+    if (!verification.ok) {
+      throw new Error(`Backup verification failed for ${outputPath}: ${verification.reason}`);
+    }
+  } catch (err) {
+    // Never leave a partial or empty dump that looks like a valid backup.
+    rmSync(outputPath, { force: true });
+    throw err;
   }
 
   return outputPath;

@@ -13,22 +13,26 @@ import {
   buildPgDumpArgs,
   buildPgRestoreListArgs,
   evaluateBackupVerification,
+  libpqEnvFromDatabaseUrl,
   pgRestorePathFor,
   resolvePgDumpCandidates,
 } from "@/lib/migration/backup";
 
-test("resolvePgDumpCandidates prefers PG_DUMP_PATH, then PATH, then the homebrew fallback", () => {
+// The homebrew libpq keg tracks the newest client, while a `pg_dump` on
+// PATH can be an older server install (16.x) that refuses to dump the 17.x
+// production server — so libpq is tried before PATH.
+test("resolvePgDumpCandidates prefers PG_DUMP_PATH, then homebrew libpq, then PATH", () => {
   const withEnvVar = resolvePgDumpCandidates({ PG_DUMP_PATH: "/custom/pg_dump" });
   assert.deepEqual(withEnvVar, [
     "/custom/pg_dump",
-    "pg_dump",
     "/opt/homebrew/opt/libpq/bin/pg_dump",
+    "pg_dump",
   ]);
 });
 
-test("resolvePgDumpCandidates without PG_DUMP_PATH skips straight to PATH then the fallback", () => {
+test("resolvePgDumpCandidates without PG_DUMP_PATH tries homebrew libpq before PATH", () => {
   const withoutEnvVar = resolvePgDumpCandidates({});
-  assert.deepEqual(withoutEnvVar, ["pg_dump", "/opt/homebrew/opt/libpq/bin/pg_dump"]);
+  assert.deepEqual(withoutEnvVar, ["/opt/homebrew/opt/libpq/bin/pg_dump", "pg_dump"]);
 });
 
 test("resolvePgDumpCandidates never duplicates a candidate that equals the fallback", () => {
@@ -110,4 +114,38 @@ test("evaluateBackupVerification accepts a clean exit, non-trivial size, and non
     fileSizeBytes: 50_000,
   });
   assert.deepEqual(result, { ok: true });
+});
+
+// pg_dump/pg_restore do not read DATABASE_URL; they read libpq's PG* env
+// vars. Passing only DATABASE_URL made pg_dump fall back to a local socket.
+test("libpqEnvFromDatabaseUrl maps a postgres URL to libpq environment variables", () => {
+  const env = libpqEnvFromDatabaseUrl(
+    "postgresql://postgres.abc:p%40ss%2Fword@aws-0-sa-east-1.pooler.supabase.com:5432/postgres",
+  );
+  assert.deepEqual(env, {
+    PGHOST: "aws-0-sa-east-1.pooler.supabase.com",
+    PGPORT: "5432",
+    PGUSER: "postgres.abc",
+    PGPASSWORD: "p@ss/word",
+    PGDATABASE: "postgres",
+    PGSSLMODE: "require",
+  });
+});
+
+test("libpqEnvFromDatabaseUrl keeps an explicit sslmode and defaults the port", () => {
+  const env = libpqEnvFromDatabaseUrl("postgres://u:pw@db.example.com/app?sslmode=verify-full");
+  assert.equal(env.PGPORT, "5432");
+  assert.equal(env.PGDATABASE, "app");
+  assert.equal(env.PGSSLMODE, "verify-full");
+});
+
+test("libpqEnvFromDatabaseUrl rejects a URL without a database", () => {
+  assert.throws(() => libpqEnvFromDatabaseUrl("postgres://u:pw@db.example.com/"), /host and database/);
+});
+
+test("libpqEnvFromDatabaseUrl never leaks the password when the URL is invalid", () => {
+  assert.throws(
+    () => libpqEnvFromDatabaseUrl("postgres://u:s3cret@/"),
+    (err: Error) => /host and database/.test(err.message) && !JSON.stringify(err).includes("s3cret") && !String(err).includes("s3cret"),
+  );
 });
