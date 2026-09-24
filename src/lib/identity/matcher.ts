@@ -11,6 +11,7 @@
  */
 import { normalizeProfileKey } from "@/lib/csv";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
+import { normalizeNameKey } from "@/lib/leads/csv";
 import { ownCompanyMatchReason } from "@/lib/ownCompany";
 import { splitEmail } from "@/lib/emailPatterns";
 
@@ -36,6 +37,13 @@ export type MatchResult =
   | { kind: "skip_own_company"; reason: "name" | "domain" }
   | { kind: "auto"; personId: PersonId; key: "profile_key" | "verified_email" }
   | { kind: "review"; personIds: PersonId[]; key: "name_company" }
+  // Strong-key conflict: the profile key and the verified email each match
+  // a DIFFERENT existing Contact. Never auto-merge here — a shared LinkedIn
+  // profile key with a mismatched verified email is more likely a data
+  // error (or two different people) than the same person, so it goes to
+  // the admin duplicate-review queue like a name+company match, but keeps
+  // its own reason/shape so the review UI can explain *why* it's flagged.
+  | { kind: "review"; reason: "conflicting_strong_keys"; candidates: PersonId[] }
   | { kind: "new" };
 
 export interface MatchableRow {
@@ -51,14 +59,15 @@ export interface MatchableRow {
  * Normalized `name::company` key used for the (never auto-merging)
  * name+company fallback. Null when there's no usable name or company to key
  * on — see "Lead without email or LinkedIn falls back to name+company".
+ * Folds accents/diacritics via normalizeNameKey (@/lib/leads/csv) so, e.g.,
+ * "José García" and "Jose Garcia" at the same company key identically —
+ * the same accent-insensitivity normalizeCompanyKey already applies to the
+ * company half of this key.
  */
 export function buildNameCompanyKey(
   row: Pick<MatchableRow, "firstName" | "lastName" | "company">,
 ): string | null {
-  const name = `${row.firstName ?? ""} ${row.lastName ?? ""}`
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+  const name = normalizeNameKey(`${row.firstName ?? ""} ${row.lastName ?? ""}`);
   const companyKey = row.company ? normalizeCompanyKey(row.company) : "";
   if (!name || !companyKey) return null;
   return `${name}::${companyKey}`;
@@ -67,27 +76,41 @@ export function buildNameCompanyKey(
 /**
  * Resolves identity for one incoming row, in precedence order (contact-
  * identity spec "Matcher precedence"): own-company skip, then profile key
- * (auto), then verified email (auto), then name+company (review only),
- * then new.
+ * and verified email together (auto only when they agree; a disagreement
+ * between the two strong keys is a review case, never an auto-merge — see
+ * "Conflicting strong-key matches"), then name+company (review only), then
+ * new.
  */
 export function matchIdentity(row: MatchableRow, index: IdentityIndex): MatchResult {
   const domain = row.email ? (splitEmail(row.email)?.domain ?? null) : null;
   const ownCompany = ownCompanyMatchReason(row.company, domain);
   if (ownCompany) return { kind: "skip_own_company", reason: ownCompany };
 
+  let profilePersonId: PersonId | null = null;
   if (row.profileKey) {
     const key = normalizeProfileKey(row.profileKey);
-    if (key) {
-      const personId = index.byProfileKey(key);
-      if (personId) return { kind: "auto", personId, key: "profile_key" };
-    }
+    if (key) profilePersonId = index.byProfileKey(key);
   }
 
+  let emailPersonId: PersonId | null = null;
   if (row.email && row.emailStatus === "verified") {
     const emailKey = row.email.trim().toLowerCase();
-    const personId = index.byVerifiedEmail(emailKey);
-    if (personId) return { kind: "auto", personId, key: "verified_email" };
+    emailPersonId = index.byVerifiedEmail(emailKey);
   }
+
+  if (profilePersonId && emailPersonId) {
+    if (profilePersonId === emailPersonId) {
+      return { kind: "auto", personId: profilePersonId, key: "profile_key" };
+    }
+    return {
+      kind: "review",
+      reason: "conflicting_strong_keys",
+      candidates: [profilePersonId, emailPersonId],
+    };
+  }
+
+  if (profilePersonId) return { kind: "auto", personId: profilePersonId, key: "profile_key" };
+  if (emailPersonId) return { kind: "auto", personId: emailPersonId, key: "verified_email" };
 
   const nameCompanyKey = buildNameCompanyKey(row);
   if (nameCompanyKey) {

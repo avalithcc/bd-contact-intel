@@ -107,7 +107,28 @@ test("Own-company rows are also caught by email domain when the company field is
   assert.deepEqual(result, { kind: "skip_own_company", reason: "domain" });
 });
 
-test("Profile key takes precedence over a verified email hit", () => {
+test("Profile key and verified email agreeing on the same person still auto-merges", () => {
+  const index = emptyIndex({
+    byProfileKey: () => "person-1",
+    byVerifiedEmail: () => "person-1",
+  });
+  const result = matchIdentity(
+    {
+      profileKey: "https://linkedin.com/in/janedoe",
+      email: "jane@acme.com",
+      emailStatus: "verified",
+      company: "Acme",
+    },
+    index,
+  );
+  assert.deepEqual(result, {
+    kind: "auto",
+    personId: "person-1",
+    key: "profile_key",
+  });
+});
+
+test("Profile key and verified email disagreeing on different people never auto-merges", () => {
   const index = emptyIndex({
     byProfileKey: () => "person-from-profile",
     byVerifiedEmail: () => "person-from-email",
@@ -122,10 +143,21 @@ test("Profile key takes precedence over a verified email hit", () => {
     index,
   );
   assert.deepEqual(result, {
-    kind: "auto",
-    personId: "person-from-profile",
-    key: "profile_key",
+    kind: "review",
+    reason: "conflicting_strong_keys",
+    candidates: ["person-from-profile", "person-from-email"],
   });
+});
+
+test("Verified email is trimmed before lookup", () => {
+  const index = emptyIndex({
+    byVerifiedEmail: (email) => (email === "jane@acme.com" ? "person-2" : null),
+  });
+  const result = matchIdentity(
+    { email: "  Jane@Acme.com  ", emailStatus: "verified", company: "Acme" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "auto", personId: "person-2", key: "verified_email" });
 });
 
 // --- buildNameCompanyKey ----------------------------------------------------
@@ -140,6 +172,35 @@ test("buildNameCompanyKey normalizes case, whitespace and company suffixes", () 
 test("buildNameCompanyKey is null when name or company is missing", () => {
   assert.equal(buildNameCompanyKey({ firstName: "Jane", lastName: null, company: null }), null);
   assert.equal(buildNameCompanyKey({ firstName: null, lastName: null, company: "Acme" }), null);
+});
+
+test("buildNameCompanyKey folds accents so 'José García' and 'Jose Garcia' key identically", () => {
+  const accented = buildNameCompanyKey({
+    firstName: "José",
+    lastName: "García",
+    company: "Acme",
+  });
+  const plain = buildNameCompanyKey({
+    firstName: "Jose",
+    lastName: "Garcia",
+    company: "Acme",
+  });
+  assert.equal(accented, plain);
+  assert.equal(accented, "jose garcia::acme");
+});
+
+test("buildNameCompanyKey folds ñ and ü", () => {
+  assert.equal(
+    buildNameCompanyKey({ firstName: "Iñaki", lastName: "Müller", company: "Acme" }),
+    "inaki muller::acme",
+  );
+});
+
+test("buildNameCompanyKey collapses extra internal and trailing whitespace", () => {
+  assert.equal(
+    buildNameCompanyKey({ firstName: "  Jane   ", lastName: "  Doe  ", company: "Acme" }),
+    "jane doe::acme",
+  );
 });
 
 // --- mergeProperty / mergeProperties (contact-identity R7) -----------------

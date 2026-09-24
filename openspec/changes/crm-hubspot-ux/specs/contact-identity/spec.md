@@ -48,6 +48,24 @@ The system MUST resolve identity using, in order: (1) normalized LinkedIn profil
 - THEN only normalized name+company matching is attempted
 - AND the result is either a review-queue entry or a new Contact, never an auto-merge
 
+### Requirement: Conflicting strong-key matches are never auto-merged
+
+The system MUST NOT auto-merge when an incoming row's normalized LinkedIn profile key and verified email each match a DIFFERENT existing Contact. Such rows MUST be placed in the possible-duplicate review queue referencing both candidate Contacts instead. When the profile key and verified email agree on the same Contact, the row auto-merges as normal.
+
+#### Scenario: Profile key and verified email disagree on different Contacts
+
+- GIVEN an incoming row's normalized LinkedIn profile key matches Contact A
+- AND the row's verified email matches a different Contact B
+- WHEN the matcher runs
+- THEN the row is placed in the possible-duplicate review queue referencing both Contact A and Contact B
+- AND no automatic merge occurs
+
+#### Scenario: Profile key and verified email agree on the same Contact
+
+- GIVEN an incoming row's normalized LinkedIn profile key and verified email both match the same existing Contact
+- WHEN the matcher runs
+- THEN the row is auto-merged into that Contact without review
+
 ### Requirement: Owner assignment on merge
 
 The system MUST set the Contact `owner` to the BD with the earliest `connectedOn` LinkedIn connection among the merged rows. If no row has a LinkedIn connection, the system MUST keep the lead's existing owner.
