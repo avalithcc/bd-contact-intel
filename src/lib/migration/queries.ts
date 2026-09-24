@@ -6,6 +6,7 @@
  * in the pure modules this file wires: collapsePlanner, collapseRun,
  * executionGuard, inputHash.
  */
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -20,6 +21,7 @@ import {
 } from "@/db/schema";
 import type { CollapseContactRow, CollapsePlan } from "./collapsePlanner";
 import type { ApprovedMigrationRun, FinalizeExecuteInput } from "./collapseRun";
+import { buildCollapseWriteRows, chunk, WRITE_BATCH_SIZE } from "./collapseWriteRows";
 import type { EmailStatus } from "@/lib/identity/matcher";
 
 const READ_BATCH_SIZE = 1000;
@@ -184,71 +186,20 @@ export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void
       );
     }
 
-    const realIdByPlanId = new Map<string, string>();
-
-    for (const p of plan.persons) {
-      const [row] = await tx
-        .insert(person)
-        .values({
-          profileKey: p.profileKey,
-          firstName: p.merged.firstName,
-          lastName: p.merged.lastName,
-          email: p.merged.email,
-          emailNormalized: p.merged.emailNormalized,
-          emailStatus: p.merged.emailStatus,
-          emailConfidence: p.merged.emailConfidence,
-          emailSource: p.merged.emailSource,
-          company: p.merged.company,
-          companyKey: p.merged.companyKey,
-          companyCategory: p.merged.companyCategory,
-          jobTitle: p.merged.jobTitle,
-          roleGroup: p.merged.roleGroup,
-          industry: p.merged.industry,
-          ownerBdId: p.ownerBdId,
-          sourceKey: "linkedin_import",
-          migrationRunId,
-        })
-        .returning({ id: person.id });
-      realIdByPlanId.set(p.planId, row.id);
-
-      for (const c of p.connections) {
-        await tx.insert(personBdConnection).values({
-          personId: row.id,
-          bdId: c.bdId,
-          connectedOn: c.connectedOn,
-          legacyContactId: c.legacyContactId,
-        });
-      }
-      for (const mapping of p.legacyMappings) {
-        await tx.insert(personIdMap).values({
-          legacyTable: "contact",
-          legacyId: mapping.legacyContactId,
-          personId: row.id,
-          method: mapping.method,
-          migrationRunId,
-        });
-      }
+    // Batched writes: ~60 round trips instead of one per row. Persons first,
+    // since connections, id-map rows and candidates reference their ids.
+    const rows = buildCollapseWriteRows(plan, migrationRunId, randomUUID);
+    for (const batch of chunk(rows.persons, WRITE_BATCH_SIZE)) {
+      await tx.insert(person).values(batch);
     }
-
-    for (const skip of plan.ownCompanySkipped) {
-      await tx.insert(personIdMap).values({
-        legacyTable: "contact",
-        legacyId: skip.legacyContactId,
-        personId: null,
-        method: "skipped_own_company",
-        migrationRunId,
-      });
+    for (const batch of chunk(rows.connections, WRITE_BATCH_SIZE)) {
+      await tx.insert(personBdConnection).values(batch);
     }
-
-    for (const pair of plan.reviewPairs) {
-      const a = realIdByPlanId.get(pair.planIdA);
-      const b = realIdByPlanId.get(pair.planIdB);
-      if (!a || !b) continue;
-      const [personAId, personBId] = a < b ? [a, b] : [b, a];
-      await tx
-        .insert(duplicateCandidate)
-        .values({ personAId, personBId, reason: pair.reason, matchKey: pair.matchKey })
-        .onConflictDoNothing();
+    for (const batch of chunk(rows.idMap, WRITE_BATCH_SIZE)) {
+      await tx.insert(personIdMap).values(batch);
+    }
+    for (const batch of chunk(rows.duplicateCandidates, WRITE_BATCH_SIZE)) {
+      await tx.insert(duplicateCandidate).values(batch).onConflictDoNothing();
     }
 
     // Link back to the approved dry run rather than orphaning a new row —
