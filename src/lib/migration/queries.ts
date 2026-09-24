@@ -19,8 +19,7 @@ import {
   personIdMap,
 } from "@/db/schema";
 import type { CollapseContactRow, CollapsePlan } from "./collapsePlanner";
-import type { CollapseRunMode } from "./collapseRun";
-import type { MigrationRunForGate } from "./executionGuard";
+import type { ApprovedMigrationRun, FinalizeExecuteInput } from "./collapseRun";
 import type { EmailStatus } from "@/lib/identity/matcher";
 
 const READ_BATCH_SIZE = 1000;
@@ -64,8 +63,8 @@ export async function readAllContactRows(): Promise<CollapseContactRow[]> {
   return rows;
 }
 
-export async function saveMigrationRun(input: {
-  mode: CollapseRunMode;
+/** Persists a fresh `dry_run` migration_run row (collapseRun.ts#runCollapseDryRun's only port call). */
+export async function saveDryRunReport(input: {
   inputHash: string;
   report: CollapsePlan["report"];
 }): Promise<string> {
@@ -73,7 +72,7 @@ export async function saveMigrationRun(input: {
     .insert(migrationRun)
     .values({
       kind: "collapse",
-      mode: input.mode,
+      mode: "dry_run",
       inputHash: input.inputHash,
       report: input.report,
     })
@@ -81,10 +80,17 @@ export async function saveMigrationRun(input: {
   return row.id;
 }
 
-export async function getMigrationRunForGate(runId: string): Promise<MigrationRunForGate | null> {
+/** Fetches the run `--execute --run=<id>` was pointed at, for assertExecutionAllowed. */
+export async function getMigrationRunForGate(runId: string): Promise<ApprovedMigrationRun | null> {
   const row = await db.query.migrationRun.findFirst({ where: eq(migrationRun.id, runId) });
   if (!row) return null;
-  return { approvedAt: row.approvedAt, inputHash: row.inputHash };
+  return {
+    id: row.id,
+    approvedAt: row.approvedAt,
+    executedAt: row.executedAt,
+    approvedByBdId: row.approvedByBdId,
+    inputHash: row.inputHash,
+  };
 }
 
 /** Left-joins the approver's name so /admin/migration doesn't show a raw bd id. */
@@ -147,12 +153,16 @@ export async function approveMigrationRun(runId: string, approvedByBdId: string)
 }
 
 /**
- * Writes a collapse plan for real. Only ever called from the `--execute`
- * path in scripts/unify-contacts.ts, after assertExecutionAllowed has
- * passed (src/lib/migration/collapseRun.ts#runCollapseExecute) — never
- * from the dry-run path.
+ * Fresh-review fix: writes a collapse plan for real, marks the SAME
+ * approved migration_run row as executed (never creates a second, orphaned
+ * row — see collapseRun.ts#ApprovedMigrationRun), and writes one
+ * `audit_log(migration_execute)` entry recording the actor, the backup
+ * path, and the report counts — all in ONE transaction. Only ever called
+ * from `runCollapseExecute`, after `assertExecutionAllowed` and
+ * `snapshotBackup` have both succeeded.
  */
-export async function writeCollapsePlan(plan: CollapsePlan, migrationRunId: string): Promise<void> {
+export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void> {
+  const { plan, migrationRunId, actorBdId, backupPath } = input;
   await db.transaction(async (tx) => {
     const realIdByPlanId = new Map<string, string>();
 
@@ -220,5 +230,25 @@ export async function writeCollapsePlan(plan: CollapsePlan, migrationRunId: stri
         .values({ personAId, personBId, reason: pair.reason, matchKey: pair.matchKey })
         .onConflictDoNothing();
     }
+
+    // Link back to the approved dry run rather than orphaning a new row —
+    // the backup path is folded into the existing jsonb `report` column
+    // (re-derived report content is identical to the dry run's, since
+    // assertExecutionAllowed already proved the input_hash matches) rather
+    // than adding a dedicated schema column for this one field.
+    const [updatedRun] = await tx
+      .update(migrationRun)
+      .set({ executedAt: new Date(), report: { ...plan.report, backupPath } })
+      .where(eq(migrationRun.id, migrationRunId))
+      .returning({ id: migrationRun.id });
+    if (!updatedRun) {
+      throw new Error(`migration_run ${migrationRunId} not found while finalizing --execute`);
+    }
+
+    await tx.insert(auditLog).values({
+      actorBdId,
+      action: "migration_execute",
+      metadata: { migrationRunId, backupPath, report: plan.report },
+    });
   });
 }

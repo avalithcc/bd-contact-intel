@@ -15,21 +15,26 @@
  *
  * `--execute --run=<id>` refuses (via
  * src/lib/migration/executionGuard.ts#assertExecutionAllowed) unless
- * `<id>` is an approved run whose `input_hash` still matches the current
- * `contact` table contents. It also refuses to proceed without a
- * production backup — see `snapshotBackup` below, which is NOT
- * implemented yet: wiring it to this project's actual backup mechanism
- * (e.g. a Supabase/Postgres point-in-time-recovery snapshot or `pg_dump`)
- * is an infra decision for the owner, out of scope for this PR. Until
- * that's wired, `--execute` always throws — this is a deliberate fail-safe,
- * not an oversight.
+ * `<id>` is an approved, not-yet-executed run whose `input_hash` still
+ * matches the current `contact` table contents. On success it writes the
+ * collapse plan, marks the SAME approved `migration_run` row as executed
+ * (linking rather than orphaning — see
+ * src/lib/migration/collapseRun.ts#ApprovedMigrationRun), and writes one
+ * `audit_log(migration_execute)` entry — all in one transaction
+ * (src/lib/migration/queries.ts#finalizeExecute).
+ *
+ * It also refuses to proceed without a production backup — see
+ * `snapshotBackup` below, which is NOT implemented yet: wiring it to this
+ * project's actual backup mechanism is an infra decision for the owner,
+ * out of scope for this commit. Until that's wired, `--execute` always
+ * throws — this is a deliberate fail-safe, not an oversight.
  */
 import { runCollapseDryRun, runCollapseExecute } from "../src/lib/migration/collapseRun";
 import {
+  finalizeExecute,
   getMigrationRunForGate,
   readAllContactRows,
-  saveMigrationRun,
-  writeCollapsePlan,
+  saveDryRunReport,
 } from "../src/lib/migration/queries";
 
 interface Args {
@@ -57,7 +62,7 @@ function parseArgs(argv: string[]): Args {
  * NOT IMPLEMENTED. Deliberately throws so `--execute` can never run
  * without a real backup wired in first (owner decision — see file header).
  */
-async function snapshotBackup(): Promise<void> {
+async function snapshotBackup(): Promise<string> {
   throw new Error(
     "snapshotBackup() is not implemented — configure a production backup " +
       "strategy (see scripts/unify-contacts.ts header) before enabling --execute.",
@@ -69,7 +74,7 @@ async function main() {
   const rows = await readAllContactRows();
 
   if (args.mode === "dry_run") {
-    const { migrationRunId, report } = await runCollapseDryRun(rows, { saveMigrationRun });
+    const { migrationRunId, report } = await runCollapseDryRun(rows, { saveDryRunReport });
     console.log(`Dry run complete. migration_run id: ${migrationRunId}`);
     console.log(JSON.stringify(report, null, 2));
     console.log("Review this report in /admin/migration and approve it before --execute.");
@@ -80,10 +85,9 @@ async function main() {
     throw new Error("--execute requires --run=<migration_run id> (the approved dry run's id)");
   }
   const approvedRun = await getMigrationRunForGate(args.runId);
-  await snapshotBackup(); // throws today — see file header
   const { migrationRunId, report } = await runCollapseExecute(rows, approvedRun, {
-    saveMigrationRun,
-    writePersons: writeCollapsePlan,
+    snapshotBackup,
+    finalizeExecute,
   });
   console.log(`Execute complete. migration_run id: ${migrationRunId}`);
   console.log(JSON.stringify(report, null, 2));
