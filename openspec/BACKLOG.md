@@ -23,6 +23,13 @@ Reports for the platform owner (admin) to act on pipeline data.
 - Activity per BD over time.
 - Depends on `crm-hubspot-ux` storing these facts as structured data: discard reason as a fixed code (not free text), contact source provenance, and timestamped activities.
 
+## auth-ux
+
+Login gaps found while testing the crm-hubspot-ux preview (2026-09-24).
+
+- No "forgot password" flow: a BD without an open session is locked out and needs a manual reset in Supabase. Add Supabase password recovery (email link → `/auth/confirm` → set new password).
+- After login the app always lands on `/`, ignoring the page that was requested. Return to the original URL (a validated, same-origin `next` parameter), as HubSpot does.
+
 ## Deferred from crm-hubspot-ux
 
 - Global cross-object search.
