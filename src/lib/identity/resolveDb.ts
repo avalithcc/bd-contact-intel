@@ -18,6 +18,7 @@ import {
   buildIdentityWriteRows,
   buildPrefetchKeys,
   IDENTITY_LOCK_KEY,
+  repointIdentityWriteRows,
   type ExistingPersonCandidate,
   type IdentityIngestRow,
   type IdentityWritePlan,
@@ -91,6 +92,13 @@ export async function prefetchIdentityIndex(
  * rows that lose that race. Callers that only ever update existing persons
  * (e.g. recomputeMessageSignals) don't need it. Wired into upsertContacts/
  * importLeads in task 4B.3 — not exercised here.
+ *
+ * Caller contract: callers MUST take this lock, in the SAME transaction,
+ * BEFORE calling prefetchIdentityIndex — verified-email dedupe (unlike
+ * profile_key) has no unique DB constraint, so nothing else prevents two
+ * concurrent chunks from both prefetching a "no match" result for the same
+ * verified email and each creating their own person. Enforced by the 4B-2
+ * wiring (task 4B.3); this comment only documents the requirement.
  */
 export async function withIdentityLock<T>(tx: DbTransaction, fn: () => Promise<T>): Promise<T> {
   await tx.execute(sql`select pg_advisory_xact_lock(${IDENTITY_LOCK_KEY})`);
@@ -101,11 +109,17 @@ export async function withIdentityLock<T>(tx: DbTransaction, fn: () => Promise<T
  * Thin DB layer (task 4B.2): batched inserts/updates from a plan already
  * built by planIdentityWrites. Callers are responsible for taking
  * withIdentityLock first when the plan may create persons (see above).
+ *
+ * Person batches are inserted (and their conflict losers collected) BEFORE
+ * any dependent row (connections/idMap/duplicateCandidates) is inserted, so
+ * a loser id from one batch can never slip into a dependent insert before
+ * it's been repointed — see repointIdentityWriteRows in ./resolve.ts.
  */
 export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWritePlan): Promise<void> {
-  const rows = buildIdentityWriteRows(plan, randomUUID);
+  const builtRows = buildIdentityWriteRows(plan, randomUUID);
+  const winnerByLoserId = new Map<string, string>();
 
-  for (const batch of chunk(rows.persons, WRITE_BATCH_SIZE)) {
+  for (const batch of chunk(builtRows.persons, WRITE_BATCH_SIZE)) {
     if (!batch.length) continue;
     const inserted = await tx
       .insert(person)
@@ -119,8 +133,9 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
     if (!losingKeys.length) continue;
 
     // A concurrent chunk beat us to the same profile key (design D14): the
-    // conflict losers never got an id, so re-point their rows' connection
-    // and id-map entries at the row that actually persisted.
+    // conflict losers never got an id. Record loser -> winner so every
+    // dependent row (connections/idMap/duplicateCandidates) across ALL
+    // person batches gets repointed once, after every batch has run.
     const winners = await tx
       .select({ id: person.id, profileKey: person.profileKey })
       .from(person)
@@ -130,10 +145,11 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
       if (!b.profileKey || insertedIds.has(b.id!)) continue;
       const winnerId = winnerByKey.get(b.profileKey);
       if (!winnerId) continue;
-      for (const c of rows.connections) if (c.personId === b.id) c.personId = winnerId;
-      for (const m of rows.idMap) if (m.personId === b.id) m.personId = winnerId;
+      winnerByLoserId.set(b.id!, winnerId);
     }
   }
+
+  const rows = repointIdentityWriteRows(builtRows, winnerByLoserId);
 
   for (const batch of chunk(rows.connections, WRITE_BATCH_SIZE)) {
     if (batch.length) await tx.insert(personBdConnection).values(batch).onConflictDoNothing();
