@@ -114,7 +114,7 @@ test("runIdentityCutoverChunk: kill switch off runs only legacyWrite — no lock
   assert.deepEqual(result, [{ id: "x" }]);
 });
 
-test("runIdentityCutoverChunk: dual write enabled takes the lock BEFORE prefetch/apply", async () => {
+test("runIdentityCutoverChunk: dual write enabled runs legacyWrite FIRST, then takes the lock around prefetch/apply only (design D14)", async () => {
   const calls: string[] = [];
   await runIdentityCutoverChunk(true, {
     withLock: async (fn) => {
@@ -156,7 +156,7 @@ test("runIdentityCutoverChunk: dual write enabled takes the lock BEFORE prefetch
       calls.push("apply");
     },
   });
-  assert.deepEqual(calls, ["lock:start", "legacyWrite", "toIdentityRows", "prefetch", "apply", "lock:end"]);
+  assert.deepEqual(calls, ["legacyWrite", "toIdentityRows", "lock:start", "prefetch", "apply", "lock:end"]);
 });
 
 test("runIdentityCutoverChunk: no identity rows for the chunk skips prefetch/apply", async () => {

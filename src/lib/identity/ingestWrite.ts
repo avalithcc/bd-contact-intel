@@ -122,7 +122,12 @@ export function leadRowsToIdentityRows(rows: readonly InsertedLeadRow[]): Identi
 // --- Orchestration (design D11/D14) -----------------------------------------
 
 export interface IdentityCutoverPorts<LegacyRow> {
-  /** Callers MUST take this in the SAME transaction as legacyWrite/prefetch/apply — see resolveDb.ts#withIdentityLock's caller contract. */
+  /**
+   * Callers MUST take this in the SAME transaction as legacyWrite/prefetch/
+   * apply — see resolveDb.ts#withIdentityLock's caller contract. The lock
+   * itself only needs to wrap `prefetch`+`apply` (design D14); `legacyWrite`
+   * runs before it, still inside the same transaction.
+   */
   withLock: (fn: () => Promise<void>) => Promise<void>;
   legacyWrite: () => Promise<LegacyRow[]>;
   toIdentityRows: (rows: readonly LegacyRow[]) => IdentityIngestRow[];
@@ -132,11 +137,15 @@ export interface IdentityCutoverPorts<LegacyRow> {
 
 /**
  * One chunk of the write cutover (task 4B.3). When `IDENTITY_DUAL_WRITE` is
- * enabled: takes the advisory lock FIRST, then runs the legacy write,
- * prefetch, matcher and identity writes, all inside that lock — so two
- * chunks racing to create the same person serialize (design D14). When
- * disabled: runs ONLY `legacyWrite`, byte-identical to pre-cutover behavior
- * (design D11) — no lock, no identity read or write.
+ * enabled: runs the legacy write FIRST, then — only if that chunk produced
+ * identity rows — takes the advisory lock around prefetch, matcher and
+ * identity writes ONLY, so two chunks racing to create the same person
+ * serialize (design D14: "legacy upsert, THEN pg_advisory_xact_lock, then
+ * prefetch/match/writes"). When disabled: runs ONLY `legacyWrite`,
+ * byte-identical to pre-cutover behavior (design D11) — no lock, no identity
+ * read or write. A thrown error from any port (including `legacyWrite`)
+ * still rolls back the whole chunk, since callers run everything in one
+ * shared transaction (see `IdentityCutoverPorts.withLock`'s caller contract).
  */
 export async function runIdentityCutoverChunk<LegacyRow>(
   dualWriteEnabled: boolean,
@@ -144,14 +153,14 @@ export async function runIdentityCutoverChunk<LegacyRow>(
 ): Promise<LegacyRow[]> {
   if (!dualWriteEnabled) return ports.legacyWrite();
 
-  let legacyRows: LegacyRow[] = [];
-  await ports.withLock(async () => {
-    legacyRows = await ports.legacyWrite();
-    const identityRows = ports.toIdentityRows(legacyRows);
-    if (!identityRows.length) return;
-    const index = await ports.prefetch(identityRows);
-    const plan = planIdentityWrites(identityRows, index);
-    await ports.apply(plan);
-  });
+  const legacyRows = await ports.legacyWrite();
+  const identityRows = ports.toIdentityRows(legacyRows);
+  if (identityRows.length) {
+    await ports.withLock(async () => {
+      const index = await ports.prefetch(identityRows);
+      const plan = planIdentityWrites(identityRows, index);
+      await ports.apply(plan);
+    });
+  }
   return legacyRows;
 }
