@@ -88,7 +88,7 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4B: Write Cutover & Catch-up (PRs 4B-1..4B-4, base: PR 4)
 
-- [ ] 4B.1 RED/GREEN: `planIdentityWrites(rows, index)` in `src/lib/identity/resolve.ts` — new/auto/review/own-company outcomes, intra-chunk dedup, merged-survivor resolution (contact-identity "Live ingestion resolves identity").
+- [x] 4B.1 RED/GREEN: `planIdentityWrites(rows, index)` in `src/lib/identity/resolve.ts` — new/auto/review/own-company outcomes, intra-chunk dedup, merged-survivor resolution (contact-identity "Live ingestion resolves identity").
 - [ ] 4B.2 GREEN: `prefetchIdentityIndex(tx, rows)` (3 indexed queries) + `applyIdentityWrites(tx, plan)` with `ON CONFLICT (profile_key) DO NOTHING RETURNING` and re-select of losers. (PR 4B-1, ~300 code)
 - [ ] 4B.3 RED/GREEN: `upsertContacts` and `importLeads` run each chunk in one transaction under `pg_advisory_xact_lock`, writing legacy + person + connection + map; `IDENTITY_DUAL_WRITE` kill switch.
 - [ ] 4B.4 Test: two concurrent uploads of the same new profile key yield one `person` and two connections. (PR 4B-2, ~260 code)
