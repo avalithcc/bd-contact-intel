@@ -120,6 +120,13 @@ Chain strategy: feature-branch-chain
 - [x] 7.1 **GATE**: owner approved all mockups under `openspec/changes/crm-hubspot-ux/mockups/` (one shared `styles.css`), including `mockups/duplicates.html`, on 2026-09-24.
 - [x] 7.2 `/admin/duplicates` page (admin-only, `requireAdmin`) implementing the approved mockup: pair list with pagination, compare panel (recommended survivor + field-level merge preview), Merge / No es duplicado / Deshacer fusión actions, Spanish copy per GLOSSARY.md. Split into three work units: `src/lib/identity/duplicateReviewView.ts` (pure `chooseDefaultSurvivor`/`previewMergeOutcome`, PR 07a) + queries/actions (PR 07a) + `es`/`en` dictionary (PR 07b) + `src/app/admin/duplicates/page.tsx`/CSS (PR 07c), to stay under the 400-line review budget.
 - [x] 7.3 E2E: non-admin gets 404 on `/admin/duplicates`; admin merge action produces one `audit_log` row. `tests/e2e/phase7.spec.ts` — written but **not executed** (no real authenticated session, and the non-admin case needs a second account this suite doesn't have yet).
+- [x] 7.4 Fresh-review fixes (07b `c868072`, 07c rebased + `4fce7f3`): added the missing `conflicting_strong_keys` reason label (the matcher's other `ReviewReason` value, alongside `name_company`) and a generic fallback so `reasonLabel` never renders a raw key; removed the dead `profile_key`/`verified_email` dictionary entries (those belong to `kind: "auto"` matches, which never reach the review queue's `reasonLabel`). Restored the mockup's unmerge confirmation overlay (`mockups/duplicates.html` ~L105-109) as a server-rendered, no-JS panel: "Deshacer fusión" links to `?confirmUnmerge=<mergeEventId>`, validated against the already-fetched, not-yet-undone history rows (plus a UUID format check) before rendering.
+
+**Intentional deviations from the mockup, left as-is:**
+- "Omitir" (skip) button dropped — it was a no-op in the mockup with no distinct behavior from just navigating away.
+- History's "Fusionado desde" count column omitted — not tracked anywhere in the schema (`merge_event` has no count of prior source records); would need a new column/derivation to add.
+- Survivor is always the recommended one from `chooseDefaultSurvivor` (no manual override in the UI) — matches the approved mockup, which shows the recommendation as the only merge action.
+- No confirmation dialog on Merge itself (only on Deshacer/unmerge) — merge is reversible via unmerge, so the extra friction was judged unnecessary; the mockup does not show a merge confirmation either.
 
 ## Phase 8: App Shell & Design Tokens (PR 8, base: PR 7; requires Phase 0)
 
