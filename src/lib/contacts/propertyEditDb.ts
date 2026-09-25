@@ -33,7 +33,9 @@ export async function updateContactProperty(
       .set(plan.personUpdate!)
       .where(eq(person.id, personId))
       .returning();
-    await tx.insert(personPropertyHistory).values(plan.historyRow!);
+    if (plan.historyRows.length) {
+      await tx.insert(personPropertyHistory).values(plan.historyRows);
+    }
     return updated!;
   });
 }
