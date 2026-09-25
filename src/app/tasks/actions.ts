@@ -18,6 +18,8 @@ export async function createTaskAction(input: {
   const task = await createTask({
     ...input,
     assignedToBdId: me.id,
+    // Who created this task (design "Reference writes"; task 4B.5).
+    actorBdId: me.id,
   } as NewTask);
 
   revalidatePath("/tasks");

@@ -58,9 +58,11 @@ function parseCsvRecords(raw: string): Record<string, string>[] {
  * Strips accents and lowercases, for matching names across sources that
  * spell the same person differently (accents, case) — same normalization
  * strategy as src/lib/companyCategories.ts#normalizeCompanyKey, applied to
- * people's names instead of company names.
+ * people's names instead of company names. Exported for reuse by
+ * src/lib/identity/matcher.ts#buildNameCompanyKey, which needs the same
+ * accent-insensitive name fold for its name+company review key.
  */
-function normalizeNameKey(name: string): string {
+export function normalizeNameKey(name: string): string {
   return name
     .normalize("NFKD")
     // eslint-disable-next-line no-control-regex -- ASCII-only fold, mirrors normalizeCompanyKey

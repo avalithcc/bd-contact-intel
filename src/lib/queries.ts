@@ -18,6 +18,13 @@ import {
 import { bucketTopN } from "@/lib/bucketing";
 import { partitionOwnCompanyRows } from "@/lib/ownCompany";
 import type { ParseMessagesResult } from "@/lib/messagesCsv";
+import {
+  contactRowsToIdentityRows,
+  runIdentityCutoverChunk,
+  type InsertedContactRow,
+} from "@/lib/identity/ingestWrite";
+import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
@@ -452,23 +459,60 @@ export async function upsertContacts(
         companyKey: trimmedCompany ? normalizeCompanyKey(trimmedCompany) : null,
       };
     });
-    await db
-      .insert(contact)
-      .values(chunk)
-      .onConflictDoUpdate({
-        target: [contact.bdId, contact.profileKey],
-        set: {
-          firstName: sql`excluded.first_name`,
-          lastName: sql`excluded.last_name`,
-          company: sql`excluded.company`,
-          position: sql`excluded.position`,
-          roleGroup: sql`excluded.role_group`,
-          companyCategory: sql`excluded.company_category`,
-          companyKey: sql`excluded.company_key`,
-          email: sql`excluded.email`,
-          connectedOn: sql`excluded.connected_on`,
-        },
+    // One transaction per chunk (design D14): the legacy upsert plus the
+    // identity resolver's lock/prefetch/match/write, or — when
+    // IDENTITY_DUAL_WRITE is off — the legacy upsert alone, byte-identical
+    // to pre-cutover behavior. See src/lib/identity/ingestWrite.ts.
+    const dualWriteEnabled = isIdentityDualWriteEnabled();
+    await db.transaction(async (tx) => {
+      // Same insert either way; `.returning()` is only appended when the
+      // identity resolver actually needs the inserted/updated rows, so the
+      // kill-switch-off path stays the exact original statement (D11:
+      // byte-identical to pre-cutover behavior, including query text).
+      const upsertContactRows = () =>
+        tx
+          .insert(contact)
+          .values(chunk)
+          .onConflictDoUpdate({
+            target: [contact.bdId, contact.profileKey],
+            set: {
+              firstName: sql`excluded.first_name`,
+              lastName: sql`excluded.last_name`,
+              company: sql`excluded.company`,
+              position: sql`excluded.position`,
+              roleGroup: sql`excluded.role_group`,
+              companyCategory: sql`excluded.company_category`,
+              companyKey: sql`excluded.company_key`,
+              email: sql`excluded.email`,
+              connectedOn: sql`excluded.connected_on`,
+            },
+          });
+      await runIdentityCutoverChunk(dualWriteEnabled, {
+        withLock: (fn) => withIdentityLock(tx, fn),
+        legacyWrite: dualWriteEnabled
+          ? () =>
+              upsertContactRows().returning({
+                id: contact.id,
+                bdId: contact.bdId,
+                profileKey: contact.profileKey,
+                firstName: contact.firstName,
+                lastName: contact.lastName,
+                company: contact.company,
+                companyKey: contact.companyKey,
+                position: contact.position,
+                industry: contact.industry,
+                connectedOn: contact.connectedOn,
+                email: contact.email,
+                emailStatus: contact.emailStatus,
+                emailConfidence: contact.emailConfidence,
+                emailSource: contact.emailSource,
+              })
+          : () => upsertContactRows().then(() => [] as InsertedContactRow[]),
+        toIdentityRows: contactRowsToIdentityRows,
+        prefetch: (rows) => prefetchIdentityIndex(tx, rows),
+        apply: (plan) => applyIdentityWrites(tx, plan),
       });
+    });
     count += chunk.length;
   }
   return { imported: count, skippedOwnCompany };
@@ -755,6 +799,51 @@ export async function recomputeMessageSignals(bdId: string): Promise<void> {
     FROM peer_agg pa
     LEFT JOIN first_msg fm ON fm.peer_profile_key = pa.peer_profile_key
     WHERE ct.bd_id = ${bdId} AND ct.profile_key = pa.peer_profile_key
+  `);
+
+  if (!isIdentityDualWriteEnabled()) return;
+
+  // Same per-BD aggregates, now also applied to the unified person's
+  // per-BD connection row (design "Reference writes": "recomputeMessageSignals
+  // gets a second set-based UPDATE person_bd_connection … FROM peer_agg JOIN
+  // person_id_map"). DB-only glue — no matcher, no lock, this never creates
+  // a person or a connection, only updates one that already exists.
+  await db.execute(sql`
+    WITH first_msg AS (
+      SELECT DISTINCT ON (c.peer_profile_key)
+        c.peer_profile_key,
+        (m.sender_profile_key IS DISTINCT FROM c.peer_profile_key) AS initiated_by_me
+      FROM message m
+      JOIN conversation c ON c.id = m.conversation_id
+      WHERE m.bd_id = ${bdId} AND m.is_draft = false AND c.peer_profile_key IS NOT NULL
+      ORDER BY c.peer_profile_key, m.sent_at ASC
+    ),
+    peer_agg AS (
+      SELECT
+        peer_profile_key,
+        sum(message_count)::int AS message_count,
+        sum(sent_count)::int AS sent_count,
+        sum(received_count)::int AS received_count,
+        min(first_message_at) AS first_message_at,
+        max(last_message_at) AS last_message_at
+      FROM conversation
+      WHERE bd_id = ${bdId} AND peer_profile_key IS NOT NULL
+      GROUP BY peer_profile_key
+    )
+    UPDATE person_bd_connection pbc
+    SET
+      message_count = pa.message_count,
+      sent_count = pa.sent_count,
+      received_count = pa.received_count,
+      first_message_at = pa.first_message_at,
+      last_message_at = pa.last_message_at,
+      initiated_by_me = fm.initiated_by_me,
+      reciprocal = (pa.sent_count > 0 AND pa.received_count > 0)
+    FROM peer_agg pa
+    JOIN contact ct2 ON ct2.bd_id = ${bdId} AND ct2.profile_key = pa.peer_profile_key
+    JOIN person_id_map pim ON pim.legacy_table = 'contact' AND pim.legacy_id = ct2.id
+    LEFT JOIN first_msg fm ON fm.peer_profile_key = pa.peer_profile_key
+    WHERE pbc.person_id = pim.person_id AND pbc.bd_id = ${bdId}
   `);
 }
 

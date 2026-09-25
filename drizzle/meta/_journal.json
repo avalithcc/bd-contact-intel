@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789503871556,
+      "tag": "0000_crazy_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789590271556,
+      "tag": "0001_lonely_hex",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789676671556,
+      "tag": "0002_hiring_signals",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789763071556,
+      "tag": "0003_hiring_crossover",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789849471556,
+      "tag": "0004_message_signals",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789935871556,
+      "tag": "0005_board_discovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790022271556,
+      "tag": "0006_job_posting_market",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790108671556,
+      "tag": "0007_job_posting_miami",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790195071556,
+      "tag": "0008_job_posting_offshore",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790281471556,
+      "tag": "0009_good_the_renegades",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790367871556,
+      "tag": "0010_flowery_sunset_bain",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790454271556,
+      "tag": "0011_sudden_speedball",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790540671556,
+      "tag": "0012_fantastic_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790627071556,
+      "tag": "0013_unified_person",
+      "breakpoints": true
+    }
+  ]
+}
