@@ -161,10 +161,27 @@ type EmailFields = Pick<
 function mergeEmailFields(a: EmailFields, b: EmailFields): EmailFields {
   const aHas = !!a.email;
   const bHas = !!b.email;
-  if (aHas && !bHas) return a;
-  if (bHas && !aHas) return b;
-  if (!aHas && !bHas) return a;
-  return emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus) ? b : a;
+  const winner =
+    aHas && !bHas
+      ? a
+      : bHas && !aHas
+        ? b
+        : !aHas && !bHas
+          ? a
+          : emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus)
+            ? b
+            : a;
+  // Pick ONLY the email keys from the winner — `winner` is typed as
+  // `EmailFields` but at runtime is the WHOLE `CollapsePersonMerged` object
+  // (TS structural typing doesn't narrow at runtime), so spreading it
+  // directly would clobber non-email fields already merged elsewhere.
+  return {
+    email: winner.email,
+    emailNormalized: winner.emailNormalized,
+    emailStatus: winner.emailStatus,
+    emailConfidence: winner.emailConfidence,
+    emailSource: winner.emailSource,
+  };
 }
 
 function mergePersonMerged(

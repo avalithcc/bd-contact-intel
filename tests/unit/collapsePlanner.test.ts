@@ -221,6 +221,58 @@ test("a conflicting-strong-keys review row never steals the profile key or email
   assert.equal(byLegacyId.get("c5"), personB, "row carrying only E must merge into B, not C");
 });
 
+// --- regression: mergeEmailFields must not clobber non-email fields
+// (mergePersonMerged spread the WHOLE winning-email side, not just its email
+// keys, silently overwriting already-merged firstName/jobTitle/etc.) --------
+
+test("email merge never overwrites non-email fields already merged from the richer row", () => {
+  const rows = [
+    // First row: rich non-email fields, no email at all.
+    row({
+      id: "c1",
+      profileKey: "linkedin.com/in/rich",
+      firstName: "Jonathan",
+      lastName: "Doeperson",
+      company: "Acme Corp",
+      companyKey: "acme-corp",
+      position: "Senior Staff Engineer",
+      industry: "software",
+      email: null,
+      emailStatus: "none",
+    }),
+    // Second row: same identity, poorer non-email fields, but wins the email
+    // merge because it's the only one with an email.
+    row({
+      id: "c2",
+      profileKey: "linkedin.com/in/rich",
+      firstName: "J",
+      lastName: null,
+      company: null,
+      companyKey: null,
+      position: null,
+      industry: null,
+      email: "jonathan@example.com",
+      emailStatus: "probable",
+    }),
+  ];
+
+  const plan = planCollapse(rows);
+
+  assert.equal(plan.persons.length, 1);
+  const [person] = plan.persons;
+  // Non-email fields must keep the richer row's values (mergeStringField:
+  // longer/present value wins), NOT get clobbered by the email winner's nulls.
+  assert.equal(person.merged.firstName, "Jonathan");
+  assert.equal(person.merged.lastName, "Doeperson");
+  assert.equal(person.merged.company, "Acme Corp");
+  assert.equal(person.merged.companyKey, "acme-corp");
+  assert.equal(person.merged.jobTitle, "Senior Staff Engineer");
+  assert.equal(person.merged.industry, "software");
+  // Email fields must still come from the email-winning row (c2).
+  assert.equal(person.merged.email, "jonathan@example.com");
+  assert.equal(person.merged.emailStatus, "probable");
+});
+
 test("merging into a person via verified email registers the row's own unmapped profile key to that same person", () => {
   const rows = [
     row({
