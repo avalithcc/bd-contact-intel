@@ -500,3 +500,118 @@ export function planUnmerge(snapshot: MergeSnapshot, context: UnmergeContext): U
     mergedPairCandidateToReopen: snapshot.mergedPairCandidate,
   };
 }
+
+// --- parseMergeSnapshot: safe revival of merge_event.snapshot (jsonb) ---
+//
+// `merge_event.snapshot` is stored as jsonb: every `Date` field
+// (firstMessageAt/lastMessageAt on MergeConnection) round-trips as an ISO
+// string, not a Date. A raw `as unknown as MergeSnapshot` cast was previously
+// used at the read site and broke `connectionValuesEqual`'s `.getTime()`
+// calls (and any DB write expecting a real Date) for any snapshot recorded
+// with non-null message dates. This function is the only supported way to
+// turn `merge_event.snapshot` back into a `MergeSnapshot`.
+
+function reviveNullableDate(value: unknown, path: string): Date | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const revived = new Date(value);
+    if (Number.isNaN(revived.getTime())) {
+      throw new Error(`Invalid merge snapshot: unparseable date at ${path}: ${JSON.stringify(value)}`);
+    }
+    return revived;
+  }
+  throw new Error(`Invalid merge snapshot: expected a date or null at ${path}, got ${typeof value}`);
+}
+
+function parseMergeConnection(value: unknown, path: string): MergeConnection {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Invalid merge snapshot: expected a connection object at ${path}`);
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row.personId !== "string" || typeof row.bdId !== "string") {
+    throw new Error(`Invalid merge snapshot: ${path} is missing personId/bdId`);
+  }
+  return {
+    personId: row.personId,
+    bdId: row.bdId,
+    connectedOn: typeof row.connectedOn === "string" ? row.connectedOn : null,
+    legacyContactId: typeof row.legacyContactId === "string" ? row.legacyContactId : null,
+    messageCount: typeof row.messageCount === "number" ? row.messageCount : 0,
+    sentCount: typeof row.sentCount === "number" ? row.sentCount : 0,
+    receivedCount: typeof row.receivedCount === "number" ? row.receivedCount : 0,
+    firstMessageAt: reviveNullableDate(row.firstMessageAt, `${path}.firstMessageAt`),
+    lastMessageAt: reviveNullableDate(row.lastMessageAt, `${path}.lastMessageAt`),
+    initiatedByMe: typeof row.initiatedByMe === "boolean" ? row.initiatedByMe : null,
+    reciprocal: row.reciprocal === true,
+  };
+}
+
+function parseConnectionConflict(value: unknown, path: string): ConnectionConflict {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Invalid merge snapshot: expected a connection conflict object at ${path}`);
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row.bdId !== "string") {
+    throw new Error(`Invalid merge snapshot: ${path} is missing bdId`);
+  }
+  return {
+    bdId: row.bdId,
+    survivorOriginal: parseMergeConnection(row.survivorOriginal, `${path}.survivorOriginal`),
+    mergedOriginal: parseMergeConnection(row.mergedOriginal, `${path}.mergedOriginal`),
+    aggregated: parseMergeConnection(row.aggregated, `${path}.aggregated`),
+  };
+}
+
+function asArray(value: unknown, path: string): unknown[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error(`Invalid merge snapshot: expected an array at ${path}`);
+  return value;
+}
+
+function asStringArray(value: unknown, path: string): string[] {
+  return asArray(value, path).map((v, i) => {
+    if (typeof v !== "string") throw new Error(`Invalid merge snapshot: expected a string at ${path}[${i}]`);
+    return v;
+  });
+}
+
+/**
+ * Validates and revives a `merge_event.snapshot` jsonb value into a
+ * `MergeSnapshot`, reviving every Date field along the way. Throws a clear
+ * `Error` (never a silent `undefined`/`NaN`) if the shape is invalid.
+ */
+export function parseMergeSnapshot(value: unknown): MergeSnapshot {
+  if (!value || typeof value !== "object") {
+    throw new Error("Invalid merge snapshot: expected an object");
+  }
+  const obj = value as Record<string, unknown>;
+  if (!obj.merged || typeof obj.merged !== "object" || typeof (obj.merged as Record<string, unknown>).id !== "string") {
+    throw new Error("Invalid merge snapshot: missing merged.id");
+  }
+
+  const mergedPairCandidateRaw = obj.mergedPairCandidate;
+  let mergedPairCandidate: MergeSnapshot["mergedPairCandidate"] = null;
+  if (mergedPairCandidateRaw && typeof mergedPairCandidateRaw === "object") {
+    const c = mergedPairCandidateRaw as Record<string, unknown>;
+    if (typeof c.id !== "string" || typeof c.originalStatus !== "string") {
+      throw new Error("Invalid merge snapshot: mergedPairCandidate is missing id/originalStatus");
+    }
+    mergedPairCandidate = { id: c.id, originalStatus: c.originalStatus };
+  }
+
+  return {
+    merged: obj.merged as MergePersonFields,
+    survivorFieldChanges: asArray(obj.survivorFieldChanges, "survivorFieldChanges") as SurvivorFieldChange[],
+    movedConnectionBdIds: asStringArray(obj.movedConnectionBdIds, "movedConnectionBdIds"),
+    connectionConflicts: asArray(obj.connectionConflicts, "connectionConflicts").map((v, i) =>
+      parseConnectionConflict(v, `connectionConflicts[${i}]`),
+    ),
+    movedReferences: asArray(obj.movedReferences, "movedReferences") as MergeReferenceRow[],
+    movedIdMapRows: asArray(obj.movedIdMapRows, "movedIdMapRows") as MergeIdMapRow[],
+    repointedDuplicateCandidates: asArray(obj.repointedDuplicateCandidates, "repointedDuplicateCandidates") as MergeDuplicateCandidateRow[],
+    droppedDuplicateCandidates: asArray(obj.droppedDuplicateCandidates, "droppedDuplicateCandidates") as MergeDuplicateCandidateRow[],
+    mergedPairCandidate,
+    propertyLosses: asArray(obj.propertyLosses, "propertyLosses") as PropertyLoss[],
+  };
+}

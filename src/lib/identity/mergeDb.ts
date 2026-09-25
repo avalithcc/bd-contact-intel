@@ -24,6 +24,7 @@ import {
 } from "@/db/schema";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import {
+  parseMergeSnapshot,
   planMerge,
   planUnmerge,
   type MergeConnection,
@@ -31,7 +32,6 @@ import {
   type MergeIdMapRow,
   type MergePersonFields,
   type MergeReferenceRow,
-  type MergeSnapshot,
 } from "@/lib/identity/merge";
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -289,7 +289,7 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
     if (!event) throw new Error("Unmerge refused: merge_event not found");
     if (event.undoneAt) throw new Error("Unmerge refused: this merge was already undone");
 
-    const snapshot = event.snapshot as unknown as MergeSnapshot;
+    const snapshot = parseMergeSnapshot(event.snapshot);
 
     const [survivorRow] = await tx.select().from(person).where(eq(person.id, event.survivorId)).for("update");
     if (!survivorRow) throw new Error("Unmerge refused: survivor not found");

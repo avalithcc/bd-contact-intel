@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  parseMergeSnapshot,
   planMerge,
   planUnmerge,
   type MergeConnection,
@@ -17,6 +18,11 @@ import {
   type MergeReferenceRow,
   type PlanMergeInput,
 } from "@/lib/identity/merge";
+
+// Non-null by default so fixtures exercise Date (de)serialization across the
+// snapshot boundary instead of always taking the "both null" shortcut.
+const DEFAULT_FIRST_MESSAGE_AT = new Date("2023-01-01T00:00:00.000Z");
+const DEFAULT_LAST_MESSAGE_AT = new Date("2023-06-01T00:00:00.000Z");
 
 function person(overrides: Partial<MergePersonFields> & { id: string }): MergePersonFields {
   return {
@@ -50,8 +56,8 @@ function connection(overrides: Partial<MergeConnection> & { personId: string; bd
     messageCount: 0,
     sentCount: 0,
     receivedCount: 0,
-    firstMessageAt: null,
-    lastMessageAt: null,
+    firstMessageAt: DEFAULT_FIRST_MESSAGE_AT,
+    lastMessageAt: DEFAULT_LAST_MESSAGE_AT,
     initiatedByMe: null,
     reciprocal: false,
     ...overrides,
@@ -187,6 +193,51 @@ test("planMerge: a repoint that collides with an existing survivor pair is dropp
   assert.deepEqual(plan.duplicateCandidatesToDrop, ["cand-3"]);
 });
 
+// --- parseMergeSnapshot: safe revival of a jsonb-round-tripped snapshot ---
+
+test("parseMergeSnapshot: throws a clear error on an invalid snapshot", () => {
+  assert.throws(() => parseMergeSnapshot(null), /Invalid merge snapshot/);
+  assert.throws(() => parseMergeSnapshot(undefined), /Invalid merge snapshot/);
+  assert.throws(() => parseMergeSnapshot("nope"), /Invalid merge snapshot/);
+  assert.throws(() => parseMergeSnapshot({}), /Invalid merge snapshot/);
+  assert.throws(() => parseMergeSnapshot({ merged: {} }), /Invalid merge snapshot/);
+});
+
+test("parseMergeSnapshot: round-trips through JSON, reviving Date fields on a same-BD conflict's survivorOriginal", () => {
+  const survivor = person({ id: "survivor" });
+  const merged = person({ id: "merged" });
+  const survivorConnections = [connection({ personId: "survivor", bdId: "bd-0" })]; // unrelated bdId, no conflict
+  const mergedConnections = [connection({ personId: "merged", bdId: "bd-0" }), connection({ personId: "merged", bdId: "bd-1" })];
+  const mergePlan = planMerge(baseInput({ survivor, merged, survivorConnections, mergedConnections }));
+  assert.deepEqual(mergePlan.snapshot.movedConnectionBdIds, ["bd-1"]);
+
+  const roundTripped = JSON.parse(JSON.stringify(mergePlan.snapshot));
+  // jsonb round-trip turns Dates into ISO strings.
+  assert.equal(typeof roundTripped.connectionConflicts[0].survivorOriginal.firstMessageAt, "string");
+
+  const parsed = parseMergeSnapshot(roundTripped);
+  const survivorOriginal = parsed.connectionConflicts[0].survivorOriginal;
+  assert.ok(survivorOriginal.firstMessageAt instanceof Date);
+  assert.equal(survivorOriginal.firstMessageAt?.getTime(), DEFAULT_FIRST_MESSAGE_AT.getTime());
+  assert.ok(survivorOriginal.lastMessageAt instanceof Date);
+  assert.equal(survivorOriginal.lastMessageAt?.getTime(), DEFAULT_LAST_MESSAGE_AT.getTime());
+});
+
+test("parseMergeSnapshot: revives Date fields inside connectionConflicts (survivorOriginal/mergedOriginal/aggregated)", () => {
+  const survivor = person({ id: "survivor" });
+  const merged = person({ id: "merged" });
+  const survivorConnections = [connection({ personId: "survivor", bdId: "bd-1" })];
+  const mergedConnections = [connection({ personId: "merged", bdId: "bd-1" })];
+  const mergePlan = planMerge(baseInput({ survivor, merged, survivorConnections, mergedConnections }));
+
+  const parsed = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const conflict = parsed.connectionConflicts[0];
+  assert.ok(conflict.survivorOriginal.firstMessageAt instanceof Date);
+  assert.ok(conflict.mergedOriginal.lastMessageAt instanceof Date);
+  assert.ok(conflict.aggregated.firstMessageAt instanceof Date);
+  assert.equal(conflict.aggregated.lastMessageAt?.getTime(), DEFAULT_LAST_MESSAGE_AT.getTime());
+});
+
 test("6.4: false merge then unmerge restores both original Contacts exactly (no intervening change)", () => {
   const survivor = person({ id: "survivor", jobTitle: "VP", ownerBdId: "bd-old" });
   const merged = person({ id: "merged", jobTitle: "VP of Engineering", ownerBdId: "bd-lead" });
@@ -213,7 +264,10 @@ test("6.4: false merge then unmerge restores both original Contacts exactly (no 
   const mergePlan = planMerge(input);
   // Nothing changed since the merge: current survivor state == what the merge wrote.
   const currentSurvivor: MergePersonFields = { id: "survivor", ...mergePlan.survivorUpdate };
-  const unmergePlan = planUnmerge(mergePlan.snapshot, { currentSurvivor, currentSurvivorConnections: [] });
+  // Route through a jsonb round-trip + parseMergeSnapshot, same as the real
+  // unmerge path (merge_event.snapshot is jsonb — Dates come back as strings).
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, { currentSurvivor, currentSurvivorConnections: [] });
 
   // Every changed field reverts exactly to its pre-merge value.
   assert.equal(unmergePlan.survivorFieldsKept.length, 0);
@@ -268,7 +322,8 @@ test("safe unmerge: a moved connection with post-merge activity returns to merge
 
   // More messages arrived on bd-1 after the merge (now sitting under survivor).
   const currentSurvivorConnections = [connection({ personId: "survivor", bdId: "bd-1", messageCount: 9 })];
-  const unmergePlan = planUnmerge(mergePlan.snapshot, {
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
     currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
     currentSurvivorConnections,
   });
@@ -286,7 +341,8 @@ test("safe unmerge: same-BD conflict aggregation — unchanged survivor row reve
   const mergePlan = planMerge(baseInput({ survivor, merged, survivorConnections, mergedConnections }));
   const conflict = mergePlan.connectionConflicts[0];
 
-  const unmergePlan = planUnmerge(mergePlan.snapshot, {
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
     currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
     currentSurvivorConnections: [conflict.aggregated], // untouched since the merge
   });
@@ -295,6 +351,7 @@ test("safe unmerge: same-BD conflict aggregation — unchanged survivor row reve
   assert.equal(restore.kind, "reverted");
   assert.deepEqual(restore.survivorRestore, survivorConnections[0]);
   assert.deepEqual(restore.mergedRestore, mergedConnections[0]);
+  assert.ok(restore.survivorRestore?.firstMessageAt instanceof Date);
 });
 
 test("safe unmerge: same-BD conflict aggregation — changed survivor row is kept, merged's original still restored", () => {
@@ -306,7 +363,8 @@ test("safe unmerge: same-BD conflict aggregation — changed survivor row is kep
 
   // More activity landed on the aggregated row after the merge.
   const changedCurrent = connection({ personId: "survivor", bdId: "bd-1", messageCount: 42 });
-  const unmergePlan = planUnmerge(mergePlan.snapshot, {
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
     currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
     currentSurvivorConnections: [changedCurrent],
   });
