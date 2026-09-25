@@ -109,10 +109,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 6: Merge/Unmerge Engine (PR 6, base: PR 5)
 
-- [ ] 6.1 RED/GREEN: `mergeContacts(survivorId, mergedId, reason, actorBdId)` — writes `merge_event` snapshot + linked `audit_log(merge)` row in one transaction.
-- [ ] 6.2 RED/GREEN: `unmergeContact(mergeEventId, actorBdId)` — replays the snapshot in reverse; writes `audit_log(unmerge)`.
-- [ ] 6.3 RED/GREEN: `markNotDuplicate(pairId, actorBdId)` — sets `duplicate_candidate.status='not_duplicate'`, writes `audit_log(not_duplicate)`; pair never resurfaces.
-- [ ] 6.4 Test: false-merge → unmerge restores both original Contacts fully.
+- [x] 6.1 RED/GREEN: `mergeContacts(survivorId, mergedId, reason, actorBdId)` — writes `merge_event` snapshot + linked `audit_log(merge)` row in one transaction. Split into two work units: pure planner `src/lib/identity/merge.ts#planMerge` (PR 06a, branch `feat/crm-hubspot-ux-06a-merge-engine`) + thin DB layer `src/lib/identity/mergeDb.ts#mergeContacts` (PR 06b, branch `feat/crm-hubspot-ux-06b-merge-db`, base 06a). `SELECT ... FOR UPDATE` on both person rows guards concurrent merges of the same person; refuses if either already has `merged_into_id` set. Recomputes the survivor's status (`recomputePersonStatuses`) in the same transaction, closing the `recompute.ts` TODO from task 5.2.
+- [x] 6.2 RED/GREEN: `unmergeContact(mergeEventId, actorBdId)` — replays the snapshot in reverse; writes `audit_log(unmerge)`. `src/lib/identity/merge.ts#planUnmerge` (pure, PR 06a) + `mergeDb.ts#unmergeContact` (PR 06b). No time limit (duplicate-review spec). **Rule for references/id-map rows created after the merge** (design left this unspecified): they stay on the survivor — `planUnmerge` only reverts the exact rows frozen in `snapshot.movedReferences`/`movedIdMapRows` at merge time, chosen as the minimal-safe interpretation.
+- [x] 6.3 RED/GREEN: `markNotDuplicate(pairId, actorBdId)` — sets `duplicate_candidate.status='not_duplicate'`, writes `audit_log(not_duplicate)`; pair never resurfaces. `mergeDb.ts#markNotDuplicate` (PR 06b). Verified all three candidate-creating paths (`src/lib/identity/resolveDb.ts`, `src/lib/migration/queries.ts` x2 for collapse/fold) already `.onConflictDoNothing()` on the unique `(person_a_id, person_b_id)` pair, so a `not_duplicate` row blocks re-insertion regardless of status.
+- [x] 6.4 Test: false-merge → unmerge restores both original Contacts fully. `tests/unit/identityMerge.test.ts` ("6.4: false merge then unmerge restores both original Contacts exactly") — pure-level round trip: `planMerge` then `planUnmerge(plan.snapshot)` recovers the original survivor/merged rows, connections, references, id-map rows and duplicate-candidate status byte-for-byte.
 
 ## Phase 7: Duplicate Review UI (PR 7, base: PR 6)
 
