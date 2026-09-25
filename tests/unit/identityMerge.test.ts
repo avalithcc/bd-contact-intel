@@ -119,11 +119,13 @@ test("planMerge: no parseable connection falls back to the lead's existing owner
   assert.equal(plan.ownerBdId, "bd-lead");
 });
 
-test("planMerge: connections unique to merged are repointed, conflicting ones are dropped", () => {
+test("planMerge: connections unique to merged are repointed, same-BD ones are aggregated (not dropped)", () => {
   const input = baseInput({
-    survivorConnections: [connection({ personId: "survivor", bdId: "bd-1" })],
+    survivorConnections: [
+      connection({ personId: "survivor", bdId: "bd-1", messageCount: 3, sentCount: 1, receivedCount: 2, connectedOn: "10 Mar 2022" }),
+    ],
     mergedConnections: [
-      connection({ personId: "merged", bdId: "bd-1", messageCount: 5 }),
+      connection({ personId: "merged", bdId: "bd-1", messageCount: 5, sentCount: 2, receivedCount: 3, connectedOn: "1 Jan 2020" }),
       connection({ personId: "merged", bdId: "bd-2", messageCount: 2 }),
     ],
   });
@@ -131,8 +133,17 @@ test("planMerge: connections unique to merged are repointed, conflicting ones ar
   assert.equal(plan.connectionsToRepoint.length, 1);
   assert.equal(plan.connectionsToRepoint[0].bdId, "bd-2");
   assert.equal(plan.connectionsToRepoint[0].personId, "survivor");
-  assert.equal(plan.connectionsToDrop.length, 1);
-  assert.equal(plan.connectionsToDrop[0].bdId, "bd-1");
+
+  assert.equal(plan.connectionConflicts.length, 1);
+  const conflict = plan.connectionConflicts[0];
+  assert.equal(conflict.bdId, "bd-1");
+  assert.equal(conflict.aggregated.messageCount, 8);
+  assert.equal(conflict.aggregated.sentCount, 3);
+  assert.equal(conflict.aggregated.receivedCount, 5);
+  assert.equal(conflict.aggregated.connectedOn, "1 Jan 2020"); // earliest wins
+  assert.equal(conflict.aggregated.personId, "survivor");
+  assert.deepEqual(conflict.survivorOriginal, input.survivorConnections[0]);
+  assert.deepEqual(conflict.mergedOriginal, input.mergedConnections[0]);
 });
 
 test("planMerge: references and id-map rows on merged are all repointed", () => {
@@ -176,7 +187,7 @@ test("planMerge: a repoint that collides with an existing survivor pair is dropp
   assert.deepEqual(plan.duplicateCandidatesToDrop, ["cand-3"]);
 });
 
-test("6.4: false merge then unmerge restores both original Contacts exactly", () => {
+test("6.4: false merge then unmerge restores both original Contacts exactly (no intervening change)", () => {
   const survivor = person({ id: "survivor", jobTitle: "VP", ownerBdId: "bd-old" });
   const merged = person({ id: "merged", jobTitle: "VP of Engineering", ownerBdId: "bd-lead" });
   const survivorConnections = [connection({ personId: "survivor", bdId: "bd-old", connectedOn: "10 Mar 2022" })];
@@ -200,14 +211,108 @@ test("6.4: false merge then unmerge restores both original Contacts exactly", ()
   });
 
   const mergePlan = planMerge(input);
-  const unmergePlan = planUnmerge(mergePlan.snapshot);
+  // Nothing changed since the merge: current survivor state == what the merge wrote.
+  const currentSurvivor: MergePersonFields = { id: "survivor", ...mergePlan.survivorUpdate };
+  const unmergePlan = planUnmerge(mergePlan.snapshot, { currentSurvivor, currentSurvivorConnections: [] });
 
-  // The original rows are recoverable byte-for-byte from the snapshot.
-  assert.deepEqual(unmergePlan.survivorRestore, survivor);
+  // Every changed field reverts exactly to its pre-merge value.
+  assert.equal(unmergePlan.survivorFieldsKept.length, 0);
+  const revertedFields = Object.fromEntries(unmergePlan.survivorFieldReverts.map((r) => [r.field, r.to]));
+  assert.equal(revertedFields.jobTitle, "VP");
+  assert.equal(revertedFields.roleGroup, survivor.roleGroup);
+  assert.equal(revertedFields.ownerBdId, "bd-old");
+
   assert.deepEqual(unmergePlan.mergedRestore, merged);
-  assert.deepEqual(unmergePlan.mergedConnectionsRestore, mergedConnections);
-  assert.deepEqual(unmergePlan.survivorBdIdsToRemove, ["bd-early"]);
+  assert.deepEqual(unmergePlan.movedConnectionBdIdsBack, ["bd-early"]);
   assert.deepEqual(unmergePlan.referencesToRepointBack, references);
   assert.deepEqual(unmergePlan.idMapRowsToRepointBack, idMapRows);
   assert.deepEqual(unmergePlan.mergedPairCandidateToReopen, { id: "cand-1", originalStatus: "open" });
+});
+
+test("safe unmerge: a survivor field edited after the merge is kept, not reverted", () => {
+  const survivor = person({ id: "survivor", jobTitle: "VP" });
+  const merged = person({ id: "merged", jobTitle: "VP of Engineering" });
+  const mergePlan = planMerge(baseInput({ survivor, merged }));
+
+  // A manual edit after the merge changed jobTitle again.
+  const currentSurvivor: MergePersonFields = { id: "survivor", ...mergePlan.survivorUpdate, jobTitle: "CTO" };
+  const unmergePlan = planUnmerge(mergePlan.snapshot, { currentSurvivor, currentSurvivorConnections: [] });
+
+  assert.equal(unmergePlan.survivorFieldReverts.some((r) => r.field === "jobTitle"), false);
+  const kept = unmergePlan.survivorFieldsKept.find((k) => k.field === "jobTitle");
+  assert.deepEqual(kept, { field: "jobTitle", currentValue: "CTO" });
+});
+
+test("safe unmerge: merge A, merge B into same survivor, unmerge A keeps B's contribution and a manual edit", () => {
+  const survivor = person({ id: "survivor", jobTitle: "VP", company: "Acme" });
+  const mergedA = person({ id: "merged-a", jobTitle: "VP of Engineering" });
+  const planA = planMerge(baseInput({ survivor, merged: mergedA }));
+  const survivorAfterA: MergePersonFields = { id: "survivor", ...planA.survivorUpdate };
+
+  const mergedB = person({ id: "merged-b", company: "Globex" });
+  const planB = planMerge(baseInput({ survivor: survivorAfterA, merged: mergedB }));
+  const survivorAfterB: MergePersonFields = { id: "survivor", ...planB.survivorUpdate, jobTitle: "CTO" }; // + manual edit
+
+  const unmergeA = planUnmerge(planA.snapshot, { currentSurvivor: survivorAfterB, currentSurvivorConnections: [] });
+
+  // jobTitle was changed again after merge A (by the manual edit) -> kept, not reverted to "VP".
+  assert.equal(unmergeA.survivorFieldReverts.some((r) => r.field === "jobTitle"), false);
+  assert.ok(unmergeA.survivorFieldsKept.some((k) => k.field === "jobTitle" && k.currentValue === "CTO"));
+});
+
+test("safe unmerge: a moved connection with post-merge activity returns to merged with its current values", () => {
+  const survivor = person({ id: "survivor" });
+  const merged = person({ id: "merged" });
+  const mergedConnections = [connection({ personId: "merged", bdId: "bd-1", messageCount: 2 })];
+  const mergePlan = planMerge(baseInput({ survivor, merged, mergedConnections }));
+
+  // More messages arrived on bd-1 after the merge (now sitting under survivor).
+  const currentSurvivorConnections = [connection({ personId: "survivor", bdId: "bd-1", messageCount: 9 })];
+  const unmergePlan = planUnmerge(mergePlan.snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections,
+  });
+
+  assert.deepEqual(unmergePlan.movedConnectionBdIdsBack, ["bd-1"]);
+  // The plan only says WHICH bdIds move back; the DB layer repoints person_id
+  // while keeping the row's CURRENT values (messageCount 9), never a snapshot.
+});
+
+test("safe unmerge: same-BD conflict aggregation — unchanged survivor row reverts both originals", () => {
+  const survivor = person({ id: "survivor" });
+  const merged = person({ id: "merged" });
+  const survivorConnections = [connection({ personId: "survivor", bdId: "bd-1", messageCount: 3 })];
+  const mergedConnections = [connection({ personId: "merged", bdId: "bd-1", messageCount: 5 })];
+  const mergePlan = planMerge(baseInput({ survivor, merged, survivorConnections, mergedConnections }));
+  const conflict = mergePlan.connectionConflicts[0];
+
+  const unmergePlan = planUnmerge(mergePlan.snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [conflict.aggregated], // untouched since the merge
+  });
+
+  const restore = unmergePlan.connectionConflictRestores[0];
+  assert.equal(restore.kind, "reverted");
+  assert.deepEqual(restore.survivorRestore, survivorConnections[0]);
+  assert.deepEqual(restore.mergedRestore, mergedConnections[0]);
+});
+
+test("safe unmerge: same-BD conflict aggregation — changed survivor row is kept, merged's original still restored", () => {
+  const survivor = person({ id: "survivor" });
+  const merged = person({ id: "merged" });
+  const survivorConnections = [connection({ personId: "survivor", bdId: "bd-1", messageCount: 3 })];
+  const mergedConnections = [connection({ personId: "merged", bdId: "bd-1", messageCount: 5 })];
+  const mergePlan = planMerge(baseInput({ survivor, merged, survivorConnections, mergedConnections }));
+
+  // More activity landed on the aggregated row after the merge.
+  const changedCurrent = connection({ personId: "survivor", bdId: "bd-1", messageCount: 42 });
+  const unmergePlan = planUnmerge(mergePlan.snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [changedCurrent],
+  });
+
+  const restore = unmergePlan.connectionConflictRestores[0];
+  assert.equal(restore.kind, "kept_changed");
+  assert.equal(restore.survivorRestore, null);
+  assert.deepEqual(restore.mergedRestore, mergedConnections[0]);
 });
