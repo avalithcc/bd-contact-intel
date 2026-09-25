@@ -144,6 +144,73 @@ function pickLaterDiscard(a: DiscardCandidate | null, b: DiscardCandidate): Disc
   return b.at >= a.at ? b : a;
 }
 
+const PERSON_STATUSES: readonly PersonStatus[] = ["new", "contacted", "replied", "meeting", "discarded"];
+
+function isPersonStatus(value: unknown): value is PersonStatus {
+  return typeof value === "string" && (PERSON_STATUSES as readonly string[]).includes(value);
+}
+
+function readMetadataStatus(metadata: unknown): PersonStatus | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const status = (metadata as Record<string, unknown>).status;
+  return isPersonStatus(status) ? status : undefined;
+}
+
+function readMetadataOriginalAt(metadata: unknown): Date | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const originalAt = (metadata as Record<string, unknown>).originalAt;
+  if (typeof originalAt !== "string" && !(originalAt instanceof Date)) return undefined;
+  const parsed = new Date(originalAt);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+/** Raw `activity` row shape (see src/db/schema.ts's `activity` table) status derivation needs. */
+export interface ActivityRowForStatus {
+  id: string;
+  type: string;
+  createdAt: Date;
+  metadata: unknown;
+}
+
+/**
+ * Builds one activity row's status event (task 5.2) — the type/metadata
+ * mapping deriveStatus() itself doesn't need to know about, kept separate so
+ * it stays pure and unit-testable without a DB row. `status_backfill` rows
+ * use `metadata.originalAt` (the historical time the migration reconstructed)
+ * as the event's effective time, not `createdAt` (when the migration ran),
+ * falling back to `createdAt` when it's missing or unparseable.
+ */
+export function activityRowToStatusEvent(row: ActivityRowForStatus): ActivityStatusEvent {
+  const at =
+    row.type === "status_backfill" ? (readMetadataOriginalAt(row.metadata) ?? row.createdAt) : row.createdAt;
+  const status =
+    row.type === "status_change" || row.type === "status_backfill"
+      ? readMetadataStatus(row.metadata)
+      : row.type === "discarded"
+        ? "discarded"
+        : undefined;
+  return { kind: "activity", id: row.id, type: row.type, at, status };
+}
+
+/** Raw `person_bd_connection` row shape (see src/db/schema.ts) status derivation needs. */
+export interface ConnectionRowForStatus {
+  bdId: string;
+  sentCount: number;
+  receivedCount: number;
+  lastMessageAt: Date | null;
+}
+
+/** 1:1 column mapping — kept as a named builder for symmetry with activityRowToStatusEvent. */
+export function connectionRowToStatusEvent(row: ConnectionRowForStatus): ConnectionStatusEvent {
+  return {
+    kind: "connection",
+    bdId: row.bdId,
+    sentCount: row.sentCount,
+    receivedCount: row.receivedCount,
+    at: row.lastMessageAt,
+  };
+}
+
 export function deriveStatus(events: readonly StatusEvent[]): DerivedStatus {
   let stage: StageCandidate | null = null;
   let discard: DiscardCandidate | null = null;

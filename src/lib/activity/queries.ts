@@ -4,6 +4,7 @@ import { activity, type Activity, type NewActivity } from "@/db/schema";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
+import { recomputePersonStatus } from "@/lib/status/recompute";
 
 export interface ActivityFilters {
   leadId?: string;
@@ -106,11 +107,19 @@ export async function getActivitiesByContact(
  * advisory lock, since this never creates a person. Left null (kill switch
  * off, or the row's legacy id isn't mapped yet) leaves this byte-identical
  * to pre-cutover behavior for that row.
+ *
+ * Wrapped in a transaction (task 5.2) so the status cache (design D4) is
+ * recomputed from the just-inserted activity in the same transaction as the
+ * write itself — every activity type is potential status evidence
+ * (deriveStatus decides which ones actually move the stage or discard).
  */
 export async function createActivity(input: NewActivity): Promise<Activity> {
   const lookup = input.personId == null ? resolvePersonIdLookup(input) : null;
   const values =
     lookup && isIdentityDualWriteEnabled() ? { ...input, personId: personIdLookupSql(lookup) } : input;
-  const [row] = await db.insert(activity).values(values).returning();
-  return row!;
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(activity).values(values).returning();
+    if (row!.personId) await recomputePersonStatus(tx, row!.personId);
+    return row!;
+  });
 }

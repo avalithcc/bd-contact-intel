@@ -25,6 +25,7 @@ import {
 } from "@/lib/identity/ingestWrite";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
+import { recomputePersonStatus } from "@/lib/status/recompute";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
@@ -737,9 +738,25 @@ export async function importMessages(
  * BD. This is also why group threads (peer_profile_key IS NULL) are
  * excluded from contact aggregation — they can't be attributed to a single
  * contact.
+ *
+ * Wrapped in one transaction (task 5.2) so the person-side aggregate update
+ * and the status-cache recompute it feeds (design D4: a connection's
+ * sent/received counts are stage evidence) land atomically. The
+ * per-affected-person recompute loop is deliberately NOT set-based SQL: the
+ * discard/rank rule (deriveStatus) isn't trivially expressible as a single
+ * UPDATE, and a message import's affected-person count is bounded by that
+ * BD's distinct message peers (already chunked at import time), not the
+ * whole contact base — flagged as a perf follow-up if that assumption stops
+ * holding.
  */
 export async function recomputeMessageSignals(bdId: string): Promise<void> {
-  await db.execute(sql`
+  return db.transaction((tx) => recomputeMessageSignalsInTx(tx, bdId));
+}
+
+type RecomputeTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function recomputeMessageSignalsInTx(tx: RecomputeTx, bdId: string): Promise<void> {
+  await tx.execute(sql`
     UPDATE conversation c
     SET
       message_count = agg.message_count,
@@ -765,7 +782,7 @@ export async function recomputeMessageSignals(bdId: string): Promise<void> {
     WHERE c.id = agg.conversation_id AND c.bd_id = ${bdId}
   `);
 
-  await db.execute(sql`
+  await tx.execute(sql`
     WITH first_msg AS (
       SELECT DISTINCT ON (c.peer_profile_key)
         c.peer_profile_key,
@@ -808,7 +825,7 @@ export async function recomputeMessageSignals(bdId: string): Promise<void> {
   // gets a second set-based UPDATE person_bd_connection … FROM peer_agg JOIN
   // person_id_map"). DB-only glue — no matcher, no lock, this never creates
   // a person or a connection, only updates one that already exists.
-  await db.execute(sql`
+  const touchedConnections = await tx.execute<{ personId: string }>(sql`
     WITH first_msg AS (
       SELECT DISTINCT ON (c.peer_profile_key)
         c.peer_profile_key,
@@ -844,7 +861,17 @@ export async function recomputeMessageSignals(bdId: string): Promise<void> {
     JOIN person_id_map pim ON pim.legacy_table = 'contact' AND pim.legacy_id = ct2.id
     LEFT JOIN first_msg fm ON fm.peer_profile_key = pa.peer_profile_key
     WHERE pbc.person_id = pim.person_id AND pbc.bd_id = ${bdId}
+    RETURNING pbc.person_id AS "personId"
   `);
+
+  // Task 5.2: a connection's sent/received counts are stage evidence (design
+  // D4), so every person whose connection this import just touched needs its
+  // status cache recomputed — see the perf note on this function's doc
+  // comment for why this is a loop, not a second set-based UPDATE.
+  const touchedPersonIds = new Set(touchedConnections.map((r) => r.personId));
+  for (const personId of touchedPersonIds) {
+    await recomputePersonStatus(tx, personId);
+  }
 }
 
 export interface MessageRow {
