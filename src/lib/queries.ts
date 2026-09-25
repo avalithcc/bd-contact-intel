@@ -18,6 +18,9 @@ import {
 import { bucketTopN } from "@/lib/bucketing";
 import { partitionOwnCompanyRows } from "@/lib/ownCompany";
 import type { ParseMessagesResult } from "@/lib/messagesCsv";
+import { contactRowsToIdentityRows, runIdentityCutoverChunk } from "@/lib/identity/ingestWrite";
+import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
@@ -452,23 +455,52 @@ export async function upsertContacts(
         companyKey: trimmedCompany ? normalizeCompanyKey(trimmedCompany) : null,
       };
     });
-    await db
-      .insert(contact)
-      .values(chunk)
-      .onConflictDoUpdate({
-        target: [contact.bdId, contact.profileKey],
-        set: {
-          firstName: sql`excluded.first_name`,
-          lastName: sql`excluded.last_name`,
-          company: sql`excluded.company`,
-          position: sql`excluded.position`,
-          roleGroup: sql`excluded.role_group`,
-          companyCategory: sql`excluded.company_category`,
-          companyKey: sql`excluded.company_key`,
-          email: sql`excluded.email`,
-          connectedOn: sql`excluded.connected_on`,
-        },
+    // One transaction per chunk (design D14): the legacy upsert plus the
+    // identity resolver's lock/prefetch/match/write, or — when
+    // IDENTITY_DUAL_WRITE is off — the legacy upsert alone, byte-identical
+    // to pre-cutover behavior. See src/lib/identity/ingestWrite.ts.
+    await db.transaction(async (tx) => {
+      await runIdentityCutoverChunk(isIdentityDualWriteEnabled(), {
+        withLock: (fn) => withIdentityLock(tx, fn),
+        legacyWrite: () =>
+          tx
+            .insert(contact)
+            .values(chunk)
+            .onConflictDoUpdate({
+              target: [contact.bdId, contact.profileKey],
+              set: {
+                firstName: sql`excluded.first_name`,
+                lastName: sql`excluded.last_name`,
+                company: sql`excluded.company`,
+                position: sql`excluded.position`,
+                roleGroup: sql`excluded.role_group`,
+                companyCategory: sql`excluded.company_category`,
+                companyKey: sql`excluded.company_key`,
+                email: sql`excluded.email`,
+                connectedOn: sql`excluded.connected_on`,
+              },
+            })
+            .returning({
+              id: contact.id,
+              bdId: contact.bdId,
+              profileKey: contact.profileKey,
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              company: contact.company,
+              companyKey: contact.companyKey,
+              position: contact.position,
+              industry: contact.industry,
+              connectedOn: contact.connectedOn,
+              email: contact.email,
+              emailStatus: contact.emailStatus,
+              emailConfidence: contact.emailConfidence,
+              emailSource: contact.emailSource,
+            }),
+        toIdentityRows: contactRowsToIdentityRows,
+        prefetch: (rows) => prefetchIdentityIndex(tx, rows),
+        apply: (plan) => applyIdentityWrites(tx, plan),
       });
+    });
     count += chunk.length;
   }
   return { imported: count, skippedOwnCompany };

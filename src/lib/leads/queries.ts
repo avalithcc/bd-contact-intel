@@ -3,6 +3,9 @@ import { db } from "@/db";
 import { bd, lead, leadSource, type NewLead } from "@/db/schema";
 import type { LeadDraft } from "./csv";
 import { isLeadStatusKey, type EmailStatusKey, type LeadStatusKey } from "./types";
+import { leadRowsToIdentityRows, runIdentityCutoverChunk } from "@/lib/identity/ingestWrite";
+import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 
 // Cap on whitespace-separated search tokens in the free-text name filter, so
 // a pathological paste-in doesn't blow up the query into dozens of OR'd
@@ -113,38 +116,65 @@ export async function importLeads(
       lastImportedAt: new Date(),
     }));
 
-    await db
-      .insert(lead)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: [lead.sourceKey, lead.attendeeId],
-        set: {
-          firstName: sql`excluded.first_name`,
-          lastName: sql`excluded.last_name`,
-          jobTitle: sql`excluded.job_title`,
-          seniority: sql`excluded.seniority`,
-          companyRaw: sql`excluded.company_raw`,
-          companyDisplay: sql`excluded.company_display`,
-          companyGroup: sql`excluded.company_group`,
-          companyKey: sql`excluded.company_key`,
-          industryRaw: sql`excluded.industry_raw`,
-          industryGroup: sql`excluded.industry_group`,
-          city: sql`excluded.city`,
-          region: sql`excluded.region`,
-          country: sql`excluded.country`,
-          attendeeType: sql`excluded.attendee_type`,
-          email: sql`excluded.email`,
-          // emailStatus/emailConfidence/emailSource deliberately NOT updated:
-          // those are set by live Hunter lookups or manual edits and must survive
-          // re-imports. A routine push_leads.py re-run would silently overwrite
-          // verified email with none, losing a BD's enrichment work.
-          // Only overwrite ownerBdId when this import actually resolved one
-          // — a stale/garbage owner value in a later re-import must not
-          // erase a previously-assigned, possibly manually-corrected owner.
-          ownerBdId: sql`coalesce(excluded.owner_bd_id, ${lead.ownerBdId})`,
-          lastImportedAt: sql`excluded.last_imported_at`,
-        },
+    // One transaction per chunk (design D14) — see upsertContacts in
+    // src/lib/queries.ts and src/lib/identity/ingestWrite.ts.
+    await db.transaction(async (tx) => {
+      await runIdentityCutoverChunk(isIdentityDualWriteEnabled(), {
+        withLock: (fn) => withIdentityLock(tx, fn),
+        legacyWrite: () =>
+          tx
+            .insert(lead)
+            .values(rows)
+            .onConflictDoUpdate({
+              target: [lead.sourceKey, lead.attendeeId],
+              set: {
+                firstName: sql`excluded.first_name`,
+                lastName: sql`excluded.last_name`,
+                jobTitle: sql`excluded.job_title`,
+                seniority: sql`excluded.seniority`,
+                companyRaw: sql`excluded.company_raw`,
+                companyDisplay: sql`excluded.company_display`,
+                companyGroup: sql`excluded.company_group`,
+                companyKey: sql`excluded.company_key`,
+                industryRaw: sql`excluded.industry_raw`,
+                industryGroup: sql`excluded.industry_group`,
+                city: sql`excluded.city`,
+                region: sql`excluded.region`,
+                country: sql`excluded.country`,
+                attendeeType: sql`excluded.attendee_type`,
+                email: sql`excluded.email`,
+                // emailStatus/emailConfidence/emailSource deliberately NOT updated:
+                // those are set by live Hunter lookups or manual edits and must survive
+                // re-imports. A routine push_leads.py re-run would silently overwrite
+                // verified email with none, losing a BD's enrichment work.
+                // Only overwrite ownerBdId when this import actually resolved one
+                // — a stale/garbage owner value in a later re-import must not
+                // erase a previously-assigned, possibly manually-corrected owner.
+                ownerBdId: sql`coalesce(excluded.owner_bd_id, ${lead.ownerBdId})`,
+                lastImportedAt: sql`excluded.last_imported_at`,
+              },
+            })
+            .returning({
+              id: lead.id,
+              ownerBdId: lead.ownerBdId,
+              firstName: lead.firstName,
+              lastName: lead.lastName,
+              companyDisplay: lead.companyDisplay,
+              companyRaw: lead.companyRaw,
+              companyKey: lead.companyKey,
+              jobTitle: lead.jobTitle,
+              industryGroup: lead.industryGroup,
+              industryRaw: lead.industryRaw,
+              email: lead.email,
+              emailStatus: lead.emailStatus,
+              emailConfidence: lead.emailConfidence,
+              emailSource: lead.emailSource,
+            }),
+        toIdentityRows: leadRowsToIdentityRows,
+        prefetch: (identityRows) => prefetchIdentityIndex(tx, identityRows),
+        apply: (plan) => applyIdentityWrites(tx, plan),
       });
+    });
     upserted += chunk.length;
   }
 
