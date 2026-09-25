@@ -20,18 +20,50 @@ import type { CollapseContactRow } from "./collapsePlanner";
 
 const FIELD_SEPARATOR = "\u0001";
 const ROW_SEPARATOR = "\u0002";
+const SET_SEPARATOR = "\u0003";
 
-function canonicalRowString(row: CollapseContactRow): string {
-  const keys = (Object.keys(row) as (keyof CollapseContactRow)[]).sort();
-  return keys.map((key) => `${key}=${JSON.stringify(row[key])}`).join(FIELD_SEPARATOR);
+function canonicalRowString<T extends Record<string, unknown>>(row: T): string {
+  const keys = (Object.keys(row) as (keyof T)[]).sort();
+  return keys.map((key) => `${String(key)}=${JSON.stringify(row[key])}`).join(FIELD_SEPARATOR);
 }
 
-export function computeCollapseInputHash(rows: CollapseContactRow[]): string {
+/**
+ * Reflective row-set hash shared by every migration phase: hashes EVERY
+ * own-enumerable field of every row (sorted by id, keys sorted too) instead
+ * of a hand-picked field list, so a row set that later gains a field the
+ * planner reads can never silently drift out of this hash (see
+ * tests/unit/migrationInputHash.test.ts's "no field is silently ignored"
+ * regression test, which this generalization preserves for collapse).
+ */
+export function hashRowSet<T extends { id: string }>(rows: readonly T[]): string {
   const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id));
   const hash = createHash("sha256");
   for (const row of sorted) {
     hash.update(canonicalRowString(row));
     hash.update(ROW_SEPARATOR);
   }
+  return hash.digest("hex");
+}
+
+export function computeCollapseInputHash(rows: CollapseContactRow[]): string {
+  return hashRowSet(rows);
+}
+
+/**
+ * Fold-leads input hash: covers both row sets the planner depends on — the
+ * `lead` rows being folded AND the `person`/`person_id_map` snapshot the
+ * `IdentityIndex` is seeded from (design.md D12 rationale: the planner's
+ * output depends on both). Combining two `hashRowSet` results (rather than
+ * hashing one concatenated array) keeps each set's own row shape reflective,
+ * without requiring a shared row type between leads and existing persons.
+ */
+export function computeFoldInputHash<
+  L extends { id: string },
+  P extends { id: string },
+>(leads: readonly L[], existingPersons: readonly P[]): string {
+  const hash = createHash("sha256");
+  hash.update(hashRowSet(leads));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(existingPersons));
   return hash.digest("hex");
 }
