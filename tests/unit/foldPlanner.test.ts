@@ -231,3 +231,102 @@ test("mergeEmailFields keeps `a` on a genuine tie (same rank, same email)", () =
 
   assert.equal(mergeEmailFields(a, b).emailSource, "a-source");
 });
+
+// --- Coverage gaps found in review -------------------------------------
+
+test("verified-email match to person A wins outright even when the lead also weakly matches person B by name+company", () => {
+  const existing = [
+    person({
+      id: "pA",
+      profileKey: null,
+      firstName: "Someone",
+      lastName: "Else",
+      companyKey: "other-co",
+      email: "jane@corp.com",
+      emailNormalized: "jane@corp.com",
+      emailStatus: "verified",
+    }),
+    person({
+      id: "pB",
+      profileKey: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      companyKey: "acme",
+      email: null,
+    }),
+  ];
+  // Matches pA by verified email AND pB by name+company (matcher precedence:
+  // a strong-key auto match short-circuits before name+company is checked).
+  const leads = [
+    lead({
+      id: "l1",
+      firstName: "Jane",
+      lastName: "Doe",
+      company: "Acme",
+      companyKey: "acme",
+      email: "jane@corp.com",
+      emailStatus: "verified",
+    }),
+  ];
+
+  const plan = planFoldLeads(existing, leads);
+
+  assert.equal(plan.matchedUpdates.length, 1);
+  assert.equal(plan.matchedUpdates[0].personId, "pA");
+  assert.equal(plan.reviewPairs.length, 0);
+  assert.equal(plan.newPersons.length, 0);
+  assert.deepEqual(plan.mappings, [{ legacyLeadId: "l1", method: "verified_email", personRef: "pA" }]);
+});
+
+test("two different leads folding into the same existing person both map to it and accumulate merged fields", () => {
+  const existing = [
+    person({
+      id: "p1",
+      profileKey: null,
+      email: "jane@corp.com",
+      emailNormalized: "jane@corp.com",
+      emailStatus: "verified",
+      jobTitle: null,
+      industry: null,
+    }),
+  ];
+  const leads = [
+    lead({ id: "l1", email: "jane@corp.com", emailStatus: "verified", jobTitle: "Manager", industry: null }),
+    lead({ id: "l2", email: "jane@corp.com", emailStatus: "verified", jobTitle: "VP Engineering", industry: "SaaS" }),
+  ];
+
+  const plan = planFoldLeads(existing, leads);
+
+  assert.equal(plan.matchedUpdates.length, 1);
+  assert.equal(plan.matchedUpdates[0].personId, "p1");
+  assert.deepEqual(
+    plan.mappings.map((m) => m.personRef),
+    ["p1", "p1"],
+  );
+  // Longer/richer value wins each round (contact-identity R7): "VP
+  // Engineering" beats "Manager", and industry fills in from null.
+  assert.equal(plan.matchedUpdates[0].merged.jobTitle, "VP Engineering");
+  assert.equal(plan.matchedUpdates[0].merged.industry, "SaaS");
+  assert.equal(plan.report.lead.autoMerged, 2);
+  assert.equal(plan.report.persons.updated, 1);
+});
+
+test("a name+company key shared by 2+ existing persons fans out a review pair per candidate", () => {
+  const existing = [
+    person({ id: "p1", profileKey: null, firstName: "Jane", lastName: "Doe", companyKey: "acme", email: null }),
+    person({ id: "p2", profileKey: null, firstName: "Jane", lastName: "Doe", companyKey: "acme", email: null }),
+  ];
+  const leads = [lead({ id: "l1", firstName: "Jane", lastName: "Doe", company: "Acme", companyKey: "acme", email: null })];
+
+  const plan = planFoldLeads(existing, leads);
+
+  assert.equal(plan.matchedUpdates.length, 0);
+  assert.equal(plan.newPersons.length, 1);
+  const [newPerson] = plan.newPersons;
+  assert.equal(plan.reviewPairs.length, 2);
+  const refs = plan.reviewPairs.flatMap((pair) => [pair.refA, pair.refB]);
+  assert.ok(refs.includes("p1"));
+  assert.ok(refs.includes("p2"));
+  assert.ok(refs.includes(newPerson.planId));
+  assert.ok(plan.reviewPairs.every((pair) => pair.reason === "name_company"));
+});
