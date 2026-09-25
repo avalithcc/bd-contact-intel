@@ -19,6 +19,24 @@
  * src/lib/migration/catchUpQueries.ts's header for what it deliberately does
  * NOT cover (contact drift).
  *
+ * **Required order** (design.md "Catch-up (owner D4b)"): `collapse --execute`
+ * → `fold_leads --execute` → `catch_up`. `--phase=catch_up` (dry-run AND
+ * execute) refuses via src/lib/migration/phaseOrderGuard.ts unless both
+ * earlier phases have actually EXECUTED (not merely dry-run or approved).
+ * `fold_leads` is NOT gated on catch-up — after queries.ts's anti-join fix
+ * (`readUnmappedLeadRowsForFold`), it is safe to run before OR after the
+ * live dual-write cutover deploys, and before OR after a catch-up.
+ *
+ * **Residual risk**: catch-up's row prefetch (readUnmappedContacts/
+ * readUnmappedLeads/readExistingPersonsForCatchUp) runs OUTSIDE the
+ * `pg_advisory_xact_lock` `withIdentityLock` takes around `applyIdentityWrites`
+ * — it happens before the execute transaction even opens. A concurrent live
+ * write that creates a `person` with the same verified email in that gap can
+ * make `--execute` fail (it rolls back cleanly; simply re-run the phase —
+ * the anti-join means the retry only re-processes what is still unmapped).
+ * Recommend running `--phase=catch_up --execute` in a low-traffic window to
+ * minimize this window.
+ *
  * `--dry-run` (the default when neither flag is passed) never writes
  * `person`/`person_bd_connection`/`person_id_map` rows — it only reads
  * `contact` and writes one `migration_run` report row. Review the report
@@ -42,14 +60,17 @@ import { runCollapseDryRun, runCollapseExecute } from "../src/lib/migration/coll
 import { runFoldDryRun, runFoldExecute } from "../src/lib/migration/foldRun";
 import { runCatchUpDryRun, runCatchUpExecute } from "../src/lib/migration/catchUpRun";
 import { snapshotBackup } from "../src/lib/migration/backup";
+import { parseArgs, type MigrationCliArgs } from "../src/lib/migration/cliArgs";
+import { assertCatchUpPhaseOrderAllowed } from "../src/lib/migration/phaseOrderGuard";
 import {
   finalizeExecute,
   finalizeFoldExecute,
+  getLatestExecutedMigrationRun,
   getLatestMigrationRun,
   getMigrationRunForGate,
   readActivityTypesByLeadId,
   readAllContactRows,
-  readAllLeadRows,
+  readUnmappedLeadRowsForFold,
   readExistingPersonsForFold,
   saveDryRunReport,
   saveFoldDryRunReport,
@@ -63,23 +84,7 @@ import {
   saveCatchUpDryRunReport,
 } from "../src/lib/migration/catchUpQueries";
 
-interface Args {
-  phase: "collapse" | "fold_leads" | "catch_up";
-  mode: "dry_run" | "execute";
-  runId: string | null;
-}
-
-function parseArgs(argv: string[]): Args {
-  const flags = new Set(argv);
-  const runArg = argv.find((a) => a.startsWith("--run="));
-  const phaseArg = argv.find((a) => a.startsWith("--phase="));
-  const phase = phaseArg?.slice("--phase=".length);
-  if (phase !== "collapse" && phase !== "fold_leads" && phase !== "catch_up") {
-    throw new Error(`--phase must be 'collapse', 'fold_leads' or 'catch_up' (got ${phase ?? "none"})`);
-  }
-  const mode = flags.has("--execute") ? "execute" : "dry_run";
-  return { phase, mode, runId: runArg?.slice("--run=".length) ?? null };
-}
+type Args = MigrationCliArgs;
 
 async function runCollapsePhase(args: Args) {
   const rows = await readAllContactRows();
@@ -107,7 +112,7 @@ async function runCollapsePhase(args: Args) {
 async function runFoldLeadsPhase(args: Args) {
   const [existingPersons, leads, activityTypesByLeadId] = await Promise.all([
     readExistingPersonsForFold(),
-    readAllLeadRows(),
+    readUnmappedLeadRowsForFold(),
     readActivityTypesByLeadId(),
   ]);
 
@@ -152,7 +157,24 @@ async function driftSince(): Promise<Date> {
   return executed ?? new Date(0);
 }
 
+/**
+ * Required order (design.md "Catch-up (owner D4b)"): collapse execute →
+ * fold_leads execute → catch_up. Refuses BOTH dry-run and execute — a
+ * dry-run report built before fold_leads has ever run would review a set of
+ * unmapped leads that fold_leads is about to (correctly) claim itself,
+ * confusing the owner-review gate. fold_leads itself does NOT depend on
+ * catch-up having run (phaseOrderGuard.ts's header).
+ */
+async function assertCatchUpPhaseOrder(): Promise<void> {
+  const [collapseRun, foldLeadsRun] = await Promise.all([
+    getLatestExecutedMigrationRun("collapse"),
+    getLatestExecutedMigrationRun("fold_leads"),
+  ]);
+  assertCatchUpPhaseOrderAllowed(collapseRun, foldLeadsRun);
+}
+
 async function runCatchUpPhase(args: Args) {
+  await assertCatchUpPhaseOrder();
   const since = await driftSince();
   const [unmappedContacts, unmappedLeads, driftedLeads] = await Promise.all([
     readUnmappedContacts(),

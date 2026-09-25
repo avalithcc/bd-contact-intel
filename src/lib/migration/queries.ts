@@ -152,6 +152,22 @@ export async function getLatestMigrationRun(
 }
 
 /**
+ * Latest EXECUTED run of `kind` — feeds `assertCatchUpPhaseOrderAllowed`
+ * (phaseOrderGuard.ts), which refuses `--phase=catch_up` unless a `collapse`
+ * AND a `fold_leads` run have both actually executed (mode `execute` +
+ * `executedAt` set), not merely dry-run or approved.
+ */
+export async function getLatestExecutedMigrationRun(
+  kind: MigrationRunKind,
+): Promise<MigrationRunWithApprover | null> {
+  const runs = await migrationRunWithApproverSelect()
+    .where(and(eq(migrationRun.kind, kind), isNotNull(migrationRun.executedAt)))
+    .orderBy(desc(migrationRun.executedAt), desc(migrationRun.id))
+    .limit(1);
+  return runs[0] ?? null;
+}
+
+/**
  * `/admin/migration`'s "Approve dry run" action (admin-access-audit spec).
  * `expectedKind` comes from the section/form that submitted `runId` — a
  * fresh-review WARNING found this approved ANY runId unconditionally, so
@@ -265,8 +281,21 @@ export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void
 // Fold-leads phase (design.md "Migration plan" step 4; task 4.3).
 // ---------------------------------------------------------------------------
 
-/** Every `lead` row, narrowed to the fields foldPlanner.ts's matcher and merge need. */
-export async function readAllLeadRows(): Promise<FoldLeadRow[]> {
+/**
+ * Every UNMAPPED `lead` row (no `person_id_map` entry yet), narrowed to the
+ * fields foldPlanner.ts's matcher and merge need — same
+ * `NOT EXISTS (person_id_map ...)` anti-join catchUpQueries.ts's
+ * `readUnmappedLeads` uses. Fresh-review fix: fold_leads used to read EVERY
+ * lead unconditionally, so re-running fold after a catch-up (or after the
+ * live dual-write cutover maps a lead) would re-plan an already-mapped lead
+ * and its `person_id_map` insert would violate the
+ * `(legacy_table, legacy_id)` primary key, rolling back the whole execute.
+ * The anti-join makes fold safe to run at any point after catch-up or the
+ * cutover starts writing. While no lead is mapped yet (today), this filter
+ * is a no-op — the row set, and so an existing dry run's `input_hash`, is
+ * unchanged from the previous "read all leads" behavior.
+ */
+export async function readUnmappedLeadRowsForFold(): Promise<FoldLeadRow[]> {
   const rows: FoldLeadRow[] = [];
   let lastId: string | null = null;
 
@@ -274,7 +303,12 @@ export async function readAllLeadRows(): Promise<FoldLeadRow[]> {
     const page = await db
       .select()
       .from(lead)
-      .where(lastId === null ? undefined : sql`${lead.id} > ${lastId}`)
+      .where(
+        and(
+          sql`NOT EXISTS (SELECT 1 FROM person_id_map m WHERE m.legacy_table = 'lead' AND m.legacy_id = ${lead.id})`,
+          lastId === null ? undefined : sql`${lead.id} > ${lastId}`,
+        ),
+      )
       .orderBy(lead.id)
       .limit(READ_BATCH_SIZE);
     if (!page.length) break;
@@ -427,7 +461,13 @@ export async function finalizeFoldExecute(input: FinalizeFoldExecuteInput): Prom
       `);
     }
     for (const batch of chunk(rows.idMap, WRITE_BATCH_SIZE)) {
-      await tx.insert(personIdMap).values(batch);
+      // Belt-and-braces (fresh-review fix): the anti-join reader above should
+      // already guarantee every lead here is unmapped, but a concurrent
+      // catch-up or live cutover write landing between the read and this
+      // transaction's commit could still race a mapping in. `DO NOTHING`
+      // turns that race into a silent skip instead of a PK violation that
+      // rolls back the whole execute.
+      await tx.insert(personIdMap).values(batch).onConflictDoNothing();
     }
     for (const batch of chunk(rows.duplicateCandidates, WRITE_BATCH_SIZE)) {
       await tx.insert(duplicateCandidate).values(batch).onConflictDoNothing();
