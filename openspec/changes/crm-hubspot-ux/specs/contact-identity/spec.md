@@ -48,6 +48,24 @@ The system MUST resolve identity using, in order: (1) normalized LinkedIn profil
 - THEN only normalized name+company matching is attempted
 - AND the result is either a review-queue entry or a new Contact, never an auto-merge
 
+### Requirement: Conflicting strong-key matches are never auto-merged
+
+The system MUST NOT auto-merge when an incoming row's normalized LinkedIn profile key and verified email each match a DIFFERENT existing Contact. Such rows MUST be placed in the possible-duplicate review queue referencing both candidate Contacts instead. When the profile key and verified email agree on the same Contact, the row auto-merges as normal.
+
+#### Scenario: Profile key and verified email disagree on different Contacts
+
+- GIVEN an incoming row's normalized LinkedIn profile key matches Contact A
+- AND the row's verified email matches a different Contact B
+- WHEN the matcher runs
+- THEN the row is placed in the possible-duplicate review queue referencing both Contact A and Contact B
+- AND no automatic merge occurs
+
+#### Scenario: Profile key and verified email agree on the same Contact
+
+- GIVEN an incoming row's normalized LinkedIn profile key and verified email both match the same existing Contact
+- WHEN the matcher runs
+- THEN the row is auto-merged into that Contact without review
+
 ### Requirement: Owner assignment on merge
 
 The system MUST set the Contact `owner` to the BD with the earliest `connectedOn` LinkedIn connection among the merged rows. If no row has a LinkedIn connection, the system MUST keep the lead's existing owner.
@@ -90,5 +108,26 @@ The system MUST exclude Contacts whose company is the own company (per `src/lib/
 - GIVEN a person works at the own company and is connected to multiple BDs
 - WHEN their rows are merged into one Contact
 - THEN that Contact remains excluded from contact lists and outreach views
-</content>
-</invoke>
+
+### Requirement: Live ingestion resolves identity at write time
+
+Every live write that creates or updates a `contact` or `lead` MUST resolve its Contact through the identity matcher and write `person`, `person_bd_connection` and `person_id_map` in the same transaction as the legacy write.
+
+#### Scenario: CSV upload of an unknown profile
+
+- GIVEN no Contact has profile key K
+- WHEN a BD uploads a CSV row with profile key K
+- THEN one Contact, one connection for that BD and one map row are written atomically with the `contact` row
+
+#### Scenario: Concurrent uploads of the same new profile
+
+- GIVEN two BDs upload profile key K at the same time and no Contact has K
+- WHEN both uploads commit
+- THEN exactly one Contact exists for K with both BDs connected
+
+#### Scenario: New activity carries the Contact
+
+- GIVEN a legacy contact or lead mapped to Contact P
+- WHEN an activity, task or signal is created for it
+- THEN the row's `person_id` is P
+

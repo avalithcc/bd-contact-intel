@@ -1,6 +1,9 @@
 import { and, desc, eq, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, type Activity, type NewActivity } from "@/db/schema";
+import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { personIdLookupSql } from "@/lib/identity/resolveDb";
+import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 
 export interface ActivityFilters {
   leadId?: string;
@@ -97,7 +100,17 @@ export async function getActivitiesByContact(
     .limit(limit);
 }
 
+/**
+ * `person_id` is resolved via a `person_id_map` subquery in the same insert
+ * statement (design "Reference writes"; task 4B.5) — no matcher, no
+ * advisory lock, since this never creates a person. Left null (kill switch
+ * off, or the row's legacy id isn't mapped yet) leaves this byte-identical
+ * to pre-cutover behavior for that row.
+ */
 export async function createActivity(input: NewActivity): Promise<Activity> {
-  const [row] = await db.insert(activity).values(input).returning();
+  const lookup = input.personId == null ? resolvePersonIdLookup(input) : null;
+  const values =
+    lookup && isIdentityDualWriteEnabled() ? { ...input, personId: personIdLookupSql(lookup) } : input;
+  const [row] = await db.insert(activity).values(values).returning();
   return row!;
 }

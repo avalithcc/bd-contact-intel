@@ -1,8 +1,22 @@
 import { and, asc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, lead, leadSource, type NewLead } from "@/db/schema";
+import { activity, bd, lead, leadSource, type NewLead } from "@/db/schema";
 import type { LeadDraft } from "./csv";
 import { isLeadStatusKey, type EmailStatusKey, type LeadStatusKey } from "./types";
+import { planStatusChangeActivity } from "./statusChange";
+import {
+  leadRowsToIdentityRows,
+  runIdentityCutoverChunk,
+  type InsertedLeadRow,
+} from "@/lib/identity/ingestWrite";
+import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
+import {
+  applyIdentityWrites,
+  personIdLookupSql,
+  prefetchIdentityIndex,
+  withIdentityLock,
+} from "@/lib/identity/resolveDb";
 
 // Cap on whitespace-separated search tokens in the free-text name filter, so
 // a pathological paste-in doesn't blow up the query into dozens of OR'd
@@ -113,38 +127,73 @@ export async function importLeads(
       lastImportedAt: new Date(),
     }));
 
-    await db
-      .insert(lead)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: [lead.sourceKey, lead.attendeeId],
-        set: {
-          firstName: sql`excluded.first_name`,
-          lastName: sql`excluded.last_name`,
-          jobTitle: sql`excluded.job_title`,
-          seniority: sql`excluded.seniority`,
-          companyRaw: sql`excluded.company_raw`,
-          companyDisplay: sql`excluded.company_display`,
-          companyGroup: sql`excluded.company_group`,
-          companyKey: sql`excluded.company_key`,
-          industryRaw: sql`excluded.industry_raw`,
-          industryGroup: sql`excluded.industry_group`,
-          city: sql`excluded.city`,
-          region: sql`excluded.region`,
-          country: sql`excluded.country`,
-          attendeeType: sql`excluded.attendee_type`,
-          email: sql`excluded.email`,
-          // emailStatus/emailConfidence/emailSource deliberately NOT updated:
-          // those are set by live Hunter lookups or manual edits and must survive
-          // re-imports. A routine push_leads.py re-run would silently overwrite
-          // verified email with none, losing a BD's enrichment work.
-          // Only overwrite ownerBdId when this import actually resolved one
-          // — a stale/garbage owner value in a later re-import must not
-          // erase a previously-assigned, possibly manually-corrected owner.
-          ownerBdId: sql`coalesce(excluded.owner_bd_id, ${lead.ownerBdId})`,
-          lastImportedAt: sql`excluded.last_imported_at`,
-        },
+    // One transaction per chunk (design D14) — see upsertContacts in
+    // src/lib/queries.ts and src/lib/identity/ingestWrite.ts.
+    const dualWriteEnabled = isIdentityDualWriteEnabled();
+    await db.transaction(async (tx) => {
+      // Same insert either way; `.returning()` is only appended when the
+      // identity resolver actually needs the inserted/updated rows, so the
+      // kill-switch-off path stays the exact original statement (D11:
+      // byte-identical to pre-cutover behavior, including query text).
+      const upsertLeadRows = () =>
+        tx
+          .insert(lead)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [lead.sourceKey, lead.attendeeId],
+            set: {
+              firstName: sql`excluded.first_name`,
+              lastName: sql`excluded.last_name`,
+              jobTitle: sql`excluded.job_title`,
+              seniority: sql`excluded.seniority`,
+              companyRaw: sql`excluded.company_raw`,
+              companyDisplay: sql`excluded.company_display`,
+              companyGroup: sql`excluded.company_group`,
+              companyKey: sql`excluded.company_key`,
+              industryRaw: sql`excluded.industry_raw`,
+              industryGroup: sql`excluded.industry_group`,
+              city: sql`excluded.city`,
+              region: sql`excluded.region`,
+              country: sql`excluded.country`,
+              attendeeType: sql`excluded.attendee_type`,
+              email: sql`excluded.email`,
+              // emailStatus/emailConfidence/emailSource deliberately NOT updated:
+              // those are set by live Hunter lookups or manual edits and must survive
+              // re-imports. A routine push_leads.py re-run would silently overwrite
+              // verified email with none, losing a BD's enrichment work.
+              // Only overwrite ownerBdId when this import actually resolved one
+              // — a stale/garbage owner value in a later re-import must not
+              // erase a previously-assigned, possibly manually-corrected owner.
+              ownerBdId: sql`coalesce(excluded.owner_bd_id, ${lead.ownerBdId})`,
+              lastImportedAt: sql`excluded.last_imported_at`,
+            },
+          });
+      await runIdentityCutoverChunk(dualWriteEnabled, {
+        withLock: (fn) => withIdentityLock(tx, fn),
+        legacyWrite: dualWriteEnabled
+          ? () =>
+              upsertLeadRows().returning({
+                id: lead.id,
+                ownerBdId: lead.ownerBdId,
+                firstName: lead.firstName,
+                lastName: lead.lastName,
+                companyDisplay: lead.companyDisplay,
+                companyRaw: lead.companyRaw,
+                companyKey: lead.companyKey,
+                jobTitle: lead.jobTitle,
+                industryGroup: lead.industryGroup,
+                industryRaw: lead.industryRaw,
+                email: lead.email,
+                emailStatus: lead.emailStatus,
+                emailConfidence: lead.emailConfidence,
+                emailSource: lead.emailSource,
+              })
+          : () => upsertLeadRows().then(() => [] as InsertedLeadRow[]),
+        toIdentityRows: leadRowsToIdentityRows,
+        prefetch: (identityRows) => prefetchIdentityIndex(tx, identityRows),
+        apply: (plan) => applyIdentityWrites(tx, plan),
       });
+    });
     upserted += chunk.length;
   }
 
@@ -388,7 +437,12 @@ export async function getLeadFilterOptions(): Promise<LeadFilterOptions> {
   };
 }
 
-/** Update a lead's status and/or notes. Any signed-in BD may do this. */
+/**
+ * Update a lead's status and/or notes. Any signed-in BD may do this. A real
+ * status edit also appends a `status_change` activity carrying `person_id`
+ * (design "Reference writes"; task 4B.6) — a notes-only call writes no
+ * activity.
+ */
 export async function updateLeadStatus(
   id: string,
   updatedByBdId: string,
@@ -398,18 +452,71 @@ export async function updateLeadStatus(
   const set: Partial<NewLead> = { updatedByBdId, updatedAt: new Date() };
   if (fields.status && isLeadStatusKey(fields.status)) set.status = fields.status;
   if (fields.notes !== undefined) set.notes = fields.notes?.trim() || null;
-  await db.update(lead).set(set).where(eq(lead.id, id));
+
+  const statusChange =
+    fields.status && isLeadStatusKey(fields.status)
+      ? planStatusChangeActivity({ status: fields.status })
+      : null;
+  const dualWriteEnabled = isIdentityDualWriteEnabled();
+
+  await db.transaction(async (tx) => {
+    await tx.update(lead).set(set).where(eq(lead.id, id));
+    if (!statusChange || !dualWriteEnabled) return;
+    const lookup = resolvePersonIdLookup({ leadId: id });
+    if (!lookup) return;
+    await tx.insert(activity).values({
+      leadId: id,
+      personId: personIdLookupSql(lookup),
+      actorBdId: updatedByBdId,
+      type: "status_change",
+      metadata: statusChange,
+    });
+  });
 }
 
-/** Reassign a lead's owner. Any signed-in BD may do this. */
+/**
+ * Reassign a lead's owner. Any signed-in BD may do this. The unified
+ * person's `owner_bd_id` only follows this edit when nobody is connected to
+ * them yet (no `person_bd_connection` row) — otherwise R3 (earliest
+ * LinkedIn connector) already governs the owner and this edit must not
+ * override it. DB-only glue (raw SQL): the R3 gate is a single `NOT EXISTS`
+ * clause, not meaningfully unit-testable without DATABASE_URL — same
+ * convention as the rest of this write-cutover's thin DB layer.
+ */
 export async function updateLeadOwner(
   id: string,
   updatedByBdId: string,
   ownerBdId: string | null,
 ): Promise<void> {
   if (!UUID_RE.test(id)) return;
-  await db
-    .update(lead)
-    .set({ ownerBdId, updatedByBdId, updatedAt: new Date() })
-    .where(eq(lead.id, id));
+  const dualWriteEnabled = isIdentityDualWriteEnabled();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(lead)
+      .set({ ownerBdId, updatedByBdId, updatedAt: new Date() })
+      .where(eq(lead.id, id));
+
+    if (!dualWriteEnabled) return;
+
+    await tx.execute(sql`
+      with target as (
+        select p.id, p.owner_bd_id as old_owner_bd_id
+        from person_id_map m
+        join person p on p.id = m.person_id
+        where m.legacy_table = 'lead' and m.legacy_id = ${id}
+          and not exists (select 1 from person_bd_connection c where c.person_id = p.id)
+      ),
+      updated as (
+        update person
+        set owner_bd_id = ${ownerBdId}, updated_by_bd_id = ${updatedByBdId}, updated_at = now()
+        from target
+        where person.id = target.id
+        returning person.id, target.old_owner_bd_id
+      )
+      insert into person_property_history (person_id, property, old_value, new_value, changed_by_bd_id, source)
+      select id, 'owner_bd_id', old_owner_bd_id::text, ${ownerBdId}::text, ${updatedByBdId}, 'edit'
+      from updated
+    `);
+  });
 }
