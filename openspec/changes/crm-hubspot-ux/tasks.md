@@ -154,7 +154,7 @@ Chain strategy: feature-branch-chain
 - [ ] 9.1 **GATE**: owner approves the record-page mockup (three-pane layout).
 - [ ] 9.2 `/contacts/[id]` route: left About pane (editable properties, quick actions: note/email/task), showing "last updated by X" per property.
 - [ ] 9.3 Spanish copy sourced from `es` dictionary per GLOSSARY.md.
-- [ ] 9.4 RED/GREEN: property edit writes `person_property_history` row with `changed_by_bd_id`.
+- [x] 9.4 RED/GREEN: property edit writes `person_property_history` row with `changed_by_bd_id`. `src/lib/contacts/propertyEdit.ts` (pure planner, `tests/unit/propertyEdit.test.ts`) + `src/lib/contacts/propertyEditDb.ts` (transactional DB glue) + `src/app/(app)/contacts/actions.ts#updateContactPropertyAction` — PR 9a, branch `feat/crm-hubspot-ux-09a-property-edit-history`. Editable properties: `email`, `jobTitle`, `roleGroup`, `seniority`, `city`, `region`, `country`, `industry`. `ownerBdId` (Responsable) intentionally excluded — reassignment has its own business rule (design R3) a generic property editor would bypass; left read-only for now, documented gap.
 
 ## Phase 10: Record — Timeline & Log Dialogs (PR 10, base: PR 9)
 
