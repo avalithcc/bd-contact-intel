@@ -15,6 +15,8 @@
   /* Neutral warm tint, reserved for the "offshore" signal badge only — not
      a general surface step (see .badge.offshore below). */
   --color-surface-tint: #f3e9ea;
+  /* proposed (mockups/styles.css): sidebar background, Phase 8 shell. */
+  --color-surface-sunken: #efeef2;
 
   /* ---- brand accent (red — Avalith's identity, replaces Linear's lavender) ----
      Unchanged across themes: #d5252f on white is ~5.1:1 contrast, so the
@@ -26,6 +28,8 @@
      owner-approved accessibility fix, 2026-09-24. */
   --color-accent-hover: #b81f27;
   --color-accent-focus: #b81f27;
+  /* proposed (mockups/styles.css): active sidebar item tint, Phase 8 shell. */
+  --color-accent-soft: #fae5e6;
 
   /* ---- text hierarchy ---- */
   --color-ink: #17151c;
@@ -110,6 +114,11 @@
      buttons, checkbox rows) so filter toolbars line up on one baseline
      regardless of each browser's native select/input metrics. */
   --control-height: 2.5rem;
+  /* Phase 8 shell: the top bar's search field uses a shorter control than
+     the app's default form controls (mockups/styles.css --control-height-sm). */
+  --control-height-sm: 1.85rem;
+  --topbar-height: 52px;
+  --sidebar-width: 232px;
 
   /* ---- elevation ----
      Soft shadow on light canvas. */
@@ -485,6 +494,21 @@ th {
   background: var(--color-surface-tint);
   color: var(--color-ink-soft);
   margin-left: var(--space-xs);
+}
+
+/* Visually hidden but still readable by screen readers (e.g. the top bar's
+   "Buscar contactos" label — the search field's placeholder is not an
+   accessible label on its own). Standard clip-based pattern. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .muted {
@@ -1259,10 +1283,12 @@ a:hover {
 }
 
 /* =========================================================================
-   Layout with sidebar
+   Layout with sidebar (Phase 8 shell: src/app/contacts/Sidebar.tsx +
+   TopBar.tsx; width/height now driven by the --sidebar-width/--topbar-height
+   tokens those components' own CSS modules use).
    ========================================================================= */
 .main-layout {
-  margin-left: 220px;
+  margin-left: var(--sidebar-width, 232px);
   min-height: 100vh;
   transition: margin-left var(--transition-fast);
 }
