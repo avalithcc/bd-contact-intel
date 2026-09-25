@@ -344,15 +344,18 @@ export function planFoldLeads(
     merged: mergedByRef.get(personId)!,
   }));
 
+  const leadsById = new Map(leads.map((l) => [l.id, l]));
   const newPersons: FoldNewPerson[] = [];
+  const seenPlanIds = new Set<string>();
   for (const mapping of mappings) {
     if (mapping.method !== "new" && mapping.method !== "review") continue;
     if (!mapping.personRef) continue;
     // Same planId may be referenced by only one lead (fold rows never merge
     // with each other, only with existing persons), so this always emits
     // exactly one FoldNewPerson per plan id.
-    if (newPersons.some((p) => p.planId === mapping.personRef)) continue;
-    const lead = leads.find((l) => l.id === mapping.legacyLeadId)!;
+    if (seenPlanIds.has(mapping.personRef)) continue;
+    seenPlanIds.add(mapping.personRef);
+    const lead = leadsById.get(mapping.legacyLeadId)!;
     newPersons.push({
       planId: mapping.personRef,
       merged: mergedByRef.get(mapping.personRef)!,
