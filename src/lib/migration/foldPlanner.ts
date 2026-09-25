@@ -148,13 +148,21 @@ export interface FoldPlan {
 }
 
 // Which existing activity `type` values already provide evidence for a
-// given manually-set lead status (design.md "Status derivation (R4)" —
-// meeting/discarded stages come from activity events; the backfill only
-// exists to cover leads that never got one). 'new' never needs a backfill
-// (it's the default, not a manual decision).
+// given manually-set lead status (design.md "Status derivation (R4)",
+// ~lines 47-53: "events = activities(person) + connections(person).
+// {sentCount>0 → contacted, receivedCount>0 → replied}"). 'new' never needs
+// a backfill (it's the default, not a manual decision).
+//
+// Fresh-review fix (D17): `replied` is deliberately ABSENT. Per R4, replied
+// is evidenced ONLY by a connection's receivedCount>0 — never by an
+// activity record — so a lead manually marked `replied` must ALWAYS get a
+// status_backfill, no matter what other activity types already exist for
+// it (an `email_sent` activity, the previous — wrong — entry, is evidence
+// for `contacted`, not `replied`). See planStatusBackfills below: a status
+// with no entry here defaults to an empty supporting-types list, which
+// means "never supported", not "skip the backfill".
 const STATUS_SUPPORTING_ACTIVITY_TYPES: Partial<Record<LeadStatusKey, readonly string[]>> = {
   contacted: ["email_sent"],
-  replied: ["email_sent"],
   meeting: ["meeting_logged"],
   discarded: ["discarded"],
 };
@@ -179,8 +187,10 @@ export function planStatusBackfills(
     const personRef = personRefByLeadId.get(lead.id);
     if (!personRef) continue;
 
-    const supportingTypes = STATUS_SUPPORTING_ACTIVITY_TYPES[lead.status];
-    if (!supportingTypes) continue;
+    // No map entry defaults to an empty list ("never supported"), not a
+    // skip — see the fresh-review fix comment on the map above. Only the
+    // explicit `lead.status === "new"` check above should ever skip.
+    const supportingTypes = STATUS_SUPPORTING_ACTIVITY_TYPES[lead.status] ?? [];
     const existingTypes = activityTypesByLeadId.get(lead.id);
     const hasSupport = !!existingTypes && supportingTypes.some((t) => existingTypes.has(t));
     if (hasSupport) continue;

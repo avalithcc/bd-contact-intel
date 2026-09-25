@@ -386,6 +386,40 @@ test("an own-company-skipped lead with a manually set status is never backfilled
   assert.equal(plan.statusBackfills.length, 0);
 });
 
+// --- fresh-review fix: STATUS_SUPPORTING_ACTIVITY_TYPES audit against
+// design.md "Status derivation (R4)" (~lines 47-53) + decision D17 —
+// `replied` is only ever evidenced by a connection's receivedCount>0, NEVER
+// by an activity record, so a lead manually marked `replied` must ALWAYS get
+// a status_backfill regardless of what other activities already exist. -----
+
+test("a lead manually marked replied ALWAYS gets a status_backfill, even with a supporting-looking email_sent activity (D17: no activity type evidences replied)", () => {
+  const leads = [lead({ id: "l1", status: "replied" })];
+  const activityTypesByLeadId = new Map([["l1", new Set(["email_sent"])]]);
+
+  const plan = planFoldLeads([], leads, activityTypesByLeadId);
+
+  assert.equal(plan.statusBackfills.length, 1);
+  assert.equal(plan.statusBackfills[0].status, "replied");
+});
+
+test("a lead manually marked contacted with an existing email_sent activity is not backfilled (email_sent is real contacted evidence)", () => {
+  const leads = [lead({ id: "l1", status: "contacted" })];
+  const activityTypesByLeadId = new Map([["l1", new Set(["email_sent"])]]);
+
+  const plan = planFoldLeads([], leads, activityTypesByLeadId);
+
+  assert.equal(plan.statusBackfills.length, 0);
+});
+
+test("a lead manually marked discarded with an existing discarded activity is not backfilled", () => {
+  const leads = [lead({ id: "l1", status: "discarded" })];
+  const activityTypesByLeadId = new Map([["l1", new Set(["discarded"])]]);
+
+  const plan = planFoldLeads([], leads, activityTypesByLeadId);
+
+  assert.equal(plan.statusBackfills.length, 0);
+});
+
 test("planStatusBackfills falls back to createdAt when updatedAt is null", () => {
   const leads = [
     lead({
