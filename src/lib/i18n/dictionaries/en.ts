@@ -556,8 +556,7 @@ export const en = {
   // spec). Deliberately a FLAT record of strings only — the whole slice is
   // handed to the "use client" AboutPane component (see
   // src/lib/contacts/labels.ts), and ClientStrings<T> forbids formatter
-  // functions in a client-bound slice. This PR (09b2, inline property edit)
-  // adds the edit keys; quick-action/composer keys land in 09b3.
+  // functions in a client-bound slice.
   contactRecord: {
     tabActivity: "Activity",
     tabOverview: "Overview",
@@ -580,6 +579,22 @@ export const en = {
     emptyValue: "—",
     lastUpdatedByPrefix: "Last updated by",
     ownerNotEditableNote: "Owner reassignment isn't available on this page yet.",
+    quickActionNote: "Note",
+    quickActionEmail: "Email",
+    quickActionTask: "Task",
+    quickActionMeeting: "Meeting",
+    quickActionDiscard: "Discard",
+    comingSoonPhase10: "Available in Phase 10",
+    notePlaceholder: "Add a note about this contact…",
+    noteSave: "Save note",
+    taskTitleLabel: "Title",
+    taskDueLabel: "Due date",
+    taskCreate: "Create task",
+    emailToLabel: "To",
+    emailSubjectLabel: "Subject",
+    emailBodyLabel: "Message",
+    emailSend: "Send",
+    emailNoAddress: "This contact has no email on file.",
     genericError: "Something went wrong. Please try again.",
     timelineComingSoon: "The filterable activity timeline ships in Phase 10.",
     associationsComingSoon: "Full associations ship in Phase 11.",

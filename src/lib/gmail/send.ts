@@ -13,6 +13,8 @@ interface SendGmailInput {
   body: string;
   leadId?: string;
   companyKey?: string;
+  // Unified-Contact subject (design D1); record page's "Correo" action (9.2).
+  personId?: string;
 }
 
 function buildRawMessage(from: string, to: string, subject: string, body: string) {
@@ -37,6 +39,7 @@ export async function sendGmailMessage({
   body,
   leadId,
   companyKey,
+  personId,
 }: SendGmailInput) {
   const [account] = await db
     .select()
@@ -132,6 +135,7 @@ export async function sendGmailMessage({
     type: "email_sent",
     leadId,
     companyKey,
+    personId,
     metadata: {
       to,
       subject,

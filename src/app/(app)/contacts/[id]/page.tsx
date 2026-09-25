@@ -16,9 +16,8 @@ interface ContactRecordPageProps {
 
 /**
  * Three-pane record shell (task 9.2; mockups/contact-record.html). The
- * read-only shell shipped in PR 09b1; this PR (09b2) swaps in the
- * interactive `AboutPane` for inline property edit (task 9.4). The Nota/
- * Correo/Tarea quick actions land in the follow-up PR 09b3.
+ * read-only shell shipped in PR 09b1; PR 09b2 wired inline property edit
+ * (task 9.4); this PR (09b3) adds the Nota/Correo/Tarea quick actions.
  */
 export default async function ContactRecordPage({ params }: ContactRecordPageProps) {
   const { id } = await params;
@@ -53,6 +52,7 @@ export default async function ContactRecordPage({ params }: ContactRecordPagePro
           headline={record.person.jobTitle}
           statusLabel={statusLabel}
           ownerLabel={record.ownerName}
+          email={record.person.email}
           properties={properties}
         />
 

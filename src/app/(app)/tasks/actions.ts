@@ -11,6 +11,8 @@ export async function createTaskAction(input: {
   leadId?: string;
   companyKey?: string;
   contactId?: string;
+  // Unified-Contact subject (design D1); record page's quick actions (9.2).
+  personId?: string;
   dueAt?: Date;
 }) {
   const me = await getCurrentBd();
@@ -25,6 +27,7 @@ export async function createTaskAction(input: {
   revalidatePath("/tasks");
   revalidatePath("/leads");
   revalidatePath("/companies");
+  if (input.personId) revalidatePath(`/contacts/${input.personId}`);
 
   return task;
 }
