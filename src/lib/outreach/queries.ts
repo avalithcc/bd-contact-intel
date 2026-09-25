@@ -88,6 +88,13 @@ export interface OutreachRow {
   // to hide/disable those two actions (fresh-review UX fix) instead of
   // re-deriving it by comparing ids.
   hasOwnContact: boolean;
+  // The unified `person.id` (design D1) — the "view" link (task addition
+  // after Phase 9) goes here for every row now that `/contacts/[id]`
+  // (design D8) isn't `bdId`-scoped, unlike the legacy `id` field above.
+  // Optional: src/lib/whatsnew/queries.ts builds OutreachRow-shaped rows
+  // from the legacy `contact` table directly (unmigrated read path, out of
+  // this task's scope) and has no unified id to put here yet.
+  personId?: string;
   firstName: string | null;
   lastName: string | null;
   company: string | null;
@@ -323,6 +330,7 @@ export async function listOutreachCandidates(
     .select({
       id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id} end), ${person.id})`,
       hasOwnContact: sql<boolean>`coalesce(bool_or(${contact.bdId} = ${bdId}), false)`,
+      personId: person.id,
       firstName: person.firstName,
       lastName: person.lastName,
       company: person.company,
@@ -358,6 +366,7 @@ export async function listOutreachCandidates(
     return {
       id: r.id,
       hasOwnContact: r.hasOwnContact,
+      personId: r.personId,
       firstName: r.firstName,
       lastName: r.lastName,
       company: r.company,

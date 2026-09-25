@@ -284,15 +284,12 @@ export default async function OutreachPage({
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>
-                      {r.hasOwnContact ? (
-                        <Link className="rowlink" href={`/contact/${r.id}`}>
-                          {[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}
-                        </Link>
-                      ) : (
-                        <span className="rowlink disabled" title={dict.outreach.unifiedRecordPending}>
-                          {[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}
-                        </span>
-                      )}
+                      {/* "view" links to the unified record page for every row now (design D8;
+                          not bdId-scoped), including teammate-exclusive Contacts that previously
+                          404'd — see src/lib/outreach/queries.ts's personId doc comment. */}
+                      <Link className="rowlink" href={`/contacts/${r.personId ?? r.id}`}>
+                        {[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}
+                      </Link>
                     </td>
                     <td>{r.position ?? "—"}</td>
                     <td>
