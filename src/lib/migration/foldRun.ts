@@ -67,7 +67,7 @@ export async function runFoldExecute(
 ): Promise<FoldRunResult> {
   const plan = planFoldLeads(existingPersons, leads, activityTypesByLeadId);
   const inputHash = computeFoldInputHash(leads, existingPersons);
-  assertExecutionAllowed(approvedRun, inputHash);
+  assertExecutionAllowed(approvedRun, inputHash, "fold_leads");
   const run = approvedRun as ApprovedFoldRun;
 
   if (!run.approvedByBdId) {

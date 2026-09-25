@@ -39,6 +39,7 @@ function row(overrides: Partial<CollapseContactRow> = {}): CollapseContactRow {
 function approvedRun(overrides: Partial<Parameters<typeof runCollapseExecute>[1]> = {}) {
   return {
     id: "run-1",
+    kind: "collapse" as const,
     approvedAt: new Date(),
     executedAt: null,
     approvedByBdId: "admin-bd-1",

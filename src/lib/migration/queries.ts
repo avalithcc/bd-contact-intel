@@ -89,12 +89,18 @@ export async function saveDryRunReport(input: {
   return row.id;
 }
 
-/** Fetches the run `--execute --run=<id>` was pointed at, for assertExecutionAllowed. */
+/**
+ * Fetches the run `--execute --run=<id>` was pointed at, for
+ * assertExecutionAllowed — including `kind`, so the gate can refuse
+ * `--phase=fold_leads --execute --run=<a collapse run's id>` (and vice
+ * versa) instead of relying on an incidental input-hash mismatch.
+ */
 export async function getMigrationRunForGate(runId: string): Promise<ApprovedMigrationRun | null> {
   const row = await db.query.migrationRun.findFirst({ where: eq(migrationRun.id, runId) });
   if (!row) return null;
   return {
     id: row.id,
+    kind: row.kind as "collapse" | "fold_leads",
     approvedAt: row.approvedAt,
     executedAt: row.executedAt,
     approvedByBdId: row.approvedByBdId,

@@ -55,6 +55,7 @@ const noActivityTypes: ReadonlyMap<string, ReadonlySet<string>> = new Map();
 function approvedRun(overrides: Partial<Parameters<typeof runFoldExecute>[3]> = {}) {
   return {
     id: "run-1",
+    kind: "fold_leads" as const,
     approvedAt: new Date(),
     executedAt: null,
     approvedByBdId: "admin-bd-1",

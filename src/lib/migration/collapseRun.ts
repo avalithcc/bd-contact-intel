@@ -79,7 +79,7 @@ export async function runCollapseExecute(
 ): Promise<CollapseRunResult> {
   const plan = planCollapse(rows);
   const inputHash = computeCollapseInputHash(rows);
-  assertExecutionAllowed(approvedRun, inputHash);
+  assertExecutionAllowed(approvedRun, inputHash, "collapse");
   // assertExecutionAllowed already guarantees approvedRun is non-null here;
   // this satisfies the type checker without re-deriving that logic.
   const run = approvedRun as ApprovedMigrationRun;
