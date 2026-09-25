@@ -45,30 +45,30 @@ Chain strategy: feature-branch-chain
 
 ## Phase 1: Foundation — Schema & Roles (PR 1, base: tracker)
 
-- [ ] 1.1 Write migration `drizzle/0013_unified_person.sql`: `person`, `person_bd_connection`, `person_property_history`, `person_id_map`, `merge_event`, `duplicate_candidate`, `audit_log`, `migration_run`, `saved_view`, plus `person_id`/`actor_bd_id` FK columns on `activity`, `task`, `signal`, `linkedin_scrape_job`.
-- [ ] 1.2 Add `bd.role text not null default 'bd'` column and seed the owner as `admin`.
-- [ ] 1.3 Add `requireAdmin()` guard in `src/lib/auth/` reusing `getCurrentBd()`.
-- [ ] 1.4 Test: `requireAdmin()` rejects non-admin, allows admin (`tests/unit/`).
+- [x] 1.1 Write migration `drizzle/0013_unified_person.sql`: `person`, `person_bd_connection`, `person_property_history`, `person_id_map`, `merge_event`, `duplicate_candidate`, `audit_log`, `migration_run`, `saved_view`, plus `person_id`/`actor_bd_id` FK columns on `activity`, `task`, `signal`, `linkedin_scrape_job`.
+- [x] 1.2 Add `bd.role text not null default 'bd'` column and seed the owner as `admin`.
+- [x] 1.3 Add `requireAdmin()` guard in `src/lib/auth/` reusing `getCurrentBd()`.
+- [x] 1.4 Test: `requireAdmin()` rejects non-admin, allows admin (`tests/unit/`).
 
 ## Phase 2: Identity Matcher (PR 2, base: PR 1)
 
-- [ ] 2.1 RED: write failing tests for `src/lib/identity/matcher.ts` per contact-identity spec scenarios (profile-key auto-merge, verified-email auto-merge, name+company → review, own-company skip, no-email/no-LinkedIn fallback).
-- [ ] 2.2 GREEN: implement `matcher.ts` with `IdentityIndex` interface and `MatchResult` union (design D3).
-- [ ] 2.3 RED/GREEN: `mergeProperties(a, b)` pure function — richer/verified/longer wins, ties go to most recent, losers recorded (contact-identity R7).
-- [ ] 2.4 REFACTOR: extract shared normalization helpers reused from `src/lib/csv.ts` (`normalizeProfileKey`) and `src/lib/ownCompany.ts`.
+- [x] 2.1 RED: write failing tests for `src/lib/identity/matcher.ts` per contact-identity spec scenarios (profile-key auto-merge, verified-email auto-merge, name+company → review, own-company skip, no-email/no-LinkedIn fallback).
+- [x] 2.2 GREEN: implement `matcher.ts` with `IdentityIndex` interface and `MatchResult` union (design D3).
+- [x] 2.3 RED/GREEN: `mergeProperties(a, b)` pure function — richer/verified/longer wins, ties go to most recent, losers recorded (contact-identity R7).
+- [x] 2.4 REFACTOR: extract shared normalization helpers reused from `src/lib/csv.ts` (`normalizeProfileKey`) and `src/lib/ownCompany.ts`.
 
 ## Phase 3: Collapse Migration + Dry-Run Gate (PR 3, base: PR 2)
 
-- [ ] 3.1 RED/GREEN: migration planner (rows → plan + counts) as a pure function, tested against fixtures (3-BDs-1-profile-key scenario).
-- [ ] 3.2 `scripts/unify-contacts.ts --phase=collapse --dry-run`: builds in-memory `IdentityIndex`, writes `migration_run` report (auto-merged/flagged/new counts per table), no writes to `person`/`person_bd_connection` outside dry-run mode.
-- [ ] 3.3 `/admin/migration` page (admin-only, `requireAdmin`): shows latest dry-run report, "Approve dry run" action writing `audit_log(migration_approve)` and `migration_run.approved_by/at`.
-- [ ] 3.4 `--execute --run=<id>`: refuses if `input_hash` changed or run not approved; snapshot production backup first; tags rows with `migration_run_id`.
-- [ ] 3.5 **GATE**: owner reviews the collapse dry-run report in `/admin/migration` (against production data via Vercel preview) and records approval before `--execute` runs.
-- [ ] 3.6 Test: dry-run mode never writes `person` rows; execute mode refuses on stale `input_hash` or missing approval.
+- [x] 3.1 RED/GREEN: migration planner (rows → plan + counts) as a pure function, tested against fixtures (3-BDs-1-profile-key scenario).
+- [x] 3.2 `scripts/unify-contacts.ts --phase=collapse --dry-run`: builds in-memory `IdentityIndex`, writes `migration_run` report (auto-merged/flagged/new counts per table), no writes to `person`/`person_bd_connection` outside dry-run mode.
+- [x] 3.3 `/admin/migration` page (admin-only, `requireAdmin`): shows latest dry-run report, "Approve dry run" action writing `audit_log(migration_approve)` and `migration_run.approved_by/at`.
+- [x] 3.4 `--execute --run=<id>`: refuses if `input_hash` changed or run not approved; snapshot production backup first; tags rows with `migration_run_id`.
+- [x] 3.5 **GATE**: owner reviews the collapse dry-run report in `/admin/migration` (against production data via Vercel preview) and records approval before `--execute` runs. (Executed in prod: migration_run b9003aae, kind=collapse, mode=execute.)
+- [x] 3.6 Test: dry-run mode never writes `person` rows; execute mode refuses on stale `input_hash` or missing approval.
 
 ## Phase 4: Fold Leads (PR 4, base: PR 3)
 
-- [ ] 4.1 RED/GREEN: fold planner — leads matched via matcher, unmatched leads become new Contacts carrying `ownerBdId` and source.
+- [x] 4.1 RED/GREEN: fold planner — leads matched via matcher, unmatched leads become new Contacts carrying `ownerBdId` and source. (`src/lib/migration/foldPlanner.ts`; IdentityIndex seeded from EXISTING `person` rows, since Phase 3 collapse is already executed in prod.)
 - [ ] 4.2 RED/GREEN: `status_backfill` activity writer for leads with a manually set status and no supporting activity (contact-migration spec scenario).
 - [ ] 4.3 `scripts/unify-contacts.ts --phase=fold_leads`: re-points `activity`/`task`/`signal`/`linkedin_scrape_job` via `person_id_map`; produces fold dry-run report.
 - [ ] 4.4 **GATE**: owner reviews the fold-leads dry-run report before `--execute`.
