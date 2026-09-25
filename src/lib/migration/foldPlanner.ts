@@ -316,6 +316,7 @@ export function planFoldLeads(
   const byNameCompany = new Map<string, string[]>();
   const mergedByRef = new Map<string, FoldMergedFields>();
   const updatedRefs = new Set<string>();
+  const existingIds = new Set(existingPersons.map((p) => p.id));
 
   for (const person of existingPersons) {
     mergedByRef.set(person.id, toMerged(person));
@@ -382,7 +383,11 @@ export function planFoldLeads(
         throw new Error(`Planner invariant violated: unknown person ${result.personId}`);
       }
       mergedByRef.set(result.personId, mergeFields(existing, leadAsMerged(lead)));
-      updatedRefs.add(result.personId);
+      // A lead can also auto-merge into a NEW plan person created earlier in
+      // this same fold (registerRefKeys indexes plan persons too). Only real,
+      // already-persisted persons become UPDATEs; a plan person just absorbs
+      // the merge into the row it will be inserted with.
+      if (existingIds.has(result.personId)) updatedRefs.add(result.personId);
       registerRefKeys(result.personId, lead);
       mappings.push({ legacyLeadId: lead.id, method: result.key, personRef: result.personId });
       autoMerged++;
@@ -431,9 +436,9 @@ export function planFoldLeads(
   for (const mapping of mappings) {
     if (mapping.method !== "new" && mapping.method !== "review") continue;
     if (!mapping.personRef) continue;
-    // Same planId may be referenced by only one lead (fold rows never merge
-    // with each other, only with existing persons), so this always emits
-    // exactly one FoldNewPerson per plan id.
+    // Only the lead that created a plan person has method "new"/"review";
+    // later leads that auto-merged into it map with their match key, so this
+    // emits exactly one FoldNewPerson per plan id, carrying the merged fields.
     if (seenPlanIds.has(mapping.personRef)) continue;
     seenPlanIds.add(mapping.personRef);
     const lead = leadsById.get(mapping.legacyLeadId)!;

@@ -437,3 +437,27 @@ test("planStatusBackfills falls back to createdAt when updatedAt is null", () =>
   assert.equal(backfills.length, 1);
   assert.equal(backfills[0].originalAt.toISOString(), "2025-06-01T00:00:00.000Z");
 });
+
+// --- Production failure 2026-09-25: a later lead auto-merged into a NEW plan
+// person created earlier in the same fold. The planner listed that plan id
+// ("np101") as an existing person to UPDATE, and the execute died on a uuid
+// cast. Plan persons must absorb such merges instead. ---------------------
+test("a lead auto-merging into a new plan person from the same fold never becomes an existing-person update", () => {
+  const leads = [
+    lead({ id: "l1", firstName: "Ana", lastName: "Paz", company: "Globex", companyKey: "globex", email: "ana@globex.com", emailStatus: "verified", jobTitle: null }),
+    lead({ id: "l2", firstName: "Ana", lastName: "Paz", company: "Globex", companyKey: "globex", email: "ana@globex.com", emailStatus: "verified", jobTitle: "Head of Data" }),
+  ];
+  const plan = planFoldLeads([], leads);
+
+  assert.deepEqual(plan.matchedUpdates, []);
+  assert.equal(plan.report.persons.updated, 0);
+  assert.equal(plan.newPersons.length, 1);
+  assert.equal(plan.newPersons[0].merged.jobTitle, "Head of Data");
+  assert.deepEqual(
+    plan.mappings.map((m) => [m.legacyLeadId, m.method, m.personRef]),
+    [
+      ["l1", "new", plan.newPersons[0].planId],
+      ["l2", "verified_email", plan.newPersons[0].planId],
+    ],
+  );
+});
