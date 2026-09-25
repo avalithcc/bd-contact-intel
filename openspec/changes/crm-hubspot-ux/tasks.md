@@ -117,9 +117,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 7: Duplicate Review UI (PR 7, base: PR 6)
 
-- [ ] 7.1 **GATE**: owner approves `mockups/index.html` duplicate-review screen before this PR's UI code is written.
-- [ ] 7.2 `/admin/duplicates` page (admin-only, `requireAdmin`) implementing the approved mockup: pair list, Merge / No es duplicado / Deshacer fusión actions, Spanish copy per GLOSSARY.md.
-- [ ] 7.3 E2E: non-admin gets 404 on `/admin/duplicates`; admin merge action produces one `audit_log` row.
+- [x] 7.1 **GATE**: owner approved all mockups under `openspec/changes/crm-hubspot-ux/mockups/` (one shared `styles.css`), including `mockups/duplicates.html`, on 2026-09-24.
+- [x] 7.2 `/admin/duplicates` page (admin-only, `requireAdmin`) implementing the approved mockup: pair list with pagination, compare panel (recommended survivor + field-level merge preview), Merge / No es duplicado / Deshacer fusión actions, Spanish copy per GLOSSARY.md. Split into three work units: `src/lib/identity/duplicateReviewView.ts` (pure `chooseDefaultSurvivor`/`previewMergeOutcome`, PR 07a) + queries/actions (PR 07a) + `es`/`en` dictionary (PR 07b) + `src/app/admin/duplicates/page.tsx`/CSS (PR 07c), to stay under the 400-line review budget.
+- [x] 7.3 E2E: non-admin gets 404 on `/admin/duplicates`; admin merge action produces one `audit_log` row. `tests/e2e/phase7.spec.ts` — written but **not executed** (no real authenticated session, and the non-admin case needs a second account this suite doesn't have yet).
 
 ## Phase 8: App Shell & Design Tokens (PR 8, base: PR 7; requires Phase 0)
 
