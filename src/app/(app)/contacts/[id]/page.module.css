@@ -1,0 +1,78 @@
+/* Three-pane record shell (mockups/contact-record.html) — CSS Modules over
+   the shared design tokens (src/app/globals.css), same convention as Phase
+   8's app shell (design D9). */
+.record {
+  display: grid;
+  grid-template-columns: 320px 1fr 300px;
+  gap: var(--space-2xl);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .record {
+    grid-template-columns: 1fr;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  background: var(--color-surface-1);
+}
+
+.cardTitle {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab,
+.tabActive {
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-ink-muted);
+  font-size: var(--text-md);
+}
+
+.tabActive {
+  color: var(--color-ink);
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-accent);
+}
+
+.placeholder {
+  padding: var(--space-2xl) 0;
+  color: var(--color-ink-muted);
+}
+
+.assocRow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assocRow:last-child {
+  border-bottom: none;
+}

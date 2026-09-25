@@ -552,6 +552,39 @@ export const en = {
     unknownSender: "Unknown sender",
   },
 
+  // Unified Contact record page (/contacts/[id], design D1/D8; contact-record
+  // spec). Deliberately a FLAT record of strings only — PR 09b2 hands this
+  // slice to the "use client" AboutPane component (see
+  // src/lib/contacts/labels.ts), and ClientStrings<T> forbids formatter
+  // functions in a client-bound slice. This PR (09b1, read-only shell) only
+  // uses a subset; the edit/quick-action/composer keys are added in 09b2
+  // alongside the code that renders them.
+  contactRecord: {
+    tabActivity: "Activity",
+    tabOverview: "Overview",
+    aboutSectionTitle: "About this contact",
+    propEmail: "Email",
+    propJobTitle: "Title",
+    propRoleGroup: "Role group",
+    propSeniority: "Seniority",
+    propCity: "City",
+    propRegion: "Region",
+    propCountry: "Country",
+    propIndustry: "Industry",
+    propOwner: "Owner",
+    propStatus: "Status",
+    propSource: "Source",
+    propCreated: "Created",
+    emptyValue: "—",
+    lastUpdatedByPrefix: "Last updated by",
+    timelineComingSoon: "The filterable activity timeline ships in Phase 10.",
+    associationsComingSoon: "Full associations ship in Phase 11.",
+    companyCardTitle: "Company",
+    connectedBdsTitle: "Connected BDs",
+    noCompany: "No company on file",
+    connectedOnPrefix: "Connected on",
+  },
+
   login: {
     title: "sign in",
     signUpIntro: "New here?",
