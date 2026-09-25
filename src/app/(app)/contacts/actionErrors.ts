@@ -1,0 +1,39 @@
+/**
+ * Typed error reasons for the Contact record's server actions (fresh-review
+ * WARNING fix). Server actions can't reliably forward a thrown `Error`'s raw
+ * message to the client — Next.js redacts it in production — and a raw
+ * English message must never reach the (Spanish-only) UI anyway. Every
+ * action returns a plain `{ ok: false, reason }` instead of throwing across
+ * the server/client boundary; `contactActionErrorReason` maps the underlying
+ * typed errors to one of these reasons, and
+ * `src/lib/contacts/labels.ts#contactActionErrorMessage` maps a reason to
+ * the Spanish string to display.
+ */
+import { ContactMergedError } from "@/lib/contacts/mergeGuard";
+import { ContactNotFoundError } from "@/lib/contacts/errors";
+import { InvalidEmailError } from "@/lib/contacts/propertyEdit";
+
+export type ContactActionErrorReason =
+  | "not_found"
+  | "merged"
+  | "invalid_email"
+  | "not_editable"
+  | "unexpected";
+
+export type ContactActionResult = { ok: true } | { ok: false; reason: ContactActionErrorReason };
+
+/** A property outside EDITABLE_PERSON_PROPERTIES was requested for edit. */
+export class PropertyNotEditableError extends Error {
+  constructor(public readonly property: string) {
+    super(`Property is not editable from the record page: ${property}`);
+    this.name = "PropertyNotEditableError";
+  }
+}
+
+export function contactActionErrorReason(err: unknown): ContactActionErrorReason {
+  if (err instanceof ContactMergedError) return "merged";
+  if (err instanceof ContactNotFoundError) return "not_found";
+  if (err instanceof InvalidEmailError) return "invalid_email";
+  if (err instanceof PropertyNotEditableError) return "not_editable";
+  return "unexpected";
+}

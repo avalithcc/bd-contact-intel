@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { addContactNoteAction, addContactTaskAction, sendContactEmailAction } from "../actions";
 import styles from "./AboutPane.module.css";
 
@@ -69,14 +69,13 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
           onSubmit={async (note) => {
             setBusy(true);
             setError(null);
-            try {
-              await addContactNoteAction(personId, note);
+            const result = await addContactNoteAction(personId, note);
+            setBusy(false);
+            if (result.ok) {
               closeQuickAction();
               router.refresh();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : l.genericError);
-            } finally {
-              setBusy(false);
+            } else {
+              setError(contactActionErrorMessage(l, result.reason));
             }
           }}
         />
@@ -91,14 +90,13 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
           onSubmit={async (title, dueAt) => {
             setBusy(true);
             setError(null);
-            try {
-              await addContactTaskAction(personId, title, dueAt);
+            const result = await addContactTaskAction(personId, title, dueAt);
+            setBusy(false);
+            if (result.ok) {
               closeQuickAction();
               router.refresh();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : l.genericError);
-            } finally {
-              setBusy(false);
+            } else {
+              setError(contactActionErrorMessage(l, result.reason));
             }
           }}
         />
@@ -121,7 +119,7 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
               closeQuickAction();
               router.refresh();
             } else {
-              setError(result.error);
+              setError(contactActionErrorMessage(l, result.reason));
             }
           }}
         />

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import type { EditablePersonProperty } from "@/lib/contacts/propertyEdit";
 import { updateContactPropertyAction } from "../actions";
 import styles from "./AboutPane.module.css";
@@ -30,6 +30,7 @@ export function PropertyList({ personId, labels: l, ownerLabel, properties }: Pr
   const router = useRouter();
   const [editingKey, setEditingKey] = useState<EditablePersonProperty | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <dl className={styles.props}>
@@ -45,14 +46,29 @@ export function PropertyList({ personId, labels: l, ownerLabel, properties }: Pr
           prop={prop}
           editing={editingKey === prop.key}
           busy={busy}
-          onStartEdit={() => setEditingKey(prop.key)}
-          onCancel={() => setEditingKey(null)}
+          error={editingKey === prop.key ? error : null}
+          onStartEdit={() => {
+            setError(null);
+            setEditingKey(prop.key);
+          }}
+          onCancel={() => {
+            setError(null);
+            setEditingKey(null);
+          }}
           onSave={async (value) => {
             setBusy(true);
+            setError(null);
             try {
-              await updateContactPropertyAction(personId, prop.key, value);
-              setEditingKey(null);
-              router.refresh();
+              // Fresh-review WARNING fix: check the typed result and keep
+              // the field in edit mode (with the user's value) on error,
+              // instead of silently swallowing a rejected save.
+              const result = await updateContactPropertyAction(personId, prop.key, value);
+              if (result.ok) {
+                setEditingKey(null);
+                router.refresh();
+              } else {
+                setError(contactActionErrorMessage(l, result.reason));
+              }
             } finally {
               setBusy(false);
             }
@@ -68,6 +84,7 @@ function PropertyRow({
   prop,
   editing,
   busy,
+  error,
   onStartEdit,
   onCancel,
   onSave,
@@ -76,18 +93,22 @@ function PropertyRow({
   prop: AboutPaneProperty;
   editing: boolean;
   busy: boolean;
+  error: string | null;
   onStartEdit: () => void;
   onCancel: () => void;
   onSave: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(prop.value ?? "");
+  const inputId = `contact-prop-${prop.key}`;
 
   if (editing) {
     return (
       <div className={styles.prop}>
-        <dt>{prop.label}</dt>
+        <dt id={`${inputId}-label`}>{prop.label}</dt>
         <dd>
           <input
+            id={inputId}
+            aria-labelledby={`${inputId}-label`}
             className={styles.input}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -95,6 +116,7 @@ function PropertyRow({
             autoFocus
           />
         </dd>
+        {error && <dd className={styles.error}>{error}</dd>}
         <dd className={styles.editRow}>
           <button type="button" onClick={() => onSave(draft)} disabled={busy}>
             {l.save}
@@ -112,7 +134,7 @@ function PropertyRow({
       <dt>{prop.label}</dt>
       <dd>
         {prop.value ?? l.emptyValue}
-        <button type="button" className={styles.editIcon} onClick={onStartEdit} aria-label={l.edit}>
+        <button type="button" className={styles.editIcon} onClick={onStartEdit}>
           {l.edit}
         </button>
       </dd>

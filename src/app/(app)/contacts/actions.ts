@@ -8,41 +8,64 @@ import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
+import {
+  contactActionErrorReason,
+  PropertyNotEditableError,
+  type ContactActionResult,
+} from "./actionErrors";
 
 /**
  * Server action behind the About pane's per-property inline edit (task 9.2,
  * 9.4). Rejects any property outside the allow-list up front — see
  * src/lib/contacts/propertyEdit.ts's doc comment for why `ownerBdId` and
- * `status` are excluded.
+ * `status` are excluded. Returns a typed result instead of throwing
+ * (fresh-review WARNING fix): a thrown Error's message is redacted by
+ * Next.js in production, and a raw English message must never reach the
+ * Spanish-only UI anyway — see actionErrors.ts.
  */
 export async function updateContactPropertyAction(
   personId: string,
   property: string,
   value: string,
-) {
-  if (!isEditablePersonProperty(property)) {
-    throw new Error(`Property is not editable from the record page: ${property}`);
+): Promise<ContactActionResult> {
+  try {
+    if (!isEditablePersonProperty(property)) throw new PropertyNotEditableError(property);
+    const me = await getCurrentBd();
+    await updateContactProperty(personId, property, value, me.id);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: contactActionErrorReason(err) };
   }
-
-  const me = await getCurrentBd();
-  const updated = await updateContactProperty(personId, property, value, me.id);
-  revalidatePath(`/contacts/${personId}`);
-  return updated;
 }
 
 /** "Nota" quick action (task 9.2) — writes a `note` activity for this Contact. */
-export async function addContactNoteAction(personId: string, note: string) {
-  await assertContactEditableById(personId);
-  return createActivityAction({ type: "note", personId, metadata: { note } });
+export async function addContactNoteAction(personId: string, note: string): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    await createActivityAction({ type: "note", personId, metadata: { note } });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: contactActionErrorReason(err) };
+  }
 }
 
 /** "Tarea" quick action (task 9.2). */
-export async function addContactTaskAction(personId: string, title: string, dueAt?: Date) {
-  await assertContactEditableById(personId);
-  return createTaskAction({ title, personId, dueAt });
+export async function addContactTaskAction(
+  personId: string,
+  title: string,
+  dueAt?: Date,
+): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    await createTaskAction({ title, personId, dueAt });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: contactActionErrorReason(err) };
+  }
 }
 
-export type SendContactEmailResult = { ok: true } | { ok: false; error: string };
+export type SendContactEmailResult = ContactActionResult;
 
 /** "Correo" quick action (task 9.2) — same Gmail send path as leads; no AI draft here. */
 export async function sendContactEmailAction(
@@ -51,13 +74,13 @@ export async function sendContactEmailAction(
   subject: string,
   body: string,
 ): Promise<SendContactEmailResult> {
-  await assertContactEditableById(personId);
-  const me = await getCurrentBd();
   try {
+    await assertContactEditableById(personId);
+    const me = await getCurrentBd();
     await sendGmailMessage({ bdId: me.id, to, subject, body, personId });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Gmail send failed" };
+    return { ok: false, reason: contactActionErrorReason(err) };
   }
 }
