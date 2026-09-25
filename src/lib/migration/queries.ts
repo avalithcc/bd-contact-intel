@@ -7,7 +7,7 @@
  * executionGuard, inputHash.
  */
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activity,
@@ -32,6 +32,7 @@ import type { FoldExistingPerson, FoldLeadRow, FoldPlan } from "./foldPlanner";
 import type { FinalizeFoldExecuteInput } from "./foldRun";
 import { buildFoldWriteRows } from "./foldWriteRows";
 import type { EmailStatus } from "@/lib/identity/matcher";
+import { IDENTITY_LOCK_KEY } from "@/lib/identity/resolve";
 
 const READ_BATCH_SIZE = 1000;
 
@@ -439,6 +440,28 @@ export async function finalizeFoldExecute(input: FinalizeFoldExecuteInput): Prom
     }
 
     const rows = buildFoldWriteRows(plan, migrationRunId, randomUUID);
+
+    // The plan was built from reads taken before this transaction. Once the
+    // live cutover is deployed, a lead import can map one of these leads in
+    // between and this run would create a second, orphaned person for it.
+    // Take the same lock live identity writes take, then refuse if any
+    // planned lead got mapped meanwhile (the whole run rolls back; re-run
+    // the dry run).
+    await tx.execute(sql`select pg_advisory_xact_lock(${IDENTITY_LOCK_KEY})`);
+    const plannedLeadIds = rows.idMap.map((m) => m.legacyId);
+    for (const ids of chunk(plannedLeadIds, WRITE_BATCH_SIZE)) {
+      const [mapped] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(personIdMap)
+        .where(and(eq(personIdMap.legacyTable, "lead"), inArray(personIdMap.legacyId, ids)));
+      if (mapped.n > 0) {
+        throw new Error(
+          `${mapped.n} lead(s) in migration_run ${migrationRunId} were mapped after the dry run; ` +
+            "refusing to execute. Run a new fold_leads dry run and approve it.",
+        );
+      }
+    }
+
     for (const batch of chunk(rows.persons, WRITE_BATCH_SIZE)) {
       await tx.insert(person).values(batch);
     }
