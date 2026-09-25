@@ -116,7 +116,7 @@ function PropertyRow({
             autoFocus
           />
         </dd>
-        {error && <dd className={styles.error}>{error}</dd>}
+        {error && <dd className={styles.error} role="alert">{error}</dd>}
         <dd className={styles.editRow}>
           <button type="button" onClick={() => onSave(draft)} disabled={busy}>
             {l.save}

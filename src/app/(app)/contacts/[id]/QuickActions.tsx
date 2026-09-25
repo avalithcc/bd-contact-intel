@@ -30,7 +30,7 @@ interface ComposerProps {
 
 function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error: ActionError }) {
   return (
-    <div className={styles.error}>
+    <div className={styles.error} role="alert">
       {error.message}
       {error.href && (
         <>

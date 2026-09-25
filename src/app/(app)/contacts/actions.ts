@@ -14,6 +14,14 @@ import {
   type ContactActionResult,
 } from "./actionErrors";
 
+// Unclassified errors reach the client only as "unexpected"; log them here so
+// a real failure (DB, schema drift) still leaves a server-side trace.
+function actionFailure(err: unknown): { ok: false; reason: ReturnType<typeof contactActionErrorReason> } {
+  const reason = contactActionErrorReason(err);
+  if (reason === "unexpected") console.error("[contacts] unexpected action error", err);
+  return { ok: false, reason };
+}
+
 /**
  * Server action behind the About pane's per-property inline edit (task 9.2,
  * 9.4). Rejects any property outside the allow-list up front — see
@@ -35,7 +43,7 @@ export async function updateContactPropertyAction(
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, reason: contactActionErrorReason(err) };
+    return actionFailure(err);
   }
 }
 
@@ -46,7 +54,7 @@ export async function addContactNoteAction(personId: string, note: string): Prom
     await createActivityAction({ type: "note", personId, metadata: { note } });
     return { ok: true };
   } catch (err) {
-    return { ok: false, reason: contactActionErrorReason(err) };
+    return actionFailure(err);
   }
 }
 
@@ -61,7 +69,7 @@ export async function addContactTaskAction(
     await createTaskAction({ title, personId, dueAt });
     return { ok: true };
   } catch (err) {
-    return { ok: false, reason: contactActionErrorReason(err) };
+    return actionFailure(err);
   }
 }
 
@@ -81,6 +89,6 @@ export async function sendContactEmailAction(
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, reason: contactActionErrorReason(err) };
+    return actionFailure(err);
   }
 }
