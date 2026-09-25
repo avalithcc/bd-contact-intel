@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Estimated changed lines | ~4,800 across 14 PRs |
+| Estimated changed lines | ~5,920 across 18 PRs (Phase 4B added) |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 → PR 14 (see table below) |
@@ -27,7 +27,11 @@ Chain strategy: feature-branch-chain
 | 2 | Identity matcher module + tests | 0 | PR 1 | ~320 | TDD |
 | 3 | Collapse planner, dry-run script, `/admin/migration` | 0 | PR 2 | ~380 | **Dry-run report approval** |
 | 4 | Fold leads, re-point refs, status backfill | 0b | PR 3 | ~360 | **Dry-run report approval** |
-| 5 | `deriveStatus`, activity writes, outreach/hiring re-scope | 0b | PR 4 | ~350 | TDD |
+| 4B-1 | Identity resolver core (`planIdentityWrites`/`applyIdentityWrites`) | 0b | PR 4 | ~300 | TDD |
+| 4B-2 | Contact/lead live write cutover under `pg_advisory_xact_lock` | 0b | PR 4B-1 | ~260 | TDD |
+| 4B-3 | Reference writes (activity/task/signal), status/owner rules | 0b | PR 4B-2 | ~240 | TDD |
+| 4B-4 | Catch-up phase (`--phase=catch_up`) | 0b | PR 4B-3 | ~320 | **Dry-run approval** |
+| 5 | `deriveStatus`, activity writes, outreach/hiring re-scope | 0b | PR 4B-4 | ~350 | TDD |
 | 6 | Merge/unmerge engine + tests | 1 | PR 5 | ~300 | TDD |
 | 7 | `/admin/duplicates` UI | 1 | PR 6 | ~280 | **Mockup approval** |
 | 8 | App shell, tokens, remove LocaleSwitcher/`en` path | UI | PR 7 | ~300 | **Mockup approval**; requires PR 0 |
@@ -70,11 +74,34 @@ Chain strategy: feature-branch-chain
 
 - [x] 4.1 RED/GREEN: fold planner — leads matched via matcher, unmatched leads become new Contacts carrying `ownerBdId` and source. (`src/lib/migration/foldPlanner.ts`; IdentityIndex seeded from EXISTING `person` rows, since Phase 3 collapse is already executed in prod.)
 - [ ] 4.2 RED/GREEN: `status_backfill` activity writer for leads with a manually set status and no supporting activity (contact-migration spec scenario).
-- [ ] 4.3 `scripts/unify-contacts.ts --phase=fold_leads`: re-points `activity`/`task`/`signal`/`linkedin_scrape_job` via `person_id_map`; produces fold dry-run report.
+- [x] 4.3 `scripts/unify-contacts.ts --phase=fold_leads`: re-points `activity`/`task`/`signal`/`linkedin_scrape_job` via `person_id_map`; produces fold dry-run report.
 - [ ] 4.4 **GATE**: owner reviews the fold-leads dry-run report before `--execute`.
-- [ ] 4.5 Test: zero orphaned references after fold execute (fixture-level check); every legacy id resolves via `person_id_map`.
+- [x] 4.5 Test: zero orphaned references after fold execute (fixture-level check); every legacy id resolves via `person_id_map`.
 
-## Phase 5: Status Derivation & Re-Scope Reads (PR 5, base: PR 4)
+**Actual PR slicing (recorded as it happened, deviates from the plan table above)**:
+
+- 4a — planner (PR #8: `feat/crm-hubspot-ux-04-fold-leads`).
+- 4b — collapse-merge fix + pure repair core (`feat/crm-hubspot-ux-04b-collapse-merge-fix`).
+- 4c — repair CLI (`feat/crm-hubspot-ux-04c-repair-cli`).
+- 4c2 — repair guards, `--run` required for both modes, drift gate (`feat/crm-hubspot-ux-04c2-repair-guards`).
+- 4d — fold-leads write path, this branch (`feat/crm-hubspot-ux-04d-fold-write`).
+- [ ] Collapse-merge repair dry run against prod (owner GATE) — not yet run.
+- [ ] Collapse-merge repair `--execute` against prod (owner GATE) — not yet run.
+
+## Phase 4B: Write Cutover & Catch-up (PRs 4B-1..4B-4, base: PR 4)
+
+- [ ] 4B.1 RED/GREEN: `planIdentityWrites(rows, index)` in `src/lib/identity/resolve.ts` — new/auto/review/own-company outcomes, intra-chunk dedup, merged-survivor resolution (contact-identity "Live ingestion resolves identity").
+- [ ] 4B.2 GREEN: `prefetchIdentityIndex(tx, rows)` (3 indexed queries) + `applyIdentityWrites(tx, plan)` with `ON CONFLICT (profile_key) DO NOTHING RETURNING` and re-select of losers. (PR 4B-1, ~300 code)
+- [ ] 4B.3 RED/GREEN: `upsertContacts` and `importLeads` run each chunk in one transaction under `pg_advisory_xact_lock`, writing legacy + person + connection + map; `IDENTITY_DUAL_WRITE` kill switch.
+- [ ] 4B.4 Test: two concurrent uploads of the same new profile key yield one `person` and two connections. (PR 4B-2, ~260 code)
+- [ ] 4B.5 RED/GREEN: `createActivity` (incl. Gmail log), `createTask`/`updateTask`, manual signal set `person_id` + `actor_bd_id` via `person_id_map` subquery.
+- [ ] 4B.6 RED/GREEN: `updateLeadStatus` appends `status_change` activity; `updateLeadOwner` applies R3; `recomputeMessageSignals` updates `person_bd_connection`. (PR 4B-3, ~240 code)
+- [ ] 4B.7 RED/GREEN: catch-up planner — anti-join input, null-`person_id` re-point, lead/contact drift; `input_hash` over input ids.
+- [ ] 4B.8 `--phase=catch_up` dry-run/execute reusing `executionGuard`, `snapshotBackup`, `finalizeExecute` pattern; shown in `/admin/migration`. (PR 4B-4, ~320 code)
+- [ ] 4B.9 **GATE**: owner confirms deploy sequence (early partial release vs. two catch-ups), reviews catch-up dry-run, approves before `--execute`.
+- [ ] 4B.10 Test: after execute, zero unmapped `contact`/`lead` rows and zero non-own-company references with null `person_id`; re-run reports zero.
+
+## Phase 5: Status Derivation & Re-Scope Reads (PR 5, base: PR 4B-4)
 
 - [ ] 5.1 RED/GREEN: pure `deriveStatus(events)` per the rank/discard algorithm in design.md, returning `{ status, because }`.
 - [ ] 5.2 Wire `deriveStatus()` into the same transaction as every activity write, merge, and message import; cache result on `person.status`/`status_activity_id`.

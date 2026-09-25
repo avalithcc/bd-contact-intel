@@ -142,3 +142,29 @@ Deferred pages keep their current bodies inside the new shell. Because they cons
 - [x] Accessibility token changes approved by the owner: accent hover darkens instead of lightening; darker badge text.
 - [x] Delivery: chained PRs with `feature-branch-chain` (tracker branch, Vercel preview deploys, one merge to `main` at the end).
 - [ ] Contact source provenance (LinkedIn, imported list, scraping) is stored as a structured field on every Contact, for `owner-reporting`.
+
+## Write cutover & catch-up (Phase 4B addendum)
+
+### Context
+
+`person` was populated by collapse run `b9003aae`. No live path writes `person`, `person_bd_connection`, `person_id_map` or `person_id`: `upsertContacts` (`src/lib/queries.ts:456`), `recomputeMessageSignals` (`src/lib/queries.ts:746`, updates per-BD message aggregates), `importLeads`, `updateLeadStatus`, `updateLeadOwner` (`src/lib/leads/queries.ts`), `createActivity` (+ Gmail log), `createTask`/`updateTask`, manual signal. Phase 5 re-scopes reads to `person`, so everything written after the run would disappear.
+
+| # | Topic | Choice | Rejected | Why |
+|---|---|---|---|---|
+| D11 | Ordering | New Phase 4B (PRs 4B-1..4B-4) after PR 4, before PR 5. PR 5 is blocked until the 4B gate closes. Legacy writes continue (dual-write); legacy stays the rollback source. | Folding cutover into PR 5 | Reads must never switch before writes. |
+| D12 | Shared resolver | `src/lib/identity/resolve.ts`: `planIdentityWrites(rows, index)` (pure) + `applyIdentityWrites(tx, plan)`. Used by live paths AND catch-up; dry-run = plan only. | Separate live and migration logic | One rule set; no drift between catch-up and live. |
+| D13 | Per-request matching | Keep the synchronous `IdentityIndex`. Per chunk, prefetch only candidates: `profile_key = ANY($1)` (unique idx), `email_normalized = ANY($2) AND email_status='verified' AND merged_into_id IS NULL` (idx), `company_key = ANY($3)` (idx) with `buildNameCompanyKey` filtered in app (the existing name index is on raw, not accent-folded, names). Merged hits resolve to survivor. Rows created earlier in the same chunk join the in-memory index. | Async DB index per row (~3 queries/row, 1,500 per 500-row chunk); loading all 19.7k persons per request | 3 indexed queries per chunk; set-based writes. |
+| D14 | Concurrency | Each chunk runs in one `db.transaction` (none today): legacy upsert, then `pg_advisory_xact_lock(IDENTITY_LOCK)`, then prefetch, match, batched writes. Person insert uses `ON CONFLICT (profile_key) DO NOTHING RETURNING`; conflicting keys are re-selected and treated as `auto`. `person_bd_connection` upserts on its PK; `person_id_map` and `duplicate_candidate` use `ON CONFLICT DO NOTHING`. | Per-key advisory locks (hundreds per chunk, deadlock ordering); SERIALIZABLE + retry (chunk-level retries); partial unique index on verified email (existing conflicting-key data may violate it; conflicts are allowed and go to review) | Only profile key has a unique constraint. The global lock serializes person-creating transactions only; these are rare (uploads, lead ingest), about 1 s per chunk. The xact-scoped lock works on a transaction-mode pooler. |
+
+**Reference writes** (no matcher, no lock): `activity`/`task`/`signal` inserts set `person_id` in the same statement via `(SELECT person_id FROM person_id_map WHERE legacy_table=$t AND legacy_id=$id)` (PK lookup) plus `actor_bd_id`; `updateTask` re-resolves on subject change. `updateLeadStatus` appends a `status_change` activity carrying `person_id` (evidence for `deriveStatus`). `updateLeadOwner` sets `person.owner_bd_id` only when the person has no `person_bd_connection` (R3) and writes `person_property_history`. `recomputeMessageSignals` gets a second set-based `UPDATE person_bd_connection … FROM peer_agg JOIN person_id_map`.
+
+**Kill switch**: env `IDENTITY_DUAL_WRITE=off` skips identity writes (legacy writes unaffected). A catch-up closes any gap it opens.
+
+### Catch-up (owner D4b)
+
+- `scripts/unify-contacts.ts --phase=catch_up`, `migration_run.kind='catch_up'`.
+- Input (keyset-paged anti-join): `contact`/`lead` rows `WHERE NOT EXISTS (person_id_map m WHERE m.legacy_table=… AND m.legacy_id=x.id)`; reference rows with `person_id IS NULL AND (contact_id OR lead_id) IS NOT NULL`, re-pointed by one `UPDATE … FROM person_id_map` per table; drift in mapped rows (leads by `updated_at > run.executed_at`; contacts, which lack `updated_at`, via the existing `planCollapseMergeRepair` diff core).
+- `input_hash` = sorted `(table, id)` of the whole input. Dry-run → `/admin/migration` approval → guarded `--execute` (hash check, `pg_dump`, `audit_log(migration_execute)`), 1,000-row batches.
+- Idempotent: a second run finds zero rows. Fold-leads uses the same anti-join, so it is catch-up-safe.
+
+**Deploy sequence (needs owner confirmation)**: PENDING OWNER DECISION. Under feature-branch-chain, cutover code reaches prod only when the tracker merges, together with the Phase 5 reads. Recommended: release the chain up to PR 4B-4 to `main` early (no visible change), then run catch-up. The unmapped set is then frozen and the hash is stable. Fallback that keeps the single final merge: run catch-up #1 just before the deploy (D4b), then a small catch-up #2 immediately after, to sweep writes made in between. Rows stay invisible until #2 executes.

@@ -76,5 +76,24 @@ Migration slices MUST write new Contact tables and the id mapping additively, al
 - WHEN rollback is executed
 - THEN reads point back to the legacy `contact`/`lead` tables
 - AND the newly written Contact rows are dropped
-</content>
-</invoke>
+
+### Requirement: Incremental catch-up run
+
+The system MUST provide a catch-up run that processes only legacy rows absent from `person_id_map`, plus references with a null `person_id`. It is gated like every migration run.
+
+#### Scenario: Only unmapped rows are processed
+
+- GIVEN 19,685 mapped contacts and 40 contacts created after the collapse run
+- WHEN the catch-up dry-run executes
+- THEN the report covers exactly the 40 unmapped contacts
+
+#### Scenario: Re-run is a no-op
+
+- GIVEN a catch-up run has executed
+- WHEN another catch-up dry-run executes with no new writes
+- THEN it reports zero rows
+
+### Requirement: Additive rollback (MODIFIED)
+
+Migration runs MUST NOT write legacy `contact`/`lead` rows. Live write paths MUST continue writing legacy tables (dual-write) until the read cutover is verified, so rollback can point reads back to legacy tables without data loss.
+
