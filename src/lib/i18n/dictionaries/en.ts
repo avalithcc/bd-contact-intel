@@ -266,6 +266,12 @@ export const en = {
     tableLastContact: "Last contact",
     tableWhy: "Why",
     tableMessage: "Message",
+    // Shown instead of the "view"/"generate message" row actions for a
+    // teammate-exclusive Contact (fresh-review UX fix; see OutreachRow.
+    // hasOwnContact) — those two actions are still bdId-scoped and would
+    // 404 for a person with no legacy contact row of the calling BD's own,
+    // until Phase 9's unified /contacts/[id] record page.
+    unifiedRecordPending: "Available once the unified record page ships",
     reasonDormantSince: (relTime: string, months: number) =>
       `Dormant since ${relTime} (${months}mo+ quiet)`,
     reasonDormant: "Dormant",

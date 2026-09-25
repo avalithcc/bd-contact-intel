@@ -81,6 +81,13 @@ export interface OutreachFilters {
 
 export interface OutreachRow {
   id: string;
+  // False for a teammate-exclusive Contact (see the `id` doc comment on
+  // listOutreachCandidates below): `id` then falls back to `person.id`,
+  // which the still-bdId-scoped `/contact/[id]` page and
+  // generateOutreachMessage don't resolve. UI callers use this explicit flag
+  // to hide/disable those two actions (fresh-review UX fix) instead of
+  // re-deriving it by comparing ids.
+  hasOwnContact: boolean;
   firstName: string | null;
   lastName: string | null;
   company: string | null;
@@ -315,6 +322,7 @@ export async function listOutreachCandidates(
     .with(pbcAgg)
     .select({
       id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id} end), ${person.id})`,
+      hasOwnContact: sql<boolean>`coalesce(bool_or(${contact.bdId} = ${bdId}), false)`,
       firstName: person.firstName,
       lastName: person.lastName,
       company: person.company,
@@ -349,6 +357,7 @@ export async function listOutreachCandidates(
       : undefined;
     return {
       id: r.id,
+      hasOwnContact: r.hasOwnContact,
       firstName: r.firstName,
       lastName: r.lastName,
       company: r.company,

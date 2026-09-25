@@ -286,9 +286,15 @@ export default async function OutreachPage({
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>
-                      <Link className="rowlink" href={`/contact/${r.id}`}>
-                        {[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}
-                      </Link>
+                      {r.hasOwnContact ? (
+                        <Link className="rowlink" href={`/contact/${r.id}`}>
+                          {[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}
+                        </Link>
+                      ) : (
+                        <span className="rowlink disabled" title={dict.outreach.unifiedRecordPending}>
+                          {[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}
+                        </span>
+                      )}
                     </td>
                     <td>{r.position ?? "—"}</td>
                     <td>
@@ -326,7 +332,13 @@ export default async function OutreachPage({
                       </div>
                     </td>
                     <td>
-                      <GenerateMessageButton contactId={r.id} locale={locale} labels={messageLabels} />
+                      {r.hasOwnContact ? (
+                        <GenerateMessageButton contactId={r.id} locale={locale} labels={messageLabels} />
+                      ) : (
+                        <span className="secondary-btn disabled" title={dict.outreach.unifiedRecordPending}>
+                          {messageLabels.generateMessage}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

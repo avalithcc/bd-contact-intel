@@ -228,6 +228,7 @@ export const es: typeof en = {
     tableLastContact: "Último contacto",
     tableWhy: "Por qué",
     tableMessage: "Mensaje",
+    unifiedRecordPending: "Disponible cuando se habilite la ficha unificada",
     reasonDormantSince: (relTime, months) =>
       `Inactivo desde ${relTime} (${months}+ meses sin actividad)`,
     reasonDormant: "Inactivo",
