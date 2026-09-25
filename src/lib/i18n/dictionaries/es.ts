@@ -569,9 +569,9 @@ export const es: typeof en = {
     pairMeta: (index: number, total: number) => `Par ${index} de ${total}`,
     reasonLabels: {
       name_company: "Coincidencia: nombre + empresa",
-      profile_key: "Coincidencia: perfil de LinkedIn",
-      verified_email: "Coincidencia: correo verificado",
+      conflicting_strong_keys: "Datos fuertes en conflicto",
     } as Record<string, string>,
+    reasonLabelFallback: "Motivo de duplicado no especificado",
     fieldJobTitle: "Cargo",
     fieldEmail: "Correo electrónico",
     fieldProfileKey: "LinkedIn",
@@ -590,6 +590,15 @@ export const es: typeof en = {
     historyWhen: "Cuándo",
     historyUndone: "Deshecha",
     undoButton: "Deshacer fusión",
+    cancelButton: "Cancelar",
+    unmergeConfirmTitle: (name: string) => `¿Deshacer la fusión de ${name}?`,
+    unmergeConfirmBody:
+      "Ambos registros originales se restauran a partir del historial de auditoría de la fusión: propiedades, responsables, BDs conectados, y las actividades, tareas y señales que pertenecían a cada uno.",
+    unmergeConfirmBullets: [
+      "La actividad registrada después de la fusión permanece en la Ficha que sobrevivió.",
+      "El par se marca como «no es duplicado» para que no vuelva a la cola.",
+      "Esta acción queda registrada en el registro de auditoría.",
+    ] as string[],
     migrationActor: "Migración",
     prevPage: "Anterior",
     nextPage: "Siguiente",

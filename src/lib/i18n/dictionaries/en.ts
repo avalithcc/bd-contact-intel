@@ -672,9 +672,9 @@ export const en = {
     pairMeta: (index: number, total: number) => `Pair ${index} of ${total}`,
     reasonLabels: {
       name_company: "Match: name + company",
-      profile_key: "Match: LinkedIn profile",
-      verified_email: "Match: verified email",
+      conflicting_strong_keys: "Conflicting strong keys",
     } as Record<string, string>,
+    reasonLabelFallback: "Unspecified duplicate reason",
     fieldJobTitle: "Title",
     fieldEmail: "Email",
     fieldProfileKey: "LinkedIn",
@@ -693,6 +693,15 @@ export const en = {
     historyWhen: "When",
     historyUndone: "Undone",
     undoButton: "Undo merge",
+    cancelButton: "Cancel",
+    unmergeConfirmTitle: (name: string) => `Undo the merge of ${name}?`,
+    unmergeConfirmBody:
+      "Both original records are restored from the merge's audit trail: properties, owners, connected BDs, and the activities, tasks, and signals that belonged to each one.",
+    unmergeConfirmBullets: [
+      "Activity logged after the merge stays on the Record that survived.",
+      "The pair is marked as \"not a duplicate\" so it doesn't return to the queue.",
+      "This action is recorded in the audit log.",
+    ] as string[],
     migrationActor: "Migration",
     prevPage: "Previous",
     nextPage: "Next",
