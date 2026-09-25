@@ -28,8 +28,9 @@ export interface FoldRunPorts {
   /**
    * One transaction: writes new person rows, updates matched existing
    * persons, writes person_id_map/duplicate_candidate rows, re-points
-   * activity/task/signal/linkedin_scrape_job via person_id_map, sets
-   * executedAt on the approved migration_run row, and writes one
+   * activity/task/signal rows via person_id_map (`linkedin_scrape_job` has
+   * no lead-scoped column, so it is never re-pointed), sets executedAt on
+   * the approved migration_run row, and writes one
    * audit_log(migration_execute) entry.
    */
   finalizeExecute(input: FinalizeFoldExecuteInput): Promise<void>;
