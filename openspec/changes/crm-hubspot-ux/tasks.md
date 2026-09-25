@@ -74,7 +74,7 @@ Chain strategy: feature-branch-chain
 
 - [x] 4.1 RED/GREEN: fold planner — leads matched via matcher, unmatched leads become new Contacts carrying `ownerBdId` and source. (`src/lib/migration/foldPlanner.ts`; IdentityIndex seeded from EXISTING `person` rows, since Phase 3 collapse is already executed in prod.)
 - [ ] 4.2 RED/GREEN: `status_backfill` activity writer for leads with a manually set status and no supporting activity (contact-migration spec scenario).
-- [x] 4.3 `scripts/unify-contacts.ts --phase=fold_leads`: re-points `activity`/`task`/`signal`/`linkedin_scrape_job` via `person_id_map`; produces fold dry-run report.
+- [x] 4.3 `scripts/unify-contacts.ts --phase=fold_leads`: re-points `activity`/`task`/`signal` via `person_id_map` (`linkedin_scrape_job` has no lead-scoped column, so it is not re-pointed here); produces fold dry-run report.
 - [ ] 4.4 **GATE**: owner reviews the fold-leads dry-run report before `--execute`.
 - [x] 4.5 Test: zero orphaned references after fold execute (fixture-level check); every legacy id resolves via `person_id_map`.
 
