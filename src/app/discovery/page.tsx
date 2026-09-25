@@ -9,7 +9,6 @@ import { linkedinCompanySearchUrl } from "@/lib/links";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDateTime } from "@/lib/i18n/format";
-import { LocaleSwitcher } from "@/lib/i18n/LocaleSwitcher";
 import { SignOutButton } from "../SignOutButton";
 import { UserMenu } from "../UserMenu";
 import { BackButton } from "../BackButton";
@@ -55,7 +54,6 @@ export default async function DiscoveryPage() {
             label={me.name || dict.common.account}
             changePasswordHref="/account/password"
             changePasswordLabel={dict.common.changePassword}
-            localeSwitcher={<LocaleSwitcher locale={locale} />}
             signOutButton={<SignOutButton locale={locale} />}
           />
         </div>

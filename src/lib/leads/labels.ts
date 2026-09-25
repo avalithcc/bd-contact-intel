@@ -1,29 +1,33 @@
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { ClientStrings } from "@/lib/i18n/clientStrings";
 
-// Only plain strings (and string-only formatter functions) may cross the
+// Only plain strings (and flat records of strings) may cross the
 // server -> client boundary — the full dictionary contains nested records
 // and functions that don't all serialize cleanly as props, so each client
-// component gets its own narrow subset. Same convention as
-// src/lib/outreach/messageLabels.ts.
+// component gets its own narrow subset. ClientStrings<> makes adding a
+// formatter function to one of these slices a compile error. Same
+// convention as src/lib/outreach/messageLabels.ts.
 
-export type LeadsUploadLabels = Pick<
-  Dictionary["leads"],
-  | "sourceKeyLabel"
-  | "sourceKeyPlaceholder"
-  | "sourceNameLabel"
-  | "sourceNamePlaceholder"
-  | "attendeesFileLabel"
-  | "decisoresFileLabel"
-  | "hunterFileLabel"
-  | "probablesFileLabel"
-  | "correosFinalFileLabel"
-  | "columnaCorreosFileLabel"
-  | "import"
-  | "importing"
-  | "importedSummary"
-  | "matchedOwnersSummary"
-  | "unmatchedOwnersSummary"
-  | "importErrors"
+export type LeadsUploadLabels = ClientStrings<
+  Pick<
+    Dictionary["leads"],
+    | "sourceKeyLabel"
+    | "sourceKeyPlaceholder"
+    | "sourceNameLabel"
+    | "sourceNamePlaceholder"
+    | "attendeesFileLabel"
+    | "decisoresFileLabel"
+    | "hunterFileLabel"
+    | "probablesFileLabel"
+    | "correosFinalFileLabel"
+    | "columnaCorreosFileLabel"
+    | "import"
+    | "importing"
+    | "importedSummary"
+    | "matchedOwnersSummary"
+    | "unmatchedOwnersSummary"
+    | "importErrors"
+  >
 >;
 
 export function pickLeadsUploadLabels(dict: Dictionary): LeadsUploadLabels {
@@ -48,20 +52,22 @@ export function pickLeadsUploadLabels(dict: Dictionary): LeadsUploadLabels {
   };
 }
 
-export type LeadEditLabels = Pick<
-  Dictionary["leads"],
-  | "fieldStatus"
-  | "fieldNotes"
-  | "fieldNotesPlaceholder"
-  | "fieldOwner"
-  | "ownerUnassigned"
-  | "saveChanges"
-  | "savingChanges"
-  | "savedChanges"
-  | "saveError"
-> & {
-  leadStatuses: Dictionary["leadStatuses"];
-};
+export type LeadEditLabels = ClientStrings<
+  Pick<
+    Dictionary["leads"],
+    | "fieldStatus"
+    | "fieldNotes"
+    | "fieldNotesPlaceholder"
+    | "fieldOwner"
+    | "ownerUnassigned"
+    | "saveChanges"
+    | "savingChanges"
+    | "savedChanges"
+    | "saveError"
+  > & {
+    leadStatuses: Dictionary["leadStatuses"];
+  }
+>;
 
 export function pickLeadEditLabels(dict: Dictionary): LeadEditLabels {
   const l = dict.leads;

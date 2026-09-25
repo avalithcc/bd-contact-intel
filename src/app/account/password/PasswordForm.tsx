@@ -6,13 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
 
-export function PasswordForm({
-  locale,
-  localeSwitcher,
-}: {
-  locale: Locale;
-  localeSwitcher: React.ReactNode;
-}) {
+export function PasswordForm({ locale }: { locale: Locale }) {
   const dict = t(locale);
   const router = useRouter();
   const supabase = createClient();
@@ -49,7 +43,6 @@ export function PasswordForm({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        {localeSwitcher}
       </div>
       <div className="eyebrow">{dict.account.eyebrow}</div>
       <h1>

@@ -1,15 +1,18 @@
-import { cookies } from "next/headers";
-import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type Locale } from "./locales";
+import { DEFAULT_LOCALE, type Locale } from "./locales";
 import { t, type Dictionary } from "./dictionaries";
 
-/** Reads the visitor's locale from the `locale` cookie, server-side only. */
+/**
+ * The app's locale, server-side only. D10 (owner decision, R11): the
+ * product ships Spanish-only — no `LocaleSwitcher`, no cookie-driven
+ * locale selection. The `{ en, es }` dictionary structure (and this
+ * return type) is kept so English can be re-added cheaply later, but
+ * nothing in the UI resolves to it today.
+ */
 export async function getLocale(): Promise<Locale> {
-  const cookieStore = await cookies();
-  const value = cookieStore.get(LOCALE_COOKIE)?.value;
-  return isLocale(value) ? value : DEFAULT_LOCALE;
+  return DEFAULT_LOCALE;
 }
 
-/** Convenience: current locale's dictionary, resolved from the cookie. */
+/** Convenience: the current (Spanish-only) locale's dictionary. */
 export async function getDictionary(): Promise<Dictionary> {
   return t(await getLocale());
 }

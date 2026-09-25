@@ -8,13 +8,7 @@ import type { Locale } from "@/lib/i18n/locales";
 
 const ALLOWED_DOMAIN = "@avalith.net";
 
-export function LoginForm({
-  locale,
-  localeSwitcher,
-}: {
-  locale: Locale;
-  localeSwitcher: React.ReactNode;
-}) {
+export function LoginForm({ locale }: { locale: Locale }) {
   const dict = t(locale);
   const router = useRouter();
   const supabase = createClient();
@@ -85,7 +79,6 @@ export function LoginForm({
         <span className="logo">
           avalith<span className="dot">.</span>
         </span>
-        {localeSwitcher}
       </div>
       <div className="eyebrow">{dict.common.brandEyebrow}</div>
       <h1>
