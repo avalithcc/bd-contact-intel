@@ -1331,3 +1331,10 @@ main {
 .duplicates-compare tr:last-child td {
   border-bottom: 0;
 }
+.duplicates-unmerge-confirm button.danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+.duplicates-unmerge-confirm button.danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}

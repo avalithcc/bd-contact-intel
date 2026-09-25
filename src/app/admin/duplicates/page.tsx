@@ -24,8 +24,10 @@ function isActionErrorReason(v: string | undefined): v is keyof typeof dict.acti
 }
 
 function reasonLabel(reason: string): string {
-  return dict.reasonLabels[reason] ?? reason;
+  return dict.reasonLabels[reason] ?? dict.reasonLabelFallback;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function fieldRow(label: string, valueA: string, valueB: string, keepA: boolean, keepB: boolean) {
   const differs = valueA !== valueB;
@@ -123,10 +125,35 @@ function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; 
   );
 }
 
+function UnmergeConfirmPanel({ mergeEventId, survivorName }: { mergeEventId: string; survivorName: string }) {
+  return (
+    <section className="panel duplicates-unmerge-confirm mt-md">
+      <h3 className="m-0">{dict.unmergeConfirmTitle(survivorName)}</h3>
+      <p className="soft mt-md">{dict.unmergeConfirmBody}</p>
+      <ul className="soft">
+        {dict.unmergeConfirmBullets.map((bullet) => (
+          <li key={bullet}>{bullet}</li>
+        ))}
+      </ul>
+      <div className="row end mt-lg">
+        <Link href="/admin/duplicates" className="secondary-btn">
+          {dict.cancelButton}
+        </Link>
+        <form action={unmergeDuplicateAction}>
+          <input type="hidden" name="mergeEventId" value={mergeEventId} />
+          <button type="submit" className="danger">
+            {dict.undoButton}
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
 export default async function DuplicatesAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ candidate?: string; page?: string; actionError?: string }>;
+  searchParams: Promise<{ candidate?: string; page?: string; actionError?: string; confirmUnmerge?: string }>;
 }) {
   try {
     await requireAdmin();
@@ -137,10 +164,24 @@ export default async function DuplicatesAdminPage({
     throw err;
   }
 
-  const { candidate: candidateParam, page: pageParam, actionError } = await searchParams;
+  const {
+    candidate: candidateParam,
+    page: pageParam,
+    actionError,
+    confirmUnmerge: confirmUnmergeParam,
+  } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
   const [list, history] = await Promise.all([listOpenDuplicateCandidates(page), listRecentMergeEvents()]);
+
+  // "Deshacer fusión" links here with `?confirmUnmerge=<mergeEventId>` (mockup's
+  // overlay, ported server-rendered/no-JS). Only whitelisted, not-yet-undone
+  // events from the already-fetched history are eligible — a tampered id
+  // can't reference an arbitrary merge_event row.
+  const unmergeTarget =
+    confirmUnmergeParam && UUID_RE.test(confirmUnmergeParam)
+      ? (history.find((h) => h.mergeEventId === confirmUnmergeParam && !h.undoneAt) ?? null)
+      : null;
   const selectedId = candidateParam ?? list.items[0]?.id ?? null;
   const detail = selectedId ? await getDuplicateCandidateDetail(selectedId) : null;
   const selectedIndex = detail ? list.items.findIndex((i) => i.id === detail.id) : -1;
@@ -235,12 +276,9 @@ export default async function DuplicatesAdminPage({
                 <td className="meta">{formatDateTime(h.createdAt, "es")}</td>
                 <td>
                   {!h.undoneAt && (
-                    <form action={unmergeDuplicateAction}>
-                      <input type="hidden" name="mergeEventId" value={h.mergeEventId} />
-                      <button type="submit" className="secondary">
-                        {dict.undoButton}
-                      </button>
-                    </form>
+                    <Link href={`/admin/duplicates?confirmUnmerge=${h.mergeEventId}`} className="secondary-btn">
+                      {dict.undoButton}
+                    </Link>
                   )}
                 </td>
               </tr>
@@ -248,6 +286,10 @@ export default async function DuplicatesAdminPage({
           </tbody>
         </table>
       </div>
+
+      {unmergeTarget && (
+        <UnmergeConfirmPanel mergeEventId={unmergeTarget.mergeEventId} survivorName={unmergeTarget.survivorName} />
+      )}
     </main>
   );
 }
