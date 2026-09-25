@@ -44,6 +44,10 @@ function lead(overrides: Partial<FoldLeadRow> = {}): FoldLeadRow {
     emailConfidence: 90,
     emailSource: "hunter",
     sourceKey: "fi-arg-2026",
+    status: "new",
+    updatedByBdId: null,
+    updatedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
@@ -121,4 +125,41 @@ test("task 4.5 — every legacy lead id resolves via person_id_map, and referenc
       assert.notEqual(ref.personId, null, `reference row for lead ${ref.leadId} was left without person_id`);
     }
   }
+});
+
+// --- task 4.2: status_backfill activity rows ---------------------------
+
+test("a status_backfill row resolves a plan id to the new person's REAL generated id, not the raw plan id", () => {
+  const plan = planFoldLeads(
+    [],
+    [
+      lead({
+        id: "lead-new",
+        email: null,
+        emailStatus: "none",
+        status: "meeting",
+        updatedByBdId: "bd-2",
+        updatedAt: new Date("2026-03-01T00:00:00Z"),
+      }),
+    ],
+  );
+  const rows = buildFoldWriteRows(plan, "run-1", sequentialIds());
+
+  assert.equal(rows.activities.length, 1);
+  const [row] = rows.activities;
+  assert.equal(row.personId, "new-id-1");
+  assert.equal(row.actorBdId, null);
+  assert.equal(row.type, "status_backfill");
+  assert.deepEqual(row.metadata, {
+    status: "meeting",
+    originalEditorBdId: "bd-2",
+    originalAt: "2026-03-01T00:00:00.000Z",
+  });
+});
+
+test("no status_backfill rows are built when no lead needs one", () => {
+  const plan = planFoldLeads([existingPerson()], [lead()]);
+  const rows = buildFoldWriteRows(plan, "run-1", sequentialIds());
+
+  assert.equal(rows.activities.length, 0);
 });

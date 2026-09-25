@@ -43,10 +43,16 @@ function lead(): FoldLeadRow {
     emailConfidence: null,
     emailSource: null,
     sourceKey: "fi-arg-2026",
+    status: "new",
+    updatedByBdId: null,
+    updatedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
   };
 }
 
-function approvedRun(overrides: Partial<Parameters<typeof runFoldExecute>[2]> = {}) {
+const noActivityTypes: ReadonlyMap<string, ReadonlySet<string>> = new Map();
+
+function approvedRun(overrides: Partial<Parameters<typeof runFoldExecute>[3]> = {}) {
   return {
     id: "run-1",
     approvedAt: new Date(),
@@ -81,7 +87,7 @@ function fakePorts() {
 
 test("dry run saves a fold_leads migration_run report and never touches execute-only ports", async () => {
   const ports = fakePorts();
-  const result = await runFoldDryRun([person()], [lead()], ports);
+  const result = await runFoldDryRun([person()], [lead()], noActivityTypes, ports);
 
   assert.equal(result.migrationRunId, "run-1");
   assert.equal(ports.calls.saveDryRunReport.length, 1);
@@ -92,7 +98,7 @@ test("dry run saves a fold_leads migration_run report and never touches execute-
 test("execute refuses when the approved run's input hash is stale", async () => {
   const ports = fakePorts();
   await assert.rejects(
-    () => runFoldExecute([person()], [lead()], approvedRun({ inputHash: "stale" }), ports),
+    () => runFoldExecute([person()], [lead()], noActivityTypes, approvedRun({ inputHash: "stale" }), ports),
     (err: unknown) => err instanceof MigrationExecutionBlockedError && err.reason === "stale_input_hash",
   );
   assert.equal(ports.calls.finalizeExecute.length, 0);
@@ -104,7 +110,7 @@ test("execute backs up, then finalizes into the approved run using the current i
   const leads = [lead()];
   const currentHash = computeFoldInputHash(leads, persons);
 
-  const result = await runFoldExecute(persons, leads, approvedRun({ inputHash: currentHash }), ports);
+  const result = await runFoldExecute(persons, leads, noActivityTypes, approvedRun({ inputHash: currentHash }), ports);
 
   assert.equal(result.migrationRunId, "run-1");
   assert.equal(ports.calls.snapshotBackup.length, 1);

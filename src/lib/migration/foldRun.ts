@@ -44,9 +44,10 @@ export interface FoldRunResult {
 export async function runFoldDryRun(
   existingPersons: FoldExistingPerson[],
   leads: FoldLeadRow[],
+  activityTypesByLeadId: ReadonlyMap<string, ReadonlySet<string>>,
   ports: Pick<FoldRunPorts, "saveDryRunReport">,
 ): Promise<FoldRunResult> {
-  const plan = planFoldLeads(existingPersons, leads);
+  const plan = planFoldLeads(existingPersons, leads, activityTypesByLeadId);
   const inputHash = computeFoldInputHash(leads, existingPersons);
   const migrationRunId = await ports.saveDryRunReport({ inputHash, report: plan.report });
   return { migrationRunId, report: plan.report };
@@ -60,10 +61,11 @@ export async function runFoldDryRun(
 export async function runFoldExecute(
   existingPersons: FoldExistingPerson[],
   leads: FoldLeadRow[],
+  activityTypesByLeadId: ReadonlyMap<string, ReadonlySet<string>>,
   approvedRun: ApprovedFoldRun | null,
   ports: Pick<FoldRunPorts, "snapshotBackup" | "finalizeExecute">,
 ): Promise<FoldRunResult> {
-  const plan = planFoldLeads(existingPersons, leads);
+  const plan = planFoldLeads(existingPersons, leads, activityTypesByLeadId);
   const inputHash = computeFoldInputHash(leads, existingPersons);
   assertExecutionAllowed(approvedRun, inputHash);
   const run = approvedRun as ApprovedFoldRun;

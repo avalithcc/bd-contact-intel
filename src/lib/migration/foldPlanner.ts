@@ -20,6 +20,7 @@ import {
   type ReviewReason,
 } from "@/lib/identity/matcher";
 import { normalizeNameKey } from "@/lib/leads/csv";
+import type { LeadStatusKey } from "@/lib/leads/types";
 
 /** The subset of an existing `person` row the matcher and merge need. */
 export interface FoldExistingPerson {
@@ -51,6 +52,13 @@ export interface FoldLeadRow {
   emailConfidence: number | null;
   emailSource: string | null;
   sourceKey: string;
+  // Fields below only feed planStatusBackfills (contact-migration spec
+  // "Backfill activity for manually set status") — the matcher itself never
+  // reads them.
+  status: LeadStatusKey;
+  updatedByBdId: string | null;
+  updatedAt: Date | null;
+  createdAt: Date;
 }
 
 // Same vocabulary as collapsePlanner's CollapseLegacyMethod, plus
@@ -114,8 +122,20 @@ export interface FoldReport {
     autoMerged: number;
     flaggedForReview: number;
     new: number;
+    statusBackfilled: number;
   };
   persons: { created: number; updated: number };
+}
+
+/** contact-migration spec "Backfill activity for manually set status". */
+export interface FoldStatusBackfillActivity {
+  // A real person id, or a fresh plan id (`np...`) for new/review leads —
+  // foldWriteRows.ts resolves plan ids to real generated ids, same as
+  // duplicateCandidates and idMap.
+  personRef: string;
+  status: LeadStatusKey;
+  originalEditorBdId: string | null;
+  originalAt: Date;
 }
 
 export interface FoldPlan {
@@ -123,7 +143,57 @@ export interface FoldPlan {
   matchedUpdates: FoldMatchedUpdate[];
   newPersons: FoldNewPerson[];
   reviewPairs: FoldReviewPair[];
+  statusBackfills: FoldStatusBackfillActivity[];
   report: FoldReport;
+}
+
+// Which existing activity `type` values already provide evidence for a
+// given manually-set lead status (design.md "Status derivation (R4)" —
+// meeting/discarded stages come from activity events; the backfill only
+// exists to cover leads that never got one). 'new' never needs a backfill
+// (it's the default, not a manual decision).
+const STATUS_SUPPORTING_ACTIVITY_TYPES: Partial<Record<LeadStatusKey, readonly string[]>> = {
+  contacted: ["email_sent"],
+  replied: ["email_sent"],
+  meeting: ["meeting_logged"],
+  discarded: ["discarded"],
+};
+
+/**
+ * Pure planner: which leads need a `status_backfill` activity, and the rows
+ * to write for them. A lead needs one when its status was manually set
+ * (anything but 'new') and no existing activity already supports that
+ * status. Leads skipped as own-company (no personRef) are excluded — there
+ * is no person to attach the activity to.
+ */
+export function planStatusBackfills(
+  leads: FoldLeadRow[],
+  mappings: FoldLeadMapping[],
+  activityTypesByLeadId: ReadonlyMap<string, ReadonlySet<string>>,
+): FoldStatusBackfillActivity[] {
+  const personRefByLeadId = new Map(mappings.map((m) => [m.legacyLeadId, m.personRef]));
+  const backfills: FoldStatusBackfillActivity[] = [];
+
+  for (const lead of leads) {
+    if (lead.status === "new") continue;
+    const personRef = personRefByLeadId.get(lead.id);
+    if (!personRef) continue;
+
+    const supportingTypes = STATUS_SUPPORTING_ACTIVITY_TYPES[lead.status];
+    if (!supportingTypes) continue;
+    const existingTypes = activityTypesByLeadId.get(lead.id);
+    const hasSupport = !!existingTypes && supportingTypes.some((t) => existingTypes.has(t));
+    if (hasSupport) continue;
+
+    backfills.push({
+      personRef,
+      status: lead.status,
+      originalEditorBdId: lead.updatedByBdId,
+      originalAt: lead.updatedAt ?? lead.createdAt,
+    });
+  }
+
+  return backfills;
 }
 
 function toMerged(person: FoldExistingPerson): FoldMergedFields {
@@ -229,6 +299,7 @@ function mergeFields(existing: FoldMergedFields, incoming: FoldMergedFields): Fo
 export function planFoldLeads(
   existingPersons: FoldExistingPerson[],
   leads: FoldLeadRow[],
+  activityTypesByLeadId: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
 ): FoldPlan {
   const byProfileKey = new Map<string, string>();
   const byVerifiedEmail = new Map<string, string>();
@@ -364,11 +435,14 @@ export function planFoldLeads(
     });
   }
 
+  const statusBackfills = planStatusBackfills(leads, mappings, activityTypesByLeadId);
+
   return {
     mappings,
     matchedUpdates,
     newPersons,
     reviewPairs,
+    statusBackfills,
     report: {
       lead: {
         rowsRead: leads.length,
@@ -376,6 +450,7 @@ export function planFoldLeads(
         autoMerged,
         flaggedForReview,
         new: newCount,
+        statusBackfilled: statusBackfills.length,
       },
       persons: { created: newPersons.length, updated: matchedUpdates.length },
     },

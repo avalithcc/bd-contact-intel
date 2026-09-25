@@ -9,6 +9,7 @@ import { test } from "node:test";
 import {
   mergeEmailFields,
   planFoldLeads,
+  planStatusBackfills,
   type FoldExistingPerson,
   type FoldLeadRow,
   type FoldMergedFields,
@@ -47,6 +48,10 @@ function lead(overrides: Partial<FoldLeadRow>): FoldLeadRow {
     emailConfidence: null,
     emailSource: null,
     sourceKey: "fi-arg-2026",
+    status: "new",
+    updatedByBdId: null,
+    updatedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
@@ -329,4 +334,72 @@ test("a name+company key shared by 2+ existing persons fans out a review pair pe
   assert.ok(refs.includes("p2"));
   assert.ok(refs.includes(newPerson.planId));
   assert.ok(plan.reviewPairs.every((pair) => pair.reason === "name_company"));
+});
+
+// --- contact-migration spec: "Backfill activity for manually set status" ---
+
+test("a lead with a manually set status and no supporting activity gets a status_backfill row", () => {
+  const leads = [
+    lead({
+      id: "l1",
+      status: "meeting",
+      updatedByBdId: "bd-7",
+      updatedAt: new Date("2026-02-01T00:00:00Z"),
+    }),
+  ];
+
+  const plan = planFoldLeads([], leads, new Map());
+
+  assert.equal(plan.statusBackfills.length, 1);
+  assert.equal(plan.report.lead.statusBackfilled, 1);
+  const [backfill] = plan.statusBackfills;
+  assert.equal(backfill.status, "meeting");
+  assert.equal(backfill.originalEditorBdId, "bd-7");
+  assert.equal(backfill.originalAt.toISOString(), "2026-02-01T00:00:00.000Z");
+  // Resolves to the same person ref foldWriteRows.ts uses for the mapping.
+  assert.equal(backfill.personRef, plan.mappings[0].personRef);
+});
+
+test("a lead with status 'new' never gets a status_backfill row (it's the default, not a manual decision)", () => {
+  const leads = [lead({ id: "l1", status: "new" })];
+
+  const plan = planFoldLeads([], leads, new Map());
+
+  assert.equal(plan.statusBackfills.length, 0);
+  assert.equal(plan.report.lead.statusBackfilled, 0);
+});
+
+test("a lead with a manually set status that already has supporting activity is not backfilled", () => {
+  const leads = [lead({ id: "l1", status: "meeting" })];
+  const activityTypesByLeadId = new Map([["l1", new Set(["meeting_logged"])]]);
+
+  const plan = planFoldLeads([], leads, activityTypesByLeadId);
+
+  assert.equal(plan.statusBackfills.length, 0);
+});
+
+test("an own-company-skipped lead with a manually set status is never backfilled (no person to attach to)", () => {
+  const leads = [lead({ id: "l1", company: "Avalith", status: "discarded" })];
+
+  const plan = planFoldLeads([], leads, new Map());
+
+  assert.equal(plan.statusBackfills.length, 0);
+});
+
+test("planStatusBackfills falls back to createdAt when updatedAt is null", () => {
+  const leads = [
+    lead({
+      id: "l1",
+      status: "contacted",
+      updatedByBdId: null,
+      updatedAt: null,
+      createdAt: new Date("2025-06-01T00:00:00Z"),
+    }),
+  ];
+  const mappings = [{ legacyLeadId: "l1", method: "new" as const, personRef: "np1" }];
+
+  const backfills = planStatusBackfills(leads, mappings, new Map());
+
+  assert.equal(backfills.length, 1);
+  assert.equal(backfills[0].originalAt.toISOString(), "2025-06-01T00:00:00.000Z");
 });

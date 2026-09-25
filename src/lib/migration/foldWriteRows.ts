@@ -4,7 +4,7 @@
  * generate ids up front so id-map and duplicate-candidate rows can reference
  * them without a round trip per row, and never write one statement per lead.
  */
-import type { duplicateCandidate, person, personIdMap } from "@/db/schema";
+import type { activity, duplicateCandidate, person, personIdMap } from "@/db/schema";
 import type { FoldPlan } from "./foldPlanner";
 
 export interface FoldPersonUpdate {
@@ -26,6 +26,10 @@ export interface FoldWriteRows {
   idMap: (typeof personIdMap.$inferInsert)[];
   duplicateCandidates: (typeof duplicateCandidate.$inferInsert)[];
   personUpdates: FoldPersonUpdate[];
+  // status_backfill activity rows (contact-migration spec "Backfill
+  // activity for manually set status"). actorBdId is null — these are
+  // system-derived (see activity.actorBdId's schema comment).
+  activities: (typeof activity.$inferInsert)[];
 }
 
 /**
@@ -81,5 +85,16 @@ export function buildFoldWriteRows(
     duplicateCandidates.push({ personAId, personBId, reason: pair.reason, matchKey: pair.matchKey });
   }
 
-  return { persons, idMap, duplicateCandidates, personUpdates };
+  const activities: (typeof activity.$inferInsert)[] = plan.statusBackfills.map((b) => ({
+    personId: resolveRef(b.personRef),
+    actorBdId: null,
+    type: "status_backfill",
+    metadata: {
+      status: b.status,
+      originalEditorBdId: b.originalEditorBdId,
+      originalAt: b.originalAt.toISOString(),
+    },
+  }));
+
+  return { persons, idMap, duplicateCandidates, personUpdates, activities };
 }

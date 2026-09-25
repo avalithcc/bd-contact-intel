@@ -260,11 +260,35 @@ export async function readAllLeadRows(): Promise<FoldLeadRow[]> {
         emailConfidence: r.emailConfidence,
         emailSource: r.emailSource,
         sourceKey: r.sourceKey,
+        status: r.status as FoldLeadRow["status"],
+        updatedByBdId: r.updatedByBdId,
+        updatedAt: r.updatedAt,
+        createdAt: r.createdAt,
       });
     }
     lastId = page[page.length - 1].id;
   }
   return rows;
+}
+
+/**
+ * Every `type` already logged per `leadId` (task 4.2's "no supporting
+ * activity" check) — grouped in one query rather than N lead-scoped ones.
+ */
+export async function readActivityTypesByLeadId(): Promise<Map<string, Set<string>>> {
+  const rows = await db
+    .selectDistinct({ leadId: activity.leadId, type: activity.type })
+    .from(activity)
+    .where(isNotNull(activity.leadId));
+
+  const result = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!r.leadId) continue;
+    const types = result.get(r.leadId) ?? new Set<string>();
+    types.add(r.type);
+    result.set(r.leadId, types);
+  }
+  return result;
 }
 
 /** Every non-merged `person` row, seeding the fold matcher's `IdentityIndex` (Phase 3 already executed). */
@@ -373,6 +397,9 @@ export async function finalizeFoldExecute(input: FinalizeFoldExecuteInput): Prom
     }
     for (const batch of chunk(rows.duplicateCandidates, WRITE_BATCH_SIZE)) {
       await tx.insert(duplicateCandidate).values(batch).onConflictDoNothing();
+    }
+    for (const batch of chunk(rows.activities, WRITE_BATCH_SIZE)) {
+      await tx.insert(activity).values(batch);
     }
 
     // Set-based re-point: every activity/task/signal row still carrying a

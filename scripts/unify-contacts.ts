@@ -37,6 +37,7 @@ import {
   finalizeExecute,
   finalizeFoldExecute,
   getMigrationRunForGate,
+  readActivityTypesByLeadId,
   readAllContactRows,
   readAllLeadRows,
   readExistingPersonsForFold,
@@ -86,10 +87,14 @@ async function runCollapsePhase(args: Args) {
 }
 
 async function runFoldLeadsPhase(args: Args) {
-  const [existingPersons, leads] = await Promise.all([readExistingPersonsForFold(), readAllLeadRows()]);
+  const [existingPersons, leads, activityTypesByLeadId] = await Promise.all([
+    readExistingPersonsForFold(),
+    readAllLeadRows(),
+    readActivityTypesByLeadId(),
+  ]);
 
   if (args.mode === "dry_run") {
-    const { migrationRunId, report } = await runFoldDryRun(existingPersons, leads, {
+    const { migrationRunId, report } = await runFoldDryRun(existingPersons, leads, activityTypesByLeadId, {
       saveDryRunReport: saveFoldDryRunReport,
     });
     console.log(`Dry run complete. migration_run id: ${migrationRunId}`);
@@ -102,10 +107,13 @@ async function runFoldLeadsPhase(args: Args) {
     throw new Error("--execute requires --run=<migration_run id> (the approved dry run's id)");
   }
   const approvedRun = await getMigrationRunForGate(args.runId);
-  const { migrationRunId, report } = await runFoldExecute(existingPersons, leads, approvedRun, {
-    snapshotBackup,
-    finalizeExecute: finalizeFoldExecute,
-  });
+  const { migrationRunId, report } = await runFoldExecute(
+    existingPersons,
+    leads,
+    activityTypesByLeadId,
+    approvedRun,
+    { snapshotBackup, finalizeExecute: finalizeFoldExecute },
+  );
   console.log(`Execute complete. migration_run id: ${migrationRunId}`);
   console.log(JSON.stringify(report, null, 2));
 }
