@@ -23,7 +23,7 @@ import {
   signal,
   task,
 } from "@/db/schema";
-import { assertApprovable } from "./approveGuard";
+import { assertApprovable, MigrationApproveBlockedError } from "./approveGuard";
 import type { CollapseContactRow, CollapsePlan } from "./collapsePlanner";
 import type { ApprovedMigrationRun, FinalizeExecuteInput } from "./collapseRun";
 import { buildCollapseWriteRows, chunk, WRITE_BATCH_SIZE } from "./collapseWriteRows";
@@ -146,7 +146,7 @@ export async function getLatestMigrationRun(
 ): Promise<MigrationRunWithApprover | null> {
   const runs = await migrationRunWithApproverSelect()
     .where(eq(migrationRun.kind, kind))
-    .orderBy(desc(migrationRun.createdAt))
+    .orderBy(desc(migrationRun.createdAt), desc(migrationRun.id))
     .limit(1);
   return runs[0] ?? null;
 }
@@ -171,12 +171,21 @@ export async function approveMigrationRun(
   assertApprovable(candidate, expectedKind, latest?.id ?? null);
 
   return db.transaction(async (tx) => {
+    // Claim atomically (same pattern as finalizeExecute): if a concurrent
+    // approval landed after the checks above, zero rows match and the second
+    // admin gets `already_approved` instead of a duplicate audit row.
     const [updated] = await tx
       .update(migrationRun)
       .set({ approvedByBdId, approvedAt: new Date() })
-      .where(eq(migrationRun.id, runId))
+      .where(
+        and(
+          eq(migrationRun.id, runId),
+          isNull(migrationRun.approvedAt),
+          isNull(migrationRun.executedAt),
+        ),
+      )
       .returning();
-    if (!updated) throw new Error(`migration_run ${runId} not found`);
+    if (!updated) throw new MigrationApproveBlockedError("already_approved");
     await tx.insert(auditLog).values({
       actorBdId: approvedByBdId,
       action: "migration_approve",
