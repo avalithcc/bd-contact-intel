@@ -25,7 +25,7 @@ import {
 } from "@/lib/identity/ingestWrite";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
-import { recomputePersonStatus } from "@/lib/status/recompute";
+import { recomputePersonStatuses } from "@/lib/status/recompute";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
@@ -742,12 +742,10 @@ export async function importMessages(
  * Wrapped in one transaction (task 5.2) so the person-side aggregate update
  * and the status-cache recompute it feeds (design D4: a connection's
  * sent/received counts are stage evidence) land atomically. The
- * per-affected-person recompute loop is deliberately NOT set-based SQL: the
- * discard/rank rule (deriveStatus) isn't trivially expressible as a single
- * UPDATE, and a message import's affected-person count is bounded by that
- * BD's distinct message peers (already chunked at import time), not the
- * whole contact base — flagged as a perf follow-up if that assumption stops
- * holding.
+ * affected-person status recompute (fresh-review fix) is one batched call
+ * to `recomputePersonStatuses` — one bulk read of `activity`/
+ * `person_bd_connection` per chunk, `deriveStatus` run in memory per person,
+ * and one `UPDATE ... FROM (VALUES ...)` per chunk — not a per-person loop.
  */
 export async function recomputeMessageSignals(bdId: string): Promise<void> {
   return db.transaction((tx) => recomputeMessageSignalsInTx(tx, bdId));
@@ -864,14 +862,13 @@ async function recomputeMessageSignalsInTx(tx: RecomputeTx, bdId: string): Promi
     RETURNING pbc.person_id AS "personId"
   `);
 
-  // Task 5.2: a connection's sent/received counts are stage evidence (design
-  // D4), so every person whose connection this import just touched needs its
-  // status cache recomputed — see the perf note on this function's doc
-  // comment for why this is a loop, not a second set-based UPDATE.
-  const touchedPersonIds = new Set(touchedConnections.map((r) => r.personId));
-  for (const personId of touchedPersonIds) {
-    await recomputePersonStatus(tx, personId);
-  }
+  // Task 5.2 (fresh-review fix): a connection's sent/received counts are
+  // stage evidence (design D4), so every person whose connection this
+  // import just touched needs its status cache recomputed — batched via
+  // recomputePersonStatuses (one bulk read + one bulk UPDATE per chunk,
+  // instead of a per-person loop; see src/lib/status/recompute.ts).
+  const touchedPersonIds = [...new Set(touchedConnections.map((r) => r.personId))];
+  await recomputePersonStatuses(tx, touchedPersonIds);
 }
 
 export interface MessageRow {

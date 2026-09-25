@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   activityRowToStatusEvent,
+  buildPersonStatusUpdates,
   connectionRowToStatusEvent,
   deriveStatus,
   type StatusEvent,
@@ -201,4 +202,33 @@ test("connectionRowToStatusEvent maps person_bd_connection columns 1:1", () => {
     connectionRowToStatusEvent({ bdId: "bd-1", sentCount: 2, receivedCount: 1, lastMessageAt }),
     { kind: "connection", bdId: "bd-1", sentCount: 2, receivedCount: 1, at: lastMessageAt },
   );
+});
+
+test("buildPersonStatusUpdates: groups rows per person and derives one update each (fresh-review fix 1)", () => {
+  const connectedAt = new Date("2025-12-01");
+  const emailSentAt = new Date("2026-01-01");
+  const meetingAt = new Date("2026-01-05");
+  const updates = buildPersonStatusUpdates(
+    ["p1", "p2", "p3"],
+    [
+      { id: "a1", type: "email_sent", createdAt: emailSentAt, metadata: {}, personId: "p1" },
+      { id: "a2", type: "meeting_logged", createdAt: meetingAt, metadata: {}, personId: "p2" },
+    ],
+    [{ bdId: "bd-1", sentCount: 1, receivedCount: 0, lastMessageAt: connectedAt, personId: "p1" }],
+  );
+
+  assert.deepEqual(updates, [
+    { personId: "p1", status: "contacted", statusActivityId: "a1" },
+    { personId: "p2", status: "meeting", statusActivityId: "a2" },
+    { personId: "p3", status: "new", statusActivityId: null },
+  ]);
+});
+
+test("buildPersonStatusUpdates: rows for a personId not in the requested list are ignored", () => {
+  const updates = buildPersonStatusUpdates(
+    ["p1"],
+    [{ id: "a1", type: "email_sent", createdAt: new Date(), metadata: {}, personId: "stray" }],
+    [],
+  );
+  assert.deepEqual(updates, [{ personId: "p1", status: "new", statusActivityId: null }]);
 });

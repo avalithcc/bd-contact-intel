@@ -211,6 +211,51 @@ export function connectionRowToStatusEvent(row: ConnectionRowForStatus): Connect
   };
 }
 
+/** One person's resolved status cache write, ready for a batched `UPDATE ... FROM (VALUES ...)`. */
+export interface PersonStatusUpdate {
+  personId: string;
+  status: PersonStatus;
+  statusActivityId: string | null;
+}
+
+/**
+ * Pure grouping + derivation step for batched status recompute (fresh-review
+ * fix: recomputeMessageSignals used to call recomputePersonStatus once per
+ * touched person, each doing its own 2 SELECT + 1 UPDATE inside the same
+ * transaction). Groups already-fetched activity/connection rows by
+ * `personId`, runs `deriveStatus` once per person, and returns one update
+ * per requested `personId` — including persons with zero rows (they resolve
+ * to `{ status: "new", because: null }`, same as `deriveStatus([])`). The
+ * caller (recompute.ts) is responsible for the actual bulk read and the
+ * single batched write; this function touches no I/O.
+ */
+export function buildPersonStatusUpdates(
+  personIds: readonly string[],
+  activityRows: readonly (ActivityRowForStatus & { personId: string })[],
+  connectionRows: readonly (ConnectionRowForStatus & { personId: string })[],
+): PersonStatusUpdate[] {
+  const eventsByPerson = new Map<string, StatusEvent[]>();
+  for (const id of personIds) eventsByPerson.set(id, []);
+
+  for (const row of activityRows) {
+    const events = eventsByPerson.get(row.personId);
+    if (events) events.push(activityRowToStatusEvent(row));
+  }
+  for (const row of connectionRows) {
+    const events = eventsByPerson.get(row.personId);
+    if (events) events.push(connectionRowToStatusEvent(row));
+  }
+
+  return personIds.map((personId) => {
+    const derived = deriveStatus(eventsByPerson.get(personId) ?? []);
+    return {
+      personId,
+      status: derived.status,
+      statusActivityId: derived.because?.source === "activity" ? derived.because.activityId : null,
+    };
+  });
+}
+
 export function deriveStatus(events: readonly StatusEvent[]): DerivedStatus {
   let stage: StageCandidate | null = null;
   let discard: DiscardCandidate | null = null;
