@@ -23,6 +23,7 @@ import {
   type IdentityIngestRow,
   type IdentityWritePlan,
 } from "@/lib/identity/resolve";
+import type { PersonIdLookup } from "@/lib/identity/referenceWrite";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -179,4 +180,15 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
       })
       .where(eq(person.id, update.personId));
   }
+}
+
+/**
+ * Same-statement `person_id` subquery for "reference writes" (design
+ * "Reference writes" addendum; task 4B.5/4B.6): activity/task/signal rows
+ * never create or lock a person, they only resolve one via `person_id_map`.
+ * Resolves to null when a row was created before its legacy row was ever
+ * mapped — the catch-up phase (task 4B.7) re-points it later.
+ */
+export function personIdLookupSql(lookup: PersonIdLookup) {
+  return sql<string | null>`(select person_id from person_id_map where legacy_table = ${lookup.legacyTable} and legacy_id = ${lookup.legacyId})`;
 }

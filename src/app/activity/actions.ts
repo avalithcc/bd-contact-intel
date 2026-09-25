@@ -17,6 +17,8 @@ export async function createActivityAction(input: {
   const activity = await createActivity({
     ...input,
     contactOwnerBdId: input.contactId ? me.id : undefined,
+    // Who logged this activity (design "Reference writes"; task 4B.5).
+    actorBdId: me.id,
   } as NewActivity);
 
   // Revalidate all affected paths

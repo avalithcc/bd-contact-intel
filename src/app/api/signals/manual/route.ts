@@ -1,6 +1,9 @@
 import { getCurrentBd } from "@/lib/queries";
 import { db } from "@/db";
 import { signal } from "@/db/schema";
+import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { personIdLookupSql } from "@/lib/identity/resolveDb";
+import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -23,16 +26,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [result] = await db
-      .insert(signal)
-      .values({
-        source: "manual_paste",
-        data: { body: signalText },
-        leadId: leadId || undefined,
-        companyKey: companyKey || undefined,
-        contactId: contactId || undefined,
-      })
-      .returning();
+    // `person_id` via the same `person_id_map` subquery as
+    // createActivity/createTask (design "Reference writes"; task 4B.5) —
+    // no matcher, no lock, since this never creates a person.
+    const lookup = resolvePersonIdLookup({ leadId, contactId });
+    const values = {
+      source: "manual_paste",
+      data: { body: signalText },
+      leadId: leadId || undefined,
+      companyKey: companyKey || undefined,
+      contactId: contactId || undefined,
+      actorBdId: me.id,
+      ...(lookup && isIdentityDualWriteEnabled() ? { personId: personIdLookupSql(lookup) } : {}),
+    };
+    const [result] = await db.insert(signal).values(values).returning();
 
     return NextResponse.json(result);
   } catch (err) {
