@@ -81,12 +81,8 @@ Chain strategy: feature-branch-chain
 **Actual PR slicing (recorded as it happened, deviates from the plan table above)**:
 
 - 4a — planner (PR #8: `feat/crm-hubspot-ux-04-fold-leads`).
-- 4b — collapse-merge fix + pure repair core (`feat/crm-hubspot-ux-04b-collapse-merge-fix`).
-- 4c — repair CLI (`feat/crm-hubspot-ux-04c-repair-cli`).
-- 4c2 — repair guards, `--run` required for both modes, drift gate (`feat/crm-hubspot-ux-04c2-repair-guards`).
+- 4b — collapse-merge planner fix (`feat/crm-hubspot-ux-04b-collapse-merge-fix`). Repair verified unnecessary: dry run against prod showed 0 diffs across all 699 multi-contact groups (identical values in the 8 affected fields), so no `--execute` was needed and no repair CLI shipped.
 - 4d — fold-leads write path, this branch (`feat/crm-hubspot-ux-04d-fold-write`).
-- [ ] Collapse-merge repair dry run against prod (owner GATE) — not yet run.
-- [ ] Collapse-merge repair `--execute` against prod (owner GATE) — not yet run.
 
 ## Phase 4B: Write Cutover & Catch-up (PRs 4B-1..4B-4, base: PR 4)
 

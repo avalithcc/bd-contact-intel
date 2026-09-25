@@ -10,18 +10,25 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  activity,
   auditLog,
   bd,
   contact,
   duplicateCandidate,
+  lead,
   migrationRun,
   person,
   personBdConnection,
   personIdMap,
+  signal,
+  task,
 } from "@/db/schema";
 import type { CollapseContactRow, CollapsePlan } from "./collapsePlanner";
 import type { ApprovedMigrationRun, FinalizeExecuteInput } from "./collapseRun";
 import { buildCollapseWriteRows, chunk, WRITE_BATCH_SIZE } from "./collapseWriteRows";
+import type { FoldExistingPerson, FoldLeadRow, FoldPlan } from "./foldPlanner";
+import type { FinalizeFoldExecuteInput } from "./foldRun";
+import { buildFoldWriteRows } from "./foldWriteRows";
 import type { EmailStatus } from "@/lib/identity/matcher";
 
 const READ_BATCH_SIZE = 1000;
@@ -207,6 +214,179 @@ export async function finalizeExecute(input: FinalizeExecuteInput): Promise<void
     // (re-derived report content is identical to the dry run's, since
     // assertExecutionAllowed already proved the input_hash matches) rather
     // than adding a dedicated schema column for this one field.
+    await tx
+      .update(migrationRun)
+      .set({ report: { ...plan.report, backupPath } })
+      .where(eq(migrationRun.id, migrationRunId));
+
+    await tx.insert(auditLog).values({
+      actorBdId,
+      action: "migration_execute",
+      metadata: { migrationRunId, backupPath, report: plan.report },
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fold-leads phase (design.md "Migration plan" step 4; task 4.3).
+// ---------------------------------------------------------------------------
+
+/** Every `lead` row, narrowed to the fields foldPlanner.ts's matcher and merge need. */
+export async function readAllLeadRows(): Promise<FoldLeadRow[]> {
+  const rows: FoldLeadRow[] = [];
+  let lastId: string | null = null;
+
+  for (;;) {
+    const page = await db
+      .select()
+      .from(lead)
+      .where(lastId === null ? undefined : sql`${lead.id} > ${lastId}`)
+      .orderBy(lead.id)
+      .limit(READ_BATCH_SIZE);
+    if (!page.length) break;
+
+    for (const r of page) {
+      rows.push({
+        id: r.id,
+        ownerBdId: r.ownerBdId,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        company: r.companyDisplay ?? r.companyRaw,
+        companyKey: r.companyKey,
+        jobTitle: r.jobTitle,
+        industry: r.industryGroup ?? r.industryRaw,
+        email: r.email,
+        emailStatus: r.emailStatus as EmailStatus,
+        emailConfidence: r.emailConfidence,
+        emailSource: r.emailSource,
+        sourceKey: r.sourceKey,
+      });
+    }
+    lastId = page[page.length - 1].id;
+  }
+  return rows;
+}
+
+/** Every non-merged `person` row, seeding the fold matcher's `IdentityIndex` (Phase 3 already executed). */
+export async function readExistingPersonsForFold(): Promise<FoldExistingPerson[]> {
+  const rows: FoldExistingPerson[] = [];
+  let lastId: string | null = null;
+
+  for (;;) {
+    const page = await db
+      .select()
+      .from(person)
+      .where(
+        and(
+          isNull(person.mergedIntoId),
+          lastId === null ? undefined : sql`${person.id} > ${lastId}`,
+        ),
+      )
+      .orderBy(person.id)
+      .limit(READ_BATCH_SIZE);
+    if (!page.length) break;
+
+    for (const r of page) {
+      rows.push({
+        id: r.id,
+        profileKey: r.profileKey,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        companyKey: r.companyKey,
+        email: r.email,
+        emailNormalized: r.emailNormalized,
+        emailStatus: r.emailStatus as EmailStatus,
+        emailConfidence: r.emailConfidence,
+        emailSource: r.emailSource,
+        jobTitle: r.jobTitle,
+        industry: r.industry,
+      });
+    }
+    lastId = page[page.length - 1].id;
+  }
+  return rows;
+}
+
+/** Persists a fresh `dry_run` migration_run row for the fold-leads phase. */
+export async function saveFoldDryRunReport(input: {
+  inputHash: string;
+  report: FoldPlan["report"];
+}): Promise<string> {
+  const [row] = await db
+    .insert(migrationRun)
+    .values({ kind: "fold_leads", mode: "dry_run", inputHash: input.inputHash, report: input.report })
+    .returning({ id: migrationRun.id });
+  return row.id;
+}
+
+/**
+ * One transaction: inserts new persons, updates matched-existing persons,
+ * writes person_id_map/duplicate_candidate rows, re-points `activity`/
+ * `task`/`signal` rows that reference a folded lead (`linkedin_scrape_job`
+ * has no lead-scoped column, so it is never re-pointed here), marks the
+ * approved run executed, and writes one audit_log(migration_execute) entry.
+ */
+export async function finalizeFoldExecute(input: FinalizeFoldExecuteInput): Promise<void> {
+  const { plan, migrationRunId, actorBdId, backupPath } = input;
+  await db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(migrationRun)
+      .set({ mode: "execute", executedAt: new Date() })
+      .where(
+        and(
+          eq(migrationRun.id, migrationRunId),
+          isNull(migrationRun.executedAt),
+          isNotNull(migrationRun.approvedAt),
+        ),
+      )
+      .returning({ id: migrationRun.id });
+    if (!claimed) {
+      throw new Error(
+        `migration_run ${migrationRunId} is not an approved, unexecuted run; refusing to execute`,
+      );
+    }
+
+    const rows = buildFoldWriteRows(plan, migrationRunId, randomUUID);
+    for (const batch of chunk(rows.persons, WRITE_BATCH_SIZE)) {
+      await tx.insert(person).values(batch);
+    }
+    for (const batch of chunk(rows.personUpdates, WRITE_BATCH_SIZE)) {
+      const values = batch.map(
+        (u) =>
+          sql`(${u.id}::uuid, ${u.firstName}::text, ${u.lastName}::text, ${u.companyKey}::text, ${u.jobTitle}::text, ${u.industry}::text, ${u.email}::text, ${u.emailNormalized}::text, ${u.emailStatus}::text, ${u.emailConfidence}::int, ${u.emailSource}::text)`,
+      );
+      await tx.execute(sql`
+        UPDATE person AS p
+        SET first_name = v.first_name, last_name = v.last_name, company_key = v.company_key,
+            job_title = v.job_title, industry = v.industry, email = v.email,
+            email_normalized = v.email_normalized, email_status = v.email_status,
+            email_confidence = v.email_confidence, email_source = v.email_source,
+            updated_at = now()
+        FROM (VALUES ${sql.join(values, sql`, `)})
+          AS v(id, first_name, last_name, company_key, job_title, industry, email,
+               email_normalized, email_status, email_confidence, email_source)
+        WHERE p.id = v.id
+      `);
+    }
+    for (const batch of chunk(rows.idMap, WRITE_BATCH_SIZE)) {
+      await tx.insert(personIdMap).values(batch);
+    }
+    for (const batch of chunk(rows.duplicateCandidates, WRITE_BATCH_SIZE)) {
+      await tx.insert(duplicateCandidate).values(batch).onConflictDoNothing();
+    }
+
+    // Set-based re-point: every activity/task/signal row still carrying a
+    // legacy leadId with no person_id gets one through the map this run (or
+    // an earlier one) just wrote — never one UPDATE per row.
+    for (const table of [activity, task, signal]) {
+      await tx.execute(sql`
+        UPDATE ${table} AS r
+        SET person_id = m.person_id
+        FROM person_id_map m
+        WHERE m.legacy_table = 'lead' AND m.legacy_id = r.lead_id AND r.person_id IS NULL
+      `);
+    }
+
     await tx
       .update(migrationRun)
       .set({ report: { ...plan.report, backupPath } })

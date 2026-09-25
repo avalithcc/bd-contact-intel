@@ -1,12 +1,15 @@
 /**
  * Collapse/fold-leads migration CLI (design.md "Migration plan", R10/R13;
- * contact-migration spec). This batch (Phase 3) only implements
- * `--phase=collapse`; `--phase=fold_leads` is Phase 4.
+ * contact-migration spec). `--phase=fold_leads` matches `lead` rows against
+ * the persons the (already-executed) collapse phase created, via
+ * src/lib/migration/foldRun.ts.
  *
  * Usage (do NOT run automatically — this reads/writes the real database
  * and, on --execute, shells out to pg_dump/pg_restore):
  *   npx tsx scripts/unify-contacts.ts --phase=collapse --dry-run
  *   npx tsx scripts/unify-contacts.ts --phase=collapse --execute --run=<migration_run id>
+ *   npx tsx scripts/unify-contacts.ts --phase=fold_leads --dry-run
+ *   npx tsx scripts/unify-contacts.ts --phase=fold_leads --execute --run=<migration_run id>
  *
  * `--dry-run` (the default when neither flag is passed) never writes
  * `person`/`person_bd_connection`/`person_id_map` rows — it only reads
@@ -28,12 +31,17 @@
  * one transaction (src/lib/migration/queries.ts#finalizeExecute).
  */
 import { runCollapseDryRun, runCollapseExecute } from "../src/lib/migration/collapseRun";
+import { runFoldDryRun, runFoldExecute } from "../src/lib/migration/foldRun";
 import { snapshotBackup } from "../src/lib/migration/backup";
 import {
   finalizeExecute,
+  finalizeFoldExecute,
   getMigrationRunForGate,
   readAllContactRows,
+  readAllLeadRows,
+  readExistingPersonsForFold,
   saveDryRunReport,
+  saveFoldDryRunReport,
 } from "../src/lib/migration/queries";
 
 interface Args {
@@ -50,15 +58,11 @@ function parseArgs(argv: string[]): Args {
   if (phase !== "collapse" && phase !== "fold_leads") {
     throw new Error(`--phase must be 'collapse' or 'fold_leads' (got ${phase ?? "none"})`);
   }
-  if (phase === "fold_leads") {
-    throw new Error("--phase=fold_leads is not implemented yet (Phase 4, PR 4)");
-  }
   const mode = flags.has("--execute") ? "execute" : "dry_run";
   return { phase, mode, runId: runArg?.slice("--run=".length) ?? null };
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+async function runCollapsePhase(args: Args) {
   const rows = await readAllContactRows();
 
   if (args.mode === "dry_run") {
@@ -79,6 +83,37 @@ async function main() {
   });
   console.log(`Execute complete. migration_run id: ${migrationRunId}`);
   console.log(JSON.stringify(report, null, 2));
+}
+
+async function runFoldLeadsPhase(args: Args) {
+  const [existingPersons, leads] = await Promise.all([readExistingPersonsForFold(), readAllLeadRows()]);
+
+  if (args.mode === "dry_run") {
+    const { migrationRunId, report } = await runFoldDryRun(existingPersons, leads, {
+      saveDryRunReport: saveFoldDryRunReport,
+    });
+    console.log(`Dry run complete. migration_run id: ${migrationRunId}`);
+    console.log(JSON.stringify(report, null, 2));
+    console.log("Review this report in /admin/migration and approve it before --execute.");
+    return;
+  }
+
+  if (!args.runId) {
+    throw new Error("--execute requires --run=<migration_run id> (the approved dry run's id)");
+  }
+  const approvedRun = await getMigrationRunForGate(args.runId);
+  const { migrationRunId, report } = await runFoldExecute(existingPersons, leads, approvedRun, {
+    snapshotBackup,
+    finalizeExecute: finalizeFoldExecute,
+  });
+  console.log(`Execute complete. migration_run id: ${migrationRunId}`);
+  console.log(JSON.stringify(report, null, 2));
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.phase === "collapse") return runCollapsePhase(args);
+  return runFoldLeadsPhase(args);
 }
 
 main()
