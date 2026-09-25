@@ -450,6 +450,61 @@ export function buildIdentityWriteRows(plan: IdentityWritePlan, newId: () => str
   return { persons, connections, idMap, duplicateCandidates, existingUpdates: plan.existingUpdates };
 }
 
+/**
+ * Pure (task 4B.2 fix): repoints every row that references a "loser" person
+ * id — one that lost the `ON CONFLICT (profile_key) DO NOTHING` race in
+ * applyIdentityWrites — to the "winner" id that actually persisted.
+ *
+ * Before this fix, applyIdentityWrites only repointed `connections` and
+ * `idMap`, never `duplicateCandidates` (built from `reviewPairs` in
+ * buildIdentityWriteRows). A duplicate-candidate row referencing a
+ * never-persisted loser id violates the `person_a_id`/`person_b_id` FK and
+ * rolls back the whole chunk transaction.
+ *
+ * `existingUpdates` is untouched on purpose: it only ever references real,
+ * already-persisted person ids (see `updatedExisting` in planIdentityWrites),
+ * never a plan ref that could become a loser.
+ */
+export function repointIdentityWriteRows(
+  rows: IdentityWriteRows,
+  winnerByLoserId: ReadonlyMap<string, string>,
+): IdentityWriteRows {
+  if (winnerByLoserId.size === 0) return rows;
+
+  const resolve = (id: string): string => {
+    const seen = new Set<string>();
+    let current = id;
+    while (winnerByLoserId.has(current) && !seen.has(current)) {
+      seen.add(current);
+      current = winnerByLoserId.get(current)!;
+    }
+    return current;
+  };
+
+  const connections = rows.connections.map((c) =>
+    winnerByLoserId.has(c.personId as string) ? { ...c, personId: resolve(c.personId as string) } : c,
+  );
+
+  const idMap = rows.idMap.map((m) =>
+    m.personId && winnerByLoserId.has(m.personId as string) ? { ...m, personId: resolve(m.personId as string) } : m,
+  );
+
+  const seenPairs = new Set<string>();
+  const duplicateCandidates: (typeof duplicateCandidate.$inferInsert)[] = [];
+  for (const pair of rows.duplicateCandidates) {
+    const a = resolve(pair.personAId as string);
+    const b = resolve(pair.personBId as string);
+    if (a === b) continue; // collapsed to a self-pair — drop it
+    const [personAId, personBId] = a < b ? [a, b] : [b, a];
+    const key = `${personAId}:${personBId}`;
+    if (seenPairs.has(key)) continue; // became identical to another pair — dedupe
+    seenPairs.add(key);
+    duplicateCandidates.push({ ...pair, personAId, personBId });
+  }
+
+  return { ...rows, connections, idMap, duplicateCandidates };
+}
+
 // A person-creating transaction's advisory lock key (design D14) — an
 // arbitrary but fixed int4 constant, distinct from any other lock this app
 // takes. Global (not per-key): the writes it serializes are rare (uploads,

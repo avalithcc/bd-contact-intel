@@ -12,8 +12,10 @@ import {
   buildPrefetchKeys,
   isIdentityDualWriteEnabled,
   planIdentityWrites,
+  repointIdentityWriteRows,
   type ExistingPersonCandidate,
   type IdentityIngestRow,
+  type IdentityWriteRows,
 } from "@/lib/identity/resolve";
 
 function row(overrides: Partial<IdentityIngestRow>): IdentityIngestRow {
@@ -177,6 +179,86 @@ test("buildIdentityWriteRows: review pairs resolve to sorted real ids", () => {
   assert.equal(built.duplicateCandidates.length, 1);
   assert.equal(built.duplicateCandidates[0].personAId, "aaa-new");
   assert.equal(built.duplicateCandidates[0].personBId, "zzz-existing");
+});
+
+function writeRows(overrides: Partial<IdentityWriteRows> = {}): IdentityWriteRows {
+  return {
+    persons: [],
+    connections: [],
+    idMap: [],
+    duplicateCandidates: [],
+    existingUpdates: [],
+    ...overrides,
+  };
+}
+
+test("repointIdentityWriteRows: no-op when there are no losers", () => {
+  const rows = writeRows({
+    connections: [{ personId: "gen-1", bdId: "bd-1", connectedOn: null, legacyContactId: "c1" }],
+  });
+  const result = repointIdentityWriteRows(rows, new Map());
+  assert.equal(result, rows);
+});
+
+test("repointIdentityWriteRows: repoints connections.personId from loser to winner", () => {
+  const rows = writeRows({
+    connections: [{ personId: "gen-1", bdId: "bd-1", connectedOn: null, legacyContactId: "c1" }],
+  });
+  const result = repointIdentityWriteRows(rows, new Map([["gen-1", "person-winner"]]));
+  assert.equal(result.connections[0].personId, "person-winner");
+});
+
+test("repointIdentityWriteRows: repoints idMap.personId from loser to winner, leaves null personId alone", () => {
+  const rows = writeRows({
+    idMap: [
+      { legacyTable: "contact", legacyId: "c1", personId: "gen-1", method: "new" },
+      { legacyTable: "contact", legacyId: "c2", personId: null, method: "skipped_own_company" },
+    ],
+  });
+  const result = repointIdentityWriteRows(rows, new Map([["gen-1", "person-winner"]]));
+  assert.equal(result.idMap[0].personId, "person-winner");
+  assert.equal(result.idMap[1].personId, null);
+});
+
+test("repointIdentityWriteRows: repoints duplicateCandidates and re-sorts the pair (a < b)", () => {
+  const rows = writeRows({
+    duplicateCandidates: [
+      { personAId: "gen-1", personBId: "zzz-existing", reason: "name_company", matchKey: "k" },
+    ],
+  });
+  // Winner id sorts after "zzz-existing", so the pair must flip order.
+  const result = repointIdentityWriteRows(rows, new Map([["gen-1", "zzz-winner"]]));
+  assert.equal(result.duplicateCandidates[0].personAId, "zzz-existing");
+  assert.equal(result.duplicateCandidates[0].personBId, "zzz-winner");
+});
+
+test("repointIdentityWriteRows: drops a duplicate-candidate pair that collapses to itself", () => {
+  const rows = writeRows({
+    duplicateCandidates: [
+      { personAId: "gen-1", personBId: "gen-2", reason: "name_company", matchKey: "k" },
+    ],
+  });
+  const winnerByLoserId = new Map([
+    ["gen-1", "person-winner"],
+    ["gen-2", "person-winner"],
+  ]);
+  const result = repointIdentityWriteRows(rows, winnerByLoserId);
+  assert.equal(result.duplicateCandidates.length, 0);
+});
+
+test("repointIdentityWriteRows: dedupes pairs that become identical after repointing", () => {
+  const rows = writeRows({
+    duplicateCandidates: [
+      { personAId: "gen-1", personBId: "other", reason: "name_company", matchKey: "k1" },
+      { personAId: "gen-2", personBId: "other", reason: "name_company", matchKey: "k2" },
+    ],
+  });
+  const winnerByLoserId = new Map([
+    ["gen-1", "person-winner"],
+    ["gen-2", "person-winner"],
+  ]);
+  const result = repointIdentityWriteRows(rows, winnerByLoserId);
+  assert.equal(result.duplicateCandidates.length, 1);
 });
 
 test("isIdentityDualWriteEnabled: defaults to enabled", () => {
