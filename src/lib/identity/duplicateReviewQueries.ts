@@ -32,6 +32,9 @@ export interface DuplicateCandidateListPage {
   total: number;
   page: number;
   pageCount: number;
+  // 0-based offset of `items[0]` within the full open-queue ordering, so the
+  // page can render "Par N de {total}" without re-deriving pagination math.
+  startIndex: number;
 }
 
 /** Open pairs, most recent first. `page` is 1-based. */
@@ -75,7 +78,7 @@ export async function listOpenDuplicateCandidates(page = 1): Promise<DuplicateCa
     createdAt: r.createdAt,
   }));
 
-  return { items, total, page, pageCount };
+  return { items, total, page, pageCount, startIndex: start };
 }
 
 export interface DuplicateCandidateSidePerson {
