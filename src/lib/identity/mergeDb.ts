@@ -18,6 +18,7 @@ import {
   person,
   personBdConnection,
   personIdMap,
+  personPropertyHistory,
   signal,
   task,
 } from "@/db/schema";
@@ -124,6 +125,21 @@ async function repointReferences(tx: DbTransaction, refs: readonly MergeReferenc
   if (signalIds.length) await tx.update(signal).set({ personId: toPersonId }).where(inArray(signal.id, signalIds));
 }
 
+/** Column set for a connection's mutable (non-identity) fields, used by both merge-time aggregation and unmerge-time restores. */
+function connectionValueColumns(c: MergeConnection) {
+  return {
+    connectedOn: c.connectedOn,
+    legacyContactId: c.legacyContactId,
+    messageCount: c.messageCount,
+    sentCount: c.sentCount,
+    receivedCount: c.receivedCount,
+    firstMessageAt: c.firstMessageAt,
+    lastMessageAt: c.lastMessageAt,
+    initiatedByMe: c.initiatedByMe,
+    reciprocal: c.reciprocal,
+  };
+}
+
 async function repointIdMapRows(tx: DbTransaction, rows: readonly MergeIdMapRow[], toPersonId: string): Promise<void> {
   for (const row of rows) {
     await tx
@@ -188,14 +204,21 @@ export async function mergeContacts(
       .where(eq(person.id, survivorId));
     await tx.update(person).set({ mergedIntoId: survivorId }).where(eq(person.id, mergedId));
 
-    for (const c of plan.connectionsToDrop) {
-      await tx.delete(personBdConnection).where(and(eq(personBdConnection.personId, mergedId), eq(personBdConnection.bdId, c.bdId)));
-    }
     for (const c of plan.connectionsToRepoint) {
       await tx
         .update(personBdConnection)
         .set({ personId: survivorId })
         .where(and(eq(personBdConnection.personId, mergedId), eq(personBdConnection.bdId, c.bdId)));
+    }
+    // Same-BD conflicts: aggregate onto survivor's row (never drop either side's facts), then drop merged's now-folded-in row.
+    for (const conflict of plan.connectionConflicts) {
+      await tx
+        .update(personBdConnection)
+        .set(connectionValueColumns(conflict.aggregated))
+        .where(and(eq(personBdConnection.personId, survivorId), eq(personBdConnection.bdId, conflict.bdId)));
+      await tx
+        .delete(personBdConnection)
+        .where(and(eq(personBdConnection.personId, mergedId), eq(personBdConnection.bdId, conflict.bdId)));
     }
 
     await repointReferences(tx, plan.referencesToRepoint, survivorId);
@@ -229,6 +252,19 @@ export async function mergeContacts(
       metadata: { mergeEventId: inserted.id },
     });
 
+    if (plan.snapshot.survivorFieldChanges.length) {
+      await tx.insert(personPropertyHistory).values(
+        plan.snapshot.survivorFieldChanges.map((c) => ({
+          personId: survivorId,
+          property: c.field,
+          oldValue: c.before == null ? null : String(c.before),
+          newValue: c.after == null ? null : String(c.after),
+          changedByBdId: actorBdId,
+          source: "merge",
+        })),
+      );
+    }
+
     await recomputePersonStatuses(tx, [survivorId]);
 
     return { mergeEventId: inserted.id };
@@ -236,11 +272,16 @@ export async function mergeContacts(
 }
 
 /**
- * Task 6.2: replays a `merge_event` snapshot in reverse, no time limit
- * (duplicate-review spec "Unmerge available regardless of merge age").
- * References/id-map rows created AFTER the merge (not present in the frozen
- * snapshot) stay on the survivor — see planUnmerge's doc comment for why
- * this is the chosen minimal-safe interpretation.
+ * Task 6.2 + fresh-review safe-unmerge fix: replays a `merge_event` snapshot
+ * in reverse, no time limit (duplicate-review spec "Unmerge available
+ * regardless of merge age"). Only reverts a survivor field or same-BD
+ * connection conflict when its CURRENT value still equals what the merge
+ * wrote (see planUnmerge's doc comment) — anything changed since (a later
+ * merge, a manual edit, new messages) is kept, not silently overwritten.
+ * The merged person's row and its non-conflicting connections are always
+ * restored fully (it was hidden the whole time). References/id-map rows
+ * created AFTER the merge (not present in the frozen snapshot) stay on the
+ * survivor — the chosen minimal-safe interpretation.
  */
 export async function unmergeContact(database: typeof db, mergeEventId: string, actorBdId: string): Promise<void> {
   await database.transaction(async (tx) => {
@@ -249,41 +290,62 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
     if (event.undoneAt) throw new Error("Unmerge refused: this merge was already undone");
 
     const snapshot = event.snapshot as unknown as MergeSnapshot;
-    const plan = planUnmerge(snapshot);
 
-    await tx
-      .update(person)
-      .set({ ...plan.survivorRestore, updatedAt: new Date() })
-      .where(eq(person.id, event.survivorId));
+    const [survivorRow] = await tx.select().from(person).where(eq(person.id, event.survivorId)).for("update");
+    if (!survivorRow) throw new Error("Unmerge refused: survivor not found");
+
+    const relevantBdIds = [...new Set([...snapshot.movedConnectionBdIds, ...snapshot.connectionConflicts.map((c) => c.bdId)])];
+    const currentSurvivorConnections = relevantBdIds.length
+      ? (
+          await tx
+            .select()
+            .from(personBdConnection)
+            .where(and(eq(personBdConnection.personId, event.survivorId), inArray(personBdConnection.bdId, relevantBdIds)))
+        ).map(toMergeConnection)
+      : [];
+
+    const plan = planUnmerge(snapshot, {
+      currentSurvivor: toMergeFields(survivorRow),
+      currentSurvivorConnections,
+    });
+
+    if (plan.survivorFieldReverts.length) {
+      const set: Record<string, string | number | null> = {};
+      for (const r of plan.survivorFieldReverts) set[r.field] = r.to;
+      await tx
+        .update(person)
+        .set({ ...set, updatedAt: new Date() })
+        .where(eq(person.id, event.survivorId));
+    }
     await tx
       .update(person)
       .set({ ...plan.mergedRestore, mergedIntoId: null, updatedAt: new Date() })
       .where(eq(person.id, event.mergedId));
 
-    if (plan.survivorBdIdsToRemove.length) {
+    // Moved connections (no conflict): repoint personId back onto merged, keeping their CURRENT values — never delete+reinsert.
+    if (plan.movedConnectionBdIdsBack.length) {
       await tx
-        .delete(personBdConnection)
+        .update(personBdConnection)
+        .set({ personId: event.mergedId })
         .where(
-          and(eq(personBdConnection.personId, event.survivorId), inArray(personBdConnection.bdId, [...plan.survivorBdIdsToRemove])),
+          and(eq(personBdConnection.personId, event.survivorId), inArray(personBdConnection.bdId, [...plan.movedConnectionBdIdsBack])),
         );
     }
-    for (const c of plan.mergedConnectionsRestore) {
+
+    // Same-BD conflicts: revert survivor's row only if untouched since the merge; merged's original row is always restored.
+    for (const restore of plan.connectionConflictRestores) {
+      if (restore.kind === "reverted" && restore.survivorRestore) {
+        await tx
+          .update(personBdConnection)
+          .set(connectionValueColumns(restore.survivorRestore))
+          .where(and(eq(personBdConnection.personId, event.survivorId), eq(personBdConnection.bdId, restore.bdId)));
+      }
       await tx
         .insert(personBdConnection)
-        .values({ ...c, personId: event.mergedId })
+        .values({ ...restore.mergedRestore, personId: event.mergedId })
         .onConflictDoUpdate({
           target: [personBdConnection.personId, personBdConnection.bdId],
-          set: {
-            connectedOn: c.connectedOn,
-            legacyContactId: c.legacyContactId,
-            messageCount: c.messageCount,
-            sentCount: c.sentCount,
-            receivedCount: c.receivedCount,
-            firstMessageAt: c.firstMessageAt,
-            lastMessageAt: c.lastMessageAt,
-            initiatedByMe: c.initiatedByMe,
-            reciprocal: c.reciprocal,
-          },
+          set: connectionValueColumns(restore.mergedRestore),
         });
     }
 
@@ -311,26 +373,42 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
       metadata: { mergeEventId },
     });
 
+    if (plan.survivorFieldReverts.length) {
+      await tx.insert(personPropertyHistory).values(
+        plan.survivorFieldReverts.map((r) => ({
+          personId: event.survivorId,
+          property: r.field,
+          oldValue: r.from == null ? null : String(r.from),
+          newValue: r.to == null ? null : String(r.to),
+          changedByBdId: actorBdId,
+          source: "unmerge",
+        })),
+      );
+    }
+
     await recomputePersonStatuses(tx, [event.survivorId, event.mergedId]);
   });
 }
 
 /**
- * Task 6.3: dismisses a possible-duplicate pair (duplicate-review spec
- * "Not-a-duplicate path") — the pair never resurfaces because every
- * candidate-creating path (matcher/resolver/catch-up) inserts via
- * `ON CONFLICT DO NOTHING` on the unique (person_a_id, person_b_id) pair,
- * so a `not_duplicate` row already blocks re-insertion; this just records
- * the decision.
+ * Task 6.3 + fresh-review WARNING 4: dismisses a possible-duplicate pair
+ * (duplicate-review spec "Not-a-duplicate path") — the pair never resurfaces
+ * because every candidate-creating path (matcher/resolver/catch-up) inserts
+ * via `ON CONFLICT DO NOTHING` on the unique (person_a_id, person_b_id)
+ * pair, so a `not_duplicate` row already blocks re-insertion. Guarded to
+ * only transition `status='open'` -> `'not_duplicate'`: a conditional
+ * update that refuses (zero rows updated) if the pair is missing or was
+ * already decided (`merged`/`not_duplicate`), instead of silently
+ * clobbering an existing decision.
  */
 export async function markNotDuplicate(database: typeof db, pairId: string, actorBdId: string): Promise<void> {
   await database.transaction(async (tx) => {
     const [updated] = await tx
       .update(duplicateCandidate)
       .set({ status: "not_duplicate", decidedByBdId: actorBdId, decidedAt: new Date() })
-      .where(eq(duplicateCandidate.id, pairId))
+      .where(and(eq(duplicateCandidate.id, pairId), eq(duplicateCandidate.status, "open")))
       .returning({ id: duplicateCandidate.id });
-    if (!updated) throw new Error("markNotDuplicate refused: pair not found");
+    if (!updated) throw new Error("markNotDuplicate refused: pair not found or not open");
 
     await tx.insert(auditLog).values({
       actorBdId,
