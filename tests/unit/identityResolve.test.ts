@@ -140,6 +140,25 @@ test("planIdentityWrites: merges properties without clobbering (R7) — longer/m
   assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales, EMEA");
 });
 
+test("planIdentityWrites: a new person's roleGroup is classified from jobTitle (fresh-review fix 3, R7)", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "VP of Engineering" })];
+  const plan = planIdentityWrites(rows, []);
+  assert.equal(plan.newPersons[0].merged.roleGroup, "eng_leadership");
+});
+
+test("planIdentityWrites: an existing person's update carries roleGroup, re-classified from the merged jobTitle", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "VP of Engineering" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: null })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.roleGroup, "eng_leadership");
+});
+
+test("buildIdentityWriteRows: new persons carry roleGroup onto the insert row", () => {
+  const plan = planIdentityWrites([row({ legacyId: "c1", jobTitle: "VP of Engineering" })], []);
+  const built = buildIdentityWriteRows(plan, () => "gen-1");
+  assert.equal(built.persons[0].roleGroup, "eng_leadership");
+});
+
 test("buildPrefetchKeys: collects distinct profile keys, verified emails and company keys", () => {
   const rows = [
     row({ profileKey: "li/a", email: "a@x.com", emailStatus: "verified", companyKey: "acme" }),

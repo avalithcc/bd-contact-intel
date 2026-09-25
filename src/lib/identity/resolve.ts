@@ -22,6 +22,7 @@
 import { duplicateCandidate, person, personBdConnection, personIdMap } from "@/db/schema";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
 import { normalizeNameKey } from "@/lib/leads/csv";
+import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import {
   buildNameCompanyKey,
   matchIdentity,
@@ -77,6 +78,13 @@ export interface IdentityMergedFields {
   lastName: string | null;
   companyKey: string | null;
   jobTitle: string | null;
+  // Classified from `jobTitle` (fresh-review fix 3, R7) — the legacy contact
+  // write's `classifyPosition(r.position)` (src/lib/queries.ts) had no
+  // equivalent here, so persons created/updated by the live resolver kept a
+  // stale/null roleGroup, silently degrading /outreach's roleGroup filter
+  // and getCompanyHiringSummaries' leadership count. Always re-derived from
+  // the FINAL merged jobTitle, never merged independently — see mergeFields.
+  roleGroup: RoleGroupKey;
   industry: string | null;
   email: string | null;
   emailNormalized: string | null;
@@ -139,11 +147,13 @@ export interface IdentityWritePlan {
 }
 
 function rowAsMerged(row: IdentityIngestRow): IdentityMergedFields {
+  const jobTitle = row.jobTitle ?? null;
   return {
     firstName: row.firstName,
     lastName: row.lastName,
     companyKey: row.companyKey ?? (row.company ? normalizeCompanyKey(row.company) : null),
-    jobTitle: row.jobTitle ?? null,
+    jobTitle,
+    roleGroup: classifyPosition(jobTitle),
     industry: row.industry ?? null,
     email: row.email,
     emailNormalized: row.email ? row.email.trim().toLowerCase() : null,
@@ -159,6 +169,7 @@ function candidateAsMerged(p: ExistingPersonCandidate): IdentityMergedFields {
     lastName: p.lastName,
     companyKey: p.companyKey,
     jobTitle: p.jobTitle,
+    roleGroup: classifyPosition(p.jobTitle),
     industry: p.industry,
     email: p.email,
     emailNormalized: p.emailNormalized,
@@ -198,11 +209,17 @@ function mergeEmailFields(a: IdentityMergedFields, b: IdentityMergedFields): Pic
 }
 
 function mergeFields(existing: IdentityMergedFields, incoming: IdentityMergedFields): IdentityMergedFields {
+  const jobTitle = mergeStringField(existing.jobTitle, incoming.jobTitle);
   return {
     firstName: mergeStringField(existing.firstName, incoming.firstName),
     lastName: mergeStringField(existing.lastName, incoming.lastName),
     companyKey: mergeStringField(existing.companyKey, incoming.companyKey),
-    jobTitle: mergeStringField(existing.jobTitle, incoming.jobTitle),
+    jobTitle,
+    // Re-derived from the FINAL merged jobTitle, not merged independently
+    // (fresh-review fix 3) — mergeStringField's "longer/more specific wins"
+    // rule already picked the right jobTitle; roleGroup must always agree
+    // with it, never lag behind from whichever side happened to have it.
+    roleGroup: classifyPosition(jobTitle),
     industry: mergeStringField(existing.industry, incoming.industry),
     ...mergeEmailFields(existing, incoming),
   };
@@ -410,6 +427,7 @@ export function buildIdentityWriteRows(plan: IdentityWritePlan, newId: () => str
       lastName: np.merged.lastName,
       companyKey: np.merged.companyKey,
       jobTitle: np.merged.jobTitle,
+      roleGroup: np.merged.roleGroup,
       industry: np.merged.industry,
       email: np.merged.email,
       emailNormalized: np.merged.emailNormalized,

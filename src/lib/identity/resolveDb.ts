@@ -170,6 +170,7 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
         lastName: update.merged.lastName,
         companyKey: update.merged.companyKey,
         jobTitle: update.merged.jobTitle,
+        roleGroup: update.merged.roleGroup,
         industry: update.merged.industry,
         email: update.merged.email,
         emailNormalized: update.merged.emailNormalized,
