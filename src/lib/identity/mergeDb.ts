@@ -8,7 +8,7 @@
  * ./resolveDb.ts and src/lib/status/recompute.ts; the planner it calls is
  * fully covered by tests/unit/identityMerge.test.ts.
  */
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import type { db } from "@/db";
 import {
   activity,
@@ -138,6 +138,29 @@ function connectionValueColumns(c: MergeConnection) {
     initiatedByMe: c.initiatedByMe,
     reciprocal: c.reciprocal,
   };
+}
+
+/**
+ * Fresh-review fix (chained same-BD merges): bdIds where a LATER, still-in-effect
+ * merge_event on this survivor recorded a same-BD conflict. Used so an
+ * unmerge of an EARLIER merge that moved that bdId cleanly (no conflict at the
+ * time) doesn't drag along a row that a subsequent merge has since aggregated
+ * onto — that row now belongs to the later merge's history and must stay on
+ * the survivor. Undone later merges are excluded: if that conflict was itself
+ * unwound, it no longer blocks this bdId from moving back.
+ */
+async function readLaterConflictBdIds(tx: DbTransaction, survivorId: string, afterCreatedAt: Date, excludeMergeEventId: string): Promise<string[]> {
+  const rows = await tx
+    .select({ id: mergeEvent.id, snapshot: mergeEvent.snapshot })
+    .from(mergeEvent)
+    .where(and(eq(mergeEvent.survivorId, survivorId), gt(mergeEvent.createdAt, afterCreatedAt), isNull(mergeEvent.undoneAt)));
+  const bdIds = new Set<string>();
+  for (const row of rows) {
+    if (row.id === excludeMergeEventId) continue;
+    const laterSnapshot = parseMergeSnapshot(row.snapshot);
+    for (const conflict of laterSnapshot.connectionConflicts) bdIds.add(conflict.bdId);
+  }
+  return [...bdIds];
 }
 
 async function repointIdMapRows(tx: DbTransaction, rows: readonly MergeIdMapRow[], toPersonId: string): Promise<void> {
@@ -295,18 +318,21 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
     if (!survivorRow) throw new Error("Unmerge refused: survivor not found");
 
     const relevantBdIds = [...new Set([...snapshot.movedConnectionBdIds, ...snapshot.connectionConflicts.map((c) => c.bdId)])];
-    const currentSurvivorConnections = relevantBdIds.length
-      ? (
-          await tx
+    const [currentSurvivorConnectionRows, laterConflictBdIds] = await Promise.all([
+      relevantBdIds.length
+        ? tx
             .select()
             .from(personBdConnection)
             .where(and(eq(personBdConnection.personId, event.survivorId), inArray(personBdConnection.bdId, relevantBdIds)))
-        ).map(toMergeConnection)
-      : [];
+        : Promise.resolve([]),
+      readLaterConflictBdIds(tx, event.survivorId, event.createdAt, mergeEventId),
+    ]);
+    const currentSurvivorConnections = currentSurvivorConnectionRows.map(toMergeConnection);
 
     const plan = planUnmerge(snapshot, {
       currentSurvivor: toMergeFields(survivorRow),
       currentSurvivorConnections,
+      laterConflictBdIds,
     });
 
     if (plan.survivorFieldReverts.length) {
@@ -330,6 +356,20 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
         .where(
           and(eq(personBdConnection.personId, event.survivorId), inArray(personBdConnection.bdId, [...plan.movedConnectionBdIdsBack])),
         );
+    }
+
+    // Chained same-BD merge (fresh-review fix): a LATER merge conflicted on
+    // this bdId, so the row now belongs to that later merge's history and
+    // stays on the survivor untouched. Re-create merged's original row instead
+    // of moving the (now-aggregated) survivor row back.
+    for (const kept of plan.movedConnectionsKeptOnSurvivor) {
+      await tx
+        .insert(personBdConnection)
+        .values({ ...kept.mergedRestore, personId: event.mergedId })
+        .onConflictDoUpdate({
+          target: [personBdConnection.personId, personBdConnection.bdId],
+          set: connectionValueColumns(kept.mergedRestore),
+        });
     }
 
     // Same-BD conflicts: revert survivor's row only if untouched since the merge; merged's original row is always restored.

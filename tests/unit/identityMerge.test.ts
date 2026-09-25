@@ -329,8 +329,38 @@ test("safe unmerge: a moved connection with post-merge activity returns to merge
   });
 
   assert.deepEqual(unmergePlan.movedConnectionBdIdsBack, ["bd-1"]);
+  assert.deepEqual(unmergePlan.movedConnectionsKeptOnSurvivor, []);
   // The plan only says WHICH bdIds move back; the DB layer repoints person_id
   // while keeping the row's CURRENT values (messageCount 9), never a snapshot.
+});
+
+test("safe unmerge: chained same-BD merge — a later merge's conflict on the same bdId keeps the row on the survivor", () => {
+  const survivor = person({ id: "survivor" });
+  const mergedA = person({ id: "merged-a" });
+  const mergedAConnections = [connection({ personId: "merged-a", bdId: "bd-1", messageCount: 2 })];
+  const planA = planMerge(baseInput({ survivor, merged: mergedA, mergedConnections: mergedAConnections }));
+
+  // Merge A moved bd-1 onto survivor cleanly (no conflict yet).
+  assert.deepEqual(planA.snapshot.movedConnectionBdIds, ["bd-1"]);
+  assert.deepEqual(planA.snapshot.movedConnectionOriginals, mergedAConnections);
+
+  const survivorAfterA: MergePersonFields = { id: "survivor", ...planA.survivorUpdate };
+
+  const snapshotA = parseMergeSnapshot(JSON.parse(JSON.stringify(planA.snapshot)));
+
+  // Unmerging A: the orchestrator (mergeDb) discovered a LATER merge_event on
+  // this survivor recorded a same-BD conflict for bd-1 (merge C aggregated
+  // onto the row A moved). The row must stay on the survivor, not follow A.
+  const unmergeA = planUnmerge(snapshotA, {
+    currentSurvivor: survivorAfterA,
+    currentSurvivorConnections: [],
+    laterConflictBdIds: ["bd-1"],
+  });
+
+  assert.deepEqual(unmergeA.movedConnectionBdIdsBack, []);
+  assert.equal(unmergeA.movedConnectionsKeptOnSurvivor.length, 1);
+  assert.equal(unmergeA.movedConnectionsKeptOnSurvivor[0].bdId, "bd-1");
+  assert.deepEqual(unmergeA.movedConnectionsKeptOnSurvivor[0].mergedRestore, mergedAConnections[0]);
 });
 
 test("safe unmerge: same-BD conflict aggregation — unchanged survivor row reverts both originals", () => {

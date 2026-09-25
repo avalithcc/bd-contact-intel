@@ -120,6 +120,10 @@ export interface MergeSnapshot {
   survivorFieldChanges: readonly SurvivorFieldChange[];
   // bdIds repointed from merged onto survivor wholesale (no same-BD conflict).
   movedConnectionBdIds: readonly string[];
+  // The original merged-side row for each entry in movedConnectionBdIds, same
+  // order, personId still merged.id. Needed to restore-by-value if a LATER
+  // merge on the survivor later conflicts on that same bdId (see planUnmerge).
+  movedConnectionOriginals: readonly MergeConnection[];
   connectionConflicts: readonly ConnectionConflict[];
   movedReferences: readonly MergeReferenceRow[];
   movedIdMapRows: readonly MergeIdMapRow[];
@@ -386,10 +390,13 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     repointedForSnapshot.push(c);
   }
 
+  const movedConnectionOriginals = input.mergedConnections.filter((c) => !survivorConnectionByBdId.get(c.bdId));
+
   const snapshot: MergeSnapshot = {
     merged,
     survivorFieldChanges,
     movedConnectionBdIds: connectionsToRepoint.map((c) => c.bdId),
+    movedConnectionOriginals,
     connectionConflicts,
     movedReferences: input.referencesOnMerged,
     movedIdMapRows: input.idMapRowsOnMerged,
@@ -441,6 +448,20 @@ export interface UnmergeContext {
   // The survivor's CURRENT connection rows for the bdIds this merge touched
   // (moved-back or same-BD conflict bdIds) — used to detect post-merge activity.
   currentSurvivorConnections: readonly MergeConnection[];
+  // bdIds (from this merge's movedConnectionBdIds) where a LATER merge_event
+  // on the same survivor recorded a same-BD conflict for that bdId — i.e. the
+  // connection this merge moved cleanly was aggregated onto by a subsequent
+  // merge. The mergeDb caller resolves this by querying later merge_events.
+  // Default: [] (no chained conflict — normal move-back-by-value applies).
+  laterConflictBdIds?: readonly string[];
+}
+
+/** A moved (no-conflict-at-merge-time) connection whose bdId was aggregated by a LATER merge on the survivor. */
+export interface MovedConnectionKeptOnSurvivor {
+  bdId: string;
+  // The original row this merge moved from merged, restored onto merged as-is
+  // (NOT the survivor's current, now-aggregated, row).
+  mergedRestore: MergeConnection;
 }
 
 export interface UnmergePlan {
@@ -449,6 +470,10 @@ export interface UnmergePlan {
   mergedRestore: MergePersonFields;
   // bdIds to repoint from survivor back onto merged, keeping their CURRENT column values.
   movedConnectionBdIdsBack: readonly string[];
+  // bdIds this merge moved that a LATER merge conflicted on: the row stays on
+  // the survivor (it now belongs to that later merge's history), and merged's
+  // original row is re-inserted from the snapshot instead.
+  movedConnectionsKeptOnSurvivor: readonly MovedConnectionKeptOnSurvivor[];
   connectionConflictRestores: readonly ConnectionConflictRestore[];
   referencesToRepointBack: readonly MergeReferenceRow[];
   idMapRowsToRepointBack: readonly MergeIdMapRow[];
@@ -488,11 +513,25 @@ export function planUnmerge(snapshot: MergeSnapshot, context: UnmergeContext): U
       : { bdId: conflict.bdId, kind: "kept_changed" as const, survivorRestore: null, mergedRestore: conflict.mergedOriginal };
   });
 
+  const laterConflictBdIds = new Set(context.laterConflictBdIds ?? []);
+  const originalByBdId = new Map(snapshot.movedConnectionOriginals.map((c) => [c.bdId, c]));
+  const movedConnectionBdIdsBack: string[] = [];
+  const movedConnectionsKeptOnSurvivor: MovedConnectionKeptOnSurvivor[] = [];
+  for (const bdId of snapshot.movedConnectionBdIds) {
+    if (laterConflictBdIds.has(bdId)) {
+      const original = originalByBdId.get(bdId);
+      if (original) movedConnectionsKeptOnSurvivor.push({ bdId, mergedRestore: original });
+    } else {
+      movedConnectionBdIdsBack.push(bdId);
+    }
+  }
+
   return {
     survivorFieldReverts,
     survivorFieldsKept,
     mergedRestore: snapshot.merged,
-    movedConnectionBdIdsBack: snapshot.movedConnectionBdIds,
+    movedConnectionBdIdsBack,
+    movedConnectionsKeptOnSurvivor,
     connectionConflictRestores,
     referencesToRepointBack: snapshot.movedReferences,
     idMapRowsToRepointBack: snapshot.movedIdMapRows,
@@ -604,6 +643,9 @@ export function parseMergeSnapshot(value: unknown): MergeSnapshot {
     merged: obj.merged as MergePersonFields,
     survivorFieldChanges: asArray(obj.survivorFieldChanges, "survivorFieldChanges") as SurvivorFieldChange[],
     movedConnectionBdIds: asStringArray(obj.movedConnectionBdIds, "movedConnectionBdIds"),
+    movedConnectionOriginals: asArray(obj.movedConnectionOriginals, "movedConnectionOriginals").map((v, i) =>
+      parseMergeConnection(v, `movedConnectionOriginals[${i}]`),
+    ),
     connectionConflicts: asArray(obj.connectionConflicts, "connectionConflicts").map((v, i) =>
       parseConnectionConflict(v, `connectionConflicts[${i}]`),
     ),
