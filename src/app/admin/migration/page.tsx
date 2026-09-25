@@ -9,6 +9,7 @@ import {
 } from "@/lib/migration/queries";
 import type { CollapseReport } from "@/lib/migration/collapsePlanner";
 import type { FoldReport } from "@/lib/migration/foldPlanner";
+import type { CatchUpRunReport } from "@/lib/migration/catchUpRun";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
 import { approveMigrationRunAction } from "./actions";
@@ -28,6 +29,10 @@ function isCollapseReport(report: unknown): report is CollapseReport {
 
 function isFoldReport(report: unknown): report is FoldReport {
   return !!report && typeof report === "object" && "lead" in report && "persons" in report;
+}
+
+function isCatchUpReport(report: unknown): report is CatchUpRunReport {
+  return !!report && typeof report === "object" && "rowsRead" in report && "leadsSkippedNoOwner" in report;
 }
 
 /**
@@ -128,6 +133,41 @@ function FoldReportTable({ report }: { report: FoldReport }) {
   );
 }
 
+function CatchUpReportTable({ report }: { report: CatchUpRunReport }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <tbody>
+          <tr>
+            <td>{dict.tableCatchUpRowsRead}</td>
+            <td>{report.rowsRead}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableCatchUpOwnCompanySkipped}</td>
+            <td>{report.ownCompanySkipped}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableCatchUpAutoMerged}</td>
+            <td>{report.autoMerged}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableCatchUpFlaggedForReview}</td>
+            <td>{report.flaggedForReview}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableCatchUpNew}</td>
+            <td>{report.new}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableCatchUpLeadsSkippedNoOwner}</td>
+            <td>{report.leadsSkippedNoOwner}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** One kind's panel: latest run (report + approve action) plus its history. */
 function MigrationKindSection({
   kind,
@@ -137,7 +177,7 @@ function MigrationKindSection({
   history,
   renderReport,
 }: {
-  kind: "collapse" | "fold_leads";
+  kind: "collapse" | "fold_leads" | "catch_up";
   sectionTitle: string;
   reportTitle: string;
   latest: MigrationRunWithApprover | null;
@@ -248,12 +288,22 @@ export default async function MigrationAdminPage({
     throw err;
   }
 
-  const [{ approveError }, collapseLatest, collapseHistory, foldLatest, foldHistory] = await Promise.all([
+  const [
+    { approveError },
+    collapseLatest,
+    collapseHistory,
+    foldLatest,
+    foldHistory,
+    catchUpLatest,
+    catchUpHistory,
+  ] = await Promise.all([
     searchParams,
     getLatestMigrationRun("collapse"),
     listMigrationRuns("collapse"),
     getLatestMigrationRun("fold_leads"),
     listMigrationRuns("fold_leads"),
+    getLatestMigrationRun("catch_up"),
+    listMigrationRuns("catch_up"),
   ]);
 
   return (
@@ -284,6 +334,15 @@ export default async function MigrationAdminPage({
         latest={foldLatest}
         history={foldHistory}
         renderReport={(report) => (isFoldReport(report) ? <FoldReportTable report={report} /> : null)}
+      />
+
+      <MigrationKindSection
+        kind="catch_up"
+        sectionTitle={dict.sectionCatchUpTitle}
+        reportTitle={dict.catchUpReportTitle}
+        latest={catchUpLatest}
+        history={catchUpHistory}
+        renderReport={(report) => (isCatchUpReport(report) ? <CatchUpReportTable report={report} /> : null)}
       />
     </main>
   );

@@ -8,7 +8,7 @@ import type { MigrationRunKind } from "@/lib/migration/executionGuard";
 import { approveMigrationRun } from "@/lib/migration/queries";
 
 function isMigrationRunKind(v: FormDataEntryValue | null): v is MigrationRunKind {
-  return v === "collapse" || v === "fold_leads";
+  return v === "collapse" || v === "fold_leads" || v === "catch_up";
 }
 
 /**

@@ -102,7 +102,7 @@ export async function getMigrationRunForGate(runId: string): Promise<ApprovedMig
   if (!row) return null;
   return {
     id: row.id,
-    kind: row.kind as "collapse" | "fold_leads",
+    kind: row.kind as MigrationRunKind,
     approvedAt: row.approvedAt,
     executedAt: row.executedAt,
     approvedByBdId: row.approvedByBdId,
@@ -134,7 +134,7 @@ export type MigrationRunWithApprover = Awaited<
 >[number];
 
 export async function listMigrationRuns(
-  kind: "collapse" | "fold_leads",
+  kind: MigrationRunKind,
 ): Promise<MigrationRunWithApprover[]> {
   return migrationRunWithApproverSelect()
     .where(eq(migrationRun.kind, kind))
@@ -142,7 +142,7 @@ export async function listMigrationRuns(
 }
 
 export async function getLatestMigrationRun(
-  kind: "collapse" | "fold_leads",
+  kind: MigrationRunKind,
 ): Promise<MigrationRunWithApprover | null> {
   const runs = await migrationRunWithApproverSelect()
     .where(eq(migrationRun.kind, kind))

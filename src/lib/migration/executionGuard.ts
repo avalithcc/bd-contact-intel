@@ -4,7 +4,7 @@
  * reviewed"). Pure — no DB access, so callers supply the already-fetched
  * migration_run row.
  */
-export type MigrationRunKind = "collapse" | "fold_leads";
+export type MigrationRunKind = "collapse" | "fold_leads" | "catch_up";
 
 export type MigrationExecutionBlockReason =
   | "not_found"
