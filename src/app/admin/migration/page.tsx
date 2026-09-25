@@ -130,12 +130,14 @@ function FoldReportTable({ report }: { report: FoldReport }) {
 
 /** One kind's panel: latest run (report + approve action) plus its history. */
 function MigrationKindSection({
+  kind,
   sectionTitle,
   reportTitle,
   latest,
   history,
   renderReport,
 }: {
+  kind: "collapse" | "fold_leads";
   sectionTitle: string;
   reportTitle: string;
   latest: MigrationRunWithApprover | null;
@@ -175,6 +177,7 @@ function MigrationKindSection({
             ) : (
               <form action={approveMigrationRunAction}>
                 <input type="hidden" name="runId" value={latest.id} />
+                <input type="hidden" name="kind" value={kind} />
                 <button type="submit" className="filter-submit">
                   {dict.approveButton}
                 </button>
@@ -227,7 +230,15 @@ function MigrationKindSection({
   );
 }
 
-export default async function MigrationAdminPage() {
+function isApproveErrorReason(v: string | undefined): v is keyof typeof dict.approveErrors {
+  return !!v && v in dict.approveErrors;
+}
+
+export default async function MigrationAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ approveError?: string }>;
+}) {
   try {
     await requireAdmin();
   } catch (err) {
@@ -237,7 +248,8 @@ export default async function MigrationAdminPage() {
     throw err;
   }
 
-  const [collapseLatest, collapseHistory, foldLatest, foldHistory] = await Promise.all([
+  const [{ approveError }, collapseLatest, collapseHistory, foldLatest, foldHistory] = await Promise.all([
+    searchParams,
     getLatestMigrationRun("collapse"),
     listMigrationRuns("collapse"),
     getLatestMigrationRun("fold_leads"),
@@ -250,7 +262,14 @@ export default async function MigrationAdminPage() {
       <h1 className="m-0">{dict.title}</h1>
       <p className="soft">{dict.subtitle}</p>
 
+      {isApproveErrorReason(approveError) && (
+        <section className="panel">
+          <strong>{dict.approveErrors[approveError]}</strong>
+        </section>
+      )}
+
       <MigrationKindSection
+        kind="collapse"
         sectionTitle={dict.sectionCollapseTitle}
         reportTitle={dict.reportTitle}
         latest={collapseLatest}
@@ -259,6 +278,7 @@ export default async function MigrationAdminPage() {
       />
 
       <MigrationKindSection
+        kind="fold_leads"
         sectionTitle={dict.sectionFoldTitle}
         reportTitle={dict.foldReportTitle}
         latest={foldLatest}

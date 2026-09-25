@@ -637,5 +637,12 @@ export const en = {
     historyStatus: "Status",
     historyApprovedBy: "Approved by",
     historyWhen: "When",
+    approveErrors: {
+      not_found: "The run to approve was not found.",
+      wrong_kind: "This run does not belong to this phase.",
+      already_executed: "This run was already executed.",
+      already_approved: "This run was already approved.",
+      not_latest_dry_run: "A newer dry run exists; this one can no longer be approved.",
+    },
   },
 };

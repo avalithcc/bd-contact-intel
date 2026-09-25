@@ -541,5 +541,12 @@ export const es: typeof en = {
     historyStatus: "Estado",
     historyApprovedBy: "Aprobado por",
     historyWhen: "Cuándo",
+    approveErrors: {
+      not_found: "No se encontró la corrida a aprobar.",
+      wrong_kind: "La corrida no corresponde a esta fase.",
+      already_executed: "La corrida ya fue ejecutada.",
+      already_approved: "La corrida ya fue aprobada.",
+      not_latest_dry_run: "Hay una simulación más reciente; esta ya no se puede aprobar.",
+    },
   },
 };

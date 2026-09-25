@@ -23,9 +23,11 @@ import {
   signal,
   task,
 } from "@/db/schema";
+import { assertApprovable } from "./approveGuard";
 import type { CollapseContactRow, CollapsePlan } from "./collapsePlanner";
 import type { ApprovedMigrationRun, FinalizeExecuteInput } from "./collapseRun";
 import { buildCollapseWriteRows, chunk, WRITE_BATCH_SIZE } from "./collapseWriteRows";
+import type { MigrationRunKind } from "./executionGuard";
 import type { FoldExistingPerson, FoldLeadRow, FoldPlan } from "./foldPlanner";
 import type { FinalizeFoldExecuteInput } from "./foldRun";
 import { buildFoldWriteRows } from "./foldWriteRows";
@@ -149,8 +151,25 @@ export async function getLatestMigrationRun(
   return runs[0] ?? null;
 }
 
-/** `/admin/migration`'s "Approve dry run" action (admin-access-audit spec). */
-export async function approveMigrationRun(runId: string, approvedByBdId: string) {
+/**
+ * `/admin/migration`'s "Approve dry run" action (admin-access-audit spec).
+ * `expectedKind` comes from the section/form that submitted `runId` — a
+ * fresh-review WARNING found this approved ANY runId unconditionally, so
+ * `assertApprovable` now also refuses a kind mismatch, an already
+ * approved/executed run, or a run that isn't the latest dry run of its
+ * kind (a newer dry run has superseded it).
+ */
+export async function approveMigrationRun(
+  runId: string,
+  approvedByBdId: string,
+  expectedKind: MigrationRunKind,
+) {
+  const [candidate, latest] = await Promise.all([
+    getMigrationRunForGate(runId),
+    getLatestMigrationRun(expectedKind),
+  ]);
+  assertApprovable(candidate, expectedKind, latest?.id ?? null);
+
   return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(migrationRun)
