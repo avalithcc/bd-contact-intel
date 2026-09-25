@@ -77,6 +77,27 @@ function hashActivityTypesByLeadId(activityTypesByLeadId: ReadonlyMap<string, Re
  * row shape reflective, without requiring a shared row type between leads
  * and existing persons.
  */
+/**
+ * Catch-up input hash (task 4B.7; design.md "Catch-up (owner D4b)"): covers
+ * every input `planCatchUp` reads — the unmapped/drifted `contact` and
+ * `lead` rows themselves AND the existing-person snapshot the identity index
+ * is matched against (same D12 rationale as `computeFoldInputHash`: the
+ * plan's output depends on both, so both must invalidate a stale dry run).
+ */
+export function computeCatchUpInputHash<
+  C extends { id: string },
+  L extends { id: string },
+  P extends { id: string },
+>(contacts: readonly C[], leads: readonly L[], existingPersons: readonly P[]): string {
+  const hash = createHash("sha256");
+  hash.update(hashRowSet(contacts));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(leads));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(existingPersons));
+  return hash.digest("hex");
+}
+
 export function computeFoldInputHash<
   L extends { id: string },
   P extends { id: string },
