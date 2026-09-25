@@ -36,7 +36,8 @@ import {
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-function toMergeFields(row: typeof person.$inferSelect): MergePersonFields {
+/** Exported for reuse by the /admin/duplicates preview (duplicateReviewQueries.ts). */
+export function toMergeFields(row: typeof person.$inferSelect): MergePersonFields {
   return {
     id: row.id,
     firstName: row.firstName,
@@ -61,7 +62,7 @@ function toMergeFields(row: typeof person.$inferSelect): MergePersonFields {
   };
 }
 
-function toMergeConnection(row: typeof personBdConnection.$inferSelect): MergeConnection {
+export function toMergeConnection(row: typeof personBdConnection.$inferSelect): MergeConnection {
   return {
     personId: row.personId,
     bdId: row.bdId,
