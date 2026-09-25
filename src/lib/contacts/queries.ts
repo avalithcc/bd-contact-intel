@@ -8,6 +8,8 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, person, personBdConnection, personPropertyHistory, type Person } from "@/db/schema";
 import { EDITABLE_PERSON_PROPERTIES, type EditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import { assertContactEditable } from "@/lib/contacts/mergeGuard";
+import { ContactNotFoundError } from "@/lib/contacts/errors";
 
 export interface ContactPropertyRow {
   key: EditablePersonProperty;
@@ -45,6 +47,17 @@ const MAX_MERGE_HOPS = 10;
 async function findPersonById(id: string): Promise<Person | undefined> {
   const [row] = await db.select().from(person).where(eq(person.id, id));
   return row;
+}
+
+/**
+ * Write-path merge guard for the quick-action server actions (note/task/
+ * email) — those don't otherwise read the person row before writing, unlike
+ * updateContactProperty (propertyEditDb.ts), which guards inline.
+ */
+export async function assertContactEditableById(personId: string): Promise<void> {
+  const row = await findPersonById(personId);
+  if (!row) throw new ContactNotFoundError(personId);
+  assertContactEditable(row);
 }
 
 /** Follows `merged_into_id` to the live survivor row, or `undefined` if the chain is broken/too long. */

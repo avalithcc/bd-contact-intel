@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
 import { updateContactProperty } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
@@ -31,11 +32,13 @@ export async function updateContactPropertyAction(
 
 /** "Nota" quick action (task 9.2) — writes a `note` activity for this Contact. */
 export async function addContactNoteAction(personId: string, note: string) {
+  await assertContactEditableById(personId);
   return createActivityAction({ type: "note", personId, metadata: { note } });
 }
 
 /** "Tarea" quick action (task 9.2). */
 export async function addContactTaskAction(personId: string, title: string, dueAt?: Date) {
+  await assertContactEditableById(personId);
   return createTaskAction({ title, personId, dueAt });
 }
 
@@ -48,6 +51,7 @@ export async function sendContactEmailAction(
   subject: string,
   body: string,
 ): Promise<SendContactEmailResult> {
+  await assertContactEditableById(personId);
   const me = await getCurrentBd();
   try {
     await sendGmailMessage({ bdId: me.id, to, subject, body, personId });

@@ -14,6 +14,8 @@ import {
   planPropertyEdit,
   type EditablePersonProperty,
 } from "@/lib/contacts/propertyEdit";
+import { assertContactEditable } from "@/lib/contacts/mergeGuard";
+import { ContactNotFoundError } from "@/lib/contacts/errors";
 
 export async function updateContactProperty(
   personId: string,
@@ -23,7 +25,8 @@ export async function updateContactProperty(
 ): Promise<Person> {
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(person).where(eq(person.id, personId));
-    if (!row) throw new Error(`Contact not found: ${personId}`);
+    if (!row) throw new ContactNotFoundError(personId);
+    assertContactEditable(row);
 
     const plan = planPropertyEdit(row, property, rawNewValue, changedByBdId);
     if (!plan.changed) return row;
