@@ -12,6 +12,7 @@
  */
 import {
   buildNameCompanyKey,
+  emailStatusRank,
   matchIdentity,
   mergeProperty,
   type EmailStatus,
@@ -180,12 +181,24 @@ type EmailFields = Pick<
  * Same "email fields move together" rule as collapsePlanner (contact-identity
  * R7) — picks ONLY the email-related keys from the winning side, never the
  * whole side, so a caller spreading the result can't accidentally clobber
- * unrelated fields (firstName, jobTitle, ...) already merged elsewhere.
+ * unrelated fields (firstName, jobTitle, ...) already merged elsewhere. The
+ * side with the higher emailStatusRank wins; a present email beats an absent
+ * one on a status tie; ties beyond that keep `a` for determinism — mirrors
+ * collapsePlanner.ts's mergeEmailFields exactly.
  */
-function mergeEmailFields(a: FoldMergedFields, b: FoldMergedFields): EmailFields {
+export function mergeEmailFields(a: FoldMergedFields, b: FoldMergedFields): EmailFields {
   const aHas = !!a.email;
   const bHas = !!b.email;
-  const winner = aHas && !bHas ? a : bHas && !aHas ? b : a;
+  const winner =
+    aHas && !bHas
+      ? a
+      : bHas && !aHas
+        ? b
+        : !aHas && !bHas
+          ? a
+          : emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus)
+            ? b
+            : a;
   return {
     email: winner.email,
     emailNormalized: winner.emailNormalized,

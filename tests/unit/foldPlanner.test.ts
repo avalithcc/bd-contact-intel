@@ -7,9 +7,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  mergeEmailFields,
   planFoldLeads,
   type FoldExistingPerson,
   type FoldLeadRow,
+  type FoldMergedFields,
 } from "@/lib/migration/foldPlanner";
 
 function person(overrides: Partial<FoldExistingPerson>): FoldExistingPerson {
@@ -133,13 +135,99 @@ test("two leads sharing only a name+company key both route to the same review pa
   assert.equal(plan.report.lead.flaggedForReview, 1);
 });
 
-test("matched lead's richer job title overrides an existing null value (contact-identity R7)", () => {
+test("matched lead's richer job title wins over an existing shorter value (contact-identity R7)", () => {
   const existing = [
-    person({ id: "p1", profileKey: null, email: "jane@corp.com", emailNormalized: "jane@corp.com", emailStatus: "verified", jobTitle: null }),
+    person({ id: "p1", profileKey: null, email: "jane@corp.com", emailNormalized: "jane@corp.com", emailStatus: "verified", jobTitle: "VP" }),
   ];
   const leads = [lead({ id: "l1", email: "jane@corp.com", emailStatus: "verified", jobTitle: "VP Engineering" })];
 
   const plan = planFoldLeads(existing, leads);
 
   assert.equal(plan.matchedUpdates[0].merged.jobTitle, "VP Engineering");
+});
+
+// --- contact-identity R7: email fields move together, higher status rank
+// wins (mirrors collapsePlanner.ts's mergeEmailFields) --------------------
+//
+// planFoldLeads can't exercise a genuine rank contest end-to-end: the only
+// auto-merge path for a lead is verified_email, which requires the incoming
+// AND existing email VALUES to already be equal-and-verified, so ranks never
+// actually differ once matched. mergeEmailFields itself must still resolve
+// ranks correctly for callers (it's exported for exactly this reason), so it
+// gets a direct unit test instead.
+
+function mergedFields(overrides: Partial<FoldMergedFields>): FoldMergedFields {
+  return {
+    firstName: null,
+    lastName: null,
+    companyKey: null,
+    jobTitle: null,
+    industry: null,
+    email: null,
+    emailNormalized: null,
+    emailStatus: "none",
+    emailConfidence: null,
+    emailSource: null,
+    ...overrides,
+  };
+}
+
+test("mergeEmailFields picks the side with the higher emailStatusRank when both have an email", () => {
+  const weaker = mergedFields({
+    email: "jane@old.com",
+    emailNormalized: "jane@old.com",
+    emailStatus: "probable",
+    emailConfidence: 40,
+    emailSource: "guess",
+  });
+  const stronger = mergedFields({
+    email: "jane@new.com",
+    emailNormalized: "jane@new.com",
+    emailStatus: "verified",
+    emailConfidence: 90,
+    emailSource: "waterfall",
+  });
+
+  const result = mergeEmailFields(weaker, stronger);
+
+  assert.deepEqual(result, {
+    email: "jane@new.com",
+    emailNormalized: "jane@new.com",
+    emailStatus: "verified",
+    emailConfidence: 90,
+    emailSource: "waterfall",
+  });
+});
+
+test("mergeEmailFields keeps a present email over an absent one regardless of rank", () => {
+  const noEmail = mergedFields({ emailStatus: "none" });
+  const hasEmail = mergedFields({
+    email: "jane@corp.com",
+    emailNormalized: "jane@corp.com",
+    emailStatus: "probable",
+    emailConfidence: 30,
+    emailSource: "guess",
+  });
+
+  assert.equal(mergeEmailFields(noEmail, hasEmail).email, "jane@corp.com");
+  assert.equal(mergeEmailFields(hasEmail, noEmail).email, "jane@corp.com");
+});
+
+test("mergeEmailFields keeps `a` on a genuine tie (same rank, same email)", () => {
+  const a = mergedFields({
+    email: "jane@corp.com",
+    emailNormalized: "jane@corp.com",
+    emailStatus: "verified",
+    emailConfidence: 50,
+    emailSource: "a-source",
+  });
+  const b = mergedFields({
+    email: "jane@corp.com",
+    emailNormalized: "jane@corp.com",
+    emailStatus: "verified",
+    emailConfidence: 99,
+    emailSource: "b-source",
+  });
+
+  assert.equal(mergeEmailFields(a, b).emailSource, "a-source");
 });
