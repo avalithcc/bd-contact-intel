@@ -3,7 +3,7 @@ import { emailAccount } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { decryptToken } from "@/lib/gmail/crypto";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
-import { classifyTokenRefreshError } from "@/lib/gmail/errors";
+import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { createActivityAction } from "@/app/activity/actions";
 
 interface SendGmailInput {
@@ -47,7 +47,10 @@ export async function sendGmailMessage({
     .where(eq(emailAccount.bdId, bdId));
 
   if (!account || account.status !== "connected" || !account.refreshTokenEncrypted) {
-    throw new Error("Gmail account not connected. Connect it at /account/email.");
+    throw new GmailSendError(
+      "not_connected",
+      "Gmail account not connected. Connect it at /account/email.",
+    );
   }
 
   const configResult = getGmailOAuthConfig();
@@ -58,7 +61,10 @@ export async function sendGmailMessage({
         lastErrorMessage: `Gmail is not configured on the server (missing: ${configResult.missing.join(", ")}).`,
       })
       .where(eq(emailAccount.bdId, bdId));
-    throw new Error("Gmail is not configured on the server. Contact an admin.");
+    throw new GmailSendError(
+      "not_configured",
+      "Gmail is not configured on the server. Contact an admin.",
+    );
   }
 
   const refreshToken = decryptToken(account.refreshTokenEncrypted);
@@ -91,12 +97,18 @@ export async function sendGmailMessage({
       .where(eq(emailAccount.bdId, bdId));
 
     if (classification.kind === "config") {
-      throw new Error("Gmail is not configured correctly on the server. Contact an admin.");
+      throw new GmailSendError(
+        "not_configured",
+        "Gmail is not configured correctly on the server. Contact an admin.",
+      );
     }
     if (classification.kind === "revoked") {
-      throw new Error("Gmail authorization expired. Reconnect at /account/email.");
+      throw new GmailSendError(
+        "reauth_required",
+        "Gmail authorization expired. Reconnect at /account/email.",
+      );
     }
-    throw new Error("Gmail authorization check failed. Try again shortly.");
+    throw new GmailSendError("temporary", "Gmail authorization check failed. Try again shortly.");
   }
 
   const { access_token } = await tokenRes.json();
@@ -121,7 +133,7 @@ export async function sendGmailMessage({
       .update(emailAccount)
       .set({ lastErrorMessage: `Gmail send failed: ${detail.slice(0, 300)}` })
       .where(eq(emailAccount.bdId, bdId));
-    throw new Error(`Gmail send failed: ${detail}`);
+    throw new GmailSendError("send_failed", `Gmail send failed: ${detail}`);
   }
 
   const sent = await sendRes.json();

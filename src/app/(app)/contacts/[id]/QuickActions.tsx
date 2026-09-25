@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
+import { contactActionErrorHref } from "../actionErrors";
 import { addContactNoteAction, addContactTaskAction, sendContactEmailAction } from "../actions";
 import styles from "./AboutPane.module.css";
 
@@ -14,11 +16,30 @@ export interface QuickActionsProps {
 
 type QuickAction = "note" | "email" | "task" | null;
 
+interface ActionError {
+  message: string;
+  href?: string;
+}
+
 interface ComposerProps {
   labels: ContactRecordLabels;
   busy: boolean;
-  error: string | null;
+  error: ActionError | null;
   onCancel: () => void;
+}
+
+function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error: ActionError }) {
+  return (
+    <div className={styles.error}>
+      {error.message}
+      {error.href && (
+        <>
+          {" "}
+          <Link href={error.href}>{l.gmailReconnectLink}</Link>
+        </>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -28,7 +49,7 @@ interface ComposerProps {
 export function QuickActions({ personId, labels: l, email }: QuickActionsProps) {
   const router = useRouter();
   const [openAction, setOpenAction] = useState<QuickAction>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ActionError | null>(null);
   const [busy, setBusy] = useState(false);
 
   function closeQuickAction() {
@@ -75,7 +96,10 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
               closeQuickAction();
               router.refresh();
             } else {
-              setError(contactActionErrorMessage(l, result.reason));
+              setError({
+                message: contactActionErrorMessage(l, result.reason),
+                href: contactActionErrorHref(result.reason),
+              });
             }
           }}
         />
@@ -96,7 +120,10 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
               closeQuickAction();
               router.refresh();
             } else {
-              setError(contactActionErrorMessage(l, result.reason));
+              setError({
+                message: contactActionErrorMessage(l, result.reason),
+                href: contactActionErrorHref(result.reason),
+              });
             }
           }}
         />
@@ -119,7 +146,10 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
               closeQuickAction();
               router.refresh();
             } else {
-              setError(contactActionErrorMessage(l, result.reason));
+              setError({
+                message: contactActionErrorMessage(l, result.reason),
+                href: contactActionErrorHref(result.reason),
+              });
             }
           }}
         />
@@ -138,7 +168,7 @@ function NoteForm({
   const [note, setNote] = useState("");
   return (
     <div className={styles.composer}>
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <ErrorNotice labels={l} error={error} />}
       <textarea
         className={styles.textarea}
         placeholder={l.notePlaceholder}
@@ -169,7 +199,7 @@ function TaskForm({
   const [dueDate, setDueDate] = useState("");
   return (
     <div className={styles.composer}>
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <ErrorNotice labels={l} error={error} />}
       <label className={styles.label}>
         {l.taskTitleLabel}
         <input className={styles.input} value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
@@ -213,7 +243,7 @@ function EmailForm({
 
   return (
     <div className={styles.composer}>
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <ErrorNotice labels={l} error={error} />}
       <label className={styles.label}>
         {l.emailToLabel}
         <input className={styles.input} value={to} disabled />

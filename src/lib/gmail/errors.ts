@@ -39,3 +39,26 @@ export function classifyTokenRefreshError(responseBody: string): GmailErrorClass
   }
   return { kind: "other", message: `Gmail token refresh failed (${detail})` };
 }
+
+// Typed error thrown by sendGmailMessage (src/lib/gmail/send.ts) so callers
+// (e.g. the Contact record's sendContactEmailAction) can tell distinct
+// failure causes apart instead of collapsing every Gmail failure into a
+// generic "unexpected" reason. `message` values are unchanged from the
+// plain Errors send.ts used to throw — the existing /leads Gmail flow reads
+// and logs those strings, so they must stay byte-for-byte identical.
+export type GmailSendErrorKind =
+  | "not_connected"
+  | "not_configured"
+  | "reauth_required"
+  | "temporary"
+  | "send_failed";
+
+export class GmailSendError extends Error {
+  constructor(
+    public readonly kind: GmailSendErrorKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = "GmailSendError";
+  }
+}

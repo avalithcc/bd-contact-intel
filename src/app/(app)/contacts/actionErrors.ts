@@ -12,12 +12,16 @@
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
 import { InvalidEmailError } from "@/lib/contacts/propertyEdit";
+import { GmailSendError } from "@/lib/gmail/errors";
 
 export type ContactActionErrorReason =
   | "not_found"
   | "merged"
   | "invalid_email"
   | "not_editable"
+  | "gmail_not_connected"
+  | "gmail_reauth"
+  | "gmail_unavailable"
   | "unexpected";
 
 export type ContactActionResult = { ok: true } | { ok: false; reason: ContactActionErrorReason };
@@ -35,5 +39,19 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof ContactNotFoundError) return "not_found";
   if (err instanceof InvalidEmailError) return "invalid_email";
   if (err instanceof PropertyNotEditableError) return "not_editable";
+  if (err instanceof GmailSendError) {
+    if (err.kind === "not_connected") return "gmail_not_connected";
+    if (err.kind === "reauth_required") return "gmail_reauth";
+    return "gmail_unavailable";
+  }
   return "unexpected";
+}
+
+/**
+ * Path to reconnect Gmail, for reasons where the user can self-serve the
+ * fix. `undefined` for reasons that don't have an actionable link.
+ */
+export function contactActionErrorHref(reason: ContactActionErrorReason): string | undefined {
+  if (reason === "gmail_not_connected" || reason === "gmail_reauth") return "/account/email";
+  return undefined;
 }

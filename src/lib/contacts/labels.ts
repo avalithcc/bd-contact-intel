@@ -30,6 +30,12 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorInvalidEmail;
     case "not_editable":
       return l.errorNotEditable;
+    case "gmail_not_connected":
+      return l.errorGmailNotConnected;
+    case "gmail_reauth":
+      return l.errorGmailReauth;
+    case "gmail_unavailable":
+      return l.errorGmailUnavailable;
     case "unexpected":
       return l.genericError;
   }
