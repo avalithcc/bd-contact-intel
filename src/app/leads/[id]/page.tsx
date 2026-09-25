@@ -35,13 +35,16 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
     );
   }
 
+  // Status badge colors come from the design tokens' status-* pairs
+  // (src/app/globals.css), not hardcoded hex — see design.md D9/Phase 8.
   const statusColor = {
-    new: "#9ca3af",
-    contacted: "#60a5fa",
-    replied: "#3b82f6",
-    meeting: "#1d4ed8",
-    discarded: "#ef4444",
-  } as Record<string, string>;
+    new: { text: "var(--status-new-text)", bg: "var(--status-new-bg)" },
+    contacted: { text: "var(--status-contacted-text)", bg: "var(--status-contacted-bg)" },
+    replied: { text: "var(--status-replied-text)", bg: "var(--status-replied-bg)" },
+    meeting: { text: "var(--status-meeting-text)", bg: "var(--status-meeting-bg)" },
+    discarded: { text: "var(--status-discarded-text)", bg: "var(--status-discarded-bg)" },
+  } as Record<string, { text: string; bg: string }>;
+  const defaultStatusColor = { text: "var(--color-ink-soft)", bg: "var(--color-surface-1)" };
 
   return (
     <main>
@@ -58,8 +61,8 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
             <span
               className={styles.statusBadge}
               style={{
-                backgroundColor: `${statusColor[lead.status as keyof typeof statusColor] || "#9ca3af"}20`,
-                color: statusColor[lead.status as keyof typeof statusColor] || "#9ca3af",
+                backgroundColor: (statusColor[lead.status] ?? defaultStatusColor).bg,
+                color: (statusColor[lead.status] ?? defaultStatusColor).text,
               }}
             >
               {lead.status}

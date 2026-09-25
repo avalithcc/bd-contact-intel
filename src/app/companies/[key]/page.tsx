@@ -37,13 +37,19 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
     );
   }
 
+  // Stage badge colors come from the design tokens (src/app/globals.css),
+  // not hardcoded hex — see design.md D9/Phase 8. Deal stage has no
+  // dedicated token family, so it maps onto the closest semantic token:
+  // prospect -> neutral, qualified -> info, proposal_sent -> warn,
+  // won -> success, lost -> danger.
   const stageColor = {
-    prospect: "#9ca3af",
-    qualified: "#3b82f6",
-    proposal_sent: "#f59e0b",
-    won: "#22c55e",
-    lost: "#ef4444",
-  } as Record<string, string>;
+    prospect: { text: "var(--color-ink-soft)", bg: "var(--color-surface-1)" },
+    qualified: { text: "var(--color-info-text)", bg: "var(--color-badge-info-bg)" },
+    proposal_sent: { text: "var(--color-warn-text)", bg: "var(--color-badge-warn-bg)" },
+    won: { text: "var(--color-success-text)", bg: "var(--color-badge-success-bg)" },
+    lost: { text: "var(--color-danger-text)", bg: "var(--color-badge-danger-bg)" },
+  } as Record<string, { text: string; bg: string }>;
+  const defaultStageColor = { text: "var(--color-ink-soft)", bg: "var(--color-surface-1)" };
 
   return (
     <main>
@@ -58,8 +64,8 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
             <span
               className={styles.stageBadge}
               style={{
-                backgroundColor: `${stageColor[company.relationshipStage as keyof typeof stageColor] || "#9ca3af"}20`,
-                color: stageColor[company.relationshipStage as keyof typeof stageColor] || "#9ca3af",
+                backgroundColor: (stageColor[company.relationshipStage] ?? defaultStageColor).bg,
+                color: (stageColor[company.relationshipStage] ?? defaultStageColor).text,
               }}
             >
               {company.relationshipStage.replace("_", " ")}

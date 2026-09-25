@@ -21,7 +21,10 @@
      brand red stays the single chromatic accent (text, fills, focus) in
      both light and dark — no separate light-theme accent needed. */
   --color-accent: #d5252f;
-  --color-accent-hover: #e6434c;
+  /* Hover darkens (not lightens): #e6434c was only 3.98:1 with white text,
+     failing AA. #b81f27 (same value as --color-accent-focus) is 6.44:1 —
+     owner-approved accessibility fix, 2026-09-24. */
+  --color-accent-hover: #b81f27;
   --color-accent-focus: #b81f27;
 
   /* ---- text hierarchy ---- */
@@ -39,12 +42,40 @@
   --color-success: #15803d;
   --color-warn: #b45309;
   --color-danger: #dc2626;
+  /* proposed: "Contacted" lead/lifecycle status */
+  --color-info: #1d4ed8;
+
+  /* ---- badge text (darker than the base semantic tokens above) ----
+     Owner-approved accessibility fix, 2026-09-24: badge text sits on a
+     tinted background, so it needs a darker shade than the base token to
+     clear AA — e.g. --color-success is 5.02:1 on white, but
+     --color-success-text is 6.08:1 on --color-badge-success-bg. */
+  --color-success-text: #166534;
+  --color-warn-text: #92400e;
+  --color-danger-text: #b91c1c;
+  --color-info-text: #1e40af;
 
   /* ---- translucent fills (badges, row hover) ---- */
   --color-badge-accent-bg: rgba(213, 37, 47, 0.12);
   --color-badge-success-bg: rgba(21, 128, 61, 0.12);
   --color-badge-warn-bg: rgba(180, 83, 9, 0.12);
+  --color-badge-danger-bg: rgba(220, 38, 38, 0.12);
+  --color-badge-info-bg: rgba(29, 78, 216, 0.12);
   --color-row-hover: rgba(0, 0, 0, 0.03);
+
+  /* ---- status badges (contact lifecycle, proposed — mockups/styles.css) ----
+     Used by record/list pages (Phase 9+) and the leads/companies detail
+     pages' stage badges (Phase 8, replacing hardcoded hex). */
+  --status-new-text: #4a4753;
+  --status-new-bg: #f1f1f2;
+  --status-contacted-text: #1e40af;
+  --status-contacted-bg: #e4eafa;
+  --status-replied-text: #5b21b6;
+  --status-replied-bg: #ede5fa;
+  --status-meeting-text: #166534;
+  --status-meeting-bg: #e3f0e8;
+  --status-discarded-text: #4a4753;
+  --status-discarded-bg: #e6e5e9;
 
   /* ---- select chevron (theme-aware data-URI icon) ----
      Light theme: dark ink-soft stroke. */
@@ -419,19 +450,19 @@ th {
 }
 .badge.green {
   background: var(--color-badge-success-bg);
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 /* "medium" confidence chip on a suggested email (see
  * src/lib/emailSuggestion.ts#SuggestionConfidence) — "high" reuses
  * .badge.green above, "low" reuses the default .badge (accent) styling. */
 .badge.warn {
   background: var(--color-badge-warn-bg);
-  color: var(--color-warn);
+  color: var(--color-warn-text);
 }
 /* Marks a contact whose company is currently hiring IT (see /hiring). */
 .badge.hiring {
   background: var(--color-badge-success-bg);
-  color: var(--color-success);
+  color: var(--color-success-text);
   margin-left: var(--space-xs);
 }
 /* Marks a contact's company classified as a startup (see
@@ -441,7 +472,7 @@ th {
  * badges above/below. */
 .badge.startup {
   background: var(--color-badge-success-bg);
-  color: var(--color-success);
+  color: var(--color-success-text);
   margin-left: var(--space-xs);
 }
 /* Marks a company that also hires in an offshore delivery hub (India,
