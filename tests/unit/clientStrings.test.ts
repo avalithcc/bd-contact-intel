@@ -16,6 +16,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { pickLeadsUploadLabels, pickLeadEditLabels } from "@/lib/leads/labels";
 import { pickNavLabels } from "@/lib/i18n/navLabels";
+import { pickContactRecordLabels } from "@/lib/contacts/labels";
 
 test("assertClientStrings accepts a plain string", () => {
   assert.doesNotThrow(() => assertClientStrings("hola"));
@@ -50,6 +51,10 @@ test("pickLeadEditLabels(es) is safe to pass to a client component", () => {
 
 test("pickNavLabels(es) is safe to pass to a client component", () => {
   assert.doesNotThrow(() => assertClientStrings(pickNavLabels(es)));
+});
+
+test("pickContactRecordLabels(es) is safe to pass to a client component", () => {
+  assert.doesNotThrow(() => assertClientStrings(pickContactRecordLabels(es)));
 });
 
 test("regression guard: the full dictionary is NOT client-safe (contains formatters)", () => {

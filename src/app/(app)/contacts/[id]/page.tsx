@@ -3,6 +3,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { getDictionary } from "@/lib/i18n/server";
+import { pickContactRecordLabels } from "@/lib/contacts/labels";
+import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import styles from "./page.module.css";
 
@@ -13,12 +15,10 @@ interface ContactRecordPageProps {
 }
 
 /**
- * Three-pane record shell (task 9.2; mockups/contact-record.html). This PR
- * (09b1) ships the read-only shell: identity, properties list, company and
- * connected-BD associations. Inline property editing and the Nota/Correo/
- * Tarea quick actions (task 9.4, still part of Phase 9) land in the
- * follow-up PR 09b2, which swaps the read-only `<dl>` below for the
- * interactive `AboutPane` client component.
+ * Three-pane record shell (task 9.2; mockups/contact-record.html). The
+ * read-only shell shipped in PR 09b1; this PR (09b2) swaps in the
+ * interactive `AboutPane` for inline property edit (task 9.4). The Nota/
+ * Correo/Tarea quick actions land in the follow-up PR 09b3.
  */
 export default async function ContactRecordPage({ params }: ContactRecordPageProps) {
   const { id } = await params;
@@ -29,38 +29,32 @@ export default async function ContactRecordPage({ params }: ContactRecordPagePro
 
   const { record } = result;
   const dict = await getDictionary();
-  const l = dict.contactRecord;
+  const l = pickContactRecordLabels(dict);
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
 
+  const properties: AboutPaneProperty[] = record.properties.map((p) => ({
+    key: p.key,
+    label: l[`prop${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}` as keyof typeof l] as string,
+    value: p.value,
+    lastUpdatedLabel: p.lastEdit
+      ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${format(p.lastEdit.at, "d MMM", { locale: es })}`
+      : null,
+  }));
+
   return (
     <main>
       <div className={styles.record}>
-        <aside aria-label={l.aboutSectionTitle}>
-          <h1>{name}</h1>
-          {record.person.jobTitle && <p>{record.person.jobTitle}</p>}
-          <span className={styles.tabActive}>{statusLabel}</span>
-
-          <div className={styles.cardTitle}>{l.aboutSectionTitle}</div>
-          <dl>
-            <div>
-              <dt>{l.propOwner}</dt>
-              <dd>{record.ownerName ?? l.emptyValue}</dd>
-            </div>
-            {record.properties.map((p) => (
-              <div key={p.key}>
-                <dt>{l[`prop${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}` as keyof typeof l] as string}</dt>
-                <dd>{p.value ?? l.emptyValue}</dd>
-                {p.lastEdit && (
-                  <dd className={styles.placeholder}>
-                    {l.lastUpdatedByPrefix} {p.lastEdit.bdName ?? "—"} · {format(p.lastEdit.at, "d MMM", { locale: es })}
-                  </dd>
-                )}
-              </div>
-            ))}
-          </dl>
-        </aside>
+        <AboutPane
+          personId={record.person.id}
+          labels={l}
+          name={name}
+          headline={record.person.jobTitle}
+          statusLabel={statusLabel}
+          ownerLabel={record.ownerName}
+          properties={properties}
+        />
 
         <div className={styles.main}>
           <RecordTabs

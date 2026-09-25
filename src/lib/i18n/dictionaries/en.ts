@@ -553,12 +553,11 @@ export const en = {
   },
 
   // Unified Contact record page (/contacts/[id], design D1/D8; contact-record
-  // spec). Deliberately a FLAT record of strings only — PR 09b2 hands this
-  // slice to the "use client" AboutPane component (see
+  // spec). Deliberately a FLAT record of strings only — the whole slice is
+  // handed to the "use client" AboutPane component (see
   // src/lib/contacts/labels.ts), and ClientStrings<T> forbids formatter
-  // functions in a client-bound slice. This PR (09b1, read-only shell) only
-  // uses a subset; the edit/quick-action/composer keys are added in 09b2
-  // alongside the code that renders them.
+  // functions in a client-bound slice. This PR (09b2, inline property edit)
+  // adds the edit keys; quick-action/composer keys land in 09b3.
   contactRecord: {
     tabActivity: "Activity",
     tabOverview: "Overview",
@@ -575,8 +574,13 @@ export const en = {
     propStatus: "Status",
     propSource: "Source",
     propCreated: "Created",
+    edit: "Edit",
+    save: "Save",
+    cancel: "Cancel",
     emptyValue: "—",
     lastUpdatedByPrefix: "Last updated by",
+    ownerNotEditableNote: "Owner reassignment isn't available on this page yet.",
+    genericError: "Something went wrong. Please try again.",
     timelineComingSoon: "The filterable activity timeline ships in Phase 10.",
     associationsComingSoon: "Full associations ship in Phase 11.",
     companyCardTitle: "Company",

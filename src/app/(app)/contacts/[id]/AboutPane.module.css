@@ -1,0 +1,87 @@
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: var(--color-ink);
+}
+
+.headline {
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+
+.statusBadge {
+  align-self: flex-start;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.sectionTitle {
+  font-weight: 700;
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-sm);
+}
+
+.props {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.prop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prop dt {
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
+
+.prop dd {
+  margin: 0;
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
+
+.editIcon {
+  margin-left: var(--space-sm);
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.editRow {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.input {
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
