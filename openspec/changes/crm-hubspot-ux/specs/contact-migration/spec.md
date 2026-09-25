@@ -43,6 +43,8 @@ The system MUST fold `lead` rows into the unified Contact set using the identity
 - WHEN the fold step runs
 - THEN the lead's notes, status-supporting activity, and source are merged into that Contact
 
+Note: the `lead` table carries no LinkedIn profile key column, so in practice a lead can only match an existing Contact via verified email or the name+company fallback — never via profile key (see `foldPlanner.ts`).
+
 ### Requirement: Reference migration via id mapping
 
 The system MUST migrate `activity`, `task`, `signal`, and `linkedinScrapeJob` references from legacy `contactId`/`leadId` to the unified Contact id through an old-id to new-id mapping table, leaving zero orphaned references.
