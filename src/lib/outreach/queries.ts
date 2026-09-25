@@ -251,6 +251,17 @@ export async function getRecentOutreachHistory(
  * stays exactly 3 whether or not they're set. `filters.companyCategory`
  * narrows query (3) the same way `filters.roleGroup` does — a plain `person`
  * column, no extra query either.
+ *
+ * Fresh-review fix: query (3) used to `leftJoin` `person_bd_connection`
+ * directly alongside `person_id_map`/`contact` (also a `leftJoin`, one row
+ * per connected BD's own legacy contact row) in the SAME query, so a person
+ * connected to N BDs with M legacy contact rows fanned out to N×M rows
+ * before `groupBy(person.id)` — inflating `sum(messageCount)` by a factor of
+ * M. `pbcAgg` pre-aggregates `person_bd_connection` to exactly one row per
+ * person BEFORE it's joined, so the `contact` fan-out (needed only to
+ * resolve `id`, see the comment above) can no longer multiply it; the outer
+ * query takes `max()` of the already-aggregated value, which is safe against
+ * duplicate identical rows.
  */
 export async function listOutreachCandidates(
   bdId: string,
@@ -286,7 +297,22 @@ export async function listOutreachCandidates(
     );
   }
 
+  // Pre-aggregated to one row per person BEFORE the (fan-out-prone) join to
+  // person_id_map/contact below — see the fresh-review fix comment above.
+  const pbcAgg = db.$with("pbc_agg").as(
+    db
+      .select({
+        personId: personBdConnection.personId,
+        messageCount: sql<number>`sum(${personBdConnection.messageCount})`.as("message_count"),
+        lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`.as("last_message_at"),
+        reciprocal: sql<boolean>`bool_or(${personBdConnection.reciprocal})`.as("reciprocal"),
+      })
+      .from(personBdConnection)
+      .groupBy(personBdConnection.personId),
+  );
+
   let query = db // query 3
+    .with(pbcAgg)
     .select({
       id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id} end), ${person.id})`,
       firstName: person.firstName,
@@ -295,12 +321,12 @@ export async function listOutreachCandidates(
       companyKey: person.companyKey,
       position: person.jobTitle,
       roleGroup: person.roleGroup,
-      messageCount: sql<number>`coalesce(sum(${personBdConnection.messageCount}), 0)::int`,
-      lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`,
-      reciprocal: sql<boolean>`coalesce(bool_or(${personBdConnection.reciprocal}), false)`,
+      messageCount: sql<number>`coalesce(max(${pbcAgg.messageCount}), 0)::int`,
+      lastMessageAt: sql<Date | null>`max(${pbcAgg.lastMessageAt})`,
+      reciprocal: sql<boolean>`coalesce(bool_or(${pbcAgg.reciprocal}), false)`,
     })
     .from(person)
-    .leftJoin(personBdConnection, eq(personBdConnection.personId, person.id))
+    .leftJoin(pbcAgg, eq(pbcAgg.personId, person.id))
     .leftJoin(
       personIdMap,
       and(eq(personIdMap.personId, person.id), eq(personIdMap.legacyTable, "contact")),
@@ -311,7 +337,7 @@ export async function listOutreachCandidates(
     .$dynamic();
 
   if (!includeNeverMessaged) {
-    query = query.having(sql`coalesce(sum(${personBdConnection.messageCount}), 0) > 0`);
+    query = query.having(sql`coalesce(max(${pbcAgg.messageCount}), 0) > 0`);
   }
 
   const rows = await query;
