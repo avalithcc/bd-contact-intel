@@ -659,4 +659,48 @@ export const en = {
       not_latest_dry_run: "A newer dry run exists; this one can no longer be approved.",
     },
   },
+
+  // /admin/duplicates (Phase 7). Same Spanish-only rationale as `migration`
+  // above — this English copy exists only to satisfy `Dictionary = typeof en`.
+  duplicates: {
+    eyebrow: "Admin",
+    title: "possible duplicates",
+    subtitle: (openCount: number) => `${openCount} open`,
+    adminOnlyBadge: "Admins only",
+    queueTitle: "Open pairs",
+    emptyQueue: "No pairs pending review.",
+    pairMeta: (index: number, total: number) => `Pair ${index} of ${total}`,
+    reasonLabels: {
+      name_company: "Match: name + company",
+      profile_key: "Match: LinkedIn profile",
+      verified_email: "Match: verified email",
+    } as Record<string, string>,
+    fieldJobTitle: "Title",
+    fieldEmail: "Email",
+    fieldProfileKey: "LinkedIn",
+    fieldLocation: "Location",
+    fieldOwner: "Owner",
+    fieldStatus: "Status",
+    recommendationNote: (survivorLabel: string) =>
+      `On merge, Record ${survivorLabel} survives. The most complete value wins per field; discarded values stay in the merge history.`,
+    mergeButton: (survivorLabel: string) => `Merge into ${survivorLabel}`,
+    notDuplicateButton: "Not a duplicate",
+    noValue: "—",
+    historyTitle: "merge history",
+    historyContact: "Merged contact",
+    historyReason: "Reason",
+    historyBy: "By",
+    historyWhen: "When",
+    historyUndone: "Undone",
+    undoButton: "Undo merge",
+    migrationActor: "Migration",
+    prevPage: "Previous",
+    nextPage: "Next",
+    pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
+    actionErrors: {
+      not_found: "The pair or merge could not be found.",
+      already_resolved: "This pair was already resolved by someone else.",
+      unexpected: "The action could not be completed. Please try again.",
+    },
+  },
 };
