@@ -73,7 +73,7 @@ Chain strategy: feature-branch-chain
 ## Phase 4: Fold Leads (PR 4, base: PR 3)
 
 - [x] 4.1 RED/GREEN: fold planner — leads matched via matcher, unmatched leads become new Contacts carrying `ownerBdId` and source. (`src/lib/migration/foldPlanner.ts`; IdentityIndex seeded from EXISTING `person` rows, since Phase 3 collapse is already executed in prod.)
-- [ ] 4.2 RED/GREEN: `status_backfill` activity writer for leads with a manually set status and no supporting activity (contact-migration spec scenario).
+- [x] 4.2 RED/GREEN: `status_backfill` activity writer for leads with a manually set status and no supporting activity (contact-migration spec scenario). (`planStatusBackfills` in `src/lib/migration/foldPlanner.ts`; no DB migration needed — `activity.type` is free text, not an enum.)
 - [x] 4.3 `scripts/unify-contacts.ts --phase=fold_leads`: re-points `activity`/`task`/`signal` via `person_id_map` (`linkedin_scrape_job` has no lead-scoped column, so it is not re-pointed here); produces fold dry-run report.
 - [ ] 4.4 **GATE**: owner reviews the fold-leads dry-run report before `--execute`.
 - [x] 4.5 Test: zero orphaned references after fold execute (fixture-level check); every legacy id resolves via `person_id_map`.
@@ -82,7 +82,9 @@ Chain strategy: feature-branch-chain
 
 - 4a — planner (PR #8: `feat/crm-hubspot-ux-04-fold-leads`).
 - 4b — collapse-merge planner fix (`feat/crm-hubspot-ux-04b-collapse-merge-fix`). Repair verified unnecessary: dry run against prod showed 0 diffs across all 699 multi-contact groups (identical values in the 8 affected fields), so no `--execute` was needed and no repair CLI shipped.
-- 4d — fold-leads write path, this branch (`feat/crm-hubspot-ux-04d-fold-write`).
+- 4d — fold-leads write path (`feat/crm-hubspot-ux-04d-fold-write`): planner + write rows + run orchestration, wired to the database.
+- 4e — fold-leads CLI wiring (`feat/crm-hubspot-ux-04e-fold-cli`): `--phase=fold_leads` reaches the real database via `scripts/unify-contacts.ts`; re-pointing scope docs fix (no `linkedin_scrape_job` column).
+- 4f — status backfill + admin UI (`feat/crm-hubspot-ux-04f-fold-backfill-admin`): task 4.2's `status_backfill` writer, and `/admin/migration` extended to list/approve `fold_leads` runs alongside `collapse`.
 
 ## Phase 4B: Write Cutover & Catch-up (PRs 4B-1..4B-4, base: PR 4)
 
