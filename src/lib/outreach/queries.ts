@@ -1,6 +1,6 @@
-import { and, desc, eq, gt, ilike, inArray, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { contact, conversation, message } from "@/db/schema";
+import { contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
 import { DORMANT_MONTHS, isDormant } from "@/lib/queries";
 import {
   getHiringMatchIndex,
@@ -215,22 +215,42 @@ export async function getRecentOutreachHistory(
 }
 
 /**
- * Ranked "who should I message this week?" list for one BD: contacts whose
- * company is currently hiring IT, ordered by relationship strength then
- * seniority then hiring urgency (see compareOutreachRows).
+ * Ranked "who should I message this week?" list: Contacts whose company is
+ * currently hiring IT, ordered by relationship strength then seniority then
+ * hiring urgency (see compareOutreachRows).
+ *
+ * Re-scoped off `bdId` (task 5.3; proposal success criterion "no `bdId`
+ * scoping on Contact queries"; contact-list spec "Central list, no per-BD
+ * scoping"): the candidate set is every unified `person` matching a hiring
+ * company, not just the calling BD's own address book — a BD now sees
+ * teammates' Contacts here too. `messageCount`/`lastMessageAt`/`reciprocal`
+ * are aggregated across every connected BD's `person_bd_connection` row
+ * (design R4: "combined across BDs"), consistent with how `deriveStatus`
+ * already treats connection evidence. `bdId` is kept only to prefer that BD's
+ * own legacy `contact` row for `id` (see below) — it is no longer a
+ * candidate-set filter.
+ *
+ * `id` stays the legacy `contact.id` (not `person.id`) so the existing
+ * "view"/"generate message" actions (`/contact/[id]`, `generateOutreachMessage`
+ * — both still `bdId`-scoped reads, out of this task's scope) keep working
+ * unchanged for a BD's own Contacts. When the calling BD has no `contact` row
+ * for a person (a teammate-exclusive Contact), `id` falls back to
+ * `person.id`, which those two `bdId`-scoped actions will not resolve today
+ * — a known, documented gap closed by Phase 9's unified `/contacts/[id]`
+ * record page (design D8), not this change.
  *
  * Exactly 3 fixed queries regardless of page number or total contact count:
  * (1)+(2) the two queries behind getHiringMatchIndex (open postings,
- * aliases — shared with /hiring, not BD-scoped), and (3) one `contact`
- * query scoped to `bd_id = bdId` and pre-filtered to only companies with an
- * open IT posting, so the row count stays bounded by the hiring crossover
- * rather than the full contact base. Scoring, sorting and pagination happen
- * in JS over that single fetched set — no per-row or per-page query.
- * `filters.market` and `filters.startupsOnly` narrow queries (1)-(2) via
- * getHiringMatchIndex's SQL WHERE clause, so the query count stays exactly
- * 3 whether or not they're set. `filters.companyCategory` narrows query (3)
- * the same way `filters.roleGroup` does — a plain `contact` column, no
- * extra query either.
+ * aliases — shared with /hiring, not BD-scoped), and (3) one `person`
+ * query (aggregated over its connections) pre-filtered to only companies
+ * with an open IT posting, so the row count stays bounded by the hiring
+ * crossover rather than the full Contact base. Scoring, sorting and
+ * pagination happen in JS over that single fetched set — no per-row or
+ * per-page query. `filters.market` and `filters.startupsOnly` narrow queries
+ * (1)-(2) via getHiringMatchIndex's SQL WHERE clause, so the query count
+ * stays exactly 3 whether or not they're set. `filters.companyCategory`
+ * narrows query (3) the same way `filters.roleGroup` does — a plain `person`
+ * column, no extra query either.
  */
 export async function listOutreachCandidates(
   bdId: string,
@@ -255,33 +275,46 @@ export async function listOutreachCandidates(
     return { rows: [], total: 0, page: 1, pageSize, totalPages: 1, hiringCompanyCount: 0 };
   }
 
-  const where = [eq(contact.bdId, bdId), inArray(contact.companyKey, matchKeys)];
-  if (filters.roleGroup) where.push(eq(contact.roleGroup, filters.roleGroup));
-  if (filters.companyCategory) where.push(eq(contact.companyCategory, filters.companyCategory));
-  if (!includeNeverMessaged) where.push(gt(contact.messageCount, 0));
+  const where = [isNull(person.mergedIntoId), inArray(person.companyKey, matchKeys)];
+  if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
+  if (filters.companyCategory) where.push(eq(person.companyCategory, filters.companyCategory));
   const name = filters.name?.trim();
   if (name) {
     const pattern = `%${name}%`;
     where.push(
-      or(ilike(contact.firstName, pattern), ilike(contact.lastName, pattern))!,
+      or(ilike(person.firstName, pattern), ilike(person.lastName, pattern))!,
     );
   }
 
-  const rows = await db // query 3
+  let query = db // query 3
     .select({
-      id: contact.id,
-      firstName: contact.firstName,
-      lastName: contact.lastName,
-      company: contact.company,
-      companyKey: contact.companyKey,
-      position: contact.position,
-      roleGroup: contact.roleGroup,
-      messageCount: contact.messageCount,
-      lastMessageAt: contact.lastMessageAt,
-      reciprocal: contact.reciprocal,
+      id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id} end), ${person.id})`,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      company: person.company,
+      companyKey: person.companyKey,
+      position: person.jobTitle,
+      roleGroup: person.roleGroup,
+      messageCount: sql<number>`coalesce(sum(${personBdConnection.messageCount}), 0)::int`,
+      lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`,
+      reciprocal: sql<boolean>`coalesce(bool_or(${personBdConnection.reciprocal}), false)`,
     })
-    .from(contact)
-    .where(and(...where));
+    .from(person)
+    .leftJoin(personBdConnection, eq(personBdConnection.personId, person.id))
+    .leftJoin(
+      personIdMap,
+      and(eq(personIdMap.personId, person.id), eq(personIdMap.legacyTable, "contact")),
+    )
+    .leftJoin(contact, eq(contact.id, personIdMap.legacyId))
+    .where(and(...where))
+    .groupBy(person.id)
+    .$dynamic();
+
+  if (!includeNeverMessaged) {
+    query = query.having(sql`coalesce(sum(${personBdConnection.messageCount}), 0) > 0`);
+  }
+
+  const rows = await query;
 
   const scored: OutreachRow[] = rows.map((r) => {
     const dormant = isDormant(r.reciprocal, r.lastMessageAt);

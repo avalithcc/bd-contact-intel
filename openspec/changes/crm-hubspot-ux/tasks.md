@@ -102,10 +102,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 5: Status Derivation & Re-Scope Reads (PR 5, base: PR 4B-4)
 
-- [ ] 5.1 RED/GREEN: pure `deriveStatus(events)` per the rank/discard algorithm in design.md, returning `{ status, because }`.
-- [ ] 5.2 Wire `deriveStatus()` into the same transaction as every activity write, merge, and message import; cache result on `person.status`/`status_activity_id`.
-- [ ] 5.3 Re-scope outreach and hiring reads off `bdId` filtering onto the unified `person` table (no `bdId` scoping on Contact queries per proposal success criteria).
-- [ ] 5.4 Test: discard un-discarded by a later activity; combined multi-BD activity picks the most advanced stage.
+- [x] 5.1 RED/GREEN: pure `deriveStatus(events)` per the rank/discard algorithm in design.md, returning `{ status, because }`. `src/lib/status/deriveStatus.ts` (PR 5a, branch `feat/crm-hubspot-ux-05a-derive-status`), plus the `activityRowToStatusEvent`/`connectionRowToStatusEvent` row builders (PR 5b).
+- [x] 5.2 Wire `deriveStatus()` into the same transaction as every activity write, merge, and message import; cache result on `person.status`/`status_activity_id`. `src/lib/status/recompute.ts#recomputePersonStatus` wired into `createActivity` (`src/lib/activity/queries.ts`), `updateLeadStatus` (`src/lib/leads/queries.ts`), and `recomputeMessageSignals` (`src/lib/queries.ts`, per-affected-person loop after its set-based `person_bd_connection` update) — PR 5b, branch `feat/crm-hubspot-ux-05b-status-wiring`. Merge (Phase 6, doesn't exist yet) gets a documented `TODO` hook in `recompute.ts`.
+- [x] 5.3 Re-scope outreach and hiring reads off `bdId` filtering onto the unified `person` table (no `bdId` scoping on Contact queries per proposal success criteria). `listOutreachCandidates` (`src/lib/outreach/queries.ts`) and `getCompanyHiringSummaries` (`src/lib/hiring/queries.ts`) — PR 5c, branch `feat/crm-hubspot-ux-05c-rescope-reads`. Visible change: BDs now see and can rank teammates' Contacts in these lists (message/reciprocal signals aggregated across every connected BD, design R4 "combined across BDs"). Known gap, not a regression: the "view"/"generate message" actions for a teammate-exclusive Contact still 404 until Phase 9's unified `/contacts/[id]` record page ships (D8) — `id` prefers the calling BD's own legacy `contact.id` and falls back to `person.id` otherwise, documented in the query's doc comment.
+- [x] 5.4 Test: discard un-discarded by a later activity; combined multi-BD activity picks the most advanced stage. `tests/unit/deriveStatus.test.ts` (PR 5a).
 
 ## Phase 6: Merge/Unmerge Engine (PR 6, base: PR 5)
 
