@@ -50,20 +50,46 @@ export function computeCollapseInputHash(rows: CollapseContactRow[]): string {
 }
 
 /**
- * Fold-leads input hash: covers both row sets the planner depends on — the
- * `lead` rows being folded AND the `person`/`person_id_map` snapshot the
+ * Deterministic fingerprint of `activityTypesByLeadId` — a THIRD
+ * `planFoldLeads` input (`planStatusBackfills`'s "no supporting activity"
+ * check), separate from the two row sets below because it isn't a row set
+ * at all (a `Map<leadId, Set<type>>`). Sorted by leadId, and each lead's
+ * types sorted too, so Map insertion order and Set iteration order can't
+ * drift the hash (fresh-review fix: a lead gaining/losing a supporting
+ * activity type between dry run and execute must trip `stale_input_hash`,
+ * not silently execute against a plan the owner never actually reviewed).
+ */
+function hashActivityTypesByLeadId(activityTypesByLeadId: ReadonlyMap<string, ReadonlySet<string>>): string {
+  const entries = [...activityTypesByLeadId.entries()]
+    .map(([leadId, types]) => `${leadId}=${[...types].sort().join(",")}`)
+    .sort();
+  return entries.join(ROW_SEPARATOR);
+}
+
+/**
+ * Fold-leads input hash: covers every input `planFoldLeads` reads — the
+ * `lead` rows being folded, the `person`/`person_id_map` snapshot the
  * `IdentityIndex` is seeded from (design.md D12 rationale: the planner's
- * output depends on both). Combining two `hashRowSet` results (rather than
- * hashing one concatenated array) keeps each set's own row shape reflective,
- * without requiring a shared row type between leads and existing persons.
+ * output depends on both), AND `activityTypesByLeadId` (fresh-review fix —
+ * previously unhashed, so a change in existing activity types between dry
+ * run and execute was never detected as stale). Combining `hashRowSet`
+ * results (rather than hashing one concatenated array) keeps each set's own
+ * row shape reflective, without requiring a shared row type between leads
+ * and existing persons.
  */
 export function computeFoldInputHash<
   L extends { id: string },
   P extends { id: string },
->(leads: readonly L[], existingPersons: readonly P[]): string {
+>(
+  leads: readonly L[],
+  existingPersons: readonly P[],
+  activityTypesByLeadId: ReadonlyMap<string, ReadonlySet<string>>,
+): string {
   const hash = createHash("sha256");
   hash.update(hashRowSet(leads));
   hash.update(SET_SEPARATOR);
   hash.update(hashRowSet(existingPersons));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashActivityTypesByLeadId(activityTypesByLeadId));
   return hash.digest("hex");
 }

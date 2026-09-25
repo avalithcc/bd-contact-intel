@@ -109,11 +109,30 @@ test("execute backs up, then finalizes into the approved run using the current i
   const ports = fakePorts();
   const persons = [person()];
   const leads = [lead()];
-  const currentHash = computeFoldInputHash(leads, persons);
+  const currentHash = computeFoldInputHash(leads, persons, noActivityTypes);
 
   const result = await runFoldExecute(persons, leads, noActivityTypes, approvedRun({ inputHash: currentHash }), ports);
 
   assert.equal(result.migrationRunId, "run-1");
   assert.equal(ports.calls.snapshotBackup.length, 1);
   assert.equal(ports.calls.finalizeExecute.length, 1);
+});
+
+test("execute refuses with stale_input_hash when only activity types changed since the dry run", async () => {
+  const ports = fakePorts();
+  const persons = [person()];
+  const leads = [lead()];
+  // Approved against the dry-run hash computed with NO activity types...
+  const dryRunHash = computeFoldInputHash(leads, persons, noActivityTypes);
+  // ...but by execute time, an activity was logged for the lead — the
+  // planner's "no supporting activity" check now sees different input than
+  // the owner reviewed, so this must be refused, not silently executed.
+  const changedActivityTypes = new Map([["lead-1", new Set(["email_sent"])]]);
+
+  await assert.rejects(
+    () =>
+      runFoldExecute(persons, leads, changedActivityTypes, approvedRun({ inputHash: dryRunHash }), ports),
+    (err: unknown) => err instanceof MigrationExecutionBlockedError && err.reason === "stale_input_hash",
+  );
+  assert.equal(ports.calls.finalizeExecute.length, 0);
 });

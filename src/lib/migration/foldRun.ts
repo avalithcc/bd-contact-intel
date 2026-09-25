@@ -49,7 +49,7 @@ export async function runFoldDryRun(
   ports: Pick<FoldRunPorts, "saveDryRunReport">,
 ): Promise<FoldRunResult> {
   const plan = planFoldLeads(existingPersons, leads, activityTypesByLeadId);
-  const inputHash = computeFoldInputHash(leads, existingPersons);
+  const inputHash = computeFoldInputHash(leads, existingPersons, activityTypesByLeadId);
   const migrationRunId = await ports.saveDryRunReport({ inputHash, report: plan.report });
   return { migrationRunId, report: plan.report };
 }
@@ -67,7 +67,7 @@ export async function runFoldExecute(
   ports: Pick<FoldRunPorts, "snapshotBackup" | "finalizeExecute">,
 ): Promise<FoldRunResult> {
   const plan = planFoldLeads(existingPersons, leads, activityTypesByLeadId);
-  const inputHash = computeFoldInputHash(leads, existingPersons);
+  const inputHash = computeFoldInputHash(leads, existingPersons, activityTypesByLeadId);
   assertExecutionAllowed(approvedRun, inputHash, "fold_leads");
   const run = approvedRun as ApprovedFoldRun;
 

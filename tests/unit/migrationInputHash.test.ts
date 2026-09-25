@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { computeCollapseInputHash } from "@/lib/migration/inputHash";
+import { computeCollapseInputHash, computeFoldInputHash } from "@/lib/migration/inputHash";
 import type { CollapseContactRow } from "@/lib/migration/collapsePlanner";
 
 function row(overrides: Partial<CollapseContactRow> = {}): CollapseContactRow {
@@ -85,4 +85,35 @@ test("changing ANY field on the row changes the hash — no field is silently ig
       `expected the hash to change for mutation: ${JSON.stringify(mutation)}`,
     );
   }
+});
+
+// --- fresh-review fix: computeFoldInputHash must also cover
+// activityTypesByLeadId, a planFoldLeads input (foldRun.ts passes it to the
+// planner but the old hash never fingerprinted it) --------------------------
+
+test("computeFoldInputHash changes when activity types change for the same leads and persons", () => {
+  const leads = [{ id: "l1" }];
+  const persons = [{ id: "p1" }];
+  const noTypes = new Map<string, Set<string>>();
+  const withTypes = new Map([["l1", new Set(["email_sent"])]]);
+
+  assert.notEqual(
+    computeFoldInputHash(leads, persons, noTypes),
+    computeFoldInputHash(leads, persons, withTypes),
+  );
+});
+
+test("computeFoldInputHash for activity types is insensitive to Map/Set insertion order", () => {
+  const leads = [{ id: "l1" }, { id: "l2" }];
+  const persons = [{ id: "p1" }];
+  const a = new Map([
+    ["l1", new Set(["email_sent", "meeting_logged"])],
+    ["l2", new Set(["discarded"])],
+  ]);
+  const b = new Map([
+    ["l2", new Set(["discarded"])],
+    ["l1", new Set(["meeting_logged", "email_sent"])],
+  ]);
+
+  assert.equal(computeFoldInputHash(leads, persons, a), computeFoldInputHash(leads, persons, b));
 });
