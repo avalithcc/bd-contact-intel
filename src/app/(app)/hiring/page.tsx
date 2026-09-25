@@ -5,9 +5,9 @@ import { getCurrentBd } from "@/lib/queries";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate } from "@/lib/i18n/format";
-import { SignOutButton } from "../SignOutButton";
-import { UserMenu } from "../UserMenu";
-import { BackButton } from "../BackButton";
+import { SignOutButton } from "../../SignOutButton";
+import { UserMenu } from "../../UserMenu";
+import { BackButton } from "../../BackButton";
 
 export const dynamic = "force-dynamic";
 

@@ -4,37 +4,43 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./Sidebar.module.css";
+import type { NavLabels } from "@/lib/i18n/navLabels";
 
 export interface SidebarItem {
-  label: string;
+  labelKey: Exclude<
+    keyof NavLabels,
+    "workspaceSection" | "signalsSection" | "account" | "contactsFallback" | "toggleSidebar"
+  >;
   href: string;
 }
 
 export interface SidebarSection {
-  title: string;
+  titleKey: Extract<keyof NavLabels, "workspaceSection" | "signalsSection">;
   items: SidebarItem[];
 }
 
-// App shell nav (design.md D9, Phase 8). Labels/routes are unchanged from
-// the pre-Phase-8 sidebar — only the visual language (mockups/styles.css)
-// changes here. Phases 9-14 reshape the information architecture itself
-// (e.g. a "Contacts" item pointing at /contacts) as each page migrates.
+// App shell nav (design.md D9, Phase 8). Routes are unchanged from the
+// pre-Phase-8 sidebar — only the visual language (mockups/styles.css) and,
+// per the Phase 8 fresh-review fix, the labels (now sourced from the `es`
+// dictionary instead of hardcoded English) change here. Phases 9-14 reshape
+// the information architecture itself (e.g. a "Contacts" item pointing at
+// /contacts) as each page migrates.
 export const NAVIGATION: SidebarSection[] = [
   {
-    title: "CENTRAL",
+    titleKey: "workspaceSection",
     items: [
-      { label: "Leads", href: "/leads" },
-      { label: "Companies", href: "/companies" },
-      { label: "Tasks", href: "/tasks" },
-      { label: "Outreach", href: "/outreach" },
+      { labelKey: "leads", href: "/leads" },
+      { labelKey: "companies", href: "/companies" },
+      { labelKey: "tasks", href: "/tasks" },
+      { labelKey: "outreach", href: "/outreach" },
     ],
   },
   {
-    title: "AREAS",
+    titleKey: "signalsSection",
     items: [
-      { label: "Hiring", href: "/hiring" },
-      { label: "What's New", href: "/whats-new" },
-      { label: "Discovery", href: "/discovery" },
+      { labelKey: "hiring", href: "/hiring" },
+      { labelKey: "whatsNew", href: "/whats-new" },
+      { labelKey: "discovery", href: "/discovery" },
     ],
   },
 ];
@@ -44,7 +50,7 @@ export const NAVIGATION: SidebarSection[] = [
  * rather than `src/components/` per D9 — it's extracted only once Company
  * (or another surface) adopts it too.
  */
-export function Sidebar() {
+export function Sidebar({ labels }: { labels: NavLabels }) {
   const [isOpen, setIsOpen] = useState(true);
   const pathname = usePathname();
 
@@ -55,7 +61,7 @@ export function Sidebar() {
       <button
         className={styles.toggleButton}
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="Toggle sidebar"
+        aria-label={labels.toggleSidebar}
       >
         ☰
       </button>
@@ -69,8 +75,8 @@ export function Sidebar() {
         </Link>
 
         {NAVIGATION.map((section) => (
-          <div key={section.title} className={styles.navSection}>
-            <h3 className={styles.navTitle}>{section.title}</h3>
+          <div key={section.titleKey} className={styles.navSection}>
+            <h3 className={styles.navTitle}>{labels[section.titleKey]}</h3>
             {section.items.map((item) => (
               <Link
                 key={item.href}
@@ -78,7 +84,7 @@ export function Sidebar() {
                 className={`${styles.navItem} ${isActive(item.href) ? styles.active : ""}`}
                 aria-current={isActive(item.href) ? "page" : undefined}
               >
-                {item.label}
+                {labels[item.labelKey]}
               </Link>
             ))}
           </div>
@@ -86,7 +92,7 @@ export function Sidebar() {
 
         <div className={styles.sidenavFooter}>
           <Link href="/account" className={styles.navItem}>
-            Account
+            {labels.account}
           </Link>
         </div>
       </nav>

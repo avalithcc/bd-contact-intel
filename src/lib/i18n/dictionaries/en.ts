@@ -138,6 +138,23 @@ export const en = {
   leadEmailStatuses,
   leadStatuses,
 
+  // App shell sidebar/topbar (design.md D9, fresh-review fix on tasks.md
+  // 8.2).
+  nav: {
+    workspaceSection: "CENTRAL",
+    signalsSection: "AREAS",
+    leads: "Leads",
+    companies: "Companies",
+    tasks: "Tasks",
+    outreach: "Outreach",
+    hiring: "Hiring",
+    whatsNew: "What's New",
+    discovery: "Discovery",
+    account: "Account",
+    contactsFallback: "Contacts",
+    toggleSidebar: "Toggle sidebar",
+  },
+
   home: {
     title: "contact base",
     signedInAs: (name: string, email: string) => `Signed in as ${name} (${email})`,

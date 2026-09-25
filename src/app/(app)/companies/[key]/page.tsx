@@ -1,8 +1,8 @@
 import { getCompanyByKey } from "@/lib/companies/queries";
 import { getActivitiesByCompany } from "@/lib/activity/queries";
 import { ActivityTimeline } from "@/app/ActivityTimeline";
-import { AddActivityButton } from "@/app/companies/AddActivityButton";
-import { EditCompanyButton } from "@/app/companies/EditCompanyButton";
+import { AddActivityButton } from "@/app/(app)/companies/AddActivityButton";
+import { EditCompanyButton } from "@/app/(app)/companies/EditCompanyButton";
 import Link from "next/link";
 import styles from "./page.module.css";
 

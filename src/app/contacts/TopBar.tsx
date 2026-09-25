@@ -4,15 +4,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import styles from "./TopBar.module.css";
 import { NAVIGATION } from "./Sidebar";
+import type { NavLabels } from "@/lib/i18n/navLabels";
 
-function breadcrumbFor(pathname: string): string {
+function breadcrumbFor(pathname: string, labels: NavLabels): string {
   const item = NAVIGATION.flatMap((section) => section.items).find((i) =>
     pathname.startsWith(i.href),
   );
   // "/" itself is the pre-Phase-12 contacts home (design.md D9: /contacts
   // formalizes it later) — label it accordingly rather than leaving the
   // breadcrumb blank.
-  return item?.label ?? "Contacts";
+  return item ? labels[item.labelKey] : labels.contactsFallback;
 }
 
 /**
@@ -24,7 +25,7 @@ function breadcrumbFor(pathname: string): string {
  * (e.g. UserMenu) that later phases migrate onto this shell one page at a
  * time, not a Phase 8 shell-only concern.
  */
-export function TopBar() {
+export function TopBar({ labels }: { labels: NavLabels }) {
   const pathname = usePathname();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -37,7 +38,7 @@ export function TopBar() {
   return (
     <header className={styles.topbar}>
       <nav className={styles.breadcrumbs} aria-label="Ruta de navegación">
-        <span>{breadcrumbFor(pathname)}</span>
+        <span>{breadcrumbFor(pathname, labels)}</span>
       </nav>
       <form className={styles.search} onSubmit={onSubmit} role="search">
         <span className="sr-only">Buscar contactos</span>

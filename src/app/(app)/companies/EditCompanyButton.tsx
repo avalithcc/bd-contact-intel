@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateCompanyAction } from "@/app/companies/actions";
+import { updateCompanyAction } from "@/app/(app)/companies/actions";
 import styles from "./EditCompanyModal.module.css";
 
 interface EditCompanyButtonProps {

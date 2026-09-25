@@ -7,9 +7,9 @@ import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
-import { SignOutButton } from "../SignOutButton";
-import { UserMenu } from "../UserMenu";
-import { BackButton } from "../BackButton";
+import { SignOutButton } from "../../SignOutButton";
+import { UserMenu } from "../../UserMenu";
+import { BackButton } from "../../BackButton";
 import { GenerateMessageButton } from "./GenerateMessageButton";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 

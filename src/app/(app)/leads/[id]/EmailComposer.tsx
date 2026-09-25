@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { draftLeadEmailAction, sendLeadEmailAction } from "@/app/leads/actions";
+import { draftLeadEmailAction, sendLeadEmailAction } from "@/app/(app)/leads/actions";
 import styles from "./EmailComposer.module.css";
 
 const DRAFT_ERRORS: Record<string, string> = {

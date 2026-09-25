@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createTaskAction } from "@/app/tasks/actions";
+import { createTaskAction } from "@/app/(app)/tasks/actions";
 import styles from "./TaskQuickAdd.module.css";
 
 export interface TaskQuickAddProps {

@@ -10,7 +10,7 @@ import {
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
-import { UploadForm, UploadMessagesForm } from "./UploadForm";
+import { UploadForm, UploadMessagesForm } from "../UploadForm";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";

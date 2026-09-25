@@ -102,6 +102,26 @@ export const es: typeof en = {
     discarded: "Descartado",
   },
 
+  // App shell sidebar/topbar (design.md D9, fresh-review fix on tasks.md
+  // 8.2). "outreach" is intentionally left untranslated per
+  // mockups/GLOSSARY.md ("Outreach" stays as the feature/route name).
+  // "discovery" uses the short nav form per GLOSSARY.md — the full phrase
+  // ("Descubrimiento de portales") overflows the fixed-width sidebar row.
+  nav: {
+    workspaceSection: "Espacio de trabajo",
+    signalsSection: "Señales",
+    leads: "Contactos",
+    companies: "Empresas",
+    tasks: "Tareas",
+    outreach: "Outreach",
+    hiring: "Vacantes abiertas",
+    whatsNew: "Novedades",
+    discovery: "Descubrimiento",
+    account: "Cuenta",
+    contactsFallback: "Contactos",
+    toggleSidebar: "Alternar barra lateral",
+  },
+
   home: {
     title: "base de contactos",
     signedInAs: (name, email) => `Sesión iniciada como ${name} (${email})`,
