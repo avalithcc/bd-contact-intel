@@ -36,6 +36,12 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorGmailReauth;
     case "gmail_unavailable":
       return l.errorGmailUnavailable;
+    case "discard_reason_required":
+      return l.errorDiscardReasonRequired;
+    case "discard_note_required":
+      return l.errorDiscardNoteRequired;
+    case "meeting_date_required":
+      return l.errorMeetingDateRequired;
     case "unexpected":
       return l.genericError;
   }

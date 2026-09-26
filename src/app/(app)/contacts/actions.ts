@@ -8,6 +8,8 @@ import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
+import { planMeeting } from "@/lib/contacts/meeting";
+import { planDiscard } from "@/lib/contacts/discard";
 import {
   contactActionErrorReason,
   PropertyNotEditableError,
@@ -67,6 +69,41 @@ export async function addContactTaskAction(
   try {
     await assertContactEditableById(personId);
     await createTaskAction({ title, personId, dueAt });
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/** "Reunión" quick action (task 10.2) — writes a `meeting_logged` activity; status recomputes to `meeting` in the same transaction (recompute.ts, via createActivity). */
+export async function logContactMeetingAction(
+  personId: string,
+  date: string,
+  time: string,
+  notes: string,
+): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    const metadata = planMeeting(date, time, notes);
+    await createActivityAction({ type: "meeting_logged", personId, metadata: { ...metadata } });
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/** "Descartar" quick action (task 10.3) — writes a `discarded` activity; planDiscard() rejects a missing reason or a missing note when reason is `other` (task 10.4). */
+export async function discardContactAction(
+  personId: string,
+  reason: string | null,
+  note: string,
+): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    const metadata = planDiscard(reason, note);
+    await createActivityAction({ type: "discarded", personId, metadata: { ...metadata } });
+    revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

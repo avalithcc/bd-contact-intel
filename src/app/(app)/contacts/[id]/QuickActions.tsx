@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { contactActionErrorHref } from "../actionErrors";
-import { addContactNoteAction, addContactTaskAction, sendContactEmailAction } from "../actions";
+import {
+  addContactNoteAction,
+  addContactTaskAction,
+  discardContactAction,
+  logContactMeetingAction,
+  sendContactEmailAction,
+} from "../actions";
+import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
 import styles from "./AboutPane.module.css";
 
 export interface QuickActionsProps {
@@ -14,7 +21,16 @@ export interface QuickActionsProps {
   email: string | null;
 }
 
-type QuickAction = "note" | "email" | "task" | null;
+type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | null;
+
+const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
+  wrong_profile: "discardReasonWrongProfile",
+  not_interested: "discardReasonNotInterested",
+  other_vendor: "discardReasonOtherVendor",
+  left_company: "discardReasonLeftCompany",
+  bad_data: "discardReasonBadData",
+  other: "discardReasonOther",
+};
 
 interface ActionError {
   message: string;
@@ -44,7 +60,8 @@ function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error:
 
 /**
  * Quick actions row (task 9.2): Nota/Correo/Tarea wired; Reunión/Descartar
- * render-only placeholders for Phase 10.
+ * wired in PR 10b (tasks 10.2/10.3) to logContactMeetingAction /
+ * discardContactAction.
  */
 export function QuickActions({ personId, labels: l, email }: QuickActionsProps) {
   const router = useRouter();
@@ -73,10 +90,10 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
         <button type="button" className={styles.qa} onClick={() => toggle("task")}>
           {l.quickActionTask}
         </button>
-        <button type="button" className={styles.qaDisabled} disabled title={l.comingSoonPhase10}>
+        <button type="button" className={styles.qa} onClick={() => toggle("meeting")}>
           {l.quickActionMeeting}
         </button>
-        <button type="button" className={styles.qaDisabled} disabled title={l.comingSoonPhase10}>
+        <button type="button" className={styles.qa} onClick={() => toggle("discard")}>
           {l.quickActionDiscard}
         </button>
       </div>
@@ -150,6 +167,48 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
                 message: contactActionErrorMessage(l, result.reason),
                 href: contactActionErrorHref(result.reason),
               });
+            }
+          }}
+        />
+      )}
+
+      {openAction === "meeting" && (
+        <MeetingForm
+          labels={l}
+          busy={busy}
+          error={error}
+          onCancel={closeQuickAction}
+          onSubmit={async (date, time, notes) => {
+            setBusy(true);
+            setError(null);
+            const result = await logContactMeetingAction(personId, date, time, notes);
+            setBusy(false);
+            if (result.ok) {
+              closeQuickAction();
+              router.refresh();
+            } else {
+              setError({ message: contactActionErrorMessage(l, result.reason) });
+            }
+          }}
+        />
+      )}
+
+      {openAction === "discard" && (
+        <DiscardForm
+          labels={l}
+          busy={busy}
+          error={error}
+          onCancel={closeQuickAction}
+          onSubmit={async (reason, note) => {
+            setBusy(true);
+            setError(null);
+            const result = await discardContactAction(personId, reason, note);
+            setBusy(false);
+            if (result.ok) {
+              closeQuickAction();
+              router.refresh();
+            } else {
+              setError({ message: contactActionErrorMessage(l, result.reason) });
             }
           }}
         />
@@ -262,6 +321,91 @@ function EmailForm({
         </button>
         <button type="button" disabled={busy || !body.trim()} onClick={() => body.trim() && onSubmit(subject.trim(), body.trim())}>
           {l.emailSend}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MeetingForm({
+  labels: l,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+}: ComposerProps & { onSubmit: (date: string, time: string, notes: string) => void }) {
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [notes, setNotes] = useState("");
+
+  return (
+    <div className={styles.composer}>
+      {error && <ErrorNotice labels={l} error={error} />}
+      <label className={styles.label}>
+        {l.meetingDateLabel}
+        <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} />
+      </label>
+      <label className={styles.label}>
+        {l.meetingTimeLabel}
+        <input className={styles.input} type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
+      </label>
+      <label className={styles.label}>
+        {l.meetingNotesLabel}
+        <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+      </label>
+      <p className={styles.hint}>{l.meetingHelp}</p>
+      <div className={styles.composerBar}>
+        <button type="button" onClick={onCancel} disabled={busy}>
+          {l.cancel}
+        </button>
+        <button type="button" disabled={busy || !date} onClick={() => date && onSubmit(date, time, notes)}>
+          {l.meetingSubmit}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DiscardForm({
+  labels: l,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+}: ComposerProps & { onSubmit: (reason: string | null, note: string) => void }) {
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const requiresNote = reason === "other";
+
+  return (
+    <div className={styles.composer}>
+      {error && <ErrorNotice labels={l} error={error} />}
+      <label className={styles.label}>
+        {l.discardReasonLabel}
+        <select className={styles.input} value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy}>
+          <option value="">{l.discardReasonPlaceholder}</option>
+          {DISCARD_REASON_CODES.map((code) => (
+            <option key={code} value={code}>
+              {l[DISCARD_REASON_LABEL_KEY[code]] as string}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className={styles.label}>
+        {l.discardNoteLabel}
+        <textarea className={styles.textarea} value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} />
+      </label>
+      {requiresNote && <p className={styles.hint}>{l.discardNoteRequiredHint}</p>}
+      <div className={styles.composerBar}>
+        <button type="button" onClick={onCancel} disabled={busy}>
+          {l.cancel}
+        </button>
+        <button
+          type="button"
+          disabled={busy || !reason || (requiresNote && !note.trim())}
+          onClick={() => onSubmit(reason || null, note)}
+        >
+          {l.discardSubmit}
         </button>
       </div>
     </div>
