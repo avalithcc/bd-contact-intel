@@ -875,6 +875,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           locale={locale}
           messageLabels={messageLabels}
           total={total}
+          filtersQuery={currentFiltersQuery}
+          sort={sort}
+          wholeViewExportHref={toolbarExportHref()}
         >
           <div className="table-wrap">
             <table className="data">

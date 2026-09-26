@@ -23,6 +23,7 @@ import {
 } from "@/lib/contacts/bdConnections";
 import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
+import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -335,6 +336,31 @@ export async function getContactListPage(
   const rows = await attachDerivedColumns(baseRows, dict);
 
   return { rows, total, page: safePage, pageSize, totalPages };
+}
+
+/**
+ * "Seleccionar los N" filter-wide bulk mode (contacts.html:104) — the
+ * server re-derives the id set from `ContactFilters`/`q` instead of a
+ * checked-boxes list. Deliberately just page 1 of `getContactListPage`
+ * with `pageSize = cap`, NOT a re-implementation of the filter logic —
+ * this is the strongest possible guarantee that "the filter-derived set
+ * equals what the list shows": the ids returned are exactly the first
+ * `cap` rows the table itself would render for the same filters/sort,
+ * because it's the literal same function, not a parallel query that could
+ * drift. `total` is the FULL matching count, so the caller can tell
+ * whether the cap actually truncated anything.
+ */
+export async function getContactIdsForFilters(
+  filters: ContactFilters,
+  meBdId: string,
+  q: string | undefined,
+  sort: ContactSortKey,
+  dict: Dict,
+  cap: number,
+  hiringKeys?: Set<string>,
+): Promise<ContactIdsForFiltersResult> {
+  const page = await getContactListPage(filters, meBdId, q, 1, cap, dict, sort, hiringKeys);
+  return idsFromContactListPage(page);
 }
 
 export interface ContactBoardColumn {

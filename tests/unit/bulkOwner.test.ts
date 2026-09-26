@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  BULK_FILTER_TARGET_CAP,
   MAX_BULK_SELECTION,
   normalizeOwnerSelectValue,
   planBulkOwnerAssignment,
@@ -55,6 +56,15 @@ test("sanitizeBulkPersonIds caps the selection at MAX_BULK_SELECTION", () => {
   });
   const result = sanitizeBulkPersonIds(many);
   assert.equal(result.length, MAX_BULK_SELECTION);
+});
+
+test("sanitizeBulkPersonIds accepts an explicit higher cap ('Seleccionar los N' filter-wide mode: BULK_FILTER_TARGET_CAP, not MAX_BULK_SELECTION)", () => {
+  const many = Array.from({ length: BULK_FILTER_TARGET_CAP + 10 }, (_, i) => {
+    const hex = i.toString(16).padStart(8, "0");
+    return `11111111-1111-4111-8111-${hex}0000`;
+  });
+  assert.equal(sanitizeBulkPersonIds(many).length, MAX_BULK_SELECTION);
+  assert.equal(sanitizeBulkPersonIds(many, BULK_FILTER_TARGET_CAP).length, BULK_FILTER_TARGET_CAP);
 });
 
 test("normalizeOwnerSelectValue maps a blank <select> value to null (unassign), a uuid to itself, and rejects garbage", () => {

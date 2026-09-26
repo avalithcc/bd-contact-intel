@@ -16,12 +16,20 @@ import {
   type BulkOwnerPlanRow,
 } from "@/lib/contacts/bulkOwner";
 
+/**
+ * `idCap` defaults to MAX_BULK_SELECTION (the plain checked-boxes path);
+ * "Seleccionar los N" filter-wide mode passes BULK_FILTER_TARGET_CAP —
+ * `rawPersonIds` there is already a server-derived id list (see
+ * getContactIdsForFilters), not raw client input, but still runs through
+ * the same uuid/dedup validation here, just against a higher cap.
+ */
 export async function bulkAssignOwner(
   rawPersonIds: unknown,
   ownerBdId: string | null,
   changedByBdId: string,
+  idCap?: number,
 ): Promise<BulkOwnerPlanRow[]> {
-  const personIds = sanitizeBulkPersonIds(rawPersonIds);
+  const personIds = sanitizeBulkPersonIds(rawPersonIds, idCap);
   if (!personIds.length) return [];
 
   return db.transaction(async (tx) => {

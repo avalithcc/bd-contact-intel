@@ -1095,7 +1095,7 @@ export const en = {
     bulkGenerateMessages: "Generate messages",
     bulkMessagesCapNotice: "Messages were generated for the first 25 selected contacts only (provisional cap, needs confirmation).",
     bulkSelectAllMatching: "Select all {n}",
-    bulkSelectAllMatchingPageOnlyNotice: "Bulk actions only apply to the contacts on this page.",
+    bulkSelectAllMatchingNotice: "This will apply to every contact matching the filter. Generate messages is still capped at the first 25.",
     boardOwnCompanyNote: "People from your own company are never shown.",
     newContactTrigger: "New contact",
     newContactTitle: "New contact",

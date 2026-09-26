@@ -13,6 +13,12 @@ import { isUuid } from "@/lib/uuid";
  * single bulk action so one request can't silently touch the whole table. */
 export const MAX_BULK_SELECTION = 200;
 
+/** "Seleccionar los N" filter-wide mode (contacts.html:104) — the server
+ * re-derives the id set from the active filter instead of a checked
+ * selection, so it needs a higher hard cap than MAX_BULK_SELECTION (which
+ * exists to bound a plain checked-boxes POST). Owner decision: 2,000. */
+export const BULK_FILTER_TARGET_CAP = 2000;
+
 export interface BulkOwnerRowInput {
   personId: string;
   hasConnection: boolean;
@@ -47,14 +53,15 @@ export function normalizeOwnerSelectValue(raw: string): string | null | undefine
 
 /** Shared by both bulk actions (assign owner, create task): validates every
  * id as a real UUID before it can reach a `uuid` column (src/lib/uuid.ts),
- * dedups, and caps at MAX_BULK_SELECTION. */
-export function sanitizeBulkPersonIds(raw: unknown): string[] {
+ * dedups, and caps at `cap` (defaults to MAX_BULK_SELECTION — the plain
+ * checked-boxes path; filter-wide mode passes BULK_FILTER_TARGET_CAP). */
+export function sanitizeBulkPersonIds(raw: unknown, cap: number = MAX_BULK_SELECTION): string[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
   for (const entry of raw) {
     if (typeof entry !== "string" || !isUuid(entry)) continue;
     seen.add(entry);
-    if (seen.size >= MAX_BULK_SELECTION) break;
+    if (seen.size >= cap) break;
   }
   return [...seen];
 }

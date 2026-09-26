@@ -19,9 +19,13 @@ import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
 import { bulkAssignOwner, filterLivePersonIds } from "@/lib/contacts/bulkOwnerDb";
 import { isUuid } from "@/lib/uuid";
-import { sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
+import { BULK_FILTER_TARGET_CAP, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { createTask } from "@/lib/tasks/queries";
 import type { NewTask } from "@/db/schema";
+import { getContactIdsForFilters } from "@/lib/contacts/listQueries";
+import { parseContactFilters } from "@/lib/contacts/viewFilters";
+import { parseContactSort } from "@/lib/contacts/sort";
+import { getDictionary } from "@/lib/i18n/server";
 
 function backTo(formData: FormData, extra: Record<string, string>): string {
   const params = new URLSearchParams();
@@ -35,16 +39,42 @@ function backTo(formData: FormData, extra: Record<string, string>): string {
   return `/contacts?${params.toString()}`;
 }
 
+/**
+ * "Seleccionar los N" filter-wide bulk mode (contacts.html:104) vs. the
+ * plain checked-boxes mode. `mode=filter` + a `filtersQuery` field (the
+ * SAME serialized ContactFilters the toolbar's own filters use, built by
+ * serializeContactFilters — see page.tsx `toolbarExportHref` for the same
+ * pattern applied to export) means the server re-derives the id set
+ * itself; the client never sends ids in that mode. Always capped at
+ * `idCap` (BULK_FILTER_TARGET_CAP for owner/task; export uses its own
+ * separate cap in export/route.ts).
+ */
+async function resolveBulkTargetIds(
+  formData: FormData,
+  meBdId: string,
+  idCap: number,
+): Promise<{ ids: string[]; wasLimited: boolean }> {
+  if (formData.get("mode") === "filter") {
+    const filters = parseContactFilters(new URLSearchParams(String(formData.get("filtersQuery") ?? "")));
+    const q = String(formData.get("q") ?? "") || undefined;
+    const sort = parseContactSort(String(formData.get("sort") ?? "") || undefined);
+    const dict = await getDictionary();
+    const { ids, total } = await getContactIdsForFilters(filters, meBdId, q, sort, dict, idCap);
+    return { ids, wasLimited: total > ids.length };
+  }
+  const rawIds = formData.getAll("personId");
+  const ids = sanitizeBulkPersonIds(rawIds);
+  return { ids, wasLimited: rawIds.length > ids.length };
+}
+
 export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
-  const rawIds = formData.getAll("personId");
-  const sanitizedIds = sanitizeBulkPersonIds(rawIds);
-  const wasLimited = rawIds.length > sanitizedIds.length;
+  const { ids: sanitizedIds, wasLimited } = await resolveBulkTargetIds(formData, me.id, BULK_FILTER_TARGET_CAP);
   const rawOwner = String(formData.get("ownerBdId") ?? "");
   const ownerBdId = rawOwner && isUuid(rawOwner) ? rawOwner : null;
   if (rawOwner && !ownerBdId) redirect(backTo(formData, { bulkResult: "owner:0:0" }));
 
-  const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id);
+  const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, BULK_FILTER_TARGET_CAP);
   const assigned = plan.filter((p) => p.outcome === "assigned").length;
   const skipped = plan.filter((p) => p.outcome === "skipped_has_connection").length;
 
@@ -63,9 +93,7 @@ export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
  * list, not a bespoke bulk-insert. */
 export async function bulkCreateTaskAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
-  const rawIds = formData.getAll("personId");
-  const personIds = sanitizeBulkPersonIds(rawIds);
-  const wasLimited = rawIds.length > personIds.length;
+  const { ids: personIds, wasLimited } = await resolveBulkTargetIds(formData, me.id, BULK_FILTER_TARGET_CAP);
   const title = String(formData.get("title") ?? "").trim();
   const dueAtRaw = String(formData.get("dueAt") ?? "");
   const dueAt = dueAtRaw ? new Date(dueAtRaw) : undefined;

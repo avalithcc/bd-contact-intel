@@ -12,6 +12,8 @@
  */
 import { useState } from "react";
 import { bulkGenerateMessagesAction, type BulkGenerateMessageResult } from "./bulkMessageActions";
+import { parseContactFilters } from "@/lib/contacts/viewFilters";
+import { parseContactSort } from "@/lib/contacts/sort";
 import type { Locale } from "@/lib/i18n/locales";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { BulkActionsLabels } from "@/lib/contacts/labels";
@@ -21,9 +23,26 @@ export interface BulkGenerateMessagesButtonProps {
   locale: Locale;
   labels: BulkActionsLabels;
   messageLabels: GenerateMessageLabels;
+  // "Seleccionar los N" filter-wide mode (contacts.html:104) — still capped
+  // at MAX_BULK_GENERATE_MESSAGES (25) server-side regardless of `total`;
+  // this only changes WHICH ids the server considers (filter-derived vs.
+  // this page's checked boxes).
+  filterWideMode: boolean;
+  filtersQuery: string;
+  sort: string;
+  q?: string;
 }
 
-export function BulkGenerateMessagesButton({ formRef, locale, labels: l, messageLabels: m }: BulkGenerateMessagesButtonProps) {
+export function BulkGenerateMessagesButton({
+  formRef,
+  locale,
+  labels: l,
+  messageLabels: m,
+  filterWideMode,
+  filtersQuery,
+  sort,
+  q,
+}: BulkGenerateMessagesButtonProps) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [results, setResults] = useState<BulkGenerateMessageResult[] | null>(null);
@@ -31,13 +50,22 @@ export function BulkGenerateMessagesButton({ formRef, locale, labels: l, message
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function run() {
-    const form = formRef.current;
-    if (!form) return;
-    const ids = [...form.querySelectorAll<HTMLInputElement>('input[name="personId"]:checked')].map((box) => box.value);
     setOpen(true);
     setPending(true);
     setResults(null);
-    const response = await bulkGenerateMessagesAction(locale, ids);
+
+    const response = filterWideMode
+      ? await bulkGenerateMessagesAction(locale, [], {
+          filters: parseContactFilters(new URLSearchParams(filtersQuery)),
+          q,
+          sort: parseContactSort(sort),
+        })
+      : await bulkGenerateMessagesAction(
+          locale,
+          [...(formRef.current?.querySelectorAll<HTMLInputElement>('input[name="personId"]:checked') ?? [])].map(
+            (box) => box.value,
+          ),
+        );
     setResults(response.results);
     setWasCapped(response.wasCapped);
     setPending(false);

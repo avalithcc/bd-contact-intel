@@ -21,12 +21,14 @@
  */
 import { getCurrentBd } from "@/lib/queries";
 import { sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
-import { capBulkGenerateMessageIds } from "@/lib/contacts/bulkMessages";
-import { getContactListRowsByIds } from "@/lib/contacts/listQueries";
+import { capBulkGenerateMessageIds, MAX_BULK_GENERATE_MESSAGES } from "@/lib/contacts/bulkMessages";
+import { getContactIdsForFilters, getContactListRowsByIds } from "@/lib/contacts/listQueries";
 import { getDictionary } from "@/lib/i18n/server";
 import { generatePersonOutreachMessageAction } from "./messageActions";
 import type { Locale } from "@/lib/i18n/locales";
 import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
+import type { ContactFilters } from "@/lib/contacts/viewFilters";
+import type { ContactSortKey } from "@/lib/contacts/sort";
 
 export interface BulkGenerateMessageResult {
   personId: string;
@@ -39,16 +41,38 @@ export interface BulkGenerateMessagesResponse {
   wasCapped: boolean;
 }
 
+/** "Seleccionar los N" filter-wide mode still caps Generar mensajes at
+ * MAX_BULK_GENERATE_MESSAGES (25) — the mockup's "select all N" doesn't
+ * mean "generate a message for all N", only the owner/task/export actions
+ * scale to the full filtered set. When `filterTarget` is given, ids are
+ * re-derived server-side (same getContactIdsForFilters guarantee as the
+ * other bulk actions) instead of trusting client-sent ids. */
 export async function bulkGenerateMessagesAction(
   locale: Locale,
   rawPersonIds: string[],
+  filterTarget?: { filters: ContactFilters; q?: string; sort: ContactSortKey } | null,
 ): Promise<BulkGenerateMessagesResponse> {
-  await getCurrentBd();
-
-  const sanitized = sanitizeBulkPersonIds(rawPersonIds);
-  const { ids, wasCapped } = capBulkGenerateMessageIds(sanitized);
-
+  const me = await getCurrentBd();
   const dict = await getDictionary();
+
+  let ids: string[];
+  let wasCapped: boolean;
+  if (filterTarget) {
+    const derived = await getContactIdsForFilters(
+      filterTarget.filters,
+      me.id,
+      filterTarget.q,
+      filterTarget.sort,
+      dict,
+      MAX_BULK_GENERATE_MESSAGES,
+    );
+    ids = derived.ids;
+    wasCapped = derived.total > derived.ids.length;
+  } else {
+    const sanitized = sanitizeBulkPersonIds(rawPersonIds);
+    ({ ids, wasCapped } = capBulkGenerateMessageIds(sanitized));
+  }
+
   const rows = ids.length ? await getContactListRowsByIds(ids, dict) : [];
   const rowById = new Map(rows.map((row) => [row.id, row]));
 

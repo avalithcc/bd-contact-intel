@@ -977,7 +977,7 @@ export const es: typeof en = {
     bulkGenerateMessages: "Generar mensajes",
     bulkMessagesCapNotice: "Se generaron mensajes solo para los primeros 25 contactos seleccionados (límite provisorio, a confirmar).",
     bulkSelectAllMatching: "Seleccionar los {n}",
-    bulkSelectAllMatchingPageOnlyNotice: "Las acciones masivas solo se aplican a los contactos de esta página.",
+    bulkSelectAllMatchingNotice: "Se aplicará a todos los contactos que coinciden con el filtro. Generar mensajes sigue limitado a los primeros 25.",
     boardOwnCompanyNote: "Las personas de la propia empresa nunca se muestran.",
     newContactTrigger: "Nuevo contacto",
     newContactTitle: "Nuevo contacto",
