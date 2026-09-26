@@ -521,6 +521,7 @@ export const es: typeof en = {
     errorDiscardReasonRequired: "Seleccionar un motivo para descartar.",
     errorDiscardNoteRequired: "Se requiere una nota cuando el motivo es «Otro».",
     errorMeetingDateRequired: "Se requiere una fecha para registrar la reunión.",
+    errorCallOutcomeRequired: "Seleccionar un resultado para registrar la llamada.",
     errorSignalTextRequired: "Se requiere el texto de la señal.",
     meetingDateLabel: "Fecha",
     meetingTimeLabel: "Hora",

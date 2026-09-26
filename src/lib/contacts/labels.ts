@@ -97,6 +97,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorDiscardNoteRequired;
     case "meeting_date_required":
       return l.errorMeetingDateRequired;
+    case "call_outcome_required":
+      return l.errorCallOutcomeRequired;
     case "signal_text_required":
       return l.errorSignalTextRequired;
     case "owner_invalid":

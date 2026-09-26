@@ -15,6 +15,7 @@ import { InvalidEmailError, InvalidPhoneError } from "@/lib/contacts/propertyEdi
 import { GmailSendError } from "@/lib/gmail/errors";
 import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/contacts/discard";
 import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
+import { CallOutcomeRequiredError } from "@/lib/contacts/call";
 import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
 
 export type ContactActionErrorReason =
@@ -29,6 +30,7 @@ export type ContactActionErrorReason =
   | "discard_reason_required"
   | "discard_note_required"
   | "meeting_date_required"
+  | "call_outcome_required"
   | "signal_text_required"
   | "owner_invalid"
   | "owner_locked"
@@ -77,6 +79,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof DiscardReasonRequiredError) return "discard_reason_required";
   if (err instanceof DiscardNoteRequiredError) return "discard_note_required";
   if (err instanceof MeetingDateRequiredError) return "meeting_date_required";
+  if (err instanceof CallOutcomeRequiredError) return "call_outcome_required";
   if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
   if (err instanceof OwnerValueInvalidError) return "owner_invalid";
   if (err instanceof OwnerReassignLockedError) return "owner_locked";

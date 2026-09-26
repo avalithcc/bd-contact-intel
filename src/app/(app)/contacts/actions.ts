@@ -9,6 +9,7 @@ import { createActivityAction } from "@/app/activity/actions";
 import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
+import { planCall } from "@/lib/contacts/call";
 import { planDiscard } from "@/lib/contacts/discard";
 import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
@@ -143,6 +144,30 @@ export async function logContactMeetingAction(
     await assertContactEditableById(personId);
     const metadata = planMeeting(date, time, notes);
     await createActivityAction({ type: "meeting_logged", personId, metadata: { ...metadata } });
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/** "Registrar llamada" quick action (contact-record mockup, first among
+ * calling/emailing actions, HubSpot order) — writes a `call` activity;
+ * status recomputes from direction/outcome in the same transaction
+ * (deriveStatus.ts, via createActivity). */
+export async function logCallAction(
+  personId: string,
+  outcome: string,
+  direction: string,
+  date: string,
+  time: string,
+  durationMinutes: string,
+  notes: string,
+): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    const metadata = planCall(outcome, direction, date, time, durationMinutes, notes);
+    await createActivityAction({ type: "call", personId, metadata: { ...metadata } });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
