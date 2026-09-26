@@ -254,6 +254,89 @@ test("normalizeDomain strips a trailing dot (FQDN)", () => {
   assert.equal(normalizeDomain("www.acme.com."), "acme.com");
 });
 
+test("planCompanyResolution: two creation-eligible groups that normalize to the same companyKey with different domains create once and link the second by name, reporting a domain conflict", () => {
+  const rows = [
+    row({ hubspotCompanyId: "1", name: "Acme Corp", domain: "acme.com", additionalDomains: [], note: null }),
+    row({ hubspotCompanyId: "2", name: "Acme Corp.", domain: "acme-alt.com", additionalDomains: [], note: null }),
+  ];
+  const result = planCompanyResolution(
+    rows,
+    [],
+    new Map([["1", 1], ["2", 1]]),
+    new Set(),
+  );
+  assert.equal(result.companiesToCreate.length, 1);
+  assert.equal(result.companiesToCreate[0]!.domain, "acme.com");
+  assert.equal(result.byHubspotCompanyId.get("1")?.matchReason, "created");
+  assert.equal(result.byHubspotCompanyId.get("2")?.matchReason, "name");
+  assert.equal(result.byHubspotCompanyId.get("2")?.companyKey, result.companiesToCreate[0]!.companyKey);
+  assert.deepEqual(result.domainConflicts, [
+    {
+      companyKey: result.companiesToCreate[0]!.companyKey,
+      keptDomain: "acme.com",
+      rejectedDomain: "acme-alt.com",
+      hubspotCompanyId: "2",
+    },
+  ]);
+});
+
+test("planCompanyResolution: two creation-eligible groups that normalize to the same companyKey and are both domain-less create once and link the second, no conflict reported", () => {
+  const rows = [
+    row({ hubspotCompanyId: "1", name: "Acme Corp", domain: null, additionalDomains: [], note: null }),
+    row({ hubspotCompanyId: "2", name: "Acme Corp.", domain: null, additionalDomains: [], note: null }),
+  ];
+  const result = planCompanyResolution(
+    rows,
+    [],
+    new Map([["1", 1], ["2", 1]]),
+    new Set(),
+  );
+  assert.equal(result.companiesToCreate.length, 1);
+  assert.equal(result.companiesToCreate[0]!.domain, null);
+  assert.equal(result.byHubspotCompanyId.get("1")?.matchReason, "created");
+  assert.equal(result.byHubspotCompanyId.get("2")?.matchReason, "name");
+  assert.equal(result.domainConflicts.length, 0);
+});
+
+test("planCompanyResolution: creation collisions are resolved deterministically by ascending hubspotCompanyId regardless of input row order", () => {
+  const rows = [
+    row({ hubspotCompanyId: "9", name: "Acme Corp.", domain: "acme-alt.com", additionalDomains: [], note: null }),
+    row({ hubspotCompanyId: "3", name: "Acme Corp", domain: "acme.com", additionalDomains: [], note: null }),
+  ];
+  const result = planCompanyResolution(
+    rows,
+    [],
+    new Map([["9", 1], ["3", 1]]),
+    new Set(),
+  );
+  assert.equal(result.companiesToCreate.length, 1);
+  // lowest hubspotCompanyId ("3") wins regardless of its position in the input array
+  assert.equal(result.companiesToCreate[0]!.hubspotCompanyId, "3");
+  assert.equal(result.companiesToCreate[0]!.domain, "acme.com");
+  assert.equal(result.domainConflicts[0]!.rejectedDomain, "acme-alt.com");
+});
+
+test("planCompanyResolution: two groups name-matching the same existing domain-less company with different domains fill once and report a domain conflict", () => {
+  const existing: ExistingCompanyRef[] = [{ companyKey: "acme", domain: null }];
+  const rows = [
+    row({ hubspotCompanyId: "1", name: "Acme Corp", domain: "acme.com", additionalDomains: [], note: null }),
+    row({ hubspotCompanyId: "2", name: "Acme Corp.", domain: "acme-alt.com", additionalDomains: [], note: null }),
+  ];
+  const result = planCompanyResolution(
+    rows,
+    existing,
+    new Map([["1", 1], ["2", 1]]),
+    new Set(),
+  );
+  assert.equal(result.companiesToCreate.length, 0);
+  assert.deepEqual(result.domainFills, [{ companyKey: "acme", domain: "acme.com" }]);
+  assert.deepEqual(result.domainConflicts, [
+    { companyKey: "acme", keptDomain: "acme.com", rejectedDomain: "acme-alt.com", hubspotCompanyId: "2" },
+  ]);
+  assert.equal(result.byHubspotCompanyId.get("1")?.companyKey, "acme");
+  assert.equal(result.byHubspotCompanyId.get("2")?.companyKey, "acme");
+});
+
 test("resolveContactCompanyKey: resolved company id returns its companyKey", () => {
   const result = planCompanyResolution(
     [row({ hubspotCompanyId: "1", name: "Acme Corp", domain: "acme.com" })],

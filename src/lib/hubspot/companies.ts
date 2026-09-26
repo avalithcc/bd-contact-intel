@@ -67,6 +67,20 @@ export interface DomainFill {
   domain: string;
 }
 
+/** Reported when two HubSpot company groups resolve to the same
+ * `companyKey` (either both eligible for creation, or both name-matching
+ * the same existing domain-less company) but carry different domains.
+ * The first group processed (ascending `hubspotCompanyId`, deterministic
+ * regardless of input row order) keeps its domain; the loser is reported
+ * here instead of silently overwriting or duplicating the company. */
+export interface DomainConflict {
+  companyKey: string;
+  keptDomain: string;
+  rejectedDomain: string;
+  /** The representative hubspotCompanyId of the LOSING group. */
+  hubspotCompanyId: string;
+}
+
 export interface CompanyNoteToCreate {
   companyKey: string;
   hubspotCompanyId: string;
@@ -77,6 +91,7 @@ export interface CompanyResolutionResult {
   byHubspotCompanyId: Map<string, CompanyResolution>;
   companiesToCreate: CompanyToCreate[];
   domainFills: DomainFill[];
+  domainConflicts: DomainConflict[];
   notesToCreate: CompanyNoteToCreate[];
 }
 
@@ -193,6 +208,18 @@ function pickRepresentative(
   }, rows[0]!);
 }
 
+/** Lowest `hubspotCompanyId` in a group (numeric compare, see
+ * `compareIds`) — used to process groups in a deterministic order that
+ * does not depend on input row order, so collisions between groups (see
+ * `planCompanyResolution`) resolve the same way regardless of export
+ * row ordering. */
+function groupMinId(group: CompanyGroup): string {
+  return group.rows.reduce(
+    (min, r) => (compareIds(r.hubspotCompanyId, min) < 0 ? r.hubspotCompanyId : min),
+    group.rows[0]!.hubspotCompanyId,
+  );
+}
+
 function groupOwnCompanyReason(group: CompanyGroup): OwnCompanyMatchReason {
   for (const row of group.rows) {
     const reason = ownCompanyMatchReason(row.name);
@@ -212,6 +239,19 @@ function groupOwnCompanyReason(group: CompanyGroup): OwnCompanyMatchReason {
  * `primaryContactCounts` and `existingNoteHubspotCompanyIds` are supplied by
  * the caller (Phase 3's planner wires this from the contacts export and
  * existing activity rows respectively) — this module stays pure and DB-free.
+ *
+ * Groups are processed in ascending `hubspotCompanyId` order (see
+ * `groupMinId`), not input row order, so results are deterministic
+ * regardless of export row ordering. `existingByKey`/`existingByDomain`
+ * are updated after EACH group resolves (matched or created) so that a
+ * later group normalizing to the same `companyKey` — e.g. "Acme Corp" and
+ * "Acme Corp." with different domains, or two domain-less duplicates —
+ * links to the earlier group's company instead of attempting a second
+ * `companiesToCreate` entry with the same key (which would violate the
+ * `company.company_key` primary key at execute time). When two groups
+ * disagree on which domain a shared `companyKey` should carry, the first
+ * one processed wins and the second is reported in `domainConflicts`
+ * instead of silently overwriting or being dropped.
  */
 export function planCompanyResolution(
   hubspotCompanies: readonly HubSpotCompanyRow[],
@@ -225,10 +265,16 @@ export function planCompanyResolution(
     existingByKey.set(c.companyKey, c);
     if (c.domain) existingByDomain.set(c.domain, c);
   }
+  // companyKeys whose domain was set (filled or created) DURING this run —
+  // only these can produce a domainConflict; a domain already on file
+  // before this run is left untouched, matching the pre-existing
+  // "never overwrite an already-set domain" contract.
+  const filledOrCreatedKeys = new Set<string>();
 
   const byHubspotCompanyId = new Map<string, CompanyResolution>();
   const companiesToCreate: CompanyToCreate[] = [];
   const domainFills: DomainFill[] = [];
+  const domainConflicts: DomainConflict[] = [];
   const notesToCreate: CompanyNoteToCreate[] = [];
 
   const addNotes = (companyKey: string, rows: readonly HubSpotCompanyRow[]) => {
@@ -239,7 +285,11 @@ export function planCompanyResolution(
     }
   };
 
-  for (const group of groupHubSpotCompanies(hubspotCompanies)) {
+  const orderedGroups = groupHubSpotCompanies(hubspotCompanies)
+    .slice()
+    .sort((a, b) => compareIds(groupMinId(a), groupMinId(b)));
+
+  for (const group of orderedGroups) {
     const ownReason = groupOwnCompanyReason(group);
     if (ownReason) {
       for (const row of group.rows) {
@@ -271,8 +321,21 @@ export function planCompanyResolution(
     }
 
     if (matched) {
-      if (matchReason === "name" && !matched.domain && group.domains.length > 0) {
-        domainFills.push({ companyKey: matched.companyKey, domain: group.domains[0]! });
+      if (matchReason === "name" && group.domains.length > 0) {
+        const groupDomain = group.domains[0]!;
+        if (!matched.domain) {
+          matched.domain = groupDomain;
+          existingByDomain.set(groupDomain, matched);
+          domainFills.push({ companyKey: matched.companyKey, domain: groupDomain });
+          filledOrCreatedKeys.add(matched.companyKey);
+        } else if (matched.domain !== groupDomain && filledOrCreatedKeys.has(matched.companyKey)) {
+          domainConflicts.push({
+            companyKey: matched.companyKey,
+            keptDomain: matched.domain,
+            rejectedDomain: groupDomain,
+            hubspotCompanyId: groupMinId(group),
+          });
+        }
       }
       for (const row of group.rows) {
         byHubspotCompanyId.set(row.hubspotCompanyId, {
@@ -303,13 +366,17 @@ export function planCompanyResolution(
     const companyKey = normalizeCompanyKey(displayName);
     const domain = group.domains[0] ?? null;
     companiesToCreate.push({ companyKey, displayName, domain, hubspotCompanyId: representative.hubspotCompanyId });
+    const createdRef: ExistingCompanyRef = { companyKey, domain };
+    existingByKey.set(companyKey, createdRef);
+    if (domain) existingByDomain.set(domain, createdRef);
+    filledOrCreatedKeys.add(companyKey);
     for (const row of group.rows) {
       byHubspotCompanyId.set(row.hubspotCompanyId, { companyKey, matchReason: "created", ownCompanyMatchReason: null });
     }
     addNotes(companyKey, group.rows);
   }
 
-  return { byHubspotCompanyId, companiesToCreate, domainFills, notesToCreate };
+  return { byHubspotCompanyId, companiesToCreate, domainFills, domainConflicts, notesToCreate };
 }
 
 export interface ContactCompanyResolution {
