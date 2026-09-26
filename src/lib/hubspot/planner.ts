@@ -62,6 +62,9 @@ export interface HubSpotContactPlanOutcome {
    * convention as planIdentityWrites), or null (skipped_own_company,
    * invalid). */
   personId: string | null;
+  /** The row's resolved company key (Phase 2), for report.ts's reviewSample
+   * (design D7) — null when unresolved/own-company/invalid. */
+  companyKey: string | null;
 }
 
 export interface HubSpotRefillOutcome {
@@ -184,11 +187,15 @@ export function planHubSpotImport(input: PlanHubSpotImportInput): PlanHubSpotImp
   // came from, so the outcome list can be filled in by index AFTER
   // planIdentityWrites resolves each row's method.
   const identityRowIndices: number[] = [];
+  // Parallel to input.contacts: the row's resolved companyKey (Phase 2),
+  // kept so the batched identity branch below (which resolves AFTER this
+  // loop) can still attach it to each outcome for report.ts's reviewSample.
+  const companyKeyByIndex: (string | null)[] = new Array(input.contacts.length).fill(null);
   const seenContactIds = new Set<string>();
 
   input.contacts.forEach((contact, index) => {
     if (seenContactIds.has(contact.hubspotContactId)) {
-      outcomesByIndex[index] = { hubspotContactId: contact.hubspotContactId, outcome: "invalid", personId: null };
+      outcomesByIndex[index] = { hubspotContactId: contact.hubspotContactId, outcome: "invalid", personId: null, companyKey: null };
       report.outcomes.invalid++;
       if (!report.warnings.duplicateHubspotContactIds.includes(contact.hubspotContactId)) {
         report.warnings.duplicateHubspotContactIds.push(contact.hubspotContactId);
@@ -204,16 +211,22 @@ export function planHubSpotImport(input: PlanHubSpotImportInput): PlanHubSpotImp
       companyResolution.byHubspotCompanyId,
     );
     if (companyResolved.noCompanyResolved) report.warnings.noCompanyResolved++;
+    companyKeyByIndex[index] = companyResolved.companyKey;
 
     if (companyResolved.ownCompany) {
-      outcomesByIndex[index] = { hubspotContactId: contact.hubspotContactId, outcome: "skipped_own_company", personId: null };
+      outcomesByIndex[index] = { hubspotContactId: contact.hubspotContactId, outcome: "skipped_own_company", personId: null, companyKey: null };
       report.outcomes.skipped_own_company++;
       return;
     }
 
     const existingPersonId = input.existingHubspotPersonIds.get(contact.hubspotContactId);
     if (existingPersonId) {
-      outcomesByIndex[index] = { hubspotContactId: contact.hubspotContactId, outcome: "already_imported", personId: existingPersonId };
+      outcomesByIndex[index] = {
+        hubspotContactId: contact.hubspotContactId,
+        outcome: "already_imported",
+        personId: existingPersonId,
+        companyKey: companyResolved.companyKey,
+      };
       report.outcomes.already_imported++;
 
       const owner = contact.ownerRaw ? matchHubSpotOwner(contact.ownerRaw, input.bds) : { bdId: null, unknownOwnerName: null };
@@ -271,7 +284,12 @@ export function planHubSpotImport(input: PlanHubSpotImportInput): PlanHubSpotImp
             : rowOutcome.method === "new"
               ? "new"
               : "profile_key";
-      outcomesByIndex[index] = { hubspotContactId: contact.hubspotContactId, outcome, personId: rowOutcome.personRef };
+      outcomesByIndex[index] = {
+        hubspotContactId: contact.hubspotContactId,
+        outcome,
+        personId: rowOutcome.personRef,
+        companyKey: companyKeyByIndex[index] ?? null,
+      };
       report.outcomes[outcome]++;
 
       if (outcome !== "skipped_own_company" && rowOutcome.personRef) {

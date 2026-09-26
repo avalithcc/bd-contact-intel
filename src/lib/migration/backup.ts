@@ -33,6 +33,9 @@ export const BACKUP_TABLES = [
   "conversation",
   "message",
   "bd",
+  // hubspot_import (design D6): companies are created/domain-filled during
+  // this phase's execute transaction.
+  "company",
   "person",
   "person_bd_connection",
   "person_id_map",
