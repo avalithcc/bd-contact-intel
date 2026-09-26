@@ -35,28 +35,27 @@ export default async function DiscoveryPage() {
 
   return (
     <main>
-      <div className="header">
-        <span className="logo">
-          avalith<span className="dot">.</span>
-        </span>
-        <div className="row row-md">
-          <BackButton label={dict.common.goBack} fallbackHref="/" />
-          <Link className="secondary-btn" href="/whats-new">
-            {dict.common.whatsNew}
-          </Link>
-          <Link className="secondary-btn" href="/hiring">
-            {dict.common.hiringSignals}
-          </Link>
-          <Link className="secondary-btn" href="/contacts">
-            {dict.common.leadsNav}
-          </Link>
-          <UserMenu
-            label={me.name || dict.common.account}
-            changePasswordHref="/account/password"
-            changePasswordLabel={dict.common.changePassword}
-            signOutButton={<SignOutButton locale={locale} />}
-          />
-        </div>
+      {/* No page-local logo/header here (tasks.md mockup-parity 1.1) — the
+          app shell ((app)/layout.tsx -> Sidebar) already renders it; this
+          row of page-specific nav/account controls hasn't migrated onto the
+          shell TopBar yet (see mockup-parity Phase 6). */}
+      <div className="row row-md">
+        <BackButton label={dict.common.goBack} fallbackHref="/" />
+        <Link className="secondary-btn" href="/whats-new">
+          {dict.common.whatsNew}
+        </Link>
+        <Link className="secondary-btn" href="/hiring">
+          {dict.common.hiringSignals}
+        </Link>
+        <Link className="secondary-btn" href="/contacts">
+          {dict.common.leadsNav}
+        </Link>
+        <UserMenu
+          label={me.name || dict.common.account}
+          changePasswordHref="/account/password"
+          changePasswordLabel={dict.common.changePassword}
+          signOutButton={<SignOutButton locale={locale} />}
+        />
       </div>
 
       <div className="mb-3xl">
