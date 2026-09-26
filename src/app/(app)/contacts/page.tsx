@@ -54,6 +54,7 @@ function bulkResultMessage(
   if (!raw) return null;
   const [kind, a, b] = raw.split(":");
   if (kind === "owner") return l.bulkResultOwner(Number(a) || 0, Number(b) || 0);
+  if (kind === "task") return l.bulkResultTask(Number(a) || 0);
   return null;
 }
 

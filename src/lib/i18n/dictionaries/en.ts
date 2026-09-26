@@ -896,15 +896,19 @@ export const en = {
     bulkSelectAllLabel: "Select all on this page",
     bulkSelectedSuffix: "selected",
     bulkAssignOwner: "Assign owner",
+    bulkCreateTask: "Create task",
     bulkClearSelection: "Clear selection",
     bulkOwnerLabel: "Owner",
     bulkOwnerUnassign: "Unassigned",
     bulkConfirm: "Apply",
     bulkCancel: "Cancel",
+    bulkTaskTitleLabel: "Task title",
+    bulkTaskDueLabel: "Due date",
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
         ? `Owner assigned to ${assigned}. ${skipped} skipped (already has a connected BD).`
         : `Owner assigned to ${assigned}.`,
+    bulkResultTask: (created: number) => `${created} task(s) created.`,
   },
 };

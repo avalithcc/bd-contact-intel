@@ -2,21 +2,20 @@
 
 /**
  * Selection + bulk-action bar for the `/contacts` table (task 13.2; mockup
- * `.bulk-bar`). This PR (13b1a) wires "Asignar responsable" only —
- * "Crear tarea" ships in follow-up PR 13b1b on top of this branch
- * (feature-branch-chain); "Generar mensajes" is deferred, "Exportar" ships
- * in a later slice. Wraps the (server-rendered) table as `children` so row
- * checkboxes stay plain HTML — this component only needs a ref to the
- * shared `<form>` to count checked boxes and wire "select all" (event
- * delegation, no per-row React state).
+ * `.bulk-bar`): "Asignar responsable" (PR 13b1a) and "Crear tarea" (this
+ * PR, 13b1b). "Generar mensajes" is deferred, "Exportar" ships in a later
+ * slice. Wraps the (server-rendered) table as `children` so row checkboxes
+ * stay plain HTML — this component only needs a ref to the shared `<form>`
+ * to count checked boxes and wire "select all" (event delegation, no
+ * per-row React state).
  *
  * Only one `type="submit"` button ever exists in the DOM at a time (the
- * confirm button of the open mini-panel) so pressing Enter in a text input
- * can't accidentally submit a different action with an empty owner select
- * (which would unassign every selected Contact).
+ * confirm button of whichever mini-panel is open) so pressing Enter in a
+ * text/date input can't accidentally submit a different action with an
+ * empty owner select (which would unassign every selected Contact).
  */
 import { useEffect, useRef, useState } from "react";
-import { bulkAssignOwnerAction } from "./bulkActions";
+import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
 import type { BulkActionsLabels } from "@/lib/contacts/labels";
 import styles from "./page.module.css";
 
@@ -29,7 +28,7 @@ export interface BulkActionsBarProps {
   children: React.ReactNode;
 }
 
-type Panel = "owner" | null;
+type Panel = "owner" | "task" | null;
 
 export function BulkActionsBar({ labels: l, ownerOptions, view, q, page, children }: BulkActionsBarProps) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -89,6 +88,9 @@ export function BulkActionsBar({ labels: l, ownerOptions, view, q, page, childre
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("owner")}>
                 {l.bulkAssignOwner}
               </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("task")}>
+                {l.bulkCreateTask}
+              </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -114,6 +116,25 @@ export function BulkActionsBar({ labels: l, ownerOptions, view, q, page, childre
                 </select>
               </label>
               <button type="submit" className="btn btn-primary btn-sm">
+                {l.bulkConfirm}
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel(null)}>
+                {l.bulkCancel}
+              </button>
+            </>
+          )}
+
+          {panel === "task" && (
+            <>
+              <label>
+                {l.bulkTaskTitleLabel}
+                <input type="text" name="title" required />
+              </label>
+              <label>
+                {l.bulkTaskDueLabel}
+                <input type="date" name="dueAt" />
+              </label>
+              <button type="submit" formAction={bulkCreateTaskAction} className="btn btn-primary btn-sm">
                 {l.bulkConfirm}
               </button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel(null)}>

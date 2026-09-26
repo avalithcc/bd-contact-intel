@@ -16,11 +16,11 @@ export function pickContactRecordLabels(dict: Dictionary): ContactRecordLabels {
 
 /**
  * `/contacts` list's bulk-action bar (task 13.2) is a client component
- * (BulkActionsBar.tsx) — same ClientStrings convention. This PR (13b1a)
- * only picks the "Asignar responsable" labels; "Crear tarea" labels join
- * this type in the follow-up PR 13b1b. The result-summary formatter
- * (`bulkResultOwner`) stays server-side (page.tsx renders the result
- * banner from the `?bulkResult=` redirect param).
+ * (BulkActionsBar.tsx) — same ClientStrings convention. "Asignar
+ * responsable" labels shipped in PR 13b1a; "Crear tarea" labels join in
+ * this PR (13b1b). The result-summary formatters (`bulkResultOwner`/
+ * `bulkResultTask`) stay server-side (page.tsx renders the result banner
+ * from the `?bulkResult=` redirect param).
  */
 export type BulkActionsLabels = ClientStrings<
   Pick<
@@ -28,11 +28,14 @@ export type BulkActionsLabels = ClientStrings<
     | "bulkSelectAllLabel"
     | "bulkSelectedSuffix"
     | "bulkAssignOwner"
+    | "bulkCreateTask"
     | "bulkClearSelection"
     | "bulkOwnerLabel"
     | "bulkOwnerUnassign"
     | "bulkConfirm"
     | "bulkCancel"
+    | "bulkTaskTitleLabel"
+    | "bulkTaskDueLabel"
   >
 >;
 
@@ -42,11 +45,14 @@ export function pickBulkActionsLabels(dict: Dictionary): BulkActionsLabels {
     bulkSelectAllLabel: l.bulkSelectAllLabel,
     bulkSelectedSuffix: l.bulkSelectedSuffix,
     bulkAssignOwner: l.bulkAssignOwner,
+    bulkCreateTask: l.bulkCreateTask,
     bulkClearSelection: l.bulkClearSelection,
     bulkOwnerLabel: l.bulkOwnerLabel,
     bulkOwnerUnassign: l.bulkOwnerUnassign,
     bulkConfirm: l.bulkConfirm,
     bulkCancel: l.bulkCancel,
+    bulkTaskTitleLabel: l.bulkTaskTitleLabel,
+    bulkTaskDueLabel: l.bulkTaskDueLabel,
   };
 }
 

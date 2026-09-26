@@ -782,15 +782,19 @@ export const es: typeof en = {
     bulkSelectAllLabel: "Seleccionar todo en la página",
     bulkSelectedSuffix: "seleccionados",
     bulkAssignOwner: "Asignar responsable",
+    bulkCreateTask: "Crear tarea",
     bulkClearSelection: "Quitar selección",
     bulkOwnerLabel: "Responsable",
     bulkOwnerUnassign: "Sin asignar",
     bulkConfirm: "Aplicar",
     bulkCancel: "Cancelar",
+    bulkTaskTitleLabel: "Título de la tarea",
+    bulkTaskDueLabel: "Vencimiento",
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
         ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya tiene un BD conectado).`
         : `Responsable asignado a ${assigned}.`,
+    bulkResultTask: (created: number) => `${created} tarea(s) creada(s).`,
   },
 };
