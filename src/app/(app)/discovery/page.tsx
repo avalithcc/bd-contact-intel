@@ -4,28 +4,23 @@ import {
   getLastDiscoveryRun,
   getPendingCandidates,
 } from "@/lib/hiring/discoveryQueries";
-import { getCurrentBd } from "@/lib/queries";
 import { linkedinCompanySearchUrl } from "@/lib/links";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDateTime } from "@/lib/i18n/format";
-import { SignOutButton } from "../../SignOutButton";
-import { UserMenu } from "../../UserMenu";
 import { BackButton } from "../../BackButton";
 import { approveCandidate, rejectCandidate } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 // This page reads shared, cross-BD data only (board_candidate and
-// discovery_run have no bd_id — see src/db/schema.ts). getCurrentBd() below
-// is used only to label the header's user menu — it deliberately is NOT
-// passed into any of the three queries below to scope them.
+// discovery_run have no bd_id — see src/db/schema.ts). It intentionally
+// takes no BD identity of its own to scope the three queries below.
 // contactCount on each candidate is an aggregate across ALL BDs, never the
 // viewing BD's own count; see the copy in src/lib/i18n/dictionaries.
 export default async function DiscoveryPage() {
   const locale = await getLocale();
   const dict = t(locale);
-  const me = await getCurrentBd();
 
   const [candidates, counts, lastRun] = await Promise.all([
     getPendingCandidates(),
@@ -50,12 +45,6 @@ export default async function DiscoveryPage() {
         <Link className="secondary-btn" href="/contacts">
           {dict.common.leadsNav}
         </Link>
-        <UserMenu
-          label={me.name || dict.common.account}
-          changePasswordHref="/account/password"
-          changePasswordLabel={dict.common.changePassword}
-          signOutButton={<SignOutButton locale={locale} />}
-        />
       </div>
 
       <div className="mb-3xl">
