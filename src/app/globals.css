@@ -28,12 +28,22 @@
      owner-approved accessibility fix, 2026-09-24. */
   --color-accent-hover: #b81f27;
   --color-accent-focus: #b81f27;
+  /* mockup-parity 1.2: aliases, not new hex — --color-accent-strong is the
+     same approved darker hover value as --color-accent-hover/-focus above
+     (mockups/styles.css names it "strong" instead of "hover"). Only
+     --color-accent-press is a genuinely new value, taken from the
+     owner-approved mockup (design-system.html's own accessibility note
+     covers this palette; not an unreviewed proposal). */
+  --color-accent-strong: var(--color-accent-hover);
+  --color-accent-press: #9c1a21;
   /* proposed (mockups/styles.css): active sidebar item tint, Phase 8 shell. */
   --color-accent-soft: #fae5e6;
 
   /* ---- text hierarchy ---- */
   --color-ink: #17151c;
   --color-ink-soft: #5b5865;
+  /* mockup-parity 1.2: meta text/placeholders (mockups/styles.css), 5.2:1. */
+  --color-ink-subtle: #6e6b78;
   --color-ink-muted: #8b8894;
 
   /* ---- borders ---- */
@@ -66,6 +76,26 @@
   --color-badge-danger-bg: rgba(220, 38, 38, 0.12);
   --color-badge-info-bg: rgba(29, 78, 216, 0.12);
   --color-row-hover: rgba(0, 0, 0, 0.03);
+  /* mockup-parity 1.2 (mockups/styles.css): Dialog overlay backdrop. */
+  --color-overlay: rgba(23, 21, 28, 0.42);
+
+  /* ---- on-dark (Toast surfaces — dark chip on the light canvas, mockup-parity 1.2) ---- */
+  --color-on-dark: #f4f3f7;
+  --color-on-dark-hover: rgba(255, 255, 255, 0.1);
+  --color-on-dark-sep: rgba(255, 255, 255, 0.2);
+  --color-on-dark-success: #86efac;
+  --color-on-dark-link: #fecaca;
+
+  /* ---- avatars (mockup-parity 1.2 — mockups/styles.css; darkened for AA
+     contrast with white initials text, see design-system.html's own
+     accessibility note; DESIGN.md's avatar-2/4/5/6 were stale pastel
+     values that fail AA, see DESIGN.md update in the same task) ---- */
+  --avatar-1: #6b5b95;
+  --avatar-2: #7a6653;
+  --avatar-3: #88398a;
+  --avatar-4: #8a5a2b;
+  --avatar-5: #3f6f5f;
+  --avatar-6: #4b6380;
 
   /* ---- status badges (contact lifecycle, proposed — mockups/styles.css) ----
      Used by record/list pages (Phase 9+) and the leads/companies detail
@@ -107,6 +137,8 @@
   /* ---- radii ---- */
   --radius-sm: 6px;
   --radius-md: 8px;
+  /* mockup-parity 1.2 (mockups/styles.css): Dialog corner radius. */
+  --radius-lg: 12px;
   --radius-pill: 999px;
 
   /* ---- controls ----
@@ -119,10 +151,20 @@
   --control-height-sm: 1.85rem;
   --topbar-height: 52px;
   --sidebar-width: 232px;
+  /* mockup-parity 1.2 (mockups/styles.css): contact record page's two-rail
+     layout (left summary rail / right activity rail widths). */
+  --record-left: 320px;
+  --record-right: 300px;
 
   /* ---- elevation ----
      Soft shadow on light canvas. */
   --shadow-dropdown: 0 8px 24px rgba(23, 21, 28, 0.12);
+  /* mockup-parity 1.2 (mockups/styles.css): Dialog/Toast elevation. */
+  --shadow-dialog: 0 24px 48px rgba(23, 21, 28, 0.2);
+  /* mockup-parity 1.2 (mockups/styles.css): shared focus-visible ring,
+     built from --color-accent-strong so it tracks the same darker accent
+     as the hover/press states above. */
+  --focus-ring: 0 0 0 2px var(--color-surface-2), 0 0 0 4px var(--color-accent-strong);
 
   /* ---- motion ---- */
   --transition-fast: 0.15s ease;

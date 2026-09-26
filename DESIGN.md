@@ -21,13 +21,17 @@ colors:
   semantic-success: "#15803d"
   semantic-warn: "#b45309"
   semantic-danger: "#dc2626"
-  # Avatar palette — distinct colors for contact initials
+  # Avatar palette — distinct colors for contact initials. Darkened
+  # 2026-09 (mockup-parity 1.3): avatar-2/4/5/6 were pastel values that
+  # fail AA contrast for white initials text on top of them; the mockup
+  # (design-system.html's own accessibility note) ships the darker,
+  # owner-approved replacements below.
   avatar-1: "#6b5b95"
-  avatar-2: "#c5b4a5"
+  avatar-2: "#7a6653"
   avatar-3: "#88398a"
-  avatar-4: "#d4a574"
-  avatar-5: "#5b8e7d"
-  avatar-6: "#a4b5c7"
+  avatar-4: "#8a5a2b"
+  avatar-5: "#3f6f5f"
+  avatar-6: "#4b6380"
 
 colors-dark:
   accent: "#d5252f"
@@ -233,6 +237,23 @@ The app ships three themes: **Light**, **Dark** (the original, still the fallbac
 `--color-accent` (`#d5252f`) is **unchanged** across themes — it measures ~5.1:1 on white, comfortably clearing AA (4.5:1) for normal text, so the same brand red serves as fill, link, and focus color in both themes. No separate light-theme accent was needed.
 
 Two more tokens are theme-aware: `--shadow-dropdown` (a lighter, softer shadow in light — the dark theme's `rgba(0,0,0,.35)` reads as a heavy smudge on a near-white canvas) and `--icon-select-chevron` (the select's chevron is a data-URI SVG with its stroke color baked in, so it can't use `currentColor`; the whole `background-image` is a token, re-pointed at a same-shaped SVG using the light-theme `ink-soft` hex). `--color-row-hover` and the two badge-tint tokens (`--color-badge-accent-bg`, `--color-badge-success-bg`) keep the **same** rgba value in both themes — a translucent tint composited over either a near-black or near-white surface stays legible on its own, so no override was needed; they were tokenized anyway so no rgba literal remains inline in a component rule.
+
+### Shell/component tokens (mockup-parity, added 2026-09-26)
+
+`openspec/changes/crm-hubspot-ux/mockups/styles.css` is the source for the Dialog/Toast/Avatar primitives and the contact-record two-rail layout. These tokens were added to `globals.css` to match it:
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-ink-subtle` | `#6e6b78` | Meta text, placeholders (5.2:1 on white) |
+| `--color-accent-strong` | `var(--color-accent-hover)` (`#b81f27`) | Alias, not a new color — same approved darker-hover value as `--color-accent-hover`/`--color-accent-focus` above, named "strong" by the mockup |
+| `--color-accent-press` | `#9c1a21` | Pressed state — the one genuinely new value here, taken from the owner-approved mockup palette |
+| `--color-overlay` | `rgba(23, 21, 28, 0.42)` | Dialog backdrop |
+| `--color-on-dark` / `-hover` / `-sep` / `-success` / `-link` | see `globals.css` | Toast surface (dark chip on the light canvas) |
+| `--shadow-dialog` | `0 24px 48px rgba(23, 21, 28, 0.2)` | Dialog/Toast elevation |
+| `--focus-ring` | `0 0 0 2px surface-2, 0 0 0 4px accent-strong` | Shared focus-visible ring for the new components |
+| `--radius-lg` | `12px` | Dialog corner radius |
+| `--record-left` / `--record-right` | `320px` / `300px` | Contact record page's two-rail layout |
+| `--avatar-1..6` | see avatar palette above | Shared `Avatar` component (mockup-parity Phase 2) |
 
 ## Typography
 
