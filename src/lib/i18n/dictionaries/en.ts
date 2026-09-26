@@ -757,6 +757,25 @@ export const en = {
     errorNotConfigured: "Gmail is not configured on the server. Contact an admin.",
   },
 
+  tasksPage: {
+    eyebrow: "Tasks",
+    title: "tasks",
+    subtitle: "Every task belongs to a contact or a company.",
+    overdueLabel: "Overdue",
+    todayLabel: "Today",
+    upcomingLabel: "Upcoming",
+    colTask: "Task",
+    colSubject: "Related to",
+    colOwner: "Owner",
+    colDue: "Due",
+    completeAria: "Mark complete",
+    subjectLead: "Contact",
+    subjectCompany: "Company",
+    dueToday: "Today",
+    dueTomorrow: "Tomorrow",
+    emptyState: "No open tasks — nice work.",
+  },
+
   upload: {
     connectionsLabel: "LinkedIn Connections.csv",
     import: "Import",

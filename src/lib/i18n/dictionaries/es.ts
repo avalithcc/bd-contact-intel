@@ -651,6 +651,25 @@ export const es: typeof en = {
     errorNotConfigured: "Gmail no está configurado en el servidor. Contactá a un administrador.",
   },
 
+  tasksPage: {
+    eyebrow: "Tareas",
+    title: "tareas",
+    subtitle: "Toda tarea pertenece a un contacto o una empresa.",
+    overdueLabel: "Vencidas",
+    todayLabel: "Hoy",
+    upcomingLabel: "Próximas",
+    colTask: "Tarea",
+    colSubject: "Asociado con",
+    colOwner: "Responsable",
+    colDue: "Vencimiento",
+    completeAria: "Completar",
+    subjectLead: "Contacto",
+    subjectCompany: "Empresa",
+    dueToday: "Hoy",
+    dueTomorrow: "Mañana",
+    emptyState: "No tenés tareas abiertas — buen trabajo.",
+  },
+
   upload: {
     connectionsLabel: "Connections.csv de LinkedIn",
     import: "Importar",
