@@ -13,10 +13,13 @@
  * (an email-finder result and a reconstructed historical status), never a
  * team member's real-time action — so those two types always bucket as
  * "Antes de la migración" regardless of date, and every other type groups
- * by the calendar month of its EFFECTIVE time (`activityRowToStatusEvent`'s
- * backfill-aware `.at`), newest month first. Open tasks with a future
- * `dueAt` always form their own "Próximas" bucket first, regardless of
- * activity.
+ * by the calendar month of its EFFECTIVE time (the ONE shared rule —
+ * @/lib/contacts/effectiveActivityTime#resolveEffectiveActivityAt, a thin
+ * wrapper around deriveStatus.ts#activityRowToStatusEvent's backfill-aware
+ * `.at` — every effective-time site reuses; this module used to have its
+ * own same-shaped `effectiveActivityAt`, collapsed into that one name),
+ * newest month first. Open tasks with a future `dueAt` always form their
+ * own "Próximas" bucket first, regardless of activity.
  */
 // "merge_unified" (mockup-port r08) is a synthetic entry (never a real
 // `activity` row — see connectionTimelineEntries.ts's sibling pattern for
@@ -24,7 +27,7 @@
 // "Unificado a partir de N registros" card; it belongs in the same bucket
 // as the other legacy-import evidence.
 const PRE_MIGRATION_TYPES = new Set(["hunter_lookup", "status_backfill", "merge_unified"]);
-import { activityRowToStatusEvent } from "@/lib/status/deriveStatus";
+import { resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
 
 export interface TimelineGroupingActivityEntry {
   id: string;
@@ -52,15 +55,6 @@ export interface GroupedActivityEntry<T> {
   at: Date;
 }
 
-export function effectiveActivityAt(entry: TimelineGroupingActivityEntry): Date {
-  return activityRowToStatusEvent({
-    id: entry.id,
-    type: entry.type,
-    createdAt: entry.createdAt,
-    metadata: entry.metadata,
-  }).at;
-}
-
 function monthKeyOf(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
@@ -73,7 +67,7 @@ function monthKeyOf(date: Date): string {
 export function groupTimelineEntries<T extends TimelineGroupingActivityEntry>(
   entries: readonly T[],
 ): TimelineGroup<GroupedActivityEntry<T>>[] {
-  const withAt = entries.map((entry) => ({ entry, at: effectiveActivityAt(entry) }));
+  const withAt = entries.map((entry) => ({ entry, at: resolveEffectiveActivityAt(entry) }));
   // Newest-first within each bucket, buckets newest-first overall.
   withAt.sort((a, b) => b.at.getTime() - a.at.getTime());
 
