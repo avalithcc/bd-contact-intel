@@ -20,6 +20,9 @@ export interface AboutPaneProps {
   properties: AboutPaneProperty[];
   messageLabels: GenerateMessageLabels;
   locale: Locale;
+  // Board drag/keyboard-menu handoff (task 10.5, 14.1): opens the matching
+  // quick-action composer on load, e.g. `?openAction=meeting`.
+  initialAction?: "email" | "meeting" | "discard" | null;
 }
 
 /**
@@ -39,6 +42,7 @@ export function AboutPane({
   properties,
   messageLabels,
   locale,
+  initialAction,
 }: AboutPaneProps) {
   return (
     <aside className={styles.pane} aria-label={l.aboutSectionTitle}>
@@ -48,7 +52,14 @@ export function AboutPane({
         <span className={styles.statusBadge}>{statusLabel}</span>
       </div>
 
-      <QuickActions personId={personId} labels={l} email={email} messageLabels={messageLabels} locale={locale} />
+      <QuickActions
+        personId={personId}
+        labels={l}
+        email={email}
+        messageLabels={messageLabels}
+        locale={locale}
+        initialAction={initialAction}
+      />
 
       <div className={styles.sectionTitle}>{l.aboutSectionTitle}</div>
       <PropertyList personId={personId} labels={l} ownerLabel={ownerLabel} properties={properties} />

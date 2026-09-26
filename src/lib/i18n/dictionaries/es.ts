@@ -797,5 +797,12 @@ export const es: typeof en = {
         ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya tiene un BD conectado).`
         : `Responsable asignado a ${assigned}.`,
     bulkResultTask: (created: number) => `${created} tarea(s) creada(s).`,
+    layoutTable: "Tabla",
+    layoutBoard: "Tablero",
+    boardDropHint:
+      "Arrastrar no cambia el estado por sí solo: la tarjeta se mueve cuando se guarda la acción registrada.",
+    boardMoveToLabel: "Mover a…",
+    boardColumnMore: (count: number) => `Ver los ${count} en la tabla`,
+    boardColumnEmpty: "Sin contactos en esta columna.",
   },
 };

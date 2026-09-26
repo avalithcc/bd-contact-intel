@@ -911,5 +911,12 @@ export const en = {
         ? `Owner assigned to ${assigned}. ${skipped} skipped (already has a connected BD).`
         : `Owner assigned to ${assigned}.`,
     bulkResultTask: (created: number) => `${created} task(s) created.`,
+    layoutTable: "Table",
+    layoutBoard: "Board",
+    boardDropHint:
+      "Dragging doesn't change status by itself: the card moves once the logged action is saved.",
+    boardMoveToLabel: "Move to…",
+    boardColumnMore: (count: number) => `View all ${count} in the table`,
+    boardColumnEmpty: "No contacts in this column.",
   },
 };

@@ -4,6 +4,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
+  getContactBoardColumns,
   getContactCountForFilters,
   getContactListPage,
   type ContactListRow,
@@ -27,6 +28,7 @@ import {
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickBulkActionsLabels } from "@/lib/contacts/labels";
 import { BulkActionsBar } from "./BulkActionsBar";
+import { Board } from "./Board";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +43,7 @@ interface ContactsPageProps {
     columns?: string;
     bulkResult?: string;
     bulkLimited?: string;
+    layout?: string;
   }>;
 }
 
@@ -168,12 +171,24 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     : undefined;
   const visibleColumns = resolveVisibleColumns(queryColumns ?? persistedColumns);
 
-  const [{ rows, total, totalPages, page: currentPage }, systemViewCounts] = await Promise.all([
-    getContactListPage(activeView.filters, me.id, sp.q, page, PAGE_SIZE, hiringKeys),
-    Promise.all(
-      SYSTEM_VIEWS.map((v) => getContactCountForFilters(v.filters, me.id, hiringKeys)),
-    ),
+  // Table/board toggle (task 14.1; design.md "Routes": "`?layout=board`
+  // all live in the query string"). Board mode groups by derived status
+  // instead of paginating a single list, so it fetches
+  // `getContactBoardColumns` instead of `getContactListPage`.
+  const isBoard = sp.layout === "board";
+
+  const [listPage, systemViewCounts, boardColumns] = await Promise.all([
+    isBoard ? null : getContactListPage(activeView.filters, me.id, sp.q, page, PAGE_SIZE, hiringKeys),
+    Promise.all(SYSTEM_VIEWS.map((v) => getContactCountForFilters(v.filters, me.id, hiringKeys))),
+    isBoard ? getContactBoardColumns(activeView.filters, me.id, sp.q, hiringKeys) : null,
   ]);
+
+  const { rows, total, totalPages, page: currentPage } = listPage ?? {
+    rows: [] as ContactListRow[],
+    total: 0,
+    totalPages: 1,
+    page: 1,
+  };
 
   const from = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const to = Math.min(currentPage * PAGE_SIZE, total);
@@ -186,6 +201,14 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     return `/contacts?${params.toString()}`;
   }
 
+  function layoutHref(target: "table" | "board"): string {
+    const params = new URLSearchParams();
+    params.set("view", activeView.viewKey);
+    if (sp.q) params.set("q", sp.q);
+    if (target === "board") params.set("layout", "board");
+    return `/contacts?${params.toString()}`;
+  }
+
   const currentFiltersQuery = serializeContactFilters(activeView.filters).toString();
 
   return (
@@ -193,6 +216,15 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       <div className={styles.header}>
         <h1 className={styles.title}>{l.pageTitle}</h1>
         <p className={styles.subtitle}>{l.subtitle}</p>
+      </div>
+
+      <div className={styles.layoutToggle} role="group" aria-label={l.layoutTable + " / " + l.layoutBoard}>
+        <Link href={layoutHref("table")} className={isBoard ? styles.layoutToggleLink : styles.layoutToggleActive}>
+          {l.layoutTable}
+        </Link>
+        <Link href={layoutHref("board")} className={isBoard ? styles.layoutToggleActive : styles.layoutToggleLink}>
+          {l.layoutBoard}
+        </Link>
       </div>
 
       <nav className={styles.viewTabs} aria-label={l.savedViewsGroupLabel}>
@@ -265,7 +297,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       {bulkMessage && <p className={styles.resultBanner}>{bulkMessage}</p>}
       {sp.bulkLimited === "1" && <p className={styles.resultBanner}>{l.bulkLimitedNotice}</p>}
 
-      {rows.length === 0 ? (
+      {isBoard ? (
+        <Board columns={boardColumns ?? []} dict={dict} tableHref={layoutHref("table")} />
+      ) : rows.length === 0 ? (
         <p className={styles.empty}>{l.noResults}</p>
       ) : (
         <BulkActionsBar

@@ -18,7 +18,16 @@ export const dynamic = "force-dynamic";
 
 interface ContactRecordPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ activityType?: string }>;
+  searchParams: Promise<{ activityType?: string; openAction?: string }>;
+}
+
+// Board drag/keyboard-menu targets (task 10.5, 14.1) — the ONLY quick
+// actions a `?openAction=` link is allowed to auto-open; anything else is
+// ignored rather than trusted blindly from a query string.
+const OPEN_ACTION_VALUES = ["email", "meeting", "discard"] as const;
+type OpenActionParam = (typeof OPEN_ACTION_VALUES)[number];
+function isOpenActionParam(value: string | undefined): value is OpenActionParam {
+  return !!value && (OPEN_ACTION_VALUES as readonly string[]).includes(value);
 }
 
 /**
@@ -30,7 +39,8 @@ interface ContactRecordPageProps {
  */
 export default async function ContactRecordPage({ params, searchParams }: ContactRecordPageProps) {
   const { id } = await params;
-  const { activityType: rawActivityType } = await searchParams;
+  const { activityType: rawActivityType, openAction: rawOpenAction } = await searchParams;
+  const openAction = isOpenActionParam(rawOpenAction) ? rawOpenAction : null;
   const result = await getContactRecord(id);
 
   if (result.kind === "not_found") notFound();
@@ -72,6 +82,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           properties={properties}
           messageLabels={messageLabels}
           locale={locale}
+          initialAction={openAction}
         />
 
         <div className={styles.main}>

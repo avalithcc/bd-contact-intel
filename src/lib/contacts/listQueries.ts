@@ -14,6 +14,8 @@ import { db } from "@/db";
 import { bd, person } from "@/db/schema";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
+import { BOARD_COLUMNS } from "@/lib/contacts/board";
+import type { PersonStatus } from "@/lib/status/deriveStatus";
 
 const LIKE_WILDCARD_RE = /[%_\\]/g;
 function escapeLikeWildcards(value: string): string {
@@ -126,6 +128,82 @@ export async function getContactListPage(
     .offset((safePage - 1) * pageSize);
 
   return { rows, total, page: safePage, pageSize, totalPages };
+}
+
+export interface ContactBoardColumn {
+  status: PersonStatus;
+  rows: ContactListRow[];
+  total: number;
+}
+
+const BOARD_COLUMN_LIMIT = 20;
+
+/**
+ * Board view (task 14.1; mockups/contacts-board.html): groups the SAME base
+ * filter set as `getContactListPage` (owner/email-verified/hiring/search —
+ * `filters.status` is intentionally ignored, since the board replaces
+ * status filtering with grouping) into the five `BOARD_COLUMNS`, one
+ * capped+counted query pair per column so no column ever loads more than
+ * `BOARD_COLUMN_LIMIT` of a (potentially thousands-deep) status bucket.
+ * Covers every Contact, including LinkedIn-only rows with no lead source —
+ * there is no `bdId`/source scoping here, same as the table view.
+ */
+export async function getContactBoardColumns(
+  filters: ContactFilters,
+  meBdId: string,
+  q: string | undefined,
+  hiringKeys?: Set<string>,
+): Promise<ContactBoardColumn[]> {
+  const base = [sql`${person.mergedIntoId} is null`];
+  if (filters.owner === "me") base.push(eq(person.ownerBdId, meBdId));
+  if (filters.emailVerified) base.push(eq(person.emailStatus, "verified"));
+  if (filters.hiring) {
+    const keys = hiringKeys ?? (await getHiringCompanyKeys());
+    base.push(keys.size ? inArray(person.companyKey, [...keys]) : sql`false`);
+  }
+  if (q) {
+    const condition = searchCondition(q);
+    if (condition) base.push(condition);
+  }
+
+  return Promise.all(
+    BOARD_COLUMNS.map(async (status): Promise<ContactBoardColumn> => {
+      const where = and(...base, eq(person.status, status));
+      const [{ total }] = await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(person)
+        .where(where);
+
+      const rows =
+        total === 0
+          ? []
+          : await db
+              .select({
+                id: person.id,
+                firstName: person.firstName,
+                lastName: person.lastName,
+                jobTitle: person.jobTitle,
+                company: person.company,
+                ownerBdId: person.ownerBdId,
+                ownerName: bd.name,
+                status: person.status,
+                email: person.email,
+                emailStatus: person.emailStatus,
+                roleGroup: person.roleGroup,
+                industry: person.industry,
+                country: person.country,
+                sourceKey: person.sourceKey,
+                createdAt: person.createdAt,
+              })
+              .from(person)
+              .leftJoin(bd, eq(bd.id, person.ownerBdId))
+              .where(where)
+              .orderBy(desc(person.createdAt))
+              .limit(BOARD_COLUMN_LIMIT);
+
+      return { status: status as PersonStatus, rows, total };
+    }),
+  );
 }
 
 /**

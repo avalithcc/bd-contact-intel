@@ -209,3 +209,131 @@
   background: var(--color-surface-2);
   color: var(--color-ink-soft);
 }
+
+/* Table/board toggle (task 14.1) */
+.layoutToggle {
+  display: inline-flex;
+  gap: var(--space-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  margin-bottom: var(--space-md);
+}
+
+.layoutToggleLink {
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-soft);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.layoutToggleActive {
+  composes: layoutToggleLink;
+  color: var(--color-ink);
+  background: var(--color-surface-2);
+}
+
+/* Board view (task 14.1; mockups/contacts-board.html) */
+.boardHint {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-md);
+}
+
+.board {
+  display: flex;
+  gap: var(--space-md);
+  overflow-x: auto;
+  align-items: flex-start;
+}
+
+.boardCol {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+}
+
+.boardColHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-2xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.boardEmpty {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-sm);
+}
+
+.boardCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  cursor: grab;
+}
+
+.boardCardLink {
+  display: block;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.boardCardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+
+.boardMoveMenu {
+  position: relative;
+}
+
+.boardMoveMenu summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.boardMoveMenuList {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2xs);
+  min-width: 140px;
+}
+
+.boardMoveMenuList a {
+  padding: var(--space-2xs) var(--space-sm);
+  color: var(--color-ink);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.boardMoveMenuList a:hover {
+  background: var(--color-surface-2);
+}
+
+.boardColMore {
+  text-align: center;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  padding: var(--space-2xs);
+}

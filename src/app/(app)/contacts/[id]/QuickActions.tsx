@@ -30,6 +30,9 @@ export interface QuickActionsProps {
   // (Spanish-only) locale fallback, same as /outreach and /whats-new.
   messageLabels: GenerateMessageLabels;
   locale: Locale;
+  // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
+  // composer on mount, e.g. arriving from `/contacts/[id]?openAction=meeting`.
+  initialAction?: "email" | "meeting" | "discard" | null;
 }
 
 type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | "signal" | null;
@@ -76,9 +79,16 @@ function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error:
  * feature-parity gap flagged in PR 11c (legacy `/leads/[id]` and
  * `/contact/[id]` "+ Paste signal" composer had no equivalent here).
  */
-export function QuickActions({ personId, labels: l, email, messageLabels, locale }: QuickActionsProps) {
+export function QuickActions({
+  personId,
+  labels: l,
+  email,
+  messageLabels,
+  locale,
+  initialAction,
+}: QuickActionsProps) {
   const router = useRouter();
-  const [openAction, setOpenAction] = useState<QuickAction>(null);
+  const [openAction, setOpenAction] = useState<QuickAction>(initialAction ?? null);
   const [error, setError] = useState<ActionError | null>(null);
   const [busy, setBusy] = useState(false);
   // Filled by "Generar mensaje" (see the EmailForm render below) — kept
