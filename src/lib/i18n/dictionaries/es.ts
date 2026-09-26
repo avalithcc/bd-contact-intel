@@ -571,6 +571,42 @@ export const es: typeof en = {
     timelineStatusBackfillPrefix: "Estado registrado antes de la migración:",
     timelineMeetingLoggedDefault: "Reunión registrada.",
     timelineDiscardedDefault: "Contacto descartado.",
+    verifiedBadge: "Verificado",
+    linkedInBadge: "LinkedIn",
+    historyAction: "Historial",
+    generateMessageCta: "Generar mensaje con IA",
+    changeCompanyAction: "Cambiar empresa",
+    statusNextStepReplied: "Registrar una reunión para pasar a Reunión.",
+    headlineConnector: "en",
+    createdViaMigration: "unificado por migración",
+    sourceLinkedInPrefix: "LinkedIn",
+    sourceLinkedInBdSuffix: "BDs",
+    sourceLeadListPrefix: "Lista de leads",
+  },
+
+  // Server-only formatter templates for the record page (mockup-port r02).
+  // Kept OUT of `contactRecord` above on purpose: that object is wrapped in
+  // `ClientStrings<...>` (src/lib/i18n/clientStrings.ts) for AboutPane/
+  // PropertyList, which forbids function values (they can't cross the
+  // server -> client boundary). page.tsx (a server component) composes the
+  // final plain strings from these templates via describeStatusReason()/
+  // inline formatting, and only ever passes the RESULT down as a prop.
+  contactRecordServer: {
+    ownerHintOldestConnection: (date: string) => `Conexión más antigua (${date})`,
+    hunterHint: (confidence: number, updatedByName: string, date: string) =>
+      `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
+    statusReasonSourceEmail: "se envió un correo",
+    statusReasonSourceMeeting: "se registró una reunión",
+    statusReasonSourceStatusChange: "se registró un cambio de estado",
+    statusReasonSourceDiscard: "se descartó el contacto",
+    statusReasonSourceNote: "se agregó una nota",
+    statusReasonSourceHunter: "se encontró un correo",
+    statusReasonSourceConnectionReplied: (bdName: string) =>
+      `se recibió una respuesta de LinkedIn en la conversación de ${bdName}`,
+    statusReasonSourceConnectionSent: (bdName: string) =>
+      `se envió un mensaje de LinkedIn en la conversación de ${bdName}`,
+    statusReasonSentence: (statusLabel: string, sourceDescription: string, dateLabel: string) =>
+      `${statusLabel} porque ${sourceDescription} el ${dateLabel}.`,
   },
 
   adminConversation: {

@@ -674,6 +674,36 @@ export const en = {
     timelineStatusBackfillPrefix: "Status recorded before the migration:",
     timelineMeetingLoggedDefault: "Meeting logged.",
     timelineDiscardedDefault: "Contact discarded.",
+    verifiedBadge: "Verified",
+    linkedInBadge: "LinkedIn",
+    historyAction: "History",
+    generateMessageCta: "Generate message with AI",
+    changeCompanyAction: "Change company",
+    statusNextStepReplied: "Log a meeting to move to Meeting.",
+    headlineConnector: "at",
+    createdViaMigration: "unified by migration",
+    sourceLinkedInPrefix: "LinkedIn",
+    sourceLinkedInBdSuffix: "BDs",
+    sourceLeadListPrefix: "Lead list",
+  },
+
+  // Server-only formatter templates — see the matching comment in es.ts.
+  contactRecordServer: {
+    ownerHintOldestConnection: (date: string) => `Oldest connection (${date})`,
+    hunterHint: (confidence: number, updatedByName: string, date: string) =>
+      `Hunter · ${confidence}% confidence · updated by ${updatedByName}, ${date}`,
+    statusReasonSourceEmail: "an email was sent",
+    statusReasonSourceMeeting: "a meeting was logged",
+    statusReasonSourceStatusChange: "a status change was recorded",
+    statusReasonSourceDiscard: "the contact was discarded",
+    statusReasonSourceNote: "a note was added",
+    statusReasonSourceHunter: "an email was found",
+    statusReasonSourceConnectionReplied: (bdName: string) =>
+      `a LinkedIn reply was received in ${bdName}'s conversation`,
+    statusReasonSourceConnectionSent: (bdName: string) =>
+      `a LinkedIn message was sent in ${bdName}'s conversation`,
+    statusReasonSentence: (statusLabel: string, sourceDescription: string, dateLabel: string) =>
+      `${statusLabel} because ${sourceDescription} on ${dateLabel}.`,
   },
 
   // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;

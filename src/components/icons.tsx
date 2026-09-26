@@ -185,3 +185,89 @@ export function BoardIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+// Contact record page icons (mockup-port r02; mockups/contact-record.html's
+// quick actions/identity badges). Path data copied 1:1 from the mockup's
+// inline SVGs, same convention as the shell icons above.
+export function NoteIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z" />
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+    </Svg>
+  );
+}
+
+export function MeetingIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </Svg>
+  );
+}
+
+export function DiscardIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m15 9-6 6M9 9l6 6" />
+    </Svg>
+  );
+}
+
+export function LinkedInIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z" />
+      <rect x="2" y="9" width="4" height="12" />
+      <circle cx="4" cy="4" r="2" />
+    </Svg>
+  );
+}
+
+export function GenerateIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" />
+    </Svg>
+  );
+}
+
+export function HistoryIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5M12 7v5l4 2" />
+    </Svg>
+  );
+}
+
+export function EditPencilIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </Svg>
+  );
+}
+
+export function CheckIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M20 6 9 17l-5-5" />
+    </Svg>
+  );
+}
+
+// "Pegar señal" quick action (mockup-port r02) — not in either approved
+// mockup's 5-action row (intentional superset, kept per owner decision);
+// a clipboard glyph distinguishes it from the note icon it previously
+// borrowed.
+export function ClipboardIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </Svg>
+  );
+}

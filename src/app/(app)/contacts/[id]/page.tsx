@@ -8,8 +8,9 @@ import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/querie
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
-import { pickContactRecordLabels } from "@/lib/contacts/labels";
+import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
+import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
@@ -76,27 +77,89 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
       : null,
   }));
 
+  // "Estado" derivation "why" hint (contact-record.html:77) — composed
+  // server-side from `record.statusReason` via `dict.contactRecordServer`'s
+  // function templates (never passed to the client component directly, see
+  // the comment on `contactRecordServer` in dictionaries/es.ts).
+  const statusReasonText = record.statusReason
+    ? describeStatusReason(
+        dict.contactRecordServer,
+        dict.leadStatuses,
+        l.emptyValue,
+        l.statusNextStepReplied,
+        record.statusReason,
+        format(record.statusReason.at, "d MMM", { locale: es }),
+      )
+    : null;
+
+  // Oldest connection date for the "Responsable" hint (contact-record.html:78
+  // "Conexión más antigua (14 mar 2019)") — `record.connections` is already
+  // ordered oldest-first (queries.ts `orderBy(asc(connectedOn))`).
+  const oldestConnectedOn = record.connections[0]?.connectedOn ?? null;
+  const ownerHint = oldestConnectedOn ? dict.contactRecordServer.ownerHintOldestConnection(oldestConnectedOn) : null;
+
+  // "Correo electrónico" Hunter provenance hint (contact-record.html:79
+  // "Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago").
+  const emailHistory = record.properties.find((p) => p.key === "email")?.lastEdit ?? null;
+  const hunterHint =
+    record.person.emailConfidence != null && emailHistory
+      ? dict.contactRecordServer.hunterHint(
+          record.person.emailConfidence,
+          emailHistory.bdName ?? l.emptyValue,
+          format(emailHistory.at, "d MMM", { locale: es }),
+        )
+      : null;
+
+  // "Origen" row (contact-record.html:85 "LinkedIn (3 BDs) · Lista de leads
+  // fi-arg-2026") — see ContactSourceEvidence (queries.ts) for the bounded
+  // per-person reads behind this.
+  const sourceParts: string[] = [];
+  if (record.source.linkedinConnectionCount > 0) {
+    sourceParts.push(`${l.sourceLinkedInPrefix} (${record.source.linkedinConnectionCount} ${l.sourceLinkedInBdSuffix})`);
+  }
+  if (record.source.leadSourceKey) {
+    sourceParts.push(`${l.sourceLeadListPrefix} ${record.source.leadSourceKey}`);
+  }
+  const sourceText = sourceParts.length ? sourceParts.join(" · ") : null;
+
+  // "Creado" row (contact-record.html:86 "6 oct 2026 · unificado por
+  // migración") — the migration suffix only applies to rows the collapse/
+  // fold-leads migration actually created (`migrationRunId` set).
+  const createdText = `${format(record.person.createdAt, "d MMM yyyy", { locale: es })}${
+    record.person.migrationRunId ? ` · ${l.createdViaMigration}` : ""
+  }`;
+
   return (
     <main>
-      <div className={styles.record}>
+      <div className="record">
         <AboutPane
           personId={record.person.id}
           labels={l}
           name={name}
-          headline={record.person.jobTitle}
+          jobTitle={record.person.jobTitle}
+          company={record.person.company}
+          companyKey={record.person.companyKey}
           statusLabel={statusLabel}
+          statusValue={record.person.status}
+          statusReasonText={statusReasonText}
+          emailVerified={record.person.emailStatus === "verified"}
+          linkedinHref={linkedinProfileHref(record.person.profileKey)}
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}
           ownerLocked={ownerLocked}
           ownerOptions={ownerOptions}
+          ownerHint={ownerHint}
           email={record.person.email}
+          hunterHint={hunterHint}
+          sourceText={sourceText}
+          createdText={createdText}
           properties={properties}
           messageLabels={messageLabels}
           locale={locale}
           initialAction={openAction}
         />
 
-        <div className={styles.main}>
+        <div className="record-main">
           <RecordTabs
             tabs={[
               {
@@ -121,7 +184,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           />
         </div>
 
-        <aside className={styles.right}>
+        <aside className="record-right">
           <div className={styles.card}>
             <h3 className={styles.cardTitle}>{l.companyCardTitle}</h3>
             {record.person.companyKey ? (
