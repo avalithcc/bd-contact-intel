@@ -1,11 +1,28 @@
-.header {
+.page {
+  max-width: 1200px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
   margin-bottom: var(--space-2xl);
 }
 
-.header h1 {
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+
+.title {
   font-size: var(--text-2xl);
   font-weight: 800;
-  margin: 0 0 var(--space-md);
+  margin: 0 0 var(--space-sm);
   color: var(--color-ink);
 }
 
@@ -13,16 +30,50 @@
   color: var(--color-ink-soft);
   margin: 0;
   font-size: var(--text-md);
+  max-width: 48ch;
 }
 
-.filters {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-lg);
+.newCompanyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-accent);
+  color: white;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: var(--text-md);
+  transition: background var(--transition-fast);
+}
+
+.newCompanyButton:hover {
+  background: var(--color-accent-hover);
+}
+
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-md);
   margin-bottom: var(--space-2xl);
 }
 
-.searchInput,
+.searchInput {
+  flex: 1;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+
 .stageFilter {
   padding: var(--space-md);
   border: 1px solid var(--color-border-strong);
@@ -31,7 +82,6 @@
   font-size: var(--text-md);
   background: var(--color-surface-2);
   color: var(--color-ink);
-  transition: border-color var(--transition-fast);
 }
 
 .searchInput:focus,
@@ -44,103 +94,121 @@
   color: var(--color-ink-muted);
 }
 
-.listContainer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xl);
+.searchButton {
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  color: var(--color-ink);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.companiesList {
-  display: grid;
-  gap: var(--space-lg);
+.searchButton:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
-.companyCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-lg);
-  background: var(--color-surface-2);
+.tableWrap {
+  overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  background: var(--color-surface-2);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--color-row-hover);
+}
+
+.companyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
   text-decoration: none;
   color: inherit;
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-
-.companyCard:hover {
-  background: var(--color-row-hover);
-  border-color: var(--color-border-strong);
-  transform: translateX(4px);
-}
-
-.cardContent {
-  flex: 1;
 }
 
 .companyName {
-  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--color-ink);
-  margin: 0 0 var(--space-sm);
+}
+
+.companyLink:hover .companyName {
+  color: var(--color-accent);
 }
 
 .stage {
   display: inline-block;
-  padding: var(--space-2xs) var(--space-md);
+  font-family: var(--font-mono);
+  font-weight: 700;
   border-radius: var(--radius-pill);
-  font-size: var(--text-base);
-  font-weight: 600;
-  margin-bottom: var(--space-md);
+  padding: 0.12rem 0.55rem;
+  font-size: var(--text-xs);
   background: var(--color-badge-accent-bg);
   color: var(--color-accent);
 }
 
 .stage-prospect {
-  background: rgba(156, 163, 175, 0.12);
-  color: #4b5563;
+  background: var(--color-surface-tint);
+  color: var(--color-ink-soft);
 }
 
 .stage-qualified {
-  background: rgba(59, 130, 246, 0.12);
-  color: #1e40af;
+  background: var(--color-badge-accent-bg);
+  color: var(--color-accent);
 }
 
 .stage-proposal_sent {
-  background: rgba(245, 158, 11, 0.12);
-  color: #92400e;
+  background: var(--color-badge-warn-bg);
+  color: var(--color-warn-text);
 }
 
 .stage-won {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: var(--color-badge-success-bg);
+  color: var(--color-success-text);
 }
 
 .stage-lost {
-  background: rgba(239, 68, 68, 0.12);
-  color: #7f1d1d;
+  background: var(--color-badge-danger-bg);
+  color: var(--color-danger-text);
 }
 
 .notes {
   color: var(--color-ink-soft);
-  font-size: var(--text-md);
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  max-width: 32ch;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .revenue {
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.revenue span {
-  font-size: var(--text-lg);
-  font-weight: 600;
   color: var(--color-success);
+  font-weight: 600;
 }
 
 .emptyState {
@@ -165,7 +233,7 @@
   border-radius: var(--radius-sm);
   text-decoration: none;
   font-weight: 600;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast);
 }
 
 .createLink:hover {
@@ -200,17 +268,11 @@
 }
 
 @media (max-width: 768px) {
-  .filters {
-    grid-template-columns: 1fr;
-  }
-
-  .companyCard {
+  .pageHeader {
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-md);
   }
 
-  .revenue {
-    text-align: left;
+  .toolbar {
+    flex-direction: column;
   }
 }
