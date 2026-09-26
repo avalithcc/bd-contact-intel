@@ -30,6 +30,16 @@ function blank(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+/** First non-blank value among `values`, trimmed. `undefined` when every
+ * value is blank or absent. */
+function firstNonBlank(...values: (string | undefined)[]): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
+}
+
 function parseIntField(value: string | undefined): number {
   const trimmed = value?.trim();
   if (!trimmed) return 0;
@@ -62,7 +72,9 @@ export function mapHubSpotContactRow(row: Record<string, string>): HubSpotContac
     city: blank(row["Ciudad"]),
     country: blank(row["País/región"]),
     phone: blank(row["Número de teléfono"]),
-    linkedinUrl: normalizeUrl(row["URL de LinkedIn"]),
+    // Preference order: "LinkedIn" (~0.6% filled, the real export's usable
+    // column), then "URL de LinkedIn" (~0% filled) — see design/columns.ts.
+    linkedinUrl: normalizeUrl(firstNonBlank(row["LinkedIn"], row["URL de LinkedIn"])),
     ownerRaw: blank(row["Propietario del contacto"]),
     timesContacted: parseIntField(row["Número de veces contactado"]),
     lastContactAt: parseDateField(row["Último contacto"]),

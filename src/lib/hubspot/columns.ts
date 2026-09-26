@@ -18,7 +18,6 @@ export const REQUIRED_CONTACT_HEADERS: readonly string[] = [
   "Ciudad",
   "País/región",
   "Número de teléfono",
-  "URL de LinkedIn",
   "Propietario del contacto",
   "Número de veces contactado",
   "Último contacto",
@@ -27,6 +26,15 @@ export const REQUIRED_CONTACT_HEADERS: readonly string[] = [
   "Estado del lead",
   "Associated Company IDs (Primary)",
 ];
+
+/**
+ * LinkedIn profile URL, in preference order (contacts.ts reads both and
+ * takes the first non-blank — the real export has "LinkedIn" ~0.6% filled
+ * and "URL de LinkedIn" ~0% filled, so neither alone is a reliable source).
+ * Pinned for documentation/tests only — deliberately NOT part of
+ * `REQUIRED_CONTACT_HEADERS`, since a row can be mapped without either.
+ */
+export const OPTIONAL_CONTACT_LINKEDIN_HEADERS: readonly string[] = ["LinkedIn", "URL de LinkedIn"];
 
 export const REQUIRED_COMPANY_HEADERS: readonly string[] = [
   "ID de registro",

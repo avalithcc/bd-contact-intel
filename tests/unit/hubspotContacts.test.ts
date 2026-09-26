@@ -71,3 +71,19 @@ test("leaves an already-https LinkedIn URL untouched, and null when blank", () =
   assert.equal(mapped.linkedinUrl, "https://www.linkedin.com/in/beto");
   assert.equal(mapHubSpotContactRow(row({ "URL de LinkedIn": "" })).linkedinUrl, null);
 });
+
+test("prefers the 'LinkedIn' column over 'URL de LinkedIn' when both are filled", () => {
+  const mapped = mapHubSpotContactRow(
+    row({ LinkedIn: "linkedin.com/in/from-linkedin-column", "URL de LinkedIn": "linkedin.com/in/from-url-column" }),
+  );
+  assert.equal(mapped.linkedinUrl, "https://linkedin.com/in/from-linkedin-column");
+});
+
+test("falls back to 'URL de LinkedIn' when 'LinkedIn' is blank", () => {
+  const mapped = mapHubSpotContactRow(row({ LinkedIn: "", "URL de LinkedIn": "linkedin.com/in/from-url-column" }));
+  assert.equal(mapped.linkedinUrl, "https://linkedin.com/in/from-url-column");
+});
+
+test("linkedinUrl is null when both LinkedIn columns are blank or absent", () => {
+  assert.equal(mapHubSpotContactRow(row({ LinkedIn: "", "URL de LinkedIn": "" })).linkedinUrl, null);
+});

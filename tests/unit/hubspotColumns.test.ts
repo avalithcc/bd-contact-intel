@@ -10,6 +10,7 @@ import { test } from "node:test";
 import {
   REQUIRED_CONTACT_HEADERS,
   REQUIRED_COMPANY_HEADERS,
+  OPTIONAL_CONTACT_LINKEDIN_HEADERS,
   assertRequiredHeaders,
 } from "@/lib/hubspot/columns";
 
@@ -48,4 +49,13 @@ test("assertRequiredHeaders throws listing the missing header NAMES, not any row
       return true;
     },
   );
+});
+
+test("REQUIRED_CONTACT_HEADERS does not require either LinkedIn column (neither is reliably filled)", () => {
+  assert.equal(REQUIRED_CONTACT_HEADERS.includes("LinkedIn"), false);
+  assert.equal(REQUIRED_CONTACT_HEADERS.includes("URL de LinkedIn"), false);
+});
+
+test("OPTIONAL_CONTACT_LINKEDIN_HEADERS pins both LinkedIn header names, 'LinkedIn' first", () => {
+  assert.deepEqual(OPTIONAL_CONTACT_LINKEDIN_HEADERS, ["LinkedIn", "URL de LinkedIn"]);
 });
