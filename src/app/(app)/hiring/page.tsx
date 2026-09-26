@@ -5,8 +5,6 @@ import { getCurrentBd } from "@/lib/queries";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate } from "@/lib/i18n/format";
-import { SignOutButton } from "../../SignOutButton";
-import { UserMenu } from "../../UserMenu";
 import { BackButton } from "../../BackButton";
 
 export const dynamic = "force-dynamic";
@@ -50,12 +48,6 @@ export default async function HiringPage({
         <Link className="secondary-btn" href="/contacts">
           {dict.common.leadsNav}
         </Link>
-        <UserMenu
-          label={me.name || dict.common.account}
-          changePasswordHref="/account/password"
-          changePasswordLabel={dict.common.changePassword}
-          signOutButton={<SignOutButton locale={locale} />}
-        />
       </div>
 
       <div className="mb-3xl">

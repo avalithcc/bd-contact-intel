@@ -9,8 +9,6 @@ import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime } from "@/lib/i18n/format";
-import { SignOutButton } from "../../SignOutButton";
-import { UserMenu } from "../../UserMenu";
 import { BackButton } from "../../BackButton";
 import { FilterCheckbox } from "./FilterCheckbox";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
@@ -90,12 +88,6 @@ export default async function WhatsNewPage({
         <Link className="secondary-btn" href="/contacts">
           {dict.common.leadsNav}
         </Link>
-        <UserMenu
-          label={me.name || dict.common.account}
-          changePasswordHref="/account/password"
-          changePasswordLabel={dict.common.changePassword}
-          signOutButton={<SignOutButton locale={locale} />}
-        />
       </div>
 
       <div className="mb-3xl">
