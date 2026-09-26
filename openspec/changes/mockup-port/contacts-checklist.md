@@ -24,7 +24,7 @@ Columns: element | mockup | status | evidence | notes
 | Meta paragraph | contacts.html:66 | done | page.tsx:338 | |
 | Segmented Tabla/Tablero control | contacts.html:68-71 | done | page.tsx:342-351 (`.segmented`, `.on` active class, `TableIcon`/`BoardIcon`) | |
 | "Importar" secondary button | contacts.html:72 | done | page.tsx:353-355 | |
-| "Nuevo contacto" primary button | contacts.html:73 | todo | — | No create-contact affordance anywhere on the page or its dialogs. Biggest single gap. |
+| "Nuevo contacto" primary button | contacts.html:73 | **done (branch 08)** | src/app/(app)/contacts/NewContactDialog.tsx | Opens the dialog; wired to createContactActions.ts. |
 
 ## View tabs
 
@@ -97,11 +97,11 @@ Columns: element | mockup | status | evidence | notes
 
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
-| Nombre / Apellido fields | contacts.html:259-260 | todo | — | No create-contact form/dialog exists anywhere in `/contacts`. |
-| LinkedIn URL field (strongest identity key) | contacts.html:261 | todo | — | `src/lib/identity/resolve.ts`/`resolveDb.ts` already implement LinkedIn-first identity resolution for ingest paths; nothing calls it from a manual "new contact" UI yet. |
-| Correo / Empresa fields | contacts.html:262-263 | todo | — | |
-| Duplicate-detection warning banner | contacts.html:264 | todo | — | `src/lib/identity/duplicateReviewQueries.ts` exists for the admin Duplicates screen; nothing surfaces a same-name+company duplicate warning inline in a create-contact flow. |
-| Cancelar / "Crear de todas formas" footer | contacts.html:266 | todo | — | |
+| Nombre / Apellido fields | contacts.html:259-260 | **done (branch 08)** | NewContactDialog.tsx | |
+| LinkedIn URL field (strongest identity key) | contacts.html:261 | **done (branch 08)** | NewContactDialog.tsx, src/lib/contacts/createContact.ts (`normalizeProfileKey`) | Deviation: does NOT reuse `@/lib/identity/resolve.ts`'s bulk ingest planner (`planIdentityWrites`/`buildIdentityWriteRows`) — that machinery requires a real legacy `contact`/`lead` row (`legacyTable`/`legacyId`), which a manually-typed contact has none of. Instead reuses `matchIdentity` directly (`@/lib/identity/matcher`), the actual matching algorithm every ingestion path shares, via two targeted indexed reads (profile key exact match; company-key-scoped rows filtered by normalized name) — see createContactActions.ts's doc comment. |
+| Correo / Empresa fields | contacts.html:262-263 | **done (branch 08)** | NewContactDialog.tsx | A manually typed email is always `emailStatus: "probable"`, never "verified" (no Hunter lookup on this quick-add path) — documented in createContact.ts. |
+| Duplicate-detection warning banner | contacts.html:264 | **done (branch 08)** | createContactActions.ts, `duplicateCandidate` insert | An exact match (profile key/verified email) blocks creation outright and links to the existing record (no "crear de todas formas" — it IS the same person). A name+company match shows the mockup's exact banner semantics (never auto-merged) with "Abrir el existente" / "Crear de todas formas"; confirming inserts a real `duplicateCandidate` row (same table the admin Duplicates screen reads) so an admin reviews it later. |
+| Cancelar / "Crear de todas formas" footer | contacts.html:266 | **done (branch 08)** | NewContactDialog.tsx | |
 
 ## #save-view dialog
 

@@ -33,6 +33,7 @@ import {
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
 import { createSavedViewAction, deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
+import { NewContactDialog, type NewContactDialogLabels } from "./NewContactDialog";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickBulkActionsLabels } from "@/lib/contacts/labels";
 import { BulkActionsBar } from "./BulkActionsBar";
@@ -278,6 +279,26 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const columnLabelsByKey = Object.fromEntries(
     ALL_CONTACT_COLUMNS.map((key) => [key, columnLabel(key, l)]),
   ) as Record<ContactColumnKey, string>;
+  const newContactLabels: NewContactDialogLabels = {
+    triggerLabel: l.newContactTrigger,
+    title: l.newContactTitle,
+    firstNameLabel: l.newContactFirstName,
+    lastNameLabel: l.newContactLastName,
+    linkedinLabel: l.newContactLinkedin,
+    linkedinHelp: l.newContactLinkedinHelp,
+    emailLabel: l.newContactEmail,
+    companyLabel: l.newContactCompany,
+    cancelLabel: l.newContactCancel,
+    createLabel: l.newContactCreate,
+    createAnywayLabel: l.newContactCreateAnyway,
+    openExistingLabel: l.newContactOpenExisting,
+    duplicateWarningPrefix: l.newContactDuplicateWarningPrefix,
+    duplicateWarningBody: l.newContactDuplicateWarningBody,
+    existingMatchTitle: l.newContactExistingMatchTitle,
+    existingMatchBody: l.newContactExistingMatchBody,
+    blockedOwnCompany: l.newContactBlockedOwnCompany,
+    invalidRequiresName: l.newContactInvalidRequiresName,
+  };
 
   // Table/board toggle (task 14.1; design.md "Routes": "`?layout=board`
   // all live in the query string"). Board mode groups by derived status
@@ -386,6 +407,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <Link href="/contacts/import" className="btn btn-secondary">
             {dict.contactsImport.pageTitle}
           </Link>
+          <NewContactDialog labels={newContactLabels} />
         </div>
       </div>
 
