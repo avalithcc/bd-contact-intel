@@ -646,6 +646,15 @@ export const person = pgTable(
     // Lowercased/trimmed `email`, for exact-match lookups independent of
     // casing (src/lib/identity/matcher.ts).
     emailNormalized: text("email_normalized"),
+    // Landline/office number, HubSpot-style ("Teléfono" on the record page).
+    // Free-text display value (src/lib/phone.ts formats/validates it); the
+    // digits-only search path uses the `person_phone_digits_idx` expression
+    // index below rather than a stored normalized column, so an edit here
+    // can never drift out of sync with a duplicate digits column.
+    phone: text("phone"),
+    // Mobile number ("Móvil" on the record page). Same free-text/expression-
+    // index treatment as `phone`.
+    mobilePhone: text("mobile_phone"),
     // 'verified' | 'probable' | 'none' — same vocabulary as contact/lead.
     emailStatus: text("email_status").notNull().default("none"),
     emailConfidence: integer("email_confidence"),
@@ -710,6 +719,18 @@ export const person = pgTable(
     byIndustry: index("person_industry_idx").on(t.industry),
     bySeniority: index("person_seniority_idx").on(t.seniority),
     byEmailStatus: index("person_email_status_idx").on(t.emailStatus),
+    // Digits-only expression indexes (migration 0016) back the phone search
+    // path: `regexp_replace(phone, '\D', '', 'g')` is IMMUTABLE, so Postgres
+    // can index it directly — chosen over a stored `phone_digits` column so
+    // an edit to `phone`/`mobile_phone` can never drift out of sync with a
+    // duplicate normalized column (src/lib/phone.ts owns the same digits
+    // rule for the JS side, used for display/`tel:` hrefs, not search).
+    byPhoneDigits: index("person_phone_digits_idx").on(
+      sql`(regexp_replace(${t.phone}, '\\D', '', 'g'))`,
+    ),
+    byMobilePhoneDigits: index("person_mobile_phone_digits_idx").on(
+      sql`(regexp_replace(${t.mobilePhone}, '\\D', '', 'g'))`,
+    ),
   }),
 );
 
