@@ -48,12 +48,12 @@ const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLab
   other: "discardReasonOther",
 };
 
-interface ActionError {
+export interface ActionError {
   message: string;
   href?: string;
 }
 
-interface ComposerProps {
+export interface ComposerProps {
   labels: ContactRecordLabels;
   busy: boolean;
   error: ActionError | null;
@@ -434,7 +434,7 @@ function EmailForm({
   );
 }
 
-function MeetingForm({
+export function MeetingForm({
   labels: l,
   busy,
   error,
@@ -475,7 +475,7 @@ function MeetingForm({
   );
 }
 
-function DiscardForm({
+export function DiscardForm({
   labels: l,
   busy,
   error,

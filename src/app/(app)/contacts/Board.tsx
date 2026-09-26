@@ -5,6 +5,7 @@ import { BOARD_COLUMNS, boardDropAction } from "@/lib/contacts/board";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { BoardDnD } from "./BoardDnD";
+import { pickContactRecordLabels } from "@/lib/contacts/labels";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
 
@@ -42,7 +43,7 @@ export function Board({ columns, dict, tableHref }: BoardProps) {
   };
 
   return (
-    <BoardDnD labels={moveConfirmLabels}>
+    <BoardDnD labels={moveConfirmLabels} recordLabels={pickContactRecordLabels(dict)}>
       <p className="meta mb-lg">{l.boardDropHint}</p>
       <div className="board">
         {columns.map((col) => {

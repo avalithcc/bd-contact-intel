@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { boardDropAction, isBoardStatus } from "@/lib/contacts/board";
+import { boardDropAction, isBoardStatus, isBoardDropAction, type BoardDropAction } from "@/lib/contacts/board";
 import { Dialog } from "@/components/Dialog";
+import { logContactMeetingAction, discardContactAction } from "./actions";
+import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
+import { MeetingForm, DiscardForm, type ActionError } from "./[id]/QuickActions";
 
 export interface BoardMoveConfirmLabels {
   titlePrefix: string;
@@ -13,29 +16,48 @@ export interface BoardMoveConfirmLabels {
 }
 
 interface PendingMove {
-  href: string;
+  personId: string;
+  action: BoardDropAction;
   targetLabel: string;
+  /** Only used for actions other than meeting/discard (currently just
+   * "email") — those still navigate to the record page's quick-action
+   * composer, unchanged. */
+  href: string;
 }
+
+type ActiveForm = { kind: "meeting" | "discard"; personId: string } | null;
 
 /**
  * Drag-and-drop progressive enhancement for the Contacts board (task 14.1,
- * 10.5; mockup-parity 4.3 move-confirm dialog). Purely a navigation
- * trigger — dropping a card on a column, or picking a target from a
- * card's "Mover a..." menu, never writes status itself; it navigates to
- * `/contacts/[id]?openAction=X`, which opens the SAME quick-action
- * composer (`QuickActions`) the record page already wires to
- * `logContactMeetingAction`/`discardContactAction`/`sendContactEmailAction`
- * (design R4, tasks.md 10.2-10.3). Both gestures now go through a shared
- * `Dialog` confirm step before that navigation, so a drag or a stray
- * click never silently leaves the board. Every card also renders a
- * native `<details>` "Mover a..." menu (see `BoardCard` in `Board.tsx`)
- * that still reaches the exact same URL without JS (confirm step
- * included, since without JS the click just follows the link directly).
+ * 10.5; mockup-parity 4.3 move-confirm dialog; contacts-board.html:93-121
+ * log-meeting/discard dialogs). Dropping a card on "Reunión" or
+ * "Descartado" (or picking either from a card's "Mover a..." menu) shows a
+ * confirm step, then opens the SAME quick-action composer the record page
+ * uses (`MeetingForm`/`DiscardForm`, exported from `[id]/QuickActions.tsx`
+ * to avoid duplicating ~90 lines of form markup) — calling
+ * `logContactMeetingAction`/`discardContactAction` directly, INLINE on the
+ * board, never leaving `/contacts?layout=board`. Any other drop target
+ * (currently just "Contactado" -> "email") still navigates to
+ * `/contacts/[id]?openAction=email` — only log-meeting/discard were asked
+ * to become inline dialogs; the record page's email composer needs the
+ * contact's full email address/history context this board card doesn't
+ * carry, so it's out of scope here.
  */
-export function BoardDnD({ children, labels }: { children: ReactNode; labels: BoardMoveConfirmLabels }) {
+export function BoardDnD({
+  children,
+  labels,
+  recordLabels,
+}: {
+  children: ReactNode;
+  labels: BoardMoveConfirmLabels;
+  recordLabels: ContactRecordLabels;
+}) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [activeForm, setActiveForm] = useState<ActiveForm>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ActionError | null>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -65,6 +87,8 @@ export function BoardDnD({ children, labels }: { children: ReactNode; labels: Bo
       if (!action) return;
       e.preventDefault();
       setPendingMove({
+        personId,
+        action,
         href: `/contacts/${personId}?openAction=${action}`,
         targetLabel: col?.getAttribute("aria-label") ?? "",
       });
@@ -75,7 +99,11 @@ export function BoardDnD({ children, labels }: { children: ReactNode; labels: Bo
       if (!link) return;
       e.preventDefault();
       link.closest("details")?.removeAttribute("open");
-      setPendingMove({ href: link.href, targetLabel: link.dataset.boardMoveLabel ?? "" });
+      const personId = link.closest<HTMLElement>("[data-person-id]")?.dataset.personId;
+      const rawAction = new URL(link.href).searchParams.get("openAction");
+      if (!personId || !rawAction || !isBoardDropAction(rawAction)) return;
+      const action = rawAction;
+      setPendingMove({ personId, action, href: link.href, targetLabel: link.dataset.boardMoveLabel ?? "" });
     }
 
     root.addEventListener("dragstart", onDragStart);
@@ -90,6 +118,21 @@ export function BoardDnD({ children, labels }: { children: ReactNode; labels: Bo
     };
   }, [router]);
 
+  function confirmMove() {
+    if (!pendingMove) return;
+    if (pendingMove.action === "meeting" || pendingMove.action === "discard") {
+      setActiveForm({ kind: pendingMove.action, personId: pendingMove.personId });
+    } else {
+      router.push(pendingMove.href);
+    }
+    setPendingMove(null);
+  }
+
+  function closeForm() {
+    setActiveForm(null);
+    setError(null);
+  }
+
   return (
     <div ref={rootRef}>
       {children}
@@ -103,14 +146,7 @@ export function BoardDnD({ children, labels }: { children: ReactNode; labels: Bo
               <button type="button" className="btn btn-secondary" onClick={() => setPendingMove(null)}>
                 {labels.cancel}
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  router.push(pendingMove.href);
-                  setPendingMove(null);
-                }}
-              >
+              <button type="button" className="btn btn-primary" onClick={confirmMove}>
                 {labels.confirm}
               </button>
             </>
@@ -118,6 +154,48 @@ export function BoardDnD({ children, labels }: { children: ReactNode; labels: Bo
         >
           <p>{labels.body}</p>
         </Dialog>
+      )}
+
+      {activeForm?.kind === "meeting" && (
+        <MeetingForm
+          labels={recordLabels}
+          busy={busy}
+          error={error}
+          onCancel={closeForm}
+          onSubmit={async (date, time, notes) => {
+            setBusy(true);
+            setError(null);
+            const result = await logContactMeetingAction(activeForm.personId, date, time, notes);
+            setBusy(false);
+            if (result.ok) {
+              closeForm();
+              router.refresh();
+            } else {
+              setError({ message: contactActionErrorMessage(recordLabels, result.reason) });
+            }
+          }}
+        />
+      )}
+
+      {activeForm?.kind === "discard" && (
+        <DiscardForm
+          labels={recordLabels}
+          busy={busy}
+          error={error}
+          onCancel={closeForm}
+          onSubmit={async (reason, note) => {
+            setBusy(true);
+            setError(null);
+            const result = await discardContactAction(activeForm.personId, reason, note);
+            setBusy(false);
+            if (result.ok) {
+              closeForm();
+              router.refresh();
+            } else {
+              setError({ message: contactActionErrorMessage(recordLabels, result.reason) });
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -119,8 +119,8 @@ Columns: element | mockup | status | evidence | notes
 | board-card (title, sub, avatar-bd + first-name meta, badge) | contacts-board.html:77-88 | done | Board.tsx | |
 | "Ver los N" col-more link | contacts-board.html:77 | done | Board.tsx | |
 | Drag-and-drop between columns | contacts-board.html:86 | done | src/app/(app)/contacts/BoardDnD.tsx, src/lib/contacts/board.ts boardDropAction | Progressive enhancement over `/contacts/[id]?openAction=X`. |
-| Log-meeting dialog on drop-to-Reunión | contacts-board.html:93-105 | done (via record page) | `/contacts/[id]?openAction=meeting` | Opens on the record page, not inline on the board — functionally equivalent per design. |
-| Discard dialog (mandatory reason) | contacts-board.html:106-121 | done (via record page) | `/contacts/[id]?openAction=discard` | Same caveat as log-meeting. |
+| Log-meeting dialog on drop-to-Reunión | contacts-board.html:93-105 | **done, inline on the board (branch 15)** | src/app/(app)/contacts/BoardDnD.tsx, `MeetingForm` (exported from `[id]/QuickActions.tsx`, reused rather than duplicated) | After the move-confirm step, the SAME form the record page uses opens inline on the board, calling `logContactMeetingAction` directly — never leaves `/contacts?layout=board`. |
+| Discard dialog (mandatory reason) | contacts-board.html:106-121 | **done, inline on the board (branch 15)** | BoardDnD.tsx, `DiscardForm` (reused from `[id]/QuickActions.tsx`) | Same as log-meeting: opens inline, calls `discardContactAction` directly. The "Contactado" drop target (-> email composer) was intentionally NOT converted — only log-meeting/discard were asked to become inline dialogs; email needs record-page context (full address/history) this board card doesn't carry. |
 
 ## Summary
 
