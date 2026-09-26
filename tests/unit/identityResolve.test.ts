@@ -159,6 +159,246 @@ test("buildIdentityWriteRows: new persons carry roleGroup onto the insert row", 
   assert.equal(built.persons[0].roleGroup, "eng_leadership");
 });
 
+// --- HubSpot import extensions (design D4, task 3.3) ------------------------
+
+test("planIdentityWrites: a hubspot_contact row sources new persons as 'hubspot_import'", () => {
+  const plan = planIdentityWrites([row({ legacyTable: "hubspot_contact", legacyId: "hs-1", bdId: null })], []);
+  assert.equal(plan.newPersons[0].sourceKey, "hubspot_import");
+});
+
+test("planIdentityWrites: a null bdId produces no personBdConnection row, but idMap is still written", () => {
+  const rows = [row({ legacyTable: "hubspot_contact", legacyId: "hs-1", bdId: null, profileKey: "li/jane" })];
+  const plan = planIdentityWrites(rows, []);
+  const built = buildIdentityWriteRows(plan, () => "gen-1");
+  assert.equal(built.connections.length, 0);
+  assert.equal(built.idMap.length, 1);
+  assert.equal(built.idMap[0].personId, "gen-1");
+});
+
+test("planIdentityWrites: hubspot_contact row with an exact email match to a not-verified Contact routes to review (email_unverified)", () => {
+  const rows = [
+    row({ legacyTable: "hubspot_contact", legacyId: "hs-1", bdId: null, email: "jane@acme.com", emailStatus: "probable" }),
+  ];
+  const index = [existing({ id: "person-1", email: "jane@acme.com", emailNormalized: "jane@acme.com", emailStatus: "probable" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.rowOutcomes[0].method, "review");
+  assert.equal(plan.reviewPairs[0].reason, "email_unverified");
+});
+
+test("planIdentityWrites: exact email match with NO profileKey or companyKey overlap still routes to review, not new (fresh-review CRITICAL fix — the prefetch gap this closes)", () => {
+  const rows = [
+    row({
+      legacyTable: "hubspot_contact",
+      legacyId: "hs-2",
+      bdId: null,
+      firstName: "Someone",
+      lastName: "Else",
+      company: "Totally Different Co",
+      companyKey: "totally-different-co",
+      profileKey: null,
+      email: "jane@acme.com",
+      emailStatus: "probable",
+    }),
+  ];
+  // The existing candidate is the ONLY thing standing in for what
+  // prefetchIdentityIndex's new hubspotEmails-scoped query must return —
+  // no profileKey, and a companyKey that shares nothing with the incoming
+  // row, so ONLY the email can produce a match here.
+  const index = [
+    existing({
+      id: "person-1",
+      profileKey: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      companyKey: "acme-original",
+      email: "jane@acme.com",
+      emailNormalized: "jane@acme.com",
+      emailStatus: "probable",
+    }),
+  ];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.rowOutcomes[0].method, "review");
+  assert.equal(plan.reviewPairs[0].reason, "email_unverified");
+  assert.notEqual(plan.rowOutcomes[0].method, "new");
+});
+
+test("planIdentityWrites: same email_unverified rule does NOT apply to plain 'contact' rows (live ingest/catch_up unaffected)", () => {
+  const rows = [
+    row({
+      legacyTable: "contact",
+      legacyId: "c1",
+      firstName: "Other",
+      lastName: "Person",
+      company: "Different Co",
+      email: "jane@acme.com",
+      emailStatus: "probable",
+    }),
+  ];
+  const index = [
+    existing({
+      id: "person-1",
+      firstName: "Jane",
+      lastName: "Doe",
+      companyKey: "acme",
+      email: "jane@acme.com",
+      emailNormalized: "jane@acme.com",
+      emailStatus: "probable",
+    }),
+  ];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.rowOutcomes[0].method, "new");
+});
+
+test("planIdentityWrites with mergePolicy 'fill_empty': an existing non-empty jobTitle is NEVER overwritten, even by a longer incoming value", () => {
+  const rows = [row({ legacyTable: "hubspot_contact", legacyId: "hs-1", bdId: null, profileKey: "li/jane", jobTitle: "Sales" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: "VP" })];
+  const plan = planIdentityWrites(rows, index, "fill_empty");
+  assert.equal(plan.existingUpdates[0].merged.jobTitle, "VP");
+});
+
+test("planIdentityWrites with mergePolicy 'fill_empty': an empty existing field IS filled from the incoming row", () => {
+  const rows = [row({ legacyTable: "hubspot_contact", legacyId: "hs-1", bdId: null, profileKey: "li/jane", jobTitle: "Sales", industry: "SaaS" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: null, industry: null })];
+  const plan = planIdentityWrites(rows, index, "fill_empty");
+  assert.equal(plan.existingUpdates[0].merged.jobTitle, "Sales");
+  assert.equal(plan.existingUpdates[0].merged.industry, "SaaS");
+});
+
+test("planIdentityWrites with mergePolicy 'fill_empty': email fields move together and only fill when existing email is empty", () => {
+  const rows = [
+    row({
+      legacyTable: "hubspot_contact",
+      legacyId: "hs-1",
+      bdId: null,
+      profileKey: "li/jane",
+      email: "jane@hubspot.com",
+      emailStatus: "probable",
+      emailSource: "hubspot_import",
+    }),
+  ];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", email: null, emailNormalized: null, emailStatus: "none" })];
+  const plan = planIdentityWrites(rows, index, "fill_empty");
+  assert.equal(plan.existingUpdates[0].merged.email, "jane@hubspot.com");
+  assert.equal(plan.existingUpdates[0].merged.emailStatus, "probable");
+  assert.equal(plan.existingUpdates[0].merged.emailSource, "hubspot_import");
+});
+
+test("planIdentityWrites with mergePolicy 'fill_empty': an existing verified email is never replaced by an incoming probable one", () => {
+  const rows = [
+    row({
+      legacyTable: "hubspot_contact",
+      legacyId: "hs-1",
+      bdId: null,
+      profileKey: "li/jane",
+      email: "jane@hubspot.com",
+      emailStatus: "probable",
+    }),
+  ];
+  const index = [
+    existing({ id: "person-1", profileKey: "li/jane", email: "jane@old.com", emailNormalized: "jane@old.com", emailStatus: "verified" }),
+  ];
+  const plan = planIdentityWrites(rows, index, "fill_empty");
+  assert.equal(plan.existingUpdates[0].merged.email, "jane@old.com");
+  assert.equal(plan.existingUpdates[0].merged.emailStatus, "verified");
+});
+
+test("planIdentityWrites with mergePolicy 'fill_empty': ownerBdId/city/country fill only when empty on the existing person", () => {
+  const rows = [
+    row({
+      legacyTable: "hubspot_contact",
+      legacyId: "hs-1",
+      bdId: null,
+      profileKey: "li/jane",
+      ownerBdId: "bd-new",
+      city: "Buenos Aires",
+      country: "Argentina",
+    }),
+  ];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", ownerBdId: "bd-existing", city: null, country: null })];
+  const plan = planIdentityWrites(rows, index, "fill_empty");
+  assert.equal(plan.existingUpdates[0].merged.ownerBdId, "bd-existing");
+  assert.equal(plan.existingUpdates[0].merged.city, "Buenos Aires");
+  assert.equal(plan.existingUpdates[0].merged.country, "Argentina");
+});
+
+test("planIdentityWrites: default mergePolicy stays 'r7' (specificity-based) when omitted — unchanged live-path behavior", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "Sales" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: "Head of Sales, EMEA" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales, EMEA");
+});
+
+// --- Fresh-review fix: company/city/country are fill-empty only for an
+// existing person, regardless of mergePolicy (live 'r7' or HubSpot
+// 'fill_empty') — an existing person's raw display fields must never be
+// silently overwritten by a re-imported/live row, even a longer/more-
+// specific one. Every other 'r7' field (e.g. jobTitle, above) keeps its
+// specificity/recency merge, unchanged. ------------------------------------
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's non-empty company is NEVER overwritten, even by a longer/different incoming value", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: "Acme" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's empty company IS filled from the incoming row", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: null })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': a brand-new person still gets the row's own company written", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme" })];
+  const plan = planIdentityWrites(rows, []);
+  assert.equal(plan.newPersons[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': every other field keeps specificity/recency merge (jobTitle unaffected)", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "Sales", company: "Different Co" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: "Head of Sales, EMEA", company: "Acme" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales, EMEA");
+  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's non-empty companyKey is NEVER overwritten, even by a differently-derived incoming key", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: "Acme", companyKey: "acme" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.companyKey, "acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's empty companyKey IS filled from the incoming row", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: null, companyKey: null })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.companyKey, "acme");
+});
+
+test("buildIdentityWriteRows: a new hubspot person's insert row carries migrationRunId, ownerBdId, city and country", () => {
+  const rows = [
+    row({
+      legacyTable: "hubspot_contact",
+      legacyId: "hs-1",
+      bdId: null,
+      profileKey: "li/jane",
+      ownerBdId: "bd-1",
+      city: "CABA",
+      country: "Argentina",
+      migrationRunId: "run-1",
+    }),
+  ];
+  const plan = planIdentityWrites(rows, []);
+  const built = buildIdentityWriteRows(plan, () => "gen-1");
+  assert.equal(built.persons[0].migrationRunId, "run-1");
+  assert.equal(built.persons[0].ownerBdId, "bd-1");
+  assert.equal(built.persons[0].city, "CABA");
+  assert.equal(built.persons[0].country, "Argentina");
+  assert.equal(built.idMap[0].migrationRunId, "run-1");
+});
+
 test("buildPrefetchKeys: collects distinct profile keys, verified emails and company keys", () => {
   const rows = [
     row({ profileKey: "li/a", email: "a@x.com", emailStatus: "verified", companyKey: "acme" }),
@@ -168,6 +408,36 @@ test("buildPrefetchKeys: collects distinct profile keys, verified emails and com
   assert.deepEqual(keys.profileKeys, ["li/a"]);
   assert.deepEqual(keys.verifiedEmails, ["a@x.com"]);
   assert.deepEqual(keys.companyKeys, ["acme"]);
+});
+
+// --- fresh-review CRITICAL fix: hubspot_import rows are always
+// emailStatus:'probable', so the `verifiedEmails` set above NEVER includes
+// their own email — the D4 email_unverified dedup rule then had nothing to
+// prefetch against. `hubspotEmails` is a SEPARATE key set, scoped to
+// legacyTable==='hubspot_contact' only, so the live ingestion prefetch
+// (contact/lead rows) is provably unaffected. --------------------------
+
+test("buildPrefetchKeys: hubspot_import rows contribute their email to hubspotEmails regardless of emailStatus", () => {
+  const rows = [
+    row({ legacyTable: "hubspot_contact", email: "a@x.com", emailStatus: "probable" }),
+    row({ legacyTable: "hubspot_contact", email: "B@X.com", emailStatus: "none" }),
+    row({ legacyTable: "hubspot_contact", email: null, emailStatus: "none" }),
+  ];
+  const keys = buildPrefetchKeys(rows);
+  assert.deepEqual(keys.hubspotEmails.sort(), ["a@x.com", "b@x.com"]);
+  // A hubspot row's own email is never 'verified', so it must NOT also
+  // leak into verifiedEmails (that would be a duplicate DB query, not a bug
+  // per se, but asserting it stays empty pins the actual reported gap).
+  assert.deepEqual(keys.verifiedEmails, []);
+});
+
+test("buildPrefetchKeys: live ingestion (contact/lead) rows never populate hubspotEmails — pin the scoping", () => {
+  const rows = [
+    row({ legacyTable: "contact", email: "a@x.com", emailStatus: "probable" }),
+    row({ legacyTable: "lead", email: "b@x.com", emailStatus: "none" }),
+  ];
+  const keys = buildPrefetchKeys(rows);
+  assert.deepEqual(keys.hubspotEmails, []);
 });
 
 test("buildIdentityWriteRows: resolves new-person refs to generated ids for connections and idMap", () => {

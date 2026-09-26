@@ -114,3 +114,45 @@ export function computeFoldInputHash<
   hash.update(hashActivityTypesByLeadId(activityTypesByLeadId));
   return hash.digest("hex");
 }
+
+/**
+ * HubSpot import input hash (design D6: "covers what the planner reads, not
+ * the file bytes"): the projected contact and company rows (`id` = the
+ * HubSpot record id) PLUS the DB snapshot `planHubSpotImport` reads —
+ * prefetched persons, existing hubspot map rows, existing `company` rows,
+ * the bd name map, and existing hubspot activity keys — so a change on
+ * either side between dry run and execute trips `stale_input_hash`.
+ */
+export function computeHubSpotInputHash<
+  C extends { id: string },
+  Co extends { id: string },
+  P extends { id: string },
+  M extends { id: string },
+  Ec extends { id: string },
+  B extends { id: string },
+  A extends { id: string },
+>(
+  contacts: readonly C[],
+  companies: readonly Co[],
+  existingPersons: readonly P[],
+  existingHubspotMap: readonly M[],
+  existingCompanies: readonly Ec[],
+  bds: readonly B[],
+  existingHubspotActivityKeys: readonly A[],
+): string {
+  const hash = createHash("sha256");
+  hash.update(hashRowSet(contacts));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(companies));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(existingPersons));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(existingHubspotMap));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(existingCompanies));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(bds));
+  hash.update(SET_SEPARATOR);
+  hash.update(hashRowSet(existingHubspotActivityKeys));
+  return hash.digest("hex");
+}

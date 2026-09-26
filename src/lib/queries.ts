@@ -86,10 +86,13 @@ export const RELATIONSHIP_FILTERS = [
 ] as const;
 export type RelationshipFilterKey = (typeof RELATIONSHIP_FILTERS)[number]["key"];
 
-// Exported so other views that need the same "reciprocal but gone quiet"
-// signal (see src/lib/outreach/queries.ts) compute it identically instead of
-// re-deriving their own threshold.
-export const DORMANT_MONTHS = 12;
+// DB-free ranking module (src/lib/outreach/ranking.ts) is the single source
+// of truth for the "reciprocal but gone quiet" threshold — re-exported here
+// (rather than redefined) so this file's isDormant() below and other views
+// (src/lib/outreach/queries.ts, src/lib/contacts/outreachView.ts) can never
+// drift apart on the value.
+import { DORMANT_MONTHS } from "@/lib/outreach/ranking";
+export { DORMANT_MONTHS };
 
 export interface ContactFilters {
   // Single free-text search box on the home page (param `q`), matching
@@ -518,7 +521,11 @@ export async function upsertContacts(
           : () => upsertContactRows().then(() => [] as InsertedContactRow[]),
         toIdentityRows: contactRowsToIdentityRows,
         prefetch: (rows) => prefetchIdentityIndex(tx, rows),
-        apply: (plan) => applyIdentityWrites(tx, plan),
+        // applyIdentityWrites now returns the resolved legacyId->personId
+        // map (hubspot_import fresh-review fix); this ingest harness's
+        // `apply` contract is Promise<void>, and live ingestion has no
+        // caller-side use for the map, so it's discarded here.
+        apply: (plan) => applyIdentityWrites(tx, plan).then(() => undefined),
       });
       chunkReports.push(report);
     });
