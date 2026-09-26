@@ -377,6 +377,12 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .record-identity h1 { font-size: var(--text-xl); }
 .record-identity .headline { color: var(--color-ink-soft); font-size: var(--text-base); }
 .quick-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-2xs); padding: var(--space-lg) 0; border-bottom: 1px solid var(--color-border); }
+/* Record page (mockup-port r02): "Pegar señal" is a 6th quick action not in
+   the approved mockup's 5-action row (contact-record.html:66-72) — kept as
+   an intentional superset, so this modifier switches to an auto-fit grid
+   only when a 6th `.qa` child is present, leaving every other `.quick-actions`
+   consumer at the mockup's exact 5-column layout. */
+.quick-actions:has(.qa:nth-child(6)) { grid-template-columns: repeat(3, 1fr); }
 .qa { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; font-size: 0.7rem; font-weight: 500; color: var(--color-ink-soft); background: none; border: 0; cursor: pointer; padding: 0; }
 .qa .qa-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--color-border-strong); background: var(--color-surface-2); color: var(--color-ink); transition: border-color var(--transition-fast), background var(--transition-fast); }
 .qa:hover { text-decoration: none; color: var(--color-ink); }

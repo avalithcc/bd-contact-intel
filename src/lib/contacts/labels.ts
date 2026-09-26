@@ -1,6 +1,7 @@
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { ContactActionErrorReason } from "@/app/(app)/contacts/actionErrors";
+import type { StatusReasonEvidence } from "@/lib/status/deriveStatus";
 
 // AboutPane (`/contacts/[id]`) is a client component — same ClientStrings
 // convention as src/lib/leads/labels.ts / src/lib/i18n/navLabels.ts.
@@ -103,6 +104,56 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
     case "unexpected":
       return l.genericError;
   }
+}
+
+/**
+ * Composes the record page's "Estado" derivation "why" hint (mockup-port
+ * r02; contact-record.html:77 "Respondió porque ... el 12 oct. Registrar
+ * una reunión para pasar a Reunión."). Server-only (imports
+ * `dict.contactRecordServer`'s function templates directly, NOT via
+ * `ContactRecordLabels` — that type is `ClientStrings`-wrapped and forbids
+ * function values; see the comment on `contactRecordServer` in
+ * dictionaries/es.ts). Callers pass this function's plain-string RESULT
+ * down to the client component, never the templates themselves.
+ * `dateLabel`/`nextStepHint`/`emptyValue` are pre-formatted/looked-up by the
+ * caller (page.tsx), same as every other date shown on this page.
+ */
+const ACTIVITY_SOURCE_LABEL_KEY: Partial<Record<string, keyof Dictionary["contactRecordServer"]>> = {
+  email_sent: "statusReasonSourceEmail",
+  meeting_logged: "statusReasonSourceMeeting",
+  status_change: "statusReasonSourceStatusChange",
+  status_backfill: "statusReasonSourceStatusChange",
+  discarded: "statusReasonSourceDiscard",
+  note: "statusReasonSourceNote",
+  hunter_lookup: "statusReasonSourceHunter",
+};
+
+export function describeStatusReason(
+  serverStrings: Dictionary["contactRecordServer"],
+  leadStatuses: Dictionary["leadStatuses"],
+  emptyValue: string,
+  nextStepHint: string,
+  evidence: StatusReasonEvidence,
+  dateLabel: string,
+): string {
+  const statusLabel = leadStatuses[evidence.status as keyof typeof leadStatuses] ?? evidence.status;
+
+  let sourceDescription: string;
+  if (evidence.because.source === "connection") {
+    const bdName = evidence.bdName ?? emptyValue;
+    sourceDescription =
+      evidence.status === "replied"
+        ? serverStrings.statusReasonSourceConnectionReplied(bdName)
+        : serverStrings.statusReasonSourceConnectionSent(bdName);
+  } else {
+    const key = evidence.activityType ? ACTIVITY_SOURCE_LABEL_KEY[evidence.activityType] : undefined;
+    sourceDescription = key
+      ? (serverStrings[key] as string)
+      : serverStrings.statusReasonSourceStatusChange;
+  }
+
+  const sentence = serverStrings.statusReasonSentence(statusLabel, sourceDescription, dateLabel);
+  return evidence.status === "replied" ? `${sentence} ${nextStepHint}` : sentence;
 }
 
 /**

@@ -6,13 +6,17 @@ import { updateContactProperty } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty } from "@/lib/contacts/propertyEdit";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
-import { createTaskAction } from "@/app/(app)/tasks/actions";
+import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planDiscard } from "@/lib/contacts/discard";
 import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
 import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
+import { getConversationForAdmin, type AdminConversationData } from "@/lib/activity/getConversationForAdmin";
+import { isUuid } from "@/lib/uuid";
 import {
   contactActionErrorReason,
   OwnerReassignLockedError,
@@ -107,6 +111,24 @@ export async function addContactTaskAction(
   }
 }
 
+/**
+ * "Marcar como hecha" on a record-page timeline/right-panel task row
+ * (mockup-port r03/r05; contact-record.html:111/181). Thin wrapper over the
+ * existing `completeTaskAction` (src/app/(app)/tasks/actions.ts) — same
+ * write, same semantics — that additionally revalidates this Contact's own
+ * page, since `completeTaskAction` itself only revalidates /tasks, /leads,
+ * /companies (it has no personId to revalidate with).
+ */
+export async function completeContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
+  try {
+    await completeTaskAction(taskId);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
 /** "Reunión" quick action (task 10.2) — writes a `meeting_logged` activity; status recomputes to `meeting` in the same transaction (recompute.ts, via createActivity). */
 export async function logContactMeetingAction(
   personId: string,
@@ -158,6 +180,39 @@ export async function addContactSignalAction(personId: string, text: string): Pr
   } catch (err) {
     return actionFailure(err);
   }
+}
+
+export type RevealAdminConversationResult =
+  | { ok: true; data: AdminConversationData }
+  | { ok: false; reason: "not_admin" | "invalid" | "not_found" };
+
+/**
+ * Inline "Ver conversación" reveal (mockup-port r04; contact-record-
+ * admin.html:130/137 — the mockup shows this expanded directly in the
+ * timeline, not only on the separate `/contacts/[id]/conversation/[bdId]`
+ * page). Goes through the EXACT SAME audited path that page already uses
+ * (`getConversationForAdmin` — writes `audit_log(view_conversation)` before
+ * returning content, and skips the audit write only when the viewer is
+ * looking at their own conversation, `shouldAuditConversationView`). The
+ * separate page stays as a deep link (bookmarkable, no client JS needed to
+ * reach it); this action is what powers the inline expand.
+ */
+export async function revealAdminConversationAction(
+  personId: string,
+  targetBdId: string,
+): Promise<RevealAdminConversationResult> {
+  if (!isUuid(personId) || !isUuid(targetBdId)) return { ok: false, reason: "invalid" };
+  let me;
+  try {
+    me = await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminRequiredError) return { ok: false, reason: "not_admin" };
+    throw err;
+  }
+  const result = await getConversationForAdmin(personId, targetBdId, me.id);
+  if (result.kind === "not_found") return { ok: false, reason: "not_found" };
+  const { kind: _kind, ...data } = result;
+  return { ok: true, data };
 }
 
 export type SendContactEmailResult = ContactActionResult;

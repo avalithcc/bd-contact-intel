@@ -571,6 +571,93 @@ export const es: typeof en = {
     timelineStatusBackfillPrefix: "Estado registrado antes de la migración:",
     timelineMeetingLoggedDefault: "Reunión registrada.",
     timelineDiscardedDefault: "Contacto descartado.",
+    verifiedBadge: "Verificado",
+    linkedInBadge: "LinkedIn",
+    historyAction: "Historial",
+    generateMessageCta: "Generar mensaje con IA",
+    changeCompanyAction: "Cambiar empresa",
+    statusNextStepReplied: "Registrar una reunión para pasar a Reunión.",
+    headlineConnector: "en",
+    createdViaMigration: "unificado por migración",
+    sourceLinkedInPrefix: "LinkedIn",
+    sourceLinkedInBdSuffix: "BDs",
+    sourceLeadListPrefix: "Lista de leads",
+    timelineGroupUpcoming: "Próximas",
+    timelineGroupPreMigration: "Antes de la migración",
+    timelineSortNewestFirst: "Más recientes primero",
+    timelineAssignedToPrefix: "Asignada a",
+    taskDueBadgePrefix: "Vence",
+    taskMarkDone: "Marcar como hecha",
+    taskReschedule: "Reprogramar",
+    addFollowUpTask: "Agregar tarea de seguimiento",
+    linkedinRepliedPrefix: "Respuesta de LinkedIn recibida",
+    linkedinSentPrefix: "Mensaje de LinkedIn enviado",
+    linkedinConversationOfPrefix: "conversación de",
+    adminAuditAlertTitle: "Está viendo la conversación de otro BD",
+    adminNoConversationContent: "Sin contenido de conversación registrado.",
+    adminOpenAsPage: "Abrir en una página",
+    stageBadgePrefix: "Etapa:",
+    conversationHistoryTitle: "Historial de conversaciones",
+    conversationHistoryIntroPrefix: "Existe historial de conversaciones con:",
+    conversationHistoryPrivateFooter: "El contenido es privado para cada BD.",
+    conversationHistoryAdminFooter:
+      "Los administradores pueden abrir cualquier conversación; cada visualización queda registrada en el registro de auditoría.",
+    tasksCardTitle: "Tareas",
+    addTaskAction: "Agregar tarea",
+    changeCompanyAria: "Cambiar empresa",
+    lastActivityStatTitle: "Última actividad",
+    touchpointsStatTitle: "Puntos de contacto (todos los BDs)",
+    openTasksTitle: "Tareas abiertas",
+    signalsTitle: "Señales",
+    noRecentActivity: "Sin actividad registrada.",
+    noOpenTasks: "Sin tareas abiertas.",
+    noSignals: "Sin señales de contratación registradas.",
+    channelLinkedIn: "LinkedIn",
+    channelEmail: "Correo enviado",
+    channelNote: "Nota",
+    useInEmailAction: "Usar en correo",
+    mergeCardWhat: "Unificado durante la migración",
+    reviewMergeAction: "Revisar / deshacer fusión",
+  },
+
+  // Server-only formatter templates for the record page (mockup-port r02).
+  // Kept OUT of `contactRecord` above on purpose: that object is wrapped in
+  // `ClientStrings<...>` (src/lib/i18n/clientStrings.ts) for AboutPane/
+  // PropertyList, which forbids function values (they can't cross the
+  // server -> client boundary). page.tsx (a server component) composes the
+  // final plain strings from these templates via describeStatusReason()/
+  // inline formatting, and only ever passes the RESULT down as a prop.
+  contactRecordServer: {
+    ownerHintOldestConnection: (date: string) => `Conexión más antigua (${date})`,
+    hunterHint: (confidence: number, updatedByName: string, date: string) =>
+      `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
+    statusReasonSourceEmail: "se envió un correo",
+    statusReasonSourceMeeting: "se registró una reunión",
+    statusReasonSourceStatusChange: "se registró un cambio de estado",
+    statusReasonSourceDiscard: "se descartó el contacto",
+    statusReasonSourceNote: "se agregó una nota",
+    statusReasonSourceHunter: "se encontró un correo",
+    statusReasonSourceConnectionReplied: (bdName: string) =>
+      `se recibió una respuesta de LinkedIn en la conversación de ${bdName}`,
+    statusReasonSourceConnectionSent: (bdName: string) =>
+      `se envió un mensaje de LinkedIn en la conversación de ${bdName}`,
+    statusReasonSentence: (statusLabel: string, sourceDescription: string, dateLabel: string) =>
+      `${statusLabel} porque ${sourceDescription} el ${dateLabel}.`,
+    timelineLockedOwnedBy: (bdName: string) =>
+      `Esta conversación pertenece a ${bdName}. Se puede ver que existe y cuándo ocurrió; su contenido es privado para ${bdName} (y los administradores).`,
+    adminAuditAlertBody: (bdName: string) => `Esta visualización quedó registrada en el registro de auditoría (conversación de ${bdName}).`,
+    hiringBadge: (count: number) => `Contratando · ${count} puestos de IT`,
+    companyContactCount: (count: number) => `${count} contactos en esta empresa`,
+    conversationHistorySummary: (count: number, dateLabel: string) => `${count} mensajes · último ${dateLabel}`,
+    lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
+    touchpointsFoot: (linkedin: number, email: number, notes: number) =>
+      `${linkedin} LinkedIn · ${email} correos · ${notes} notas`,
+    openTaskLine: (title: string, dateLabel: string, assignedToName: string) =>
+      `${title} · vence ${dateLabel} · ${assignedToName}`,
+    hiringSignalText: (companyName: string, count: number) =>
+      `${companyName} tiene ${count} puestos de IT abiertos.`,
+    hiringSignalNewLast7Days: (count: number) => ` Publicó ${count} nuevos puestos esta semana.`,
+    mergeCardBody: (count: number) => `${count} registros combinados durante la migración.`,
   },
 
   adminConversation: {

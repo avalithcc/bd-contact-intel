@@ -4,8 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import type { EditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
+import { statusBadgeClass } from "@/lib/contacts/statusBadge";
+import { InfoIcon, EditPencilIcon } from "@/components/icons";
 import { updateContactOwnerAction, updateContactPropertyAction } from "../actions";
-import styles from "./AboutPane.module.css";
 
 export interface AboutPaneProperty {
   key: EditablePersonProperty;
@@ -22,6 +25,9 @@ export interface OwnerOption {
 export interface PropertyListProps {
   personId: string;
   labels: ContactRecordLabels;
+  statusLabel: string;
+  statusValue: string;
+  statusReasonText: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
   // R3 (design.md): reassignment is only allowed while the person has no
@@ -30,22 +36,38 @@ export interface PropertyListProps {
   // disabled instead of silently letting a doomed request through.
   ownerLocked: boolean;
   ownerOptions: OwnerOption[];
+  ownerHint: string | null;
+  emailVerified: boolean;
+  hunterHint: string | null;
+  sourceText: string | null;
+  createdText: string;
   properties: AboutPaneProperty[];
 }
 
 /**
- * Editable-properties list of the Contact record shell (task 9.4): the
- * `owner` row — editable since task 13.3 (single-record reassignment,
- * reusing the list's bulk "Asignar responsable" R3 rule) — plus one
- * inline-editable row per allow-listed property.
+ * Editable-properties list of the Contact record shell (task 9.4, mockup-
+ * port r02 markup rework onto design-system.css's `.props`/`.prop`/
+ * `.owner-chip` classes — contact-record.html:75-87). Leads with the
+ * read-only derived "Estado" row (contact-record spec: status is never
+ * edited directly), then the editable `owner` row (task 13.3), then one
+ * inline-editable row per allow-listed property, then the read-only
+ * "Origen"/"Creado" rows.
  */
 export function PropertyList({
   personId,
   labels: l,
+  statusLabel,
+  statusValue,
+  statusReasonText,
   ownerLabel,
   ownerBdId,
   ownerLocked,
   ownerOptions,
+  ownerHint,
+  emailVerified,
+  hunterHint,
+  sourceText,
+  createdText,
   properties,
 }: PropertyListProps) {
   const router = useRouter();
@@ -57,15 +79,27 @@ export function PropertyList({
   const [ownerDraft, setOwnerDraft] = useState(ownerBdId ?? "");
 
   return (
-    <dl className={styles.props}>
-      <div className={styles.prop}>
+    <dl className="props">
+      <div className="prop derived">
+        <dt>{l.propStatus}</dt>
+        <dd>
+          <span className={statusBadgeClass(statusValue)}>{statusLabel}</span>
+        </dd>
+        {statusReasonText && (
+          <dd className="why">
+            <InfoIcon className="icon" /> {statusReasonText}
+          </dd>
+        )}
+      </div>
+
+      <div className="prop">
         <dt id="contact-prop-owner-label">{l.propOwner}</dt>
         {ownerEditing ? (
           <>
             <dd>
               <select
                 aria-labelledby="contact-prop-owner-label"
-                className={styles.input}
+                className="input"
                 value={ownerDraft}
                 onChange={(e) => setOwnerDraft(e.target.value)}
                 disabled={busy}
@@ -80,13 +114,14 @@ export function PropertyList({
               </select>
             </dd>
             {ownerError && (
-              <dd className={styles.error} role="alert">
+              <dd className="error-text" role="alert">
                 {ownerError}
               </dd>
             )}
-            <dd className={styles.editRow}>
+            <dd className="row">
               <button
                 type="button"
+                className="btn btn-secondary btn-sm"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);
@@ -108,6 +143,7 @@ export function PropertyList({
               </button>
               <button
                 type="button"
+                className="btn btn-ghost btn-sm"
                 disabled={busy}
                 onClick={() => {
                   setOwnerError(null);
@@ -121,21 +157,32 @@ export function PropertyList({
           </>
         ) : (
           <dd>
-            {ownerLabel ?? l.emptyValue}
+            {ownerLabel ? (
+              <span className="owner-chip">
+                <Avatar id={ownerBdId ?? ownerLabel} initials={initialsFromName(ownerLabel)} variant="bd" size="sm" />
+                {ownerLabel}
+              </span>
+            ) : (
+              l.emptyValue
+            )}
             {!ownerLocked && (
-              <button type="button" className={styles.editIcon} onClick={() => setOwnerEditing(true)}>
-                {l.edit}
+              <button type="button" className="edit" onClick={() => setOwnerEditing(true)} aria-label={l.edit}>
+                <EditPencilIcon className="icon" />
               </button>
             )}
           </dd>
         )}
-        {ownerLocked && <dd className={styles.hint}>{l.ownerLockedNote}</dd>}
+        {ownerLocked && <dd className="hint">{l.ownerLockedNote}</dd>}
+        {!ownerLocked && ownerHint && <dd className="hint">{ownerHint}</dd>}
       </div>
+
       {properties.map((prop) => (
         <PropertyRow
           key={prop.key}
           labels={l}
           prop={prop}
+          emailVerified={prop.key === "email" && emailVerified}
+          hunterHint={prop.key === "email" ? hunterHint : null}
           editing={editingKey === prop.key}
           busy={busy}
           error={editingKey === prop.key ? error : null}
@@ -167,6 +214,18 @@ export function PropertyList({
           }}
         />
       ))}
+
+      {sourceText && (
+        <div className="prop">
+          <dt>{l.propSource}</dt>
+          <dd>{sourceText}</dd>
+        </div>
+      )}
+
+      <div className="prop">
+        <dt>{l.propCreated}</dt>
+        <dd className="soft">{createdText}</dd>
+      </div>
     </dl>
   );
 }
@@ -174,6 +233,8 @@ export function PropertyList({
 function PropertyRow({
   labels: l,
   prop,
+  emailVerified,
+  hunterHint,
   editing,
   busy,
   error,
@@ -183,6 +244,8 @@ function PropertyRow({
 }: {
   labels: ContactRecordLabels;
   prop: AboutPaneProperty;
+  emailVerified: boolean;
+  hunterHint: string | null;
   editing: boolean;
   busy: boolean;
   error: string | null;
@@ -195,25 +258,29 @@ function PropertyRow({
 
   if (editing) {
     return (
-      <div className={styles.prop}>
+      <div className="prop">
         <dt id={`${inputId}-label`}>{prop.label}</dt>
         <dd>
           <input
             id={inputId}
             aria-labelledby={`${inputId}-label`}
-            className={styles.input}
+            className="input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={busy}
             autoFocus
           />
         </dd>
-        {error && <dd className={styles.error} role="alert">{error}</dd>}
-        <dd className={styles.editRow}>
-          <button type="button" onClick={() => onSave(draft)} disabled={busy}>
+        {error && (
+          <dd className="error-text" role="alert">
+            {error}
+          </dd>
+        )}
+        <dd className="row">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onSave(draft)} disabled={busy}>
             {l.save}
           </button>
-          <button type="button" onClick={onCancel} disabled={busy}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
         </dd>
@@ -222,15 +289,20 @@ function PropertyRow({
   }
 
   return (
-    <div className={styles.prop}>
+    <div className="prop">
       <dt>{prop.label}</dt>
       <dd>
         {prop.value ?? l.emptyValue}
-        <button type="button" className={styles.editIcon} onClick={onStartEdit}>
-          {l.edit}
+        {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
+        <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
+          <EditPencilIcon className="icon" />
         </button>
       </dd>
-      {prop.lastUpdatedLabel && <dd className={styles.hint}>{prop.lastUpdatedLabel}</dd>}
+      {hunterHint ? (
+        <dd className="hint">{hunterHint}</dd>
+      ) : (
+        prop.lastUpdatedLabel && <dd className="hint">{prop.lastUpdatedLabel}</dd>
+      )}
     </div>
   );
 }
