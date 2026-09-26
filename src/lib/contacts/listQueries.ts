@@ -129,6 +129,39 @@ export async function getContactListPage(
 }
 
 /**
+ * Fetches the same row shape as getContactListPage, but for an explicit set
+ * of ids (bulk "Exportar", task 13.2) instead of a filtered/paginated view —
+ * the export always reflects exactly the rows the BD checked, not the
+ * active view's filters. Excludes merged-away rows (design D1/D6), same as
+ * every other read. No `total`/pagination — ids.length IS the row count,
+ * already capped by sanitizeBulkPersonIds (MAX_BULK_SELECTION) upstream.
+ */
+export async function getContactListRowsByIds(ids: string[]): Promise<ContactListRow[]> {
+  if (!ids.length) return [];
+  return db
+    .select({
+      id: person.id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      jobTitle: person.jobTitle,
+      company: person.company,
+      ownerBdId: person.ownerBdId,
+      ownerName: bd.name,
+      status: person.status,
+      email: person.email,
+      emailStatus: person.emailStatus,
+      roleGroup: person.roleGroup,
+      industry: person.industry,
+      country: person.country,
+      sourceKey: person.sourceKey,
+      createdAt: person.createdAt,
+    })
+    .from(person)
+    .leftJoin(bd, eq(bd.id, person.ownerBdId))
+    .where(and(sql`${person.mergedIntoId} is null`, inArray(person.id, ids)));
+}
+
+/**
  * Per-view result counts for the tab badges (mockup: "Todos los
  * contactos<span class='count'>16,642</span>"). One count query per system
  * view — small, fixed number of views, each hitting an indexed column.

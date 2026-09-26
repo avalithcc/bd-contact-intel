@@ -904,6 +904,7 @@ export const en = {
     bulkCancel: "Cancel",
     bulkTaskTitleLabel: "Task title",
     bulkTaskDueLabel: "Due date",
+    bulkExport: "Export",
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

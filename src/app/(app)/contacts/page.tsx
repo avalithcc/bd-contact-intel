@@ -274,6 +274,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           view={activeView.viewKey}
           q={sp.q}
           page={currentPage}
+          columns={visibleColumns}
         >
           <div className={styles.tableWrap}>
             <table className={styles.table}>

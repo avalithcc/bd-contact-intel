@@ -790,6 +790,7 @@ export const es: typeof en = {
     bulkCancel: "Cancelar",
     bulkTaskTitleLabel: "Título de la tarea",
     bulkTaskDueLabel: "Vencimiento",
+    bulkExport: "Exportar",
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

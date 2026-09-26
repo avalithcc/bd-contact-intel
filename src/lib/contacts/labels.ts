@@ -36,6 +36,7 @@ export type BulkActionsLabels = ClientStrings<
     | "bulkCancel"
     | "bulkTaskTitleLabel"
     | "bulkTaskDueLabel"
+    | "bulkExport"
   >
 >;
 
@@ -53,6 +54,7 @@ export function pickBulkActionsLabels(dict: Dictionary): BulkActionsLabels {
     bulkCancel: l.bulkCancel,
     bulkTaskTitleLabel: l.bulkTaskTitleLabel,
     bulkTaskDueLabel: l.bulkTaskDueLabel,
+    bulkExport: l.bulkExport,
   };
 }
 
