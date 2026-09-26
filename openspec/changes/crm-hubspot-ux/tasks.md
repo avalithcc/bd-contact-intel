@@ -159,11 +159,11 @@ Chain strategy: feature-branch-chain
 
 ## Phase 10: Record — Timeline & Log Dialogs (PR 10, base: PR 9)
 
-- [ ] 10.1 Middle timeline pane: filterable by activity type; renders `note`, `email_sent`, `hunter_lookup`, `status_change` (read-only), `meeting_logged`, `discarded`, `status_backfill`.
-- [ ] 10.2 "Log meeting" dialog (Registrar reunión) writing `meeting_logged` activity.
-- [ ] 10.3 "Discard contact" dialog with fixed reason codes (`wrong_profile`/`not_interested`/`other_vendor`/`left_company`/`bad_data`/`other`); `note` required when reason is `other`.
-- [ ] 10.4 RED/GREEN: discard reason validation — `other` without a note is rejected.
-- [ ] 10.5 Board drag-to-status opens the matching log dialog instead of writing status directly (proposal Implications).
+- [x] 10.1 Middle timeline pane: filterable by activity type; renders `note`, `email_sent`, `hunter_lookup`, `status_change` (read-only), `meeting_logged`, `discarded`, `status_backfill`. PR **10a** (branch `feat/crm-hubspot-ux-10a-timeline`, base 09d). `src/lib/activity/queries.ts#getPersonTimeline` + `src/lib/activity/timelineVisibility.ts` (pure, RED/GREEN) + `src/app/(app)/contacts/[id]/Timeline.tsx`. Filter chips are plain links to `?activityType=`, server re-fetches — no new client JS. `email_sent` from a BD other than the viewer is redacted (locked marker) for every viewer including admins until Phase 11's audited bypass (task 11.3) ships — documented interim R6 default, never over-reveals.
+- [x] 10.2 "Log meeting" dialog (Registrar reunión) writing `meeting_logged` activity. PR **10b** (branch `feat/crm-hubspot-ux-10b-meeting-discard`, base 10a). `src/lib/contacts/meeting.ts#planMeeting` (pure, RED/GREEN) + `logContactMeetingAction`. Rendered as the existing inline composer pattern (Nota/Correo/Tarea), not a modal overlay — matches this codebase's established QuickActions convention over the mockup's overlay chrome.
+- [x] 10.3 "Discard contact" dialog with fixed reason codes (`wrong_profile`/`not_interested`/`other_vendor`/`left_company`/`bad_data`/`other`); `note` required when reason is `other`. PR **10b**. `src/lib/contacts/discard.ts#planDiscard` + `discardContactAction`. Labels use the owner-confirmed Spanish strings (sdd/crm-hubspot-ux/design-decisions).
+- [x] 10.4 RED/GREEN: discard reason validation — `other` without a note is rejected. PR **10b**. `tests/unit/discard.test.ts`.
+- [ ] 10.5 Board drag-to-status opens the matching log dialog instead of writing status directly (proposal Implications). **Deferred to Phase 14**: the only existing board (`src/app/(app)/leads/LeadsBoard.tsx`) drags cards on the legacy `lead` table via `updateLeadStatusAction`, not on the unified `person`/activity model the Phase 10 dialogs write to; that page is itself redirected away in task 13.3. The Contacts board is task 14.1. Wiring drag-to-status-opens-dialog onto the legacy board would be thrown away, not reused.
 
 ## Phase 11: Record — Associations, Admin View, Redirects (PR 11, base: PR 10)
 
