@@ -611,36 +611,6 @@ a:hover {
   pointer-events: none;
 }
 
-/* ---- locale switcher ---- */
-.locale-switcher {
-  display: inline-flex;
-  gap: var(--space-2xs);
-  margin: 0;
-}
-.locale-btn {
-  padding: 0.5rem 0.65rem;
-  font-family: var(--font-mono);
-}
-.locale-btn.active {
-  color: var(--color-ink);
-  border-color: var(--color-accent);
-}
-
-/* ---- theme switcher (Light / Dark / System, in the user menu) ---- */
-.theme-switcher {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-2xs);
-  margin: 0;
-}
-.theme-btn {
-  padding: 0.5rem 0.65rem;
-}
-.theme-btn.active {
-  color: var(--color-ink);
-  border-color: var(--color-accent);
-}
-
 /* ---- back button (header, icon-only "go back") ---- */
 .back-btn {
   display: inline-flex;
@@ -718,21 +688,6 @@ a:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.user-menu-locale {
-  display: flex;
-  justify-content: flex-start;
-}
-.user-menu-theme {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-}
-.user-menu-section-label {
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .user-menu-item {
   display: block;
@@ -1030,126 +985,6 @@ a:hover {
   }
 }
 
-/* ---- detail fields ---- */
-.field {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: var(--space-lg);
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.field:last-child {
-  border-bottom: none;
-}
-.field-label {
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--color-ink-soft);
-}
-.field-value {
-  font-size: 0.92rem;
-  word-break: break-word;
-}
-.field-value.empty {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  font-style: italic;
-}
-
-/* Suggested (unverified) email on the contact detail page — see
- * src/lib/emailSuggestion.ts. Reuses --color-accent/--color-badge-accent-bg
- * (same tokens as .badge) so it reads as "flagged, not confirmed" rather
- * than a real value, consistently in both light and dark themes. */
-.suggestion-value {
-  font-family: var(--font-mono);
-  color: var(--color-accent);
-  background: var(--color-badge-accent-bg);
-  border-radius: var(--radius-sm);
-  padding: 0.1rem 0.4rem;
-  display: inline-block;
-}
-.suggestion-note {
-  display: block;
-  margin-top: 0.3rem;
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-}
-
-/* ---- conversation history (contact detail) ---- */
-.thread-notice {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  background: var(--color-surface-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.55rem 0.8rem;
-  margin: 0 0 var(--space-lg);
-}
-.thread {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-lg);
-  overflow: hidden;
-}
-.thread:last-child {
-  margin-bottom: 0;
-}
-.thread-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  background: var(--color-surface-1);
-  border-bottom: 1px solid var(--color-border);
-  padding: 0.6rem 0.9rem;
-}
-.thread-title {
-  font-weight: 700;
-  font-size: var(--text-base);
-}
-.thread-meta {
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-.thread-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  padding: 0.9rem;
-}
-.message {
-  min-width: 0;
-}
-.message-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-sm);
-  margin-bottom: 0.25rem;
-}
-.message-sender {
-  font-weight: 600;
-  font-size: var(--text-base);
-}
-.message-time {
-  font-size: 0.75rem;
-}
-.message-content {
-  font-size: var(--text-md);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-@media (max-width: 560px) {
-  .thread-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
 /* =========================================================================
    Layout & spacing utilities
    Small, composable classes that replace one-off inline `style={{...}}`
@@ -1187,9 +1022,6 @@ a:hover {
 .mb-lg {
   margin-bottom: var(--space-lg);
 }
-.mb-2xl {
-  margin-bottom: var(--space-2xl);
-}
 .mb-3xl {
   margin-bottom: var(--space-3xl);
 }
@@ -1211,9 +1043,6 @@ a:hover {
 
 .form-narrow {
   max-width: 25rem; /* 400px */
-}
-.detail-narrow {
-  max-width: 45rem; /* 720px */
 }
 
 .inline-block {
@@ -1498,16 +1327,6 @@ main {
   color: var(--color-ink);
   white-space: nowrap;
 }
-.avatar-stack {
-  display: inline-flex;
-}
-.avatar-stack .avatar {
-  box-shadow: 0 0 0 2px var(--color-surface-2);
-}
-.avatar-stack .avatar + .avatar {
-  margin-left: -6px;
-}
-
 /* ---- dialog (src/components/Dialog.tsx) ---- */
 .overlay {
   position: fixed;

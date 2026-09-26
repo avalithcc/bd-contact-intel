@@ -9,6 +9,8 @@ import {
   type DuplicateCandidateDetail,
   type DuplicateCandidateSidePerson,
 } from "@/lib/identity/duplicateReviewQueries";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
 import { mergeDuplicateCandidateAction, markNotDuplicateAction, unmergeDuplicateAction } from "./actions";
@@ -69,8 +71,18 @@ function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; 
           <thead>
             <tr>
               <th></th>
-              <th>Ficha A · {detail.personA.name}</th>
-              <th>Ficha B · {detail.personB.name}</th>
+              <th>
+                <div className="row">
+                  <Avatar id={detail.personA.id} initials={initialsFromName(detail.personA.name)} size="sm" />
+                  <span>Ficha A · {detail.personA.name}</span>
+                </div>
+              </th>
+              <th>
+                <div className="row">
+                  <Avatar id={detail.personB.id} initials={initialsFromName(detail.personB.name)} size="sm" />
+                  <span>Ficha B · {detail.personB.name}</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -189,15 +201,19 @@ export default async function DuplicatesAdminPage({
 
   return (
     <main>
-      <div className="eyebrow">{dict.eyebrow}</div>
-      <div className="row between">
-        <h1 className="m-0">
-          {dict.title}
-          <span className="dot">.</span>
-        </h1>
-        <span className="badge">{dict.adminOnlyBadge}</span>
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{dict.eyebrow}</div>
+          <h1 className="m-0">
+            {dict.title}
+            <span className="dot">.</span>
+          </h1>
+          <p className="soft">{dict.subtitle(list.total)}</p>
+        </div>
+        <div className="actions">
+          <span className="badge">{dict.adminOnlyBadge}</span>
+        </div>
       </div>
-      <p className="soft">{dict.subtitle(list.total)}</p>
 
       {isActionErrorReason(actionError) && (
         <section className="panel">

@@ -969,6 +969,7 @@ export const es: typeof en = {
   // upload (previously only on `/leads`) behind the SAME identity resolver
   // the live cutover uses, showing a dedup outcome after each run.
   contactsImport: {
+    eyebrow: "Contactos",
     pageTitle: "Importar contactos",
     subtitle: "Conexiones de LinkedIn o una lista de leads (CSV).",
     connectionsCardTitle: "Conexiones de LinkedIn",
