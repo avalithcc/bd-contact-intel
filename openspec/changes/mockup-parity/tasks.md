@@ -1,0 +1,80 @@
+# Tasks — mockup-parity
+
+Source of truth: `openspec/changes/crm-hubspot-ux/mockups/` (styles.css,
+design-system.html, per-screen HTMLs, GLOSSARY.md for copy) and `DESIGN.md`
+(tokens). Mockups are owner-approved; where a mockup token value differs from
+`DESIGN.md` (avatar palette, accent hover contrast), the mockup wins and
+`DESIGN.md` is updated to match — see `design-system.html`'s own "Cambio
+respecto de DESIGN.md" alert, which documents that the darker hover
+(`#b81f27`, 6.44:1) and darker avatar colors (`#7a6653`, `#8a5a2b`,
+`#3f6f5f`, `#4b6380`) are the approved AA fix, not a proposal pending review.
+
+Audit performed against production (`origin/main`, no uncommitted local
+state) on 2026-09-26.
+
+## Phase 1 — Shell fixes (branch `feat/mockup-parity-01-shell-fixes`)
+
+- [x] 1.1 Remove the duplicate `<div className="header"><span className="logo">...` block from `/hiring`, `/discovery`, `/whats-new` — the app shell (`(app)/layout.tsx` → `Sidebar`) already renders the logo; these pages currently render it a second time inside `<main>` (visible bug in prod). Keep the `row row-md` nav/account content as a direct child of `<main>` — those controls (BackButton, cross-links, UserMenu) aren't migrated onto the shell TopBar yet (out of scope here; see Phase 6).
+  - Note: `/outreach` has the identical bug but is intentionally excluded — it's mid-flight to a redirect-only page in another PR (`feat/crm-hubspot-ux-15b-outreach-redirect`, not yet merged to `origin/main`); touching it here would conflict.
+- [x] 1.2 Add missing design tokens to `src/app/globals.css` per `mockups/styles.css` and `DESIGN.md`:
+  - `--color-ink-subtle: #6e6b78` (meta text/placeholders, 5.2:1)
+  - `--color-accent-strong` and `--color-accent-press` — aliased to existing values rather than inventing unreviewed hex: `--color-accent-strong: var(--color-accent-focus)` (mockup's approved darker hover, `#b81f27`, already equals our existing `--color-accent-focus`), `--color-accent-press: #9c1a21` (mockup's approved pressed state — part of the owner-approved mockup, not a new proposal)
+  - `--color-overlay: rgba(23, 21, 28, 0.42)`
+  - `--color-on-dark`, `--color-on-dark-hover`, `--color-on-dark-sep`, `--color-on-dark-success`, `--color-on-dark-link`
+  - `--shadow-dialog: 0 24px 48px rgba(23, 21, 28, 0.2)`
+  - `--focus-ring: 0 0 0 2px var(--color-surface-2), 0 0 0 4px var(--color-accent-strong)`
+  - `--radius-lg: 12px`
+  - `--record-left: 320px`, `--record-right: 300px`
+  - `--avatar-1` through `--avatar-6` (mockup's darkened AA-safe values: `#6b5b95, #7a6653, #88398a, #8a5a2b, #3f6f5f, #4b6380`)
+- [x] 1.3 Update `DESIGN.md`'s token table and avatar palette to match the values added in 1.2 (avatar-2/4/5/6 were stale pastel values that fail AA for white initials text; document the accent-strong/press aliasing decision).
+
+## Phase 2 — Shared primitives (branch `feat/mockup-parity-02-components`, chained on phase 1)
+
+- [x] 2.1 `Avatar` component (`src/components/Avatar.tsx` + pure palette-selection function, unit-tested RED→GREEN): deterministic `avatar-1..6` class from a stable id (e.g. contact/BD id), renders initials, supports circle (contact) vs rounded-square (`avatar-bd`) per `design-system.html`.
+- [x] 2.2 Shared `Dialog` component (`src/components/Dialog.tsx`): overlay + `aria-modal`, focus trap, Esc to close, returns focus to the trigger on close, matches `.overlay`/`.dialog` classes and structure from `design-system.html`/`styles.css`.
+- [ ] 2.3 Shared `Toast` component (`src/components/Toast.tsx` + a toast region/provider): on-dark tokens, `role="status"`, `aria-live="polite"`, matches `.toast`/`.toast-region` classes.
+- [ ] 2.4 Wire `Toast` region into the app shell (`(app)/layout.tsx`) so any page can trigger a toast without its own ad hoc implementation.
+
+## Phase 3 — TopBar + Sidebar parity (new branch, chained on phase 2)
+
+- [ ] 3.1 TopBar "Crear" menu (uses `Dialog`/dropdown patterns from `design-system.html`).
+- [ ] 3.2 TopBar account/avatar menu (replaces ad hoc `UserMenu` per-page instances where the shell already covers it).
+- [ ] 3.3 Sidebar nav icons + item counts per mockup.
+
+## Phase 4 — Contacts list + record quick actions
+
+- [ ] 4.1 Contacts list avatars + owner chips (`Avatar` component from 2.1).
+- [ ] 4.2 Record quick actions (discard, log meeting, etc.) migrated to `Dialog` (2.2) instead of ad hoc modals.
+- [ ] 4.3 Board move-confirm dialog using `Dialog`.
+
+## Phase 5 — Account pages
+
+- [ ] 5.1 Redesign `/account`, `/account/password` pages per mockups (`account.html`, `account-password.html`, `account-email.html`).
+- [ ] 5.2 Spanish copy pass via `GLOSSARY.md`.
+
+## Phase 6 — Legacy page restyle
+
+- [ ] 6.1 `/hiring`, `/discovery`, `/whats-new` full restyle (beyond the Phase 1 header fix): migrate remaining ad hoc modals/dropdowns to `Dialog`/`Toast`, adopt shared `Avatar` where applicable.
+- [ ] 6.2 `/tasks`, `/companies`, company record restyle + modal migration.
+
+## Phase 7 — Duplicates / import / migration polish
+
+- [ ] 7.1 `/duplicates`, `/import`, migration dry-run screens — visual parity + `Dialog`/`Toast` adoption.
+
+## Review Workload Forecast
+
+| Phase | Est. changed lines | Chained PR? | Notes |
+|---|---|---|---|
+| 1 | ~120–180 | No (single PR) | 3 JSX unwraps + CSS token additions + DESIGN.md doc update |
+| 2 | ~350–420 | Borderline — kept to Avatar+Dialog only in this batch, Toast deferred to keep phase 2 batch ≤400 | New components + unit tests + CSS additions already covered by phase 1 |
+| 3 | ~250–350 | No | TopBar/Sidebar markup + CSS, no new primitives |
+| 4 | ~300–400 | Maybe | Depends on how many quick-action modals exist |
+| 5 | ~200–300 | No | Two pages, mostly markup/CSS + copy |
+| 6 | ~400–600 | Yes | 5 legacy pages, likely 2 PRs |
+| 7 | ~200–300 | No | 3 screens, smaller surface |
+
+`400-line budget risk: Medium` (phase-dependent, phases 6 and possibly 4 are the risk points)
+`Chained PRs recommended: Yes` (already reflected in the phase/branch split above)
+`Decision needed before apply: No` (phase 1–2 boundary already fits `feature-branch-chain`; later phases will re-forecast per branch)
+
+Chain strategy: `feature-branch-chain` (per delivery instructions) — phase branches target the previous phase's branch; a tracker PR (not created in this batch) aggregates to `main`.
