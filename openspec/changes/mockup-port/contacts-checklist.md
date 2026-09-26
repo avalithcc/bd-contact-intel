@@ -31,7 +31,7 @@ Columns: element | mockup | status | evidence | notes
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
 | 6 system view tabs | contacts.html:75 | done | src/lib/contacts/views.ts SYSTEM_VIEWS, page.tsx:360-370 | Outreach tab has no count badge — pre-existing, owner-approved deviation (2026-09-26). |
-| "Guardar vista" | contacts.html:75 | deviation | page.tsx:399-420 | Renders as a `.dropdown`/`.menu` (much closer to the mockup's affordance than a plain inline form), but still an inline form inside the menu, not the `#save-view` modal `.overlay` dialog with the "Incluye" chip/columns-count summary. |
+| "Guardar vista" | contacts.html:75 | **done (branch 11)** | src/app/(app)/contacts/SaveViewDialog.tsx, src/lib/contacts/filterChips.ts `buildSaveViewSummary` | Now a real modal via the shared Dialog component, with the mockup's "Incluye" chip summary (reuses the same `activeFilterChips` the toolbar chips use, plus a "Columnas: N" line) and help text. Submission is the same unchanged `createSavedViewAction`. |
 | Saved view tabs (BD's own) | — | done | page.tsx:383-398, src/lib/contacts/savedViews.ts | Includes a delete ("×") affordance the mockup doesn't show a state for. |
 
 ## Toolbar — filter chips + "Agregar filtro"
@@ -107,7 +107,7 @@ Columns: element | mockup | status | evidence | notes
 
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
-| Name field, "Incluye" chip summary, help text | contacts.html:271-273 | deviation | page.tsx:399-420, src/lib/contacts/savedViews.ts | Functionally covered (name + current filters serialized) inside a dropdown menu, not a modal dialog, and without the "Incluye" chip/columns-count preview. |
+| Name field, "Incluye" chip summary, help text | contacts.html:271-273 | **done (branch 11)** | SaveViewDialog.tsx, src/lib/contacts/savedViews.ts | Real modal (shared Dialog), name field, "Incluye" chip summary + columns count, help text — matches the mockup. |
 
 ## Board (contacts-board.html)
 

@@ -59,3 +59,17 @@ export function buildActiveFilterChips(filters: ContactFilters, ctx: FilterChipC
 
   return chips;
 }
+
+/**
+ * "Incluye" summary for the "Guardar vista" modal (mockups/contacts.html
+ * `#save-view`: "Estado: Nuevo, Contactado", "Grupo de rol: ... +2",
+ * "Columnas: 8"). One line per active filter chip, plus a trailing
+ * "Columnas: N" line — always present, even with zero active filters,
+ * since the mockup's dialog always shows a columns count.
+ */
+export function buildSaveViewSummary(chips: FilterChip[], columnsCount: number, columnsLabel = "Columnas"): string[] {
+  return [
+    ...chips.map((chip) => (chip.valueText === null ? chip.label : `${chip.label}: ${chip.valueText}`)),
+    `${columnsLabel}: ${columnsCount}`,
+  ];
+}

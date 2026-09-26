@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildActiveFilterChips, type FilterChipContext } from "@/lib/contacts/filterChips";
+import { buildActiveFilterChips, buildSaveViewSummary, type FilterChipContext } from "@/lib/contacts/filterChips";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 
 const ctx: FilterChipContext = {
@@ -68,4 +68,19 @@ test("buildActiveFilterChips: lastActivityDays renders a human 'últimos N días
 test("buildActiveFilterChips: bdConnected resolves through bdName", () => {
   const chips = buildActiveFilterChips({ bdConnected: "bd-1" }, ctx);
   assert.deepEqual(chips, [{ field: "bdConnected", label: "BD conectado", valueText: "BD bd-1" }]);
+});
+
+test("buildSaveViewSummary: 'Incluye' chip texts (mockup #save-view: 'Estado: Nuevo, Contactado', 'Columnas: 8') plus a trailing Columnas count", () => {
+  const chips = buildActiveFilterChips({ status: ["new", "contacted"], owner: "me" }, ctx);
+  const summary = buildSaveViewSummary(chips, 8);
+  assert.deepEqual(summary, ["Responsable: Yo", "Estado: Nuevo, Contactado", "Columnas: 8"]);
+});
+
+test("buildSaveViewSummary: a boolean chip with no value text renders as just its label", () => {
+  const summary = buildSaveViewSummary([{ field: "hiring", label: "Empresa con vacantes abiertas", valueText: null }], 4);
+  assert.deepEqual(summary, ["Empresa con vacantes abiertas", "Columnas: 4"]);
+});
+
+test("buildSaveViewSummary: no active filters still shows the Columnas count", () => {
+  assert.deepEqual(buildSaveViewSummary([], 4), ["Columnas: 4"]);
 });

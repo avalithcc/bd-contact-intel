@@ -32,9 +32,11 @@ import {
 } from "@/lib/contacts/columns";
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
 import { buildActiveFilterChips, type FilterChip } from "@/lib/contacts/filterChips";
-import { createSavedViewAction, deleteSavedViewAction } from "./viewActions";
+import { deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
 import { NewContactDialog, type NewContactDialogLabels } from "./NewContactDialog";
+import { SaveViewDialog } from "./SaveViewDialog";
+import { buildSaveViewSummary } from "@/lib/contacts/filterChips";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickBulkActionsLabels } from "@/lib/contacts/labels";
 import { BulkActionsBar } from "./BulkActionsBar";
@@ -474,6 +476,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   }
 
   const currentFiltersQuery = serializeContactFilters(effectiveFilters).toString();
+  const saveViewSummaryChips = buildSaveViewSummary(activeFilterChips, visibleColumns.length, l.saveViewColumnsLabel);
 
   return (
     <main className="page">
@@ -546,28 +549,19 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             </form>
           </span>
         ))}
-        <details className="dropdown">
-          <summary className="view-tab add">
-            {l.saveView}
-          </summary>
-          <form action={createSavedViewAction} className="menu">
-            <input type="hidden" name="filtersQuery" value={currentFiltersQuery} />
-            <label htmlFor="save-view-name" className="label">
-              {l.saveViewNameLabel}
-            </label>
-            <input
-              id="save-view-name"
-              className="input input-sm"
-              type="text"
-              name="name"
-              placeholder={l.saveViewNameLabel}
-              required
-            />
-            <button type="submit" className="btn btn-primary btn-sm mt-lg">
-              {l.saveView}
-            </button>
-          </form>
-        </details>
+        <SaveViewDialog
+          labels={{
+            triggerLabel: l.saveView,
+            title: l.saveViewDialogTitle,
+            nameLabel: l.saveViewNameLabel,
+            includesLabel: l.saveViewIncludesLabel,
+            helpText: l.saveViewHelp,
+            cancelLabel: l.newContactCancel,
+            saveLabel: l.saveView,
+          }}
+          filtersQuery={currentFiltersQuery}
+          summaryChips={saveViewSummaryChips}
+        />
       </nav>
 
       {!isOutreachView && !isBoard && (
