@@ -156,7 +156,9 @@ function summarizeNotes(notes: string[]): string | null {
   const sample = notes.slice(0, MAX_NOTES);
   const lines = sample.map((note) => {
     const content = note.length > MAX_NOTE_CHARS ? `${note.slice(0, MAX_NOTE_CHARS)}…` : note;
-    const safeContent = content.replaceAll("<<<CONTACT_NOTES", "<< <CONTACT_NOTES");
+    const safeContent = content
+      .replaceAll("<<<CONTACT_NOTES", "<< <CONTACT_NOTES")
+      .replaceAll("<<<CONVERSATION_HISTORY", "<< <CONVERSATION_HISTORY");
     return `- ${safeContent}`;
   });
   return lines.join("\n");

@@ -17,7 +17,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
-import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
+import { bulkAssignOwner, filterLivePersonIds } from "@/lib/contacts/bulkOwnerDb";
+import { isUuid } from "@/lib/uuid";
 import { sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { createTask } from "@/lib/tasks/queries";
 import type { NewTask } from "@/db/schema";
@@ -39,7 +40,9 @@ export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
   const rawIds = formData.getAll("personId");
   const sanitizedIds = sanitizeBulkPersonIds(rawIds);
   const wasLimited = rawIds.length > sanitizedIds.length;
-  const ownerBdId = String(formData.get("ownerBdId") ?? "") || null;
+  const rawOwner = String(formData.get("ownerBdId") ?? "");
+  const ownerBdId = rawOwner && isUuid(rawOwner) ? rawOwner : null;
+  if (rawOwner && !ownerBdId) redirect(backTo(formData, { bulkResult: "owner:0:0" }));
 
   const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id);
   const assigned = plan.filter((p) => p.outcome === "assigned").length;
@@ -69,7 +72,7 @@ export async function bulkCreateTaskAction(formData: FormData): Promise<void> {
 
   let created = 0;
   if (title) {
-    for (const personId of personIds) {
+    for (const personId of await filterLivePersonIds(personIds)) {
       await createTask({
         title,
         dueAt,

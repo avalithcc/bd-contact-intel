@@ -59,6 +59,8 @@ export async function GET(request: Request): Promise<Response> {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="contactos.csv"`,
+      // Personal data selected by id in the URL: never cache it anywhere.
+      "Cache-Control": "no-store",
     },
   });
 }

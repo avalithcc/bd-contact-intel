@@ -7,7 +7,7 @@
  * Not unit-tested directly (imports `db`) — planBulkOwnerAssignment
  * (bulkOwner.ts) carries the tested rule.
  */
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, person, personBdConnection, personPropertyHistory } from "@/db/schema";
 import {
@@ -25,10 +25,16 @@ export async function bulkAssignOwner(
   if (!personIds.length) return [];
 
   return db.transaction(async (tx) => {
+    // An owner id that isn't a real BD would only fail on the FK (a 500).
+    if (ownerBdId) {
+      const [owner] = await tx.select({ id: bd.id }).from(bd).where(eq(bd.id, ownerBdId));
+      if (!owner) return [];
+    }
+    // Merged-away persons are hidden everywhere; never write to them.
     const rows = await tx
       .select({ id: person.id, ownerBdId: person.ownerBdId })
       .from(person)
-      .where(inArray(person.id, personIds));
+      .where(and(inArray(person.id, personIds), isNull(person.mergedIntoId)));
     if (!rows.length) return [];
 
     const connectionRows = await tx
@@ -71,4 +77,15 @@ export async function bulkAssignOwner(
 
 export async function listOwnerOptions(): Promise<{ id: string; name: string }[]> {
   return db.select({ id: bd.id, name: bd.name }).from(bd).orderBy(asc(bd.name));
+}
+
+/** Keeps only live (not merged-away) persons, for bulk writes that don't go
+ * through the single-record merge guard. */
+export async function filterLivePersonIds(personIds: string[]): Promise<string[]> {
+  if (!personIds.length) return [];
+  const rows = await db
+    .select({ id: person.id })
+    .from(person)
+    .where(and(inArray(person.id, personIds), isNull(person.mergedIntoId)));
+  return rows.map((r) => r.id);
 }
