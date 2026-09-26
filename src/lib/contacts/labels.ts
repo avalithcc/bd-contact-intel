@@ -81,6 +81,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorNotFound;
     case "invalid_email":
       return l.errorInvalidEmail;
+    case "invalid_phone":
+      return l.errorInvalidPhone;
     case "not_editable":
       return l.errorNotEditable;
     case "gmail_not_connected":

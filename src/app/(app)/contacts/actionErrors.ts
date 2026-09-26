@@ -11,7 +11,7 @@
  */
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
-import { InvalidEmailError } from "@/lib/contacts/propertyEdit";
+import { InvalidEmailError, InvalidPhoneError } from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/contacts/discard";
 import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
@@ -21,6 +21,7 @@ export type ContactActionErrorReason =
   | "not_found"
   | "merged"
   | "invalid_email"
+  | "invalid_phone"
   | "not_editable"
   | "gmail_not_connected"
   | "gmail_reauth"
@@ -66,6 +67,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof ContactMergedError) return "merged";
   if (err instanceof ContactNotFoundError) return "not_found";
   if (err instanceof InvalidEmailError) return "invalid_email";
+  if (err instanceof InvalidPhoneError) return "invalid_phone";
   if (err instanceof PropertyNotEditableError) return "not_editable";
   if (err instanceof GmailSendError) {
     if (err.kind === "not_connected") return "gmail_not_connected";

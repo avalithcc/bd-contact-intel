@@ -615,6 +615,7 @@ export const en = {
     errorNotFound: "This contact could not be found.",
     errorMerged: "This contact was merged into another one. Open the current contact.",
     errorInvalidEmail: "That doesn't look like a valid email address.",
+    errorInvalidPhone: "That doesn't look like a valid phone number.",
     errorNotEditable: "This field can't be edited from this page.",
     errorGmailNotConnected: "Your Gmail account isn't connected. Connect it in Account › Email.",
     errorGmailReauth: "Gmail authorization has expired. Reconnect it in Account › Email.",

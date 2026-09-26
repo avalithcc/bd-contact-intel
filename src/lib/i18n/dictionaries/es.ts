@@ -512,6 +512,7 @@ export const es: typeof en = {
     errorNotFound: "No se encontró este contacto.",
     errorMerged: "Este contacto fue fusionado con otro. Abrir el contacto vigente.",
     errorInvalidEmail: "Ese valor no parece un correo electrónico válido.",
+    errorInvalidPhone: "Ese valor no parece un número de teléfono válido.",
     errorNotEditable: "Este campo no se puede editar desde esta página.",
     errorGmailNotConnected: "La cuenta de Gmail no está conectada. Conectarla en Cuenta › Correo.",
     errorGmailReauth: "La autorización de Gmail venció. Volver a conectarla en Cuenta › Correo.",
