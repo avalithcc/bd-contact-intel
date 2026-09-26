@@ -30,8 +30,8 @@ state) on 2026-09-26.
 
 ## Phase 2 — Shared primitives (branch `feat/mockup-parity-02-components`, chained on phase 1)
 
-- [x] 2.1 `Avatar` component (`src/components/Avatar.tsx` + pure palette-selection function, unit-tested RED→GREEN): deterministic `avatar-1..6` class from a stable id (e.g. contact/BD id), renders initials, supports circle (contact) vs rounded-square (`avatar-bd`) per `design-system.html`.
-- [x] 2.2 Shared `Dialog` component (`src/components/Dialog.tsx`): overlay + `aria-modal`, focus trap, Esc to close, returns focus to the trigger on close, matches `.overlay`/`.dialog` classes and structure from `design-system.html`/`styles.css`.
+- [x] 2.1 `Avatar` component (`src/components/Avatar.tsx` + pure palette-selection function, unit-tested RED→GREEN): deterministic `avatar-1..6` class from a stable id (e.g. contact/BD id), renders initials, supports circle (contact) vs rounded-square (`avatar-bd`) per `design-system.html`. DONE — `src/components/avatarPalette.ts` (pure fn, RED→GREEN in `tests/unit/avatarPalette.test.ts`) + `src/components/Avatar.tsx`.
+- [x] 2.2 Shared `Dialog` component (`src/components/Dialog.tsx`): overlay + `aria-modal`, focus trap, Esc to close, returns focus to the trigger on close, matches `.overlay`/`.dialog` classes and structure from `design-system.html`/`styles.css`. DONE.
 - [ ] 2.3 Shared `Toast` component (`src/components/Toast.tsx` + a toast region/provider): on-dark tokens, `role="status"`, `aria-live="polite"`, matches `.toast`/`.toast-region` classes.
 - [ ] 2.4 Wire `Toast` region into the app shell (`(app)/layout.tsx`) so any page can trigger a toast without its own ad hoc implementation.
 
