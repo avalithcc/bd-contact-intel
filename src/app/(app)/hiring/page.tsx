@@ -5,7 +5,6 @@ import { getCurrentBd } from "@/lib/queries";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate } from "@/lib/i18n/format";
-import { BackButton } from "../../BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,23 +32,11 @@ export default async function HiringPage({
 
   return (
     <main>
-      {/* No page-local logo/header here (tasks.md mockup-parity 1.1) — the
-          app shell ((app)/layout.tsx -> Sidebar) already renders it; this
-          row of page-specific nav/account controls hasn't migrated onto the
-          shell TopBar yet (see mockup-parity Phase 6). */}
-      <div className="row row-md">
-        <BackButton label={dict.common.goBack} fallbackHref="/" />
-        <Link className="secondary-btn" href="/outreach">
-          {dict.common.priorityOutreach}
-        </Link>
-        <Link className="secondary-btn" href="/whats-new">
-          {dict.common.whatsNew}
-        </Link>
-        <Link className="secondary-btn" href="/contacts">
-          {dict.common.leadsNav}
-        </Link>
-      </div>
-
+      {/* The page-local logo/header and cross-link nav row (BackButton +
+          Outreach/Novedades/Contactos secondary-btns) were removed here
+          (mockup-parity 6.1) — the app shell ((app)/layout.tsx -> Sidebar
+          + TopBar breadcrumb) already covers both: the sidenav lists this
+          same set of routes, and the breadcrumb shows where you are. */}
       <div className="mb-3xl">
         <div className="eyebrow">{dict.hiring.eyebrow}</div>
         <h1>

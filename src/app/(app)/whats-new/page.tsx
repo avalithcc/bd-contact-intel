@@ -9,7 +9,6 @@ import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime } from "@/lib/i18n/format";
-import { BackButton } from "../../BackButton";
 import { FilterCheckbox } from "./FilterCheckbox";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { generateOutreachMessage } from "../outreach/actions";
@@ -73,23 +72,10 @@ export default async function WhatsNewPage({
 
   return (
     <main>
-      {/* No page-local logo/header here (tasks.md mockup-parity 1.1) — the
-          app shell ((app)/layout.tsx -> Sidebar) already renders it; this
-          row of page-specific nav/account controls hasn't migrated onto the
-          shell TopBar yet (see mockup-parity Phase 6). */}
-      <div className="row row-md">
-        <BackButton label={dict.common.goBack} fallbackHref="/" />
-        <Link className="secondary-btn" href="/outreach">
-          {dict.common.priorityOutreach}
-        </Link>
-        <Link className="secondary-btn" href="/hiring">
-          {dict.common.hiringSignals}
-        </Link>
-        <Link className="secondary-btn" href="/contacts">
-          {dict.common.leadsNav}
-        </Link>
-      </div>
-
+      {/* The page-local logo/header and cross-link nav row (BackButton +
+          Outreach/Vacantes/Contactos secondary-btns) were removed here
+          (mockup-parity 6.1) — the app shell ((app)/layout.tsx -> Sidebar
+          + TopBar breadcrumb) already covers both. */}
       <div className="mb-3xl">
         <div className="eyebrow">{dict.whatsNew.eyebrow}</div>
         <h1>
