@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -33,8 +34,11 @@ import { recomputePersonStatuses } from "@/lib/status/recompute";
  * Resolves the current BD from the authenticated Supabase user, creating the
  * `bd` row on first sign-in. Callers run behind middleware that redirects
  * unauthenticated requests to /login, so a missing user is an error here.
+ *
+ * Wrapped in React `cache` so the app-shell layout and the page it renders
+ * share one auth lookup + query per request instead of repeating them.
  */
-export async function getCurrentBd() {
+export const getCurrentBd = cache(async function getCurrentBd() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -55,7 +59,7 @@ export async function getCurrentBd() {
     .onConflictDoUpdate({ target: bd.email, set: { email: user.email } })
     .returning();
   return created;
-}
+});
 
 /**
  * The authenticated Supabase auth user's id — distinct from `bd.id` (a
