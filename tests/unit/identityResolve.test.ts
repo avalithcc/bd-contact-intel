@@ -326,6 +326,20 @@ test("planIdentityWrites with default mergePolicy 'r7': every other field keeps 
   assert.equal(plan.existingUpdates[0].merged.company, "Acme");
 });
 
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's non-empty companyKey is NEVER overwritten, even by a differently-derived incoming key", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: "Acme", companyKey: "acme" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.companyKey, "acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's empty companyKey IS filled from the incoming row", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: null, companyKey: null })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.companyKey, "acme");
+});
+
 test("buildIdentityWriteRows: a new hubspot person's insert row carries migrationRunId, ownerBdId, city and country", () => {
   const rows = [
     row({

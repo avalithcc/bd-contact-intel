@@ -297,6 +297,12 @@ function mergeFields(
     // (there is nothing existing to fill against). Every other field (e.g.
     // jobTitle above) keeps its per-policy behavior unchanged.
     company: fillEmptyField(existing.company, incoming.company),
+    // companyKey follows company: it's only ever derived FROM company
+    // (rowAsMerged/candidateAsMerged), so it must use the exact same
+    // fill-empty rule as company — merging it independently (e.g. per
+    // mergePolicy like jobTitle) could let companyKey drift onto the
+    // incoming row's key while company itself stays frozen at the
+    // existing value, leaving the two out of sync on the same person.
     companyKey: fillEmptyField(existing.companyKey, incoming.companyKey),
     jobTitle,
     // Re-derived from the FINAL merged jobTitle, not merged independently
