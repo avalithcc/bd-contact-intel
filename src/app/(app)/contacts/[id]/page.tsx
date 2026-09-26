@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
@@ -15,12 +15,15 @@ import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { getCompanyByKey, getCompanyContactCount } from "@/lib/companies/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { splitEmail } from "@/lib/emailPatterns";
+import { effectiveActivityAt } from "@/lib/contacts/timelineGrouping";
+import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { EditPencilIcon, LockIcon, PlusIcon } from "@/components/icons";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
+import { Overview } from "./Overview";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import styles from "./page.module.css";
 
@@ -168,6 +171,35 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // combined card already computed.
   const connectionsWithHistory = record.connections.filter((c) => describeConnectionHistory(c).kind === "some");
 
+  // Resumen tab (contact-record.html:151-157; mockup-port r06) — every stat
+  // reuses data already fetched above for the Actividad tab/right panel.
+  const lastActivityCandidates: RecentActivityCandidate[] = [
+    ...timeline.entries.map((e) => ({
+      at: effectiveActivityAt(e),
+      channelLabel:
+        e.type === "email_sent" ? l.channelEmail : e.type === "note" ? l.channelNote : l.timelineSystemActor,
+      actorName: e.actorName,
+    })),
+    ...record.connections
+      .filter((c) => c.lastMessageAt !== null)
+      .map((c) => ({ at: c.lastMessageAt!, channelLabel: l.channelLinkedIn, actorName: c.bdName })),
+  ];
+  const lastActivity = mostRecentActivity(lastActivityCandidates);
+  const touchpoints = {
+    linkedin: record.connections.reduce((sum, c) => sum + c.messageCount, 0),
+    email: timeline.countsByType.email_sent ?? 0,
+    notes: timeline.countsByType.note ?? 0,
+  };
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const signal =
+    companyKey && companyOpenItCount > 0
+      ? {
+          companyName: record.person.company ?? l.noCompany,
+          openItCount: companyOpenItCount,
+          newLast7Days: companyPostings?.postings.filter((p) => p.postedAt && p.postedAt > sevenDaysAgo).length ?? 0,
+        }
+      : null;
+
   return (
     <main>
       <div className="record">
@@ -227,7 +259,29 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
               {
                 id: "overview",
                 label: l.tabOverview,
-                content: <div className={styles.placeholder}>{l.overviewComingSoon}</div>,
+                content: (
+                  <Overview
+                    labels={l}
+                    serverStrings={dict.contactRecordServer}
+                    lastActivity={
+                      lastActivity
+                        ? {
+                            relativeLabel: formatDistanceToNow(lastActivity.at, { locale: es }),
+                            channelLabel: lastActivity.channelLabel,
+                            actorName: lastActivity.actorName,
+                          }
+                        : null
+                    }
+                    touchpoints={{ ...touchpoints, total: touchpointTotal(touchpoints) }}
+                    openTasks={openTasks.map((t) => ({
+                      id: t.id,
+                      title: t.title,
+                      dueAt: t.dueAt,
+                      assignedToName: t.assignedToName ?? null,
+                    }))}
+                    signal={signal}
+                  />
+                ),
               },
             ]}
           />

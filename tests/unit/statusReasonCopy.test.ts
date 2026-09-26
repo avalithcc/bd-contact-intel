@@ -29,6 +29,11 @@ const serverStrings: Dictionary["contactRecordServer"] = {
   hiringBadge: (count) => `Contratando · ${count} puestos de IT`,
   companyContactCount: (count) => `${count} contactos en esta empresa`,
   conversationHistorySummary: (count, dateLabel) => `${count} mensajes · último ${dateLabel}`,
+  lastActivityFoot: (channelLabel, actorName) => `${channelLabel} · ${actorName}`,
+  touchpointsFoot: (linkedin, email, notes) => `${linkedin} LinkedIn · ${email} correos · ${notes} notas`,
+  openTaskLine: (title, dateLabel, assignedToName) => `${title} · vence ${dateLabel} · ${assignedToName}`,
+  hiringSignalText: (companyName, count) => `${companyName} tiene ${count} puestos de IT abiertos.`,
+  hiringSignalNewLast7Days: (count) => ` Publicó ${count} nuevos puestos esta semana.`,
 };
 
 const leadStatuses = {

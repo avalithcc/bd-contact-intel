@@ -605,6 +605,16 @@ export const es: typeof en = {
     tasksCardTitle: "Tareas",
     addTaskAction: "Agregar tarea",
     changeCompanyAria: "Cambiar empresa",
+    lastActivityStatTitle: "Última actividad",
+    touchpointsStatTitle: "Puntos de contacto (todos los BDs)",
+    openTasksTitle: "Tareas abiertas",
+    signalsTitle: "Señales",
+    noRecentActivity: "Sin actividad registrada.",
+    noOpenTasks: "Sin tareas abiertas.",
+    noSignals: "Sin señales de contratación registradas.",
+    channelLinkedIn: "LinkedIn",
+    channelEmail: "Correo enviado",
+    channelNote: "Nota",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).
@@ -636,6 +646,14 @@ export const es: typeof en = {
     hiringBadge: (count: number) => `Contratando · ${count} puestos de IT`,
     companyContactCount: (count: number) => `${count} contactos en esta empresa`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} mensajes · último ${dateLabel}`,
+    lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
+    touchpointsFoot: (linkedin: number, email: number, notes: number) =>
+      `${linkedin} LinkedIn · ${email} correos · ${notes} notas`,
+    openTaskLine: (title: string, dateLabel: string, assignedToName: string) =>
+      `${title} · vence ${dateLabel} · ${assignedToName}`,
+    hiringSignalText: (companyName: string, count: number) =>
+      `${companyName} tiene ${count} puestos de IT abiertos.`,
+    hiringSignalNewLast7Days: (count: number) => ` Publicó ${count} nuevos puestos esta semana.`,
   },
 
   adminConversation: {

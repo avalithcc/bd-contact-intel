@@ -708,6 +708,16 @@ export const en = {
     tasksCardTitle: "Tasks",
     addTaskAction: "Add task",
     changeCompanyAria: "Change company",
+    lastActivityStatTitle: "Last activity",
+    touchpointsStatTitle: "Touchpoints (all BDs)",
+    openTasksTitle: "Open tasks",
+    signalsTitle: "Signals",
+    noRecentActivity: "No activity recorded.",
+    noOpenTasks: "No open tasks.",
+    noSignals: "No hiring signals on file.",
+    channelLinkedIn: "LinkedIn",
+    channelEmail: "Email sent",
+    channelNote: "Note",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.
@@ -733,6 +743,14 @@ export const en = {
     hiringBadge: (count: number) => `Hiring · ${count} IT roles`,
     companyContactCount: (count: number) => `${count} contacts at this company`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} messages · last ${dateLabel}`,
+    lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
+    touchpointsFoot: (linkedin: number, email: number, notes: number) =>
+      `${linkedin} LinkedIn · ${email} emails · ${notes} notes`,
+    openTaskLine: (title: string, dateLabel: string, assignedToName: string) =>
+      `${title} · due ${dateLabel} · ${assignedToName}`,
+    hiringSignalText: (companyName: string, count: number) =>
+      `${companyName} has ${count} open IT roles.`,
+    hiringSignalNewLast7Days: (count: number) => ` Posted ${count} new roles this week.`,
   },
 
   // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;
