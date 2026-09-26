@@ -311,15 +311,17 @@ export async function listOutreachCandidates(
     );
   }
 
+  // Aliases are pbc_-prefixed: drizzle references CTE columns unqualified,
+  // and `contact` (joined below) has message_count/last_message_at/reciprocal.
   // Pre-aggregated to one row per person BEFORE the (fan-out-prone) join to
   // person_id_map/contact below — see the fresh-review fix comment above.
   const pbcAgg = db.$with("pbc_agg").as(
     db
       .select({
         personId: personBdConnection.personId,
-        messageCount: sql<number>`sum(${personBdConnection.messageCount})`.as("message_count"),
-        lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`.as("last_message_at"),
-        reciprocal: sql<boolean>`bool_or(${personBdConnection.reciprocal})`.as("reciprocal"),
+        messageCount: sql<number>`sum(${personBdConnection.messageCount})`.as("pbc_message_count"),
+        lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`.as("pbc_last_message_at"),
+        reciprocal: sql<boolean>`bool_or(${personBdConnection.reciprocal})`.as("pbc_reciprocal"),
       })
       .from(personBdConnection)
       .groupBy(personBdConnection.personId),
@@ -328,7 +330,8 @@ export async function listOutreachCandidates(
   let query = db // query 3
     .with(pbcAgg)
     .select({
-      id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id} end), ${person.id})`,
+      // Postgres has no max(uuid): aggregate the id as text.
+      id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id}::text end), ${person.id}::text)`,
       hasOwnContact: sql<boolean>`coalesce(bool_or(${contact.bdId} = ${bdId}), false)`,
       personId: person.id,
       firstName: person.firstName,
