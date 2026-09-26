@@ -31,7 +31,6 @@ export function Toast({
   return (
     <div
       className="toast"
-      role="status"
       onMouseEnter={() => onPause(toast.id)}
       onMouseLeave={() => onResume(toast.id)}
       onFocus={() => onPause(toast.id)}
