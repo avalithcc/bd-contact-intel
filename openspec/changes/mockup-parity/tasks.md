@@ -77,7 +77,13 @@ state) on 2026-09-26.
 
 ## Phase 7 — Duplicates / import / migration polish
 
-- [ ] 7.1 `/duplicates`, `/import`, migration dry-run screens — visual parity + `Dialog`/`Toast` adoption.
+- [x] 7.1 `/duplicates`, `/import`, migration dry-run screens — visual parity + `Dialog`/`Toast` adoption.
+  - DONE (branch `feat/mockup-parity-07a-admin-polish`, chained on `06f-review-fixes`): unified the `.page-header`/`.titles`/`.actions` chrome (eyebrow, lowercase `<h1>` + `.dot`, subtitle, actions slot) across `/admin/duplicates`, `/admin/migration` and `/contacts/import`, matching `mockups/duplicates.html`, `mockups/migration-dry-run.html` and `mockups/import.html`'s shared header pattern. `/admin/duplicates`'s compare table now shows an `Avatar` (existing `initialsFromName`, `detail.personA/B.id`) next to each "Ficha A/B" name, matching the mockup's per-side avatar. New `contactsImport.eyebrow` dict key (en+es). No server action or query touched.
+  - Deviation: `/admin/duplicates`'s unmerge confirmation stays the existing server-rendered `?confirmUnmerge=` panel (not the shared client `Dialog`) — that was an intentional prior decision (see the page's own comment, "ported server-rendered/no-JS") so history rows work without JS; converting it to `Dialog` would be a behavior change, not a presentation-only polish pass.
+  - Deviation: `/admin/duplicates`'s "Cola"/"Historial" mockup tabs stay a single scrolling page (existing behavior) rather than JS tabs — no new client-side state was introduced for a polish-only batch.
+  - `/admin/migration` scope: per apply instructions (parallel `hubspot-import` branch adds a HubSpot section to this page), only the shared page-header chrome was touched; `MigrationKindSection`'s report tables/sections and every server action/query are unchanged.
+  - Final polish: removed dead legacy CSS from `globals.css` — the pre-shell locale/theme switcher (`.locale-switcher`, `.locale-btn`, `.theme-switcher`, `.theme-btn`, `.user-menu-locale`, `.user-menu-theme`, `.user-menu-section-label`, all superseded by design D10's Spanish-only/no-switcher decision) and the pre-record-page "detail fields"/"conversation history" block (`.field`/`.field-label`/`.field-value`/`.suggestion-value`/`.suggestion-note`/`.thread*`/`.message*`, superseded by the new `/contacts/[id]` record page), plus unused `.mb-2xl`, `.detail-narrow` and `.avatar-stack` utilities — each verified unused across `src/**/*.{ts,tsx}` with `rg` before deletion. No remaining hardcoded English UI copy found in the shell (`Sidebar.tsx`/`TopBar.tsx` — only English code comments, which are in scope).
+  - `npx tsc --noEmit` silent and `npm run test:unit` 405/405 pass. Diff: 47 insertions / 197 deletions (well under the ~200–300 line forecast — no chaining needed).
 
 ## Review Workload Forecast
 

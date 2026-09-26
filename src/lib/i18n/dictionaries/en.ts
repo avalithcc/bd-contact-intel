@@ -1083,6 +1083,7 @@ export const en = {
   },
 
   contactsImport: {
+    eyebrow: "Contacts",
     pageTitle: "Import contacts",
     subtitle: "LinkedIn connections or a leads list (CSV).",
     connectionsCardTitle: "LinkedIn connections",

@@ -308,9 +308,16 @@ export default async function MigrationAdminPage({
 
   return (
     <main>
-      <div className="eyebrow">{dict.eyebrow}</div>
-      <h1 className="m-0">{dict.title}</h1>
-      <p className="soft">{dict.subtitle}</p>
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{dict.eyebrow}</div>
+          <h1 className="m-0">
+            {dict.title}
+            <span className="dot">.</span>
+          </h1>
+          <p className="soft">{dict.subtitle}</p>
+        </div>
+      </div>
 
       {isApproveErrorReason(approveError) && (
         <section className="panel">

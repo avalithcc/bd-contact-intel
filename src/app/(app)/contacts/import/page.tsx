@@ -25,8 +25,14 @@ export default async function ContactsImportPage() {
   return (
     <main>
       <div className="page-header">
-        <h1>{l.pageTitle}</h1>
-        <p className="meta">{l.subtitle}</p>
+        <div className="titles">
+          <div className="eyebrow">{l.eyebrow}</div>
+          <h1>
+            {l.pageTitle}
+            <span className="dot">.</span>
+          </h1>
+          <p className="meta">{l.subtitle}</p>
+        </div>
       </div>
 
       <div className="grid-2">
