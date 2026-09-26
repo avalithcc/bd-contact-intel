@@ -51,6 +51,7 @@ import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { generateOutreachMessage } from "../outreach/actions";
+import { TableIcon, BoardIcon } from "@/components/icons";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -143,7 +144,7 @@ function columnCell(
   const l = dict.contactList;
   switch (key) {
     case "company":
-      return row.company ?? l.ownerNone;
+      return row.company ? <span className="soft">{row.company}</span> : l.ownerNone;
     case "owner":
       return row.ownerName ? (
         <span className="owner-chip">
@@ -160,16 +161,25 @@ function columnCell(
       );
     case "status": {
       const statusLabel = dict.leadStatuses[row.status as keyof typeof dict.leadStatuses] ?? row.status;
-      return <span className={styles.statusBadge}>{statusLabel}</span>;
+      const knownStatus = PERSON_STATUSES.includes(row.status as (typeof PERSON_STATUSES)[number]);
+      return <span className={knownStatus ? `badge badge-${row.status}` : "badge"}>{statusLabel}</span>;
     }
     case "email": {
-      const badge = emailBadge(row, dict);
-      return (
-        <>
-          {badge && <span className={styles.emailBadge}>{badge}</span>}
-          {row.email ?? (badge ? null : l.emailNone)}
-        </>
-      );
+      if (row.emailStatus === "verified") {
+        return (
+          <>
+            <span className="badge badge-verified">{l.emailVerified}</span> <span className="meta">{row.email}</span>
+          </>
+        );
+      }
+      if (row.emailStatus === "probable") {
+        return (
+          <>
+            <span className="badge badge-probable">{l.emailProbable}</span> <span className="meta">{row.email}</span>
+          </>
+        );
+      }
+      return row.email ? row.email : <span className="badge badge-none">{l.emailNone}</span>;
     }
     case "roleGroup":
       return row.roleGroup ?? l.ownerNone;
@@ -317,38 +327,45 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const currentFiltersQuery = serializeContactFilters(effectiveFilters).toString();
 
   return (
-    <main>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{l.pageTitle}</h1>
-        <p className={styles.subtitle}>{l.subtitle}</p>
+    <main className="page">
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{l.pageTitle}</div>
+          <h1>
+            {l.pageTitle.toLowerCase()}
+            <span className="dot">.</span>
+          </h1>
+          <p className="meta">{l.subtitle}</p>
+        </div>
+        <div className="actions">
+          {!isOutreachView && (
+            <div className="segmented" role="group" aria-label={l.layoutTable + " / " + l.layoutBoard}>
+              <Link href={layoutHref("table")} className={isBoard ? "" : "on"} aria-current={isBoard ? undefined : "page"}>
+                <TableIcon className="icon" />
+                {l.layoutTable}
+              </Link>
+              <Link href={layoutHref("board")} className={isBoard ? "on" : ""} aria-current={isBoard ? "page" : undefined}>
+                <BoardIcon className="icon" />
+                {l.layoutBoard}
+              </Link>
+            </div>
+          )}
+          <Link href="/contacts/import" className="btn btn-secondary">
+            {dict.contactsImport.pageTitle}
+          </Link>
+        </div>
       </div>
 
-      <div className={styles.toolbarRow}>
-        {!isOutreachView && (
-          <div className={styles.layoutToggle} role="group" aria-label={l.layoutTable + " / " + l.layoutBoard}>
-            <Link href={layoutHref("table")} className={isBoard ? styles.layoutToggleLink : styles.layoutToggleActive}>
-              {l.layoutTable}
-            </Link>
-            <Link href={layoutHref("board")} className={isBoard ? styles.layoutToggleActive : styles.layoutToggleLink}>
-              {l.layoutBoard}
-            </Link>
-          </div>
-        )}
-        <Link href="/contacts/import" className="btn btn-secondary btn-sm">
-          {dict.contactsImport.pageTitle}
-        </Link>
-      </div>
-
-      <nav className={styles.viewTabs} aria-label={l.savedViewsGroupLabel}>
+      <nav className="view-tabs" aria-label={l.savedViewsGroupLabel}>
         {SYSTEM_VIEWS.map((v, i) => (
           <Link
             key={v.key}
             href={`/contacts?view=${v.key}`}
-            className={activeView.viewKey === v.key ? styles.viewTabActive : styles.viewTab}
+            className={`view-tab${activeView.viewKey === v.key ? " active" : ""}`}
             aria-current={activeView.viewKey === v.key ? "page" : undefined}
           >
             {l.views[v.key]}
-            <span className={styles.viewCount}>{systemViewCounts[i]}</span>
+            <span className="count">{systemViewCounts[i]}</span>
           </Link>
         ))}
         {/* Task 15a-2 (owner decision 2026-09-26): same ranking as
@@ -358,21 +375,20 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             load regardless of active view, not just when this tab is open. */}
         <Link
           href="/contacts?view=outreach"
-          className={isOutreachView ? styles.viewTabActive : styles.viewTab}
+          className={`view-tab${isOutreachView ? " active" : ""}`}
           aria-current={isOutreachView ? "page" : undefined}
         >
           {dict.nav.outreach}
         </Link>
         {savedViewRows.map((v) => (
-          <span key={v.id} className={styles.savedTab}>
+          <span key={v.id} className={`view-tab${activeView.savedViewId === v.id ? " active" : ""}`}>
             <Link
               href={`/contacts?view=saved:${v.id}`}
-              className={activeView.savedViewId === v.id ? styles.viewTabActive : styles.viewTab}
               aria-current={activeView.savedViewId === v.id ? "page" : undefined}
             >
               {v.name}
             </Link>
-            <form action={deleteSavedViewAction}>
+            <form action={deleteSavedViewAction} className="inline-block">
               <input type="hidden" name="id" value={v.id} />
               <button type="submit" className={styles.deleteView} aria-label={l.deleteView}>
                 ×
@@ -380,46 +396,58 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             </form>
           </span>
         ))}
-      </nav>
-
-      {!isOutreachView && (
-        <form action={createSavedViewAction} className={styles.saveViewForm}>
-          <input type="hidden" name="filtersQuery" value={currentFiltersQuery} />
-          <label htmlFor="save-view-name" className="sr-only">
-            {l.saveViewNameLabel}
-          </label>
-          <input id="save-view-name" type="text" name="name" placeholder={l.saveViewNameLabel} required />
-          <button type="submit" className="btn btn-secondary btn-sm">
+        <details className="dropdown">
+          <summary className="view-tab add">
             {l.saveView}
-          </button>
-        </form>
-      )}
-
-      {!isOutreachView && (
-        <details className={styles.columnPicker}>
-          <summary className="btn btn-secondary btn-sm">{l.columnsPickerLabel}</summary>
-          <form action={updateViewColumnsAction} className={styles.columnPickerMenu}>
-            <input type="hidden" name="view" value={activeView.viewKey} />
-            <span className={styles.columnPickerHelp}>{l.columnsPickerHelp}</span>
-            <label className={styles.columnCheck}>
-              <input type="checkbox" checked disabled /> {l.colName}
+          </summary>
+          <form action={createSavedViewAction} className="menu">
+            <input type="hidden" name="filtersQuery" value={currentFiltersQuery} />
+            <label htmlFor="save-view-name" className="label">
+              {l.saveViewNameLabel}
             </label>
-            {ALL_CONTACT_COLUMNS.map((key) => (
-              <label key={key} className={styles.columnCheck}>
-                <input
-                  type="checkbox"
-                  name="columns"
-                  value={key}
-                  defaultChecked={visibleColumns.includes(key)}
-                />{" "}
-                {columnLabel(key, l)}
-              </label>
-            ))}
-            <button type="submit" className="btn btn-primary btn-sm">
-              {l.columnsApply}
+            <input
+              id="save-view-name"
+              className="input input-sm"
+              type="text"
+              name="name"
+              placeholder={l.saveViewNameLabel}
+              required
+            />
+            <button type="submit" className="btn btn-primary btn-sm mt-lg">
+              {l.saveView}
             </button>
           </form>
         </details>
+      </nav>
+
+      {!isOutreachView && (
+        <div className="toolbar">
+          <details className="dropdown">
+            <summary className="btn btn-secondary btn-sm">{l.columnsPickerLabel}</summary>
+            <form action={updateViewColumnsAction} className="menu">
+              <input type="hidden" name="view" value={activeView.viewKey} />
+              <div className="menu-label">{l.columnsPickerHelp}</div>
+              <label className="check">
+                <input type="checkbox" checked disabled /> {l.colName}
+              </label>
+              {ALL_CONTACT_COLUMNS.map((key) => (
+                <label key={key} className="check">
+                  <input
+                    type="checkbox"
+                    name="columns"
+                    value={key}
+                    defaultChecked={visibleColumns.includes(key)}
+                  />{" "}
+                  {columnLabel(key, l)}
+                </label>
+              ))}
+              <div className="menu-sep" />
+              <button type="submit" className="btn btn-primary btn-sm">
+                {l.columnsApply}
+              </button>
+            </form>
+          </details>
+        </div>
       )}
 
       {isOutreachView ? (
@@ -504,86 +532,97 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           </form>
         </section>
       ) : (
-        <details className={styles.columnPicker}>
-          <summary className="btn btn-secondary btn-sm">{l.filtersPanelLabel}</summary>
-          <form method="get" action="/contacts" className={styles.columnPickerMenu}>
-            <input type="hidden" name="view" value={activeView.viewKey} />
-            {sp.q && <input type="hidden" name="q" value={sp.q} />}
-            {sp.layout && <input type="hidden" name="layout" value={sp.layout} />}
-            {sp.columns && <input type="hidden" name="columns" value={sp.columns} />}
+        <div className="toolbar">
+          <details className="dropdown">
+            <summary className="chip chip-add">{l.filtersPanelLabel}</summary>
+            <form method="get" action="/contacts" className="menu left">
+              <input type="hidden" name="view" value={activeView.viewKey} />
+              {sp.q && <input type="hidden" name="q" value={sp.q} />}
+              {sp.layout && <input type="hidden" name="layout" value={sp.layout} />}
+              {sp.columns && <input type="hidden" name="columns" value={sp.columns} />}
 
-            <label className={styles.columnCheck}>
-              {l.filterOwnerLabel}
-              <select name="owner" defaultValue={sp.owner ?? ""}>
-                <option value="">{l.filterOwnerAny}</option>
-                <option value="me">{l.filterOwnerMe}</option>
-                <option value="unassigned">{l.filterOwnerUnassigned}</option>
-                {ownerOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="check">
+                {l.filterOwnerLabel}
+                <select name="owner" defaultValue={sp.owner ?? ""} className="select input-sm">
+                  <option value="">{l.filterOwnerAny}</option>
+                  <option value="me">{l.filterOwnerMe}</option>
+                  <option value="unassigned">{l.filterOwnerUnassigned}</option>
+                  {ownerOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label className={styles.columnCheck}>
-              {l.filterIndustryLabel}
-              <select name="industryGroup" defaultValue={sp.industryGroup ?? ""}>
-                <option value="">{l.filterIndustryAny}</option>
-                {filterOptions.industryGroups.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="check">
+                {l.filterIndustryLabel}
+                <select name="industryGroup" defaultValue={sp.industryGroup ?? ""} className="select input-sm">
+                  <option value="">{l.filterIndustryAny}</option>
+                  {filterOptions.industryGroups.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label className={styles.columnCheck}>
-              {l.filterSeniorityLabel}
-              <select name="seniority" defaultValue={sp.seniority ?? ""}>
-                <option value="">{l.filterSeniorityAny}</option>
-                {filterOptions.seniorities.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="check">
+                {l.filterSeniorityLabel}
+                <select name="seniority" defaultValue={sp.seniority ?? ""} className="select input-sm">
+                  <option value="">{l.filterSeniorityAny}</option>
+                  {filterOptions.seniorities.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label className={styles.columnCheck}>
-              {l.filterEmailStatusLabel}
-              <select name="emailStatus" defaultValue={sp.emailStatus ?? ""}>
-                <option value="">{l.filterEmailStatusAny}</option>
-                <option value="verified">{l.emailVerified}</option>
-                <option value="probable">{l.emailProbable}</option>
-                <option value="none">{l.emailNone}</option>
-              </select>
-            </label>
+              <label className="check">
+                {l.filterEmailStatusLabel}
+                <select name="emailStatus" defaultValue={sp.emailStatus ?? ""} className="select input-sm">
+                  <option value="">{l.filterEmailStatusAny}</option>
+                  <option value="verified">{l.emailVerified}</option>
+                  <option value="probable">{l.emailProbable}</option>
+                  <option value="none">{l.emailNone}</option>
+                </select>
+              </label>
 
-            <label className={styles.columnCheck}>
-              {l.filterStatusLabel}
-              <select name="status" defaultValue={sp.status ?? ""}>
-                <option value="">{l.filterStatusAny}</option>
-                {PERSON_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {dict.leadStatuses[s]}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="check">
+                {l.filterStatusLabel}
+                <select name="status" defaultValue={sp.status ?? ""} className="select input-sm">
+                  <option value="">{l.filterStatusAny}</option>
+                  {PERSON_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {dict.leadStatuses[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <button type="submit" className="btn btn-primary btn-sm">
-              {l.filtersApply}
-            </button>
-            <Link href={`/contacts?view=${activeView.viewKey}`} className="btn btn-secondary btn-sm">
-              {l.filtersClear}
-            </Link>
-          </form>
-        </details>
+              <div className="menu-sep" />
+              <button type="submit" className="btn btn-primary btn-sm">
+                {l.filtersApply}
+              </button>
+              <Link href={`/contacts?view=${activeView.viewKey}`} className="btn btn-secondary btn-sm mt-lg">
+                {l.filtersClear}
+              </Link>
+            </form>
+          </details>
+        </div>
       )}
 
-      {bulkMessage && <p className={styles.resultBanner}>{bulkMessage}</p>}
-      {sp.bulkLimited === "1" && <p className={styles.resultBanner}>{l.bulkLimitedNotice}</p>}
+      {bulkMessage && (
+        <div className="alert alert-info mb-lg">
+          <p>{bulkMessage}</p>
+        </div>
+      )}
+      {sp.bulkLimited === "1" && (
+        <div className="alert alert-warn mb-lg">
+          <p>{l.bulkLimitedNotice}</p>
+        </div>
+      )}
 
       {isOutreachView ? (
         outreachPage && !outreachPage.hiringCompanyCount ? (
@@ -606,8 +645,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             )}
           </p>
         ) : outreachPage && outreachPage.rows.length > 0 ? (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className="table-wrap">
+            <table className="data">
               <thead>
                 <tr>
                   <th>{dict.outreach.tableName}</th>
@@ -624,27 +663,27 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                 {outreachPage.rows.map((r) => (
                   <tr key={r.id}>
                     <td>
-                      <Link href={`/contacts/${r.personId ?? r.id}`} className={styles.name}>
+                      <Link href={`/contacts/${r.personId ?? r.id}`} className="name">
                         {[r.firstName, r.lastName].filter(Boolean).join(" ") || l.ownerNone}
                       </Link>
                     </td>
                     <td>{r.position ?? "—"}</td>
-                    <td>
+                    <td className="nowrap">
                       {r.company ?? "—"}
                       {r.isStartup && (
-                        <span className="legacy-badge startup" title={r.startupReason ?? undefined}>
+                        <span className="badge badge-brand" title={r.startupReason ?? undefined}>
                           {dict.outreach.startupBadge}
                         </span>
                       )}
                       {r.offshoreHeavy && (
-                        <span className="legacy-badge offshore">
+                        <span className="badge badge-offshore">
                           {dict.common.offshoreBadge(r.offshoreItCount, r.latamItCount)}
                         </span>
                       )}
                     </td>
                     <td>{r.roleGroup ? dict.roleGroups[r.roleGroup] : "—"}</td>
                     <td>{r.openItCount}</td>
-                    <td>{r.lastMessageAt ? relTime(new Date(r.lastMessageAt)) : dict.common.never}</td>
+                    <td className="nowrap meta">{r.lastMessageAt ? relTime(new Date(r.lastMessageAt)) : dict.common.never}</td>
                     <td>
                       <div className="reason-chips">
                         {r.reasons.map((reason) => (
@@ -652,10 +691,10 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                             key={reason}
                             className={
                               r.relationshipTier === "dormant"
-                                ? "badge dormant"
+                                ? "badge badge-neutral no-dot"
                                 : r.isLeadership
-                                  ? "badge green"
-                                  : "badge"
+                                  ? "badge badge-success no-dot"
+                                  : "badge no-dot"
                             }
                           >
                             {reason}
@@ -670,7 +709,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                           labels={messageLabels}
                         />
                       ) : (
-                        <span className="secondary-btn disabled" title={dict.outreach.unifiedRecordPending}>
+                        <span className="btn btn-secondary is-disabled" title={dict.outreach.unifiedRecordPending}>
                           {messageLabels.generateMessage}
                         </span>
                       )}
@@ -679,9 +718,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                 ))}
               </tbody>
             </table>
-            <div className={styles.footer}>
+            <div className="table-footer">
               <span>{l.showingRange((currentPage - 1) * PAGE_SIZE + 1, Math.min(currentPage * PAGE_SIZE, outreachPage.total), outreachPage.total)}</span>
-              <div className={styles.pager}>
+              <div className="row">
                 {outreachPage.page > 1 && (
                   <Link href={outreachPageHref(outreachPage.page - 1)} className="btn btn-secondary btn-sm">
                     {l.prevPage}
@@ -697,12 +736,16 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             </div>
           </div>
         ) : (
-          <p className={styles.empty}>{l.noResults}</p>
+          <div className="empty">
+            <p>{l.noResults}</p>
+          </div>
         )
       ) : isBoard ? (
         <Board columns={boardColumns ?? []} dict={dict} tableHref={layoutHref("table")} />
       ) : rows.length === 0 ? (
-        <p className={styles.empty}>{l.noResults}</p>
+        <div className="empty">
+          <p>{l.noResults}</p>
+        </div>
       ) : (
         <BulkActionsBar
           labels={bulkLabels}
@@ -712,11 +755,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           page={currentPage}
           columns={visibleColumns}
         >
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className="table-wrap">
+            <table className="data">
               <thead>
                 <tr>
-                  <th className={styles.colCheck}>
+                  <th className="col-check">
                     <input type="checkbox" id="select-all-contacts" aria-label={l.bulkSelectAllLabel} />
                   </th>
                   <th>{l.colName}</th>
@@ -728,11 +771,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>
-                    <td className={styles.colCheck}>
+                    <td className="col-check">
                       <input type="checkbox" name="personId" value={row.id} aria-label={row.firstName ?? row.id} />
                     </td>
                     <td>
-                      <div className={styles.cellPerson}>
+                      <div className="cell-person">
                         <Avatar
                           id={row.id}
                           initials={initialsFromName(
@@ -740,23 +783,25 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                           )}
                         />
                         <div>
-                          <Link href={`/contacts/${row.id}`} className={styles.name}>
+                          <Link href={`/contacts/${row.id}`} className="name">
                             {[row.firstName, row.lastName].filter(Boolean).join(" ") || l.ownerNone}
                           </Link>
-                          {row.jobTitle && <span className={styles.jobTitle}>{row.jobTitle}</span>}
+                          {row.jobTitle && <div className="sub">{row.jobTitle}</div>}
                         </div>
                       </div>
                     </td>
                     {visibleColumns.map((key) => (
-                      <td key={key}>{columnCell(key, row, dict)}</td>
+                      <td key={key} className={key === "created" ? "nowrap meta" : undefined}>
+                        {columnCell(key, row, dict)}
+                      </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className={styles.footer}>
+            <div className="table-footer">
               <span>{l.showingRange(from, to, total)}</span>
-              <div className={styles.pager}>
+              <div className="row">
                 {currentPage > 1 && (
                   <Link href={pageHref(currentPage - 1)} className="btn btn-secondary btn-sm">
                     {l.prevPage}
