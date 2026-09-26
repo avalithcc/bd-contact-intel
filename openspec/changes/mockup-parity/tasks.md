@@ -32,8 +32,8 @@ state) on 2026-09-26.
 
 - [x] 2.1 `Avatar` component (`src/components/Avatar.tsx` + pure palette-selection function, unit-tested RED→GREEN): deterministic `avatar-1..6` class from a stable id (e.g. contact/BD id), renders initials, supports circle (contact) vs rounded-square (`avatar-bd`) per `design-system.html`. DONE — `src/components/avatarPalette.ts` (pure fn, RED→GREEN in `tests/unit/avatarPalette.test.ts`) + `src/components/Avatar.tsx`.
 - [x] 2.2 Shared `Dialog` component (`src/components/Dialog.tsx`): overlay + `aria-modal`, focus trap, Esc to close, returns focus to the trigger on close, matches `.overlay`/`.dialog` classes and structure from `design-system.html`/`styles.css`. DONE.
-- [ ] 2.3 Shared `Toast` component (`src/components/Toast.tsx` + a toast region/provider): on-dark tokens, `role="status"`, `aria-live="polite"`, matches `.toast`/`.toast-region` classes.
-- [ ] 2.4 Wire `Toast` region into the app shell (`(app)/layout.tsx`) so any page can trigger a toast without its own ad hoc implementation.
+- [x] 2.3 Shared `Toast` component (`src/components/Toast.tsx` + a toast region/provider): on-dark tokens, `role="status"`, `aria-live="polite"`, matches `.toast`/`.toast-region` classes. DONE — `src/components/Toast.tsx` (presentational) + `src/components/ToastProvider.tsx` (`useToast()` hook, auto-dismiss with pause on hover/focus) + `src/components/toastTimer.ts` (pure timer state, RED→GREEN in `tests/unit/toastTimer.test.ts`).
+- [x] 2.4 Wire `Toast` region into the app shell (`(app)/layout.tsx`) so any page can trigger a toast without its own ad hoc implementation. DONE — `ToastProvider` now wraps `(app)/layout.tsx`.
 
 ## Phase 3 — TopBar + Sidebar parity (new branch, chained on phase 2)
 
