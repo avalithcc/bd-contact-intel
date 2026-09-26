@@ -80,3 +80,15 @@ export function buildOutreachViewParams(sp: OutreachViewSearchParams, page: numb
   params.set("page", String(page));
   return params;
 }
+
+/** `/outreach` -> `/contacts?view=outreach` redirect (task 15c): every field
+ * on `/outreach`'s own searchParams shares its exact name/semantics with
+ * `OutreachViewSearchParams` above (deliberate, see that type's doc
+ * comment), so this is a straight pass-through via `buildOutreachViewParams`
+ * — no new mapping logic, unlike `/leads`'s redirect (buildContactsRedirectQuery)
+ * which had to translate several renamed/reshaped fields. No I/O —
+ * `/outreach/page.tsx` calls `redirect()` with this string. */
+export function buildOutreachRedirectQuery(sp: OutreachViewSearchParams & { page?: string }): string {
+  const page = Math.max(1, Number(sp.page) || 1);
+  return buildOutreachViewParams(sp, page).toString();
+}

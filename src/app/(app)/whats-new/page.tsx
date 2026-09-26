@@ -81,7 +81,7 @@ export default async function WhatsNewPage({
         </span>
         <div className="row row-md">
           <BackButton label={dict.common.goBack} fallbackHref="/" />
-          <Link className="secondary-btn" href="/outreach">
+          <Link className="secondary-btn" href="/contacts?view=outreach">
             {dict.common.priorityOutreach}
           </Link>
           <Link className="secondary-btn" href="/hiring">

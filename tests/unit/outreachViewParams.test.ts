@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildOutreachRedirectQuery,
   buildOutreachViewParams,
   isCompanyCategoryKey,
   isRoleGroupKey,
@@ -73,4 +74,33 @@ test("buildOutreachViewParams drops miamiOnly when market isn't 'us', and invali
   const params = buildOutreachViewParams({ roleGroup: "bogus", market: "latam", miamiOnly: "on" }, 1);
   assert.equal(params.has("roleGroup"), false);
   assert.equal(params.has("miamiOnly"), false);
+});
+
+test("buildOutreachRedirectQuery maps /outreach's own searchParams 1:1, defaulting page to 1", () => {
+  const q = buildOutreachRedirectQuery({
+    roleGroup: "eng_leadership",
+    market: "us",
+    miamiOnly: "on",
+    excludeNever: "on",
+    hideOffshore: "on",
+    startupsOnly: "on",
+    name: "Ada",
+    page: "3",
+  });
+  const params = new URLSearchParams(q);
+  assert.equal(params.get("view"), "outreach");
+  assert.equal(params.get("page"), "3");
+  assert.equal(params.get("roleGroup"), "eng_leadership");
+  assert.equal(params.get("market"), "us");
+  assert.equal(params.get("miamiOnly"), "on");
+  assert.equal(params.get("excludeNever"), "on");
+  assert.equal(params.get("hideOffshore"), "on");
+  assert.equal(params.get("startupsOnly"), "on");
+  assert.equal(params.get("name"), "Ada");
+});
+
+test("buildOutreachRedirectQuery defaults page to 1 for a missing/invalid page param", () => {
+  assert.equal(new URLSearchParams(buildOutreachRedirectQuery({})).get("page"), "1");
+  assert.equal(new URLSearchParams(buildOutreachRedirectQuery({ page: "bogus" })).get("page"), "1");
+  assert.equal(new URLSearchParams(buildOutreachRedirectQuery({ page: "0" })).get("page"), "1");
 });
