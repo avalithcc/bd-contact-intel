@@ -362,7 +362,9 @@ export async function listOutreachCandidates(
   const rows = await query;
 
   const scored: OutreachRow[] = rows.map((r) => {
-    const dormant = isDormant(r.reciprocal, r.lastMessageAt);
+    // A raw-SQL aggregate comes back from the driver as a string, not a Date.
+    const lastMessageAt = r.lastMessageAt == null ? null : new Date(r.lastMessageAt);
+    const dormant = isDormant(r.reciprocal, lastMessageAt);
     const hiring: HiringMatch | undefined = r.companyKey
       ? hiringIndex.get(r.companyKey)
       : undefined;
@@ -376,7 +378,7 @@ export async function listOutreachCandidates(
       position: r.position,
       roleGroup: (r.roleGroup ?? null) as RoleGroupKey | null,
       messageCount: r.messageCount,
-      lastMessageAt: r.lastMessageAt,
+      lastMessageAt,
       reciprocal: r.reciprocal,
       dormant,
       isLeadership: isLeadershipRoleGroup(r.roleGroup),
