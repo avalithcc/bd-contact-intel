@@ -36,7 +36,9 @@ export default async function HiringPage({
           Outreach/Novedades/Contactos secondary-btns) were removed here
           (mockup-parity 6.1) — the app shell ((app)/layout.tsx -> Sidebar
           + TopBar breadcrumb) already covers both: the sidenav lists this
-          same set of routes, and the breadcrumb shows where you are. */}
+          same set of routes (including the /contacts?view=outreach redirect
+          added in feat/crm-hubspot-ux-15b-outreach-redirect), and the
+          breadcrumb shows where you are. */}
       <div className="mb-3xl">
         <div className="eyebrow">{dict.hiring.eyebrow}</div>
         <h1>
