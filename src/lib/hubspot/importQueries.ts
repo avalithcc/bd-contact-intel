@@ -196,7 +196,7 @@ export async function getHubSpotMigrationRunForGate(runId: string): Promise<HubS
  * `WRITE_BATCH_SIZE`), never row-by-row.
  */
 export async function finalizeHubSpotExecute(input: FinalizeHubSpotExecuteInput): Promise<void> {
-  const { plan, migrationRunId, actorBdId, backupPath } = input;
+  const { plan, report, migrationRunId, actorBdId, backupPath } = input;
   await db.transaction(async (tx) => {
     const [claimed] = await tx
       .update(migrationRun)
@@ -286,12 +286,18 @@ export async function finalizeHubSpotExecute(input: FinalizeHubSpotExecuteInput)
 
     if (touchedPersonIds.size) await recomputePersonStatuses(tx, [...touchedPersonIds]);
 
-    await tx.update(migrationRun).set({ report: { ...plan.report, backupPath } }).where(eq(migrationRun.id, migrationRunId));
+    // Follow-up fix (prod run c9de8587): persist the FULL `HubSpotRunReport`
+    // shape passed in by the caller (`report`, built via the same
+    // `buildHubSpotRunReport` the dry run uses) — never the planner's raw
+    // `plan.report`, which lacks reviewSample/reviewThreshold/overThreshold/
+    // createdCompanyKeys/domainFilledCompanyKeys and left `/admin/migration`
+    // with nothing to render for an executed run.
+    await tx.update(migrationRun).set({ report: { ...report, backupPath } }).where(eq(migrationRun.id, migrationRunId));
 
     await tx.insert(auditLog).values({
       actorBdId,
       action: "migration_execute",
-      metadata: { migrationRunId, backupPath, report: plan.report },
+      metadata: { migrationRunId, backupPath, report },
     });
   });
 }
