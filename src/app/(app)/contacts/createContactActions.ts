@@ -91,6 +91,11 @@ export async function createContactAction(
     // row's emailStatus is "verified", and buildNewContactFields never
     // produces that for a manually typed address (see its doc comment).
     byVerifiedEmail: () => null,
+    // Never reached: matchIdentity only consults this when row.source is
+    // "hubspot_import" (contact-identity delta's email_unverified review
+    // rule), and matchRow here never sets that — this is a manually typed
+    // contact, not a HubSpot import row.
+    byEmail: () => [],
     byNameCompany: (key) => byNameCompanyIds.get(key) ?? [],
   });
 
