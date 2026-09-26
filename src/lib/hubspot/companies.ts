@@ -360,10 +360,24 @@ export function planCompanyResolution(
     if (arr) arr.push(ref);
     else existingByCompact.set(key, [ref]);
   };
+  // Root-cause fix (prod run c9de8587): this function later does
+  // `matched.domain = groupDomain` to record an in-run fill. Storing the
+  // CALLER's own `existingCompanies` objects directly here means that
+  // mutation leaks back into the caller's array — so a second, later call
+  // against the SAME `existingCompanies` reference (e.g.
+  // scripts/unify-contacts.ts calls this once directly to prefetch
+  // `identityIndex`, then again indirectly via `planHubSpotImport` inside
+  // `runHubSpotImportDryRun`/`runHubSpotImportExecute`) sees `matched.domain`
+  // already non-null from the FIRST call and silently reports ZERO new
+  // `domainFills` — even though nothing was ever written to the DB. Cloning
+  // every ref here keeps this function pure/idempotent: `existingCompanies`
+  // is never mutated, so calling it any number of times with the same input
+  // always produces the same `domainFills`.
   for (const c of existingCompanies) {
-    existingByKey.set(c.companyKey, c);
-    if (c.domain) existingByDomain.set(c.domain, c);
-    addCompact(normalizeCompactCompanyKey(c.companyKey), c);
+    const ref: ExistingCompanyRef = { ...c };
+    existingByKey.set(ref.companyKey, ref);
+    if (ref.domain) existingByDomain.set(ref.domain, ref);
+    addCompact(normalizeCompactCompanyKey(ref.companyKey), ref);
   }
   let ambiguousCompactMatches = 0;
   // companyKeys whose domain was set (filled or created) DURING this run —
