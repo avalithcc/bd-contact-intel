@@ -90,16 +90,48 @@ exports, which previously split one company's domain group into two.
 
 ## Phase 3: Identity Planning + Activities (PR H3, base: PR H2)
 
-- [ ] 3.1 RED/GREEN: `src/lib/identity/matcher.ts` — add `IdentityIndex.byEmail(email): PersonId[]`; after strong keys, exact email match where either side is not `verified` → `review` with reason `email_unverified`, scoped ONLY to rows sourced from `hubspot_import` (contact-identity delta — live ingest/`catch_up` unchanged).
-- [ ] 3.2 RED/GREEN: `buildNameCompanyKey` prefers an explicit `companyKey` (domain-resolved key from Phase 2 used for matching).
-- [ ] 3.3 RED/GREEN: `src/lib/identity/resolve.ts`/`resolveDb.ts` — nullable `bdId`, no `person_bd_connection` for HubSpot rows; optional `ownerBdId`/`company`/`city`/`country`/`migrationRunId`; `mergePolicy: 'r7' | 'fill_empty'`, HubSpot uses `fill_empty`.
-- [ ] 3.4 RED/GREEN: mapper — HubSpot rows → `IdentityIngestRow` with `legacyTable:'hubspot_contact'`, `profileKey=normalizeProfileKey(linkedin)`, `emailStatus:'probable'`, `emailSource:'hubspot_import'`, `sourceKey:'hubspot_import'` (contact-identity "HubSpot emails are stored as probable").
-- [ ] 3.5 RED/GREEN: `src/lib/hubspot/statusEvidence.ts` (pure) — emit at most one stage backfill + at most one discard per the evidence table (D5): `contacted` / `replied` / `discarded(wrong_profile)` / nothing. Discard emits `status_backfill{status:'discarded', reason:'wrong_profile'}`, never a plain `discarded`-type row, so the historical `originalAt` is preserved (hubspot-import spec "Discard evidence preserves the historical date").
-- [ ] 3.6 RED/GREEN: `originalAt` resolution — `Último contacto` → `Última actividad` → `Fecha de creación`, portal timezone; all-fail → run time + `dateFallback` increment.
-- [ ] 3.7 RED/GREEN: idempotency key `(hubspotContactId, status)` — later export can advance status without duplicate activities.
-- [ ] 3.8 RED/GREEN: `src/lib/hubspot/refill.ts` — `planHubSpotRefill` fills only null/empty fields on re-import (Q3); email fields move together, fill only when `email` is null; every filled field writes `person_property_history(source:'import')`; profile-key auto-match gets the same fill-empty treatment.
-- [ ] 3.9 RED/GREEN: `src/lib/hubspot/planner.ts` — orchestrates companies → contacts → identity (`planIdentityWrites`) → refill → activities, pure, single entry point for the dry-run/execute ports.
-- [ ] 3.10 Test: row outcome classification — every row lands in exactly one of `new`/`review`/`profile_key`/`skipped_own_company`/`already_imported`/`invalid` (hubspot-import spec "Row classification per contact").
+- [x] 3.1 RED/GREEN: `src/lib/identity/matcher.ts` — add `IdentityIndex.byEmail(email): PersonId[]`; after strong keys, exact email match where either side is not `verified` → `review` with reason `email_unverified`, scoped ONLY to rows sourced from `hubspot_import` (contact-identity delta — live ingest/`catch_up` unchanged).
+- [x] 3.2 RED/GREEN: `buildNameCompanyKey` prefers an explicit `companyKey` (domain-resolved key from Phase 2 used for matching).
+- [x] 3.3 RED/GREEN: `src/lib/identity/resolve.ts`/`resolveDb.ts` — nullable `bdId`, no `person_bd_connection` for HubSpot rows; optional `ownerBdId`/`company`/`city`/`country`/`migrationRunId`; `mergePolicy: 'r7' | 'fill_empty'`, HubSpot uses `fill_empty`.
+- [x] 3.4 RED/GREEN: mapper — HubSpot rows → `IdentityIngestRow` with `legacyTable:'hubspot_contact'`, `profileKey=normalizeProfileKey(linkedin)`, `emailStatus:'probable'`, `emailSource:'hubspot_import'`, `sourceKey:'hubspot_import'` (contact-identity "HubSpot emails are stored as probable").
+- [x] 3.5 RED/GREEN: `src/lib/hubspot/statusEvidence.ts` (pure) — emit at most one stage backfill + at most one discard per the evidence table (D5): `contacted` / `replied` / `discarded(wrong_profile)` / nothing. Discard emits `status_backfill{status:'discarded', reason:'wrong_profile'}`, never a plain `discarded`-type row, so the historical `originalAt` is preserved (hubspot-import spec "Discard evidence preserves the historical date").
+- [x] 3.6 RED/GREEN: `originalAt` resolution — `Último contacto` → `Última actividad` → `Fecha de creación`, portal timezone; all-fail → run time + `dateFallback` increment.
+- [x] 3.7 RED/GREEN: idempotency key `(hubspotContactId, status)` — later export can advance status without duplicate activities.
+- [x] 3.8 RED/GREEN: `src/lib/hubspot/refill.ts` — `planHubSpotRefill` fills only null/empty fields on re-import (Q3); email fields move together, fill only when `email` is null; every filled field writes `person_property_history(source:'import')`; profile-key auto-match gets the same fill-empty treatment.
+- [x] 3.9 RED/GREEN: `src/lib/hubspot/planner.ts` — orchestrates companies → contacts → identity (`planIdentityWrites`) → refill → activities, pure, single entry point for the dry-run/execute ports.
+- [x] 3.10 Test: row outcome classification — every row lands in exactly one of `new`/`review`/`profile_key`/`skipped_own_company`/`already_imported`/`invalid` (hubspot-import spec "Row classification per contact").
+
+**Post-implementation notes (PR H3):** `IdentityIndex.byEmail` returns every
+live person matching an email regardless of status (unlike
+`byVerifiedEmail`, which only ever holds a hit whose OWN email is
+verified) — `matchIdentity` only consults it when `row.source ===
+'hubspot_import'`, checked after the strong keys and before name+company,
+so live ingest/`catch_up` (which never set `source`) are provably
+unaffected (`identityMatcher.test.ts`/`identityResolve.test.ts` both
+assert this explicitly). `mergePolicy: 'fill_empty'` lives in
+`planIdentityWrites`/`mergeFields` alongside the existing `'r7'` default —
+HubSpot rows always pass `'fill_empty'`; every other caller
+(collapse/fold/live resolver) keeps the default, unchanged. `person.company`
+(raw display text) is now read/written by the resolver for the first time
+(it was silently dropped before this PR) — a pre-existing gap, not a
+behavior change for existing callers, since `company` was never populated
+on `person` from the live path either way. `already_imported` rows never
+touch the matcher or `planIdentityWrites` at all — they route straight
+through `planHubSpotRefill` against the prefetched existing-person
+snapshot (Phase 4 wires that prefetch). `invalid` is defined as a
+`hubspotContactId` repeated more than once within the same export file
+(every occurrence after the first) — not explicitly enumerated by the
+spec's classification scenarios, but required by design D7's report shape
+(`outcomes.invalid`) and by "every row lands in exactly one outcome."
+Also fixed, as a directly-related spec requirement not on this phase's
+task list: the record page's timeline only showed a discard `reason` for
+a plain `discarded` activity, never for a `status_backfill{status:
+'discarded'}` row (which is exactly what `statusEvidence.ts` writes, to
+preserve the historical date) — extracted the pure body formatter into
+`src/lib/contacts/timelineEntryBody.ts` (Timeline.tsx pulls in
+`@/lib/activity/queries`'s DB-touching value exports, so the formatter
+couldn't be unit-tested in place) and made both cases share the same
+reason display.
 
 ## Phase 4: DB Wiring + CLI Phase + Report (PR H4, base: PR H3)
 
