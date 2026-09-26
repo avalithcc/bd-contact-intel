@@ -59,14 +59,24 @@ function isContactColumnKey(value: unknown): value is ContactColumnKey {
 }
 
 /**
- * Keeps only recognized column keys, drops duplicates, and always returns
- * them in `ALL_CONTACT_COLUMNS` order regardless of input order — same
- * "never throw on unexpected shape" convention as sanitizeContactFilters.
+ * Keeps only recognized column keys, drops duplicates (first occurrence
+ * wins), and preserves the CALLER's order — not a fixed order — so the
+ * "Columnas" picker's drag-and-drop reorder (mockup: "arrastrar para
+ * reordenar") actually persists through the same `?columns=`/saved-view
+ * round-trip visibility already uses. Same "never throw on unexpected
+ * shape" convention as sanitizeContactFilters.
  */
 export function sanitizeColumnKeys(value: unknown): ContactColumnKey[] {
   if (!Array.isArray(value)) return [];
-  const requested = new Set(value.filter(isContactColumnKey));
-  return ALL_CONTACT_COLUMNS.filter((key) => requested.has(key));
+  const seen = new Set<ContactColumnKey>();
+  const result: ContactColumnKey[] = [];
+  for (const entry of value) {
+    if (isContactColumnKey(entry) && !seen.has(entry)) {
+      seen.add(entry);
+      result.push(entry);
+    }
+  }
+  return result;
 }
 
 /**

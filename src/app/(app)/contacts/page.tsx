@@ -31,11 +31,8 @@ import {
   type ContactColumnKey,
 } from "@/lib/contacts/columns";
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
-import {
-  createSavedViewAction,
-  deleteSavedViewAction,
-  updateViewColumnsAction,
-} from "./viewActions";
+import { createSavedViewAction, deleteSavedViewAction } from "./viewActions";
+import { ColumnPicker } from "./ColumnPicker";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickBulkActionsLabels } from "@/lib/contacts/labels";
 import { BulkActionsBar } from "./BulkActionsBar";
@@ -278,6 +275,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     ? savedViewRows.find((v) => v.id === activeView.savedViewId)?.columns
     : undefined;
   const visibleColumns = resolveVisibleColumns(queryColumns ?? persistedColumns);
+  const columnLabelsByKey = Object.fromEntries(
+    ALL_CONTACT_COLUMNS.map((key) => [key, columnLabel(key, l)]),
+  ) as Record<ContactColumnKey, string>;
 
   // Table/board toggle (task 14.1; design.md "Routes": "`?layout=board`
   // all live in the query string"). Board mode groups by derived status
@@ -459,31 +459,21 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <span className="meta">
             {l.sortedByPrefix} <strong className="soft">{sort === "name" ? l.colName : l.colLastActivity}</strong>
           </span>
-          <details className="dropdown">
-            <summary className="btn btn-secondary btn-sm">{l.columnsPickerLabel}</summary>
-            <form action={updateViewColumnsAction} className="menu">
-              <input type="hidden" name="view" value={activeView.viewKey} />
-              <div className="menu-label">{l.columnsPickerHelp}</div>
-              <label className="check">
-                <input type="checkbox" checked disabled /> {l.colName}
-              </label>
-              {ALL_CONTACT_COLUMNS.map((key) => (
-                <label key={key} className="check">
-                  <input
-                    type="checkbox"
-                    name="columns"
-                    value={key}
-                    defaultChecked={visibleColumns.includes(key)}
-                  />{" "}
-                  {columnLabel(key, l)}
-                </label>
-              ))}
-              <div className="menu-sep" />
-              <button type="submit" className="btn btn-primary btn-sm">
-                {l.columnsApply}
-              </button>
-            </form>
-          </details>
+          <ColumnPicker
+            viewKey={activeView.viewKey}
+            allColumns={ALL_CONTACT_COLUMNS}
+            visibleColumns={visibleColumns}
+            columnLabels={columnLabelsByKey}
+            labels={{
+              pickerLabel: l.columnsPickerLabel,
+              helpText: l.columnsPickerHelp,
+              nameLabel: l.colName,
+              applyLabel: l.columnsApply,
+              resetLabel: l.columnsReset,
+              moveUpLabel: l.columnsMoveUp,
+              moveDownLabel: l.columnsMoveDown,
+            }}
+          />
         </div>
       )}
 

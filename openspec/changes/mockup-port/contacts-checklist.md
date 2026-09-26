@@ -53,8 +53,8 @@ Columns: element | mockup | status | evidence | notes
 | "Borrar todo" | contacts.html:89 | deviation | page.tsx:608-610 (`l.filtersClear` link) | Clears ad-hoc filters via a link back to `?view=X`, but lives inside the filter panel, not as a toolbar-level "Borrar todo" button next to chips. |
 | "Ordenado por Última actividad" indicator | contacts.html:91 | **done (branch 05)** | page.tsx (`l.sortedByPrefix`), default `sort=lastActivity` | |
 | "Columnas" dropdown, 12 checkable columns | contacts.html:92-94 | done | src/lib/contacts/columns.ts, page.tsx | All 12 mockup columns now selectable. |
-| — drag to reorder | contacts.html:93 (`.drag` handles) | todo | — | `ALL_CONTACT_COLUMNS` is a fixed array; `resolveVisibleColumns` always re-sorts to that fixed order regardless of requested order — no reorder capability exists. |
-| — "Restablecer" | contacts.html:94 | todo | — | No reset-to-default button in the column picker form; only "Aplicar" (submit). |
+| — drag to reorder | contacts.html:93 (`.drag` handles) | **done (branch 06)** | src/app/(app)/contacts/ColumnPicker.tsx, src/lib/contacts/columnOrder.ts | `sanitizeColumnKeys` now order-preserves (caller order, dedup by first occurrence) instead of always re-sorting to a fixed order — a real behavior change, existing tests updated. Drag-and-drop via native HTML5 DnD; also added Up/Down buttons per row for keyboard accessibility (task instruction), which the static mockup doesn't show but doesn't contradict either. |
+| — "Restablecer" | contacts.html:94 | **done (branch 06)** | ColumnPicker.tsx `reset()` | Resets both order and checked set to `DEFAULT_CONTACT_COLUMNS`. |
 | — "Aplicar" | contacts.html:94 | done | page.tsx:445-447 | |
 | "Exportar" (toolbar-level, whole filtered view) | contacts.html:95 | todo | src/lib/contacts/csvExport.ts (bulk-selection export only) | Only a bulk/selection-scoped export exists (BulkActionsBar.tsx `buildExportHref`); no toolbar-level "export the whole current view" action. |
 

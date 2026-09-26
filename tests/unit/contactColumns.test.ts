@@ -14,9 +14,9 @@ import {
   sanitizeColumnKeys,
 } from "@/lib/contacts/columns";
 
-test("sanitizeColumnKeys keeps only known keys, dedups, preserves ALL_CONTACT_COLUMNS order", () => {
+test("sanitizeColumnKeys keeps only known keys, dedups (first occurrence wins), and preserves the CALLER's order — not a fixed order — so column drag-reorder (mockup 'arrastrar para reordenar') actually persists", () => {
   const result = sanitizeColumnKeys(["email", "bogus", "company", "email", "owner"]);
-  assert.deepEqual(result, ["company", "owner", "email"]);
+  assert.deepEqual(result, ["email", "company", "owner"]);
 });
 
 test("sanitizeColumnKeys drops non-string entries and non-array input", () => {
@@ -38,7 +38,7 @@ test("resolveVisibleColumns falls back to DEFAULT_CONTACT_COLUMNS when given no 
 
 test("resolveVisibleColumns honors a valid explicit selection, including a subset", () => {
   assert.deepEqual(resolveVisibleColumns(["status"]), ["status"]);
-  assert.deepEqual(resolveVisibleColumns(["industry", "company"]), ["company", "industry"]);
+  assert.deepEqual(resolveVisibleColumns(["industry", "company"]), ["industry", "company"]);
 });
 
 test("ALL_CONTACT_COLUMNS contains every DEFAULT_CONTACT_COLUMNS entry", () => {
