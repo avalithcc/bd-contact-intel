@@ -8,6 +8,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon } from "@/components/icons";
+import { toTelHref } from "@/lib/phone";
 import { updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 
 export interface AboutPaneProperty {
@@ -255,6 +256,12 @@ function PropertyRow({
 }) {
   const [draft, setDraft] = useState(prop.value ?? "");
   const inputId = `contact-prop-${prop.key}`;
+  // "Teléfono"/"Móvil" rows are `tel:` links (contact-record.html), not
+  // plain text — same phone.ts helper the record page's export and list
+  // column use, so display/dialing can never disagree on what's a valid
+  // number.
+  const isPhoneProp = prop.key === "phone" || prop.key === "mobilePhone";
+  const telHref = isPhoneProp && prop.value ? toTelHref(prop.value) : null;
 
   if (editing) {
     return (
@@ -292,7 +299,7 @@ function PropertyRow({
     <div className="prop">
       <dt>{prop.label}</dt>
       <dd>
-        {prop.value ?? l.emptyValue}
+        {telHref ? <a href={telHref}>{prop.value}</a> : (prop.value ?? l.emptyValue)}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
         <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />

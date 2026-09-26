@@ -13,8 +13,9 @@ import {
   type LinkedinTimelineEntryType,
 } from "@/lib/contacts/connectionTimelineEntries";
 import { groupEmailThreads } from "@/lib/contacts/emailThreads";
-import { entryBody } from "@/lib/contacts/timelineEntryBody";
+import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
 import {
+  CallIcon,
   DiscardIcon,
   HistoryIcon,
   LinkedInIcon,
@@ -71,6 +72,7 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   hunter_lookup: "timelineFilterHunter",
   status_change: "timelineFilterStatusChange",
   meeting_logged: "timelineFilterMeeting",
+  call: "timelineFilterCall",
   discarded: "timelineFilterDiscarded",
   status_backfill: "timelineFilterStatusBackfill",
 };
@@ -84,6 +86,7 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   hunter_lookup: SearchIcon,
   status_change: HistoryIcon,
   meeting_logged: MeetingIcon,
+  call: CallIcon,
   discarded: DiscardIcon,
   status_backfill: HistoryIcon,
 };
@@ -92,6 +95,7 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   email_sent: "email",
   status_change: "system",
   meeting_logged: "meeting",
+  call: "call",
   discarded: "discard",
   status_backfill: "system",
 };
@@ -368,8 +372,14 @@ export function Timeline({
                     <div className={iconClass === "system" ? "tl-card system" : "tl-card"}>
                       <div className="tl-head">
                         <span className="what">
-                          {l[FILTER_LABEL_KEY[timelineEntry.type as TimelineActivityType]] as string} ·{" "}
-                          {timelineEntry.actorName ?? l.timelineSystemActor}
+                          {timelineEntry.type === "call" ? (
+                            callWhatLabel(timelineEntry.metadata ?? {}, l)
+                          ) : (
+                            <>
+                              {l[FILTER_LABEL_KEY[timelineEntry.type as TimelineActivityType]] as string} ·{" "}
+                              {timelineEntry.actorName ?? l.timelineSystemActor}
+                            </>
+                          )}
                         </span>
                         <span className="when">{formatWhen(timelineEntry.createdAt)}</span>
                       </div>

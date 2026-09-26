@@ -9,9 +9,11 @@ import {
   addContactSignalAction,
   addContactTaskAction,
   discardContactAction,
+  logCallAction,
   logContactMeetingAction,
   sendContactEmailAction,
 } from "../actions";
+import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
 import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
@@ -21,6 +23,7 @@ import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/dis
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
 import {
+  CallIcon,
   ClipboardIcon,
   DiscardIcon,
   GenerateIcon,
@@ -45,7 +48,20 @@ export interface QuickActionsProps {
   initialAction?: "email" | "meeting" | "discard" | null;
 }
 
-type QuickAction = "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
+type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
+
+const CALL_OUTCOME_LABEL_KEY: Record<CallOutcomeCode, keyof ContactRecordLabels> = {
+  connected: "callOutcomeConnected",
+  busy: "callOutcomeBusy",
+  no_answer: "callOutcomeNoAnswer",
+  voicemail: "callOutcomeVoicemail",
+  wrong_number: "callOutcomeWrongNumber",
+};
+
+const CALL_DIRECTION_LABEL_KEY: Record<CallDirection, keyof ContactRecordLabels> = {
+  outbound: "callDirectionOutbound",
+  inbound: "callDirectionInbound",
+};
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -130,6 +146,12 @@ export function QuickActions({
           </span>
           {l.quickActionNote}
         </a>
+        <button type="button" className="qa" onClick={() => toggle("call")}>
+          <span className="qa-icon">
+            <CallIcon className="icon" />
+          </span>
+          {l.quickActionCall}
+        </button>
         <button type="button" className="qa" onClick={() => toggle("email")}>
           <span className="qa-icon">
             <MailIcon className="icon" />
@@ -198,6 +220,30 @@ export function QuickActions({
             )}
           </div>
         </Dialog>
+      )}
+
+      {openAction === "call" && (
+        <CallForm
+          labels={l}
+          busy={busy}
+          error={error}
+          onCancel={closeQuickAction}
+          onSubmit={async (outcome, direction, date, time, durationMinutes, notes) => {
+            setBusy(true);
+            setError(null);
+            const result = await logCallAction(personId, outcome, direction, date, time, durationMinutes, notes);
+            setBusy(false);
+            if (result.ok) {
+              closeQuickAction();
+              showToast(l.toastCallLogged);
+              router.refresh();
+            } else {
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message });
+              showToast(message, "error");
+            }
+          }}
+        />
       )}
 
       {openAction === "task" && (
@@ -442,6 +488,97 @@ function EmailForm({
           </button>
           <button type="button" disabled={busy || !body.trim()} onClick={() => body.trim() && onSubmit(subject.trim(), body.trim())}>
             {l.emailSend}
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+export function CallForm({
+  labels: l,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+}: ComposerProps & {
+  onSubmit: (
+    outcome: string,
+    direction: string,
+    date: string,
+    time: string,
+    durationMinutes: string,
+    notes: string,
+  ) => void;
+}) {
+  const [outcome, setOutcome] = useState("");
+  const [direction, setDirection] = useState<CallDirection>("outbound");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [notes, setNotes] = useState("");
+
+  return (
+    <Dialog open onClose={onCancel} title={l.callSubmit}>
+      <div className="composer">
+        {error && <ErrorNotice labels={l} error={error} />}
+        <label className="field">
+          {l.callOutcomeLabel}
+          <select className="input" value={outcome} onChange={(e) => setOutcome(e.target.value)} disabled={busy}>
+            <option value="">{l.callOutcomePlaceholder}</option>
+            {CALL_OUTCOME_CODES.map((code) => (
+              <option key={code} value={code}>
+                {l[CALL_OUTCOME_LABEL_KEY[code]] as string}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          {l.callDirectionLabel}
+          <select
+            className="input"
+            value={direction}
+            onChange={(e) => setDirection(e.target.value as CallDirection)}
+            disabled={busy}
+          >
+            {CALL_DIRECTIONS.map((code) => (
+              <option key={code} value={code}>
+                {l[CALL_DIRECTION_LABEL_KEY[code]] as string}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          {l.callDateLabel}
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} />
+          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.callDurationLabel}
+          <input
+            className="input"
+            type="number"
+            min={0}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+        <label className="field">
+          {l.callNotesLabel}
+          <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+        </label>
+        <p className="hint">{l.callHelp}</p>
+        <div className="bar">
+          <button type="button" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={busy || !outcome}
+            onClick={() => outcome && onSubmit(outcome, direction, date, time, durationMinutes, notes)}
+          >
+            {l.callSubmit}
           </button>
         </div>
       </div>

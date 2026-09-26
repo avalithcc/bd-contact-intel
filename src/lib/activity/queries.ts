@@ -14,6 +14,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "hunter_lookup",
   "status_change",
   "meeting_logged",
+  "call",
   "discarded",
   "status_backfill",
 ] as const;
