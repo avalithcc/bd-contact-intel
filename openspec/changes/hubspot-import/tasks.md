@@ -61,13 +61,13 @@ sanitized error if a *required* header name repeats.
 ## Phase 2: Company Resolution + Migration 0015 (PR H2, base: PR H1)
 
 - [ ] 2.1 **GATE (owner/orchestrator)**: apply migration `drizzle/0015_company_domain.sql` to prod BEFORE any dry run against production data.
-- [ ] 2.2 Write `drizzle/0015_company_domain.sql` + `drizzle/meta/*`: `company.domain text` + partial unique index (domain not null). `src/db/schema.ts` updated.
-- [ ] 2.3 Test: `tests/unit/drizzleJournal.test.ts` — 0015's journal `when` exceeds 0014's `1790713471556`.
-- [ ] 2.4 RED/GREEN: `src/lib/hubspot/companies.ts` (pure) — group by normalized domain (lowercase, no protocol/`www.`/path); per group, match by domain, then by `companyKey` of each name, else create; representative = most primary contacts, ties → lowest ID; name match fills empty `domain` only.
-- [ ] 2.5 RED/GREEN: own-company groups (`ownCompanyMatchReason`, name or domain) create nothing; their contacts are skipped and counted `skipped_own_company`.
-- [ ] 2.6 RED/GREEN: company rows created ONLY for groups that are the primary company of ≥1 imported contact, or that carry a note (hubspot-import spec "Company matching and creation" — no-op scenario for unlinked, note-less companies).
-- [ ] 2.7 RED/GREEN: `Associated Note` → `activity{companyKey, type:'note', actorBdId:null, metadata:{body, source:'hubspot_import', hubspotCompanyId}}`; skipped if one with the same `hubspotCompanyId` already exists.
-- [ ] 2.8 Test: no-company-resolved fallback counted as `noCompanyResolved` when `Associated Company IDs (Primary)` is absent or unresolved.
+- [x] 2.2 Write `drizzle/0015_company_domain.sql` + `drizzle/meta/*`: `company.domain text` + partial unique index (domain not null). `src/db/schema.ts` updated.
+- [x] 2.3 Test: `tests/unit/drizzleJournal.test.ts` — 0015's journal `when` exceeds 0014's `1790713471556`.
+- [x] 2.4 RED/GREEN: `src/lib/hubspot/companies.ts` (pure) — group by normalized domain (lowercase, no protocol/`www.`/path); per group, match by domain, then by `companyKey` of each name, else create; representative = most primary contacts, ties → lowest ID; name match fills empty `domain` only.
+- [x] 2.5 RED/GREEN: own-company groups (`ownCompanyMatchReason`, name or domain) create nothing; their contacts are skipped and counted `skipped_own_company`. (Company-side primitive: `resolveContactCompanyKey` returns `ownCompany:true`, `companyKey:null`. Actual contact skip + `skipped_own_company` counter wiring happens in Phase 3's `planner.ts`, task 3.9.)
+- [x] 2.6 RED/GREEN: company rows created ONLY for groups that are the primary company of ≥1 imported contact, or that carry a note (hubspot-import spec "Company matching and creation" — no-op scenario for unlinked, note-less companies).
+- [x] 2.7 RED/GREEN: `Associated Note` → `activity{companyKey, type:'note', actorBdId:null, metadata:{body, source:'hubspot_import', hubspotCompanyId}}`; skipped if one with the same `hubspotCompanyId` already exists. (`companies.ts#notesToCreate` plans the note; wiring it to an actual `activity` insert with `actorBdId:null` happens in Phase 4's execute transaction, since this PR stays DB-write-free.)
+- [x] 2.8 Test: no-company-resolved fallback counted as `noCompanyResolved` when `Associated Company IDs (Primary)` is absent or unresolved.
 
 ## Phase 3: Identity Planning + Activities (PR H3, base: PR H2)
 
