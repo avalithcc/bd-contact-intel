@@ -29,7 +29,28 @@ export type ContactActionErrorReason =
   | "discard_note_required"
   | "meeting_date_required"
   | "signal_text_required"
+  | "owner_invalid"
+  | "owner_locked"
   | "unexpected";
+
+/** A `?owner=` `<select>` value that isn't blank and isn't a well-formed
+ * uuid (src/lib/contacts/bulkOwner.ts#normalizeOwnerSelectValue). */
+export class OwnerValueInvalidError extends Error {
+  constructor() {
+    super("Owner value is not a blank string or a valid uuid");
+    this.name = "OwnerValueInvalidError";
+  }
+}
+
+/** R3 blocked the reassignment: the person already has a
+ * `person_bd_connection` row (same rule as updateLeadOwner/bulkAssignOwner —
+ * see design.md R3). */
+export class OwnerReassignLockedError extends Error {
+  constructor() {
+    super("Owner cannot be reassigned: person already has a connected BD (R3)");
+    this.name = "OwnerReassignLockedError";
+  }
+}
 
 export type ContactActionResult = { ok: true } | { ok: false; reason: ContactActionErrorReason };
 
@@ -55,6 +76,8 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof DiscardNoteRequiredError) return "discard_note_required";
   if (err instanceof MeetingDateRequiredError) return "meeting_date_required";
   if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
+  if (err instanceof OwnerValueInvalidError) return "owner_invalid";
+  if (err instanceof OwnerReassignLockedError) return "owner_locked";
   return "unexpected";
 }
 

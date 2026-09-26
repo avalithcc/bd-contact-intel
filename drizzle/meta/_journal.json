@@ -99,6 +99,13 @@
       "when": 1790627071556,
       "tag": "0013_unified_person",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790713471556,
+      "tag": "0014_wealthy_micromax",
+      "breakpoints": true
     }
   ]
 }

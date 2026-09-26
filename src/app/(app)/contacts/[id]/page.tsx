@@ -3,11 +3,13 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
+import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
-import { getDictionary } from "@/lib/i18n/server";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
+import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
@@ -17,7 +19,16 @@ export const dynamic = "force-dynamic";
 
 interface ContactRecordPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ activityType?: string }>;
+  searchParams: Promise<{ activityType?: string; openAction?: string }>;
+}
+
+// Board drag/keyboard-menu targets (task 10.5, 14.1) — the ONLY quick
+// actions a `?openAction=` link is allowed to auto-open; anything else is
+// ignored rather than trusted blindly from a query string.
+const OPEN_ACTION_VALUES = ["email", "meeting", "discard"] as const;
+type OpenActionParam = (typeof OPEN_ACTION_VALUES)[number];
+function isOpenActionParam(value: string | undefined): value is OpenActionParam {
+  return !!value && (OPEN_ACTION_VALUES as readonly string[]).includes(value);
 }
 
 /**
@@ -29,7 +40,8 @@ interface ContactRecordPageProps {
  */
 export default async function ContactRecordPage({ params, searchParams }: ContactRecordPageProps) {
   const { id } = await params;
-  const { activityType: rawActivityType } = await searchParams;
+  const { activityType: rawActivityType, openAction: rawOpenAction } = await searchParams;
+  const openAction = isOpenActionParam(rawOpenAction) ? rawOpenAction : null;
   const result = await getContactRecord(id);
 
   if (result.kind === "not_found") notFound();
@@ -38,10 +50,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const { record } = result;
   const dict = await getDictionary();
   const l = pickContactRecordLabels(dict);
+  const messageLabels = pickGenerateMessageLabels(dict);
+  const locale = await getLocale();
   const activityType = rawActivityType && isTimelineActivityType(rawActivityType) ? rawActivityType : undefined;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const timeline = await getPersonTimeline(record.person.id, me.id, { type: activityType });
+  const [timeline, ownerOptions] = await Promise.all([
+    getPersonTimeline(record.person.id, me.id, { type: activityType }),
+    listOwnerOptions(),
+  ]);
+  // R3 (design.md): reassignment is only allowed while the person has no
+  // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
+  // enforces server-side for updateContactOwnerAction (task 13.3).
+  const ownerLocked = record.connections.length > 0;
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
@@ -65,8 +86,14 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           headline={record.person.jobTitle}
           statusLabel={statusLabel}
           ownerLabel={record.ownerName}
+          ownerBdId={record.person.ownerBdId}
+          ownerLocked={ownerLocked}
+          ownerOptions={ownerOptions}
           email={record.person.email}
           properties={properties}
+          messageLabels={messageLabels}
+          locale={locale}
+          initialAction={openAction}
         />
 
         <div className={styles.main}>

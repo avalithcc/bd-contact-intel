@@ -47,7 +47,7 @@ export default async function HiringPage({
           <Link className="secondary-btn" href="/whats-new">
             {dict.common.whatsNew}
           </Link>
-          <Link className="secondary-btn" href="/leads">
+          <Link className="secondary-btn" href="/contacts">
             {dict.common.leadsNav}
           </Link>
           <UserMenu

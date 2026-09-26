@@ -10,20 +10,21 @@ function breadcrumbFor(pathname: string, labels: NavLabels): string {
   const item = NAVIGATION.flatMap((section) => section.items).find((i) =>
     pathname.startsWith(i.href),
   );
-  // "/" itself is the pre-Phase-12 contacts home (design.md D9: /contacts
-  // formalizes it later) — label it accordingly rather than leaving the
-  // breadcrumb blank.
+  // "/" is the legacy pre-Phase-12 contacts home, kept as a separate,
+  // still-bdId-scoped page (task 11.7 SUGGESTION) — /contacts (task 12.2)
+  // is the new unified list this breadcrumb/search now points at.
   return item ? labels[item.labelKey] : labels.contactsFallback;
 }
 
 /**
  * App shell top bar (design.md D9, Phase 8). Search is contacts-only (owner
- * decision, tasks.md 8.2): it submits to the current contacts list (`/`,
- * pending the /contacts route Phase 12 introduces) using the same `q`
- * param that page already reads. Deliberately does not include the
- * mockup's "Crear"/account dropdowns — those duplicate per-page controls
- * (e.g. UserMenu) that later phases migrate onto this shell one page at a
- * time, not a Phase 8 shell-only concern.
+ * decision, tasks.md 8.2): it submits to `/contacts` (task 12.2 — this
+ * route didn't exist yet when the shell shipped, so it targeted `/`),
+ * using the same `q` param that page reads (getContactListPage's search
+ * condition, listQueries.ts). Deliberately does not include the mockup's
+ * "Crear"/account dropdowns — those duplicate per-page controls (e.g.
+ * UserMenu) that later phases migrate onto this shell one page at a time,
+ * not a Phase 8 shell-only concern.
  */
 export function TopBar({ labels }: { labels: NavLabels }) {
   const pathname = usePathname();
@@ -32,7 +33,7 @@ export function TopBar({ labels }: { labels: NavLabels }) {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push(q ? `/?q=${encodeURIComponent(q)}` : "/");
+    router.push(q ? `/contacts?q=${encodeURIComponent(q)}` : "/contacts");
   }
 
   return (

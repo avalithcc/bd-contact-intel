@@ -15,6 +15,7 @@ import {
   contactRowsToIdentityRows,
   leadRowsToIdentityRows,
   runIdentityCutoverChunk,
+  sumIdentityReports,
   type InsertedContactRow,
   type InsertedLeadRow,
 } from "@/lib/identity/ingestWrite";
@@ -111,7 +112,7 @@ test("runIdentityCutoverChunk: kill switch off runs only legacyWrite — no lock
     },
   });
   assert.deepEqual(calls, ["legacyWrite"]);
-  assert.deepEqual(result, [{ id: "x" }]);
+  assert.deepEqual(result, { legacyRows: [{ id: "x" }], report: null });
 });
 
 test("runIdentityCutoverChunk: dual write enabled runs legacyWrite FIRST, then takes the lock around prefetch/apply only (design D14)", async () => {
@@ -179,6 +180,65 @@ test("runIdentityCutoverChunk: no identity rows for the chunk skips prefetch/app
     },
   });
   assert.deepEqual(calls, ["toIdentityRows"]);
+});
+
+test("runIdentityCutoverChunk (task 14.2): surfaces the plan's report so a caller can show a dedup outcome", async () => {
+  const result = await runIdentityCutoverChunk(true, {
+    withLock: async (fn) => fn(),
+    legacyWrite: async () => [{ id: "x" }],
+    toIdentityRows: () => [
+      {
+        legacyTable: "contact",
+        legacyId: "x",
+        bdId: "bd-1",
+        profileKey: "https://www.linkedin.com/in/new-person/",
+        connectedOn: null,
+        firstName: "New",
+        lastName: "Person",
+        company: "Acme",
+        companyKey: "acme",
+        jobTitle: null,
+        industry: null,
+        email: null,
+        emailStatus: "none",
+        emailConfidence: null,
+        emailSource: null,
+      },
+    ],
+    prefetch: async () => [],
+    apply: async () => {},
+  });
+  assert.equal(result.report?.rowsRead, 1);
+  assert.equal(result.report?.new, 1);
+});
+
+test("sumIdentityReports (task 14.2): sums across chunks, ignoring null (kill-switch-off / no-identity-rows) chunks", () => {
+  const a: import("@/lib/identity/ingestWrite").IdentityIngestReport = {
+    rowsRead: 3,
+    ownCompanySkipped: 1,
+    autoMerged: 1,
+    flaggedForReview: 0,
+    new: 1,
+  };
+  const b: import("@/lib/identity/ingestWrite").IdentityIngestReport = {
+    rowsRead: 2,
+    ownCompanySkipped: 0,
+    autoMerged: 0,
+    flaggedForReview: 1,
+    new: 1,
+  };
+  const total = sumIdentityReports([a, null, b]);
+  assert.deepEqual(total, {
+    rowsRead: 5,
+    ownCompanySkipped: 1,
+    autoMerged: 1,
+    flaggedForReview: 1,
+    new: 2,
+  });
+});
+
+test("sumIdentityReports: returns null when every chunk contributed nothing (e.g. kill switch off for the whole import)", () => {
+  assert.equal(sumIdentityReports([null, null]), null);
 });
 
 test("runIdentityCutoverChunk: a failure in apply propagates out (so the caller's db.transaction rolls back the legacy write too)", async () => {

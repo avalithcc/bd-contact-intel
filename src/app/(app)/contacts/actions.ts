@@ -11,8 +11,12 @@ import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planDiscard } from "@/lib/contacts/discard";
 import { addManualSignal } from "@/lib/contacts/manualSignalDb";
+import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
+import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
 import {
   contactActionErrorReason,
+  OwnerReassignLockedError,
+  OwnerValueInvalidError,
   PropertyNotEditableError,
   type ContactActionResult,
 } from "./actionErrors";
@@ -43,6 +47,33 @@ export async function updateContactPropertyAction(
     if (!isEditablePersonProperty(property)) throw new PropertyNotEditableError(property);
     const me = await getCurrentBd();
     await updateContactProperty(personId, property, value, me.id);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * Single-record owner reassignment (task 13.3 parity gap: `/leads/[id]`
+ * offered this, `/contacts/[id]`'s generic property editor deliberately
+ * excludes `ownerBdId` — see propertyEdit.ts's doc comment). Reuses
+ * `bulkAssignOwner` — the SAME R3 rule as the list's bulk "Asignar
+ * responsable" (task 13.2) and `updateLeadOwner`, applied to a one-element
+ * selection, so a single-record and bulk reassignment can never disagree on
+ * when a reassignment is allowed.
+ */
+export async function updateContactOwnerAction(
+  personId: string,
+  ownerBdIdRaw: string,
+): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    const ownerBdId = normalizeOwnerSelectValue(ownerBdIdRaw);
+    if (ownerBdId === undefined) throw new OwnerValueInvalidError();
+    const me = await getCurrentBd();
+    const plan = await bulkAssignOwner([personId], ownerBdId, me.id);
+    if (plan[0]?.outcome === "skipped_has_connection") throw new OwnerReassignLockedError();
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

@@ -21,6 +21,8 @@ import type { ParseMessagesResult } from "@/lib/messagesCsv";
 import {
   contactRowsToIdentityRows,
   runIdentityCutoverChunk,
+  sumIdentityReports,
+  type IdentityIngestReport,
   type InsertedContactRow,
 } from "@/lib/identity/ingestWrite";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
@@ -423,6 +425,10 @@ export interface UpsertContactsResult {
   // LinkedIn connections today, potentially a scrape or a third-party CSV
   // tomorrow). See src/lib/ownCompany.ts.
   skippedOwnCompany: number;
+  // The identity resolver's dedup outcome across every chunk (task 14.2's
+  // `/contacts/import`), or null when IDENTITY_DUAL_WRITE is off. See
+  // sumIdentityReports.
+  identityReport: IdentityIngestReport | null;
 }
 
 /**
@@ -437,12 +443,13 @@ export async function upsertContacts(
   bdId: string,
   rows: Omit<NewContact, "bdId">[],
 ): Promise<UpsertContactsResult> {
-  if (!rows.length) return { imported: 0, skippedOwnCompany: 0 };
+  if (!rows.length) return { imported: 0, skippedOwnCompany: 0, identityReport: null };
   const { kept: filteredRows, skipped: ownRows } = partitionOwnCompanyRows(rows);
   const skippedOwnCompany = ownRows.length;
-  if (!filteredRows.length) return { imported: 0, skippedOwnCompany };
+  if (!filteredRows.length) return { imported: 0, skippedOwnCompany, identityReport: null };
 
   let count = 0;
+  const chunkReports: (IdentityIngestReport | null)[] = [];
   // chunk to keep parameter counts sane
   const chunkSize = 500;
   for (let i = 0; i < filteredRows.length; i += chunkSize) {
@@ -488,7 +495,7 @@ export async function upsertContacts(
               connectedOn: sql`excluded.connected_on`,
             },
           });
-      await runIdentityCutoverChunk(dualWriteEnabled, {
+      const { report } = await runIdentityCutoverChunk(dualWriteEnabled, {
         withLock: (fn) => withIdentityLock(tx, fn),
         legacyWrite: dualWriteEnabled
           ? () =>
@@ -513,10 +520,11 @@ export async function upsertContacts(
         prefetch: (rows) => prefetchIdentityIndex(tx, rows),
         apply: (plan) => applyIdentityWrites(tx, plan),
       });
+      chunkReports.push(report);
     });
     count += chunk.length;
   }
-  return { imported: count, skippedOwnCompany };
+  return { imported: count, skippedOwnCompany, identityReport: sumIdentityReports(chunkReports) };
 }
 
 export interface PositionTitleCount {

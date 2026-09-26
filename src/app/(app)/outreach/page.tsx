@@ -11,6 +11,7 @@ import { SignOutButton } from "../../SignOutButton";
 import { UserMenu } from "../../UserMenu";
 import { BackButton } from "../../BackButton";
 import { GenerateMessageButton } from "./GenerateMessageButton";
+import { generateOutreachMessage } from "./actions";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 export const dynamic = "force-dynamic";
@@ -112,7 +113,7 @@ export default async function OutreachPage({
           <Link className="secondary-btn" href="/hiring">
             {dict.common.hiringSignals}
           </Link>
-          <Link className="secondary-btn" href="/leads">
+          <Link className="secondary-btn" href="/contacts">
             {dict.common.leadsNav}
           </Link>
           <UserMenu
@@ -328,7 +329,10 @@ export default async function OutreachPage({
                     </td>
                     <td>
                       {r.hasOwnContact ? (
-                        <GenerateMessageButton contactId={r.id} locale={locale} labels={messageLabels} />
+                        <GenerateMessageButton
+                          boundAction={generateOutreachMessage.bind(null, r.id, locale)}
+                          labels={messageLabels}
+                        />
                       ) : (
                         <span className="secondary-btn disabled" title={dict.outreach.unifiedRecordPending}>
                           {messageLabels.generateMessage}

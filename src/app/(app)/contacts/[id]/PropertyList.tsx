@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import type { EditablePersonProperty } from "@/lib/contacts/propertyEdit";
-import { updateContactPropertyAction } from "../actions";
+import { updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 import styles from "./AboutPane.module.css";
 
 export interface AboutPaneProperty {
@@ -14,30 +14,122 @@ export interface AboutPaneProperty {
   lastUpdatedLabel: string | null;
 }
 
+export interface OwnerOption {
+  id: string;
+  name: string;
+}
+
 export interface PropertyListProps {
   personId: string;
   labels: ContactRecordLabels;
   ownerLabel: string | null;
+  ownerBdId: string | null;
+  // R3 (design.md): reassignment is only allowed while the person has no
+  // `person_bd_connection` row yet — same rule bulkAssignOwner enforces
+  // server-side; this only decides whether to render the picker as busy/
+  // disabled instead of silently letting a doomed request through.
+  ownerLocked: boolean;
+  ownerOptions: OwnerOption[];
   properties: AboutPaneProperty[];
 }
 
 /**
  * Editable-properties list of the Contact record shell (task 9.4): the
- * `owner` row (read-only, see propertyEdit.ts's doc comment) plus one
+ * `owner` row — editable since task 13.3 (single-record reassignment,
+ * reusing the list's bulk "Asignar responsable" R3 rule) — plus one
  * inline-editable row per allow-listed property.
  */
-export function PropertyList({ personId, labels: l, ownerLabel, properties }: PropertyListProps) {
+export function PropertyList({
+  personId,
+  labels: l,
+  ownerLabel,
+  ownerBdId,
+  ownerLocked,
+  ownerOptions,
+  properties,
+}: PropertyListProps) {
   const router = useRouter();
   const [editingKey, setEditingKey] = useState<EditablePersonProperty | null>(null);
+  const [ownerEditing, setOwnerEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ownerError, setOwnerError] = useState<string | null>(null);
+  const [ownerDraft, setOwnerDraft] = useState(ownerBdId ?? "");
 
   return (
     <dl className={styles.props}>
       <div className={styles.prop}>
-        <dt>{l.propOwner}</dt>
-        <dd>{ownerLabel ?? l.emptyValue}</dd>
-        <dd className={styles.hint}>{l.ownerNotEditableNote}</dd>
+        <dt id="contact-prop-owner-label">{l.propOwner}</dt>
+        {ownerEditing ? (
+          <>
+            <dd>
+              <select
+                aria-labelledby="contact-prop-owner-label"
+                className={styles.input}
+                value={ownerDraft}
+                onChange={(e) => setOwnerDraft(e.target.value)}
+                disabled={busy}
+                autoFocus
+              >
+                <option value="">{l.ownerUnassignedOption}</option>
+                {ownerOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </dd>
+            {ownerError && (
+              <dd className={styles.error} role="alert">
+                {ownerError}
+              </dd>
+            )}
+            <dd className={styles.editRow}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setOwnerError(null);
+                  try {
+                    const result = await updateContactOwnerAction(personId, ownerDraft);
+                    if (result.ok) {
+                      setOwnerEditing(false);
+                      router.refresh();
+                    } else {
+                      setOwnerError(contactActionErrorMessage(l, result.reason));
+                    }
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {l.save}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setOwnerError(null);
+                  setOwnerDraft(ownerBdId ?? "");
+                  setOwnerEditing(false);
+                }}
+              >
+                {l.cancel}
+              </button>
+            </dd>
+          </>
+        ) : (
+          <dd>
+            {ownerLabel ?? l.emptyValue}
+            {!ownerLocked && (
+              <button type="button" className={styles.editIcon} onClick={() => setOwnerEditing(true)}>
+                {l.edit}
+              </button>
+            )}
+          </dd>
+        )}
+        {ownerLocked && <dd className={styles.hint}>{l.ownerLockedNote}</dd>}
       </div>
       {properties.map((prop) => (
         <PropertyRow
