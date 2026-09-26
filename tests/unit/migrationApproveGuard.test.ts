@@ -55,3 +55,22 @@ test("refuses when the run is not the latest dry run of its kind (a newer run ha
     (err: unknown) => err instanceof MigrationApproveBlockedError && err.reason === "not_latest_dry_run",
   );
 });
+
+test("refuses approving a hubspot_import run over the review threshold without explicit confirmation", () => {
+  assert.throws(
+    () => assertApprovable(run({ kind: "hubspot_import", reviewCount: 301 }), "hubspot_import", "run-1"),
+    (err: unknown) => err instanceof MigrationApproveBlockedError && err.reason === "review_threshold_unconfirmed",
+  );
+});
+
+test("allows approving a hubspot_import run over the threshold once explicitly confirmed", () => {
+  assert.doesNotThrow(() =>
+    assertApprovable(run({ kind: "hubspot_import", reviewCount: 301 }), "hubspot_import", "run-1", true),
+  );
+});
+
+test("does not require confirmation for a hubspot_import run at or below the review threshold", () => {
+  assert.doesNotThrow(() =>
+    assertApprovable(run({ kind: "hubspot_import", reviewCount: 300 }), "hubspot_import", "run-1"),
+  );
+});

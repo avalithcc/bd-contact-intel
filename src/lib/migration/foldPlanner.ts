@@ -335,6 +335,10 @@ export function planFoldLeads(
   const index: IdentityIndex = {
     byProfileKey: (key) => byProfileKey.get(key) ?? null,
     byVerifiedEmail: (email) => byVerifiedEmail.get(email) ?? null,
+    // email_unverified (contact-identity delta) is scoped to hubspot_import
+    // rows only — fold-leads never sets `source`, so this is never
+    // consulted; kept empty rather than omitted to satisfy the interface.
+    byEmail: () => [],
     byNameCompany: (key) => byNameCompany.get(key) ?? [],
   };
 

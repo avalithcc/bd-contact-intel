@@ -12,6 +12,8 @@ test("parses --phase=collapse with no other flags as a dry run", () => {
     phase: "collapse",
     mode: "dry_run",
     runId: null,
+    file: null,
+    companies: null,
   });
 });
 
@@ -20,6 +22,8 @@ test("parses explicit --dry-run the same as the default", () => {
     phase: "fold_leads",
     mode: "dry_run",
     runId: null,
+    file: null,
+    companies: null,
   });
 });
 
@@ -28,6 +32,8 @@ test("parses --execute with --run=<id>", () => {
     phase: "catch_up",
     mode: "execute",
     runId: "abc-123",
+    file: null,
+    companies: null,
   });
 });
 
@@ -44,6 +50,27 @@ test("rejects --execute together with --dry-run", () => {
     () => parseArgs(["--phase=collapse", "--execute", "--dry-run"]),
     /--execute.*--dry-run|--dry-run.*--execute/,
   );
+});
+
+test("parses --phase=hubspot_import with --file and --companies as a dry run", () => {
+  assert.deepEqual(parseArgs(["--phase=hubspot_import", "--file=/tmp/contacts.csv", "--companies=/tmp/companies.csv"]), {
+    phase: "hubspot_import",
+    mode: "dry_run",
+    runId: null,
+    file: "/tmp/contacts.csv",
+    companies: "/tmp/companies.csv",
+  });
+});
+
+test("rejects --phase=hubspot_import missing --file or --companies", () => {
+  assert.throws(() => parseArgs(["--phase=hubspot_import", "--file=/tmp/contacts.csv"]), /--file.*--companies|--companies.*--file/);
+  assert.throws(() => parseArgs(["--phase=hubspot_import", "--companies=/tmp/companies.csv"]), /--file.*--companies|--companies.*--file/);
+  assert.throws(() => parseArgs(["--phase=hubspot_import"]), /--file.*--companies|--companies.*--file/);
+});
+
+test("rejects --file/--companies for any phase other than hubspot_import", () => {
+  assert.throws(() => parseArgs(["--phase=collapse", "--file=/tmp/x.csv"]), /hubspot_import/);
+  assert.throws(() => parseArgs(["--phase=catch_up", "--companies=/tmp/x.csv"]), /hubspot_import/);
 });
 
 test("rejects an unknown flag and lists the valid ones", () => {

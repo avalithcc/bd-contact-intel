@@ -16,3 +16,6 @@ tests/.auth/
 # src/lib/migration/backup.ts. Never committed — these are pg_dump files of
 # real production data.
 backups/
+
+# HubSpot exports with personal data (never commit)
+/hubspot/

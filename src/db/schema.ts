@@ -4,12 +4,14 @@ import {
   text,
   timestamp,
   index,
+  uniqueIndex,
   unique,
   primaryKey,
   boolean,
   jsonb,
   integer,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // A Business Developer. In v1 this stands in for the authenticated user;
 // it will later map 1:1 to a Supabase auth user id.
@@ -966,21 +968,35 @@ export type NewSavedView = typeof savedView.$inferInsert;
 // Company entity — team-shared CRM tracking. Keyed by the same companyKey
 // as targetCompany (via normalizeCompanyKey), but separate table so ATS
 // config/columns stay isolated.
-export const company = pgTable("company", {
-  companyKey: text("company_key").primaryKey(),
-  displayName: text("display_name").notNull(),
-  // Free text, app-validated pipeline: 'prospect' | 'qualified' | 'proposal_sent' | 'won' | 'lost'
-  relationshipStage: text("relationship_stage"),
-  // Revenue potential in undefined unit; nullable until estimated. Never
-  // used for calculations in MVP — display-only for now.
-  revenuePotential: integer("revenue_potential"),
-  notes: text("notes"),
-  // These are denormalized (not FKs) to preserve history if the BD is removed.
-  createdByBdId: uuid("created_by_bd_id"),
-  updatedByBdId: uuid("updated_by_bd_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const company = pgTable(
+  "company",
+  {
+    companyKey: text("company_key").primaryKey(),
+    displayName: text("display_name").notNull(),
+    // Free text, app-validated pipeline: 'prospect' | 'qualified' | 'proposal_sent' | 'won' | 'lost'
+    relationshipStage: text("relationship_stage"),
+    // Revenue potential in undefined unit; nullable until estimated. Never
+    // used for calculations in MVP — display-only for now.
+    revenuePotential: integer("revenue_potential"),
+    notes: text("notes"),
+    // These are denormalized (not FKs) to preserve history if the BD is removed.
+    createdByBdId: uuid("created_by_bd_id"),
+    updatedByBdId: uuid("updated_by_bd_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    // Normalized domain (lowercase, no protocol/www./path), used by the
+    // HubSpot import to match a HubSpot company to an existing one before
+    // falling back to the normalized-name key. Nullable — most existing
+    // companies have no domain on file yet. Partial unique index (below)
+    // so multiple NULLs are allowed but two companies can't share a domain.
+    domain: text("domain"),
+  },
+  (t) => ({
+    domainIdx: uniqueIndex("company_domain_idx")
+      .on(t.domain)
+      .where(sql`${t.domain} is not null`),
+  }),
+);
 
 export type Company = typeof company.$inferSelect;
 export type NewCompany = typeof company.$inferInsert;

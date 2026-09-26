@@ -95,3 +95,56 @@ test("refuses --phase=collapse --execute --run=<id> when the run is a fold_leads
     (err: unknown) => err instanceof MigrationExecutionBlockedError && err.reason === "wrong_kind",
   );
 });
+
+// --- hubspot_import review-threshold gate (hubspot-import spec
+// "Review-count threshold gate"; design D7) -------------------------------
+
+test("allows hubspot_import execution when review count is at the threshold (300)", () => {
+  assert.doesNotThrow(() =>
+    assertExecutionAllowed(
+      { kind: "hubspot_import", approvedAt: new Date(), executedAt: null, inputHash: "abc", reviewCount: 300 },
+      "abc",
+      "hubspot_import",
+    ),
+  );
+});
+
+test("refuses hubspot_import execution above the review threshold without an explicit confirmation", () => {
+  assert.throws(
+    () =>
+      assertExecutionAllowed(
+        { kind: "hubspot_import", approvedAt: new Date(), executedAt: null, inputHash: "abc", reviewCount: 301 },
+        "abc",
+        "hubspot_import",
+      ),
+    (err: unknown) =>
+      err instanceof MigrationExecutionBlockedError && err.reason === "review_threshold_unconfirmed",
+  );
+});
+
+test("allows hubspot_import execution above the review threshold once explicitly confirmed", () => {
+  assert.doesNotThrow(() =>
+    assertExecutionAllowed(
+      {
+        kind: "hubspot_import",
+        approvedAt: new Date(),
+        executedAt: null,
+        inputHash: "abc",
+        reviewCount: 301,
+        reviewThresholdConfirmed: true,
+      },
+      "abc",
+      "hubspot_import",
+    ),
+  );
+});
+
+test("a non-hubspot_import kind is never subject to the review-threshold gate", () => {
+  assert.doesNotThrow(() =>
+    assertExecutionAllowed(
+      { kind: "catch_up", approvedAt: new Date(), executedAt: null, inputHash: "abc", reviewCount: 9999 },
+      "abc",
+      "catch_up",
+    ),
+  );
+});

@@ -34,10 +34,36 @@ import {
 
 // --- Row-building blocks shared with the row-level types below -------------
 
+/** contact-identity delta (task 3.3): 'r7' is the existing specificity/
+ * recency-based merge (unchanged default for the live/collapse/fold paths);
+ * 'fill_empty' NEVER overwrites a value already present on the existing
+ * person — it only fills a field that is currently null/empty. HubSpot
+ * import uses 'fill_empty' (design D4 "Re-import (R7/Q3)"). */
+export type MergePolicy = "r7" | "fill_empty";
+
+/**
+ * The ONE key format for a `legacyIdToPersonId` map entry (PR H7 fix — the
+ * `np51`-class production bug): `applyIdentityWrites` (resolveDb.ts) is the
+ * single producer of this map, keyed by `${legacyTable}:${legacyId}`; every
+ * consumer that needs to resolve a legacy row's real person id (e.g.
+ * hubspot_import's status-evidence activities, keyed by
+ * `hubspotContactId` -> `hubspotLegacyId(hubspotContactId)`) MUST build its
+ * lookup key through this function instead of reconstructing the format
+ * itself — a bare `legacyId` with no table prefix silently misses every
+ * entry and falls back to an unresolved plan ref (see
+ * src/lib/hubspot/executeWriteRows.ts).
+ */
+export function personIdMapKey(legacyTable: IdentityIngestRow["legacyTable"], legacyId: string): string {
+  return `${legacyTable}:${legacyId}`;
+}
+
 export interface IdentityIngestRow {
-  legacyTable: "contact" | "lead";
+  legacyTable: "contact" | "lead" | "hubspot_contact";
   legacyId: string;
-  bdId: string;
+  // Nullable (design D4): a HubSpot row's owner becomes person.ownerBdId,
+  // not a person_bd_connection — a HubSpot owner is not a LinkedIn
+  // connection. null bdId means no person_bd_connection row is written.
+  bdId: string | null;
   // Contacts only — leads have no LinkedIn profile key (contact-identity
   // spec: "Lead without email or LinkedIn falls back to name+company").
   profileKey?: string | null;
@@ -52,6 +78,14 @@ export interface IdentityIngestRow {
   emailStatus: EmailStatus;
   emailConfidence?: number | null;
   emailSource?: string | null;
+  // HubSpot-only extensions (design D4) — optional so `contact`/`lead` rows
+  // (and every existing caller) are unaffected.
+  ownerBdId?: string | null;
+  city?: string | null;
+  country?: string | null;
+  /** The migration_run that created this row, written once at person
+   * creation only — never touched on an existing-person update. */
+  migrationRunId?: string | null;
 }
 
 /** Subset of an existing `person` row the matcher/merge need — same shape as foldPlanner.ts's FoldExistingPerson. */
@@ -68,6 +102,15 @@ export interface ExistingPersonCandidate {
   emailStatus: EmailStatus;
   emailConfidence: number | null;
   emailSource: string | null;
+  // Raw company display text (person.company) — optional so existing
+  // callers built before this field existed (there were none passing an
+  // explicit value) default to null, same as "not yet on file".
+  company?: string | null;
+  // HubSpot-only extensions (design D4) — optional so every existing caller
+  // (prefetchIdentityIndex's live-path candidates) is unaffected.
+  ownerBdId?: string | null;
+  city?: string | null;
+  country?: string | null;
 }
 
 /** Only the persons that could match this chunk's rows (design D13) — never the whole table. */
@@ -76,6 +119,7 @@ export type PrefetchedIdentityIndex = readonly ExistingPersonCandidate[];
 export interface IdentityMergedFields {
   firstName: string | null;
   lastName: string | null;
+  company: string | null;
   companyKey: string | null;
   jobTitle: string | null;
   // Classified from `jobTitle` (fresh-review fix 3, R7) — the legacy contact
@@ -91,6 +135,11 @@ export interface IdentityMergedFields {
   emailStatus: EmailStatus;
   emailConfidence: number | null;
   emailSource: string | null;
+  // HubSpot-only extensions (design D4) — always present (null when unset)
+  // so mergeFields/mergeFieldsFillEmpty treat them like every other field.
+  city: string | null;
+  country: string | null;
+  ownerBdId: string | null;
 }
 
 // 'skipped_own_company' | 'new' | 'review' | one of the matcher's strong
@@ -117,6 +166,8 @@ export interface IdentityNewPerson {
   profileKey: string | null;
   sourceKey: string;
   merged: IdentityMergedFields;
+  /** Written once at creation only — see IdentityIngestRow.migrationRunId. */
+  migrationRunId: string | null;
 }
 
 export interface IdentityExistingUpdate {
@@ -151,6 +202,7 @@ function rowAsMerged(row: IdentityIngestRow): IdentityMergedFields {
   return {
     firstName: row.firstName,
     lastName: row.lastName,
+    company: row.company,
     companyKey: row.companyKey ?? (row.company ? normalizeCompanyKey(row.company) : null),
     jobTitle,
     roleGroup: classifyPosition(jobTitle),
@@ -160,6 +212,9 @@ function rowAsMerged(row: IdentityIngestRow): IdentityMergedFields {
     emailStatus: row.emailStatus,
     emailConfidence: row.emailConfidence ?? null,
     emailSource: row.emailSource ?? null,
+    city: row.city ?? null,
+    country: row.country ?? null,
+    ownerBdId: row.ownerBdId ?? null,
   };
 }
 
@@ -167,6 +222,7 @@ function candidateAsMerged(p: ExistingPersonCandidate): IdentityMergedFields {
   return {
     firstName: p.firstName,
     lastName: p.lastName,
+    company: p.company ?? null,
     companyKey: p.companyKey,
     jobTitle: p.jobTitle,
     roleGroup: classifyPosition(p.jobTitle),
@@ -176,6 +232,9 @@ function candidateAsMerged(p: ExistingPersonCandidate): IdentityMergedFields {
     emailStatus: p.emailStatus,
     emailConfidence: p.emailConfidence,
     emailSource: p.emailSource,
+    city: p.city ?? null,
+    country: p.country ?? null,
+    ownerBdId: p.ownerBdId ?? null,
   };
 }
 
@@ -187,6 +246,15 @@ function nameCompanyKeyFromCandidate(p: ExistingPersonCandidate): string | null 
 
 function mergeStringField(a: string | null, b: string | null): string | null {
   return mergeProperty({ value: a }, { value: b }).value ?? null;
+}
+
+/** 'fill_empty' policy (design D4 "Re-import (R7/Q3)"): the existing value
+ * NEVER changes once set — an incoming row only ever fills a currently
+ * null/empty field. Unlike mergeStringField, this ignores specificity and
+ * recency entirely; re-importing the same export twice is then a true
+ * no-op on every field that was already filled once. */
+function fillEmptyField(existing: string | null, incoming: string | null): string | null {
+  return existing != null && existing !== "" ? existing : incoming;
 }
 
 /** Same "email fields move together" rule as collapsePlanner/foldPlanner (contact-identity R7). */
@@ -208,27 +276,70 @@ function mergeEmailFields(a: IdentityMergedFields, b: IdentityMergedFields): Pic
   };
 }
 
-function mergeFields(existing: IdentityMergedFields, incoming: IdentityMergedFields): IdentityMergedFields {
-  const jobTitle = mergeStringField(existing.jobTitle, incoming.jobTitle);
+/** 'fill_empty' counterpart to mergeEmailFields: the email fields still move
+ * together as one unit, but ONLY fill from incoming when the EXISTING
+ * email is empty — an existing (even 'probable') email is never replaced,
+ * unlike mergeEmailFields' specificity-rank comparison. */
+function fillEmptyEmailFields(existing: IdentityMergedFields, incoming: IdentityMergedFields): Pick<
+  IdentityMergedFields,
+  "email" | "emailNormalized" | "emailStatus" | "emailConfidence" | "emailSource"
+> {
+  const source = existing.email ? existing : incoming;
   return {
-    firstName: mergeStringField(existing.firstName, incoming.firstName),
-    lastName: mergeStringField(existing.lastName, incoming.lastName),
-    companyKey: mergeStringField(existing.companyKey, incoming.companyKey),
+    email: source.email,
+    emailNormalized: source.emailNormalized,
+    emailStatus: source.emailStatus,
+    emailConfidence: source.emailConfidence,
+    emailSource: source.emailSource,
+  };
+}
+
+function mergeFields(
+  existing: IdentityMergedFields,
+  incoming: IdentityMergedFields,
+  policy: MergePolicy = "r7",
+): IdentityMergedFields {
+  const field = policy === "fill_empty" ? fillEmptyField : mergeStringField;
+  const jobTitle = field(existing.jobTitle, incoming.jobTitle);
+  return {
+    firstName: field(existing.firstName, incoming.firstName),
+    lastName: field(existing.lastName, incoming.lastName),
+    // company/companyKey/city/country are ALWAYS fill-empty-only, for EVERY
+    // mergePolicy (fresh-review fix, post-H3a) — an existing person's raw
+    // display fields must never be silently overwritten by a re-imported or
+    // live row, even a longer/more-specific one under the default 'r7'
+    // policy. Only a currently empty field is ever filled; a brand-new
+    // person still gets the row's own company/city/country written as-is
+    // (there is nothing existing to fill against). Every other field (e.g.
+    // jobTitle above) keeps its per-policy behavior unchanged.
+    company: fillEmptyField(existing.company, incoming.company),
+    // companyKey follows company: it's only ever derived FROM company
+    // (rowAsMerged/candidateAsMerged), so it must use the exact same
+    // fill-empty rule as company — merging it independently (e.g. per
+    // mergePolicy like jobTitle) could let companyKey drift onto the
+    // incoming row's key while company itself stays frozen at the
+    // existing value, leaving the two out of sync on the same person.
+    companyKey: fillEmptyField(existing.companyKey, incoming.companyKey),
     jobTitle,
     // Re-derived from the FINAL merged jobTitle, not merged independently
-    // (fresh-review fix 3) — mergeStringField's "longer/more specific wins"
-    // rule already picked the right jobTitle; roleGroup must always agree
-    // with it, never lag behind from whichever side happened to have it.
+    // (fresh-review fix 3) — the field-merge rule above already picked the
+    // right jobTitle; roleGroup must always agree with it, never lag behind
+    // from whichever side happened to have it.
     roleGroup: classifyPosition(jobTitle),
-    industry: mergeStringField(existing.industry, incoming.industry),
-    ...mergeEmailFields(existing, incoming),
+    industry: field(existing.industry, incoming.industry),
+    city: fillEmptyField(existing.city, incoming.city),
+    country: fillEmptyField(existing.country, incoming.country),
+    ownerBdId: field(existing.ownerBdId, incoming.ownerBdId),
+    ...(policy === "fill_empty" ? fillEmptyEmailFields(existing, incoming) : mergeEmailFields(existing, incoming)),
   };
 }
 
 // Design-decision default: contacts come from the CSV/LinkedIn import,
-// leads from the leads-ingest path — mirrors the vocabulary person.sourceKey
-// already uses for migration-created rows ("linkedin_import"/"csv").
+// leads from the leads-ingest path, HubSpot rows from the hubspot_import
+// migration — mirrors the vocabulary person.sourceKey already uses for
+// migration-created rows ("linkedin_import"/"csv"/"hubspot_import").
 function sourceKeyFor(row: IdentityIngestRow): string {
+  if (row.legacyTable === "hubspot_contact") return "hubspot_import";
   return row.legacyTable === "contact" ? "csv" : "lead_import";
 }
 
@@ -243,9 +354,15 @@ function sourceKeyFor(row: IdentityIngestRow): string {
 export function planIdentityWrites(
   rows: readonly IdentityIngestRow[],
   index: PrefetchedIdentityIndex,
+  mergePolicy: MergePolicy = "r7",
 ): IdentityWritePlan {
   const byProfileKey = new Map<string, string>();
   const byVerifiedEmail = new Map<string, string>();
+  // Every person whose stored email matches, regardless of status (design
+  // D4 / contact-identity delta "email_unverified") — unlike
+  // byVerifiedEmail, which only ever holds a hit whose OWN email is
+  // verified.
+  const byEmailAny = new Map<string, string[]>();
   const byNameCompany = new Map<string, string[]>();
   const mergedByRef = new Map<string, IdentityMergedFields>();
   const rowByRef = new Map<string, IdentityIngestRow>();
@@ -257,6 +374,7 @@ export function planIdentityWrites(
     mergedByRef.set(p.id, candidateAsMerged(p));
     if (p.profileKey) byProfileKey.set(p.profileKey, p.id);
     if (p.emailStatus === "verified" && p.emailNormalized) byVerifiedEmail.set(p.emailNormalized, p.id);
+    if (p.emailNormalized) byEmailAny.set(p.emailNormalized, [...(byEmailAny.get(p.emailNormalized) ?? []), p.id]);
     const key = nameCompanyKeyFromCandidate(p);
     if (key) byNameCompany.set(key, [...(byNameCompany.get(key) ?? []), p.id]);
   }
@@ -264,6 +382,7 @@ export function planIdentityWrites(
   const matcherIndex: IdentityIndex = {
     byProfileKey: (k) => byProfileKey.get(k) ?? null,
     byVerifiedEmail: (e) => byVerifiedEmail.get(e) ?? null,
+    byEmail: (e) => byEmailAny.get(e) ?? [],
     byNameCompany: (k) => byNameCompany.get(k) ?? [],
   };
 
@@ -272,6 +391,12 @@ export function planIdentityWrites(
     if (row.emailStatus === "verified" && row.email) {
       const key = row.email.trim().toLowerCase();
       if (!byVerifiedEmail.has(key)) byVerifiedEmail.set(key, ref);
+    }
+    if (row.email) {
+      const key = row.email.trim().toLowerCase();
+      const list = byEmailAny.get(key) ?? [];
+      if (!list.includes(ref)) list.push(ref);
+      byEmailAny.set(key, list);
     }
     const key = buildNameCompanyKey(row);
     if (key) {
@@ -297,6 +422,8 @@ export function planIdentityWrites(
       firstName: row.firstName,
       lastName: row.lastName,
       company: row.company,
+      companyKey: row.companyKey,
+      source: row.legacyTable === "hubspot_contact" ? ("hubspot_import" as const) : undefined,
     };
     const result = matchIdentity(matchRow, matcherIndex);
 
@@ -309,7 +436,7 @@ export function planIdentityWrites(
     if (result.kind === "auto") {
       const existing = mergedByRef.get(result.personId);
       if (!existing) throw new Error(`Planner invariant violated: unknown person ${result.personId}`);
-      mergedByRef.set(result.personId, mergeFields(existing, rowAsMerged(row)));
+      mergedByRef.set(result.personId, mergeFields(existing, rowAsMerged(row), mergePolicy));
       if (existingIds.has(result.personId)) updatedExisting.add(result.personId);
       registerRowKeys(result.personId, row);
       rowOutcomes.push({ row, method: result.key, personRef: result.personId });
@@ -337,7 +464,9 @@ export function planIdentityWrites(
           matchKey:
             result.reason === "name_company"
               ? (buildNameCompanyKey(matchRow) ?? "")
-              : `conflicting:${row.profileKey ?? ""}:${row.email?.trim().toLowerCase() ?? ""}`,
+              : result.reason === "email_unverified"
+                ? (row.email?.trim().toLowerCase() ?? "")
+                : `conflicting:${row.profileKey ?? ""}:${row.email?.trim().toLowerCase() ?? ""}`,
         });
       }
     } else {
@@ -363,6 +492,7 @@ export function planIdentityWrites(
       profileKey: firstRow.profileKey ?? null,
       sourceKey: sourceKeyFor(firstRow),
       merged: mergedByRef.get(ref)!,
+      migrationRunId: firstRow.migrationRunId ?? null,
     });
   }
 
@@ -387,6 +517,16 @@ export interface PrefetchKeys {
   profileKeys: string[];
   verifiedEmails: string[];
   companyKeys: string[];
+  /** hubspot_import only (fresh-review CRITICAL fix, contact-identity
+   * spec "not-verified-side exact-email review rule"): HubSpot rows are
+   * ALWAYS `emailStatus:'probable'`, so `verifiedEmails` above never
+   * includes their own email — the D4 `email_unverified` dedup rule then
+   * has nothing to match against, and duplicates get created instead of
+   * routed to review. A SEPARATE key set, scoped strictly to
+   * `legacyTable==='hubspot_contact'`, so the live-ingestion prefetch
+   * (plain `contact`/`lead` rows) is provably unaffected — pinned by
+   * tests/unit/identityResolve.test.ts's scoping test. */
+  hubspotEmails: string[];
 }
 
 /** Pure key extraction so prefetchIdentityIndex's queries stay unit-testable. */
@@ -394,13 +534,20 @@ export function buildPrefetchKeys(rows: readonly IdentityIngestRow[]): PrefetchK
   const profileKeys = new Set<string>();
   const verifiedEmails = new Set<string>();
   const companyKeys = new Set<string>();
+  const hubspotEmails = new Set<string>();
   for (const row of rows) {
     if (row.profileKey) profileKeys.add(row.profileKey);
     if (row.emailStatus === "verified" && row.email) verifiedEmails.add(row.email.trim().toLowerCase());
+    if (row.legacyTable === "hubspot_contact" && row.email) hubspotEmails.add(row.email.trim().toLowerCase());
     const key = row.companyKey ?? (row.company ? normalizeCompanyKey(row.company) : null);
     if (key) companyKeys.add(key);
   }
-  return { profileKeys: [...profileKeys], verifiedEmails: [...verifiedEmails], companyKeys: [...companyKeys] };
+  return {
+    profileKeys: [...profileKeys],
+    verifiedEmails: [...verifiedEmails],
+    companyKeys: [...companyKeys],
+    hubspotEmails: [...hubspotEmails],
+  };
 }
 
 // --- Write-row building (pure); apply lives in ./resolveDb.ts (thin DB) ----
@@ -425,16 +572,21 @@ export function buildIdentityWriteRows(plan: IdentityWritePlan, newId: () => str
       profileKey: np.profileKey,
       firstName: np.merged.firstName,
       lastName: np.merged.lastName,
+      company: np.merged.company,
       companyKey: np.merged.companyKey,
       jobTitle: np.merged.jobTitle,
       roleGroup: np.merged.roleGroup,
       industry: np.merged.industry,
+      city: np.merged.city,
+      country: np.merged.country,
       email: np.merged.email,
       emailNormalized: np.merged.emailNormalized,
       emailStatus: np.merged.emailStatus,
       emailConfidence: np.merged.emailConfidence,
       emailSource: np.merged.emailSource,
       sourceKey: np.sourceKey,
+      ownerBdId: np.merged.ownerBdId,
+      migrationRunId: np.migrationRunId,
     });
   }
 
@@ -444,17 +596,34 @@ export function buildIdentityWriteRows(plan: IdentityWritePlan, newId: () => str
   const idMap: (typeof personIdMap.$inferInsert)[] = [];
   for (const outcome of plan.rowOutcomes) {
     if (outcome.method === "skipped_own_company") {
-      idMap.push({ legacyTable: outcome.row.legacyTable, legacyId: outcome.row.legacyId, personId: null, method: outcome.method });
+      idMap.push({
+        legacyTable: outcome.row.legacyTable,
+        legacyId: outcome.row.legacyId,
+        personId: null,
+        method: outcome.method,
+        migrationRunId: outcome.row.migrationRunId ?? null,
+      });
       continue;
     }
     const personId = resolveRef(outcome.personRef!);
-    idMap.push({ legacyTable: outcome.row.legacyTable, legacyId: outcome.row.legacyId, personId, method: outcome.method });
-    connections.push({
+    idMap.push({
+      legacyTable: outcome.row.legacyTable,
+      legacyId: outcome.row.legacyId,
       personId,
-      bdId: outcome.row.bdId,
-      connectedOn: outcome.row.legacyTable === "contact" ? (outcome.row.connectedOn ?? null) : null,
-      legacyContactId: outcome.row.legacyTable === "contact" ? outcome.row.legacyId : null,
+      method: outcome.method,
+      migrationRunId: outcome.row.migrationRunId ?? null,
     });
+    // No person_bd_connection for a null bdId (design D4) — a HubSpot
+    // owner is not a LinkedIn connection; the owner itself is written onto
+    // person.ownerBdId (np.merged.ownerBdId / mergeFields) instead.
+    if (outcome.row.bdId) {
+      connections.push({
+        personId,
+        bdId: outcome.row.bdId,
+        connectedOn: outcome.row.legacyTable === "contact" ? (outcome.row.connectedOn ?? null) : null,
+        legacyContactId: outcome.row.legacyTable === "contact" ? outcome.row.legacyId : null,
+      });
+    }
   }
 
   const duplicateCandidates: (typeof duplicateCandidate.$inferInsert)[] = [];

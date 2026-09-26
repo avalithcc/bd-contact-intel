@@ -101,12 +101,16 @@ export async function saveDryRunReport(input: {
 export async function getMigrationRunForGate(runId: string): Promise<ApprovedMigrationRun | null> {
   const row = await db.query.migrationRun.findFirst({ where: eq(migrationRun.id, runId) });
   if (!row) return null;
+  // `reviewCount` only means something for `hubspot_import` (design D7); for
+  // every other kind this is simply `undefined` and both guards ignore it.
+  const report = row.report as { outcomes?: { review?: number } } | null;
   return {
     id: row.id,
     kind: row.kind as MigrationRunKind,
     approvedAt: row.approvedAt,
     executedAt: row.executedAt,
     approvedByBdId: row.approvedByBdId,
+    reviewCount: report?.outcomes?.review,
     inputHash: row.inputHash,
   };
 }
@@ -175,17 +179,24 @@ export async function getLatestExecutedMigrationRun(
  * `assertApprovable` now also refuses a kind mismatch, an already
  * approved/executed run, or a run that isn't the latest dry run of its
  * kind (a newer dry run has superseded it).
+ *
+ * `confirmedThreshold` is only meaningful for `hubspot_import` runs above
+ * `HUBSPOT_REVIEW_THRESHOLD` (design D7): the page's confirmation checkbox.
+ * Once approval succeeds, it is persisted into `report.reviewThresholdConfirmed`
+ * so `executionGuard`'s defense-in-depth check at `--execute` time (which
+ * reads the persisted report, not the request) also sees it.
  */
 export async function approveMigrationRun(
   runId: string,
   approvedByBdId: string,
   expectedKind: MigrationRunKind,
+  confirmedThreshold = false,
 ) {
   const [candidate, latest] = await Promise.all([
     getMigrationRunForGate(runId),
     getLatestMigrationRun(expectedKind),
   ]);
-  assertApprovable(candidate, expectedKind, latest?.id ?? null);
+  assertApprovable(candidate, expectedKind, latest?.id ?? null, confirmedThreshold);
 
   return db.transaction(async (tx) => {
     // Claim atomically (same pattern as finalizeExecute): if a concurrent
@@ -193,7 +204,13 @@ export async function approveMigrationRun(
     // admin gets `already_approved` instead of a duplicate audit row.
     const [updated] = await tx
       .update(migrationRun)
-      .set({ approvedByBdId, approvedAt: new Date() })
+      .set({
+        approvedByBdId,
+        approvedAt: new Date(),
+        ...(confirmedThreshold
+          ? { report: sql`${migrationRun.report} || '{"reviewThresholdConfirmed":true}'::jsonb` }
+          : {}),
+      })
       .where(
         and(
           eq(migrationRun.id, runId),

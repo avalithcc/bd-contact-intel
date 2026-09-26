@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { computeCollapseInputHash, computeFoldInputHash } from "@/lib/migration/inputHash";
+import { computeCollapseInputHash, computeFoldInputHash, computeHubSpotInputHash } from "@/lib/migration/inputHash";
 import type { CollapseContactRow } from "@/lib/migration/collapsePlanner";
 
 function row(overrides: Partial<CollapseContactRow> = {}): CollapseContactRow {
@@ -116,4 +116,82 @@ test("computeFoldInputHash for activity types is insensitive to Map/Set insertio
   ]);
 
   assert.equal(computeFoldInputHash(leads, persons, a), computeFoldInputHash(leads, persons, b));
+});
+
+// --- computeHubSpotInputHash (design D6: "covers what the planner reads,
+// not the file bytes" — every DB snapshot the HubSpot planner touches must
+// invalidate a stale dry run, not only the two CSV row sets) --------------
+
+function hubspotArgs(overrides: { contacts?: { id: string }[] } = {}) {
+  const contacts = overrides.contacts ?? [{ id: "1" }];
+  const companies = [{ id: "10" }];
+  const existingPersons = [{ id: "p1" }];
+  const existingHubspotMap = [{ id: "1" }];
+  const existingCompanies = [{ id: "acme" }];
+  const bds = [{ id: "bd1" }];
+  const existingHubspotActivityKeys = [{ id: "1:contacted" }];
+  return [
+    contacts,
+    companies,
+    existingPersons,
+    existingHubspotMap,
+    existingCompanies,
+    bds,
+    existingHubspotActivityKeys,
+  ] as const;
+}
+
+test("computeHubSpotInputHash is stable for the same inputs and order-independent per set", () => {
+  const args = hubspotArgs();
+  assert.equal(computeHubSpotInputHash(...args), computeHubSpotInputHash(...args));
+});
+
+test("computeHubSpotInputHash changes when a contact row changes", () => {
+  const base = computeHubSpotInputHash(...hubspotArgs());
+  const changed = computeHubSpotInputHash(...hubspotArgs({ contacts: [{ id: "2" }] }));
+  assert.notEqual(base, changed);
+});
+
+test("computeHubSpotInputHash changes when the DB snapshot (existing persons, map, companies, bds, or activity keys) changes, not only the CSV rows", () => {
+  const [contacts, companies, existingPersons, existingHubspotMap, existingCompanies, bds, existingHubspotActivityKeys] =
+    hubspotArgs();
+  const base = computeHubSpotInputHash(
+    contacts,
+    companies,
+    existingPersons,
+    existingHubspotMap,
+    existingCompanies,
+    bds,
+    existingHubspotActivityKeys,
+  );
+  const withExtraExistingPerson = computeHubSpotInputHash(
+    contacts,
+    companies,
+    [...existingPersons, { id: "p2" }],
+    existingHubspotMap,
+    existingCompanies,
+    bds,
+    existingHubspotActivityKeys,
+  );
+  const withExtraActivityKey = computeHubSpotInputHash(
+    contacts,
+    companies,
+    existingPersons,
+    existingHubspotMap,
+    existingCompanies,
+    bds,
+    [...existingHubspotActivityKeys, { id: "1:replied" }],
+  );
+  const withExtraExistingCompany = computeHubSpotInputHash(
+    contacts,
+    companies,
+    existingPersons,
+    existingHubspotMap,
+    [...existingCompanies, { id: "beta" }],
+    bds,
+    existingHubspotActivityKeys,
+  );
+  assert.notEqual(base, withExtraExistingPerson);
+  assert.notEqual(base, withExtraActivityKey);
+  assert.notEqual(base, withExtraExistingCompany);
 });

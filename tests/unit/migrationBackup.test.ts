@@ -68,6 +68,10 @@ test("buildPgDumpArgs uses custom format and -t for every table, defaulting to B
   }
 });
 
+test("BACKUP_TABLES includes company (hubspot_import creates/domain-fills companies during execute)", () => {
+  assert.ok(BACKUP_TABLES.includes("company"));
+});
+
 test("buildPgDumpArgs respects an explicit table list", () => {
   const args = buildPgDumpArgs("backups/x.dump", ["contact", "lead"]);
   assert.deepEqual(args, ["-Fc", "-f", "backups/x.dump", "-t", "contact", "-t", "lead"]);
