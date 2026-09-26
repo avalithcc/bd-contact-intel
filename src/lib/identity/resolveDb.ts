@@ -55,15 +55,28 @@ function toCandidate(r: typeof person.$inferSelect): ExistingPersonCandidate {
  * company-key lookup is narrowed by the DB index and then filtered app-side
  * against each row's exact name+company key (the name index is on raw, not
  * accent-folded, names — same reasoning as foldPlanner.ts).
+ *
+ * A 4th query, scoped to `hubspotEmails` (fresh-review CRITICAL fix,
+ * contact-identity spec "not-verified-side exact-email review rule"),
+ * prefetches existing persons by email regardless of THEIR OWN
+ * `emailStatus` too — the `verifiedEmails` query above only ever matches an
+ * existing person whose stored email is `verified`, which would silently
+ * miss a `probable`-vs-`probable` collision the `email_unverified` rule is
+ * specifically meant to catch. `hubspotEmails` is empty for every live
+ * ingestion caller (contact/lead rows never populate it — see
+ * buildPrefetchKeys), so this query is a no-op outside hubspot_import.
+ * Batched via `chunk` (unlike the 3 queries above): a HubSpot export can
+ * carry ~9k rows in one call, well past a single `IN (...)` list's
+ * practical size.
  */
 export async function prefetchIdentityIndex(
   tx: DbTransaction,
   rows: readonly IdentityIngestRow[],
 ): Promise<ExistingPersonCandidate[]> {
-  const { profileKeys, verifiedEmails, companyKeys } = buildPrefetchKeys(rows);
+  const { profileKeys, verifiedEmails, companyKeys, hubspotEmails } = buildPrefetchKeys(rows);
   const byId = new Map<string, ExistingPersonCandidate>();
 
-  const [byProfile, byEmail, byCompany] = await Promise.all([
+  const [byProfile, byEmail, byCompany, byHubspotEmail] = await Promise.all([
     profileKeys.length
       ? tx.select().from(person).where(and(inArray(person.profileKey, profileKeys), isNull(person.mergedIntoId)))
       : Promise.resolve([]),
@@ -82,9 +95,19 @@ export async function prefetchIdentityIndex(
     companyKeys.length
       ? tx.select().from(person).where(and(inArray(person.companyKey, companyKeys), isNull(person.mergedIntoId)))
       : Promise.resolve([]),
+    hubspotEmails.length
+      ? Promise.all(
+          chunk(hubspotEmails, WRITE_BATCH_SIZE).map((batch) =>
+            tx
+              .select()
+              .from(person)
+              .where(and(inArray(person.emailNormalized, batch), isNull(person.mergedIntoId))),
+          ),
+        ).then((pages) => pages.flat())
+      : Promise.resolve([]),
   ]);
 
-  for (const r of [...byProfile, ...byEmail, ...byCompany]) byId.set(r.id, toCandidate(r));
+  for (const r of [...byProfile, ...byEmail, ...byCompany, ...byHubspotEmail]) byId.set(r.id, toCandidate(r));
   return [...byId.values()];
 }
 

@@ -501,6 +501,16 @@ export interface PrefetchKeys {
   profileKeys: string[];
   verifiedEmails: string[];
   companyKeys: string[];
+  /** hubspot_import only (fresh-review CRITICAL fix, contact-identity
+   * spec "not-verified-side exact-email review rule"): HubSpot rows are
+   * ALWAYS `emailStatus:'probable'`, so `verifiedEmails` above never
+   * includes their own email — the D4 `email_unverified` dedup rule then
+   * has nothing to match against, and duplicates get created instead of
+   * routed to review. A SEPARATE key set, scoped strictly to
+   * `legacyTable==='hubspot_contact'`, so the live-ingestion prefetch
+   * (plain `contact`/`lead` rows) is provably unaffected — pinned by
+   * tests/unit/identityResolve.test.ts's scoping test. */
+  hubspotEmails: string[];
 }
 
 /** Pure key extraction so prefetchIdentityIndex's queries stay unit-testable. */
@@ -508,13 +518,20 @@ export function buildPrefetchKeys(rows: readonly IdentityIngestRow[]): PrefetchK
   const profileKeys = new Set<string>();
   const verifiedEmails = new Set<string>();
   const companyKeys = new Set<string>();
+  const hubspotEmails = new Set<string>();
   for (const row of rows) {
     if (row.profileKey) profileKeys.add(row.profileKey);
     if (row.emailStatus === "verified" && row.email) verifiedEmails.add(row.email.trim().toLowerCase());
+    if (row.legacyTable === "hubspot_contact" && row.email) hubspotEmails.add(row.email.trim().toLowerCase());
     const key = row.companyKey ?? (row.company ? normalizeCompanyKey(row.company) : null);
     if (key) companyKeys.add(key);
   }
-  return { profileKeys: [...profileKeys], verifiedEmails: [...verifiedEmails], companyKeys: [...companyKeys] };
+  return {
+    profileKeys: [...profileKeys],
+    verifiedEmails: [...verifiedEmails],
+    companyKeys: [...companyKeys],
+    hubspotEmails: [...hubspotEmails],
+  };
 }
 
 // --- Write-row building (pure); apply lives in ./resolveDb.ts (thin DB) ----

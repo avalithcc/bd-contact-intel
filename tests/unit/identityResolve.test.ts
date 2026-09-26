@@ -185,6 +185,43 @@ test("planIdentityWrites: hubspot_contact row with an exact email match to a not
   assert.equal(plan.reviewPairs[0].reason, "email_unverified");
 });
 
+test("planIdentityWrites: exact email match with NO profileKey or companyKey overlap still routes to review, not new (fresh-review CRITICAL fix — the prefetch gap this closes)", () => {
+  const rows = [
+    row({
+      legacyTable: "hubspot_contact",
+      legacyId: "hs-2",
+      bdId: null,
+      firstName: "Someone",
+      lastName: "Else",
+      company: "Totally Different Co",
+      companyKey: "totally-different-co",
+      profileKey: null,
+      email: "jane@acme.com",
+      emailStatus: "probable",
+    }),
+  ];
+  // The existing candidate is the ONLY thing standing in for what
+  // prefetchIdentityIndex's new hubspotEmails-scoped query must return —
+  // no profileKey, and a companyKey that shares nothing with the incoming
+  // row, so ONLY the email can produce a match here.
+  const index = [
+    existing({
+      id: "person-1",
+      profileKey: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      companyKey: "acme-original",
+      email: "jane@acme.com",
+      emailNormalized: "jane@acme.com",
+      emailStatus: "probable",
+    }),
+  ];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.rowOutcomes[0].method, "review");
+  assert.equal(plan.reviewPairs[0].reason, "email_unverified");
+  assert.notEqual(plan.rowOutcomes[0].method, "new");
+});
+
 test("planIdentityWrites: same email_unverified rule does NOT apply to plain 'contact' rows (live ingest/catch_up unaffected)", () => {
   const rows = [
     row({
@@ -371,6 +408,36 @@ test("buildPrefetchKeys: collects distinct profile keys, verified emails and com
   assert.deepEqual(keys.profileKeys, ["li/a"]);
   assert.deepEqual(keys.verifiedEmails, ["a@x.com"]);
   assert.deepEqual(keys.companyKeys, ["acme"]);
+});
+
+// --- fresh-review CRITICAL fix: hubspot_import rows are always
+// emailStatus:'probable', so the `verifiedEmails` set above NEVER includes
+// their own email — the D4 email_unverified dedup rule then had nothing to
+// prefetch against. `hubspotEmails` is a SEPARATE key set, scoped to
+// legacyTable==='hubspot_contact' only, so the live ingestion prefetch
+// (contact/lead rows) is provably unaffected. --------------------------
+
+test("buildPrefetchKeys: hubspot_import rows contribute their email to hubspotEmails regardless of emailStatus", () => {
+  const rows = [
+    row({ legacyTable: "hubspot_contact", email: "a@x.com", emailStatus: "probable" }),
+    row({ legacyTable: "hubspot_contact", email: "B@X.com", emailStatus: "none" }),
+    row({ legacyTable: "hubspot_contact", email: null, emailStatus: "none" }),
+  ];
+  const keys = buildPrefetchKeys(rows);
+  assert.deepEqual(keys.hubspotEmails.sort(), ["a@x.com", "b@x.com"]);
+  // A hubspot row's own email is never 'verified', so it must NOT also
+  // leak into verifiedEmails (that would be a duplicate DB query, not a bug
+  // per se, but asserting it stays empty pins the actual reported gap).
+  assert.deepEqual(keys.verifiedEmails, []);
+});
+
+test("buildPrefetchKeys: live ingestion (contact/lead) rows never populate hubspotEmails — pin the scoping", () => {
+  const rows = [
+    row({ legacyTable: "contact", email: "a@x.com", emailStatus: "probable" }),
+    row({ legacyTable: "lead", email: "b@x.com", emailStatus: "none" }),
+  ];
+  const keys = buildPrefetchKeys(rows);
+  assert.deepEqual(keys.hubspotEmails, []);
 });
 
 test("buildIdentityWriteRows: resolves new-person refs to generated ids for connections and idMap", () => {
