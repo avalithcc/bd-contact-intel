@@ -1077,6 +1077,8 @@ export const en = {
     bulkTaskTitleLabel: "Task title",
     bulkTaskDueLabel: "Due date",
     bulkExport: "Export",
+    bulkGenerateMessages: "Generate messages",
+    bulkMessagesCapNotice: "Messages were generated for the first 25 selected contacts only (provisional cap, needs confirmation).",
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

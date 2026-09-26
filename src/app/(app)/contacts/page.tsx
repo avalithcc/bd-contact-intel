@@ -781,6 +781,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           q={sp.q}
           page={currentPage}
           columns={visibleColumns}
+          locale={locale}
+          messageLabels={messageLabels}
         >
           <div className="table-wrap">
             <table className="data">

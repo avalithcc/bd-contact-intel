@@ -959,6 +959,8 @@ export const es: typeof en = {
     bulkTaskTitleLabel: "Título de la tarea",
     bulkTaskDueLabel: "Vencimiento",
     bulkExport: "Exportar",
+    bulkGenerateMessages: "Generar mensajes",
+    bulkMessagesCapNotice: "Se generaron mensajes solo para los primeros 25 contactos seleccionados (límite provisorio, a confirmar).",
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

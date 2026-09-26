@@ -37,6 +37,8 @@ export type BulkActionsLabels = ClientStrings<
     | "bulkTaskTitleLabel"
     | "bulkTaskDueLabel"
     | "bulkExport"
+    | "bulkGenerateMessages"
+    | "bulkMessagesCapNotice"
   >
 >;
 
@@ -55,6 +57,8 @@ export function pickBulkActionsLabels(dict: Dictionary): BulkActionsLabels {
     bulkTaskTitleLabel: l.bulkTaskTitleLabel,
     bulkTaskDueLabel: l.bulkTaskDueLabel,
     bulkExport: l.bulkExport,
+    bulkGenerateMessages: l.bulkGenerateMessages,
+    bulkMessagesCapNotice: l.bulkMessagesCapNotice,
   };
 }
 

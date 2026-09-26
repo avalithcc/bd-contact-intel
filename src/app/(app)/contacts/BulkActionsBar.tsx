@@ -19,8 +19,11 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
+import { BulkGenerateMessagesButton } from "./BulkGenerateMessagesButton";
 import type { BulkActionsLabels } from "@/lib/contacts/labels";
 import type { ContactColumnKey } from "@/lib/contacts/columns";
+import type { Locale } from "@/lib/i18n/locales";
+import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 export interface BulkActionsBarProps {
   labels: BulkActionsLabels;
@@ -31,6 +34,10 @@ export interface BulkActionsBarProps {
   // The active view's currently visible columns (src/lib/contacts/columns.ts)
   // — "Exportar" downloads exactly what's on screen, same column set.
   columns: ContactColumnKey[];
+  // "Generar mensajes" (bulk AI, this batch) — same locale/labels the
+  // per-contact GenerateMessageButton already uses.
+  locale: Locale;
+  messageLabels: GenerateMessageLabels;
   children: React.ReactNode;
 }
 
@@ -49,7 +56,17 @@ function buildExportHref(form: HTMLFormElement, columns: ContactColumnKey[]): st
 
 type Panel = "owner" | "task" | null;
 
-export function BulkActionsBar({ labels: l, ownerOptions, view, q, page, columns, children }: BulkActionsBarProps) {
+export function BulkActionsBar({
+  labels: l,
+  ownerOptions,
+  view,
+  q,
+  page,
+  columns,
+  locale,
+  messageLabels,
+  children,
+}: BulkActionsBarProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [panel, setPanel] = useState<Panel>(null);
@@ -111,6 +128,7 @@ export function BulkActionsBar({ labels: l, ownerOptions, view, q, page, columns
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("task")}>
                 {l.bulkCreateTask}
               </button>
+              <BulkGenerateMessagesButton formRef={formRef} locale={locale} labels={l} messageLabels={messageLabels} />
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
