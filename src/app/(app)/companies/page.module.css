@@ -174,13 +174,13 @@
 }
 
 .stage-prospect {
-  background: var(--color-surface-tint);
+  background: var(--color-surface-1);
   color: var(--color-ink-soft);
 }
 
 .stage-qualified {
-  background: var(--color-badge-accent-bg);
-  color: var(--color-accent);
+  background: var(--color-badge-info-bg);
+  color: var(--color-info-text);
 }
 
 .stage-proposal_sent {
