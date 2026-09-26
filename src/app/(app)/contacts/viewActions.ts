@@ -11,6 +11,7 @@ import { getCurrentBd } from "@/lib/queries";
 import { createSavedView, deleteSavedView } from "@/lib/contacts/savedViews";
 import { SavedViewNameError } from "@/lib/contacts/savedViewInput";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
+import { isUuid } from "@/lib/uuid";
 
 export async function createSavedViewAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
@@ -36,6 +37,8 @@ export async function createSavedViewAction(formData: FormData): Promise<void> {
 export async function deleteSavedViewAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
   const id = String(formData.get("id") ?? "");
+  // A tampered or stale form id would otherwise reach a uuid column and throw.
+  if (!isUuid(id)) redirect("/contacts");
   await deleteSavedView(id, me.id);
   revalidatePath("/contacts");
   redirect("/contacts");
