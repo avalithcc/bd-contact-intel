@@ -35,11 +35,11 @@ state) on 2026-09-26.
 - [x] 2.3 Shared `Toast` component (`src/components/Toast.tsx` + a toast region/provider): on-dark tokens, `role="status"`, `aria-live="polite"`, matches `.toast`/`.toast-region` classes. DONE — `src/components/Toast.tsx` (presentational) + `src/components/ToastProvider.tsx` (`useToast()` hook, auto-dismiss with pause on hover/focus) + `src/components/toastTimer.ts` (pure timer state, RED→GREEN in `tests/unit/toastTimer.test.ts`).
 - [x] 2.4 Wire `Toast` region into the app shell (`(app)/layout.tsx`) so any page can trigger a toast without its own ad hoc implementation. DONE — `ToastProvider` now wraps `(app)/layout.tsx`.
 
-## Phase 3 — TopBar + Sidebar parity (new branch, chained on phase 2)
+## Phase 3 — TopBar + Sidebar parity (branches chained on phase 2, split into 3a/3b: actual size came in over the ~250-350 line forecast, mostly the new shared `DropdownMenu` + icon library)
 
-- [ ] 3.1 TopBar "Crear" menu (uses `Dialog`/dropdown patterns from `design-system.html`).
-- [ ] 3.2 TopBar account/avatar menu (replaces ad hoc `UserMenu` per-page instances where the shell already covers it).
-- [ ] 3.3 Sidebar nav icons + item counts per mockup.
+- [x] 3.1 TopBar "Crear" menu (branch `feat/mockup-parity-03-shell-nav`). DONE — new generic `DropdownMenu` component (`src/components/DropdownMenu.tsx`), used instead of the mockup's `<details>` per the apply instructions' keyboard-accessibility requirement. Only "Importar contactos" → `/contacts/import` is wired; the mockup's Contacto/Tarea/Nota en un contacto items are omitted because no standalone new-contact form, global new-task modal, or contact-note picker exists yet (see TopBar.tsx's comment).
+- [x] 3.2 TopBar account/avatar menu (same branch). DONE — replaces the ad hoc `UserMenu` on `/hiring`, `/discovery`, `/whats-new` (shell now covers it); `/outreach` keeps `UserMenu` (mid-flight on another branch, out of scope). New pure `initialsFromName` helper (RED→GREEN in `tests/unit/initials.test.ts`) derives the avatar initials from the BD's name.
+- [x] 3.3 Sidebar nav icons (branch `feat/mockup-parity-03b-sidebar-icons`, chained on 3a). DONE — per-item icons added, deferred from Phase 8. Item **counts** (`.nav-count`/`.pill-count`) are intentionally NOT added: no cheap count-only query exists yet for contacts/tasks/discovery (existing queries return full rows, not a count), and the apply instructions require counts to come from a cheap existing query or be left out — revisit once such a query exists.
 
 ## Phase 4 — Contacts list + record quick actions
 
