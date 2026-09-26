@@ -24,33 +24,19 @@ import {
 import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
-import { buildSinceIso } from "@/lib/contacts/effectiveActivityTime";
+import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
 
-/**
- * Bug fix (owner report): the "effective time" of an `activity` row for
- * every "Última actividad" read (the DISTINCT ON latest-activity pick
- * below, `lastActivityAgg`'s MAX, and the `lastActivityDays` EXISTS filter)
- * — `created_at` for a normal row, but `metadata.originalAt` for a
- * `status_backfill` row (a migration reconstruction whose real historical
- * time is NOT when the migration ran). Mirrors
- * src/lib/status/deriveStatus.ts#activityRowToStatusEvent's `.at` rule
- * exactly (see src/lib/contacts/effectiveActivityTime.ts, which pins that
- * same rule in a unit test) so status derivation and "last activity" never
- * disagree on what a backfill's time means.
- *
- * The regex guard is intentionally stricter than the JS side's
- * `new Date(...)` parsing (which accepts anything `Date` can parse) —
- * Postgres's `::timestamptz` cast is far less forgiving, so this only
- * attempts the cast when the text already looks like an ISO datetime
- * (`YYYY-MM-DDTHH:MM:SS`); anything else falls back to `created_at` instead
- * of ever throwing and failing the whole query.
- */
-function effectiveActivityAtSql() {
-  return sql`(case when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz else ${activity.createdAt} end)`;
-}
+// `effectiveActivityAtSql` (bug fix, owner report: the DISTINCT ON
+// latest-activity pick below, `lastActivityAgg`'s MAX, and the
+// `lastActivityDays` EXISTS filter all need a `status_backfill` row's real
+// historical time — `metadata.originalAt` — not `created_at`, when the
+// migration ran) now lives in @/lib/contacts/effectiveActivityTime, the ONE
+// shared helper every raw-SQL site reuses (also used by the Contact record
+// timeline, src/lib/activity/queries.ts#getPersonTimeline) — see that
+// module's doc comment for the rule and its guard.
 
 const LIKE_WILDCARD_RE = /[%_\\]/g;
 function escapeLikeWildcards(value: string): string {
