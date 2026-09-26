@@ -49,9 +49,16 @@ export const REQUIRED_COMPANY_HEADERS: readonly string[] = [
 
 /** NFC-compose + trim, so headers that differ only by Unicode form or
  * incidental whitespace still match the pinned names above. */
-function normalizeHeader(value: string): string {
+export function normalizeHeader(value: string): string {
   return value.normalize("NFC").trim();
 }
+
+/**
+ * Marks an error message as already sanitized (header names only, never row
+ * data), so callers like `parseHubSpotCsv` can rethrow it verbatim instead
+ * of wrapping it into a generic "line N (code)" message.
+ */
+export class SanitizedHubSpotError extends Error {}
 
 /**
  * Throws listing the missing header NAMES (never row data) when any
@@ -62,6 +69,28 @@ export function assertRequiredHeaders(actualHeaders: string[], required: readonl
   const normalizedActual = new Set(actualHeaders.map(normalizeHeader));
   const missing = required.filter((name) => !normalizedActual.has(normalizeHeader(name)));
   if (missing.length > 0) {
-    throw new Error(`HubSpot export is missing required column(s): ${missing.join(", ")}`);
+    throw new SanitizedHubSpotError(`HubSpot export is missing required column(s): ${missing.join(", ")}`);
+  }
+}
+
+/**
+ * csv-parse's `columns: true` keeps only the LAST occurrence of a duplicated
+ * header name (the real export has duplicates, e.g. "Función laboral" x2,
+ * "Billing Contact IDs" x3) — silently dropping every earlier column sharing
+ * that name. Throws (listing the duplicated header NAMES, never row data)
+ * when any `required` header name appears more than once in `actualHeaders`,
+ * so a required column can never be silently discarded this way.
+ */
+export function assertNoDuplicateRequiredHeaders(actualHeaders: string[], required: readonly string[]): void {
+  const counts = new Map<string, number>();
+  for (const raw of actualHeaders) {
+    const key = normalizeHeader(raw);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const duplicated = required.filter((name) => (counts.get(normalizeHeader(name)) ?? 0) > 1);
+  if (duplicated.length > 0) {
+    throw new SanitizedHubSpotError(
+      `HubSpot export has duplicate required column(s): ${duplicated.join(", ")}`,
+    );
   }
 }

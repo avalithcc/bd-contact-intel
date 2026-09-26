@@ -47,6 +47,36 @@ test("keeps a huge cell value intact instead of truncating it", async () => {
   }
 });
 
+test("rejects a CSV whose header row repeats a required column name", async () => {
+  // "Correo" duplicated — csv-parse's columns:true would otherwise silently
+  // keep only the second occurrence's values.
+  const path = writeFixture('"ID de registro","Correo","Correo"\n"1","a@example.com","b@example.com"\n');
+  try {
+    await assert.rejects(() => parseHubSpotCsv(path, ["ID de registro", "Correo"]), (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /duplicate required column/);
+      assert.match(err.message, /Correo/);
+      assert.doesNotMatch(err.message, /example\.com/);
+      return true;
+    });
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
+test("accepts a CSV whose header row repeats a NON-required column name", async () => {
+  const path = writeFixture(
+    '"ID de registro","Función laboral","Función laboral"\n"1","dev","manager"\n',
+  );
+  try {
+    const rows = await parseHubSpotCsv(path, ["ID de registro"]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!["ID de registro"], "1");
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
 test("rejects a row with a mismatched column count (relax_column_count:false)", async () => {
   const path = writeFixture('"ID de registro","Nombre"\n"1","Ana Prueba","extra column"\n');
   try {

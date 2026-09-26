@@ -12,6 +12,7 @@ import {
   REQUIRED_COMPANY_HEADERS,
   OPTIONAL_CONTACT_LINKEDIN_HEADERS,
   assertRequiredHeaders,
+  assertNoDuplicateRequiredHeaders,
 } from "@/lib/hubspot/columns";
 
 test("REQUIRED_CONTACT_HEADERS pins the exact Spanish header strings from the real export", () => {
@@ -58,4 +59,36 @@ test("REQUIRED_CONTACT_HEADERS does not require either LinkedIn column (neither 
 
 test("OPTIONAL_CONTACT_LINKEDIN_HEADERS pins both LinkedIn header names, 'LinkedIn' first", () => {
   assert.deepEqual(OPTIONAL_CONTACT_LINKEDIN_HEADERS, ["LinkedIn", "URL de LinkedIn"]);
+});
+
+test("assertNoDuplicateRequiredHeaders passes when no required header repeats", () => {
+  assert.doesNotThrow(() =>
+    assertNoDuplicateRequiredHeaders(["ID de registro", "Correo", "Función laboral"], ["ID de registro", "Correo"]),
+  );
+});
+
+test("assertNoDuplicateRequiredHeaders throws listing the duplicated required header NAMES, not any row data", () => {
+  assert.throws(
+    () =>
+      assertNoDuplicateRequiredHeaders(
+        ["ID de registro", "Correo", "Correo", "Billing Contact IDs", "Billing Contact IDs"],
+        ["ID de registro", "Correo", "Billing Contact IDs"],
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /Correo/);
+      assert.match(err.message, /Billing Contact IDs/);
+      assert.doesNotMatch(err.message, /ID de registro/);
+      return true;
+    },
+  );
+});
+
+test("assertNoDuplicateRequiredHeaders ignores duplicates of non-required headers", () => {
+  assert.doesNotThrow(() =>
+    assertNoDuplicateRequiredHeaders(
+      ["ID de registro", "Función laboral", "Función laboral"],
+      ["ID de registro"],
+    ),
+  );
 });
