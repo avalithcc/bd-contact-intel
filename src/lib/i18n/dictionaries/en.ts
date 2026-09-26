@@ -699,6 +699,15 @@ export const en = {
     adminAuditAlertTitle: "You are viewing another BD's conversation",
     adminNoConversationContent: "No conversation content on file.",
     adminOpenAsPage: "Open as a page",
+    stageBadgePrefix: "Stage:",
+    conversationHistoryTitle: "Conversation history",
+    conversationHistoryIntroPrefix: "Conversation history exists with:",
+    conversationHistoryPrivateFooter: "Content is private to each BD.",
+    conversationHistoryAdminFooter:
+      "Admins can open any conversation; every view is recorded in the audit log.",
+    tasksCardTitle: "Tasks",
+    addTaskAction: "Add task",
+    changeCompanyAria: "Change company",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.
@@ -721,6 +730,9 @@ export const en = {
     timelineLockedOwnedBy: (bdName: string) =>
       `This conversation belongs to ${bdName}. You can see that it exists and when it happened; its content is private to ${bdName} (and admins).`,
     adminAuditAlertBody: (bdName: string) => `This view was recorded in the audit log (conversation with ${bdName}).`,
+    hiringBadge: (count: number) => `Hiring · ${count} IT roles`,
+    companyContactCount: (count: number) => `${count} contacts at this company`,
+    conversationHistorySummary: (count: number, dateLabel: string) => `${count} messages · last ${dateLabel}`,
   },
 
   // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;

@@ -12,9 +12,16 @@ import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
+import { getCompanyByKey, getCompanyContactCount } from "@/lib/companies/queries";
+import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
+import { splitEmail } from "@/lib/emailPatterns";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
+import { EditPencilIcon, LockIcon, PlusIcon } from "@/components/icons";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
+import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -131,6 +138,36 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     record.person.migrationRunId ? ` · ${l.createdViaMigration}` : ""
   }`;
 
+  // Right panel — Empresa card (contact-record.html:160-163). Bounded to
+  // this Contact's single `companyKey`, or skipped entirely when there is
+  // none.
+  const companyKey = record.person.companyKey;
+  const [companyRow, companyPostings, companyContactCount] = companyKey
+    ? await Promise.all([getCompanyByKey(companyKey), getCompanyPostingsForKey(companyKey), getCompanyContactCount(companyKey)])
+    : [null, null, 0];
+  const companyOpenItCount = companyPostings?.postings.length ?? 0;
+  // No `domain` column exists on `company`/`target_company` (checked
+  // schema.ts) — derived from this Contact's own verified email domain as
+  // the closest real substitute, same data the "Correo electrónico" row
+  // already shows. `null` when there's no email on file.
+  const companyDomain = record.person.email ? (splitEmail(record.person.email)?.domain ?? null) : null;
+  const stageLabels: Record<string, string> = {
+    prospect: dict.companiesPage.stageProspect,
+    qualified: dict.companiesPage.stageQualified,
+    proposal_sent: dict.companiesPage.stageProposalSent,
+    won: dict.companiesPage.stageWon,
+    lost: dict.companiesPage.stageLost,
+  };
+  function stageLabel(stage: string): string {
+    return stageLabels[stage] ?? stage;
+  }
+
+  // Right panel — "Historial de conversaciones" (contact-record.html:172-178)
+  // is a SEPARATE card from "BDs conectados" — only BDs with real message
+  // history, reusing the same describeConnectionHistory summary the old
+  // combined card already computed.
+  const connectionsWithHistory = record.connections.filter((c) => describeConnectionHistory(c).kind === "some");
+
   return (
     <main>
       <div className="record">
@@ -197,46 +234,171 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
         </div>
 
         <aside className="record-right">
-          <div className={styles.card}>
-            <h3 className={styles.cardTitle}>{l.companyCardTitle}</h3>
-            {record.person.companyKey ? (
-              <Link href={`/companies/${record.person.companyKey}`} className={styles.assocLink}>
-                {record.person.company ?? l.noCompany}
-              </Link>
-            ) : (
-              <div>{record.person.company ?? l.noCompany}</div>
-            )}
-          </div>
-          <div className={styles.card}>
-            <h3 className={styles.cardTitle}>{l.connectedBdsTitle}</h3>
-            {record.connections.length ? (
-              record.connections.map((c) => {
-                const history = describeConnectionHistory(c);
-                const canViewConversation = isAdmin && c.bdId !== me.id && history.kind === "some";
-                return (
-                  <div key={c.bdId} className={styles.assocRowStack}>
-                    <div className={styles.assocRow}>
-                      <span>{c.bdName ?? "—"}</span>
-                      <span>{c.connectedOn ? `${l.connectedOnPrefix} ${c.connectedOn}` : l.emptyValue}</span>
-                    </div>
-                    <div className={styles.assocMeta}>
-                      {history.kind === "some"
-                        ? `${history.count} ${l.connectionHistorySomePrefix} ${
-                            history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue
-                          }`
-                        : l.connectionHistoryNone}
-                    </div>
-                    {canViewConversation && (
-                      <Link href={`/contacts/${record.person.id}/conversation/${c.bdId}`} className={styles.assocLink}>
-                        {l.viewConversationLink}
+          <div className="card assoc">
+            <div className="card-header">
+              <h3>{l.companyCardTitle}</h3>
+              {record.person.companyKey && (
+                <span className="actions">
+                  {/* Mockup itself has no wired destination for "Cambiar
+                      empresa" (contact-record.html:160) — kept inert. */}
+                  <a className="btn btn-ghost btn-sm btn-icon" href="#" aria-label={l.changeCompanyAria}>
+                    <EditPencilIcon className="icon" />
+                  </a>
+                </span>
+              )}
+            </div>
+            <div className="card-body">
+              {record.person.companyKey ? (
+                <>
+                  <div className="assoc-row">
+                    <span className="company-logo lg" aria-hidden="true">
+                      {initialsFromName(record.person.company ?? l.noCompany)}
+                    </span>
+                    <div className="grow">
+                      <Link className="n" href={`/companies/${record.person.companyKey}`}>
+                        {record.person.company ?? l.noCompany}
                       </Link>
+                      <div className="s">
+                        {[companyDomain, record.person.industry].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row wrap mt-lg">
+                    {companyOpenItCount > 0 && (
+                      <span className="badge badge-success no-dot">
+                        {dict.contactRecordServer.hiringBadge(companyOpenItCount)}
+                      </span>
+                    )}
+                    {companyRow?.relationshipStage && (
+                      <span className="badge badge-neutral no-dot">
+                        {l.stageBadgePrefix} {stageLabel(companyRow.relationshipStage)}
+                      </span>
                     )}
                   </div>
-                );
-              })
-            ) : (
-              <div className={styles.placeholder}>{l.associationsComingSoon}</div>
-            )}
+                  <div className="meta mt-lg">{dict.contactRecordServer.companyContactCount(companyContactCount)}</div>
+                </>
+              ) : (
+                <div>{l.noCompany}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="card assoc">
+            <div className="card-header">
+              <h3>{l.connectedBdsTitle}</h3>
+              <span className="meta">{record.connections.length}</span>
+            </div>
+            <div className="card-body">
+              {record.connections.length ? (
+                record.connections.map((c) => (
+                  <div key={c.bdId} className="assoc-row">
+                    <Avatar id={c.bdId} initials={initialsFromName(c.bdName ?? "—")} variant="bd" size="sm" />
+                    <div className="grow">
+                      <div className="n">
+                        {c.bdName ?? l.emptyValue}
+                        {c.bdId === record.person.ownerBdId && (
+                          <span className="badge badge-brand no-dot">{l.propOwner}</span>
+                        )}
+                      </div>
+                      <div className="s">
+                        {c.connectedOn ? `${l.connectedOnPrefix} ${c.connectedOn}` : l.emptyValue}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="placeholder">{l.associationsComingSoon}</div>
+              )}
+            </div>
+          </div>
+
+          {connectionsWithHistory.length > 0 && (
+            <div className="card assoc">
+              <div className="card-header">
+                <h3>{l.conversationHistoryTitle}</h3>
+              </div>
+              <div className="card-body">
+                <p className="small">
+                  {l.conversationHistoryIntroPrefix}{" "}
+                  {connectionsWithHistory.map((c, i) => (
+                    <span key={c.bdId}>
+                      {i > 0 && ", "}
+                      <strong>{c.bdName ?? l.emptyValue}</strong>
+                    </span>
+                  ))}
+                  .
+                </p>
+                {connectionsWithHistory.map((c) => {
+                  const history = describeConnectionHistory(c);
+                  const canViewConversation = isAdmin && c.bdId !== me.id;
+                  return (
+                    <div key={c.bdId} className="assoc-row">
+                      <div className="grow">
+                        <div className="n">{c.bdName ?? l.emptyValue}</div>
+                        <div className="s">
+                          {history.kind === "some"
+                            ? dict.contactRecordServer.conversationHistorySummary(
+                                history.count,
+                                history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue,
+                              )
+                            : l.connectionHistoryNone}
+                        </div>
+                      </div>
+                      {canViewConversation ? (
+                        <Link
+                          href={`/contacts/${record.person.id}/conversation/${c.bdId}`}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          <LockIcon className="icon" />
+                          {l.viewConversationLink}
+                        </Link>
+                      ) : (
+                        <span className="meta">
+                          <LockIcon className="icon" />
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                <p className="meta mt-lg">
+                  {isAdmin ? l.conversationHistoryAdminFooter : l.conversationHistoryPrivateFooter}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="card assoc">
+            <div className="card-header">
+              <h3>{l.tasksCardTitle}</h3>
+              <span className="actions">
+                <a className="btn btn-ghost btn-sm btn-icon" href="#task" aria-label={l.addTaskAction}>
+                  <PlusIcon className="icon" />
+                </a>
+              </span>
+            </div>
+            <div className="card-body">
+              {openTasks.length ? (
+                openTasks.map((t) => (
+                  <div key={t.id} className="assoc-row">
+                    <CompleteTaskCheckbox
+                      taskId={t.id}
+                      personId={record.person.id}
+                      ariaLabel={l.taskMarkDone}
+                      errorLabel={l.genericError}
+                    />
+                    <div className="grow">
+                      <div className="n">{t.title}</div>
+                      <div className="s">
+                        {t.dueAt ? `${l.taskDueBadgePrefix} ${format(t.dueAt, "d MMM", { locale: es })}` : l.emptyValue}
+                        {t.assignedToName ? ` · ${t.assignedToName}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="placeholder">{l.associationsComingSoon}</div>
+              )}
+            </div>
           </div>
         </aside>
       </div>

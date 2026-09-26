@@ -596,6 +596,15 @@ export const es: typeof en = {
     adminAuditAlertTitle: "Está viendo la conversación de otro BD",
     adminNoConversationContent: "Sin contenido de conversación registrado.",
     adminOpenAsPage: "Abrir en una página",
+    stageBadgePrefix: "Etapa:",
+    conversationHistoryTitle: "Historial de conversaciones",
+    conversationHistoryIntroPrefix: "Existe historial de conversaciones con:",
+    conversationHistoryPrivateFooter: "El contenido es privado para cada BD.",
+    conversationHistoryAdminFooter:
+      "Los administradores pueden abrir cualquier conversación; cada visualización queda registrada en el registro de auditoría.",
+    tasksCardTitle: "Tareas",
+    addTaskAction: "Agregar tarea",
+    changeCompanyAria: "Cambiar empresa",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).
@@ -624,6 +633,9 @@ export const es: typeof en = {
     timelineLockedOwnedBy: (bdName: string) =>
       `Esta conversación pertenece a ${bdName}. Se puede ver que existe y cuándo ocurrió; su contenido es privado para ${bdName} (y los administradores).`,
     adminAuditAlertBody: (bdName: string) => `Esta visualización quedó registrada en el registro de auditoría (conversación de ${bdName}).`,
+    hiringBadge: (count: number) => `Contratando · ${count} puestos de IT`,
+    companyContactCount: (count: number) => `${count} contactos en esta empresa`,
+    conversationHistorySummary: (count: number, dateLabel: string) => `${count} mensajes · último ${dateLabel}`,
   },
 
   adminConversation: {

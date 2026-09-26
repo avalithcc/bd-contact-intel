@@ -89,6 +89,18 @@ export async function getCompanies(
   };
 }
 
+/**
+ * "N contactos en esta empresa" (mockup-port r05; contact-record.html:163).
+ * Bounded to one company — excludes merged-away rows (design D6), same
+ * convention as every other Contact read (queries.ts's `findPersonById`).
+ */
+export async function getCompanyContactCount(companyKey: string): Promise<number> {
+  const [row] = await db.execute<{ count: string }>(
+    sql`select count(*)::text as count from person where company_key = ${companyKey} and merged_into_id is null`,
+  );
+  return row ? Number(row.count) : 0;
+}
+
 export async function getCompanyByKey(companyKey: string): Promise<Company | null> {
   const [row] = await db.select().from(company).where(eq(company.companyKey, companyKey));
   return row ?? null;
