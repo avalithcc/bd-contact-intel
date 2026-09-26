@@ -15,6 +15,12 @@ import { TopBar } from "../contacts/TopBar";
  * cheap `findFirst` by unique email index already called by most pages
  * under this layout (contacts/tasks/hiring/discovery/whats-new) — not a
  * new heavy query, just one more call site for it.
+ *
+ * mockup-port 02: the `.app`/`.main` wrapper below is contacts.html's own
+ * shell grid (design-system.css) — `.app { grid-template-columns:
+ * sidebar-width minmax(0,1fr) }`, `.main { display: flex; flex-direction:
+ * column }` — replacing the previous `.main-layout` margin-left hack that
+ * paired with Sidebar's fixed-position drawer.
  */
 export default async function AppLayout({
   children,
@@ -27,14 +33,16 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
-      <Sidebar labels={labels} />
-      <div className="main-layout">
-        <TopBar
-          labels={labels}
-          locale={locale}
-          me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
-        />
-        {children}
+      <div className="app">
+        <Sidebar labels={labels} />
+        <div className="main">
+          <TopBar
+            labels={labels}
+            locale={locale}
+            me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
+          />
+          {children}
+        </div>
       </div>
     </ToastProvider>
   );
