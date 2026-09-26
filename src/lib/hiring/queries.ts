@@ -361,7 +361,7 @@ export interface HiringMatch {
  * lifetime of the request (same mechanism Next.js uses for `fetch`); it is
  * a no-op the rest of the time, when the two call sites' args differ.
  */
-export const getHiringMatchIndex = cache(async function getHiringMatchIndex(
+const getHiringMatchIndexCached = cache(async function getHiringMatchIndexUncached(
   market?: MarketKey,
   miamiOnly?: boolean,
   hideOffshore?: boolean,
@@ -384,6 +384,22 @@ export const getHiringMatchIndex = cache(async function getHiringMatchIndex(
   }
   return index;
 });
+
+/**
+ * Fixed-arity entry point: React `cache()` keys on the argument list
+ * including its length, so `getHiringMatchIndex()` and
+ * `getHiringMatchIndex(undefined, undefined, undefined, undefined)` would
+ * otherwise miss each other. Always forwarding all four arguments makes the
+ * two call sites above share one cached result.
+ */
+export function getHiringMatchIndex(
+  market?: MarketKey,
+  miamiOnly?: boolean,
+  hideOffshore?: boolean,
+  startupsOnly?: boolean,
+): Promise<Map<string, HiringMatch>> {
+  return getHiringMatchIndexCached(market, miamiOnly, hideOffshore, startupsOnly);
+}
 
 export interface CompanyPostingsForMessage {
   companyKey: string;
