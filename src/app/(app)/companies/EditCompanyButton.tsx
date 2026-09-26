@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateCompanyAction } from "@/app/(app)/companies/actions";
+import { Dialog } from "@/components/Dialog";
+import { useToast } from "@/components/ToastProvider";
+import type { ClientStrings } from "@/lib/i18n/clientStrings";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 import styles from "./EditCompanyModal.module.css";
+
+export type CompanyRecordLabels = ClientStrings<Dictionary["companyRecord"]>;
 
 interface EditCompanyButtonProps {
   companyKey: string;
@@ -10,7 +17,11 @@ interface EditCompanyButtonProps {
   relationshipStage?: string | null;
   revenuePotential?: number | null;
   notes?: string | null;
+  labels: CompanyRecordLabels;
+  stageLabels: Record<string, string>;
 }
+
+const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 
 export function EditCompanyButton({
   companyKey,
@@ -18,7 +29,11 @@ export function EditCompanyButton({
   relationshipStage,
   revenuePotential,
   notes,
+  labels: l,
+  stageLabels,
 }: EditCompanyButtonProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState(displayName);
   const [stage, setStage] = useState(relationshipStage ?? "");
@@ -26,6 +41,11 @@ export function EditCompanyButton({
   const [notesText, setNotesText] = useState(notes ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function close() {
+    setIsOpen(false);
+    setError(null);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,103 +59,86 @@ export function EditCompanyButton({
         notes: notesText || undefined,
       });
       setIsOpen(false);
+      showToast(l.editSuccess);
+      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update company");
+      const message = err instanceof Error ? err.message : l.editError;
+      setError(message);
+      showToast(message, "error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        className={styles.openButton}
-        onClick={() => setIsOpen(true)}
-      >
-        Edit company
-      </button>
-    );
-  }
-
   return (
-    <div className={styles.modal}>
-      <div className={styles.overlay} onClick={() => setIsOpen(false)} />
-      <div className={styles.content}>
-        <h2>Edit Company</h2>
-        {error && <div className={styles.error}>{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Company Name</label>
+    <>
+      <button type="button" className={styles.openButton} onClick={() => setIsOpen(true)}>
+        {l.editCompany}
+      </button>
+
+      <Dialog open={isOpen} onClose={close} title={l.editDialogTitle}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          {error && (
+            <div className={styles.error} role="alert">
+              {error}
+            </div>
+          )}
+          <label className={styles.field}>
+            <span>{l.companyNameLabel}</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className={styles.input}
               disabled={isSubmitting}
             />
-          </div>
+          </label>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Stage</label>
+          <label className={styles.field}>
+            <span>{l.stageLabel}</span>
             <select
               value={stage}
               onChange={(e) => setStage(e.target.value)}
-              className={styles.select}
               disabled={isSubmitting}
             >
-              <option value="">None</option>
-              <option value="prospect">Prospect</option>
-              <option value="qualified">Qualified</option>
-              <option value="proposal_sent">Proposal Sent</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
+              <option value="">{l.stageNone}</option>
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {stageLabels[s] ?? s}
+                </option>
+              ))}
             </select>
-          </div>
+          </label>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Revenue Potential</label>
+          <label className={styles.field}>
+            <span>{l.revenueLabel}</span>
             <input
               type="number"
               value={revenue}
               onChange={(e) => setRevenue(e.target.value)}
               placeholder="0"
-              className={styles.input}
               disabled={isSubmitting}
             />
-          </div>
+          </label>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Notes</label>
+          <label className={styles.field}>
+            <span>{l.notesLabel}</span>
             <textarea
               value={notesText}
               onChange={(e) => setNotesText(e.target.value)}
-              className={styles.textarea}
               disabled={isSubmitting}
             />
-          </div>
+          </label>
 
           <div className={styles.actions}>
-            <button
-              type="submit"
-              className={styles.submitButton}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : "Save"}
+            <button type="button" onClick={close} disabled={isSubmitting}>
+              {l.cancel}
             </button>
-            <button
-              type="button"
-              className={styles.cancelButton}
-              onClick={() => {
-                setIsOpen(false);
-                setError(null);
-              }}
-              disabled={isSubmitting}
-            >
-              Cancel
+            <button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? l.saving : l.save}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
+    </>
   );
 }
