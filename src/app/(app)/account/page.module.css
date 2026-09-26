@@ -1,0 +1,132 @@
+.page {
+  max-width: 40rem;
+}
+
+.header {
+  margin-bottom: var(--space-2xl);
+}
+
+.card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2xl);
+}
+
+.card + .card {
+  margin-top: var(--space-lg);
+}
+
+.cardHeader {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin: 0 0 var(--space-lg);
+  color: var(--color-ink);
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.profileInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileInfo h2 {
+  font-size: var(--text-xl);
+  margin: 0;
+}
+
+.profileEmail {
+  color: var(--color-ink-soft);
+  font-size: var(--text-md);
+  margin: var(--space-2xs) 0 0;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  background: var(--color-badge-accent-bg);
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.65rem;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.fieldLabel {
+  color: var(--color-ink-soft);
+  font-size: var(--text-md);
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.segmentedOn {
+  padding: 0.35rem 0.9rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.listLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) 0;
+  color: inherit;
+  text-decoration: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.listLink:first-of-type {
+  border-top: none;
+}
+
+.listLinkIcon {
+  color: var(--color-ink-soft);
+  flex: none;
+}
+
+.listLinkGrow {
+  flex: 1;
+  min-width: 0;
+}
+
+.listLinkTitle {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.listLinkMeta {
+  display: block;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  margin-top: 0.1rem;
+}
+
+.listLinkChevron {
+  color: var(--color-ink-muted);
+  flex: none;
+}
+
+.signOutRow {
+  margin-top: var(--space-xl);
+}

@@ -609,6 +609,21 @@ export const es: typeof en = {
     passwordsDontMatch: "Las contraseñas no coinciden.",
   },
 
+  accountSettings: {
+    eyebrow: "Cuenta",
+    title: "cuenta",
+    preferencesTitle: "Preferencias",
+    languageLabel: "Idioma",
+    languageValue: "Español",
+    connectionsTitle: "Conexiones y seguridad",
+    gmailRowTitle: "Conexión con Gmail",
+    gmailConnectedMeta: (email: string) => `Conectado como ${email}`,
+    gmailNotConnectedMeta: "No conectado",
+    badgeConnected: "Conectado",
+    passwordRowTitle: "Contraseña",
+    passwordRowMeta: "Actualizá tu contraseña de acceso",
+  },
+
   upload: {
     connectionsLabel: "Connections.csv de LinkedIn",
     import: "Importar",

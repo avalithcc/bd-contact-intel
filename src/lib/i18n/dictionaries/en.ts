@@ -716,6 +716,21 @@ export const en = {
     passwordsDontMatch: "Passwords don't match.",
   },
 
+  accountSettings: {
+    eyebrow: "Account",
+    title: "account",
+    preferencesTitle: "Preferences",
+    languageLabel: "Language",
+    languageValue: "Spanish",
+    connectionsTitle: "Connections & security",
+    gmailRowTitle: "Gmail connection",
+    gmailConnectedMeta: (email: string) => `Connected as ${email}`,
+    gmailNotConnectedMeta: "Not connected",
+    badgeConnected: "Connected",
+    passwordRowTitle: "Password",
+    passwordRowMeta: "Update your sign-in password",
+  },
+
   upload: {
     connectionsLabel: "LinkedIn Connections.csv",
     import: "Import",
