@@ -38,6 +38,26 @@ Chain strategy: feature-branch-chain
 - [x] 1.6 RED/GREEN: `src/lib/hubspot/owners.ts` — `normalizeNameKey(hubspotOwner) === normalizeNameKey(bd.name)`; blank/`(Deactivated…)` suffix → unassigned; unknown name → unassigned + counted (hubspot-import spec "Owner mapping").
 - [x] 1.7 Test: `.gitignore` still excludes `hubspot/` (D8 PII rule — export files never committed).
 
+**Post-review fixes (fresh review of PR H1):** the real export has BOTH
+`LinkedIn` (~0.6% filled, holds the actual profile URL) and `URL de
+LinkedIn` (~0% filled) — `contacts.ts` now reads both and keeps the first
+non-blank, `LinkedIn` first; neither is in `REQUIRED_CONTACT_HEADERS`
+anymore, only pinned as `OPTIONAL_CONTACT_LINKEDIN_HEADERS` (columns.ts).
+Timestamp fields (`Último contacto`/`Última actividad`/`Fecha de creación`,
+format `YYYY-MM-DD[ HH:mm]`) are parsed as the HubSpot portal's timezone,
+confirmed by the owner as `America/Argentina/Buenos_Aires` (fixed UTC-3, no
+DST) — via pure `Date.UTC` arithmetic (`HUBSPOT_PORTAL_TIMEZONE` constant in
+contacts.ts), independent of the running process's TZ (proven under both
+`TZ=UTC` and `TZ=America/New_York`), instead of `new Date(string)` which
+depended on it. `Associated Company IDs (Primary)` can carry more than one
+semicolon-separated id — only the first is kept, and
+`associatedCompanyIdPrimaryMultiple` flags it for the import report. Also
+added `assertNoDuplicateRequiredHeaders` (columns.ts) wired into
+`parseHubSpotCsv` (parse.ts): csv-parse's `columns:true` silently keeps only
+the last occurrence of a duplicated header (the export has dupes, e.g.
+"Función laboral" x2, "Billing Contact IDs" x3) — this now throws a
+sanitized error if a *required* header name repeats.
+
 ## Phase 2: Company Resolution + Migration 0015 (PR H2, base: PR H1)
 
 - [ ] 2.1 **GATE (owner/orchestrator)**: apply migration `drizzle/0015_company_domain.sql` to prod BEFORE any dry run against production data.
