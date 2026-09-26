@@ -155,7 +155,54 @@ to close (branches 11-15) is now closed too, PLUS a prod bug fix (branch
 No row was left silently undone. See the per-row "notes" column above for
 the full reasoning behind every remaining item.
 
-## Prod bugs fixed (branches 10, 16, 17)
+## Prod bugs fixed (branches 10, 16, 17) / owner feedback (branch 18)
+
+**Branch 18** (owner feedback round 18, perf + UX, no bugs — three
+requested improvements):
+
+1. **`getHiringMatchIndex` computed twice per request on the Outreach
+   view.** Confirmed via full call-site audit: the "Contratando" badge
+   call (`page.tsx`, zero args) and `listOutreachCandidates`' own call
+   (`src/lib/outreach/queries.ts`) resolve to the exact same argument
+   tuple (`undefined, undefined, undefined, undefined`) whenever the
+   Outreach tab has no ad-hoc market/startups override — a genuine
+   duplicate. Confirmed `getContactListPage`/`getContactBoardColumns`
+   (mutually exclusive with each other and with Outreach) and the 6
+   SYSTEM_VIEWS count queries (never set market/startupsOnly) never
+   duplicate it. Fixed by wrapping `getHiringMatchIndex` in React
+   `cache()` (per-request memoization, same mechanism Next.js uses for
+   `fetch`) — a no-op whenever the two call sites' args differ, so no
+   risk of stale data across different filter combinations.
+2. **Loading feedback.** Added `src/app/(app)/contacts/loading.tsx`, a
+   route-level Suspense fallback built entirely from design-system's
+   `.skeleton` blocks (no new CSS) — Next.js renders it the instant
+   navigation starts, before ANY of the page's data (listPage,
+   boardColumns, systemViewCounts, hiring index...) resolves, independent
+   of how slow the board specifically is. Layered on top: `LinkPendingDot`
+   (`useLinkStatus`, confirmed available — installed Next is 15.5.25
+   despite the `^15.1.3` package.json range) on the Tabla/Tablero
+   segmented links and every view-tab link, for an even earlier signal
+   the instant the click happens.
+   - Investigated but NOT changed: the board's per-column query shape
+     (`getContactBoardColumns`) already runs its 5 columns' count+rows
+     queries in parallel via `Promise.all` (not sequential) — this was
+     already efficient. Consolidating each column's 2 queries into 1 (a
+     window-function rewrite) is a real DB query change I did not
+     attempt without database access to verify against real data.
+   - The main data-fetch block (`listPage`/`systemViewCounts`/
+     `boardColumns`/`outreachPage`) was already a single `Promise.all` —
+     confirmed, no change needed.
+3. **View-tabs overflow (owner-chosen option A).** New pure
+   `src/lib/contacts/viewTabs.ts` (`splitViewTabs`, unit-tested) splits
+   every view into a pinned set — "Todos los contactos", "Mis contactos",
+   "Sin contactar", "Listos para Outreach" (`PINNED_VIEW_TAB_KEYS`) — and
+   an overflow set rendered inside a "Más vistas ▾" dropdown (reused the
+   existing generic `DropdownMenu` component as-is, no new dropdown
+   implementation). If the active view lives in the overflow set, it is
+   ALSO shown as a tab right after the pinned ones (HubSpot-style), so the
+   current view is never hidden behind a click. No horizontal scroll at
+   any width, since the visible row is now capped at 4 pinned tabs + the
+   promoted active tab (if any) + the dropdown trigger, down to ~1024px.
 
 **Branch 17**:
 
@@ -281,3 +328,12 @@ would have 500'd or crashed in prod, missed by branch 10's unit tests):
 - **15** (`feat/mockup-port-15-board-inline-dialogs`): log-meeting/discard
   dialogs now open inline on the board (shared Dialog, same server
   actions as the record page), not via navigation.
+- **16** (`feat/mockup-port-16-smoke-fixes`): two prod-smoke bugs in the
+  branch-10 effective-time fix — see "Prod bugs fixed" above.
+- **17** (`feat/mockup-port-17-owner-feedback`): bulk-selection-bar fix,
+  board "no funciona" investigation, audit log for bulk owner changes —
+  see "Prod bugs fixed" above.
+- **18** (`feat/mockup-port-18-perf-loading-tabs`): `getHiringMatchIndex`
+  cache() dedup, `loading.tsx` + `useLinkStatus` pending feedback,
+  view-tabs pinned/overflow split — see "owner feedback (branch 18)"
+  above.
