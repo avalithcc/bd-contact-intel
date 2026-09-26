@@ -31,6 +31,7 @@ import {
   type ContactColumnKey,
 } from "@/lib/contacts/columns";
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
+import { buildActiveFilterChips, type FilterChip } from "@/lib/contacts/filterChips";
 import { createSavedViewAction, deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
 import { NewContactDialog, type NewContactDialogLabels } from "./NewContactDialog";
@@ -72,7 +73,20 @@ interface ContactsPageProps {
     industryGroup?: string;
     seniority?: string;
     emailStatus?: string;
-    status?: string;
+    // Multi-select status chip (mockup: "Nuevo, Contactado" as ONE chip) —
+    // checkboxes sharing `name="status"` produce repeated `?status=` params
+    // on a GET form submit, which Next.js parses as string[]; a single
+    // value (e.g. a chip-removal link) stays a plain string.
+    status?: string | string[];
+    // 10-filter parity (contacts.html "Agregar filtro") — company/
+    // bdConnected/lastActivityDays are new query params; market/roleGroup/
+    // startupsOnly below already exist for the Outreach-view branch and are
+    // reused verbatim for the general ad-hoc filter panel (mutually
+    // exclusive branches, no collision).
+    company?: string;
+    hiring?: string;
+    bdConnected?: string;
+    lastActivityDays?: string;
     // "Outreach" system view filters (task 15a-2; owner decision
     // 2026-09-26): same param names/semantics as `/outreach`'s own
     // searchParams — see src/lib/contacts/outreachViewParams.ts.
@@ -225,6 +239,10 @@ function columnCell(
  */
 export default async function ContactsPage({ searchParams }: ContactsPageProps) {
   const sp = await searchParams;
+  // Normalizes the multi-select status chip's repeated `?status=` params
+  // (parsed as string[] by Next.js) down to the same comma-joined shape
+  // every other ad-hoc filter/href-building helper below expects.
+  const statusQuery = Array.isArray(sp.status) ? sp.status.join(",") : sp.status;
   const me = await getCurrentBd();
   const dict = await getDictionary();
   const l = dict.contactList;
@@ -265,7 +283,14 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     industryGroup: sp.industryGroup,
     seniority: sp.seniority,
     emailStatus: sp.emailStatus,
-    status: sp.status,
+    status: statusQuery,
+    company: sp.company,
+    hiring: sp.hiring,
+    market: sp.market,
+    roleGroup: sp.roleGroup,
+    startupsOnly: sp.startupsOnly,
+    bdConnected: sp.bdConnected,
+    lastActivityDays: sp.lastActivityDays,
   });
 
   // Column picker (task 13.1): a `?columns=` query override wins (used by
@@ -345,10 +370,67 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     if (sp.industryGroup !== undefined) params.set("industryGroup", sp.industryGroup);
     if (sp.seniority !== undefined) params.set("seniority", sp.seniority);
     if (sp.emailStatus !== undefined) params.set("emailStatus", sp.emailStatus);
-    if (sp.status !== undefined) params.set("status", sp.status);
+    if (statusQuery !== undefined) params.set("status", statusQuery);
+    if (sp.company !== undefined) params.set("company", sp.company);
+    if (sp.hiring !== undefined) params.set("hiring", sp.hiring);
+    if (sp.market !== undefined) params.set("market", sp.market);
+    if (sp.roleGroup !== undefined) params.set("roleGroup", sp.roleGroup);
+    if (sp.startupsOnly !== undefined) params.set("startupsOnly", sp.startupsOnly);
+    if (sp.bdConnected !== undefined) params.set("bdConnected", sp.bdConnected);
+    if (sp.lastActivityDays !== undefined) params.set("lastActivityDays", sp.lastActivityDays);
     if (sp.sort !== undefined) params.set("sort", sp.sort);
     return params;
   }
+
+  // Removable filter chips (mockup: `.chip` + "Quitar filtro" button each) —
+  // clears exactly ONE field's ad-hoc param, keeping every other filter,
+  // sort, layout, and page-size param untouched.
+  const AD_HOC_FIELD_TO_PARAM: Record<FilterChip["field"], string> = {
+    owner: "owner",
+    status: "status",
+    emailStatus: "emailStatus",
+    company: "company",
+    hiring: "hiring",
+    market: "market",
+    roleGroup: "roleGroup",
+    startupsOnly: "startupsOnly",
+    bdConnected: "bdConnected",
+    lastActivityDays: "lastActivityDays",
+    industryGroup: "industryGroup",
+    seniority: "seniority",
+    emailVerified: "emailVerified",
+  };
+
+  function removeFilterHref(field: FilterChip["field"]): string {
+    const params = withAdHocFilterParams(new URLSearchParams());
+    params.set(AD_HOC_FIELD_TO_PARAM[field], "");
+    params.set("view", activeView.viewKey);
+    if (sp.q) params.set("q", sp.q);
+    return `/contacts?${params.toString()}`;
+  }
+
+  function clearAllFiltersHref(): string {
+    const params = new URLSearchParams();
+    params.set("view", activeView.viewKey);
+    if (sp.q) params.set("q", sp.q);
+    if (sp.sort) params.set("sort", sp.sort);
+    if (sp.columns) params.set("columns", sp.columns);
+    return `/contacts?${params.toString()}`;
+  }
+
+  const bdNameById = new Map(ownerOptions.map((o) => [o.id, o.name]));
+  const activeFilterChips = isOutreachView
+    ? []
+    : buildActiveFilterChips(effectiveFilters, {
+        ownerLabel: (value) =>
+          value === "me" ? l.filterOwnerMe : value === "unassigned" ? l.filterOwnerUnassigned : (bdNameById.get(value) ?? value),
+        statusLabel: (status) => dict.leadStatuses[status],
+        emailStatusLabel: (status) =>
+          status === "verified" ? l.emailVerified : status === "probable" ? l.emailProbable : l.emailNone,
+        marketLabel: (market) => dict.markets[market],
+        roleGroupLabel: (key) => dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key,
+        bdName: (bdId) => bdNameById.get(bdId) ?? bdId,
+      });
 
   // Sortable headers (mockup: "Nombre" and "Última actividad ↓", the
   // latter sorted by default). A plain link toggle, same "no client JS
@@ -360,6 +442,19 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     if (sp.q) params.set("q", sp.q);
     params.set("sort", target);
     return `/contacts?${params.toString()}`;
+  }
+
+  // Toolbar-level "Exportar" (contacts.html:95, whole filtered view — not
+  // just the bulk selection BulkActionsBar.tsx's own "Exportar" covers).
+  // Serializes the ALREADY-RESOLVED `effectiveFilters` straight through, so
+  // `/contacts/export` never has to re-resolve `?view=` itself — see that
+  // route's doc comment.
+  function toolbarExportHref(): string {
+    const params = serializeContactFilters(effectiveFilters);
+    if (sp.q) params.set("q", sp.q);
+    params.set("sort", sort);
+    if (visibleColumns.length) params.set("columns", visibleColumns.join(","));
+    return `/contacts/export?${params.toString()}`;
   }
 
   function pageHref(targetPage: number): string {
@@ -496,6 +591,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               moveDownLabel: l.columnsMoveDown,
             }}
           />
+          <Link href={toolbarExportHref()} className="btn btn-secondary btn-sm">
+            {l.bulkExport}
+          </Link>
         </div>
       )}
 
@@ -582,6 +680,14 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         </section>
       ) : (
         <div className="toolbar">
+          {activeFilterChips.map((chip) => (
+            <span key={chip.field} className="chip">
+              <span className="k">{chip.label}:</span> {chip.valueText ?? l.filterChipActiveNoValue}
+              <Link href={removeFilterHref(chip.field)} aria-label={l.filterRemoveLabel}>
+                ×
+              </Link>
+            </span>
+          ))}
           <details className="dropdown">
             <summary className="chip chip-add">{l.filtersPanelLabel}</summary>
             <form method="get" action="/contacts" className="menu left">
@@ -589,6 +695,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               {sp.q && <input type="hidden" name="q" value={sp.q} />}
               {sp.layout && <input type="hidden" name="layout" value={sp.layout} />}
               {sp.columns && <input type="hidden" name="columns" value={sp.columns} />}
+              {sp.sort && <input type="hidden" name="sort" value={sp.sort} />}
+
+              <div className="menu-label">{l.filtersPanelLabel}</div>
 
               <label className="check">
                 {l.filterOwnerLabel}
@@ -601,6 +710,97 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                       {o.name}
                     </option>
                   ))}
+                </select>
+              </label>
+
+              <fieldset className="check">
+                <legend>{l.filterStatusLabel}</legend>
+                {PERSON_STATUSES.map((s) => (
+                  <label key={s} className="check">
+                    <input
+                      type="checkbox"
+                      name="status"
+                      value={s}
+                      defaultChecked={effectiveFilters.status?.includes(s) ?? false}
+                    />{" "}
+                    {dict.leadStatuses[s]}
+                  </label>
+                ))}
+              </fieldset>
+
+              <label className="check">
+                {l.filterEmailStatusLabel}
+                <select name="emailStatus" defaultValue={sp.emailStatus ?? ""} className="select input-sm">
+                  <option value="">{l.filterEmailStatusAny}</option>
+                  <option value="verified">{l.emailVerified}</option>
+                  <option value="probable">{l.emailProbable}</option>
+                  <option value="none">{l.emailNone}</option>
+                </select>
+              </label>
+
+              <label className="check">
+                {l.filterCompanyLabel}
+                <input type="text" name="company" defaultValue={sp.company ?? ""} className="input input-sm" />
+              </label>
+
+              <label className="check">
+                <input type="checkbox" name="hiring" value="1" defaultChecked={effectiveFilters.hiring ?? false} />{" "}
+                {l.filterHiringLabel}
+              </label>
+
+              <label className="check">
+                {dict.common.marketLabel}
+                <select name="market" defaultValue={sp.market ?? ""} className="select input-sm">
+                  <option value="">{dict.common.allMarkets}</option>
+                  {MARKETS.map((m) => (
+                    <option key={m} value={m}>
+                      {dict.markets[m]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="check">
+                {dict.common.roleGroupLabel}
+                <select name="roleGroup" defaultValue={sp.roleGroup ?? ""} className="select input-sm">
+                  <option value="">{dict.common.allGroups}</option>
+                  {ROLE_GROUPS.map((g) => (
+                    <option key={g.key} value={g.key}>
+                      {dict.roleGroups[g.key]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="check">
+                <input
+                  type="checkbox"
+                  name="startupsOnly"
+                  value="on"
+                  defaultChecked={effectiveFilters.startupsOnly ?? false}
+                />{" "}
+                {l.filterStartupLabel}
+              </label>
+
+              <label className="check">
+                {l.filterBdConnectedLabel}
+                <select name="bdConnected" defaultValue={sp.bdConnected ?? ""} className="select input-sm">
+                  <option value="">{l.filterOwnerAny}</option>
+                  {ownerOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="check">
+                {l.filterLastActivityLabel}
+                <select name="lastActivityDays" defaultValue={sp.lastActivityDays ?? ""} className="select input-sm">
+                  <option value="">{l.filterOwnerAny}</option>
+                  <option value="7">{l.filterLastActivity7d}</option>
+                  <option value="30">{l.filterLastActivity30d}</option>
+                  <option value="90">{l.filterLastActivity90d}</option>
                 </select>
               </label>
 
@@ -628,28 +828,6 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                 </select>
               </label>
 
-              <label className="check">
-                {l.filterEmailStatusLabel}
-                <select name="emailStatus" defaultValue={sp.emailStatus ?? ""} className="select input-sm">
-                  <option value="">{l.filterEmailStatusAny}</option>
-                  <option value="verified">{l.emailVerified}</option>
-                  <option value="probable">{l.emailProbable}</option>
-                  <option value="none">{l.emailNone}</option>
-                </select>
-              </label>
-
-              <label className="check">
-                {l.filterStatusLabel}
-                <select name="status" defaultValue={sp.status ?? ""} className="select input-sm">
-                  <option value="">{l.filterStatusAny}</option>
-                  {PERSON_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {dict.leadStatuses[s]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               <div className="menu-sep" />
               <button type="submit" className="btn btn-primary btn-sm">
                 {l.filtersApply}
@@ -659,6 +837,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               </Link>
             </form>
           </details>
+          {activeFilterChips.length > 0 && (
+            <Link href={clearAllFiltersHref()} className="btn btn-ghost btn-sm">
+              {l.filtersClearAll}
+            </Link>
+          )}
         </div>
       )}
 
@@ -790,7 +973,18 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           </div>
         )
       ) : isBoard ? (
-        <Board columns={boardColumns ?? []} dict={dict} tableHref={layoutHref("table")} />
+        <>
+          {/* mockups/contacts-board.html:76 — "Las personas de la propia
+              empresa nunca se muestran". Not board-specific enforcement: the
+              identity resolver skips own-company matches at ingest time
+              (src/lib/identity/matcher.ts skip_own_company), so no person
+              row for an Avalith teammate ever exists to filter out, in
+              either the table or the board. This note just surfaces that
+              existing, already-universal invariant in the one place the
+              mockup calls it out. */}
+          <p className="meta mb-lg">{l.boardOwnCompanyNote}</p>
+          <Board columns={boardColumns ?? []} dict={dict} tableHref={layoutHref("table")} />
+        </>
       ) : rows.length === 0 ? (
         <div className="empty">
           <p>{l.noResults}</p>
@@ -805,6 +999,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           columns={visibleColumns}
           locale={locale}
           messageLabels={messageLabels}
+          total={total}
         >
           <div className="table-wrap">
             <table className="data">

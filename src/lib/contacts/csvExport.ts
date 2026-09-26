@@ -15,6 +15,9 @@
  * (rare) false positive.
  */
 import type { ContactColumnKey } from "@/lib/contacts/columns";
+// Type-only import (erased at build time, no `@/db` runtime dependency) —
+// keeps this module's "pure, no DB" guarantee intact.
+import type { ContactListRow } from "@/lib/contacts/listQueries";
 
 /** Prepended to the CSV text by the route handler so Excel opens UTF-8
  * (accented Spanish headers) correctly instead of guessing Latin-1. */
@@ -90,6 +93,33 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
 
 function nameValue(row: ContactExportRow): string {
   return [row.firstName, row.lastName].filter(Boolean).join(" ");
+}
+
+/**
+ * Maps one `ContactListRow` (whatever read produced it — a single bulk
+ * selection, or a whole filtered view) into the CSV builder's row shape.
+ * Shared by both `/contacts/export` modes (route.ts) so the two never
+ * drift on which fields get exported or how they're formatted.
+ */
+export function mapContactRowToExportRow(row: ContactListRow, statusLabel: string): ContactExportRow {
+  return {
+    firstName: row.firstName,
+    lastName: row.lastName,
+    company: row.company,
+    ownerName: row.ownerName,
+    statusLabel,
+    email: row.email,
+    bdConnectionNames: row.bdConnections.title,
+    lastActivityText: row.lastActivity
+      ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`
+      : "",
+    roleGroup: row.roleGroup,
+    industry: row.industry,
+    country: row.country,
+    sourceKey: row.sourceKey,
+    createdAt: row.createdAt,
+    seniority: row.seniority,
+  };
 }
 
 /** Builds the full CSV text (no BOM — the caller prepends CSV_BOM), "Nombre"

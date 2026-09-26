@@ -7,7 +7,8 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildContactsCsv, CSV_BOM, type ContactExportRow } from "@/lib/contacts/csvExport";
+import { buildContactsCsv, CSV_BOM, mapContactRowToExportRow, type ContactExportRow } from "@/lib/contacts/csvExport";
+import type { ContactListRow } from "@/lib/contacts/listQueries";
 
 const HEADERS = {
   name: "Nombre",
@@ -103,4 +104,47 @@ test("buildContactsCsv does not prefix ordinary text", () => {
 
 test("CSV_BOM is the UTF-8 byte-order-mark character", () => {
   assert.equal(CSV_BOM, "﻿");
+});
+
+function contactListRow(overrides: Partial<ContactListRow> = {}): ContactListRow {
+  return {
+    id: "p1",
+    firstName: "Ana",
+    lastName: "Gomez",
+    jobTitle: null,
+    company: "Acme",
+    ownerBdId: null,
+    ownerName: "Bruno",
+    status: "new",
+    email: "ana@acme.com",
+    emailStatus: "verified",
+    roleGroup: null,
+    industry: null,
+    country: null,
+    sourceKey: null,
+    createdAt: new Date("2026-01-15T00:00:00Z"),
+    seniority: null,
+    bdConnections: { avatars: [], title: "" },
+    lastActivity: null,
+    ...overrides,
+  };
+}
+
+test("mapContactRowToExportRow: no BDs connected / no activity renders as empty strings, not 'null'", () => {
+  const row = mapContactRowToExportRow(contactListRow(), "Nuevo");
+  assert.equal(row.bdConnectionNames, "");
+  assert.equal(row.lastActivityText, "");
+  assert.equal(row.statusLabel, "Nuevo");
+});
+
+test("mapContactRowToExportRow: bdConnections title and formatted last-activity text carry through", () => {
+  const row = mapContactRowToExportRow(
+    contactListRow({
+      bdConnections: { avatars: [{ bdId: "bd1", name: "Ana Pereyra", initials: "AP" }], title: "Ana Pereyra" },
+      lastActivity: { type: "email_sent", label: "Correo enviado", createdAt: new Date("2026-02-01T00:00:00Z") },
+    }),
+    "Nuevo",
+  );
+  assert.equal(row.bdConnectionNames, "Ana Pereyra");
+  assert.equal(row.lastActivityText, "Correo enviado (2026-02-01)");
 });

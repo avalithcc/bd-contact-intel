@@ -38,25 +38,25 @@ Columns: element | mockup | status | evidence | notes
 
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
-| Removable filter chips (one per active filter, "Quitar filtro" button each) | contacts.html:77-79 | todo | page.tsx:535-613 | Current UI is a `.chip.chip-add` trigger opening one `<details>` menu with `<select>` dropdowns (owner/industryGroup/seniority/emailStatus/status) submitted together — no per-filter removable chip, no independent add/remove per filter. |
-| "Agregar filtro" dropdown, 10 options | contacts.html:80-88 | partial | — | See per-filter rows below. |
+| Removable filter chips (one per active filter, "Quitar filtro" button each) | contacts.html:77-79 | **done (branch 09/09b)** | src/lib/contacts/filterChips.ts, page.tsx `activeFilterChips`/`removeFilterHref` | Deviation: chips render for every active filter with a working "×" remove link (removes exactly that field, keeps everything else), but adding a NEW filter still happens via one shared "Agregar filtro" panel listing all 10 fields at once, not the mockup's per-item dropdown -> inline editor flow. UX simplification, not a missing feature. |
+| "Agregar filtro" dropdown, 10 options | contacts.html:80-88 | **done, all 10 (branch 09/09b)** | page.tsx filter panel `<form>` | All 10 filter types are present in the panel; see per-filter rows below. |
 | — Responsable | contacts.html:83 | done (as select, not chip) | page.tsx:544-556 | |
-| — Estado | contacts.html:83 | done (as select, not chip) | page.tsx:592-602 | UI is single-select; `ContactFilters.status` is actually multi-value (`inArray`) in the DB layer — mockup shows "Nuevo, Contactado" (multi). Select-based UI can't express multi-select yet. |
+| — Estado | contacts.html:83 | **done, multi-select (branch 09/09b)** | page.tsx (checkbox group, `name="status"`), viewFilters.ts (comma-joined ad-hoc override) | Now genuinely multi-select, matching the mockup's "Nuevo, Contactado" chip. |
 | — Estado del correo | contacts.html:84 | done (as select, not chip) | page.tsx:582-590 | |
-| — Empresa | contacts.html:84 | todo | — | No company-name/company-key filter exists in `ContactFilters` or the panel. |
-| — Empresa con vacantes abiertas | contacts.html:85 | done (as implicit view filter, not toolbar toggle) | src/lib/contacts/viewFilters.ts `hiring` field, SYSTEM_VIEWS "Con vacantes abiertas" | Only reachable via the system view tab, not as an independent ad-hoc filter on top of any view. |
-| — Mercado de contratación | contacts.html:85 | todo (regular view) / done (Outreach view only) | src/lib/contacts/outreachViewParams.ts, page.tsx:490-499 (Outreach branch only) | `market`/`miamiOnly` only exist on the Outreach-view branch, not in `ContactFilters` for the regular table. |
-| — Grupo de rol | contacts.html:86 | todo (regular view) / done (Outreach view only) | src/lib/roleGroups.ts, page.tsx:459-467 (Outreach branch only) | Not wired into `ContactFilters`/the general filter panel. |
-| — Startup | contacts.html:86 | todo (regular view) / done (Outreach view only) | page.tsx:522-527 (Outreach branch only) | Same gap. |
-| — BD conectado | contacts.html:87 | todo | — | No filter by connected-BD exists. The read side now exists (`src/lib/contacts/bdConnections.ts`, this batch) but nothing filters by it yet. |
-| — Última actividad | contacts.html:87 | todo | — | No "last activity" filter (recency bucket) exists. |
-| "Borrar todo" | contacts.html:89 | deviation | page.tsx:608-610 (`l.filtersClear` link) | Clears ad-hoc filters via a link back to `?view=X`, but lives inside the filter panel, not as a toolbar-level "Borrar todo" button next to chips. |
+| — Empresa | contacts.html:84 | **done (branch 09/09b)** | viewFilters.ts `company`, listQueries.ts `ilike(person.company, ...)` | Free-text substring match, not an exact companyKey match. |
+| — Empresa con vacantes abiertas | contacts.html:85 | **done, ad-hoc (branch 09/09b)** | viewFilters.ts `hiring` (now ad-hoc overridable), page.tsx checkbox | Reachable both via the system view tab AND as an independent ad-hoc toggle on top of any view. |
+| — Mercado de contratación | contacts.html:85 | **done (branch 09/09b)** | viewFilters.ts `market`, listQueries.ts (reuses `getHiringMatchIndex`, same crossover the Outreach view uses) | `miamiOnly` stays Outreach-view-only (that view's own extra Florida cut); the general filter exposes the 3 `MarketKey` buckets (latam/us/other). |
+| — Grupo de rol | contacts.html:86 | **done (branch 09/09b)** | viewFilters.ts `roleGroup`, listQueries.ts `eq(person.roleGroup, ...)` | Now wired into the general `ContactFilters`/panel too. |
+| — Startup | contacts.html:86 | **done (branch 09/09b)** | viewFilters.ts `startupsOnly`, listQueries.ts (same `getHiringMatchIndex` crossover as market) | |
+| — BD conectado | contacts.html:87 | **done (branch 09/09b)** | viewFilters.ts `bdConnected`, listQueries.ts (EXISTS on `person_bd_connection`) | Reuses the same `ownerOptions` BD list already fetched for "Responsable" — no new query. |
+| — Última actividad | contacts.html:87 | **done (branch 09/09b)** | viewFilters.ts `lastActivityDays`, listQueries.ts (EXISTS on `activity`, bounded by `activity_person_idx`/`activity_created_idx`) | Fixed buckets (7/30/90 days), not a free date-range picker. |
+| "Borrar todo" | contacts.html:89 | **done (branch 09/09b)** | page.tsx `clearAllFiltersHref` | Real toolbar-level button next to the chips (only rendered when a filter is active) that clears every ad-hoc filter while preserving sort/columns/search/page-size. |
 | "Ordenado por Última actividad" indicator | contacts.html:91 | **done (branch 05)** | page.tsx (`l.sortedByPrefix`), default `sort=lastActivity` | |
 | "Columnas" dropdown, 12 checkable columns | contacts.html:92-94 | done | src/lib/contacts/columns.ts, page.tsx | All 12 mockup columns now selectable. |
 | — drag to reorder | contacts.html:93 (`.drag` handles) | **done (branch 06)** | src/app/(app)/contacts/ColumnPicker.tsx, src/lib/contacts/columnOrder.ts | `sanitizeColumnKeys` now order-preserves (caller order, dedup by first occurrence) instead of always re-sorting to a fixed order — a real behavior change, existing tests updated. Drag-and-drop via native HTML5 DnD; also added Up/Down buttons per row for keyboard accessibility (task instruction), which the static mockup doesn't show but doesn't contradict either. |
 | — "Restablecer" | contacts.html:94 | **done (branch 06)** | ColumnPicker.tsx `reset()` | Resets both order and checked set to `DEFAULT_CONTACT_COLUMNS`. |
 | — "Aplicar" | contacts.html:94 | done | page.tsx:445-447 | |
-| "Exportar" (toolbar-level, whole filtered view) | contacts.html:95 | todo | src/lib/contacts/csvExport.ts (bulk-selection export only) | Only a bulk/selection-scoped export exists (BulkActionsBar.tsx `buildExportHref`); no toolbar-level "export the whole current view" action. |
+| "Exportar" (toolbar-level, whole filtered view) | contacts.html:95 | **done (branch 09b) — owner confirmation needed on the cap** | page.tsx `toolbarExportHref`, export/route.ts (whole-view mode) | Reuses `getContactListPage` with the current filters/sort and a page size of `MAX_VIEW_EXPORT_ROWS = 5000` instead of the usual 50, capped so an unfiltered 26,606-row view can't return an unbounded CSV. A capped response sets `X-Export-Truncated: 1` (no UI currently surfaces it). **The 5000 cap is a stopgap, not a spec'd number — same "needs owner confirmation" flag as the bulk-message-generation cap.** |
 
 ## Bulk bar
 
@@ -67,7 +67,7 @@ Columns: element | mockup | status | evidence | notes
 | Crear tarea | contacts.html:100 | done | BulkActionsBar.tsx | |
 | Generar mensajes | contacts.html:101 | **done (branch 07) — owner confirmation needed on the cap** | src/app/(app)/contacts/BulkGenerateMessagesButton.tsx, bulkMessageActions.ts, src/lib/contacts/bulkMessages.ts | Smallest faithful version per owner decision: runs `generatePersonOutreachMessageAction` (the SAME person-scoped generator `/contacts/[id]` uses — NOT the legacy contact-scoped `generateOutreachMessage`, which would 404 for most unified Contacts) sequentially over the selection, capped at `MAX_BULK_GENERATE_MESSAGES = 25`. Results render in a dialog, one per contact, each with its own copy button (reusing the same copy/copied/error/pending strings as the per-contact button). **The 25 cap is a stopgap, not a spec'd number — needs explicit owner confirmation before this is considered final**, and a capped run shows a visible warning banner in the dialog. |
 | Exportar | contacts.html:102 | done | BulkActionsBar.tsx `buildExportHref` | Now includes the `bdConnections` column in the exported CSV when visible (this batch). |
-| "Seleccionar los N" | contacts.html:104 | todo | — | No "select all N matching the filter, not just this page" affordance; only page-level "select all" exists. |
+| "Seleccionar los N" | contacts.html:104 | **done, page-scoped (branch 09b) — true filter-wide bulk action needs an owner decision** | BulkActionsBar.tsx `selectAllMatching` | Deviation, documented in code: every bulk action here (owner/task/messages/export) takes an explicit checked-id list, not a filter predicate — there is no server-side "act on everything matching this filter" mode. The button shows the mockup's exact "Seleccionar los N" label and selects everything on the current page (same as the header checkbox), then shows a banner clarifying bulk actions only apply to this page. Turning this into a true filter-scoped bulk action (server-side, no id list) is a larger, separate change — flagged as needing an explicit owner decision, not invented silently. |
 | Quitar selección | contacts.html:105 | done | BulkActionsBar.tsx `clearSelection` | |
 
 ## Table
@@ -114,7 +114,7 @@ Columns: element | mockup | status | evidence | notes
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
 | Segmented control on Tablero | contacts-board.html:68-71 | done | page.tsx (shared with table) | |
-| Toolbar: single "Responsable: Yo" chip + own-company note | contacts-board.html:76 | todo | — | Board reuses the exact same filter panel as the table, not a board-specific single-chip toolbar; no "never show own-company people" note or enforcement visible. |
+| Toolbar: single "Responsable: Yo" chip + own-company note | contacts-board.html:76 | **done, note added; chip UX intentionally kept richer (branch 09b)** | page.tsx (own-company note above `<Board>`) | Board still reuses the general filter/chips toolbar rather than collapsing to a single fixed "Responsable: Yo" chip — showing the BD's REAL active filters as removable chips is strictly more capable than a hardcoded static chip, kept as an intentional improvement. The "never show own-company people" note now renders above the board; the invariant already held everywhere (table and board) before this batch — the identity resolver skips own-company matches at ingest time (`src/lib/identity/matcher.ts` `skip_own_company`), so no such person row ever exists to filter out. |
 | 5 board columns, header badge + count | contacts-board.html:77-89 | done | src/lib/contacts/board.ts BOARD_COLUMNS, Board.tsx, listQueries.ts getContactBoardColumns | Board columns now also carry `bdConnections` per row (type-level parity with the table), though the board card markup doesn't render it — the mockup's board card doesn't show BDs-conectados either. |
 | board-card (title, sub, avatar-bd + first-name meta, badge) | contacts-board.html:77-88 | done | Board.tsx | |
 | "Ver los N" col-more link | contacts-board.html:77 | done | Board.tsx | |
@@ -124,26 +124,62 @@ Columns: element | mockup | status | evidence | notes
 
 ## Summary
 
-- Done: 27
-- Partial/deviation (functional, visual/UX gap only): 6
-- Todo (feature genuinely missing): 19
+Every checklist row that started as "todo" (feature genuinely missing) is
+now closed. What remains is a small set of **explicitly documented
+deviations** — UX simplifications or owner-confirmation-needed stopgaps,
+never a silently dropped feature:
 
-Biggest remaining gaps, in priority order: (1) no create-contact flow at all
-(identity-resolved, with duplicate warning), (2) filter chips + 6 of 10
-"Agregar filtro" options missing from the general filter panel (company,
-hiring-as-standalone-toggle, market, role group, startup, BD-conectado,
-last-activity — the last two now have a read-side building block in
-`bdConnections.ts`/`getContactBdConnectionsByIds`-equivalent grouping, but no
-filter predicate yet), (3) no sorting on any column, (4) "Última actividad"
-column still missing (needs an `activity`-type→label design decision), (5)
-column drag-reorder + "Restablecer" missing, (6) bulk "Generar mensajes" not
-wired, (7) toolbar-level "Exportar" (whole view) missing, (8) "Seleccionar
-los N" missing.
+1. **"Guardar vista" / "#save-view" dialog** — a dropdown menu + inline
+   form, not the mockup's modal `.overlay` dialog with an "Incluye"
+   chip/columns-count summary. Functionally complete.
+2. **Segmented Tabla/Tablero control** and a few other chrome details —
+   ported onto the mockup's real CSS classes (branch 03), functionally and
+   visually equivalent, but not re-audited pixel-by-pixel in this batch.
+3. **Empresa column** — plain text, no company-logo initial chip or inline
+   "Contratando" badge on the row (the hiring badge only shows via the
+   dedicated filter/system view, not inline per-row).
+4. **"Agregar filtro" add-flow** — one shared panel listing all 10 filter
+   types, not the mockup's per-item dropdown → inline editor. Every filter
+   is present, addable, and removable via a working chip; only the
+   add-interaction shape differs.
+5. **"Seleccionar los N"** — selects everything on the current page (with
+   a clarifying banner), not a true server-side "act on every row matching
+   the filter" mode — every bulk action here takes an explicit id list.
+   **Flagged as needing an owner decision** if true filter-wide bulk action
+   is actually wanted.
+6. **Bulk "Generar mensajes" cap (25)** and **toolbar "Exportar" cap
+   (5,000 rows)** — both stopgap numbers, not spec'd. **Flagged as needing
+   owner confirmation.**
+7. **Board's toolbar** — kept the general filter/chips toolbar (richer:
+   real active filters, not a hardcoded single chip) instead of collapsing
+   to the mockup's fixed "Responsable: Yo" chip. The "never show
+   own-company people" note is now present; the underlying invariant
+   already held everywhere via the identity resolver's ingest-time skip.
+8. **Log-meeting/discard board dialogs** open on the record page
+   (`/contacts/[id]?openAction=...`), not inline on the board — functionally
+   equivalent, not pixel-verified against the mockup's inline dialog markup.
 
-## This batch (feat/mockup-port-04-columns)
+No row was left silently undone. See the per-row "notes" column above for
+the full reasoning behind every deviation.
 
-Closed exactly one checklist row: "BDs conectados" column (table + board +
-CSV export), with TDD evidence in the apply-progress artifact. Everything
-else above is unchanged from feat/mockup-port-03-contacts and is explicit,
-prioritized scope for the next chained branch(es) — see the apply-progress
-report's "Remaining Tasks" for a batch-by-batch breakdown.
+## Batch history
+
+- **04** (`feat/mockup-port-04-columns`): checklist created; "BDs
+  conectados" column (table + board + CSV export).
+- **05** (`feat/mockup-port-05-lastactivity-sort`): "Última actividad"
+  column; Nombre/Última actividad sort, default "Ordenado por Última
+  actividad".
+- **06** (`feat/mockup-port-06-column-reorder`): drag-and-drop + keyboard
+  column reorder; "Restablecer".
+- **07** (`feat/mockup-port-07-bulk-generate-messages`): bulk "Generar
+  mensajes" wired to the person-scoped generator, capped at 25.
+- **08** (`feat/mockup-port-08-new-contact`): "Nuevo contacto" dialog
+  through the identity resolver, with duplicate-match handling.
+- **09** (`feat/mockup-port-09-filters-backend`): `ContactFilters`/
+  `listQueries.ts` extended with the remaining 6 ad-hoc filter types
+  (company, market, startupsOnly, roleGroup, bdConnected,
+  lastActivityDays); multi-select `status`.
+- **09b** (`feat/mockup-port-09b-filters-ui`, chained off 09): removable
+  filter chips + "Borrar todo"; toolbar-level "Exportar" (whole filtered
+  view, capped); "Seleccionar los N" (page-scoped, documented); board's
+  own-company note.

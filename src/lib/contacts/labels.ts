@@ -39,6 +39,8 @@ export type BulkActionsLabels = ClientStrings<
     | "bulkExport"
     | "bulkGenerateMessages"
     | "bulkMessagesCapNotice"
+    | "bulkSelectAllMatching"
+    | "bulkSelectAllMatchingPageOnlyNotice"
   >
 >;
 
@@ -59,6 +61,8 @@ export function pickBulkActionsLabels(dict: Dictionary): BulkActionsLabels {
     bulkExport: l.bulkExport,
     bulkGenerateMessages: l.bulkGenerateMessages,
     bulkMessagesCapNotice: l.bulkMessagesCapNotice,
+    bulkSelectAllMatching: l.bulkSelectAllMatching,
+    bulkSelectAllMatchingPageOnlyNotice: l.bulkSelectAllMatchingPageOnlyNotice,
   };
 }
 

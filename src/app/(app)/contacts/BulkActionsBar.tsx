@@ -38,6 +38,12 @@ export interface BulkActionsBarProps {
   // per-contact GenerateMessageButton already uses.
   locale: Locale;
   messageLabels: GenerateMessageLabels;
+  // "Seleccionar los N" (contacts.html:104) — total rows matching the
+  // active filter, for the button's label. Selecting them for bulk action
+  // is capped to what's actually on this page (see selectAllMatching's doc
+  // comment) — every bulk action here (owner/task/messages/export) takes an
+  // explicit id list, there is no "act on a filter, not an id list" mode.
+  total: number;
   children: React.ReactNode;
 }
 
@@ -65,11 +71,13 @@ export function BulkActionsBar({
   columns,
   locale,
   messageLabels,
+  total,
   children,
 }: BulkActionsBarProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [panel, setPanel] = useState<Panel>(null);
+  const [selectedAllMatching, setSelectedAllMatching] = useState(false);
 
   function recount() {
     const form = formRef.current;
@@ -102,7 +110,30 @@ export function BulkActionsBar({
       box.checked = false;
     });
     setSelectedCount(0);
+    setSelectedAllMatching(false);
     setPanel(null);
+  }
+
+  /**
+   * "Seleccionar los N" (contacts.html:104). Smallest faithful version:
+   * every bulk action here (owner/task/messages/export) takes an explicit
+   * checked-id list, not a filter predicate — there is no server-side "act
+   * on everything matching this filter" mode. Selecting more than what's
+   * rendered on this page would silently apply to fewer contacts than the
+   * button claims, which is worse than being upfront about the limit. So
+   * this checks every row ON THIS PAGE (same as the header checkbox) and
+   * flips a banner explaining the page-only scope, rather than pretending
+   * to act on all N. Turning this into a true filter-scoped bulk action is
+   * a larger, separate change (new server-side bulk-by-filter mode) — an
+   * owner call, not something to invent silently here.
+   */
+  function selectAllMatching() {
+    const boxes = formRef.current?.querySelectorAll<HTMLInputElement>('input[name="personId"]');
+    boxes?.forEach((box) => {
+      box.checked = true;
+    });
+    setSelectedAllMatching(true);
+    recount();
   }
 
   return (
@@ -140,6 +171,11 @@ export function BulkActionsBar({
               >
                 {l.bulkExport}
               </button>
+              {total > selectedCount && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={selectAllMatching}>
+                  {l.bulkSelectAllMatching.replace("{n}", String(total))}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -149,6 +185,9 @@ export function BulkActionsBar({
                 {l.bulkClearSelection}
               </button>
             </>
+          )}
+          {selectedAllMatching && total > selectedCount && (
+            <span className="meta">{l.bulkSelectAllMatchingPageOnlyNotice}</span>
           )}
 
           {panel === "owner" && (
