@@ -58,6 +58,13 @@ export interface ActivityStatusEvent {
   type: string;
   at: Date;
   status?: PersonStatus;
+  // `call` rows only (migration 0016) — read from metadata.outcome/direction
+  // by activityRowToStatusEvent below, and used by activityStageCandidate's
+  // dedicated `call` case (owner rule 2026-09-26: an outbound call with any
+  // outcome is contact evidence; an outcome of `connected` in either
+  // direction is a reply).
+  callOutcome?: string;
+  callDirection?: string;
 }
 
 /**
@@ -110,6 +117,26 @@ export function activityStageCandidate(event: ActivityStatusEvent): StageCandida
       because: { source: "activity", activityId: event.id },
     };
   }
+  if (event.type === "call") {
+    const stage = callStage(event.callOutcome, event.callDirection);
+    if (!stage) return null;
+    return { rank: STAGE_RANK[stage], at: event.at, because: { source: "activity", activityId: event.id } };
+  }
+  return null;
+}
+
+/**
+ * Owner rule (2026-09-26): an outbound call with ANY outcome counts as
+ * contact evidence (`contacted`); an outcome of `connected` in EITHER
+ * direction counts as a reply (`replied`, the higher rank, so it wins
+ * regardless of direction). An inbound call that didn't connect (e.g. a
+ * missed inbound call) contributes no stage — HubSpot draws the same line:
+ * only a completed conversation or an outbound attempt is evidence the BD
+ * did something.
+ */
+function callStage(outcome: string | undefined, direction: string | undefined): StatusStage | null {
+  if (outcome === "connected") return "replied";
+  if (direction === "outbound") return "contacted";
   return null;
 }
 
@@ -156,12 +183,26 @@ function readMetadataStatus(metadata: unknown): PersonStatus | undefined {
   return isPersonStatus(status) ? status : undefined;
 }
 
-function readMetadataOriginalAt(metadata: unknown): Date | undefined {
+function readMetadataDate(metadata: unknown, key: string): Date | undefined {
   if (!metadata || typeof metadata !== "object") return undefined;
-  const originalAt = (metadata as Record<string, unknown>).originalAt;
-  if (typeof originalAt !== "string" && !(originalAt instanceof Date)) return undefined;
-  const parsed = new Date(originalAt);
+  const value = (metadata as Record<string, unknown>)[key];
+  if (typeof value !== "string" && !(value instanceof Date)) return undefined;
+  const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function readMetadataOriginalAt(metadata: unknown): Date | undefined {
+  return readMetadataDate(metadata, "originalAt");
+}
+
+function readMetadataOccurredAt(metadata: unknown): Date | undefined {
+  return readMetadataDate(metadata, "occurredAt");
+}
+
+function readMetadataString(metadata: unknown, key: string): string | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 /** Raw `activity` row shape (see src/db/schema.ts's `activity` table) status derivation needs. */
@@ -182,14 +223,23 @@ export interface ActivityRowForStatus {
  */
 export function activityRowToStatusEvent(row: ActivityRowForStatus): ActivityStatusEvent {
   const at =
-    row.type === "status_backfill" ? (readMetadataOriginalAt(row.metadata) ?? row.createdAt) : row.createdAt;
+    row.type === "status_backfill"
+      ? (readMetadataOriginalAt(row.metadata) ?? row.createdAt)
+      : row.type === "call"
+        ? (readMetadataOccurredAt(row.metadata) ?? row.createdAt)
+        : row.createdAt;
   const status =
     row.type === "status_change" || row.type === "status_backfill"
       ? readMetadataStatus(row.metadata)
       : row.type === "discarded"
         ? "discarded"
         : undefined;
-  return { kind: "activity", id: row.id, type: row.type, at, status };
+  const event: ActivityStatusEvent = { kind: "activity", id: row.id, type: row.type, at, status };
+  if (row.type === "call") {
+    event.callOutcome = readMetadataString(row.metadata, "outcome");
+    event.callDirection = readMetadataString(row.metadata, "direction");
+  }
+  return event;
 }
 
 /** Raw `person_bd_connection` row shape (see src/db/schema.ts) status derivation needs. */

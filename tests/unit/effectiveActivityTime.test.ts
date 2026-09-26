@@ -48,6 +48,18 @@ test("resolveEffectiveActivityAt: a status_backfill row with missing/unparseable
   );
 });
 
+test("resolveEffectiveActivityAt: a call row with a valid metadata.occurredAt uses that, not createdAt", () => {
+  const occurredAt = new Date("2026-09-15T10:20:00.000Z");
+  const createdAt = new Date("2026-09-26T00:00:00.000Z"); // dialog saved later
+  const at = resolveEffectiveActivityAt({
+    id: "a1",
+    type: "call",
+    createdAt,
+    metadata: { outcome: "connected", direction: "outbound", occurredAt: occurredAt.toISOString() },
+  });
+  assert.equal(at.getTime(), occurredAt.getTime());
+});
+
 test("resolveEffectiveActivityAt: every other activity type always uses createdAt, even if metadata has an originalAt-shaped field", () => {
   const createdAt = new Date("2026-09-26T00:00:00.000Z");
   const at = resolveEffectiveActivityAt({

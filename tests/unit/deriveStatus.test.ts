@@ -232,3 +232,55 @@ test("buildPersonStatusUpdates: rows for a personId not in the requested list ar
   );
   assert.deepEqual(updates, [{ personId: "p1", status: "new", statusActivityId: null }]);
 });
+
+// --- call activity (migration 0016; owner rule 2026-09-26) ------------------
+
+test("an outbound call with any outcome is contact evidence: advances stage to contacted", () => {
+  const result = deriveStatus([
+    activityEvent({ id: "a1", type: "call", at: new Date("2026-01-01"), callOutcome: "no_answer", callDirection: "outbound" }),
+  ]);
+  assert.equal(result.status, "contacted");
+  assert.deepEqual(result.because, { source: "activity", activityId: "a1" });
+});
+
+test("an outcome of 'connected' in either direction is a reply: advances stage to replied", () => {
+  const outbound = deriveStatus([
+    activityEvent({ id: "a1", type: "call", at: new Date("2026-01-01"), callOutcome: "connected", callDirection: "outbound" }),
+  ]);
+  assert.equal(outbound.status, "replied");
+
+  const inbound = deriveStatus([
+    activityEvent({ id: "a2", type: "call", at: new Date("2026-01-01"), callOutcome: "connected", callDirection: "inbound" }),
+  ]);
+  assert.equal(inbound.status, "replied");
+});
+
+test("an inbound call that did not connect contributes no stage", () => {
+  const result = deriveStatus([
+    activityEvent({ id: "a1", type: "call", at: new Date("2026-01-01"), callOutcome: "no_answer", callDirection: "inbound" }),
+  ]);
+  assert.equal(result.status, "new");
+});
+
+test("activityRowToStatusEvent uses a call's metadata.occurredAt, not createdAt, as the event time", () => {
+  const occurredAt = new Date("2026-09-15T10:20:00.000Z");
+  const createdAt = new Date("2026-09-26T00:00:00.000Z");
+  const event = activityRowToStatusEvent({
+    id: "a1",
+    type: "call",
+    createdAt,
+    metadata: { outcome: "connected", direction: "outbound", occurredAt: occurredAt.toISOString() },
+  });
+  assert.equal(event.at.getTime(), occurredAt.getTime());
+});
+
+test("activityRowToStatusEvent falls back to createdAt when a call's occurredAt is missing/invalid", () => {
+  const createdAt = new Date("2026-09-26T00:00:00.000Z");
+  const event = activityRowToStatusEvent({
+    id: "a1",
+    type: "call",
+    createdAt,
+    metadata: { outcome: "connected", direction: "outbound" },
+  });
+  assert.equal(event.at.getTime(), createdAt.getTime());
+});

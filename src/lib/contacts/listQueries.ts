@@ -35,11 +35,13 @@ type Dict = Awaited<ReturnType<typeof getDictionary>>;
  * below, `lastActivityAgg`'s MAX, and the `lastActivityDays` EXISTS filter)
  * — `created_at` for a normal row, but `metadata.originalAt` for a
  * `status_backfill` row (a migration reconstruction whose real historical
- * time is NOT when the migration ran). Mirrors
- * src/lib/status/deriveStatus.ts#activityRowToStatusEvent's `.at` rule
- * exactly (see src/lib/contacts/effectiveActivityTime.ts, which pins that
- * same rule in a unit test) so status derivation and "last activity" never
- * disagree on what a backfill's time means.
+ * time is NOT when the migration ran), and `metadata.occurredAt` for a
+ * `call` row (migration 0016 — a call is logged after the fact, so its
+ * effective time is when it happened, not when the dialog was saved).
+ * Mirrors src/lib/status/deriveStatus.ts#activityRowToStatusEvent's `.at`
+ * rule exactly (see src/lib/contacts/effectiveActivityTime.ts, which pins
+ * that same rule in a unit test) so status derivation and "last activity"
+ * never disagree on what a backfill's or a call's time means.
  *
  * The regex guard is intentionally stricter than the JS side's
  * `new Date(...)` parsing (which accepts anything `Date` can parse) —
@@ -49,7 +51,10 @@ type Dict = Awaited<ReturnType<typeof getDictionary>>;
  * of ever throwing and failing the whole query.
  */
 function effectiveActivityAtSql() {
-  return sql`(case when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz else ${activity.createdAt} end)`;
+  return sql`(case
+    when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz
+    when ${activity.type} = 'call' and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
+    else ${activity.createdAt} end)`;
 }
 
 const LIKE_WILDCARD_RE = /[%_\\]/g;
