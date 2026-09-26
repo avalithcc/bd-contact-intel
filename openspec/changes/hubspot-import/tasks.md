@@ -154,10 +154,10 @@ reason display.
 
 ## Phase 5: Admin UI + Labels (PR H5, base: PR H4b)
 
-- [ ] 5.1 `/admin/migration` gets an "Importación de HubSpot" section: latest report (counts, `reviewSample` admin-only), approve action with the over-threshold confirmation checkbox ("Confirmo N contactos a revisar").
-- [ ] 5.2 `src/app/(app)/admin/migration/actions.ts` — approve action wired to `review_threshold_unconfirmed` guard from 4.4.
-- [ ] 5.3 `es.migration`/`en` dictionary entries — neutral Spanish, following `mockups/GLOSSARY.md`; label for the new review reason `email_unverified`.
-- [ ] 5.4 E2E/manual: non-admin gets 404 on the HubSpot section; admin approve-over-threshold without the checkbox is blocked with a distinct message.
+- [x] 5.1 `/admin/migration` gets an "Importación de HubSpot" section: latest report (counts, `reviewSample` admin-only), approve action with the over-threshold confirmation checkbox ("Confirmo N contactos a revisar"). (PR H5)
+- [x] 5.2 `src/app/(app)/admin/migration/actions.ts` — approve action wired to `review_threshold_unconfirmed` guard from 4.4. (PR H5 — enforced in `approveGuard.assertApprovable`, called from `queries.approveMigrationRun`, called from the action)
+- [x] 5.3 `es.migration`/`en` dictionary entries — neutral Spanish, following `mockups/GLOSSARY.md`; label for the new review reason `email_unverified`. (PR H5)
+- [~] 5.4 E2E/manual: non-admin gets 404 on the HubSpot section; admin approve-over-threshold without the checkbox is blocked with a distinct message. **Partially done**: the over-threshold-without-checkbox block is unit-tested (`tests/unit/migrationApproveGuard.test.ts`, pure `assertApprovable` logic — 3 new tests, RED→GREEN). The non-admin-404 path reuses the existing `requireAdmin`/`notFound()` guard already covering every other section on this page (not new logic, not independently tested here, same as collapse/fold_leads/catch_up). Manual click-through against a real session was NOT performed by this batch — recommend a quick manual check before merge.
 
 ## PII & Safety Rules (apply across all phases)
 
@@ -168,4 +168,4 @@ reason display.
 
 ## Next Step
 
-Ready for implementation (`sdd-apply`), starting with PR H1. Gate 2.1 (migration 0015 in prod) and gates 4.10–4.12 (dry-run review/approve/execute) require explicit owner action — `sdd-apply` MUST stop and report rather than proceeding past them.
+Phases 1-3 and Phase 5 (excluding 5.4's manual click-through) complete. Phase 4 code is done (excluding owner gates 2.1, 4.10-4.12), so all six PRs (H1-H5) now have their code implemented. Gate 2.1 (migration 0015 in prod) and gates 4.10-4.12 (dry-run review/approve/execute) still require explicit owner action — `sdd-apply` MUST stop and report rather than proceeding past them. Recommend a manual click-through of task 5.4 (non-admin 404, over-threshold checkbox) before merging PR H5.
