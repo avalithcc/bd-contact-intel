@@ -13,14 +13,22 @@
  *
  * `legacyIdToPersonId` is the fix: `applyIdentityWrites` (resolveDb.ts)
  * returns the FINAL, post-conflict-repoint `person_id_map` rows it just
- * wrote, keyed by `${legacyTable}:${legacyId}` — that already resolves
- * every ref (plan or real) to the real inserted/matched id, for every
- * row outcome except `skipped_own_company`. `importQueries.ts` wires this
- * module against that map; everything here is pure and unit-tested,
+ * wrote, keyed by `personIdMapKey(legacyTable, legacyId)` — that already
+ * resolves every ref (plan or real) to the real inserted/matched id, for
+ * every row outcome except `skipped_own_company`. `importQueries.ts` wires
+ * this module against that map; everything here is pure and unit-tested,
  * mirroring collapseWriteRows.ts/foldWriteRows.ts.
+ *
+ * PR H7 fix: the lookup key here MUST be built with the SAME
+ * `personIdMapKey` helper the producer (`applyIdentityWrites`) uses — a
+ * bare `hubspotLegacyId(...)` with no `hubspot_contact:` table prefix
+ * silently misses every entry (`np51`-class production bug: a real
+ * `execute` aborted with `NonUuidPersonIdError` because every lookup
+ * missed and fell back to an unresolved plan ref).
  */
 import { isUuid } from "@/lib/uuid";
 import { hubspotLegacyId } from "@/lib/hubspot/uuidv5";
+import { personIdMapKey } from "@/lib/identity/resolve";
 import type { HubSpotStatusEvidenceOutcome } from "@/lib/hubspot/planner";
 import type { activity } from "@/db/schema";
 
@@ -54,7 +62,7 @@ export function resolveStatusEvidencePersonId(
   outcome: HubSpotStatusEvidenceOutcome,
   legacyIdToPersonId: ReadonlyMap<string, string>,
 ): string {
-  const mapped = legacyIdToPersonId.get(hubspotLegacyId(outcome.hubspotContactId));
+  const mapped = legacyIdToPersonId.get(personIdMapKey("hubspot_contact", hubspotLegacyId(outcome.hubspotContactId)));
   const personId = mapped ?? outcome.personRef;
   assertPersonUuid(personId, `status_backfill activity for hubspotContactId=${outcome.hubspotContactId}`);
   return personId;

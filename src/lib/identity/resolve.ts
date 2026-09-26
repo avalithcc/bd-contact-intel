@@ -41,6 +41,22 @@ import {
  * import uses 'fill_empty' (design D4 "Re-import (R7/Q3)"). */
 export type MergePolicy = "r7" | "fill_empty";
 
+/**
+ * The ONE key format for a `legacyIdToPersonId` map entry (PR H7 fix — the
+ * `np51`-class production bug): `applyIdentityWrites` (resolveDb.ts) is the
+ * single producer of this map, keyed by `${legacyTable}:${legacyId}`; every
+ * consumer that needs to resolve a legacy row's real person id (e.g.
+ * hubspot_import's status-evidence activities, keyed by
+ * `hubspotContactId` -> `hubspotLegacyId(hubspotContactId)`) MUST build its
+ * lookup key through this function instead of reconstructing the format
+ * itself — a bare `legacyId` with no table prefix silently misses every
+ * entry and falls back to an unresolved plan ref (see
+ * src/lib/hubspot/executeWriteRows.ts).
+ */
+export function personIdMapKey(legacyTable: IdentityIngestRow["legacyTable"], legacyId: string): string {
+  return `${legacyTable}:${legacyId}`;
+}
+
 export interface IdentityIngestRow {
   legacyTable: "contact" | "lead" | "hubspot_contact";
   legacyId: string;

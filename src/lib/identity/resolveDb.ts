@@ -18,6 +18,7 @@ import {
   buildIdentityWriteRows,
   buildPrefetchKeys,
   IDENTITY_LOCK_KEY,
+  personIdMapKey,
   repointIdentityWriteRows,
   type ExistingPersonCandidate,
   type IdentityIngestRow,
@@ -231,7 +232,7 @@ export async function applyIdentityWrites(
   const legacyIdToPersonId = new Map<string, string>();
   for (const row of rows.idMap) {
     if (!row.personId) continue; // skipped_own_company rows have a null personId
-    legacyIdToPersonId.set(`${row.legacyTable}:${row.legacyId}`, row.personId);
+    legacyIdToPersonId.set(personIdMapKey(row.legacyTable as IdentityIngestRow["legacyTable"], row.legacyId), row.personId);
   }
   return legacyIdToPersonId;
 }
