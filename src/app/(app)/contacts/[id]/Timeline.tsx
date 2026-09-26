@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
 import { TIMELINE_ACTIVITY_TYPES } from "@/lib/activity/queries";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { entryBody } from "@/lib/contacts/timelineEntryBody";
 import styles from "./page.module.css";
 
 export interface TimelineProps {
@@ -30,40 +31,6 @@ function filterHref(personId: string, type?: TimelineActivityType): string {
 
 function formatWhen(at: Date): string {
   return format(at, "d MMM, HH:mm", { locale: es });
-}
-
-function entryBody(entry: TimelineEntry, l: ContactRecordLabels): string {
-  if (!entry.visible) return l.timelineLockedContent;
-  const metadata = entry.metadata ?? {};
-  switch (entry.type) {
-    case "note":
-      return typeof metadata.note === "string" ? metadata.note : "";
-    case "email_sent":
-      return typeof metadata.to === "string" ? `${l.timelineEmailSentPrefix} ${metadata.to}` : l.timelineEmailSentPrefix;
-    case "hunter_lookup":
-      return typeof metadata.hunterScore === "number"
-        ? `${l.timelineHunterPrefix} · ${metadata.hunterScore}`
-        : l.timelineHunterPrefix;
-    case "status_change": {
-      const status = typeof metadata.status === "string" ? metadata.status : null;
-      const label = status ? (l.leadStatuses[status as keyof typeof l.leadStatuses] ?? status) : "";
-      return `${l.timelineStatusChangedPrefix} ${label}`;
-    }
-    case "status_backfill": {
-      const status = typeof metadata.status === "string" ? metadata.status : null;
-      const label = status ? (l.leadStatuses[status as keyof typeof l.leadStatuses] ?? status) : "";
-      return `${l.timelineStatusBackfillPrefix} ${label}`;
-    }
-    case "meeting_logged":
-      return typeof metadata.notes === "string" && metadata.notes ? metadata.notes : l.timelineMeetingLoggedDefault;
-    case "discarded": {
-      const reason = typeof metadata.reason === "string" ? metadata.reason : null;
-      const note = typeof metadata.note === "string" ? metadata.note : null;
-      return [reason, note].filter(Boolean).join(" · ") || l.timelineDiscardedDefault;
-    }
-    default:
-      return "";
-  }
 }
 
 /**
