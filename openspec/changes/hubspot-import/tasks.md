@@ -25,8 +25,9 @@ Chain strategy: feature-branch-chain
 | H1 | Pure parsing + mapping (`columns`, `uuidv5`, `parse`, `contacts`, `owners`) | tracker | ~380 | TDD |
 | H2 | Company resolution + migration 0015 (`company.domain`) | PR H1 | ~340 | **Owner applies 0015 in prod** |
 | H3 | Identity planning + activities (matcher, resolver, status evidence, refill, planner) | PR H2 | ~400 | TDD |
-| H4 | DB wiring + CLI phase + report (queries, `hubspotRun`, guards, script) | PR H3 | ~380 | **Dry-run review + approve + execute** |
-| H5 | `/admin/migration` HubSpot section + labels | PR H4 | ~260 | Mockup-free (reuses existing admin page pattern) |
+| H4a | Execution gates, input hash, report (`executionGuard`, `cliArgs`, `inputHash`, `backup`, `hubspot/report`, `hubspotRun`) | PR H3 | ~386 (actual) | TDD |
+| H4b | DB wiring + CLI phase (`importQueries`, `unify-contacts.ts`) | PR H4a | ~412 (actual) | **Dry-run review + approve + execute** |
+| H5 | `/admin/migration` HubSpot section + labels | PR H4b | ~260 | Mockup-free (reuses existing admin page pattern) |
 
 ## Phase 1: Parsing & Mapping (PR H1, base: tracker)
 
@@ -133,23 +134,25 @@ preserve the historical date) — extracted the pure body formatter into
 couldn't be unit-tested in place) and made both cases share the same
 reason display.
 
-## Phase 4: DB Wiring + CLI Phase + Report (PR H4, base: PR H3)
+## Phase 4: DB Wiring + CLI Phase + Report (split into PR H4a + PR H4b, base: PR H3)
 
-- [ ] 4.1 `src/lib/hubspot/importQueries.ts` — snapshot reads (prefetched persons, existing hubspot map rows, touched companies, bd name map, existing hubspot activity keys) and `finalizeHubSpotExecute`.
-- [ ] 4.2 `src/lib/migration/hubspotRun.ts` — dry-run/execute ports mirroring `catchUpRun.ts`.
-- [ ] 4.3 `src/lib/migration/cliArgs.ts` — `--phase=hubspot_import --file=<path> --companies=<path> [--dry-run | --execute --run=<id>]`; requires both paths for this phase, rejects them for other phases.
-- [ ] 4.4 `src/lib/migration/executionGuard.ts` — `MigrationRunKind` gains `hubspot_import`; new block reason `review_threshold_unconfirmed` (hubspot-import spec "Review-count threshold gate", `HUBSPOT_REVIEW_THRESHOLD=300`).
-- [ ] 4.5 `src/lib/migration/inputHash.ts` — `hashRowSet` over projected contact rows + company rows (`id`=HubSpot ID) plus the DB snapshot the planner reads.
-- [ ] 4.6 `src/lib/migration/backup.ts` — add `company` to `BACKUP_TABLES`.
-- [ ] 4.7 `scripts/unify-contacts.ts` — wire `--phase=hubspot_import`; execute order: pre-check hash → `snapshotBackup` → one transaction (claim run → `pg_advisory_xact_lock(IDENTITY_LOCK_KEY)` → re-prefetch/re-hash inside lock, abort on mismatch → companies → persons/map/candidates → refill → activities → `recomputePersonStatuses` → report/`executedAt`/`audit_log(migration_execute)`). Batch size `WRITE_BATCH_SIZE=1000`.
-- [ ] 4.8 `src/lib/hubspot/report.ts` — `redactReportForLog(report)`: counts only, `reviewSample` removed, owner maps collapsed to counts; phase catches its own errors and prints a sanitized message, never raw `err` (D8 PII rule).
-- [ ] 4.9 Test: dry-run mode never writes `person`/`company` rows; execute refuses on stale `input_hash`, missing approval, or unconfirmed over-threshold review count.
+**Split rationale (apply-time, `ask-on-risk`):** the original single-PR estimate (~380 lines) undercounted the report/reviewSample and identity/DB-wiring work. Split at the pure/DB-wiring boundary — H4a (~386 production lines) is everything testable without a database; H4b (~412 production lines) is the DB reads/writes and CLI wiring that depends on it.
+
+- [x] 4.1 `src/lib/hubspot/importQueries.ts` — snapshot reads (prefetched persons, existing hubspot map rows, touched companies, bd name map, existing hubspot activity keys) and `finalizeHubSpotExecute`. (PR H4b)
+- [x] 4.2 `src/lib/migration/hubspotRun.ts` — dry-run/execute ports mirroring `catchUpRun.ts`. (PR H4a)
+- [x] 4.3 `src/lib/migration/cliArgs.ts` — `--phase=hubspot_import --file=<path> --companies=<path> [--dry-run | --execute --run=<id>]`; requires both paths for this phase, rejects them for other phases. (PR H4a)
+- [x] 4.4 `src/lib/migration/executionGuard.ts` — `MigrationRunKind` gains `hubspot_import`; new block reason `review_threshold_unconfirmed` (hubspot-import spec "Review-count threshold gate", `HUBSPOT_REVIEW_THRESHOLD=300`, defined in `src/lib/hubspot/report.ts` as the single source of truth). (PR H4a)
+- [x] 4.5 `src/lib/migration/inputHash.ts` — `computeHubSpotInputHash` over projected contact rows + company rows (`id`=HubSpot ID) plus the DB snapshot the planner reads (existing persons, hubspot map, existing companies, bds, existing hubspot activity keys). (PR H4a)
+- [x] 4.6 `src/lib/migration/backup.ts` — add `company` to `BACKUP_TABLES`. (PR H4a)
+- [x] 4.7 `scripts/unify-contacts.ts` — wire `--phase=hubspot_import`; execute order: pre-check hash → `snapshotBackup` → one transaction (claim run → companies create/domain-fill/notes → `withIdentityLock`+`applyIdentityWrites` → refill → status-evidence activities, skipping any whose `(hubspotContactId, status)` idempotency key already exists → `recomputePersonStatuses` → report/`executedAt`/`audit_log(migration_execute)`). Batch size `WRITE_BATCH_SIZE=1000`. **Scope decision**: does NOT re-prefetch/re-hash a second time inside the lock — matches `catchUpQueries.ts#finalizeCatchUpExecute`'s already-documented residual-risk scope (the pre-transaction `assertExecutionAllowed` hash check + `snapshotBackup` is the same defense every other phase relies on); noted, not silently dropped. (PR H4b)
+- [x] 4.8 `src/lib/hubspot/report.ts` — `buildHubSpotRunReport` (adds `reviewThreshold`/`overThreshold`/`createdCompanyKeys`/`domainFilledCompanyKeys`/`reviewSample`) and `redactReportForLog(report)`: counts only, `reviewSample` removed, owner maps collapsed to counts. `parseHubSpotCsv` (Phase 1) already sanitizes its own parse errors; `scripts/unify-contacts.ts` never lets a raw report (with `reviewSample`) reach stdout. (PR H4a)
+- [x] 4.9 Test: dry-run mode never writes `person`/`company` rows (`tests/unit/hubspotRun.test.ts`); execute refuses on stale `input_hash`, missing approval, or unconfirmed over-threshold review count (`tests/unit/migrationExecutionGuard.test.ts`, `tests/unit/hubspotRun.test.ts`). (PR H4a)
 - [ ] 4.10 **GATE (owner)**: review the `hubspot_import` dry-run report in `/admin/migration` against the real export (read-only prod smoke: run `--dry-run` against prod DB snapshot reads only, zero writes) before approving.
 - [ ] 4.11 **GATE (owner)**: approve the run in `/admin/migration` (confirm-over-threshold checkbox if `review > 300`).
 - [ ] 4.12 **GATE (owner)**: `--execute --run=<id>` in the low-traffic window; verify `pg_dump` backup succeeded first.
-- [ ] 4.13 Test: re-running the dry-run after execute reports 0 `new` rows (idempotent re-import scenario).
+- [x] 4.13 Test: re-running the dry-run after every contact is already-imported reports 0 `new` rows (idempotent re-import scenario) — `tests/unit/hubspotRun.test.ts`. (PR H4a)
 
-## Phase 5: Admin UI + Labels (PR H5, base: PR H4)
+## Phase 5: Admin UI + Labels (PR H5, base: PR H4b)
 
 - [ ] 5.1 `/admin/migration` gets an "Importación de HubSpot" section: latest report (counts, `reviewSample` admin-only), approve action with the over-threshold confirmation checkbox ("Confirmo N contactos a revisar").
 - [ ] 5.2 `src/app/(app)/admin/migration/actions.ts` — approve action wired to `review_threshold_unconfirmed` guard from 4.4.
