@@ -6,7 +6,7 @@ import { updateContactProperty } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty } from "@/lib/contacts/propertyEdit";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
-import { createTaskAction } from "@/app/(app)/tasks/actions";
+import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planDiscard } from "@/lib/contacts/discard";
@@ -101,6 +101,24 @@ export async function addContactTaskAction(
   try {
     await assertContactEditableById(personId);
     await createTaskAction({ title, personId, dueAt });
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * "Marcar como hecha" on a record-page timeline/right-panel task row
+ * (mockup-port r03/r05; contact-record.html:111/181). Thin wrapper over the
+ * existing `completeTaskAction` (src/app/(app)/tasks/actions.ts) — same
+ * write, same semantics — that additionally revalidates this Contact's own
+ * page, since `completeTaskAction` itself only revalidates /tasks, /leads,
+ * /companies (it has no personId to revalidate with).
+ */
+export async function completeContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
+  try {
+    await completeTaskAction(taskId);
+    revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
