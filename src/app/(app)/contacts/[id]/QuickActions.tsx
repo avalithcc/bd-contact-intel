@@ -13,6 +13,11 @@ import {
   logContactMeetingAction,
   sendContactEmailAction,
 } from "../actions";
+import { generatePersonOutreachMessageAction } from "../messageActions";
+import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
+import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
+import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
+import type { Locale } from "@/lib/i18n/locales";
 import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
 import styles from "./AboutPane.module.css";
 
@@ -20,6 +25,14 @@ export interface QuickActionsProps {
   personId: string;
   labels: ContactRecordLabels;
   email: string | null;
+  // "Generar mensaje" (task 13.3) reuses /outreach's GenerateMessageButton —
+  // needs its own ClientStrings-safe labels slice and the record page's
+  // (Spanish-only) locale fallback, same as /outreach and /whats-new.
+  messageLabels: GenerateMessageLabels;
+  locale: Locale;
+  // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
+  // composer on mount, e.g. arriving from `/contacts/[id]?openAction=meeting`.
+  initialAction?: "email" | "meeting" | "discard" | null;
 }
 
 type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | "signal" | null;
@@ -66,11 +79,22 @@ function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error:
  * feature-parity gap flagged in PR 11c (legacy `/leads/[id]` and
  * `/contact/[id]` "+ Paste signal" composer had no equivalent here).
  */
-export function QuickActions({ personId, labels: l, email }: QuickActionsProps) {
+export function QuickActions({
+  personId,
+  labels: l,
+  email,
+  messageLabels,
+  locale,
+  initialAction,
+}: QuickActionsProps) {
   const router = useRouter();
-  const [openAction, setOpenAction] = useState<QuickAction>(null);
+  const [openAction, setOpenAction] = useState<QuickAction>(initialAction ?? null);
   const [error, setError] = useState<ActionError | null>(null);
   const [busy, setBusy] = useState(false);
+  // Filled by "Generar mensaje" (see the EmailForm render below) — kept
+  // here (not inside EmailForm's own state) so a fresh generation before
+  // the email panel is opened still has somewhere to land.
+  const [generatedBody, setGeneratedBody] = useState<string | null>(null);
 
   function closeQuickAction() {
     setOpenAction(null);
@@ -158,6 +182,12 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
           to={email}
           busy={busy}
           error={error}
+          initialBody={generatedBody}
+          generate={{
+            labels: messageLabels,
+            boundAction: generatePersonOutreachMessageAction.bind(null, personId, locale),
+            onGenerated: setGeneratedBody,
+          }}
           onCancel={closeQuickAction}
           onSubmit={async (subject, body) => {
             if (!email) return;
@@ -312,16 +342,36 @@ function TaskForm({
   );
 }
 
+interface EmailGenerateProps {
+  labels: GenerateMessageLabels;
+  boundAction: (
+    prevState: GenerateOutreachMessageResult | null,
+    formData: FormData,
+  ) => Promise<GenerateOutreachMessageResult>;
+  onGenerated: (message: string) => void;
+}
+
 function EmailForm({
   labels: l,
   to,
   busy,
   error,
+  initialBody,
+  generate,
   onCancel,
   onSubmit,
-}: ComposerProps & { to: string | null; onSubmit: (subject: string, body: string) => void }) {
+}: ComposerProps & {
+  to: string | null;
+  initialBody?: string | null;
+  // "Generar mensaje" (task 13.3) — omitted entirely (rather than rendered
+  // disabled) when the caller has nothing to bind, keeping this composer
+  // reusable for a context with no AI draft (none today, but no reason to
+  // hard-couple the two).
+  generate?: EmailGenerateProps;
+  onSubmit: (subject: string, body: string) => void;
+}) {
   const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody ?? "");
 
   if (!to) {
     return <div className={styles.composer}>{l.emailNoAddress}</div>;
@@ -342,6 +392,16 @@ function EmailForm({
         {l.emailBodyLabel}
         <textarea className={styles.textarea} value={body} onChange={(e) => setBody(e.target.value)} disabled={busy} />
       </label>
+      {generate && (
+        <GenerateMessageButton
+          boundAction={generate.boundAction}
+          labels={generate.labels}
+          onGenerated={(message) => {
+            generate.onGenerated(message);
+            setBody(message);
+          }}
+        />
+      )}
       <div className={styles.composerBar}>
         <button type="button" onClick={onCancel} disabled={busy}>
           {l.cancel}

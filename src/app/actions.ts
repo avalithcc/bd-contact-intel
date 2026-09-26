@@ -9,6 +9,7 @@ import {
   importMessages,
   upsertContacts,
 } from "@/lib/queries";
+import type { IdentityIngestReport } from "@/lib/identity/ingestWrite";
 import { createClient } from "@/lib/supabase/server";
 import { MESSAGES_IMPORT_BUCKET } from "@/lib/storage";
 
@@ -30,6 +31,9 @@ export interface UploadResult {
   // coworker imported alongside their real connections) — see
   // src/lib/ownCompany.ts and src/lib/queries.ts#upsertContacts.
   skippedOwnCompany?: number;
+  // Dedup outcome from the identity resolver (task 14.2's `/contacts/import`
+  // outcome summary) — null when IDENTITY_DUAL_WRITE is off.
+  identityReport?: IdentityIngestReport | null;
   errorKey?: UploadErrorKey;
   // Raw message from an unexpected (not specifically handled) exception —
   // technical/diagnostic only, intentionally left untranslated like any
@@ -73,9 +77,10 @@ export async function uploadCsv(
       return { ok: false, errorKey: "noConnectionsFound" };
     }
     const me = await getCurrentBd();
-    const { imported, skippedOwnCompany } = await upsertContacts(me.id, parsed);
+    const { imported, skippedOwnCompany, identityReport } = await upsertContacts(me.id, parsed);
     revalidatePath("/");
-    return { ok: true, imported, skippedOwnCompany };
+    revalidatePath("/contacts");
+    return { ok: true, imported, skippedOwnCompany, identityReport };
   } catch (err) {
     return {
       ok: false,

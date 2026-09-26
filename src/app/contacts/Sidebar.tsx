@@ -29,7 +29,7 @@ export const NAVIGATION: SidebarSection[] = [
   {
     titleKey: "workspaceSection",
     items: [
-      { labelKey: "leads", href: "/leads" },
+      { labelKey: "leads", href: "/contacts" },
       { labelKey: "companies", href: "/companies" },
       { labelKey: "tasks", href: "/tasks" },
       { labelKey: "outreach", href: "/outreach" },

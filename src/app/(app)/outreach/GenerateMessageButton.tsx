@@ -1,38 +1,53 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { generateOutreachMessage, type GenerateOutreachMessageResult } from "./actions";
-import type { Locale } from "@/lib/i18n/locales";
+import type { GenerateOutreachMessageResult } from "./actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 /**
- * "Generate message" control for one contact — calls the
- * generateOutreachMessage server action (Claude via the AI Gateway, see
- * src/app/outreach/actions.ts) and renders the result inline with a
- * copy-to-clipboard button. Resubmitting the same form regenerates.
+ * "Generate message" control for one contact — calls a server action bound
+ * to the caller's subject (contact or person) and renders the result inline
+ * with a copy-to-clipboard button. Resubmitting the same form regenerates.
  *
- * `contactId` and `locale` are bound into the server action ahead of
- * useActionState so the (prevState, formData) signature it expects is
- * satisfied by the language-choice submit buttons below. `locale` stays
- * bound only as the server-side fallback when the language field is
- * missing/invalid — the message's actual language always comes from the
- * inline "Español"/"English" choice the user submits (see the
- * "messageLanguage" field), which is independent of the UI locale.
+ * `boundAction` is a server action already bound to its subject id and the
+ * UI-locale fallback (e.g. `generateOutreachMessage.bind(null, contactId,
+ * locale)` on /outreach and /whats-new, or `generatePersonOutreachMessageAction.bind(null,
+ * personId, locale)` on the /contacts/[id] record page — task 13.3) so this
+ * component stays subject-agnostic: `useActionState` only needs the
+ * (prevState, formData) signature, satisfied by the language-choice submit
+ * buttons below. The bound locale is only the server-side fallback when the
+ * language field is missing/invalid — the message's actual language always
+ * comes from the inline "Español"/"English" choice the user submits (see
+ * the "messageLanguage" field), independent of the UI locale.
+ *
+ * `onGenerated`, when given, fires with the generated text on success —
+ * used by the record page (task 13.3) to also populate the email composer,
+ * on top of this component's own copy-to-clipboard display.
  */
 export function GenerateMessageButton({
-  contactId,
-  locale,
+  boundAction,
   labels,
+  onGenerated,
 }: {
-  contactId: string;
-  locale: Locale;
+  boundAction: (
+    prevState: GenerateOutreachMessageResult | null,
+    formData: FormData,
+  ) => Promise<GenerateOutreachMessageResult>;
   labels: GenerateMessageLabels;
+  onGenerated?: (message: string) => void;
 }) {
-  const boundAction = generateOutreachMessage.bind(null, contactId, locale);
+  const wrappedAction = async (
+    prevState: GenerateOutreachMessageResult | null,
+    formData: FormData,
+  ): Promise<GenerateOutreachMessageResult> => {
+    const result = await boundAction(prevState, formData);
+    if (result.ok) onGenerated?.(result.message);
+    return result;
+  };
   const [state, formAction, pending] = useActionState<
     GenerateOutreachMessageResult | null,
     FormData
-  >(boundAction, null);
+  >(wrappedAction, null);
   const [copied, setCopied] = useState(false);
   // Shows the inline "Español"/"English" choice instead of the plain
   // generate/regenerate button. Reopened on every generate AND regenerate
