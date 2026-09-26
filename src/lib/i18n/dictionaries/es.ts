@@ -635,6 +635,7 @@ export const es: typeof en = {
       `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "se envió un correo",
     statusReasonSourceMeeting: "se registró una reunión",
+    statusReasonSourceCall: "se registró una llamada",
     statusReasonSourceStatusChange: "se registró un cambio de estado",
     statusReasonSourceDiscard: "se descartó el contacto",
     statusReasonSourceNote: "se agregó una nota",

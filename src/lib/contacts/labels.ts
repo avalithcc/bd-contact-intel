@@ -125,6 +125,7 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
 const ACTIVITY_SOURCE_LABEL_KEY: Partial<Record<string, keyof Dictionary["contactRecordServer"]>> = {
   email_sent: "statusReasonSourceEmail",
   meeting_logged: "statusReasonSourceMeeting",
+  call: "statusReasonSourceCall",
   status_change: "statusReasonSourceStatusChange",
   status_backfill: "statusReasonSourceStatusChange",
   discarded: "statusReasonSourceDiscard",

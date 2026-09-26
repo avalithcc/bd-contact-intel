@@ -732,6 +732,7 @@ export const en = {
       `Hunter · ${confidence}% confidence · updated by ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "an email was sent",
     statusReasonSourceMeeting: "a meeting was logged",
+    statusReasonSourceCall: "a call was logged",
     statusReasonSourceStatusChange: "a status change was recorded",
     statusReasonSourceDiscard: "the contact was discarded",
     statusReasonSourceNote: "a note was added",

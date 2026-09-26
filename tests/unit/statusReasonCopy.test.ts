@@ -17,6 +17,7 @@ const serverStrings: Dictionary["contactRecordServer"] = {
   hunterHint: (confidence, name, date) => `Hunter · ${confidence} % de confianza · actualizado por ${name}, ${date}`,
   statusReasonSourceEmail: "se envió un correo",
   statusReasonSourceMeeting: "se registró una reunión",
+  statusReasonSourceCall: "se registró una llamada",
   statusReasonSourceStatusChange: "se registró un cambio de estado",
   statusReasonSourceDiscard: "se descartó el contacto",
   statusReasonSourceNote: "se agregó una nota",
@@ -88,6 +89,18 @@ test("activity-sourced 'meeting' uses the activity-type source phrase", () => {
   };
   const result = describeStatusReason(serverStrings, leadStatuses, emptyValue, nextStepHint, evidence, "21 oct");
   assert.equal(result, "Reunión porque se registró una reunión el 21 oct.");
+});
+
+test("activity-sourced 'contacted' from a call uses the call source phrase", () => {
+  const evidence: StatusReasonEvidence = {
+    status: "contacted",
+    because: { source: "activity", activityId: "a1" },
+    at: new Date("2026-10-15T10:20:00Z"),
+    bdName: null,
+    activityType: "call",
+  };
+  const result = describeStatusReason(serverStrings, leadStatuses, emptyValue, nextStepHint, evidence, "15 oct");
+  assert.equal(result, "Contactado porque se registró una llamada el 15 oct.");
 });
 
 test("activity-sourced with an unmapped activity type falls back to the generic status-change phrase", () => {
