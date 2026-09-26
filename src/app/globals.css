@@ -1210,15 +1210,11 @@ a:hover {
 
 /* =========================================================================
    Layout with sidebar (Phase 8 shell: src/app/contacts/Sidebar.tsx +
-   TopBar.tsx; width/height now driven by the --sidebar-width/--topbar-height
-   tokens those components' own CSS modules use).
+   TopBar.tsx; width/height driven by the --sidebar-width/--topbar-height
+   tokens; mockup-port 02: the `.app`/`.main` grid itself now lives in
+   design-system.css, matching contacts.html — this file just keeps the
+   bare `<main>` element's padding for pages that don't wrap it in `.page`).
    ========================================================================= */
-.main-layout {
-  margin-left: var(--sidebar-width, 232px);
-  min-height: 100vh;
-  transition: margin-left var(--transition-fast);
-}
-
 main {
   max-width: none;
   padding: var(--space-2xl) var(--space-3xl);
@@ -1226,12 +1222,8 @@ main {
 }
 
 @media (max-width: 768px) {
-  .main-layout {
-    margin-left: 0;
-  }
-
   main {
-    padding: calc(60px + var(--space-2xl)) var(--space-lg) var(--space-2xl);
+    padding: var(--space-lg);
   }
 }
 

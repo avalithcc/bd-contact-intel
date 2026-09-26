@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import styles from "./DropdownMenu.module.css";
 
 /**
  * Generic accessible dropdown menu (tasks.md mockup-parity 3.1/3.2),
@@ -13,6 +12,10 @@ import styles from "./DropdownMenu.module.css";
  * Escape closes and returns focus to the trigger, and a click outside
  * closes it. Kept generic so both the TopBar "Crear" menu and the account
  * menu share one implementation instead of two near-duplicates.
+ *
+ * mockup-port 02: renders the mockup's own `.dropdown`/`.menu`/`.menu.left`
+ * global classes (design-system.css) instead of a dedicated CSS module —
+ * same component, same behavior, now pixel-matched to design-system.html.
  */
 export function DropdownMenu({
   trigger,
@@ -54,7 +57,7 @@ export function DropdownMenu({
   }, [open]);
 
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div className="dropdown" ref={rootRef}>
       <button
         type="button"
         ref={triggerRef}
@@ -69,7 +72,7 @@ export function DropdownMenu({
       {open && (
         <div
           role="menu"
-          className={`${styles.menu} ${align === "left" ? styles.alignLeft : ""}`}
+          className={`menu${align === "left" ? " left" : ""}`}
           onClick={(e) => {
             // Menu items are links/buttons that navigate or act on click —
             // close the menu right after so it doesn't linger over the
