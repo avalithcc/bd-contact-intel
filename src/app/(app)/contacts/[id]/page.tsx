@@ -14,7 +14,7 @@ import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { getCompanyByKey, getCompanyContactCount } from "@/lib/companies/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { splitEmail } from "@/lib/emailPatterns";
+import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { effectiveActivityAt } from "@/lib/contacts/timelineGrouping";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { Avatar } from "@/components/Avatar";
@@ -149,11 +149,11 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     ? await Promise.all([getCompanyByKey(companyKey), getCompanyPostingsForKey(companyKey), getCompanyContactCount(companyKey)])
     : [null, null, 0];
   const companyOpenItCount = companyPostings?.postings.length ?? 0;
-  // No `domain` column exists on `company`/`target_company` (checked
-  // schema.ts) — derived from this Contact's own verified email domain as
-  // the closest real substitute, same data the "Correo electrónico" row
-  // already shows. `null` when there's no email on file.
-  const companyDomain = record.person.email ? (splitEmail(record.person.email)?.domain ?? null) : null;
+  // `company.domain` (hubspot-import migration, drizzle/0015_company_domain.sql)
+  // is the real, owner-maintained domain — prefer it. Fall back to deriving
+  // one from this Contact's own verified email domain only when the
+  // company has none on file (see resolveCompanyDomain).
+  const companyDomain = resolveCompanyDomain(companyRow?.domain, record.person.email);
   const stageLabels: Record<string, string> = {
     prospect: dict.companiesPage.stageProspect,
     qualified: dict.companiesPage.stageQualified,
