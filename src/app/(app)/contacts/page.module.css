@@ -1,8 +1,9 @@
-/* `/contacts` list (task 12.2-12.4; mockups/contacts.html) — CSS Modules
-   over the shared design tokens (src/app/globals.css), same convention as
-   the record page (page.module.css) and Phase 8's app shell (design D9).
-   Deliberately does not port the mockup's column picker/bulk-action-bar/
-   board chrome — those ship in Phase 13/14 (tasks.md). */
+/* `/contacts` list (task 12.2-12.4, 13.1; mockups/contacts.html) — CSS
+   Modules over the shared design tokens (src/app/globals.css), same
+   convention as the record page (page.module.css) and Phase 8's app shell
+   (design D9). Column picker ships a simple checklist form, not the
+   mockup's drag-to-reorder menu. Bulk-action-bar/board chrome remain
+   Phase 13/14 (tasks.md). */
 
 .header {
   display: flex;
@@ -82,6 +83,32 @@
   padding: var(--space-sm);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+.columnPicker {
+  margin-bottom: var(--space-lg);
+}
+
+.columnPickerMenu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  max-width: 260px;
+}
+
+.columnPickerHelp {
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+
+.columnCheck {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .tableWrap {

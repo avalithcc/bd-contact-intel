@@ -48,6 +48,13 @@ export interface ContactListRow {
   status: string;
   email: string | null;
   emailStatus: string;
+  // Column-picker (task 13.1) additions — projected always, rendered only
+  // when the resolved column set includes them (src/lib/contacts/columns.ts).
+  roleGroup: string | null;
+  industry: string | null;
+  country: string | null;
+  sourceKey: string | null;
+  createdAt: Date;
 }
 
 export interface ContactListPage {
@@ -105,6 +112,11 @@ export async function getContactListPage(
       status: person.status,
       email: person.email,
       emailStatus: person.emailStatus,
+      roleGroup: person.roleGroup,
+      industry: person.industry,
+      country: person.country,
+      sourceKey: person.sourceKey,
+      createdAt: person.createdAt,
     })
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))

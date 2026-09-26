@@ -8,10 +8,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
-import { createSavedView, deleteSavedView } from "@/lib/contacts/savedViews";
+import { createSavedView, deleteSavedView, getSavedView, updateSavedView } from "@/lib/contacts/savedViews";
 import { SavedViewNameError } from "@/lib/contacts/savedViewInput";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
+import { sanitizeColumnKeys } from "@/lib/contacts/columns";
 import { isUuid } from "@/lib/uuid";
+
+const SAVED_VIEW_PREFIX = "saved:";
 
 export async function createSavedViewAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
@@ -42,4 +45,40 @@ export async function deleteSavedViewAction(formData: FormData): Promise<void> {
   await deleteSavedView(id, me.id);
   revalidatePath("/contacts");
   redirect("/contacts");
+}
+
+/**
+ * Column picker submit (task 13.1). "Persisted per view (saved_view.columns)"
+ * applies literally when the active view IS a saved view — the selection is
+ * written to that row's `columns` jsonb (design D7). System views have no DB
+ * row to persist onto, so their selection round-trips through a `?columns=`
+ * query param instead (redirects with it set) — a deliberate scope decision,
+ * not a silent gap: flagged in apply-progress for sdd-verify.
+ */
+export async function updateViewColumnsAction(formData: FormData): Promise<void> {
+  const me = await getCurrentBd();
+  const view = String(formData.get("view") ?? "");
+  const columns = sanitizeColumnKeys(formData.getAll("columns"));
+
+  if (view.startsWith(SAVED_VIEW_PREFIX)) {
+    const id = view.slice(SAVED_VIEW_PREFIX.length);
+    if (isUuid(id)) {
+      const existing = await getSavedView(id, me.id);
+      if (existing) {
+        await updateSavedView(id, me.id, {
+          name: existing.name,
+          filters: existing.filters,
+          columns,
+          sort: existing.sort,
+        });
+      }
+    }
+    revalidatePath("/contacts");
+    redirect(`/contacts?view=${encodeURIComponent(view)}`);
+  }
+
+  const params = new URLSearchParams();
+  params.set("view", view || "all");
+  if (columns.length) params.set("columns", columns.join(","));
+  redirect(`/contacts?${params.toString()}`);
 }
