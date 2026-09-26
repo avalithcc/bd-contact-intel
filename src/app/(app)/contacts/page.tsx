@@ -4,6 +4,7 @@ import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
+import { toTelHref } from "@/lib/phone";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import { listSavedViews } from "@/lib/contacts/savedViews";
@@ -142,6 +143,8 @@ function columnLabel(
       return l.colStatus;
     case "email":
       return l.colEmail;
+    case "phone":
+      return l.colPhone;
     case "bdConnections":
       return l.colBdConnections;
     case "lastActivity":
@@ -219,6 +222,12 @@ function columnCell(
         );
       }
       return row.email ? row.email : <span className="badge badge-none">{l.emailNone}</span>;
+    }
+    case "phone": {
+      const value = row.phone ?? row.mobilePhone;
+      if (!value) return <span className="badge badge-none">{l.phoneNone}</span>;
+      const href = toTelHref(value);
+      return href ? <a href={href}>{value}</a> : value;
     }
     case "bdConnections":
       return row.bdConnections.avatars.length ? (

@@ -108,6 +108,10 @@ async function baseContactFilterConditions(
   if (filters.company) where.push(ilike(person.company, `%${escapeLikeWildcards(filters.company)}%`));
   // "Grupo de rol" ad-hoc filter.
   if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
+  // "Tiene teléfono" ad-hoc filter (migration 0016) — either phone column set.
+  if (filters.hasPhone) {
+    where.push(sql`(${person.phone} is not null or ${person.mobilePhone} is not null)`);
+  }
   // "BD conectado" ad-hoc filter — EXISTS on person_bd_connection, never a
   // join that could fan out the outer person row.
   if (filters.bdConnected) {
@@ -187,6 +191,12 @@ export interface ContactListRow {
   // inventory: "seniority filter AND column" — `person.seniority` already
   // existed with zero UI surface).
   seniority: string | null;
+  // "Teléfono" column (migration 0016) — display prefers `phone`, falls
+  // back to `mobilePhone` (same "primary, then secondary" convention the
+  // record page's props panel shows both of separately; the list only has
+  // room for one phone value per row).
+  phone: string | null;
+  mobilePhone: string | null;
   // "BDs conectados" column (mockups/contacts.html avatar-stack cell) —
   // populated by attachDerivedColumns() below, one extra batched query
   // scoped to exactly this page's ids, never a per-row query.
@@ -214,6 +224,8 @@ const CONTACT_LIST_ROW_COLUMNS = {
   sourceKey: person.sourceKey,
   createdAt: person.createdAt,
   seniority: person.seniority,
+  phone: person.phone,
+  mobilePhone: person.mobilePhone,
 } as const;
 
 type ContactListRowBase = Omit<ContactListRow, "bdConnections" | "lastActivity">;

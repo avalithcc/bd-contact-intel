@@ -43,6 +43,7 @@ export const FILTER_FIELD_LABEL: Record<FilterChipField, string> = {
   industryGroup: "Industria",
   seniority: "Seniority",
   emailVerified: "Correo verificado",
+  hasPhone: "Tiene teléfono",
 };
 
 /**
@@ -76,6 +77,7 @@ export function buildActiveFilterChips(filters: ContactFilters, ctx: FilterChipC
   if (filters.industryGroup) chips.push({ field: "industryGroup", label: L.industryGroup, valueText: filters.industryGroup });
   if (filters.seniority) chips.push({ field: "seniority", label: L.seniority, valueText: filters.seniority });
   if (filters.emailVerified) chips.push({ field: "emailVerified", label: L.emailVerified, valueText: null });
+  if (filters.hasPhone) chips.push({ field: "hasPhone", label: L.hasPhone, valueText: null });
 
   return chips;
 }

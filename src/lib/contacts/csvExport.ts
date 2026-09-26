@@ -44,6 +44,9 @@ export interface ContactExportRow {
   // dictionary-agnostic beyond the header labels passed in.
   statusLabel: string;
   email: string | null;
+  // "Teléfono" column export value — display prefers `phone`, falls back
+  // to `mobilePhone` (mapContactRowToExportRow below).
+  phone: string | null;
   roleGroup: string | null;
   industry: string | null;
   country: string | null;
@@ -72,6 +75,8 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.statusLabel;
     case "email":
       return row.email ?? "";
+    case "phone":
+      return row.phone ?? "";
     case "roleGroup":
       return row.roleGroup ?? "";
     case "industry":
@@ -109,6 +114,7 @@ export function mapContactRowToExportRow(row: ContactListRow, statusLabel: strin
     ownerName: row.ownerName,
     statusLabel,
     email: row.email,
+    phone: row.phone ?? row.mobilePhone,
     bdConnectionNames: row.bdConnections.title,
     lastActivityText: row.lastActivity
       ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`

@@ -16,6 +16,7 @@ const HEADERS = {
   owner: "Responsable",
   status: "Estado",
   email: "Correo",
+  phone: "Teléfono",
   bdConnections: "BDs conectados",
   lastActivity: "Última actividad",
   roleGroup: "Grupo de rol",
@@ -34,6 +35,7 @@ function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
     ownerName: "Bruno",
     statusLabel: "Nuevo",
     email: "ana@acme.com",
+    phone: null,
     roleGroup: null,
     industry: null,
     country: null,
@@ -119,6 +121,8 @@ function contactListRow(overrides: Partial<ContactListRow> = {}): ContactListRow
     status: "new",
     email: "ana@acme.com",
     emailStatus: "verified",
+    phone: null,
+    mobilePhone: null,
     roleGroup: null,
     industry: null,
     country: null,
@@ -148,4 +152,13 @@ test("mapContactRowToExportRow: bdConnections title and formatted last-activity 
   );
   assert.equal(row.bdConnectionNames, "Ana Pereyra");
   assert.equal(row.lastActivityText, "Correo enviado (2026-02-01)");
+});
+
+test("mapContactRowToExportRow: phone prefers `phone`, falls back to `mobilePhone`", () => {
+  assert.equal(mapContactRowToExportRow(contactListRow({ phone: "+54 11 4000-0000" }), "Nuevo").phone, "+54 11 4000-0000");
+  assert.equal(
+    mapContactRowToExportRow(contactListRow({ phone: null, mobilePhone: "+54 9 11 4123-4567" }), "Nuevo").phone,
+    "+54 9 11 4123-4567",
+  );
+  assert.equal(mapContactRowToExportRow(contactListRow(), "Nuevo").phone, null);
 });

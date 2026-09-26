@@ -1128,6 +1128,7 @@ export const en = {
     colOwner: "Owner",
     colStatus: "Status",
     colEmail: "Email",
+    colPhone: "Phone",
     colRoleGroup: "Role group",
     colIndustry: "Industry",
     colCountry: "Country",
@@ -1179,6 +1180,7 @@ export const en = {
     emailVerified: "Verified",
     emailProbable: "Probable",
     emailNone: "No email",
+    phoneNone: "No phone",
     ownerNone: "—",
     noResults: "No contacts match this view.",
     showingRange: (from: number, to: number, total: number) =>

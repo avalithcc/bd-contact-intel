@@ -14,6 +14,7 @@ export type ContactColumnKey =
   | "owner"
   | "status"
   | "email"
+  | "phone"
   | "bdConnections"
   | "lastActivity"
   | "roleGroup"
@@ -30,6 +31,8 @@ export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "owner",
   "status",
   "email",
+  // Migration 0016 — "Teléfono" column (contacts.html "Columnas" picker).
+  "phone",
   "bdConnections",
   "lastActivity",
   "roleGroup",

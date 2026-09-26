@@ -81,6 +81,9 @@ export interface ContactFilters {
   /** "Última actividad" recency bucket, in days (7/30/90/…) — filters to
    * persons whose most recent `activity` row is within the last N days. */
   lastActivityDays?: number;
+  /** "Tiene teléfono" ad-hoc filter (migration 0016) — `person.phone` or
+   * `person.mobilePhone` is set. */
+  hasPhone?: boolean;
 }
 
 export function serializeContactFilters(filters: ContactFilters): URLSearchParams {
@@ -98,6 +101,7 @@ export function serializeContactFilters(filters: ContactFilters): URLSearchParam
   if (filters.roleGroup) params.set("roleGroup", filters.roleGroup);
   if (filters.bdConnected) params.set("bdConnected", filters.bdConnected);
   if (filters.lastActivityDays) params.set("lastActivityDays", String(filters.lastActivityDays));
+  if (filters.hasPhone) params.set("hasPhone", "1");
   return params;
 }
 
@@ -145,6 +149,8 @@ export function parseContactFilters(params: URLSearchParams): ContactFilters {
     if (Number.isFinite(n) && n > 0) filters.lastActivityDays = n;
   }
 
+  if (params.get("hasPhone") === "1") filters.hasPhone = true;
+
   return filters;
 }
 
@@ -178,6 +184,7 @@ export function sanitizeContactFilters(value: unknown): ContactFilters {
   if (typeof raw.lastActivityDays === "number" && raw.lastActivityDays > 0) {
     filters.lastActivityDays = raw.lastActivityDays;
   }
+  if (raw.hasPhone === true) filters.hasPhone = true;
 
   return filters;
 }
@@ -204,6 +211,7 @@ export interface AdHocContactFilterInput {
   roleGroup?: string;
   bdConnected?: string;
   lastActivityDays?: string;
+  hasPhone?: string;
 }
 
 /**
@@ -281,6 +289,11 @@ export function applyAdHocContactFilterOverrides(
       const n = Number(raw.lastActivityDays);
       if (Number.isFinite(n) && n > 0) result.lastActivityDays = n;
     }
+  }
+
+  if (raw.hasPhone !== undefined) {
+    if (raw.hasPhone === "" || raw.hasPhone === "0") delete result.hasPhone;
+    else result.hasPhone = true;
   }
 
   return result;

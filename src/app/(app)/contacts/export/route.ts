@@ -46,6 +46,7 @@ export async function GET(request: Request): Promise<Response> {
     owner: l.colOwner,
     status: l.colStatus,
     email: l.colEmail,
+    phone: l.colPhone,
     bdConnections: l.colBdConnections,
     lastActivity: l.colLastActivity,
     roleGroup: l.colRoleGroup,

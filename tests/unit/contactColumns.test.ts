@@ -30,6 +30,11 @@ test("sanitizeColumnKeys never includes the always-visible name column", () => {
   assert.deepEqual(result, ["company"]);
 });
 
+test("phone (migration 0016) is a recognized, selectable column", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("phone"));
+  assert.deepEqual(sanitizeColumnKeys(["phone", "bogus"]), ["phone"]);
+});
+
 test("resolveVisibleColumns falls back to DEFAULT_CONTACT_COLUMNS when given no valid selection", () => {
   assert.deepEqual(resolveVisibleColumns(undefined), DEFAULT_CONTACT_COLUMNS);
   assert.deepEqual(resolveVisibleColumns([]), DEFAULT_CONTACT_COLUMNS);

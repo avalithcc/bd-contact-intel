@@ -7,11 +7,13 @@ import type { FilterChipField } from "@/lib/contacts/filterChips";
 
 export type FilterFieldKind = "select" | "multiselect" | "checkbox" | "text";
 
-/** Exactly the mockup's 10 "Agregar filtro" options, in menu order. */
+/** Exactly the mockup's 11 "Agregar filtro" options (migration 0016 added
+ * "Tiene teléfono"), in menu order. */
 export const FILTER_MENU_ORDER: readonly FilterChipField[] = [
   "owner",
   "status",
   "emailStatus",
+  "hasPhone",
   "company",
   "hiring",
   "market",
@@ -32,6 +34,7 @@ export const FILTER_FIELD_KIND: Record<FilterChipField, FilterFieldKind> = {
   owner: "select",
   status: "multiselect",
   emailStatus: "select",
+  hasPhone: "checkbox",
   company: "text",
   hiring: "checkbox",
   market: "select",

@@ -55,6 +55,7 @@ const FIELD_PARAM_NAMES: Record<FilterChipField, string[]> = {
   owner: ["owner"],
   status: ["status"],
   emailStatus: ["emailStatus"],
+  hasPhone: ["hasPhone"],
   company: ["company"],
   hiring: ["hiring"],
   market: ["market"],

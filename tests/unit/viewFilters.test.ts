@@ -38,6 +38,8 @@ const CASES: ContactFilters[] = [
   { startupsOnly: true },
   { bdConnected: SOME_BD_ID },
   { lastActivityDays: 30 },
+  // "Tiene teléfono" ad-hoc filter (migration 0016; contacts.html "Agregar filtro").
+  { hasPhone: true },
   {
     owner: SOME_BD_ID,
     status: ["new"],
@@ -52,6 +54,7 @@ const CASES: ContactFilters[] = [
     startupsOnly: true,
     bdConnected: SOME_BD_ID,
     lastActivityDays: 90,
+    hasPhone: true,
   },
 ];
 
@@ -200,4 +203,10 @@ test("applyAdHocContactFilterOverrides: company/market/roleGroup/startupsOnly/bd
   });
   assert.deepEqual(applyAdHocContactFilterOverrides(base, { lastActivityDays: "not-a-number" }), base);
   assert.deepEqual(applyAdHocContactFilterOverrides(base, { lastActivityDays: "" }), {});
+});
+
+test("applyAdHocContactFilterOverrides: hasPhone ('Tiene teléfono') is ad-hoc overridable", () => {
+  const base: ContactFilters = {};
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { hasPhone: "on" }), { hasPhone: true });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { hasPhone: "" }), {});
 });
