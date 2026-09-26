@@ -1008,6 +1008,7 @@ export const en = {
     },
     colName: "Name",
     colCompany: "Company",
+    hiringBadge: "Hiring",
     colOwner: "Owner",
     colStatus: "Status",
     colEmail: "Email",

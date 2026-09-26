@@ -152,6 +152,10 @@ export interface ContactListRow {
   lastName: string | null;
   jobTitle: string | null;
   company: string | null;
+  // "Empresa" column's inline "Contratando" badge (mockup: badge shown when
+  // the row's company is in the current hiring-match index) needs the key,
+  // not just the display name.
+  companyKey: string | null;
   ownerBdId: string | null;
   ownerName: string | null;
   status: string;
@@ -183,6 +187,7 @@ const CONTACT_LIST_ROW_COLUMNS = {
   lastName: person.lastName,
   jobTitle: person.jobTitle,
   company: person.company,
+  companyKey: person.companyKey,
   ownerBdId: person.ownerBdId,
   ownerName: bd.name,
   status: person.status,

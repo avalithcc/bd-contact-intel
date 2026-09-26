@@ -891,6 +891,7 @@ export const es: typeof en = {
     },
     colName: "Nombre",
     colCompany: "Empresa",
+    hiringBadge: "Contratando",
     colOwner: "Responsable",
     colStatus: "Estado",
     colEmail: "Correo",

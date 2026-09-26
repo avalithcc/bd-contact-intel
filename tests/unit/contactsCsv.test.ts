@@ -113,6 +113,7 @@ function contactListRow(overrides: Partial<ContactListRow> = {}): ContactListRow
     lastName: "Gomez",
     jobTitle: null,
     company: "Acme",
+    companyKey: "acme",
     ownerBdId: null,
     ownerName: "Bruno",
     status: "new",

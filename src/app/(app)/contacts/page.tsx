@@ -3,8 +3,9 @@ import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
+import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { relativeTime } from "@/lib/i18n/format";
-import { getHiringCompanyKeys } from "@/lib/hiring/queries";
+import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
   getContactBoardColumns,
@@ -161,11 +162,24 @@ function columnCell(
   row: ContactListRow,
   dict: Awaited<ReturnType<typeof getDictionary>>,
   relTime: (d: Date) => string,
+  hiringCompanyKeys: Set<string>,
 ) {
   const l = dict.contactList;
   switch (key) {
     case "company":
-      return row.company ? <span className="soft">{row.company}</span> : l.ownerNone;
+      return row.company ? (
+        <>
+          <span className="company-logo" aria-hidden="true">
+            {companyLogoInitials(row.company)}
+          </span>{" "}
+          <span className="soft">{row.company}</span>
+          {row.companyKey && hiringCompanyKeys.has(row.companyKey) && (
+            <span className="badge badge-success no-dot">{l.hiringBadge}</span>
+          )}
+        </>
+      ) : (
+        l.ownerNone
+      );
     case "owner":
       return row.ownerName ? (
         <span className="owner-chip">
@@ -250,12 +264,18 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const l = dict.contactList;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [savedViewRows, hiringKeys, ownerOptions, filterOptions] = await Promise.all([
+  const [savedViewRows, hiringKeys, ownerOptions, filterOptions, hiringMatchIndex] = await Promise.all([
     listSavedViews(me.id),
     getHiringCompanyKeys(),
     listOwnerOptions(),
     getContactFilterOptions(),
+    // "Empresa" column's inline "Contratando" badge (mockup) — ONE call for
+    // the whole page, never per-row, same function the market/startup
+    // ad-hoc filters already reuse (listQueries.ts), so the badge and
+    // those filters can never disagree on which companies count as hiring.
+    getHiringMatchIndex(),
   ]);
+  const hiringCompanyKeysForBadge = new Set(hiringMatchIndex.keys());
   const bulkLabels = pickBulkActionsLabels(dict);
   const bulkMessage = bulkResultMessage(sp.bulkResult, l);
   const savedViewsForResolve: ActiveViewSavedInput[] = savedViewRows.map((v) => ({
@@ -1046,7 +1066,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                     </td>
                     {visibleColumns.map((key) => (
                       <td key={key} className={key === "created" ? "nowrap meta" : undefined}>
-                        {columnCell(key, row, dict, relTime)}
+                        {columnCell(key, row, dict, relTime, hiringCompanyKeysForBadge)}
                       </td>
                     ))}
                   </tr>
