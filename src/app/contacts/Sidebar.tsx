@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import styles from "./Sidebar.module.css";
 import type { NavLabels } from "@/lib/i18n/navLabels";
 import {
   ContactsIcon,
@@ -31,14 +29,15 @@ export interface SidebarSection {
   items: SidebarItem[];
 }
 
-// App shell nav (design.md D9, Phase 8). Routes are unchanged from the
-// pre-Phase-8 sidebar — only the visual language (mockups/styles.css) and,
-// per the Phase 8 fresh-review fix, the labels (now sourced from the `es`
-// dictionary instead of hardcoded English) change here. Phases 9-14 reshape
-// the information architecture itself (e.g. a "Contacts" item pointing at
-// /contacts) as each page migrates. Icons added in mockup-parity 3.3 (see
-// src/components/icons.tsx for provenance/deviation notes, incl. why
-// "outreach" gets an icon at all even though it's gone from the mockup).
+// App shell nav (design.md D9, Phase 8; mockup-port 02 re-markup). Routes are
+// unchanged from the pre-Phase-8 sidebar — only the visual language
+// (mockups/styles.css `.sidenav`/`.nav-item`, now via design-system.css's
+// global classes instead of Sidebar.module.css) and, per the Phase 8
+// fresh-review fix, the labels (now sourced from the `es` dictionary
+// instead of hardcoded English) change here. Icons added in mockup-parity
+// 3.3 (see src/components/icons.tsx for provenance/deviation notes, incl.
+// why "outreach" gets an icon at all even though it's gone from the
+// mockup).
 //
 // Item counts (mockup's `.nav-count`/`.pill-count`) are intentionally left
 // out here — the apply instructions require counts to come from cheap
@@ -70,55 +69,50 @@ export const NAVIGATION: SidebarSection[] = [
  * App shell sidebar (design.md D9, Phase 8). Lives under `src/app/contacts/`
  * rather than `src/components/` per D9 — it's extracted only once Company
  * (or another surface) adopts it too.
+ *
+ * mockup-port 02: markup now matches contacts.html's `<nav class="sidenav">`
+ * 1:1 via design-system.css's global classes — no more Sidebar.module.css or
+ * a JS-driven mobile drawer toggle. Below the 860px breakpoint,
+ * design-system.css's own `.sidenav`/`.nav-section` responsive rules (same
+ * ones the mockup ships) turn the sidebar into a static wrapping icon row
+ * instead of the previous fixed-position slide-out drawer — a deliberate
+ * simplification to stay faithful to the approved mockup, which has no JS
+ * toggle of its own.
  */
 export function Sidebar({ labels }: { labels: NavLabels }) {
-  const [isOpen, setIsOpen] = useState(true);
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname.startsWith(href);
 
   return (
-    <>
-      <button
-        className={styles.toggleButton}
-        onClick={() => setIsOpen(!isOpen)}
-        aria-label={labels.toggleSidebar}
-      >
-        ☰
-      </button>
+    <nav className="sidenav" aria-label="Principal">
+      <Link href="/" className="logo">
+        avalith<span className="dot">.</span>
+      </Link>
 
-      <nav
-        className={`${styles.sidenav} ${isOpen ? styles.open : styles.closed}`}
-        aria-label="Principal"
-      >
-        <Link href="/" className={styles.logo}>
-          avalith<span className={styles.dot}>.</span>
-        </Link>
-
-        {NAVIGATION.map((section) => (
-          <div key={section.titleKey} className={styles.navSection}>
-            <h3 className={styles.navTitle}>{labels[section.titleKey]}</h3>
-            {section.items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.navItem} ${isActive(item.href) ? styles.active : ""}`}
-                aria-current={isActive(item.href) ? "page" : undefined}
-              >
-                <item.icon className={styles.icon} />
-                {labels[item.labelKey]}
-              </Link>
-            ))}
-          </div>
-        ))}
-
-        <div className={styles.sidenavFooter}>
-          <Link href="/account" className={styles.navItem}>
-            <AccountIcon className={styles.icon} />
-            {labels.account}
-          </Link>
+      {NAVIGATION.map((section) => (
+        <div key={section.titleKey} className="nav-section">
+          <div className="nav-title">{labels[section.titleKey]}</div>
+          {section.items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-item${isActive(item.href) ? " active" : ""}`}
+              aria-current={isActive(item.href) ? "page" : undefined}
+            >
+              <item.icon className="icon" />
+              {labels[item.labelKey]}
+            </Link>
+          ))}
         </div>
-      </nav>
-    </>
+      ))}
+
+      <div className="sidenav-footer">
+        <Link href="/account" className="nav-item">
+          <AccountIcon className="icon" />
+          {labels.account}
+        </Link>
+      </div>
+    </nav>
   );
 }

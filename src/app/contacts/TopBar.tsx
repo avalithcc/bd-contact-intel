@@ -47,6 +47,17 @@ function breadcrumbFor(pathname: string, labels: NavLabels): string {
  * QuickActions). Per the apply instructions ("Crear items link to existing
  * create flows only... omit if a flow doesn't exist"), those three items
  * are omitted rather than pointed at a route that doesn't exist.
+ *
+ * mockup-port 02: markup now uses design-system.css's global classes
+ * (`.topbar`, `.breadcrumbs`, `.search`, `.topbar-actions`, `.btn`,
+ * `.menu-item`, etc.) matching contacts.html 1:1, instead of
+ * TopBar.module.css. The DropdownMenu component itself (focus management,
+ * Escape/outside-click, aria-haspopup/aria-expanded) is unchanged — only
+ * its `triggerClassName` and the classes on its children are now the
+ * mockup's global vocabulary. TopBar.module.css is kept, scoped down to
+ * just the sign-out button's width/alignment override — the static mockup
+ * has no equivalent for a full-width button inside a menu (it only shows a
+ * plain "Cerrar sesión" link).
  */
 export function TopBar({
   labels,
@@ -70,11 +81,11 @@ export function TopBar({
   const roleLabel = me.role === "admin" ? labels.roleAdmin : labels.roleBd;
 
   return (
-    <header className={styles.topbar}>
-      <nav className={styles.breadcrumbs} aria-label="Ruta de navegación">
+    <header className="topbar">
+      <nav className="breadcrumbs" aria-label="Ruta de navegación">
         <span>{breadcrumbFor(pathname, labels)}</span>
       </nav>
-      <form className={styles.search} onSubmit={onSubmit} role="search">
+      <form className="search" onSubmit={onSubmit} role="search">
         <span className="sr-only">Buscar contactos</span>
         <input
           type="search"
@@ -83,46 +94,49 @@ export function TopBar({
           onChange={(e) => setQ(e.target.value)}
         />
       </form>
-      <div className={styles.actions}>
+      <div className="topbar-actions">
         <DropdownMenu
-          triggerClassName={`${styles.btn} ${styles.btnPrimary}`}
+          triggerClassName="btn btn-primary btn-sm"
           trigger={
             <>
-              <PlusIcon className={styles.icon} />
+              <PlusIcon className="icon" />
               {labels.create}
-              <ChevronDownIcon className={styles.icon} />
+              <ChevronDownIcon className="icon" />
             </>
           }
         >
-          <Link className={styles.menuItem} role="menuitem" href="/contacts/import">
-            <ImportIcon className={styles.icon} />
+          <Link className="menu-item" role="menuitem" href="/contacts/import">
+            <ImportIcon className="icon" />
             {labels.importContacts}
           </Link>
         </DropdownMenu>
 
         <DropdownMenu
           ariaLabel={labels.accountMenuLabel}
-          triggerClassName={`${styles.btn} ${styles.btnGhost}`}
+          triggerClassName="btn btn-ghost btn-sm"
           trigger={
             <>
               <Avatar id={me.id} initials={initialsFromName(me.name)} size="sm" />
-              <ChevronDownIcon className={styles.icon} />
+              <ChevronDownIcon className="icon" />
             </>
           }
         >
-          <div className={styles.menuLabel} role="none">
+          <div className="menu-label" role="none">
             {labels.signedInLabel}
           </div>
-          <div className={styles.menuInfo} role="none">
-            <strong>{accountLabel}</strong>
-            <span className={styles.meta}>{roleLabel}</span>
+          <div className="menu-item" role="none">
+            <span className="grow">
+              <strong>{accountLabel}</strong>
+              <br />
+              <span className="meta">{roleLabel}</span>
+            </span>
           </div>
-          <div className={styles.menuSep} role="none" />
-          <Link className={styles.menuItem} role="menuitem" href="/account">
-            <AccountIcon className={styles.icon} />
+          <div className="menu-sep" role="none" />
+          <Link className="menu-item" role="menuitem" href="/account">
+            <AccountIcon className="icon" />
             {labels.account}
           </Link>
-          <div className={`${styles.menuItem} ${styles.menuSignOut}`} role="none">
+          <div className={`menu-item ${styles.menuSignOut}`} role="none">
             <SignOutButton locale={locale} />
           </div>
         </DropdownMenu>
