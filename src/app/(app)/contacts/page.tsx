@@ -24,6 +24,9 @@ import {
   deleteSavedViewAction,
   updateViewColumnsAction,
 } from "./viewActions";
+import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
+import { pickBulkActionsLabels } from "@/lib/contacts/labels";
+import { BulkActionsBar } from "./BulkActionsBar";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +34,27 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 interface ContactsPageProps {
-  searchParams: Promise<{ view?: string; q?: string; page?: string; columns?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    q?: string;
+    page?: string;
+    columns?: string;
+    bulkResult?: string;
+    bulkLimited?: string;
+  }>;
+}
+
+/** Parses the `?bulkResult=` redirect param (bulkActions.ts) into the
+ * Spanish banner text — kept server-side (page.tsx) since the two
+ * formatters (bulkResultOwner/bulkResultTask) aren't client-safe. */
+function bulkResultMessage(
+  raw: string | undefined,
+  l: Awaited<ReturnType<typeof getDictionary>>["contactList"],
+): string | null {
+  if (!raw) return null;
+  const [kind, a, b] = raw.split(":");
+  if (kind === "owner") return l.bulkResultOwner(Number(a) || 0, Number(b) || 0);
+  return null;
 }
 
 function emailBadge(row: ContactListRow, dict: Awaited<ReturnType<typeof getDictionary>>) {
@@ -120,10 +143,13 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const l = dict.contactList;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [savedViewRows, hiringKeys] = await Promise.all([
+  const [savedViewRows, hiringKeys, ownerOptions] = await Promise.all([
     listSavedViews(me.id),
     getHiringCompanyKeys(),
+    listOwnerOptions(),
   ]);
+  const bulkLabels = pickBulkActionsLabels(dict);
+  const bulkMessage = bulkResultMessage(sp.bulkResult, l);
   const savedViewsForResolve: ActiveViewSavedInput[] = savedViewRows.map((v) => ({
     id: v.id,
     name: v.name,
@@ -235,52 +261,69 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         </form>
       </details>
 
+      {bulkMessage && <p className={styles.resultBanner}>{bulkMessage}</p>}
+      {sp.bulkLimited === "1" && <p className={styles.resultBanner}>{l.bulkLimitedNotice}</p>}
+
       {rows.length === 0 ? (
         <p className={styles.empty}>{l.noResults}</p>
       ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{l.colName}</th>
-                {visibleColumns.map((key) => (
-                  <th key={key}>{columnLabel(key, l)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <Link href={`/contacts/${row.id}`} className={styles.name}>
-                      {[row.firstName, row.lastName].filter(Boolean).join(" ") || l.ownerNone}
-                    </Link>
-                    {row.jobTitle && <span className={styles.jobTitle}>{row.jobTitle}</span>}
-                  </td>
+        <BulkActionsBar
+          labels={bulkLabels}
+          ownerOptions={ownerOptions}
+          view={activeView.viewKey}
+          q={sp.q}
+          page={currentPage}
+        >
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.colCheck}>
+                    <input type="checkbox" id="select-all-contacts" aria-label={l.bulkSelectAllLabel} />
+                  </th>
+                  <th>{l.colName}</th>
                   {visibleColumns.map((key) => (
-                    <td key={key}>{columnCell(key, row, dict)}</td>
+                    <th key={key}>{columnLabel(key, l)}</th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className={styles.footer}>
-            <span>{l.showingRange(from, to, total)}</span>
-            <div className={styles.pager}>
-              {currentPage > 1 && (
-                <Link href={pageHref(currentPage - 1)} className="btn btn-secondary btn-sm">
-                  {l.prevPage}
-                </Link>
-              )}
-              <span>{l.pageOf(currentPage, totalPages)}</span>
-              {currentPage < totalPages && (
-                <Link href={pageHref(currentPage + 1)} className="btn btn-secondary btn-sm">
-                  {l.nextPage}
-                </Link>
-              )}
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td className={styles.colCheck}>
+                      <input type="checkbox" name="personId" value={row.id} aria-label={row.firstName ?? row.id} />
+                    </td>
+                    <td>
+                      <Link href={`/contacts/${row.id}`} className={styles.name}>
+                        {[row.firstName, row.lastName].filter(Boolean).join(" ") || l.ownerNone}
+                      </Link>
+                      {row.jobTitle && <span className={styles.jobTitle}>{row.jobTitle}</span>}
+                    </td>
+                    {visibleColumns.map((key) => (
+                      <td key={key}>{columnCell(key, row, dict)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className={styles.footer}>
+              <span>{l.showingRange(from, to, total)}</span>
+              <div className={styles.pager}>
+                {currentPage > 1 && (
+                  <Link href={pageHref(currentPage - 1)} className="btn btn-secondary btn-sm">
+                    {l.prevPage}
+                  </Link>
+                )}
+                <span>{l.pageOf(currentPage, totalPages)}</span>
+                {currentPage < totalPages && (
+                  <Link href={pageHref(currentPage + 1)} className="btn btn-secondary btn-sm">
+                    {l.nextPage}
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </BulkActionsBar>
       )}
     </main>
   );

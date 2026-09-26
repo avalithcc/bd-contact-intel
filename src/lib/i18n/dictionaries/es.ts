@@ -779,5 +779,18 @@ export const es: typeof en = {
     save: "Guardar",
     cancel: "Cancelar",
     deleteView: "Eliminar vista",
+    bulkSelectAllLabel: "Seleccionar todo en la página",
+    bulkSelectedSuffix: "seleccionados",
+    bulkAssignOwner: "Asignar responsable",
+    bulkClearSelection: "Quitar selección",
+    bulkOwnerLabel: "Responsable",
+    bulkOwnerUnassign: "Sin asignar",
+    bulkConfirm: "Aplicar",
+    bulkCancel: "Cancelar",
+    bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
+    bulkResultOwner: (assigned: number, skipped: number) =>
+      skipped > 0
+        ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya tiene un BD conectado).`
+        : `Responsable asignado a ${assigned}.`,
   },
 };
