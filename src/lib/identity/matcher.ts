@@ -30,10 +30,17 @@ export type EmailStatus = "verified" | "probable" | "none";
 export interface IdentityIndex {
   byProfileKey(key: string): PersonId | null;
   byVerifiedEmail(email: string): PersonId | null;
+  /**
+   * Every live person whose stored email exactly matches, regardless of
+   * `emailStatus` — unlike byVerifiedEmail, which only ever returns a hit
+   * whose OWN stored email is `verified`. Backs the hubspot_import-only
+   * `email_unverified` review rule (contact-identity delta).
+   */
+  byEmail(email: string): PersonId[];
   byNameCompany(key: string): PersonId[];
 }
 
-export type ReviewReason = "name_company" | "conflicting_strong_keys";
+export type ReviewReason = "name_company" | "conflicting_strong_keys" | "email_unverified";
 
 export type MatchResult =
   | { kind: "skip_own_company"; reason: "name" | "domain" }
@@ -48,6 +55,14 @@ export type MatchResult =
   | { kind: "review"; reason: ReviewReason; personIds: PersonId[] }
   | { kind: "new" };
 
+/**
+ * Batch-source tag (contact-identity delta "Matcher precedence"). The
+ * not-verified-side exact-email review rule applies ONLY when `source` is
+ * `"hubspot_import"` — live lead ingest and the `catch_up` migration phase
+ * never set this, so they keep the prior behavior unchanged.
+ */
+export type MatchSource = "hubspot_import";
+
 export interface MatchableRow {
   profileKey?: string | null;
   email?: string | null;
@@ -55,6 +70,13 @@ export interface MatchableRow {
   firstName?: string | null;
   lastName?: string | null;
   company?: string | null;
+  // A pre-resolved companyKey (e.g. the HubSpot import's domain-resolved
+  // company, design D3) — preferred over deriving one from `company` via
+  // normalizeCompanyKey, since the resolved key may differ from a naive
+  // normalization of the raw company text (domain/name matched to a
+  // DIFFERENT existing company's key).
+  companyKey?: string | null;
+  source?: MatchSource;
 }
 
 /**
@@ -67,10 +89,10 @@ export interface MatchableRow {
  * company half of this key.
  */
 export function buildNameCompanyKey(
-  row: Pick<MatchableRow, "firstName" | "lastName" | "company">,
+  row: Pick<MatchableRow, "firstName" | "lastName" | "company" | "companyKey">,
 ): string | null {
   const name = normalizeNameKey(`${row.firstName ?? ""} ${row.lastName ?? ""}`);
-  const companyKey = row.company ? normalizeCompanyKey(row.company) : "";
+  const companyKey = row.companyKey ? row.companyKey : row.company ? normalizeCompanyKey(row.company) : "";
   if (!name || !companyKey) return null;
   return `${name}::${companyKey}`;
 }
@@ -113,6 +135,21 @@ export function matchIdentity(row: MatchableRow, index: IdentityIndex): MatchRes
 
   if (profilePersonId) return { kind: "auto", personId: profilePersonId, key: "profile_key" };
   if (emailPersonId) return { kind: "auto", personId: emailPersonId, key: "verified_email" };
+
+  // hubspot_import-only rule (contact-identity delta): an exact email match
+  // where at least one side is not verified never auto-merges, but DOES
+  // outrank name+company — checked before it, never after. Reaching here
+  // means neither strong key already auto-matched above, so by
+  // byVerifiedEmail's contract ("only a hit whose OWN stored email is
+  // verified"), any candidate returned by byEmail below has at least one
+  // not-verified side (the incoming row's, the candidate's, or both).
+  if (row.source === "hubspot_import" && row.email) {
+    const emailKey = row.email.trim().toLowerCase();
+    const candidates = index.byEmail(emailKey);
+    if (candidates.length > 0) {
+      return { kind: "review", reason: "email_unverified", personIds: candidates };
+    }
+  }
 
   const nameCompanyKey = buildNameCompanyKey(row);
   if (nameCompanyKey) {
