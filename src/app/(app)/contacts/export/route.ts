@@ -34,6 +34,7 @@ export async function GET(request: Request): Promise<Response> {
     country: l.colCountry,
     source: l.colSource,
     created: l.colCreated,
+    seniority: l.colSeniority,
   };
 
   const rows = ids.length ? await getContactListRowsByIds(ids) : [];
@@ -50,6 +51,7 @@ export async function GET(request: Request): Promise<Response> {
       country: row.country,
       sourceKey: row.sourceKey,
       createdAt: row.createdAt,
+      seniority: row.seniority,
     })),
     columns,
     headers,

@@ -8,20 +8,36 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  applyAdHocContactFilterOverrides,
   parseContactFilters,
   sanitizeContactFilters,
   serializeContactFilters,
   type ContactFilters,
 } from "@/lib/contacts/viewFilters";
 
+const SOME_BD_ID = "8f14e45f-ceea-467e-9a0c-8c6b4c3e3a1a";
+
 const CASES: ContactFilters[] = [
   {},
   { owner: "me" },
+  { owner: "unassigned" },
+  { owner: SOME_BD_ID },
   { status: ["new"] },
   { status: ["new", "contacted"] },
   { emailVerified: true },
   { hiring: true },
-  { owner: "me", status: ["new"], emailVerified: true, hiring: true },
+  { industryGroup: "SaaS" },
+  { seniority: "Manager" },
+  { emailStatus: "probable" },
+  {
+    owner: SOME_BD_ID,
+    status: ["new"],
+    emailVerified: true,
+    hiring: true,
+    industryGroup: "SaaS",
+    seniority: "Manager",
+    emailStatus: "probable",
+  },
 ];
 
 test("serializeContactFilters -> parseContactFilters round-trips every filter combination", () => {
@@ -74,4 +90,57 @@ test("sanitizeContactFilters coerces non-boolean emailVerified/hiring to absent"
   assert.deepEqual(sanitizeContactFilters({ emailVerified: true, hiring: false }), {
     emailVerified: true,
   });
+});
+
+test("owner accepts 'me', 'unassigned', or a specific BD uuid; rejects anything else", () => {
+  assert.deepEqual(parseContactFilters(new URLSearchParams("owner=unassigned")), {
+    owner: "unassigned",
+  });
+  assert.deepEqual(parseContactFilters(new URLSearchParams(`owner=${SOME_BD_ID}`)), {
+    owner: SOME_BD_ID,
+  });
+  assert.deepEqual(parseContactFilters(new URLSearchParams("owner=not-a-uuid")), {});
+  assert.deepEqual(sanitizeContactFilters({ owner: "unassigned" }), { owner: "unassigned" });
+  assert.deepEqual(sanitizeContactFilters({ owner: SOME_BD_ID }), { owner: SOME_BD_ID });
+  assert.deepEqual(sanitizeContactFilters({ owner: "not-a-uuid" }), {});
+});
+
+test("industryGroup and seniority round-trip as plain strings; blank is absent", () => {
+  assert.deepEqual(parseContactFilters(new URLSearchParams("industryGroup=SaaS")), {
+    industryGroup: "SaaS",
+  });
+  assert.deepEqual(parseContactFilters(new URLSearchParams("seniority=Manager")), {
+    seniority: "Manager",
+  });
+  assert.deepEqual(parseContactFilters(new URLSearchParams("industryGroup=")), {});
+});
+
+test("emailStatus accepts verified/probable/none only", () => {
+  assert.deepEqual(parseContactFilters(new URLSearchParams("emailStatus=probable")), {
+    emailStatus: "probable",
+  });
+  assert.deepEqual(parseContactFilters(new URLSearchParams("emailStatus=bogus")), {});
+  assert.deepEqual(sanitizeContactFilters({ emailStatus: "verified" }), {
+    emailStatus: "verified",
+  });
+});
+
+test("applyAdHocContactFilterOverrides overrides an inherited view filter field-by-field, including explicit clear", () => {
+  const base: ContactFilters = { owner: "me", status: ["new"] };
+  // Explicit empty string clears the inherited owner filter.
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { owner: "" }), { status: ["new"] });
+  // A valid explicit value overrides it.
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { owner: "unassigned" }), {
+    owner: "unassigned",
+    status: ["new"],
+  });
+  // An invalid value is ignored (base filter kept).
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { owner: "garbage" }), base);
+  // A field absent from the raw input is left untouched.
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, {}), base);
+  // Multiple ad-hoc fields at once.
+  assert.deepEqual(
+    applyAdHocContactFilterOverrides(base, { industryGroup: "SaaS", emailStatus: "probable" }),
+    { owner: "me", status: ["new"], industryGroup: "SaaS", emailStatus: "probable" },
+  );
 });

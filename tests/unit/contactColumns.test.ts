@@ -46,3 +46,9 @@ test("ALL_CONTACT_COLUMNS contains every DEFAULT_CONTACT_COLUMNS entry", () => {
     assert.ok(ALL_CONTACT_COLUMNS.includes(key));
   }
 });
+
+test("seniority is a selectable column (task 13.3 parity gap), not visible by default", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("seniority"));
+  assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("seniority"));
+  assert.deepEqual(resolveVisibleColumns(["seniority"]), ["seniority"]);
+});

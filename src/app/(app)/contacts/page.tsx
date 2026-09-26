@@ -6,6 +6,7 @@ import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
   getContactBoardColumns,
   getContactCountForFilters,
+  getContactFilterOptions,
   getContactListPage,
   type ContactListRow,
 } from "@/lib/contacts/listQueries";
@@ -14,7 +15,11 @@ import {
   resolveActiveView,
   type ActiveViewSavedInput,
 } from "@/lib/contacts/views";
-import { serializeContactFilters } from "@/lib/contacts/viewFilters";
+import {
+  applyAdHocContactFilterOverrides,
+  serializeContactFilters,
+  type ContactFilters,
+} from "@/lib/contacts/viewFilters";
 import {
   ALL_CONTACT_COLUMNS,
   resolveVisibleColumns,
@@ -44,6 +49,12 @@ interface ContactsPageProps {
     bulkResult?: string;
     bulkLimited?: string;
     layout?: string;
+    // Ad-hoc filter panel (task 13.3 parity gaps), layered on top of the
+    // active view's filters — see applyAdHocContactFilterOverrides.
+    owner?: string;
+    industryGroup?: string;
+    seniority?: string;
+    emailStatus?: string;
   }>;
 }
 
@@ -90,6 +101,8 @@ function columnLabel(
       return l.colSource;
     case "created":
       return l.colCreated;
+    case "seniority":
+      return l.colSeniority;
   }
 }
 
@@ -127,6 +140,8 @@ function columnCell(
       return row.sourceKey ?? l.ownerNone;
     case "created":
       return row.createdAt.toLocaleDateString();
+    case "seniority":
+      return row.seniority ?? l.ownerNone;
   }
 }
 
@@ -147,10 +162,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const l = dict.contactList;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [savedViewRows, hiringKeys, ownerOptions] = await Promise.all([
+  const [savedViewRows, hiringKeys, ownerOptions, filterOptions] = await Promise.all([
     listSavedViews(me.id),
     getHiringCompanyKeys(),
     listOwnerOptions(),
+    getContactFilterOptions(),
   ]);
   const bulkLabels = pickBulkActionsLabels(dict);
   const bulkMessage = bulkResultMessage(sp.bulkResult, l);
@@ -161,6 +177,18 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   }));
 
   const activeView = resolveActiveView(sp.view, savedViewsForResolve);
+
+  // Ad-hoc filter panel (task 13.3 parity gaps: industryGroup, seniority,
+  // owner-by-specific-BD/unassigned, granular emailStatus — task 13.1's
+  // deferred "Agregar filtro" scope). Layers on top of the active view's
+  // filters field-by-field; an explicit empty selection clears the
+  // inherited value instead of being ignored.
+  const effectiveFilters: ContactFilters = applyAdHocContactFilterOverrides(activeView.filters, {
+    owner: sp.owner,
+    industryGroup: sp.industryGroup,
+    seniority: sp.seniority,
+    emailStatus: sp.emailStatus,
+  });
 
   // Column picker (task 13.1): a `?columns=` query override wins (used by
   // system views, which have no DB row to persist onto); otherwise a saved
@@ -178,9 +206,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const isBoard = sp.layout === "board";
 
   const [listPage, systemViewCounts, boardColumns] = await Promise.all([
-    isBoard ? null : getContactListPage(activeView.filters, me.id, sp.q, page, PAGE_SIZE, hiringKeys),
+    isBoard ? null : getContactListPage(effectiveFilters, me.id, sp.q, page, PAGE_SIZE, hiringKeys),
     Promise.all(SYSTEM_VIEWS.map((v) => getContactCountForFilters(v.filters, me.id, hiringKeys))),
-    isBoard ? getContactBoardColumns(activeView.filters, me.id, sp.q, hiringKeys) : null,
+    isBoard ? getContactBoardColumns(effectiveFilters, me.id, sp.q, hiringKeys) : null,
   ]);
 
   const { rows, total, totalPages, page: currentPage } = listPage ?? {
@@ -193,8 +221,19 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const from = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const to = Math.min(currentPage * PAGE_SIZE, total);
 
+  // Ad-hoc filter query params (task 13.3) ride along on every link the
+  // page generates (pagination, layout toggle) so they never silently
+  // reset when a BD navigates within the same view.
+  function withAdHocFilterParams(params: URLSearchParams): URLSearchParams {
+    if (sp.owner !== undefined) params.set("owner", sp.owner);
+    if (sp.industryGroup !== undefined) params.set("industryGroup", sp.industryGroup);
+    if (sp.seniority !== undefined) params.set("seniority", sp.seniority);
+    if (sp.emailStatus !== undefined) params.set("emailStatus", sp.emailStatus);
+    return params;
+  }
+
   function pageHref(targetPage: number): string {
-    const params = new URLSearchParams();
+    const params = withAdHocFilterParams(new URLSearchParams());
     params.set("view", activeView.viewKey);
     if (sp.q) params.set("q", sp.q);
     params.set("page", String(targetPage));
@@ -202,14 +241,14 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   }
 
   function layoutHref(target: "table" | "board"): string {
-    const params = new URLSearchParams();
+    const params = withAdHocFilterParams(new URLSearchParams());
     params.set("view", activeView.viewKey);
     if (sp.q) params.set("q", sp.q);
     if (target === "board") params.set("layout", "board");
     return `/contacts?${params.toString()}`;
   }
 
-  const currentFiltersQuery = serializeContactFilters(activeView.filters).toString();
+  const currentFiltersQuery = serializeContactFilters(effectiveFilters).toString();
 
   return (
     <main>
@@ -296,6 +335,71 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <button type="submit" className="btn btn-primary btn-sm">
             {l.columnsApply}
           </button>
+        </form>
+      </details>
+
+      <details className={styles.columnPicker}>
+        <summary className="btn btn-secondary btn-sm">{l.filtersPanelLabel}</summary>
+        <form method="get" action="/contacts" className={styles.columnPickerMenu}>
+          <input type="hidden" name="view" value={activeView.viewKey} />
+          {sp.q && <input type="hidden" name="q" value={sp.q} />}
+          {sp.layout && <input type="hidden" name="layout" value={sp.layout} />}
+          {sp.columns && <input type="hidden" name="columns" value={sp.columns} />}
+
+          <label className={styles.columnCheck}>
+            {l.filterOwnerLabel}
+            <select name="owner" defaultValue={sp.owner ?? ""}>
+              <option value="">{l.filterOwnerAny}</option>
+              <option value="me">{l.filterOwnerMe}</option>
+              <option value="unassigned">{l.filterOwnerUnassigned}</option>
+              {ownerOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.columnCheck}>
+            {l.filterIndustryLabel}
+            <select name="industryGroup" defaultValue={sp.industryGroup ?? ""}>
+              <option value="">{l.filterIndustryAny}</option>
+              {filterOptions.industryGroups.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.columnCheck}>
+            {l.filterSeniorityLabel}
+            <select name="seniority" defaultValue={sp.seniority ?? ""}>
+              <option value="">{l.filterSeniorityAny}</option>
+              {filterOptions.seniorities.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.columnCheck}>
+            {l.filterEmailStatusLabel}
+            <select name="emailStatus" defaultValue={sp.emailStatus ?? ""}>
+              <option value="">{l.filterEmailStatusAny}</option>
+              <option value="verified">{l.emailVerified}</option>
+              <option value="probable">{l.emailProbable}</option>
+              <option value="none">{l.emailNone}</option>
+            </select>
+          </label>
+
+          <button type="submit" className="btn btn-primary btn-sm">
+            {l.filtersApply}
+          </button>
+          <Link href={`/contacts?view=${activeView.viewKey}`} className="btn btn-secondary btn-sm">
+            {l.filtersClear}
+          </Link>
         </form>
       </details>
 

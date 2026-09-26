@@ -46,6 +46,7 @@ export interface ContactExportRow {
   country: string | null;
   sourceKey: string | null;
   createdAt: Date;
+  seniority: string | null;
 }
 
 export type ContactCsvHeaders = Record<"name" | ContactColumnKey, string>;
@@ -70,6 +71,8 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.sourceKey ?? "";
     case "created":
       return row.createdAt.toISOString().slice(0, 10);
+    case "seniority":
+      return row.seniority ?? "";
   }
 }
 

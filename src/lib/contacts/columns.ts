@@ -18,7 +18,8 @@ export type ContactColumnKey =
   | "industry"
   | "country"
   | "source"
-  | "created";
+  | "created"
+  | "seniority";
 
 /** Mockup order (contacts.html column-picker menu, minus "BDs conectados"
  * and "Última actividad" — those need a join this phase's budget doesn't
@@ -33,6 +34,9 @@ export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "country",
   "source",
   "created",
+  // Closes the `/leads` parity gap (task 13.3 inventory): `person.seniority`
+  // existed in the DB with no UI surface at all until this batch.
+  "seniority",
 ];
 
 /** Matches the fixed column set the `/contacts` page shipped with pre-13.1

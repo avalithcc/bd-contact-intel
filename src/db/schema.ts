@@ -701,6 +701,13 @@ export const person = pgTable(
       t.companyKey,
     ),
     byMergedInto: index("person_merged_into_idx").on(t.mergedIntoId),
+    // Serve the `/contacts` list's industryGroup/seniority/emailStatus
+    // filters (task 13.3 parity gaps) — same indexed-filter treatment as
+    // the legacy `lead` table's lead_industry_group_idx/lead_seniority_idx/
+    // lead_email_status_idx.
+    byIndustry: index("person_industry_idx").on(t.industry),
+    bySeniority: index("person_seniority_idx").on(t.seniority),
+    byEmailStatus: index("person_email_status_idx").on(t.emailStatus),
   }),
 );
 

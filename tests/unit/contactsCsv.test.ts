@@ -20,6 +20,7 @@ const HEADERS = {
   country: "País",
   source: "Origen",
   created: "Creado",
+  seniority: "Seniority",
 };
 
 function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
@@ -35,6 +36,7 @@ function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
     country: null,
     sourceKey: null,
     createdAt: new Date("2026-01-15T00:00:00Z"),
+    seniority: null,
     ...overrides,
   };
 }
