@@ -554,6 +554,16 @@ export const es: typeof en = {
     timelineDiscardedDefault: "Contacto descartado.",
   },
 
+  adminConversation: {
+    backLink: "Volver a la ficha",
+    title: "Conversación con",
+    auditNotice: "Esta visualización queda registrada en el registro de auditoría.",
+    emailSectionTitle: "Correos",
+    linkedinSectionTitle: "Conversación de LinkedIn",
+    noEmailContent: "Este BD no envió correos.",
+    noLinkedinContent: "No hay conversación de LinkedIn con este BD.",
+  },
+
   login: {
     title: "iniciar sesión",
     signUpIntro: "¿Primera vez aquí?",

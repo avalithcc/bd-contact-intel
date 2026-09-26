@@ -652,6 +652,20 @@ export const en = {
     timelineDiscardedDefault: "Contact discarded.",
   },
 
+  // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;
+  // admin-access-audit spec). Server-rendered, no client component — plain
+  // strings for consistency with the rest of the dictionary, not bound by
+  // ClientStrings since this page never crosses to a "use client" boundary.
+  adminConversation: {
+    backLink: "Back to the record",
+    title: "Conversation with",
+    auditNotice: "This view is recorded in the audit log.",
+    emailSectionTitle: "Emails",
+    linkedinSectionTitle: "LinkedIn conversation",
+    noEmailContent: "No emails sent by this BD.",
+    noLinkedinContent: "No LinkedIn conversation with this BD.",
+  },
+
   login: {
     title: "sign in",
     signUpIntro: "New here?",
