@@ -39,6 +39,15 @@ export default async function CompaniesPage({
     20,
   );
 
+  // Pagination keeps the active search and stage filters.
+  const pageHref = (p: number) => {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set("search", params.search);
+    if (params.stage) qs.set("stage", params.stage);
+    qs.set("page", String(p));
+    return `/companies?${qs}`;
+  };
+
   const stageLabel = (stage: string) =>
     ({
       prospect: l.stageProspect,
@@ -148,7 +157,7 @@ export default async function CompaniesPage({
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <Link
                   key={p}
-                  href={`/companies?page=${p}`}
+                  href={pageHref(p)}
                   className={`${styles.pageLink} ${p === page ? styles.active : ""}`}
                 >
                   {p}
