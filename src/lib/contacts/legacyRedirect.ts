@@ -13,7 +13,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { personIdMap } from "@/db/schema";
 import { resolveSurvivor } from "@/lib/contacts/queries";
-import { decideLegacyRedirectFromMap } from "@/lib/contacts/legacyRedirectDecision";
+import { decideLegacyRedirectFromMap, isValidLegacyId } from "@/lib/contacts/legacyRedirectDecision";
 
 export type { LegacyRedirectDecision } from "@/lib/contacts/legacyRedirectDecision";
 export type LegacyTable = "lead" | "contact";
@@ -23,6 +23,8 @@ export type LegacyTable = "lead" | "contact";
  * or `null` if the caller should answer 404.
  */
 export async function resolveLegacyRedirectTarget(legacyTable: LegacyTable, legacyId: string): Promise<string | null> {
+  if (!isValidLegacyId(legacyId)) return null;
+
   const [row] = await db
     .select({ personId: personIdMap.personId })
     .from(personIdMap)
