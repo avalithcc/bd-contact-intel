@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
@@ -118,7 +120,19 @@ function columnCell(
     case "company":
       return row.company ?? l.ownerNone;
     case "owner":
-      return row.ownerName ?? l.ownerNone;
+      return row.ownerName ? (
+        <span className="owner-chip">
+          <Avatar
+            id={row.ownerBdId ?? row.ownerName}
+            initials={initialsFromName(row.ownerName)}
+            variant="bd"
+            size="sm"
+          />
+          {row.ownerName}
+        </span>
+      ) : (
+        l.ownerNone
+      );
     case "status": {
       const statusLabel = dict.leadStatuses[row.status as keyof typeof dict.leadStatuses] ?? row.status;
       return <span className={styles.statusBadge}>{statusLabel}</span>;
@@ -455,10 +469,20 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                       <input type="checkbox" name="personId" value={row.id} aria-label={row.firstName ?? row.id} />
                     </td>
                     <td>
-                      <Link href={`/contacts/${row.id}`} className={styles.name}>
-                        {[row.firstName, row.lastName].filter(Boolean).join(" ") || l.ownerNone}
-                      </Link>
-                      {row.jobTitle && <span className={styles.jobTitle}>{row.jobTitle}</span>}
+                      <div className={styles.cellPerson}>
+                        <Avatar
+                          id={row.id}
+                          initials={initialsFromName(
+                            [row.firstName, row.lastName].filter(Boolean).join(" ") || row.id,
+                          )}
+                        />
+                        <div>
+                          <Link href={`/contacts/${row.id}`} className={styles.name}>
+                            {[row.firstName, row.lastName].filter(Boolean).join(" ") || l.ownerNone}
+                          </Link>
+                          {row.jobTitle && <span className={styles.jobTitle}>{row.jobTitle}</span>}
+                        </div>
+                      </div>
                     </td>
                     {visibleColumns.map((key) => (
                       <td key={key}>{columnCell(key, row, dict)}</td>
