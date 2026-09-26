@@ -42,6 +42,10 @@ function toCandidate(r: typeof person.$inferSelect): ExistingPersonCandidate {
     emailStatus: r.emailStatus as EmailStatus,
     emailConfidence: r.emailConfidence,
     emailSource: r.emailSource,
+    company: r.company,
+    ownerBdId: r.ownerBdId,
+    city: r.city,
+    country: r.country,
   };
 }
 
@@ -168,10 +172,14 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
       .set({
         firstName: update.merged.firstName,
         lastName: update.merged.lastName,
+        company: update.merged.company,
         companyKey: update.merged.companyKey,
         jobTitle: update.merged.jobTitle,
         roleGroup: update.merged.roleGroup,
         industry: update.merged.industry,
+        city: update.merged.city,
+        country: update.merged.country,
+        ownerBdId: update.merged.ownerBdId,
         email: update.merged.email,
         emailNormalized: update.merged.emailNormalized,
         emailStatus: update.merged.emailStatus,
