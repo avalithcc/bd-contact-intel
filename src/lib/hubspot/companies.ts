@@ -191,6 +191,24 @@ export function normalizeCompactCompanyKey(value: string | null | undefined): st
   return compact || null;
 }
 
+/**
+ * Whether filling `companyKey`'s empty domain with `domain` would collide
+ * with a DIFFERENT existing company that already owns that exact domain
+ * (the partial unique index `company_domain_idx`) — a blind write here
+ * would throw and abort the whole execute transaction. Used defensively by
+ * both `planCompanyResolution` and the standalone one-off backfill script
+ * (scripts/backfill-company-domains.ts) so a claimed domain is always
+ * reported as a conflict and never attempted as a write.
+ */
+export function domainClaimedByOtherCompany(
+  companyKey: string,
+  domain: string,
+  existingByDomain: ReadonlyMap<string, ExistingCompanyRef>,
+): ExistingCompanyRef | null {
+  const owner = existingByDomain.get(domain);
+  return owner && owner.companyKey !== companyKey ? owner : null;
+}
+
 function splitAdditionalDomains(value: string | undefined): string[] {
   const trimmed = value?.trim();
   if (!trimmed) return [];
@@ -434,10 +452,25 @@ export function planCompanyResolution(
       if ((matchReason === "name" || matchReason === "compact") && group.domains.length > 0) {
         const groupDomain = group.domains[0]!;
         if (!matched.domain) {
-          matched.domain = groupDomain;
-          existingByDomain.set(groupDomain, matched);
-          domainFills.push({ companyKey: matched.companyKey, domain: groupDomain });
-          filledOrCreatedKeys.add(matched.companyKey);
+          // Defensive (follow-up fix, prod run c9de8587): never blindly
+          // assign a domain another existing company already owns — that
+          // would violate the partial unique index `company_domain_idx`
+          // and throw, aborting the whole execute transaction. Report a
+          // conflict instead.
+          const claimedBy = domainClaimedByOtherCompany(matched.companyKey, groupDomain, existingByDomain);
+          if (claimedBy) {
+            domainConflicts.push({
+              companyKey: claimedBy.companyKey,
+              keptDomain: groupDomain,
+              rejectedDomain: groupDomain,
+              hubspotCompanyId: groupMinId(group),
+            });
+          } else {
+            matched.domain = groupDomain;
+            existingByDomain.set(groupDomain, matched);
+            domainFills.push({ companyKey: matched.companyKey, domain: groupDomain });
+            filledOrCreatedKeys.add(matched.companyKey);
+          }
         } else if (matched.domain !== groupDomain && filledOrCreatedKeys.has(matched.companyKey)) {
           domainConflicts.push({
             companyKey: matched.companyKey,

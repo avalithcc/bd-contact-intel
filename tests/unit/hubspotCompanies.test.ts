@@ -14,6 +14,7 @@ import {
   groupHubSpotCompanies,
   planCompanyResolution,
   resolveContactCompanyKey,
+  domainClaimedByOtherCompany,
   type HubSpotCompanyRow,
   type ExistingCompanyRef,
 } from "@/lib/hubspot/companies";
@@ -454,4 +455,28 @@ test("resolveContactCompanyKey: resolved company id returns its companyKey", () 
   const resolved = resolveContactCompanyKey("1", result.byHubspotCompanyId);
   assert.equal(resolved.companyKey, "acme");
   assert.equal(resolved.noCompanyResolved, false);
+});
+
+// --- Follow-up fix: domain fills must never assign a domain already
+// claimed by a DIFFERENT existing company (the partial unique index
+// `company_domain_idx` — a blind UPDATE would throw and abort the whole
+// execute transaction). Both `planCompanyResolution` and the standalone
+// backfill script (scripts/backfill-company-domains.ts) route every
+// candidate fill through this one pure check first. ------------------------
+
+test("domainClaimedByOtherCompany: returns null when the domain is unclaimed", () => {
+  const existingByDomain = new Map<string, ExistingCompanyRef>();
+  assert.equal(domainClaimedByOtherCompany("acme", "acme.com", existingByDomain), null);
+});
+
+test("domainClaimedByOtherCompany: returns null when the SAME companyKey already owns the domain", () => {
+  const owner: ExistingCompanyRef = { companyKey: "acme", domain: "acme.com" };
+  const existingByDomain = new Map([["acme.com", owner]]);
+  assert.equal(domainClaimedByOtherCompany("acme", "acme.com", existingByDomain), null);
+});
+
+test("domainClaimedByOtherCompany: returns the owner when a DIFFERENT companyKey already owns the domain", () => {
+  const owner: ExistingCompanyRef = { companyKey: "acme-holdings", domain: "acme.com" };
+  const existingByDomain = new Map([["acme.com", owner]]);
+  assert.equal(domainClaimedByOtherCompany("acme", "acme.com", existingByDomain), owner);
 });
