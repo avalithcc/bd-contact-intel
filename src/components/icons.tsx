@@ -121,3 +121,30 @@ export function DiscoveryIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+// Account pages icons (mockup-parity 5.1; account.html / account-email.html).
+export function MailIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-10 6L2 7" />
+    </Svg>
+  );
+}
+
+export function LockIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="7.5" cy="15.5" r="5.5" />
+      <path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3" />
+    </Svg>
+  );
+}
+
+export function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="m9 18 6-6-6-6" />
+    </Svg>
+  );
+}

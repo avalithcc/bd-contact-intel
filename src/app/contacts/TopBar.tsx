@@ -14,6 +14,13 @@ import { SignOutButton } from "../SignOutButton";
 import type { Locale } from "@/lib/i18n/locales";
 
 function breadcrumbFor(pathname: string, labels: NavLabels): string {
+  // /account, /account/email — not in the sidenav NAVIGATION list (they're
+  // reached from the account menu, not a nav item), so they'd otherwise
+  // fall through to the contacts fallback below (tasks.md mockup-parity
+  // 5.1 fix; mockups/account.html and account-email.html both show
+  // "Cuenta" as the single-level breadcrumb here).
+  if (pathname.startsWith("/account")) return labels.account;
+
   const item = NAVIGATION.flatMap((section) => section.items).find((i) =>
     pathname.startsWith(i.href),
   );
