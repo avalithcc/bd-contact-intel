@@ -159,8 +159,8 @@ export function BulkActionsBar({
         </>
       )}
 
-      {children}
-
+      {/* Bulk bar sits above the table, as in mockups/contacts.html, so it is
+          visible as soon as a row is checked (it used to render below all 50 rows). */}
       {selectedCount > 0 && (
         <div className="bulk-bar" role="region" aria-label={l.bulkAssignOwner}>
           <span className="count">
@@ -260,6 +260,8 @@ export function BulkActionsBar({
           )}
         </div>
       )}
+
+      {children}
     </form>
   );
 }
