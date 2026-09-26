@@ -98,8 +98,10 @@ export function normalizeDomain(value: string | null | undefined): string | null
   const lower = trimmed.toLowerCase();
   const noScheme = lower.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
   const noWww = noScheme.replace(/^www\./, "");
-  const host = noWww.split(/[/?#]/)[0]!.trim();
-  return host || null;
+  const hostWithPort = noWww.split(/[/?#]/)[0]!.trim();
+  const noPort = hostWithPort.replace(/:\d+$/, "");
+  const noTrailingDot = noPort.replace(/\.+$/, "");
+  return noTrailingDot || null;
 }
 
 function splitAdditionalDomains(value: string | undefined): string[] {

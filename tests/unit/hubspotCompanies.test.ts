@@ -244,6 +244,16 @@ test("resolveContactCompanyKey: own-company link is skipped, not counted as noCo
   assert.equal(resolved.ownCompany, true);
 });
 
+test("normalizeDomain strips a trailing port", () => {
+  assert.equal(normalizeDomain("acme.com:8080"), "acme.com");
+  assert.equal(normalizeDomain("https://acme.com:443/path"), "acme.com");
+});
+
+test("normalizeDomain strips a trailing dot (FQDN)", () => {
+  assert.equal(normalizeDomain("acme.com."), "acme.com");
+  assert.equal(normalizeDomain("www.acme.com."), "acme.com");
+});
+
 test("resolveContactCompanyKey: resolved company id returns its companyKey", () => {
   const result = planCompanyResolution(
     [row({ hubspotCompanyId: "1", name: "Acme Corp", domain: "acme.com" })],
