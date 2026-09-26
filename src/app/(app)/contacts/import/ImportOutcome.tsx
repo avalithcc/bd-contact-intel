@@ -15,9 +15,13 @@ import type { IdentityIngestReport } from "@/lib/identity/ingestWrite";
 export function ImportOutcome({
   report,
   labels: l,
+  ownCompanySkippedBeforeMatching = 0,
 }: {
   report: IdentityIngestReport | null;
   labels: ContactsImportLabels;
+  // Rows dropped by the own-company pre-filter before they reach the
+  // resolver (src/lib/ownCompany.ts); the resolver only counts the rest.
+  ownCompanySkippedBeforeMatching?: number;
 }) {
   if (!report) {
     return <p className="muted mb-0">{l.outcomeUnavailable}</p>;
@@ -28,7 +32,7 @@ export function ImportOutcome({
       <p className="muted mb-0">
         <strong>{l.outcomeTitle}:</strong> {l.outcomeAutoMerged} {report.autoMerged} ·{" "}
         {l.outcomeFlaggedForReview} {report.flaggedForReview} · {l.outcomeNew} {report.new} ·{" "}
-        {l.outcomeSkippedOwnCompany} {report.ownCompanySkipped}
+        {l.outcomeSkippedOwnCompany} {report.ownCompanySkipped + ownCompanySkippedBeforeMatching}
       </p>
       {report.flaggedForReview > 0 && (
         <p className="muted mb-0">

@@ -38,7 +38,11 @@ export function ConnectionsUploadForm({ labels: l }: { labels: ContactsImportLab
         </button>
       </div>
 
-      {state?.ok && <ImportOutcome report={state.identityReport ?? null} labels={l} />}
+      {state?.ok && <ImportOutcome
+          report={state.identityReport ?? null}
+          labels={l}
+          ownCompanySkippedBeforeMatching={state.skippedOwnCompany ?? 0}
+        />}
       {state && !state.ok && (
         <p className="text-danger mb-0">
           {state.errorKey ? l[CONNECTIONS_ERROR_KEY[state.errorKey]] : null}
