@@ -85,7 +85,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
               {
                 id: "overview",
                 label: l.tabOverview,
-                content: <div className={styles.placeholder}>{l.timelineComingSoon}</div>,
+                content: <div className={styles.placeholder}>{l.overviewComingSoon}</div>,
               },
             ]}
           />
