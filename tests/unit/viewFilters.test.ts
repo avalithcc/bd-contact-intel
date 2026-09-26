@@ -29,6 +29,15 @@ const CASES: ContactFilters[] = [
   { industryGroup: "SaaS" },
   { seniority: "Manager" },
   { emailStatus: "probable" },
+  // 10-filter parity (contacts.html "Agregar filtro" menu) — Empresa,
+  // Mercado de contratación, Grupo de rol, Startup, BD conectado, Última
+  // actividad.
+  { company: "Mercado Libre" },
+  { market: "us" },
+  { roleGroup: "eng_leadership" },
+  { startupsOnly: true },
+  { bdConnected: SOME_BD_ID },
+  { lastActivityDays: 30 },
   {
     owner: SOME_BD_ID,
     status: ["new"],
@@ -37,6 +46,12 @@ const CASES: ContactFilters[] = [
     industryGroup: "SaaS",
     seniority: "Manager",
     emailStatus: "probable",
+    company: "Mercado Libre",
+    market: "latam",
+    roleGroup: "eng_leadership",
+    startupsOnly: true,
+    bdConnected: SOME_BD_ID,
+    lastActivityDays: 90,
   },
 ];
 
@@ -152,4 +167,37 @@ test("applyAdHocContactFilterOverrides overrides status as a single ad-hoc pick 
   });
   assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "" }), {});
   assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "bogus" }), base);
+});
+
+test("applyAdHocContactFilterOverrides: status accepts a comma-joined multi-select too (mockup shows 'Nuevo, Contactado' as ONE chip) — same field, same query param, just more than one value", () => {
+  const base: ContactFilters = {};
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "new,contacted" }), {
+    status: ["new", "contacted"],
+  });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "new,bogus" }), {
+    status: ["new"],
+  });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "bogus,also-bogus" }), base);
+});
+
+test("applyAdHocContactFilterOverrides: company/market/roleGroup/startupsOnly/bdConnected/lastActivityDays are all ad-hoc overridable, chip-filter parity gap (contacts.html 'Agregar filtro')", () => {
+  const base: ContactFilters = {};
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { company: "Nubank" }), { company: "Nubank" });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { company: "" }), {});
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { market: "us" }), { market: "us" });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { market: "bogus" }), {});
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { roleGroup: "eng_leadership" }), {
+    roleGroup: "eng_leadership",
+  });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { startupsOnly: "on" }), { startupsOnly: true });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { startupsOnly: "" }), {});
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { bdConnected: SOME_BD_ID }), {
+    bdConnected: SOME_BD_ID,
+  });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { bdConnected: "not-a-uuid" }), base);
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { lastActivityDays: "30" }), {
+    lastActivityDays: 30,
+  });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { lastActivityDays: "not-a-number" }), base);
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { lastActivityDays: "" }), {});
 });

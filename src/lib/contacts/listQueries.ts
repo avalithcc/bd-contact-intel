@@ -9,10 +9,10 @@
  * company_key). `count(*)::int` casts the aggregate — Postgres returns
  * bigint aggregates as strings over the wire otherwise.
  */
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, person, personBdConnection } from "@/db/schema";
-import { getHiringCompanyKeys } from "@/lib/hiring/queries";
+import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 import { BOARD_COLUMNS } from "@/lib/contacts/board";
 import type { PersonStatus } from "@/lib/status/deriveStatus";
@@ -61,6 +61,49 @@ async function baseContactFilterConditions(
   if (filters.hiring) {
     const keys = hiringKeys ?? (await getHiringCompanyKeys());
     where.push(keys.size ? inArray(person.companyKey, [...keys]) : sql`false`);
+  }
+  // "Mercado de contratación" / "Startup" ad-hoc filters (contacts.html
+  // "Agregar filtro") — reuse getHiringMatchIndex the SAME way the Outreach
+  // view's listOutreachCandidates does (src/lib/outreach/queries.ts), one
+  // extra crossover query only when either is actually set, never on every
+  // system-view count (those never set market/startupsOnly).
+  if (filters.market || filters.startupsOnly) {
+    const hiringIndex = await getHiringMatchIndex(filters.market, undefined, undefined, filters.startupsOnly);
+    const matchKeys = [...new Set([...hiringIndex.values()].map((m) => m.companyKey))];
+    where.push(matchKeys.length ? inArray(person.companyKey, matchKeys) : sql`false`);
+  }
+  // "Empresa" ad-hoc filter — substring match on the raw company name (not
+  // companyKey — a BD types a free-text company name, same convention as
+  // the global search's company token).
+  if (filters.company) where.push(ilike(person.company, `%${escapeLikeWildcards(filters.company)}%`));
+  // "Grupo de rol" ad-hoc filter.
+  if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
+  // "BD conectado" ad-hoc filter — EXISTS on person_bd_connection, never a
+  // join that could fan out the outer person row.
+  if (filters.bdConnected) {
+    where.push(
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(personBdConnection)
+          .where(
+            and(eq(personBdConnection.personId, person.id), eq(personBdConnection.bdId, filters.bdConnected)),
+          ),
+      ),
+    );
+  }
+  // "Última actividad" ad-hoc filter (recency bucket) — same EXISTS
+  // convention, bounded by `activity_person_idx`/`activity_created_idx`.
+  if (filters.lastActivityDays) {
+    const since = new Date(Date.now() - filters.lastActivityDays * 24 * 60 * 60 * 1000);
+    where.push(
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(activity)
+          .where(and(eq(activity.personId, person.id), gte(activity.createdAt, since))),
+      ),
+    );
   }
   return where;
 }
