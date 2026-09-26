@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
+import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
@@ -38,6 +40,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const l = pickContactRecordLabels(dict);
   const activityType = rawActivityType && isTimelineActivityType(rawActivityType) ? rawActivityType : undefined;
   const me = await getCurrentBd();
+  const isAdmin = me.role === "admin";
   const timeline = await getPersonTimeline(record.person.id, me.id, { type: activityType });
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
@@ -94,17 +97,41 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
         <aside className={styles.right}>
           <div className={styles.card}>
             <h3 className={styles.cardTitle}>{l.companyCardTitle}</h3>
-            <div>{record.person.company ?? l.noCompany}</div>
+            {record.person.companyKey ? (
+              <Link href={`/companies/${record.person.companyKey}`} className={styles.assocLink}>
+                {record.person.company ?? l.noCompany}
+              </Link>
+            ) : (
+              <div>{record.person.company ?? l.noCompany}</div>
+            )}
           </div>
           <div className={styles.card}>
             <h3 className={styles.cardTitle}>{l.connectedBdsTitle}</h3>
             {record.connections.length ? (
-              record.connections.map((c) => (
-                <div key={c.bdId} className={styles.assocRow}>
-                  <span>{c.bdName ?? "—"}</span>
-                  <span>{c.connectedOn ? `${l.connectedOnPrefix} ${c.connectedOn}` : l.emptyValue}</span>
-                </div>
-              ))
+              record.connections.map((c) => {
+                const history = describeConnectionHistory(c);
+                const canViewConversation = isAdmin && c.bdId !== me.id && history.kind === "some";
+                return (
+                  <div key={c.bdId} className={styles.assocRowStack}>
+                    <div className={styles.assocRow}>
+                      <span>{c.bdName ?? "—"}</span>
+                      <span>{c.connectedOn ? `${l.connectedOnPrefix} ${c.connectedOn}` : l.emptyValue}</span>
+                    </div>
+                    <div className={styles.assocMeta}>
+                      {history.kind === "some"
+                        ? `${history.count} ${l.connectionHistorySomePrefix} ${
+                            history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue
+                          }`
+                        : l.connectionHistoryNone}
+                    </div>
+                    {canViewConversation && (
+                      <Link href={`/contacts/${record.person.id}/conversation/${c.bdId}`} className={styles.assocLink}>
+                        {l.viewConversationLink}
+                      </Link>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div className={styles.placeholder}>{l.associationsComingSoon}</div>
             )}

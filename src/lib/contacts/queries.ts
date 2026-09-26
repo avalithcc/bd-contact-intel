@@ -24,6 +24,8 @@ export interface ContactConnectionRow {
   bdId: string;
   bdName: string | null;
   connectedOn: string | null;
+  messageCount: number;
+  lastMessageAt: Date | null;
 }
 
 export interface ContactRecord {
@@ -60,8 +62,14 @@ export async function assertContactEditableById(personId: string): Promise<void>
   assertContactEditable(row);
 }
 
-/** Follows `merged_into_id` to the live survivor row, or `undefined` if the chain is broken/too long. */
-async function resolveSurvivor(startId: string): Promise<Person | undefined> {
+/**
+ * Follows `merged_into_id` to the live survivor row, or `undefined` if the
+ * chain is broken/too long. Exported for reuse by the legacy `/leads/[id]`
+ * and `/contact/[id]` redirects (task 11.4, design D8) — those resolve a
+ * `person_id_map` row first, then must follow the same merge chain as this
+ * page.
+ */
+export async function resolveSurvivor(startId: string): Promise<Person | undefined> {
   let current = await findPersonById(startId);
   for (let hop = 0; current?.mergedIntoId && hop < MAX_MERGE_HOPS; hop++) {
     current = await findPersonById(current.mergedIntoId);
@@ -83,7 +91,13 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       ? db.select({ name: bd.name }).from(bd).where(eq(bd.id, row.ownerBdId))
       : Promise.resolve([]),
     db
-      .select({ bdId: personBdConnection.bdId, bdName: bd.name, connectedOn: personBdConnection.connectedOn })
+      .select({
+        bdId: personBdConnection.bdId,
+        bdName: bd.name,
+        connectedOn: personBdConnection.connectedOn,
+        messageCount: personBdConnection.messageCount,
+        lastMessageAt: personBdConnection.lastMessageAt,
+      })
       .from(personBdConnection)
       .leftJoin(bd, eq(bd.id, personBdConnection.bdId))
       .where(eq(personBdConnection.personId, row.id))
