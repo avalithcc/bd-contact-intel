@@ -32,7 +32,8 @@ import {
   type ContactColumnKey,
 } from "@/lib/contacts/columns";
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
-import { buildActiveFilterChips, type FilterChip } from "@/lib/contacts/filterChips";
+import { buildActiveFilterChips } from "@/lib/contacts/filterChips";
+import { FilterMenu } from "./FilterMenu";
 import { deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
 import { NewContactDialog, type NewContactDialogLabels } from "./NewContactDialog";
@@ -404,32 +405,18 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     return params;
   }
 
-  // Removable filter chips (mockup: `.chip` + "Quitar filtro" button each) —
-  // clears exactly ONE field's ad-hoc param, keeping every other filter,
-  // sort, layout, and page-size param untouched.
-  const AD_HOC_FIELD_TO_PARAM: Record<FilterChip["field"], string> = {
-    owner: "owner",
-    status: "status",
-    emailStatus: "emailStatus",
-    company: "company",
-    hiring: "hiring",
-    market: "market",
-    roleGroup: "roleGroup",
-    startupsOnly: "startupsOnly",
-    bdConnected: "bdConnected",
-    lastActivityDays: "lastActivityDays",
-    industryGroup: "industryGroup",
-    seniority: "seniority",
-    emailVerified: "emailVerified",
-  };
-
-  function removeFilterHref(field: FilterChip["field"]): string {
+  // FilterMenu.tsx builds its own per-field "remove" hrefs from
+  // `filterMenuBaseParams` below (same params this function already
+  // builds), so a chip's × always clears exactly one field while keeping
+  // every other filter/sort/layout/page-size param untouched.
+  const filterMenuBaseParams = (() => {
     const params = withAdHocFilterParams(new URLSearchParams());
-    params.set(AD_HOC_FIELD_TO_PARAM[field], "");
     params.set("view", activeView.viewKey);
     if (sp.q) params.set("q", sp.q);
-    return `/contacts?${params.toString()}`;
-  }
+    if (sp.layout) params.set("layout", sp.layout);
+    if (sp.columns) params.set("columns", sp.columns);
+    return params.toString();
+  })();
 
   function clearAllFiltersHref(): string {
     const params = new URLSearchParams();
@@ -584,33 +571,6 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         />
       </nav>
 
-      {!isOutreachView && !isBoard && (
-        <div className="toolbar">
-          <span className="spacer" />
-          <span className="meta">
-            {l.sortedByPrefix} <strong className="soft">{sort === "name" ? l.colName : l.colLastActivity}</strong>
-          </span>
-          <ColumnPicker
-            viewKey={activeView.viewKey}
-            allColumns={ALL_CONTACT_COLUMNS}
-            visibleColumns={visibleColumns}
-            columnLabels={columnLabelsByKey}
-            labels={{
-              pickerLabel: l.columnsPickerLabel,
-              helpText: l.columnsPickerHelp,
-              nameLabel: l.colName,
-              applyLabel: l.columnsApply,
-              resetLabel: l.columnsReset,
-              moveUpLabel: l.columnsMoveUp,
-              moveDownLabel: l.columnsMoveDown,
-            }}
-          />
-          <Link href={toolbarExportHref()} className="btn btn-secondary btn-sm">
-            {l.bulkExport}
-          </Link>
-        </div>
-      )}
-
       {isOutreachView ? (
         <section className="panel">
           <div className="eyebrow">{dict.common.filterEyebrow}</div>
@@ -694,167 +654,68 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         </section>
       ) : (
         <div className="toolbar">
-          {activeFilterChips.map((chip) => (
-            <span key={chip.field} className="chip">
-              <span className="k">{chip.label}:</span> {chip.valueText ?? l.filterChipActiveNoValue}
-              <Link href={removeFilterHref(chip.field)} aria-label={l.filterRemoveLabel}>
-                ×
-              </Link>
-            </span>
-          ))}
-          <details className="dropdown">
-            <summary className="chip chip-add">{l.filtersPanelLabel}</summary>
-            <form method="get" action="/contacts" className="menu left">
-              <input type="hidden" name="view" value={activeView.viewKey} />
-              {sp.q && <input type="hidden" name="q" value={sp.q} />}
-              {sp.layout && <input type="hidden" name="layout" value={sp.layout} />}
-              {sp.columns && <input type="hidden" name="columns" value={sp.columns} />}
-              {sp.sort && <input type="hidden" name="sort" value={sp.sort} />}
-
-              <div className="menu-label">{l.filtersPanelLabel}</div>
-
-              <label className="check">
-                {l.filterOwnerLabel}
-                <select name="owner" defaultValue={sp.owner ?? ""} className="select input-sm">
-                  <option value="">{l.filterOwnerAny}</option>
-                  <option value="me">{l.filterOwnerMe}</option>
-                  <option value="unassigned">{l.filterOwnerUnassigned}</option>
-                  {ownerOptions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <fieldset className="check">
-                <legend>{l.filterStatusLabel}</legend>
-                {PERSON_STATUSES.map((s) => (
-                  <label key={s} className="check">
-                    <input
-                      type="checkbox"
-                      name="status"
-                      value={s}
-                      defaultChecked={effectiveFilters.status?.includes(s) ?? false}
-                    />{" "}
-                    {dict.leadStatuses[s]}
-                  </label>
-                ))}
-              </fieldset>
-
-              <label className="check">
-                {l.filterEmailStatusLabel}
-                <select name="emailStatus" defaultValue={sp.emailStatus ?? ""} className="select input-sm">
-                  <option value="">{l.filterEmailStatusAny}</option>
-                  <option value="verified">{l.emailVerified}</option>
-                  <option value="probable">{l.emailProbable}</option>
-                  <option value="none">{l.emailNone}</option>
-                </select>
-              </label>
-
-              <label className="check">
-                {l.filterCompanyLabel}
-                <input type="text" name="company" defaultValue={sp.company ?? ""} className="input input-sm" />
-              </label>
-
-              <label className="check">
-                <input type="checkbox" name="hiring" value="1" defaultChecked={effectiveFilters.hiring ?? false} />{" "}
-                {l.filterHiringLabel}
-              </label>
-
-              <label className="check">
-                {dict.common.marketLabel}
-                <select name="market" defaultValue={sp.market ?? ""} className="select input-sm">
-                  <option value="">{dict.common.allMarkets}</option>
-                  {MARKETS.map((m) => (
-                    <option key={m} value={m}>
-                      {dict.markets[m]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="check">
-                {dict.common.roleGroupLabel}
-                <select name="roleGroup" defaultValue={sp.roleGroup ?? ""} className="select input-sm">
-                  <option value="">{dict.common.allGroups}</option>
-                  {ROLE_GROUPS.map((g) => (
-                    <option key={g.key} value={g.key}>
-                      {dict.roleGroups[g.key]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="check">
-                <input
-                  type="checkbox"
-                  name="startupsOnly"
-                  value="on"
-                  defaultChecked={effectiveFilters.startupsOnly ?? false}
-                />{" "}
-                {l.filterStartupLabel}
-              </label>
-
-              <label className="check">
-                {l.filterBdConnectedLabel}
-                <select name="bdConnected" defaultValue={sp.bdConnected ?? ""} className="select input-sm">
-                  <option value="">{l.filterOwnerAny}</option>
-                  {ownerOptions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="check">
-                {l.filterLastActivityLabel}
-                <select name="lastActivityDays" defaultValue={sp.lastActivityDays ?? ""} className="select input-sm">
-                  <option value="">{l.filterOwnerAny}</option>
-                  <option value="7">{l.filterLastActivity7d}</option>
-                  <option value="30">{l.filterLastActivity30d}</option>
-                  <option value="90">{l.filterLastActivity90d}</option>
-                </select>
-              </label>
-
-              <label className="check">
-                {l.filterIndustryLabel}
-                <select name="industryGroup" defaultValue={sp.industryGroup ?? ""} className="select input-sm">
-                  <option value="">{l.filterIndustryAny}</option>
-                  {filterOptions.industryGroups.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="check">
-                {l.filterSeniorityLabel}
-                <select name="seniority" defaultValue={sp.seniority ?? ""} className="select input-sm">
-                  <option value="">{l.filterSeniorityAny}</option>
-                  {filterOptions.seniorities.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="menu-sep" />
-              <button type="submit" className="btn btn-primary btn-sm">
-                {l.filtersApply}
-              </button>
-              <Link href={`/contacts?view=${activeView.viewKey}`} className="btn btn-secondary btn-sm mt-lg">
-                {l.filtersClear}
-              </Link>
-            </form>
-          </details>
+          <FilterMenu
+            baseParamsQuery={filterMenuBaseParams}
+            chips={activeFilterChips}
+            ownerSelectOptions={[
+              { value: "me", label: l.filterOwnerMe },
+              { value: "unassigned", label: l.filterOwnerUnassigned },
+              ...ownerOptions.map((o) => ({ value: o.id, label: o.name })),
+            ]}
+            bdConnectedOptions={ownerOptions.map((o) => ({ value: o.id, label: o.name }))}
+            statusOptions={PERSON_STATUSES.map((s) => ({ value: s, label: dict.leadStatuses[s] }))}
+            emailStatusOptions={[
+              { value: "verified", label: l.emailVerified },
+              { value: "probable", label: l.emailProbable },
+              { value: "none", label: l.emailNone },
+            ]}
+            marketOptions={MARKETS.map((m) => ({ value: m, label: dict.markets[m] }))}
+            roleGroupOptions={ROLE_GROUPS.map((g) => ({ value: g.key, label: dict.roleGroups[g.key] }))}
+            lastActivityOptions={[
+              { value: "7", label: l.filterLastActivity7d },
+              { value: "30", label: l.filterLastActivity30d },
+              { value: "90", label: l.filterLastActivity90d },
+            ]}
+            industryGroupOptions={filterOptions.industryGroups.map((v) => ({ value: v, label: v }))}
+            seniorityOptions={filterOptions.seniorities.map((v) => ({ value: v, label: v }))}
+            labels={{
+              addFilterLabel: l.filtersPanelLabel,
+              removeFilterLabel: l.filterRemoveLabel,
+              applyLabel: l.filtersApply,
+              cancelLabel: l.newContactCancel,
+              anyLabel: l.filterOwnerAny,
+            }}
+          />
           {activeFilterChips.length > 0 && (
             <Link href={clearAllFiltersHref()} className="btn btn-ghost btn-sm">
               {l.filtersClearAll}
             </Link>
+          )}
+          {!isBoard && (
+            <>
+              <span className="spacer" />
+              <span className="meta">
+                {l.sortedByPrefix} <strong className="soft">{sort === "name" ? l.colName : l.colLastActivity}</strong>
+              </span>
+              <ColumnPicker
+                viewKey={activeView.viewKey}
+                allColumns={ALL_CONTACT_COLUMNS}
+                visibleColumns={visibleColumns}
+                columnLabels={columnLabelsByKey}
+                labels={{
+                  pickerLabel: l.columnsPickerLabel,
+                  helpText: l.columnsPickerHelp,
+                  nameLabel: l.colName,
+                  applyLabel: l.columnsApply,
+                  resetLabel: l.columnsReset,
+                  moveUpLabel: l.columnsMoveUp,
+                  moveDownLabel: l.columnsMoveDown,
+                }}
+              />
+              <Link href={toolbarExportHref()} className="btn btn-secondary btn-sm">
+                {l.bulkExport}
+              </Link>
+            </>
           )}
         </div>
       )}

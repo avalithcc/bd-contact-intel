@@ -22,7 +22,7 @@ Columns: element | mockup | status | evidence | notes
 | Eyebrow "Contactos" | contacts.html:65 | done | page.tsx:333 (`<div className="eyebrow">`) | |
 | h1 "contactos." | contacts.html:65 | done | page.tsx:334-337 | |
 | Meta paragraph | contacts.html:66 | done | page.tsx:338 | |
-| Segmented Tabla/Tablero control | contacts.html:68-71 | done | page.tsx:342-351 (`.segmented`, `.on` active class, `TableIcon`/`BoardIcon`) | |
+| Segmented Tabla/Tablero control | contacts.html:68-71 | **done, audited pixel-by-pixel (branch 13)** | page.tsx (`.segmented`, `.on` active class), src/components/icons.tsx `TableIcon`/`BoardIcon` | Re-checked against contacts.html:68-71's exact markup: same wrapper classes/aria-label, same `.on`/plain toggle, and the SVG `<path>`/`<rect>` coordinates in `TableIcon`/`BoardIcon` are byte-identical to the mockup's inline SVGs. No difference found. |
 | "Importar" secondary button | contacts.html:72 | done | page.tsx:353-355 | |
 | "Nuevo contacto" primary button | contacts.html:73 | **done (branch 08)** | src/app/(app)/contacts/NewContactDialog.tsx | Opens the dialog; wired to createContactActions.ts. |
 
@@ -38,8 +38,8 @@ Columns: element | mockup | status | evidence | notes
 
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
-| Removable filter chips (one per active filter, "Quitar filtro" button each) | contacts.html:77-79 | **done (branch 09/09b)** | src/lib/contacts/filterChips.ts, page.tsx `activeFilterChips`/`removeFilterHref` | Deviation: chips render for every active filter with a working "×" remove link (removes exactly that field, keeps everything else), but adding a NEW filter still happens via one shared "Agregar filtro" panel listing all 10 fields at once, not the mockup's per-item dropdown -> inline editor flow. UX simplification, not a missing feature. |
-| "Agregar filtro" dropdown, 10 options | contacts.html:80-88 | **done, all 10 (branch 09/09b)** | page.tsx filter panel `<form>` | All 10 filter types are present in the panel; see per-filter rows below. |
+| Removable filter chips (one per active filter, "Quitar filtro" button each) | contacts.html:77-79 | **done (branch 09/09b; reworked branch 13)** | src/app/(app)/contacts/FilterMenu.tsx, src/lib/contacts/filterChips.ts | Clicking a chip's label reopens that filter's own inline editor, pre-filled with its current value (mockup shape); the "×" still removes it directly. |
+| "Agregar filtro" dropdown, 10 options | contacts.html:80-88 | **done, matches mockup shape (branch 13)** | FilterMenu.tsx, src/lib/contacts/filterFieldKinds.ts | Now a real dropdown listing the 10 mockup options; picking one opens THAT filter's own inline editor (select/multiselect/checkbox/text per `FILTER_FIELD_KIND`), not one shared panel with all 10 fields at once. industryGroup/seniority (pre-existing, task 13.3 `/leads` parity — not in the mockup's 10) are kept addable in a second "more filters" group below a separator rather than silently dropped. |
 | — Responsable | contacts.html:83 | done (as select, not chip) | page.tsx:544-556 | |
 | — Estado | contacts.html:83 | **done, multi-select (branch 09/09b)** | page.tsx (checkbox group, `name="status"`), viewFilters.ts (comma-joined ad-hoc override) | Now genuinely multi-select, matching the mockup's "Nuevo, Contactado" chip. |
 | — Estado del correo | contacts.html:84 | done (as select, not chip) | page.tsx:582-590 | |
