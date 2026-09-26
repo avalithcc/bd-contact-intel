@@ -185,7 +185,7 @@ Chain strategy: feature-branch-chain
 
 ## Phase 13: List — Columns & Bulk Actions (PR 13, base: PR 12)
 
-- [ ] 13.1 Column picker (Selector de columnas) with persisted column selection per view.
+- [x] 13.1 Column picker (Selector de columnas) with persisted column selection per view. PR **13a** (branch `feat/crm-hubspot-ux-13a-column-picker`, base 12c). `src/lib/contacts/columns.ts#sanitizeColumnKeys`/`resolveVisibleColumns` (pure, RED/GREEN, `tests/unit/contactColumns.test.ts`) plus `updateViewColumnsAction` (`viewActions.ts`): persists onto `saved_view.columns` (design D7) when the active view is a saved view; a system view (no DB row) round-trips through a `?columns=` query override instead — documented scope decision, not silently dropped. Extra columns available: `roleGroup`/`industry`/`country`/`source`/`created` (all already on `person`); "BDs conectados"/"Última actividad" from the mockup are deferred (need a join beyond this task's budget).
 - [ ] 13.2 Bulk actions (Acciones masivas) on multi-row selection.
 - [ ] 13.3 `/leads` and `/outreach` redirect to `/contacts?view=…`; "Generate message" moves to the record page.
 
