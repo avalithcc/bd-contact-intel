@@ -30,13 +30,13 @@ Chain strategy: feature-branch-chain
 
 ## Phase 1: Parsing & Mapping (PR H1, base: tracker)
 
-- [ ] 1.1 RED: write failing tests for `src/lib/hubspot/uuidv5.ts` — `HUBSPOT_NAMESPACE` pinned test vector; `hubspotLegacyId(id)` deterministic (design D1; contact-migration "External non-uuid legacy id mapping").
-- [ ] 1.2 GREEN: implement `uuidv5.ts` over `node:crypto` SHA-1, no new dependency.
-- [ ] 1.3 RED/GREEN: `src/lib/hubspot/columns.ts` pins header strings (NFC+trim comparison); missing required header fails listing missing names (not PII).
-- [ ] 1.4 RED/GREEN: `src/lib/hubspot/parse.ts` — `csv-parse` stream over `fs.createReadStream(path,"utf8")`, `bom:true`, `columns:true`, `skip_empty_lines:true`, `relax_column_count:false`, `max_record_size:2_000_000`; parser errors rethrown as `Error("CSV parse failed at line N (code)")`, never the raw `CsvError`/`record`/`raw` (D2, D8 — PII rule: sanitize csv-parse errors).
-- [ ] 1.5 RED/GREEN: `src/lib/hubspot/contacts.ts` — pure row → typed `HubSpotContactRow` mapper (trim, blank→null, integers, dates, URL normalization).
-- [ ] 1.6 RED/GREEN: `src/lib/hubspot/owners.ts` — `normalizeNameKey(hubspotOwner) === normalizeNameKey(bd.name)`; blank/`(Deactivated…)` suffix → unassigned; unknown name → unassigned + counted (hubspot-import spec "Owner mapping").
-- [ ] 1.7 Test: `.gitignore` still excludes `hubspot/` (D8 PII rule — export files never committed).
+- [x] 1.1 RED: write failing tests for `src/lib/hubspot/uuidv5.ts` — `HUBSPOT_NAMESPACE` pinned test vector; `hubspotLegacyId(id)` deterministic (design D1; contact-migration "External non-uuid legacy id mapping").
+- [x] 1.2 GREEN: implement `uuidv5.ts` over `node:crypto` SHA-1, no new dependency.
+- [x] 1.3 RED/GREEN: `src/lib/hubspot/columns.ts` pins header strings (NFC+trim comparison); missing required header fails listing missing names (not PII).
+- [x] 1.4 RED/GREEN: `src/lib/hubspot/parse.ts` — `csv-parse` stream over `fs.createReadStream(path,"utf8")`, `bom:true`, `columns:true`, `skip_empty_lines:true`, `relax_column_count:false`, `max_record_size:2_000_000`; parser errors rethrown as `Error("CSV parse failed at line N (code)")`, never the raw `CsvError`/`record`/`raw` (D2, D8 — PII rule: sanitize csv-parse errors).
+- [x] 1.5 RED/GREEN: `src/lib/hubspot/contacts.ts` — pure row → typed `HubSpotContactRow` mapper (trim, blank→null, integers, dates, URL normalization).
+- [x] 1.6 RED/GREEN: `src/lib/hubspot/owners.ts` — `normalizeNameKey(hubspotOwner) === normalizeNameKey(bd.name)`; blank/`(Deactivated…)` suffix → unassigned; unknown name → unassigned + counted (hubspot-import spec "Owner mapping").
+- [x] 1.7 Test: `.gitignore` still excludes `hubspot/` (D8 PII rule — export files never committed).
 
 ## Phase 2: Company Resolution + Migration 0015 (PR H2, base: PR H1)
 
