@@ -25,9 +25,12 @@ export interface HubSpotRunReport extends HubSpotImportReport {
   overThreshold: boolean;
   createdCompanyKeys: string[];
   domainFilledCompanyKeys: string[];
-  /** ≤20 pairs, admin-only (design D8) — email LOCAL PARTS are never
-   * included, only the domain. Never printed to stdout: see
-   * redactReportForLog. */
+  /** ≤20 pairs. Persisted as-is in `migration_run.report` (DB-only,
+   * admin-reviewed in /admin/migration) — accepted per design D8: the
+   * review queue already shows this same data to admins, so storing it
+   * here is not a NEW exposure. Email LOCAL PARTS are never included, only
+   * the domain. Never printed to stdout: see redactReportForLog, which
+   * strips this field before anything reaches a log line. */
   reviewSample: HubSpotReviewSampleEntry[];
 }
 

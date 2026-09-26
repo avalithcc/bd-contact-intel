@@ -19,6 +19,11 @@ import type { HubSpotContactRow } from "@/lib/hubspot/contacts";
 import type { HubSpotRefillExistingPerson } from "@/lib/hubspot/refill";
 import { statusBackfillIdempotencyKey, type StatusEvidenceStatus } from "@/lib/hubspot/statusEvidence";
 import { hubspotLegacyId } from "@/lib/hubspot/uuidv5";
+import {
+  assertPersonUuid,
+  buildStatusBackfillActivityRows,
+  resolveTouchedPersonIds,
+} from "@/lib/hubspot/executeWriteRows";
 import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 import type { EmailStatus } from "@/lib/identity/matcher";
 import type { IdentityIngestRow } from "@/lib/identity/resolve";
@@ -232,18 +237,31 @@ export async function finalizeHubSpotExecute(input: FinalizeHubSpotExecuteInput)
     }
 
     const touchedPersonIds = new Set<string>();
+    // Fresh-review CRITICAL fix: resolve.ts's plan gives `new`/`review` rows
+    // a PLAN-LOCAL ref (e.g. "np1") until applyIdentityWrites actually
+    // inserts them. Every subsequent write keyed by hubspotContactId
+    // (status-evidence activities, recomputePersonStatuses) MUST resolve
+    // through the map applyIdentityWrites returns — never trust
+    // `outcome.personRef` directly. See executeWriteRows.ts.
+    let legacyIdToPersonId = new Map<string, string>();
 
     if (plan.identityPlan) {
-      await withIdentityLock(tx, () => applyIdentityWrites(tx, plan.identityPlan!));
-      for (const u of plan.identityPlan.existingUpdates) touchedPersonIds.add(u.personId);
+      legacyIdToPersonId = await withIdentityLock(tx, () => applyIdentityWrites(tx, plan.identityPlan!));
+      for (const u of plan.identityPlan.existingUpdates) {
+        assertPersonUuid(u.personId, "identity existingUpdates");
+        touchedPersonIds.add(u.personId);
+      }
     }
 
     // Refill: fills only currently-empty fields on already_imported persons
     // (design D4 "Re-import (R7/Q3)") — each filled field also writes a
-    // person_property_history(source:'import') row.
+    // person_property_history(source:'import') row. `r.personId` always
+    // comes from readExistingHubspotPersonIds' person_id_map read (a real
+    // id already), never a plan ref — guarded defensively anyway.
     for (const batch of chunk(plan.refillPlans, WRITE_BATCH_SIZE)) {
       for (const r of batch) {
         if (!r.plan.changed || !r.plan.personUpdate) continue;
+        assertPersonUuid(r.personId, "refill personUpdate");
         await tx.update(person).set(r.plan.personUpdate).where(eq(person.id, r.personId));
         if (r.plan.historyRows.length) {
           await tx.insert(personPropertyHistory).values(r.plan.historyRows);
@@ -253,18 +271,18 @@ export async function finalizeHubSpotExecute(input: FinalizeHubSpotExecuteInput)
     }
 
     // Status-evidence + idempotency: skip any activity whose
-    // (hubspotContactId, status) key already exists (task 3.7).
+    // (hubspotContactId, status) key already exists (task 3.7). Every
+    // personId is resolved through legacyIdToPersonId first (never a raw
+    // plan ref) and guarded to be uuid-shaped before it ever reaches an
+    // insert — see executeWriteRows.ts.
     const existingKeys = await readExistingHubspotActivityKeys();
-    const activitiesToInsert = plan.statusEvidence
-      .flatMap((s) =>
-        s.plan.activities
-          .filter((a) => !existingKeys.has(a.idempotencyKey))
-          .map((a) => ({ personId: s.personRef, actorBdId: null, type: "status_backfill", metadata: a.metadata })),
-      );
+    const activitiesToInsert = buildStatusBackfillActivityRows(plan.statusEvidence, legacyIdToPersonId, existingKeys);
     for (const batch of chunk(activitiesToInsert, WRITE_BATCH_SIZE)) {
       if (batch.length) await tx.insert(activity).values(batch);
     }
-    for (const s of plan.statusEvidence) touchedPersonIds.add(s.personRef);
+    for (const personId of resolveTouchedPersonIds(plan.statusEvidence, legacyIdToPersonId)) {
+      touchedPersonIds.add(personId);
+    }
 
     if (touchedPersonIds.size) await recomputePersonStatuses(tx, [...touchedPersonIds]);
 

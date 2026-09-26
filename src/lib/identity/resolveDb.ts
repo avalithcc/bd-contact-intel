@@ -119,8 +119,23 @@ export async function withIdentityLock<T>(tx: DbTransaction, fn: () => Promise<T
  * any dependent row (connections/idMap/duplicateCandidates) is inserted, so
  * a loser id from one batch can never slip into a dependent insert before
  * it's been repointed — see repointIdentityWriteRows in ./resolve.ts.
+ *
+ * Returns the FINAL, post-conflict-repoint `person_id_map` rows just
+ * written, keyed by `${legacyTable}:${legacyId}` (fresh-review CRITICAL
+ * fix): `rows.idMap` already resolves every row outcome — including
+ * `new`/`review` rows, whose `IdentityWritePlan` only ever carries a
+ * plan-local ref like `"np1"` until this function inserts the real row —
+ * to the real, persisted `person.id`. Callers that need to write a
+ * DEPENDENT row keyed by the same legacy id after this call returns (e.g.
+ * hubspot_import's status-evidence activities, keyed by
+ * `hubspotLegacyId(hubspotContactId)`) MUST resolve through this map
+ * instead of trusting an in-memory plan ref — see
+ * src/lib/hubspot/executeWriteRows.ts.
  */
-export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWritePlan): Promise<void> {
+export async function applyIdentityWrites(
+  tx: DbTransaction,
+  plan: IdentityWritePlan,
+): Promise<Map<string, string>> {
   const builtRows = buildIdentityWriteRows(plan, randomUUID);
   const winnerByLoserId = new Map<string, string>();
 
@@ -189,6 +204,13 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
       })
       .where(eq(person.id, update.personId));
   }
+
+  const legacyIdToPersonId = new Map<string, string>();
+  for (const row of rows.idMap) {
+    if (!row.personId) continue; // skipped_own_company rows have a null personId
+    legacyIdToPersonId.set(`${row.legacyTable}:${row.legacyId}`, row.personId);
+  }
+  return legacyIdToPersonId;
 }
 
 /**
