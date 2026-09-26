@@ -100,3 +100,15 @@ test("parses a date-only value as portal-local midnight (Argentina, UTC-3)", () 
   const mapped = mapHubSpotContactRow(row({ "Fecha de creación": "2026-01-15" }));
   assert.equal(mapped.createdAt!.toISOString(), "2026-01-15T03:00:00.000Z");
 });
+
+test("takes the first company id and flags it when Associated Company IDs (Primary) has multiple semicolon-separated ids", () => {
+  const mapped = mapHubSpotContactRow(row({ "Associated Company IDs (Primary)": "555;777;888" }));
+  assert.equal(mapped.associatedCompanyIdPrimary, "555");
+  assert.equal(mapped.associatedCompanyIdPrimaryMultiple, true);
+});
+
+test("does not flag a single Associated Company IDs (Primary) value", () => {
+  const mapped = mapHubSpotContactRow(row({ "Associated Company IDs (Primary)": "555" }));
+  assert.equal(mapped.associatedCompanyIdPrimary, "555");
+  assert.equal(mapped.associatedCompanyIdPrimaryMultiple, false);
+});

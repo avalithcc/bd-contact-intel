@@ -32,6 +32,10 @@ export interface HubSpotContactRow {
   createdAt: Date | null;
   leadStatus: string | null;
   associatedCompanyIdPrimary: string | null;
+  /** True when "Associated Company IDs (Primary)" carried more than one
+   * semicolon-separated id — only the first was kept, flagged so the import
+   * report can surface a warning instead of silently dropping data. */
+  associatedCompanyIdPrimaryMultiple: boolean;
 }
 
 function blank(value: string | undefined): string | null {
@@ -85,6 +89,14 @@ function normalizeUrl(value: string | undefined): string | null {
 }
 
 export function mapHubSpotContactRow(row: Record<string, string>): HubSpotContactRow {
+  const associatedCompanyIdPrimaryRaw = blank(row["Associated Company IDs (Primary)"]);
+  const associatedCompanyIds = associatedCompanyIdPrimaryRaw
+    ? associatedCompanyIdPrimaryRaw
+        .split(";")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0)
+    : [];
+
   return {
     hubspotContactId: row["ID de registro"]!.trim(),
     firstName: blank(row["Nombre"]),
@@ -103,6 +115,7 @@ export function mapHubSpotContactRow(row: Record<string, string>): HubSpotContac
     lastActivityAt: parseDateField(row["Última actividad"]),
     createdAt: parseDateField(row["Fecha de creación"]),
     leadStatus: blank(row["Estado del lead"]),
-    associatedCompanyIdPrimary: blank(row["Associated Company IDs (Primary)"]),
+    associatedCompanyIdPrimary: associatedCompanyIds[0] ?? null,
+    associatedCompanyIdPrimaryMultiple: associatedCompanyIds.length > 1,
   };
 }
