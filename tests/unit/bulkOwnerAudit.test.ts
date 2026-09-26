@@ -61,3 +61,17 @@ test("buildBulkOwnerAuditRow: an id list at exactly the cap is not flagged as tr
   assert.equal(row.metadata.truncated, false);
   assert.equal(row.metadata.personIds.length, AUDIT_LOG_ID_CAP);
 });
+
+test("buildBulkOwnerAuditRow: mode 'single' (record-page single-Contact reassignment) writes a distinct 'owner_change' action, not 'bulk_owner_change'", () => {
+  const row = buildBulkOwnerAuditRow({ actorBdId, ownerBdId, mode: "single", personIds: ["p1"] });
+  assert.equal(row.action, "owner_change");
+  assert.equal(row.metadata.mode, "single");
+  assert.equal(row.metadata.count, 1);
+  assert.deepEqual(row.metadata.personIds, ["p1"]);
+});
+
+test("buildBulkOwnerAuditRow: mode 'single' unassign (ownerBdId null) still records action 'owner_change'", () => {
+  const row = buildBulkOwnerAuditRow({ actorBdId, ownerBdId: null, mode: "single", personIds: ["p1"] });
+  assert.equal(row.action, "owner_change");
+  assert.equal(row.targetBdId, null);
+});

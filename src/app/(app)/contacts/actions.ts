@@ -76,7 +76,10 @@ export async function updateContactOwnerAction(
     const ownerBdId = normalizeOwnerSelectValue(ownerBdIdRaw);
     if (ownerBdId === undefined) throw new OwnerValueInvalidError();
     const me = await getCurrentBd();
-    const plan = await bulkAssignOwner([personId], ownerBdId, me.id);
+    // mode: "single" — this is one Contact's own record page, not a
+    // list-page bulk/filter-wide reassignment; the audit_log row must say
+    // so (see bulkOwnerAudit.ts's "owner_change" vs "bulk_owner_change").
+    const plan = await bulkAssignOwner([personId], ownerBdId, me.id, { mode: "single" });
     if (plan[0]?.outcome === "skipped_has_connection") throw new OwnerReassignLockedError();
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
