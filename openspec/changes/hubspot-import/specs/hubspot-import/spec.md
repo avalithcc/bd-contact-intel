@@ -30,7 +30,7 @@ The system MUST classify every HubSpot contact row into exactly one outcome: `ne
 
 ### Requirement: Company matching and creation
 
-The system MUST match each HubSpot company to an existing company first by domain, then by normalized name if no domain match exists, and MUST create a new company when neither matches AND the HubSpot company is the primary company of at least one imported contact or carries a non-empty "Associated Note". A HubSpot company with no domain or name match that is neither a primary company of an imported contact nor carries a note MUST NOT create a company.
+The system MUST match each HubSpot company to an existing company first by domain, then by normalized name, then by a compact-key fallback (spaces, punctuation, URL scheme/`www.`, and a fixed list of generic suffix tokens stripped) if neither matches, and MUST create a new company when none of the three matches AND the HubSpot company is the primary company of at least one imported contact or carries a non-empty "Associated Note". A HubSpot company with no domain, name, or compact match that is neither a primary company of an imported contact nor carries a note MUST NOT create a company. The compact-key fallback MUST only resolve a match when exactly one existing company (or one company created earlier in the same run) shares that compact key; a compact key shared by two or more existing companies MUST NOT be matched, and MUST be counted instead.
 
 #### Scenario: Domain match links to existing company
 
@@ -38,16 +38,29 @@ The system MUST match each HubSpot company to an existing company first by domai
 - WHEN the import runs
 - THEN contacts linked to that HubSpot company resolve to the existing company, no new company is created
 
-#### Scenario: No domain or name match creates a company when it is a primary company or carries a note
+#### Scenario: Compact-key match links to existing company and fills its empty domain
 
-- GIVEN a HubSpot company has no domain or normalized-name match among existing companies
+- GIVEN a HubSpot company named "Kavak com" has no domain or exact normalized-name match among existing companies
+- AND exactly one existing company's `companyKey` compacts (lowercase, punctuation/URL-scheme/`www.`/generic-suffix-tokens stripped) to the same value as the HubSpot company's name
+- WHEN the import runs
+- THEN contacts linked to that HubSpot company resolve to that existing company, no new company is created, and the existing company's `domain` is filled from the HubSpot row only if it was previously empty
+
+#### Scenario: Ambiguous compact-key match is not guessed
+
+- GIVEN a HubSpot company's name compacts to the same value as two or more existing companies' `companyKey`
+- WHEN the import runs
+- THEN no existing company is matched by the compact key, the ambiguity is counted in the report instead, and the HubSpot company falls through to normal creation-eligibility (primary-contact or note check)
+
+#### Scenario: No domain, name, or compact match creates a company when it is a primary company or carries a note
+
+- GIVEN a HubSpot company has no domain, normalized-name, or compact-key match among existing companies
 - AND it is the primary company of at least one imported contact, or it carries a non-empty "Associated Note"
 - WHEN the import runs
 - THEN a new company is created from the HubSpot company record
 
 #### Scenario: Unlinked, note-less company creates nothing
 
-- GIVEN a HubSpot company has no domain or normalized-name match among existing companies
+- GIVEN a HubSpot company has no domain, normalized-name, or compact-key match among existing companies
 - AND it is not the primary company of any imported contact and carries no note
 - WHEN the import runs
 - THEN no company is created for that HubSpot company record
@@ -116,13 +129,19 @@ The system MUST write a `status_backfill` activity for each imported contact who
 
 ### Requirement: Discard evidence preserves the historical date
 
-The system MUST record a HubSpot row disqualified as `No calificado` as a `status_backfill` activity with `status: 'discarded'` and a `reason` (not a plain `discarded`-type activity), so the activity's timestamp reflects the HubSpot evidence date instead of the import run time. The record page's discard-reason display MUST read the reason from either a `discarded` activity or a `status_backfill` activity with `status: 'discarded'`.
+The system MUST record a HubSpot row disqualified as `Sin calificar` (the real export's value) or its accepted alias `No calificado` as a `status_backfill` activity with `status: 'discarded'` and a `reason` (not a plain `discarded`-type activity), so the activity's timestamp reflects the HubSpot evidence date instead of the import run time. The record page's discard-reason display MUST read the reason from either a `discarded` activity or a `status_backfill` activity with `status: 'discarded'`. A non-empty lead status the system does not recognize MUST NOT be treated as a discard or as any other status evidence, and MUST be counted by raw value in the report instead.
 
 #### Scenario: Disqualified row backfills a discard with its historical date
 
-- GIVEN a HubSpot row has lead status `No calificado`
+- GIVEN a HubSpot row has lead status `Sin calificar`
 - WHEN the import runs
 - THEN a `status_backfill` activity is written with `status: 'discarded'`, `reason: 'wrong_profile'`, and a timestamp derived from the row's HubSpot date fields, not the import run time
+
+#### Scenario: Unrecognized lead status is counted, not guessed
+
+- GIVEN a HubSpot row's lead status is a non-empty value outside the known vocabulary (`Nuevo`, `Abierto`, `En curso`, `Intento de contacto`, `Conectado`, `Mal momento`, `Negocio abierto`, `Sin calificar`, `No calificado`)
+- WHEN the import runs
+- THEN no `status_backfill` activity is written for that row's lead status, and the raw value is counted in the report's unmapped-status warnings
 
 #### Scenario: Record page shows the discard reason for an imported row
 

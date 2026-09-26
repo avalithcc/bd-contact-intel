@@ -32,10 +32,11 @@ A new gated migration phase, `hubspot_import`, in `scripts/unify-contacts.ts`. T
 - **Context**: `company` (PK `companyKey = normalizeCompanyKey(name)`) has **no domain column**, so the spec's "domain matches an existing company" cannot be met without one. The matcher's name+company key and `person.companyKey` both come from the normalized name.
 - **Decision**: Additive migration `0015_company_domain`: `company.domain text` plus a partial unique index where the domain is not null. Its journal `when` must exceed 0014's (`tests/unit/drizzleJournal.test.ts`). Resolution in `src/lib/hubspot/companies.ts` (pure):
   1. Group HubSpot companies by normalized domain (lowercase, no protocol, no `www.`, no path).
-  2. Per group, look for an existing company by domain; failing that, by the `companyKey` of each name in the group; failing that, create one. The representative record is the one with the most primary contacts, with ties going to the lowest ID. A name match fills `domain` only if it is empty.
+  2. Per group, look for an existing company by domain; failing that, by the `companyKey` of each name in the group; failing that, by a compact-key fallback (H6, below); failing that, create one. The representative record is the one with the most primary contacts, with ties going to the lowest ID. A name match or compact match fills `domain` only if it is empty.
   3. Own-company groups (via `ownCompanyMatchReason`, name or domain) create nothing, and their contacts are skipped.
   4. Company rows are created only for groups that are the primary company of at least one imported contact, or that carry a note.
-- **Linking**: `Associated Company IDs (Primary)` → group → `person.companyKey`/`person.company`. If the ID is absent or unresolved, fall back to the contact's own company text, counted as `noCompanyResolved`.
+- **H6 — compact-key fallback**: The real export's `company` rows mostly have no `domain` yet, so exact `companyKey` matching missed near-duplicates such as "Kavak" vs. "Kavak com" (~60 rows in the first prod dry run). `normalizeCompactCompanyKey` (in `companies.ts`) lowercases, strips a leading URL scheme/`www.`, removes every non-alphanumeric character, and drops a fixed list of generic tokens (`inc`, `llc`, `ltd`, `sa`, `srl`, `sas`, `corp`, `corporation`, `company`, `co`, `com`, `io`, `ar`, `br`, `mx`, `holding`, `holdings`, `group`, `technologies`, `technology`, `software`, `labs`, `the`), then joins what remains. The fallback is used **only when it matches exactly one** existing company (by `companyKey`) or one company created earlier in the same run; a compact key shared by two or more existing companies is left unmatched, counted in `report.warnings.ambiguousCompactMatches`, and the group falls through to normal creation-eligibility. Because the match is looser than an exact key, a generic token (`the`, `group`, `holding`) can still coincide with a genuinely different company's remaining words when there happens to be only one existing match — accepted as a tradeoff (tested in `hubspotCompanies.test.ts`) rather than blocking the import; the admin report surfaces the count so the owner can spot-check.
+- **Linking**: `Associated Company IDs (Primary)` → group → `person.companyKey`/`person.company`. If the ID is absent or unresolved, fall back to the contact's own company text, counted as `noCompanyResolved`. The resolved existing `companyKey` (domain, name, or compact match) is what reaches person matching and each contact's `companyKey` — the fallback never changes the shape of that propagation, only how the match is found.
 - **Notes**: Each non-empty `Associated Note` becomes `activity{companyKey, type:'note', actorBdId:null, metadata:{body, source:'hubspot_import', hubspotCompanyId}}`. It is skipped when one with the same `hubspotCompanyId` already exists.
 - **Alternatives**: Use the domain only to dedupe within the export, with no column. The spec's domain scenario would then be unsatisfiable, and later imports could not match by domain. Rejected.
 - **Consequences**: `emailSuggestion` can use the stored domains later (out of scope). Industry, country and size stay out of scope because `company` has no columns for them.
@@ -58,10 +59,13 @@ A new gated migration phase, `hubspot_import`, in `scripts/unify-contacts.ts`. T
 
 | Evidence | Emits |
 |---|---|
-| `Número de veces contactado` > 0, `Último contacto` set, or `En curso` | `contacted` |
-| `Conectado`, `Mal momento` | `replied` |
-| `No calificado` | `discarded`, `reason:'wrong_profile'` |
+| `Número de veces contactado` > 0, `Último contacto` set, `En curso`, or `Intento de contacto` | `contacted` |
+| `Conectado`, `Mal momento`, `Negocio abierto` | `replied` |
+| `Sin calificar` (real export value) or its alias `No calificado` | `discarded`, `reason:'wrong_profile'` |
 | `Nuevo`, `Abierto`, no evidence | nothing |
+| any other non-empty value | nothing, counted in `report.warnings.unknownLeadStatuses` |
+
+- **H6 — real export status labels**: The first prod dry run used labels different from the initial mapping (`Sin calificar` instead of `No calificado`, plus `Intento de contacto` and `Negocio abierto` unmapped), so the `discarded` count came out 0. `No calificado` is kept as an accepted alias for `Sin calificar`. `Negocio abierto` (an open deal) counts as engagement, so it maps to `replied`. Any non-empty lead status outside this vocabulary is never guessed at — it produces no evidence and is tallied by raw value in `report.warnings.unknownLeadStatuses` (status labels are not PII) so an unmapped label doesn't silently disappear.
 
 - **Metadata**: `{status, reason?, originalEditorBdId: ownerBdId, originalAt, source:'hubspot_import', hubspotContactId}`.
 - **`originalAt`**: `Último contacto`, then `Última actividad`, then `Fecha de creación`, parsed in the portal timezone constant. If all three fail, it uses the run time and increments `dateFallback`.

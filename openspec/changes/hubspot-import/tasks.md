@@ -159,6 +159,14 @@ reason display.
 - [x] 5.3 `es.migration`/`en` dictionary entries — neutral Spanish, following `mockups/GLOSSARY.md`; label for the new review reason `email_unverified`. (PR H5)
 - [~] 5.4 E2E/manual: non-admin gets 404 on the HubSpot section; admin approve-over-threshold without the checkbox is blocked with a distinct message. **Partially done**: the over-threshold-without-checkbox block is unit-tested (`tests/unit/migrationApproveGuard.test.ts`, pure `assertApprovable` logic — 3 new tests, RED→GREEN). The non-admin-404 path reuses the existing `requireAdmin`/`notFound()` guard already covering every other section on this page (not new logic, not independently tested here, same as collapse/fold_leads/catch_up). Manual click-through against a real session was NOT performed by this batch — recommend a quick manual check before merge.
 
+## Phase 6: Dry-run fixes from the first prod dry run (PR H6, base: PR H5)
+
+- [x] 6.1 `src/lib/hubspot/statusEvidence.ts` — map the real export's lead-status values: `Sin calificar` discards (`reason: 'wrong_profile'`), keeping `No calificado` as an accepted alias; `Intento de contacto` maps to `contacted`; `Negocio abierto` maps to `replied`; any other non-empty value produces no evidence and is returned as `unknownLeadStatus`. (PR H6)
+- [x] 6.2 `src/lib/hubspot/planner.ts` — surface `report.warnings.unknownLeadStatuses` (raw value → row count) and `report.companies.matchedByCompact` / `report.warnings.ambiguousCompactMatches`. (PR H6)
+- [x] 6.3 `src/lib/hubspot/companies.ts` — add `normalizeCompactCompanyKey` and a compact-key matching fallback in `planCompanyResolution`, used only on a unique hit against existing companies (including ones created earlier in the same run); ambiguous hits are counted and left to normal creation-eligibility. Domain fill-empty and `domainConflicts` reuse the existing name-match path. (PR H6)
+- [x] 6.4 `/admin/migration` — render `matchedByCompact`, `ambiguousCompactMatches`, and an "Unmapped lead statuses" table; `es`/`en` dictionary entries. (PR H6)
+- [x] 6.5 Tests: `normalizeCompactCompanyKey` (stop tokens, URL-shaped names, blank input), unique vs. ambiguous compact match, same-run created-company compact match, `Sin calificar`/`Intento de contacto`/`Negocio abierto` mapping, unrecognized lead status reporting. (PR H6)
+
 ## PII & Safety Rules (apply across all phases)
 
 - Never commit or print raw HubSpot rows (names, emails, phone numbers) anywhere — logs, errors, or report fields outside `reviewSample` (admin-only, DB-persisted).
