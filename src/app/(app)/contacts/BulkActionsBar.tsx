@@ -21,7 +21,6 @@ import { useEffect, useRef, useState } from "react";
 import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
 import type { BulkActionsLabels } from "@/lib/contacts/labels";
 import type { ContactColumnKey } from "@/lib/contacts/columns";
-import styles from "./page.module.css";
 
 export interface BulkActionsBarProps {
   labels: BulkActionsLabels;
@@ -98,10 +97,11 @@ export function BulkActionsBar({ labels: l, ownerOptions, view, q, page, columns
       {children}
 
       {selectedCount > 0 && (
-        <div className={styles.bulkBar} role="region" aria-label={l.bulkAssignOwner}>
-          <span>
+        <div className="bulk-bar" role="region" aria-label={l.bulkAssignOwner}>
+          <span className="count">
             {selectedCount} {l.bulkSelectedSuffix}
           </span>
+          <span className="sep" />
 
           {panel === null && (
             <>
