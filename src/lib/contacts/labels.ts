@@ -88,6 +88,10 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorMeetingDateRequired;
     case "signal_text_required":
       return l.errorSignalTextRequired;
+    case "owner_invalid":
+      return l.errorOwnerInvalid;
+    case "owner_locked":
+      return l.errorOwnerLocked;
     case "unexpected":
       return l.genericError;
   }

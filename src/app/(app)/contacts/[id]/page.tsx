@@ -3,6 +3,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
+import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
@@ -54,7 +55,14 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const activityType = rawActivityType && isTimelineActivityType(rawActivityType) ? rawActivityType : undefined;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const timeline = await getPersonTimeline(record.person.id, me.id, { type: activityType });
+  const [timeline, ownerOptions] = await Promise.all([
+    getPersonTimeline(record.person.id, me.id, { type: activityType }),
+    listOwnerOptions(),
+  ]);
+  // R3 (design.md): reassignment is only allowed while the person has no
+  // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
+  // enforces server-side for updateContactOwnerAction (task 13.3).
+  const ownerLocked = record.connections.length > 0;
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
@@ -78,6 +86,9 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           headline={record.person.jobTitle}
           statusLabel={statusLabel}
           ownerLabel={record.ownerName}
+          ownerBdId={record.person.ownerBdId}
+          ownerLocked={ownerLocked}
+          ownerOptions={ownerOptions}
           email={record.person.email}
           properties={properties}
           messageLabels={messageLabels}

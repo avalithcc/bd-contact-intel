@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   MAX_BULK_SELECTION,
+  normalizeOwnerSelectValue,
   planBulkOwnerAssignment,
   sanitizeBulkPersonIds,
 } from "@/lib/contacts/bulkOwner";
@@ -54,4 +55,11 @@ test("sanitizeBulkPersonIds caps the selection at MAX_BULK_SELECTION", () => {
   });
   const result = sanitizeBulkPersonIds(many);
   assert.equal(result.length, MAX_BULK_SELECTION);
+});
+
+test("normalizeOwnerSelectValue maps a blank <select> value to null (unassign), a uuid to itself, and rejects garbage", () => {
+  const uuid = "11111111-1111-4111-8111-111111111111";
+  assert.equal(normalizeOwnerSelectValue(""), null);
+  assert.equal(normalizeOwnerSelectValue(uuid), uuid);
+  assert.equal(normalizeOwnerSelectValue("not-a-uuid"), undefined);
 });

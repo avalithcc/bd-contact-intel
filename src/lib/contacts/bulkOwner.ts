@@ -32,6 +32,19 @@ export function planBulkOwnerAssignment(rows: BulkOwnerRowInput[]): BulkOwnerPla
   }));
 }
 
+/**
+ * Normalizes a single `<select>` owner value (task 13.3 parity gap:
+ * single-record owner reassignment on `/contacts/[id]`, reusing bulkAssignOwner
+ * — see contacts/actions.ts#updateContactOwnerAction). A blank selection means
+ * "unassign" (`null`, matches updateLeadOwner's `ownerBdId: string | null`
+ * shape); a well-formed uuid passes through; anything else is `undefined` so
+ * the caller can reject it before it reaches a `uuid` column.
+ */
+export function normalizeOwnerSelectValue(raw: string): string | null | undefined {
+  if (raw === "") return null;
+  return isUuid(raw) ? raw : undefined;
+}
+
 /** Shared by both bulk actions (assign owner, create task): validates every
  * id as a real UUID before it can reach a `uuid` column (src/lib/uuid.ts),
  * dedups, and caps at MAX_BULK_SELECTION. */

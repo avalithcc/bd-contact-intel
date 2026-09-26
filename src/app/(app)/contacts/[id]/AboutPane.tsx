@@ -3,11 +3,11 @@
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { Locale } from "@/lib/i18n/locales";
-import { PropertyList, type AboutPaneProperty } from "./PropertyList";
+import { PropertyList, type AboutPaneProperty, type OwnerOption } from "./PropertyList";
 import { QuickActions } from "./QuickActions";
 import styles from "./AboutPane.module.css";
 
-export type { AboutPaneProperty };
+export type { AboutPaneProperty, OwnerOption };
 
 export interface AboutPaneProps {
   personId: string;
@@ -16,6 +16,9 @@ export interface AboutPaneProps {
   headline: string | null;
   statusLabel: string;
   ownerLabel: string | null;
+  ownerBdId: string | null;
+  ownerLocked: boolean;
+  ownerOptions: OwnerOption[];
   email: string | null;
   properties: AboutPaneProperty[];
   messageLabels: GenerateMessageLabels;
@@ -38,6 +41,9 @@ export function AboutPane({
   headline,
   statusLabel,
   ownerLabel,
+  ownerBdId,
+  ownerLocked,
+  ownerOptions,
   email,
   properties,
   messageLabels,
@@ -62,7 +68,15 @@ export function AboutPane({
       />
 
       <div className={styles.sectionTitle}>{l.aboutSectionTitle}</div>
-      <PropertyList personId={personId} labels={l} ownerLabel={ownerLabel} properties={properties} />
+      <PropertyList
+        personId={personId}
+        labels={l}
+        ownerLabel={ownerLabel}
+        ownerBdId={ownerBdId}
+        ownerLocked={ownerLocked}
+        ownerOptions={ownerOptions}
+        properties={properties}
+      />
     </aside>
   );
 }
