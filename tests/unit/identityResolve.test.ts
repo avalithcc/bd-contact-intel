@@ -291,6 +291,41 @@ test("planIdentityWrites: default mergePolicy stays 'r7' (specificity-based) whe
   assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales, EMEA");
 });
 
+// --- Fresh-review fix: company/city/country are fill-empty only for an
+// existing person, regardless of mergePolicy (live 'r7' or HubSpot
+// 'fill_empty') — an existing person's raw display fields must never be
+// silently overwritten by a re-imported/live row, even a longer/more-
+// specific one. Every other 'r7' field (e.g. jobTitle, above) keeps its
+// specificity/recency merge, unchanged. ------------------------------------
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's non-empty company is NEVER overwritten, even by a longer/different incoming value", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: "Acme" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': an existing person's empty company IS filled from the incoming row", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", company: null })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': a brand-new person still gets the row's own company written", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme" })];
+  const plan = planIdentityWrites(rows, []);
+  assert.equal(plan.newPersons[0].merged.company, "Acme");
+});
+
+test("planIdentityWrites with default mergePolicy 'r7': every other field keeps specificity/recency merge (jobTitle unaffected)", () => {
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "Sales", company: "Different Co" })];
+  const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: "Head of Sales, EMEA", company: "Acme" })];
+  const plan = planIdentityWrites(rows, index);
+  assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales, EMEA");
+  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+});
+
 test("buildIdentityWriteRows: a new hubspot person's insert row carries migrationRunId, ownerBdId, city and country", () => {
   const rows = [
     row({

@@ -288,8 +288,16 @@ function mergeFields(
   return {
     firstName: field(existing.firstName, incoming.firstName),
     lastName: field(existing.lastName, incoming.lastName),
-    company: field(existing.company, incoming.company),
-    companyKey: field(existing.companyKey, incoming.companyKey),
+    // company/companyKey/city/country are ALWAYS fill-empty-only, for EVERY
+    // mergePolicy (fresh-review fix, post-H3a) — an existing person's raw
+    // display fields must never be silently overwritten by a re-imported or
+    // live row, even a longer/more-specific one under the default 'r7'
+    // policy. Only a currently empty field is ever filled; a brand-new
+    // person still gets the row's own company/city/country written as-is
+    // (there is nothing existing to fill against). Every other field (e.g.
+    // jobTitle above) keeps its per-policy behavior unchanged.
+    company: fillEmptyField(existing.company, incoming.company),
+    companyKey: fillEmptyField(existing.companyKey, incoming.companyKey),
     jobTitle,
     // Re-derived from the FINAL merged jobTitle, not merged independently
     // (fresh-review fix 3) — the field-merge rule above already picked the
@@ -297,8 +305,8 @@ function mergeFields(
     // from whichever side happened to have it.
     roleGroup: classifyPosition(jobTitle),
     industry: field(existing.industry, incoming.industry),
-    city: field(existing.city, incoming.city),
-    country: field(existing.country, incoming.country),
+    city: fillEmptyField(existing.city, incoming.city),
+    country: fillEmptyField(existing.country, incoming.country),
     ownerBdId: field(existing.ownerBdId, incoming.ownerBdId),
     ...(policy === "fill_empty" ? fillEmptyEmailFields(existing, incoming) : mergeEmailFields(existing, incoming)),
   };
