@@ -125,42 +125,47 @@ Columns: element | mockup | status | evidence | notes
 ## Summary
 
 Every checklist row that started as "todo" (feature genuinely missing) is
-now closed. What remains is a small set of **explicitly documented
-deviations** — UX simplifications or owner-confirmation-needed stopgaps,
-never a silently dropped feature:
+closed, and every previously-documented UX-shape deviation the owner asked
+to close (branches 11-15) is now closed too, PLUS a prod bug fix (branch
+10). What remains is a small, deliberately-kept set:
 
-1. **"Guardar vista" / "#save-view" dialog** — a dropdown menu + inline
-   form, not the mockup's modal `.overlay` dialog with an "Incluye"
-   chip/columns-count summary. Functionally complete.
-2. **Segmented Tabla/Tablero control** and a few other chrome details —
-   ported onto the mockup's real CSS classes (branch 03), functionally and
-   visually equivalent, but not re-audited pixel-by-pixel in this batch.
-3. **Empresa column** — plain text, no company-logo initial chip or inline
-   "Contratando" badge on the row (the hiring badge only shows via the
-   dedicated filter/system view, not inline per-row).
-4. **"Agregar filtro" add-flow** — one shared panel listing all 10 filter
-   types, not the mockup's per-item dropdown → inline editor. Every filter
-   is present, addable, and removable via a working chip; only the
-   add-interaction shape differs.
-5. **"Seleccionar los N"** — selects everything on the current page (with
-   a clarifying banner), not a true server-side "act on every row matching
-   the filter" mode — every bulk action here takes an explicit id list.
-   **Flagged as needing an owner decision** if true filter-wide bulk action
-   is actually wanted.
-6. **Bulk "Generar mensajes" cap (25)** and **toolbar "Exportar" cap
-   (5,000 rows)** — both stopgap numbers, not spec'd. **Flagged as needing
-   owner confirmation.**
-7. **Board's toolbar** — kept the general filter/chips toolbar (richer:
-   real active filters, not a hardcoded single chip) instead of collapsing
-   to the mockup's fixed "Responsable: Yo" chip. The "never show
-   own-company people" note is now present; the underlying invariant
-   already held everywhere via the identity resolver's ingest-time skip.
-8. **Log-meeting/discard board dialogs** open on the record page
-   (`/contacts/[id]?openAction=...`), not inline on the board — functionally
-   equivalent, not pixel-verified against the mockup's inline dialog markup.
+1. **Board's toolbar** (kept, per explicit instruction) — the general
+   filter/chips toolbar (richer: real active filters, not a hardcoded
+   single "Responsable: Yo" chip) instead of collapsing to the mockup's
+   fixed chip. The "never show own-company people" note is present; the
+   underlying invariant already holds everywhere via the identity
+   resolver's ingest-time skip.
+2. **Stopgap caps, kept as-is** (per explicit instruction; owner is
+   raising these separately) — bulk "Generar mensajes" (25), toolbar/
+   filter-wide "Exportar" (5,000 rows), filter-wide owner/task
+   (`BULK_FILTER_TARGET_CAP` = 2,000).
+3. **"Agregar filtro" add-flow** — a real dropdown of the mockup's 10
+   options -> per-item inline editor (branch 13), but industryGroup/
+   seniority (pre-existing, not in the mockup's 10) are kept addable in a
+   second "more filters" group rather than silently dropped.
+4. **Audit log** — the existing bulk-owner path does not write to
+   `audit_log` today, so per instruction ("if the existing path audits")
+   no new audit write was added for the filter-wide case either (branch
+   14) — flagging in case this was assumed to already exist.
+5. **Company column** — logo chip + inline "Contratando" badge now done
+   (branch 12); still no company-record-page-style extra detail beyond
+   what the mockup itself shows.
 
 No row was left silently undone. See the per-row "notes" column above for
-the full reasoning behind every deviation.
+the full reasoning behind every remaining item.
+
+## Prod bug fixed (branch 10)
+
+"Última actividad" (column, sort, and the `lastActivityDays` filter) used
+`activity.created_at` for `status_backfill` rows (migration
+reconstructions) instead of `metadata.originalAt` — every backfill
+imported on the same day read as active that day, matching
+`lastActivityDays=30` and sorting to the top of the default list
+regardless of when the event actually happened. Fixed with one shared
+`effectiveActivityAtSql()` CASE expression, used consistently everywhere
+"last activity" is read or sorted or filtered — see
+src/lib/contacts/effectiveActivityTime.ts for the pure rule it mirrors
+(same as src/lib/status/deriveStatus.ts's status-derivation rule).
 
 ## Batch history
 
@@ -181,5 +186,24 @@ the full reasoning behind every deviation.
   lastActivityDays); multi-select `status`.
 - **09b** (`feat/mockup-port-09b-filters-ui`, chained off 09): removable
   filter chips + "Borrar todo"; toolbar-level "Exportar" (whole filtered
-  view, capped); "Seleccionar los N" (page-scoped, documented); board's
+  view, capped); "Seleccionar los N" (page-scoped at the time); board's
   own-company note.
+- **10** (`feat/mockup-port-10-lastactivity-bugfix`): prod bug fix — see
+  "Prod bug fixed" above.
+- **11** (`feat/mockup-port-11-save-view-modal`): "Guardar vista" rebuilt
+  as a real modal (shared Dialog) with the mockup's "Incluye"
+  chip/columns-count summary.
+- **12** (`feat/mockup-port-12-company-logo-hiring-badge`): Empresa
+  column's company-logo chip + inline "Contratando" badge (reuses
+  `getHiringMatchIndex()`, one call per page).
+- **13** (`feat/mockup-port-13-filter-menu-editors`): "Agregar filtro"
+  reworked into a real dropdown -> per-item inline editor; the two
+  previously-stacked toolbar rows merged into one (table view only, board
+  toolbar kept as-is).
+- **14** (`feat/mockup-port-14-filter-wide-bulk-actions`): "Seleccionar los
+  N" made genuinely filter-wide for owner/task/export (capped), reusing
+  `getContactListPage` itself (never a parallel query) to guarantee the
+  filter-derived id set matches what the list shows.
+- **15** (`feat/mockup-port-15-board-inline-dialogs`): log-meeting/discard
+  dialogs now open inline on the board (shared Dialog, same server
+  actions as the record page), not via navigation.
