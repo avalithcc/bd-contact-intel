@@ -96,7 +96,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
           <div className={styles.cardHeader}>
             <MailIcon className={styles.cardHeaderIcon} />
             <h3>{l.connectedTitle}</h3>
-            <span className="badge green">{l.badgeConnected}</span>
+            <span className="legacy-badge green">{l.badgeConnected}</span>
           </div>
           <div className={styles.cardBody}>
             <dl className={styles.props}>

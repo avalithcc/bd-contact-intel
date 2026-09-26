@@ -78,7 +78,7 @@ export default async function AccountPage() {
               {gmailConnected ? l.gmailConnectedMeta(account.emailAddress) : l.gmailNotConnectedMeta}
             </span>
           </span>
-          {gmailConnected && <span className="badge green">{l.badgeConnected}</span>}
+          {gmailConnected && <span className="legacy-badge green">{l.badgeConnected}</span>}
           <ChevronRightIcon className={styles.listLinkChevron} />
         </a>
         <a className={styles.listLink} href="/account/password">

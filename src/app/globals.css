@@ -36,6 +36,8 @@
      covers this palette; not an unreviewed proposal). */
   --color-accent-strong: var(--color-accent-hover);
   --color-accent-press: #9c1a21;
+  /* mockup-port 01: pressed danger button state (mockups/styles.css). */
+  --color-danger-press: #991b1b;
   /* proposed (mockups/styles.css): active sidebar item tint, Phase 8 shell. */
   --color-accent-soft: #fae5e6;
 
@@ -69,13 +71,22 @@
   --color-danger-text: #b91c1c;
   --color-info-text: #1e40af;
 
+  /* ---- solid status-tint backgrounds (mockup-port 01: mockups/styles.css'
+     alert-*/badge-verified/badge-probable/stat.* rules use flat tints, not
+     the translucent --color-badge-*-bg overlays below). ---- */
+  --color-success-bg: #e3f0e8;
+  --color-warn-bg: #f6eae1;
+  --color-danger-bg: #fbe5e5;
+  --color-info-bg: #e4eafa;
+
   /* ---- translucent fills (badges, row hover) ---- */
   --color-badge-accent-bg: rgba(213, 37, 47, 0.12);
   --color-badge-success-bg: rgba(21, 128, 61, 0.12);
   --color-badge-warn-bg: rgba(180, 83, 9, 0.12);
   --color-badge-danger-bg: rgba(220, 38, 38, 0.12);
   --color-badge-info-bg: rgba(29, 78, 216, 0.12);
-  --color-row-hover: rgba(0, 0, 0, 0.03);
+  /* mockup-port 01: aligned to mockups/styles.css's --color-row-hover. */
+  --color-row-hover: rgba(0, 0, 0, 0.025);
   /* mockup-parity 1.2 (mockups/styles.css): Dialog overlay backdrop. */
   --color-overlay: rgba(23, 21, 28, 0.42);
 
@@ -125,6 +136,9 @@
   --text-2xl: 1.6rem;
 
   /* ---- spacing scale ---- */
+  /* mockup-port 01 (mockups/styles.css): tightest gap, e.g. badge dot/icon
+     spacing. */
+  --space-3xs: 0.2rem;
   --space-2xs: 0.35rem;
   --space-xs: 0.4rem;
   --space-sm: 0.5rem;
@@ -133,6 +147,8 @@
   --space-xl: 1.25rem;
   --space-2xl: 1.5rem;
   --space-3xl: 1.75rem;
+  /* mockup-port 01 (mockups/styles.css): empty-state padding. */
+  --space-4xl: 2.5rem;
 
   /* ---- radii ---- */
   --radius-sm: 6px;
@@ -145,7 +161,10 @@
      One height for every form control (text inputs, selects, submit
      buttons, checkbox rows) so filter toolbars line up on one baseline
      regardless of each browser's native select/input metrics. */
-  --control-height: 2.5rem;
+  /* mockup-port 01: aligned to mockups/styles.css's --control-height
+     (was 2.5rem) so every control — inputs, buttons, selects — matches the
+     approved mockup's sizing app-wide. */
+  --control-height: 2.25rem;
   /* Phase 8 shell: the top bar's search field uses a shorter control than
      the app's default form controls (mockups/styles.css --control-height-sm). */
   --control-height-sm: 1.85rem;
@@ -458,8 +477,12 @@ button.secondary:hover:not(:disabled) {
   background: var(--color-surface-1);
 }
 
-/* ---- layout helpers ---- */
-.row {
+/* ---- legacy layout helpers (mockup-port 01) ----
+ * Renamed from `.row` to free that name for the mockup's row utility (see
+ * design-system.css), whose default alignment/gap differ (center + tighter
+ * gap vs. this flex-end + looser gap). Still used by pages not yet ported to
+ * mockup markup (login, leads upload, admin/duplicates, home upload forms). */
+.legacy-row {
   display: flex;
   gap: var(--space-lg);
   align-items: flex-end;
@@ -473,15 +496,15 @@ button.secondary:hover:not(:disabled) {
   gap: var(--space-md);
   margin-bottom: var(--space-3xl);
 }
-.header .row {
+.header .legacy-row {
   flex-wrap: wrap;
   align-items: center;
 }
-.row.between {
+.legacy-row.between {
   justify-content: space-between;
   align-items: center;
 }
-.row.end {
+.legacy-row.end {
   justify-content: flex-end;
 }
 
@@ -507,8 +530,13 @@ th {
   letter-spacing: 0.01em;
 }
 
-/* ---- badges ---- */
-.badge {
+/* ---- legacy badges (mockup-port 01) ----
+ * Renamed from `.badge` to free that name for the mockup's status-dot badge
+ * system (see design-system.css). Still used by pages not yet ported to the
+ * mockup markup (discovery, hiring, whats-new, admin/duplicates, account,
+ * the home hub, and contacts/page.tsx pending mockup-port 03) — rename
+ * these call sites to the new `.badge-*` classes as each page is ported. */
+.legacy-badge {
   display: inline-block;
   font-family: var(--font-mono);
   font-weight: 700;
@@ -518,29 +546,30 @@ th {
   padding: 0.12rem 0.55rem;
   font-size: var(--text-xs);
 }
-.badge.green {
+.legacy-badge.green {
   background: var(--color-badge-success-bg);
   color: var(--color-success-text);
 }
 /* "medium" confidence chip on a suggested email (see
  * src/lib/emailSuggestion.ts#SuggestionConfidence) — "high" reuses
- * .badge.green above, "low" reuses the default .badge (accent) styling. */
-.badge.warn {
+ * .legacy-badge.green above, "low" reuses the default .legacy-badge (accent)
+ * styling. */
+.legacy-badge.warn {
   background: var(--color-badge-warn-bg);
   color: var(--color-warn-text);
 }
 /* Marks a contact whose company is currently hiring IT (see /hiring). */
-.badge.hiring {
+.legacy-badge.hiring {
   background: var(--color-badge-success-bg);
   color: var(--color-success-text);
   margin-left: var(--space-xs);
 }
 /* Marks a contact's company classified as a startup (see
  * src/lib/hiring/startupClassification.ts) — a positive prospecting signal,
- * so it reuses .badge.hiring's success green rather than inventing a new
- * color, with the same margin-left spacing as the other company-cell
+ * so it reuses .legacy-badge.hiring's success green rather than inventing a
+ * new color, with the same margin-left spacing as the other company-cell
  * badges above/below. */
-.badge.startup {
+.legacy-badge.startup {
   background: var(--color-badge-success-bg);
   color: var(--color-success-text);
   margin-left: var(--space-xs);
@@ -548,10 +577,10 @@ th {
 /* Marks a company that also hires in an offshore delivery hub (India,
  * Philippines, etc. — see src/lib/hiring/markets.ts#isOffshoreHub). A
  * factual, deprioritizing signal, not a danger or a positive one, so it
- * deliberately does NOT reuse .badge's red or .badge.green's green — it
- * uses --color-surface-tint (an otherwise-unused neutral-warm token) with
- * --color-ink-soft text. */
-.badge.offshore {
+ * deliberately does NOT reuse .legacy-badge's red or .legacy-badge.green's
+ * green — it uses --color-surface-tint (an otherwise-unused neutral-warm
+ * token) with --color-ink-soft text. */
+.legacy-badge.offshore {
   background: var(--color-surface-tint);
   color: var(--color-ink-soft);
   margin-left: var(--space-xs);
@@ -831,7 +860,11 @@ a:hover {
   gap: var(--space-sm);
   margin-top: var(--space-lg);
 }
-.chip {
+/* mockup-port 01: renamed from `.chip` to free that name for the mockup's
+   chip component (see design-system.css) — same "active filter" concept,
+   but a different remove-control markup (mockup's `.chip button` vs. this
+   `.chip a`) and sizing, so the two can't share one rule set yet. */
+.legacy-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -842,14 +875,14 @@ a:hover {
   font-size: var(--text-sm);
   color: var(--color-ink-soft);
 }
-.chip a {
+.legacy-chip a {
   color: var(--color-ink-muted);
   text-decoration: none;
   font-family: var(--font-mono);
   line-height: 1;
   padding: 0 0.3rem;
 }
-.chip a:hover {
+.legacy-chip a:hover {
   color: var(--color-accent);
 }
 .clear-all {
@@ -1048,10 +1081,13 @@ a:hover {
   margin-left: var(--space-sm);
 }
 
-.row-md {
+/* mockup-port 01: renamed alongside .legacy-row above. .row-xs is renamed
+   (not just namespaced) because mockups/styles.css defines its own
+   `.row-xs` with a different gap (--space-2xs vs. this --space-xs). */
+.legacy-row-md {
   gap: var(--space-md);
 }
-.row-xs {
+.legacy-row-xs {
   gap: var(--space-xs);
 }
 

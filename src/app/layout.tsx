@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { getLocale } from "@/lib/i18n/server";
 import { NavigationTracker } from "./NavigationTracker";
 import "./globals.css";
+import "./design-system.css";
 
 const inter = Inter({
   subsets: ["latin"],

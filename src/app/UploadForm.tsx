@@ -16,7 +16,7 @@ export function UploadForm({ locale }: { locale: Locale }) {
 
   return (
     <form action={action}>
-      <div className="row">
+      <div className="legacy-row">
         <div className="field-grow">
           <label htmlFor="file">{dict.upload.connectionsLabel}</label>
           <input id="file" name="file" type="file" accept=".csv" required />
@@ -106,7 +106,7 @@ export function UploadMessagesForm({ locale }: { locale: Locale }) {
 
   return (
     <form action={action}>
-      <div className="row">
+      <div className="legacy-row">
         <div className="field-grow">
           <label htmlFor="messagesFile">{dict.upload.messagesLabel}</label>
           <input id="messagesFile" name="file" type="file" accept=".csv" required />
