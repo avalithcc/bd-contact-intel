@@ -177,10 +177,11 @@ Chain strategy: feature-branch-chain
 
 ## Phase 12: List — Views & Filters (PR 12, base: PR 11)
 
-- [ ] 12.1 **GATE**: owner approves the contact-list mockup (views as tabs, filters).
-- [ ] 12.2 `src/lib/contacts/views.ts`: system views as code constants (All, Mis contactos, Sin contactar, Nuevo con email verificado, Empresas con vacantes, Listo para outreach).
-- [ ] 12.3 `saved_view` table CRUD for BD-created views (filters/columns/sort as jsonb).
-- [ ] 12.4 RED/GREEN: view filter serialization round-trips through the query string (`?view=`).
+- [x] 12.1 **GATE**: owner approved ALL mockups on 2026-09-24, including `mockups/contacts.html` (views as tabs, filters).
+- [x] 12.2 `src/lib/contacts/views.ts`: system views as code constants (All, Mis contactos, Sin contactar, Nuevo con email verificado, Empresas con vacantes, Listo para outreach). PR **12a** (branch `feat/crm-hubspot-ux-12a-views-saved-views`, base 11e). `SYSTEM_VIEWS` + `resolveActiveView` (resolves `?view=` against system views and a BD's saved views).
+- [x] 12.3 `saved_view` table CRUD for BD-created views (filters/columns/sort as jsonb). PR **12a**. `src/lib/contacts/savedViewInput.ts#planSavedViewInput` (pure planner, RED/GREEN) + `src/lib/contacts/savedViews.ts` (DB glue: list/get/create/update/delete, every operation scoped to `owner_bd_id` — personal views only, design D7). The `saved_view` table itself already existed in schema (migration 0013); no new migration needed.
+- [x] 12.4 RED/GREEN: view filter serialization round-trips through the query string (`?view=`). PR **12a**. `src/lib/contacts/viewFilters.ts#serializeContactFilters`/`parseContactFilters` (pure, `tests/unit/viewFilters.test.ts`) plus `sanitizeContactFilters` for defensively reading a saved view's `filters` jsonb.
+- [x] 12.5 (addition, needed to make 12.2-12.4 usable) `/contacts` list page: server-side paginated/filtered table (Nombre/Empresa/Responsable/Estado/Correo), system + saved view tabs, save/delete-view forms (no client JS). PR **12b** (branch `feat/crm-hubspot-ux-12b-contacts-list-query`, base 12a) — `src/lib/contacts/listQueries.ts#getContactListPage`/`getContactCountForFilters` (SQL over `person`, `count(*)::int` cast, reuses existing owner/status/company_key indexes — never loads all ~20.7k rows), `contactList` dictionary slice (es/en), and repoints the TopBar's contacts-only search from `/` to `/contacts`. PR **12c** (branch `feat/crm-hubspot-ux-12c-contacts-list-page`, base 12b) — `src/app/(app)/contacts/page.tsx` + `page.module.css` + `viewActions.ts` (`createSavedViewAction`/`deleteSavedViewAction`). Column picker, bulk-action bar, ad-hoc "Agregar filtro" chips beyond the system views, and the table/board toggle are explicitly out of scope here — Phase 13/14.
 
 ## Phase 13: List — Columns & Bulk Actions (PR 13, base: PR 12)
 
