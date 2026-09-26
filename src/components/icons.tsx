@@ -166,3 +166,22 @@ export function WarningIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+// /contacts table/board layout toggle (mockup-port 03; contacts.html's
+// `.segmented` group).
+export function TableIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </Svg>
+  );
+}
+
+export function BoardIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M8 7v7M12 7v4M16 7v9" />
+    </Svg>
+  );
+}
