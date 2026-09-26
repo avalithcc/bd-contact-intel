@@ -14,6 +14,7 @@ import { UserMenu } from "../../UserMenu";
 import { BackButton } from "../../BackButton";
 import { FilterCheckbox } from "./FilterCheckbox";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
+import { generateOutreachMessage } from "../outreach/actions";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 
 export const dynamic = "force-dynamic";
@@ -228,7 +229,10 @@ export default async function WhatsNewPage({
                         {dict.roleGroups[sc.roleGroup]}
                       </span>
                     )}
-                    <GenerateMessageButton contactId={sc.id} locale={locale} labels={messageLabels} />
+                    <GenerateMessageButton
+                      boundAction={generateOutreachMessage.bind(null, sc.id, locale)}
+                      labels={messageLabels}
+                    />
                   </span>
                 ))}
               </div>

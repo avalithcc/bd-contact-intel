@@ -1,6 +1,8 @@
 "use client";
 
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
+import type { Locale } from "@/lib/i18n/locales";
 import { PropertyList, type AboutPaneProperty } from "./PropertyList";
 import { QuickActions } from "./QuickActions";
 import styles from "./AboutPane.module.css";
@@ -16,6 +18,8 @@ export interface AboutPaneProps {
   ownerLabel: string | null;
   email: string | null;
   properties: AboutPaneProperty[];
+  messageLabels: GenerateMessageLabels;
+  locale: Locale;
 }
 
 /**
@@ -33,6 +37,8 @@ export function AboutPane({
   ownerLabel,
   email,
   properties,
+  messageLabels,
+  locale,
 }: AboutPaneProps) {
   return (
     <aside className={styles.pane} aria-label={l.aboutSectionTitle}>
@@ -42,7 +48,7 @@ export function AboutPane({
         <span className={styles.statusBadge}>{statusLabel}</span>
       </div>
 
-      <QuickActions personId={personId} labels={l} email={email} />
+      <QuickActions personId={personId} labels={l} email={email} messageLabels={messageLabels} locale={locale} />
 
       <div className={styles.sectionTitle}>{l.aboutSectionTitle}</div>
       <PropertyList personId={personId} labels={l} ownerLabel={ownerLabel} properties={properties} />

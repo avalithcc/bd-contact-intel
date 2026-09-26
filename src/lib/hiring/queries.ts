@@ -1,8 +1,10 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
-import type { RoleGroupKey } from "@/lib/roleGroups";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
+import { LEADERSHIP_ROLE_GROUPS } from "@/lib/hiring/leadership";
+
+export { LEADERSHIP_ROLE_GROUPS };
 
 export interface OpenPosting {
   id: string;
@@ -41,17 +43,6 @@ export interface CompanyHiringSummary {
 }
 
 // Role groups considered "leadership" for the hiring crossover — the
-// contacts most worth reaching out to at a company that's actively hiring.
-// Exported so other views built on the same signal (see
-// src/lib/outreach/queries.ts) use the identical definition instead of
-// re-declaring it.
-export const LEADERSHIP_ROLE_GROUPS: RoleGroupKey[] = [
-  "c_level_tech",
-  "c_level_business",
-  "eng_leadership",
-  "engineering_manager",
-];
-
 interface ResolvedHiringCompany {
   companyKey: string;
   displayName: string;

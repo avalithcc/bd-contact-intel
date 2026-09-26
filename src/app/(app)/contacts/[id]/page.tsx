@@ -6,8 +6,9 @@ import { getContactRecord } from "@/lib/contacts/queries";
 import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
-import { getDictionary } from "@/lib/i18n/server";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
+import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
@@ -38,6 +39,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const { record } = result;
   const dict = await getDictionary();
   const l = pickContactRecordLabels(dict);
+  const messageLabels = pickGenerateMessageLabels(dict);
+  const locale = await getLocale();
   const activityType = rawActivityType && isTimelineActivityType(rawActivityType) ? rawActivityType : undefined;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
@@ -67,6 +70,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           ownerLabel={record.ownerName}
           email={record.person.email}
           properties={properties}
+          messageLabels={messageLabels}
+          locale={locale}
         />
 
         <div className={styles.main}>
