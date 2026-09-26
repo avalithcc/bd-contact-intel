@@ -1,8 +1,7 @@
 /* App shell sidebar (design.md D9, Phase 8), reskinned to match
    mockups/styles.css `.sidenav`/`.nav-item` — same fixed-position + mobile
    toggle mechanism as the pre-Phase-8 sidebar, only the visual language
-   changes. Icons from the mockup are intentionally omitted (decorative,
-   not tracked in tasks.md 8.2) to keep this a shell-only PR. */
+   changes. Nav icons added in mockup-parity 3.3 (deferred from 8.2). */
 
 .toggleButton {
   display: none;
@@ -77,6 +76,7 @@
 .navItem {
   display: flex;
   align-items: center;
+  gap: var(--space-sm);
   padding: 0.38rem var(--space-sm);
   border-radius: var(--radius-sm);
   color: var(--color-ink-soft);
@@ -84,6 +84,16 @@
   font-weight: 500;
   text-decoration: none;
   transition: all var(--transition-fast);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.navItem.active .icon {
+  color: var(--color-accent);
 }
 
 .navItem:hover {

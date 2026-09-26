@@ -51,3 +51,73 @@ export function ImportIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+// Sidebar nav icons (mockup-parity 3.3).
+export function ContactsIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </Svg>
+  );
+}
+
+export function CompaniesIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M9 22v-4h6v4" />
+      <path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" />
+    </Svg>
+  );
+}
+
+export function TasksIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="m9 12 2 2 4-4" />
+    </Svg>
+  );
+}
+
+// No standalone "Outreach" row exists in the approved mockup anymore — it
+// redirects into Contactos (see outreach.html's "Trasladado" note). This
+// icon (arrow, reused from that same page's before/after table) is a
+// pragmatic stand-in kept only because removing the nav item itself is a
+// separate branch's concern (feat/crm-hubspot-ux-15b-outreach-redirect).
+export function OutreachIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M5 12h14M12 5l7 7-7 7" />
+    </Svg>
+  );
+}
+
+export function HiringIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </Svg>
+  );
+}
+
+export function WhatsNewIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+      <path d="M18 14h-8M15 18h-5M10 6h8v4h-8z" />
+    </Svg>
+  );
+}
+
+export function DiscoveryIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z" />
+    </Svg>
+  );
+}
