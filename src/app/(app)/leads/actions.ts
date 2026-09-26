@@ -14,6 +14,7 @@ import {
   updateLeadStatus,
 } from "@/lib/leads/queries";
 import { getCurrentBd } from "@/lib/queries";
+import type { IdentityIngestReport } from "@/lib/identity/ingestWrite";
 import { buildOutreachEmailPrompt } from "@/lib/outreach/emailPrompt";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { isLeadStatusKey, type LeadStatusKey } from "@/lib/leads/types";
@@ -30,6 +31,9 @@ export interface ImportLeadsResult {
   upserted?: number;
   matchedOwners?: string[];
   unmatchedOwners?: string[];
+  // Dedup outcome from the identity resolver (task 14.2's `/contacts/import`
+  // outcome summary) — null when IDENTITY_DUAL_WRITE is off.
+  identityReport?: IdentityIngestReport | null;
   errorKey?: ImportLeadsErrorKey;
   errorDetail?: string;
 }
@@ -73,11 +77,13 @@ export async function importLeadsCsv(
     const drafts = buildLeadDrafts(bundle);
     const result = await importLeads(sourceKey, sourceName, drafts);
     revalidatePath("/leads");
+    revalidatePath("/contacts");
     return {
       ok: true,
       upserted: result.upserted,
       matchedOwners: result.matchedOwners,
       unmatchedOwners: result.unmatchedOwners,
+      identityReport: result.identityReport,
     };
   } catch (err) {
     return {

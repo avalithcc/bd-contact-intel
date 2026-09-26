@@ -7,6 +7,8 @@ import { planStatusChangeActivity } from "./statusChange";
 import {
   leadRowsToIdentityRows,
   runIdentityCutoverChunk,
+  sumIdentityReports,
+  type IdentityIngestReport,
   type InsertedLeadRow,
 } from "@/lib/identity/ingestWrite";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
@@ -68,6 +70,9 @@ export interface ImportLeadsResult {
   upserted: number;
   matchedOwners: string[];
   unmatchedOwners: string[];
+  // Identity resolver dedup outcome across every chunk (task 14.2), or null
+  // when IDENTITY_DUAL_WRITE is off. See sumIdentityReports.
+  identityReport: IdentityIngestReport | null;
 }
 
 /**
@@ -101,6 +106,7 @@ export async function importLeads(
 
   const CHUNK = 500;
   let upserted = 0;
+  const chunkReports: (IdentityIngestReport | null)[] = [];
   for (let i = 0; i < drafts.length; i += CHUNK) {
     const chunk = drafts.slice(i, i + CHUNK);
     const rows: NewLead[] = chunk.map((d) => ({
@@ -169,7 +175,7 @@ export async function importLeads(
               lastImportedAt: sql`excluded.last_imported_at`,
             },
           });
-      await runIdentityCutoverChunk(dualWriteEnabled, {
+      const { report } = await runIdentityCutoverChunk(dualWriteEnabled, {
         withLock: (fn) => withIdentityLock(tx, fn),
         legacyWrite: dualWriteEnabled
           ? () =>
@@ -194,6 +200,7 @@ export async function importLeads(
         prefetch: (identityRows) => prefetchIdentityIndex(tx, identityRows),
         apply: (plan) => applyIdentityWrites(tx, plan),
       });
+      chunkReports.push(report);
     });
     upserted += chunk.length;
   }
@@ -201,6 +208,7 @@ export async function importLeads(
   return {
     sourceKey,
     upserted,
+    identityReport: sumIdentityReports(chunkReports),
     matchedOwners: [...matched.keys()],
     unmatchedOwners: unmatched,
   };

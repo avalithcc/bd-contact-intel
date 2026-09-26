@@ -210,7 +210,14 @@
   color: var(--color-ink-soft);
 }
 
-/* Table/board toggle (task 14.1) */
+/* Table/board toggle (task 14.1) + import link (task 14.2) */
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
 .layoutToggle {
   display: inline-flex;
   gap: var(--space-2xs);

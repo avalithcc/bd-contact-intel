@@ -3,14 +3,27 @@
 import { useActionState } from "react";
 import { importLeadsCsv, type ImportLeadsResult } from "./actions";
 import type { LeadsUploadLabels } from "@/lib/leads/labels";
+import type { ContactsImportLabels } from "@/lib/contacts/labels";
+import { ImportOutcome } from "@/app/(app)/contacts/import/ImportOutcome";
 
 /**
  * Import control for the event export files (see src/lib/leads/csv.ts for
  * the merge logic). All optional except a source key, which identifies the
  * event/import batch (`lead_source.key`) and is what makes re-running the
  * same import idempotent instead of creating a second, disconnected batch.
+ *
+ * `outcomeLabels` (task 14.2) is optional so the pre-existing `/leads`
+ * usage (which doesn't pass it) keeps its exact prior behavior; the new
+ * `/contacts/import` page passes it to show the SAME dedup-outcome summary
+ * the LinkedIn-connections form shows.
  */
-export function UploadLeadsForm({ labels }: { labels: LeadsUploadLabels }) {
+export function UploadLeadsForm({
+  labels,
+  outcomeLabels,
+}: {
+  labels: LeadsUploadLabels;
+  outcomeLabels?: ContactsImportLabels;
+}) {
   const [state, action, pending] = useActionState<ImportLeadsResult | null, FormData>(
     importLeadsCsv,
     null,
@@ -89,6 +102,9 @@ export function UploadLeadsForm({ labels }: { labels: LeadsUploadLabels }) {
             <p className="text-warn mb-0">
               {labels.unmatchedOwnersSummary.replace("{owners}", state.unmatchedOwners.join(", "))}
             </p>
+          )}
+          {outcomeLabels && (
+            <ImportOutcome report={state.identityReport ?? null} labels={outcomeLabels} />
           )}
         </>
       )}

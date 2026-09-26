@@ -805,4 +805,29 @@ export const es: typeof en = {
     boardColumnMore: (count: number) => `Ver los ${count} en la tabla`,
     boardColumnEmpty: "Sin contactos en esta columna.",
   },
+
+  // `/contacts/import` (task 14.2; mockups/import.html) — consolidates the
+  // LinkedIn connections upload (previously only on `/`) and the leads CSV
+  // upload (previously only on `/leads`) behind the SAME identity resolver
+  // the live cutover uses, showing a dedup outcome after each run.
+  contactsImport: {
+    pageTitle: "Importar contactos",
+    subtitle: "Conexiones de LinkedIn o una lista de leads (CSV).",
+    connectionsCardTitle: "Conexiones de LinkedIn",
+    connectionsFileLabel: "Archivo Connections.csv",
+    connectionsSubmit: "Importar",
+    connectionsImporting: "Importando…",
+    connectionsErrorMissingFile: "Elige un archivo CSV.",
+    connectionsErrorNoConnectionsFound: "No se encontraron conexiones en ese archivo.",
+    connectionsErrorGenericFailed: "No se pudo importar el archivo.",
+    leadsCardTitle: "Lista de leads",
+    outcomeTitle: "Resultado de la importación",
+    outcomeAutoMerged: "Fusionados automáticamente",
+    outcomeFlaggedForReview: "Enviados a revisión",
+    outcomeNew: "Contactos nuevos",
+    outcomeSkippedOwnCompany: "Omitidos · empresa propia",
+    outcomeReviewQueueLink: "Ver cola de revisión",
+    outcomeUnavailable:
+      "El resumen de deduplicación no está disponible para esta importación.",
+  },
 };

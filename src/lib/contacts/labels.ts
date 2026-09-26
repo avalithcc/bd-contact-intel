@@ -92,3 +92,14 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.genericError;
   }
 }
+
+/**
+ * `/contacts/import` (task 14.2): the LinkedIn-connections upload form and
+ * the dedup-outcome summary are both client components — same ClientStrings
+ * convention as the rest of this file.
+ */
+export type ContactsImportLabels = ClientStrings<Dictionary["contactsImport"]>;
+
+export function pickContactsImportLabels(dict: Dictionary): ContactsImportLabels {
+  return { ...dict.contactsImport };
+}

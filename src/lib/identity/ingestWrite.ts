@@ -22,6 +22,42 @@ import {
   type PrefetchedIdentityIndex,
 } from "@/lib/identity/resolve";
 
+/** Same shape as `IdentityWritePlan.report` — the dedup outcome a caller (task 14.2's `/contacts/import`) surfaces to the BD. */
+export type IdentityIngestReport = IdentityWritePlan["report"];
+
+const EMPTY_REPORT: IdentityIngestReport = {
+  rowsRead: 0,
+  ownCompanySkipped: 0,
+  autoMerged: 0,
+  flaggedForReview: 0,
+  new: 0,
+};
+
+/**
+ * Sums per-chunk reports into one total for the whole import (task 14.2:
+ * "Outcome counts should come from the resolver's plan"). `null` entries
+ * (kill switch off, or a chunk with zero identity rows) contribute nothing.
+ * Returns `null` only when EVERY chunk contributed nothing — e.g. the whole
+ * import ran with `IDENTITY_DUAL_WRITE=false` — so a caller can tell "no
+ * report available" apart from "a report with all-zero counts".
+ */
+export function sumIdentityReports(
+  reports: readonly (IdentityIngestReport | null)[],
+): IdentityIngestReport | null {
+  const present = reports.filter((r): r is IdentityIngestReport => r !== null);
+  if (!present.length) return null;
+  return present.reduce(
+    (acc, r) => ({
+      rowsRead: acc.rowsRead + r.rowsRead,
+      ownCompanySkipped: acc.ownCompanySkipped + r.ownCompanySkipped,
+      autoMerged: acc.autoMerged + r.autoMerged,
+      flaggedForReview: acc.flaggedForReview + r.flaggedForReview,
+      new: acc.new + r.new,
+    }),
+    { ...EMPTY_REPORT },
+  );
+}
+
 // --- Contacts (CSV upload) ---------------------------------------------------
 
 /** Shape returned by upsertContacts's per-chunk `.returning()` (task 4B.3). */
@@ -147,20 +183,30 @@ export interface IdentityCutoverPorts<LegacyRow> {
  * still rolls back the whole chunk, since callers run everything in one
  * shared transaction (see `IdentityCutoverPorts.withLock`'s caller contract).
  */
+export interface IdentityCutoverChunkResult<LegacyRow> {
+  legacyRows: LegacyRow[];
+  // The chunk's own IdentityWritePlan.report (task 14.2), or null when the
+  // kill switch is off or this chunk had no identity rows to plan at all —
+  // see sumIdentityReports for how a caller collapses these across chunks.
+  report: IdentityIngestReport | null;
+}
+
 export async function runIdentityCutoverChunk<LegacyRow>(
   dualWriteEnabled: boolean,
   ports: IdentityCutoverPorts<LegacyRow>,
-): Promise<LegacyRow[]> {
-  if (!dualWriteEnabled) return ports.legacyWrite();
+): Promise<IdentityCutoverChunkResult<LegacyRow>> {
+  if (!dualWriteEnabled) return { legacyRows: await ports.legacyWrite(), report: null };
 
   const legacyRows = await ports.legacyWrite();
   const identityRows = ports.toIdentityRows(legacyRows);
-  if (identityRows.length) {
-    await ports.withLock(async () => {
-      const index = await ports.prefetch(identityRows);
-      const plan = planIdentityWrites(identityRows, index);
-      await ports.apply(plan);
-    });
-  }
-  return legacyRows;
+  if (!identityRows.length) return { legacyRows, report: null };
+
+  let report: IdentityIngestReport | null = null;
+  await ports.withLock(async () => {
+    const index = await ports.prefetch(identityRows);
+    const plan = planIdentityWrites(identityRows, index);
+    await ports.apply(plan);
+    report = plan.report;
+  });
+  return { legacyRows, report };
 }

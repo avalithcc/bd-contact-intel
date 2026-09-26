@@ -218,12 +218,17 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         <p className={styles.subtitle}>{l.subtitle}</p>
       </div>
 
-      <div className={styles.layoutToggle} role="group" aria-label={l.layoutTable + " / " + l.layoutBoard}>
-        <Link href={layoutHref("table")} className={isBoard ? styles.layoutToggleLink : styles.layoutToggleActive}>
-          {l.layoutTable}
-        </Link>
-        <Link href={layoutHref("board")} className={isBoard ? styles.layoutToggleActive : styles.layoutToggleLink}>
-          {l.layoutBoard}
+      <div className={styles.toolbarRow}>
+        <div className={styles.layoutToggle} role="group" aria-label={l.layoutTable + " / " + l.layoutBoard}>
+          <Link href={layoutHref("table")} className={isBoard ? styles.layoutToggleLink : styles.layoutToggleActive}>
+            {l.layoutTable}
+          </Link>
+          <Link href={layoutHref("board")} className={isBoard ? styles.layoutToggleActive : styles.layoutToggleLink}>
+            {l.layoutBoard}
+          </Link>
+        </div>
+        <Link href="/contacts/import" className="btn btn-secondary btn-sm">
+          {dict.contactsImport.pageTitle}
         </Link>
       </div>
 
