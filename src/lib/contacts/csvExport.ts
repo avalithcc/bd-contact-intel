@@ -51,6 +51,10 @@ export interface ContactExportRow {
   // text) — the CSV has no room for per-BD avatars, so it exports the same
   // names the tooltip shows, already flattened by buildBdConnectionSummaries.
   bdConnectionNames: string;
+  // Pre-formatted "Última actividad" text (label + ISO date), same
+  // dictionary-agnostic convention as bdConnectionNames — the route handler
+  // has already resolved the label via lastActivity.ts before this point.
+  lastActivityText: string;
 }
 
 export type ContactCsvHeaders = Record<"name" | ContactColumnKey, string>;
@@ -79,6 +83,8 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.seniority ?? "";
     case "bdConnections":
       return row.bdConnectionNames;
+    case "lastActivity":
+      return row.lastActivityText;
   }
 }
 

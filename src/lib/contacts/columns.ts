@@ -15,6 +15,7 @@ export type ContactColumnKey =
   | "status"
   | "email"
   | "bdConnections"
+  | "lastActivity"
   | "roleGroup"
   | "industry"
   | "country"
@@ -22,17 +23,15 @@ export type ContactColumnKey =
   | "created"
   | "seniority";
 
-/** Mockup order (contacts.html column-picker menu). "Última actividad" is
- * still missing — see openspec/changes/mockup-port/contacts-checklist.md —
- * deferred to a later apply batch, same "needs a join this phase's budget
- * doesn't cover" reasoning that used to also apply to "BDs conectados"
- * before this batch closed that gap (src/lib/contacts/bdConnections.ts). */
+/** Mockup order (contacts.html column-picker menu) — every column the
+ * mockup lists is now selectable. */
 export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "company",
   "owner",
   "status",
   "email",
   "bdConnections",
+  "lastActivity",
   "roleGroup",
   "industry",
   "country",

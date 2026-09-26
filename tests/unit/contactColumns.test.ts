@@ -58,3 +58,9 @@ test("bdConnections (mockup 'BDs conectados') is a selectable column, not visibl
   assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("bdConnections"));
   assert.deepEqual(resolveVisibleColumns(["bdConnections"]), ["bdConnections"]);
 });
+
+test("lastActivity (mockup 'Última actividad') is a selectable column, not visible by default", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("lastActivity"));
+  assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("lastActivity"));
+  assert.deepEqual(resolveVisibleColumns(["lastActivity"]), ["lastActivity"]);
+});

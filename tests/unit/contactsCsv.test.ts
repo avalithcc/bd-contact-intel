@@ -16,6 +16,7 @@ const HEADERS = {
   status: "Estado",
   email: "Correo",
   bdConnections: "BDs conectados",
+  lastActivity: "Última actividad",
   roleGroup: "Grupo de rol",
   industry: "Industria",
   country: "País",
@@ -39,6 +40,7 @@ function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
     createdAt: new Date("2026-01-15T00:00:00Z"),
     seniority: null,
     bdConnectionNames: "",
+    lastActivityText: "",
     ...overrides,
   };
 }

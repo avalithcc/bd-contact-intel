@@ -51,8 +51,8 @@ Columns: element | mockup | status | evidence | notes
 | — BD conectado | contacts.html:87 | todo | — | No filter by connected-BD exists. The read side now exists (`src/lib/contacts/bdConnections.ts`, this batch) but nothing filters by it yet. |
 | — Última actividad | contacts.html:87 | todo | — | No "last activity" filter (recency bucket) exists. |
 | "Borrar todo" | contacts.html:89 | deviation | page.tsx:608-610 (`l.filtersClear` link) | Clears ad-hoc filters via a link back to `?view=X`, but lives inside the filter panel, not as a toolbar-level "Borrar todo" button next to chips. |
-| "Ordenado por Última actividad" indicator | contacts.html:91 | todo | — | No sort-order text/state; list is hardcoded `orderBy(asc(lastName), asc(firstName))` (listQueries.ts), never "Última actividad". |
-| "Columnas" dropdown, 12 checkable columns | contacts.html:92-94 | partial | src/lib/contacts/columns.ts, page.tsx:425-449 | 11 of 12 columns now selectable (see columns section). |
+| "Ordenado por Última actividad" indicator | contacts.html:91 | **done (branch 05)** | page.tsx (`l.sortedByPrefix`), default `sort=lastActivity` | |
+| "Columnas" dropdown, 12 checkable columns | contacts.html:92-94 | done | src/lib/contacts/columns.ts, page.tsx | All 12 mockup columns now selectable. |
 | — drag to reorder | contacts.html:93 (`.drag` handles) | todo | — | `ALL_CONTACT_COLUMNS` is a fixed array; `resolveVisibleColumns` always re-sorts to that fixed order regardless of requested order — no reorder capability exists. |
 | — "Restablecer" | contacts.html:94 | todo | — | No reset-to-default button in the column picker form; only "Aplicar" (submit). |
 | — "Aplicar" | contacts.html:94 | done | page.tsx:445-447 | |
@@ -74,7 +74,7 @@ Columns: element | mockup | status | evidence | notes
 
 | element | mockup | status | evidence | notes |
 |---|---|---|---|---|
-| Sortable header indicators (Nombre, Última actividad shown sorted) | contacts.html:108-109 | todo | page.tsx (plain `<th>`, no sort links/state) | No column is sortable; order is hardcoded by last/first name. |
+| Sortable header indicators (Nombre, Última actividad shown sorted) | contacts.html:108-109 | **done (branch 05)** | page.tsx `sortHref`, src/lib/contacts/sort.ts, listQueries.ts `lastActivityAgg` | Two sortable headers (Nombre, Última actividad), plain link toggle (no client JS), default sort = Última actividad desc, matching the mockup's default. No asc/desc toggle affordance (the static mockup shows none either). |
 | Row checkbox / "select all" | contacts.html:108, 111 | done | page.tsx | |
 | cell-person (avatar, name link, sub-line) | contacts.html:112 | done | page.tsx (`Avatar` + `initialsFromName`) | |
 | Empresa column | contacts.html:113 | partial | page.tsx `columnCell` "company" | Plain `.soft` text; no company-logo initial chip, no inline "Contratando" hiring badge on the row. |
@@ -82,9 +82,9 @@ Columns: element | mockup | status | evidence | notes
 | Estado badge | contacts.html:115 | done | page.tsx `columnCell` "status" (`badge badge-${status}`) | |
 | Correo (verified/probable/none badge + address) | contacts.html:116 | done | page.tsx `columnCell` "email" | |
 | BDs conectados (avatar stack, tooltip of names) | contacts.html:117 | **done (this batch)** | src/lib/contacts/bdConnections.ts, src/lib/contacts/listQueries.ts `attachBdConnections`, page.tsx `columnCell` "bdConnections" | New column, selectable via the picker, exported in CSV. Reads `person_bd_connection` joined to `bd`, batched per already-paginated page/board-column/export id set (never unbounded). See TDD Cycle Evidence below. |
-| Última actividad (relative time + activity text) | contacts.html:118 | todo | — | Column still doesn't exist; needs an `activity`-table join and a type→label mapping decision (deferred to next batch — see Deviations). |
+| Última actividad (relative time + activity text) | contacts.html:118 | **done (branch 05)** | src/lib/contacts/lastActivity.ts, listQueries.ts `attachDerivedColumns`, page.tsx `columnCell` "lastActivity" | Owner decision: label = latest activity's type label in Spanish (reusing the record page's Timeline activity-type taxonomy, src/lib/activity/queries.ts TIMELINE_ACTIVITY_TYPES) + relative time, e.g. "Correo enviado · hace 2d". `status_change`/`status_backfill` special-cases "replied" -> "Respuesta recibida"; other statuses fall back to their own leadStatuses label. No `linkedin_message`/`reply_received` activity type exists in the schema (only note/email_sent/hunter_lookup/status_change/meeting_logged/discarded/status_backfill), so those two mockup examples are approximated via the closest real type rather than invented. |
 | Grupo de rol | contacts.html:119 | done | page.tsx `columnCell` "roleGroup" | |
-| Sort indicator arrow (↓) | contacts.html:109 | todo | — | Tied to the sortable-header gap above. |
+| Sort indicator arrow (↓) | contacts.html:109 | **done (branch 05)** | page.tsx (`<span className="sort">↓</span>` on the active sort header) | |
 
 ## Table footer
 

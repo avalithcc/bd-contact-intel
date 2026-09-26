@@ -1,0 +1,86 @@
+/**
+ * "Última actividad" column (mockups/contacts.html: "Correo enviado ·
+ * hace 2d", "Descartado · hace 2sem", "—" when a person has no activity at
+ * all). Pure label derivation only — no I/O — the actual `activity` table
+ * read (one row per person, the most recent) lives in
+ * listQueries.ts#attachLastActivity, which calls `buildLastActivityEntries`
+ * on its result. Reuses the SAME activity-type taxonomy the record page's
+ * Timeline renders (src/lib/activity/queries.ts TIMELINE_ACTIVITY_TYPES) —
+ * no new type invented here, just a different (denser, table-cell) label
+ * for each.
+ */
+import type { getDictionary } from "@/lib/i18n/server";
+
+type Dict = Awaited<ReturnType<typeof getDictionary>>;
+
+export interface LastActivityRawRow {
+  personId: string;
+  type: string;
+  metadata: unknown;
+  createdAt: Date;
+}
+
+export interface LastActivityEntry {
+  type: string;
+  label: string;
+  createdAt: Date;
+}
+
+function metadataStatus(metadata: unknown): string | null {
+  if (typeof metadata !== "object" || metadata === null) return null;
+  const status = (metadata as Record<string, unknown>).status;
+  return typeof status === "string" ? status : null;
+}
+
+/**
+ * Maps one activity row to its mockup label. `status_change`/
+ * `status_backfill` special-case "replied" (mockup: "Respuesta recibida");
+ * every other status falls back to that status's own leadStatuses label so
+ * an unexpected/future status never renders blank, and a missing/malformed
+ * `metadata.status` falls back to the generic `lastActivityStatusChanged`
+ * label rather than throwing.
+ */
+export function formatLastActivityLabel(
+  row: Pick<LastActivityRawRow, "type" | "metadata">,
+  dict: Dict,
+): string {
+  const l = dict.contactList;
+  switch (row.type) {
+    case "email_sent":
+      return l.lastActivityEmailSent;
+    case "meeting_logged":
+      return l.lastActivityMeetingLogged;
+    case "discarded":
+      return l.lastActivityDiscarded;
+    case "note":
+      return l.lastActivityNote;
+    case "hunter_lookup":
+      return l.lastActivityHunterLookup;
+    case "status_change":
+    case "status_backfill": {
+      const status = metadataStatus(row.metadata);
+      if (status === "replied") return l.lastActivityReplyReceived;
+      if (status) return dict.leadStatuses[status as keyof typeof dict.leadStatuses] ?? l.lastActivityStatusChanged;
+      return l.lastActivityStatusChanged;
+    }
+    default:
+      return l.lastActivityStatusChanged;
+  }
+}
+
+/** One raw row per person (the DB layer already dedups to the single most
+ * recent row via `DISTINCT ON`) mapped into the render-ready entry. */
+export function buildLastActivityEntries(
+  rows: LastActivityRawRow[],
+  dict: Dict,
+): Map<string, LastActivityEntry> {
+  const map = new Map<string, LastActivityEntry>();
+  for (const row of rows) {
+    map.set(row.personId, {
+      type: row.type,
+      label: formatLastActivityLabel(row, dict),
+      createdAt: row.createdAt,
+    });
+  }
+  return map;
+}

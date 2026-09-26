@@ -30,6 +30,7 @@ import {
   resolveVisibleColumns,
   type ContactColumnKey,
 } from "@/lib/contacts/columns";
+import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
 import {
   createSavedViewAction,
   deleteSavedViewAction,
@@ -85,6 +86,7 @@ interface ContactsPageProps {
     hideOffshore?: string;
     startupsOnly?: string;
     name?: string;
+    sort?: string;
   }>;
 }
 
@@ -123,6 +125,8 @@ function columnLabel(
       return l.colEmail;
     case "bdConnections":
       return l.colBdConnections;
+    case "lastActivity":
+      return l.colLastActivity;
     case "roleGroup":
       return l.colRoleGroup;
     case "industry":
@@ -142,6 +146,7 @@ function columnCell(
   key: ContactColumnKey,
   row: ContactListRow,
   dict: Awaited<ReturnType<typeof getDictionary>>,
+  relTime: (d: Date) => string,
 ) {
   const l = dict.contactList;
   switch (key) {
@@ -193,6 +198,8 @@ function columnCell(
       ) : (
         l.ownerNone
       );
+    case "lastActivity":
+      return row.lastActivity ? `${row.lastActivity.label} · ${relTime(row.lastActivity.createdAt)}` : "—";
     case "roleGroup":
       return row.roleGroup ?? l.ownerNone;
     case "industry":
@@ -277,6 +284,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   // instead of paginating a single list, so it fetches
   // `getContactBoardColumns` instead of `getContactListPage`.
   const isBoard = !isOutreachView && sp.layout === "board";
+  const sort = parseContactSort(sp.sort);
 
   const locale = await getLocale();
   const relTime = (d: Date) => relativeTime(d, locale);
@@ -286,9 +294,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const [listPage, systemViewCounts, boardColumns, outreachPage] = await Promise.all([
     isOutreachView || isBoard
       ? null
-      : getContactListPage(effectiveFilters, me.id, sp.q, page, PAGE_SIZE, hiringKeys),
+      : getContactListPage(effectiveFilters, me.id, sp.q, page, PAGE_SIZE, dict, sort, hiringKeys),
     Promise.all(SYSTEM_VIEWS.map((v) => getContactCountForFilters(v.filters, me.id, hiringKeys))),
-    isBoard ? getContactBoardColumns(effectiveFilters, me.id, sp.q, hiringKeys) : null,
+    isBoard ? getContactBoardColumns(effectiveFilters, me.id, sp.q, dict, hiringKeys) : null,
     isOutreachView
       ? getOutreachContactsPage(me.id, outreachFilters, page, PAGE_SIZE, relTime, dict)
       : null,
@@ -317,7 +325,20 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     if (sp.seniority !== undefined) params.set("seniority", sp.seniority);
     if (sp.emailStatus !== undefined) params.set("emailStatus", sp.emailStatus);
     if (sp.status !== undefined) params.set("status", sp.status);
+    if (sp.sort !== undefined) params.set("sort", sp.sort);
     return params;
+  }
+
+  // Sortable headers (mockup: "Nombre" and "Última actividad ↓", the
+  // latter sorted by default). A plain link toggle, same "no client JS
+  // needed" convention as pagination/layout — no asc/desc affordance since
+  // the static mockup shows none either.
+  function sortHref(target: ContactSortKey): string {
+    const params = withAdHocFilterParams(new URLSearchParams());
+    params.set("view", activeView.viewKey);
+    if (sp.q) params.set("q", sp.q);
+    params.set("sort", target);
+    return `/contacts?${params.toString()}`;
   }
 
   function pageHref(targetPage: number): string {
@@ -432,8 +453,12 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         </details>
       </nav>
 
-      {!isOutreachView && (
+      {!isOutreachView && !isBoard && (
         <div className="toolbar">
+          <span className="spacer" />
+          <span className="meta">
+            {l.sortedByPrefix} <strong className="soft">{sort === "name" ? l.colName : l.colLastActivity}</strong>
+          </span>
           <details className="dropdown">
             <summary className="btn btn-secondary btn-sm">{l.columnsPickerLabel}</summary>
             <form action={updateViewColumnsAction} className="menu">
@@ -774,10 +799,24 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                   <th className="col-check">
                     <input type="checkbox" id="select-all-contacts" aria-label={l.bulkSelectAllLabel} />
                   </th>
-                  <th>{l.colName}</th>
-                  {visibleColumns.map((key) => (
-                    <th key={key}>{columnLabel(key, l)}</th>
-                  ))}
+                  <th className={sort === "name" ? "sorted" : undefined}>
+                    <Link href={sortHref("name")} >
+                      {l.colName}
+                      {sort === "name" && <span className="sort">↓</span>}
+                    </Link>
+                  </th>
+                  {visibleColumns.map((key) =>
+                    key === "lastActivity" ? (
+                      <th key={key} className={sort === "lastActivity" ? "sorted" : undefined}>
+                        <Link href={sortHref("lastActivity")} >
+                          {columnLabel(key, l)}
+                          {sort === "lastActivity" && <span className="sort">↓</span>}
+                        </Link>
+                      </th>
+                    ) : (
+                      <th key={key}>{columnLabel(key, l)}</th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -804,7 +843,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                     </td>
                     {visibleColumns.map((key) => (
                       <td key={key} className={key === "created" ? "nowrap meta" : undefined}>
-                        {columnCell(key, row, dict)}
+                        {columnCell(key, row, dict, relTime)}
                       </td>
                     ))}
                   </tr>

@@ -11,7 +11,7 @@
  */
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, person, personBdConnection } from "@/db/schema";
+import { activity, bd, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 import { BOARD_COLUMNS } from "@/lib/contacts/board";
@@ -21,6 +21,11 @@ import {
   groupBdConnectionsByPerson,
   type BdConnectionSummary,
 } from "@/lib/contacts/bdConnections";
+import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
+import type { ContactSortKey } from "@/lib/contacts/sort";
+import type { getDictionary } from "@/lib/i18n/server";
+
+type Dict = Awaited<ReturnType<typeof getDictionary>>;
 
 const LIKE_WILDCARD_RE = /[%_\\]/g;
 function escapeLikeWildcards(value: string): string {
@@ -98,9 +103,12 @@ export interface ContactListRow {
   // existed with zero UI surface).
   seniority: string | null;
   // "BDs conectados" column (mockups/contacts.html avatar-stack cell) —
-  // populated by attachBdConnections() below, one extra batched query
+  // populated by attachDerivedColumns() below, one extra batched query
   // scoped to exactly this page's ids, never a per-row query.
   bdConnections: BdConnectionSummary;
+  // "Última actividad" column — same batching convention, `null` when a
+  // person has zero `activity` rows (mockup renders "—").
+  lastActivity: LastActivityEntry | null;
 }
 
 const CONTACT_LIST_ROW_COLUMNS = {
@@ -122,38 +130,60 @@ const CONTACT_LIST_ROW_COLUMNS = {
   seniority: person.seniority,
 } as const;
 
-type ContactListRowWithoutConnections = Omit<ContactListRow, "bdConnections">;
+type ContactListRowBase = Omit<ContactListRow, "bdConnections" | "lastActivity">;
 
 const EMPTY_BD_CONNECTION_SUMMARY: BdConnectionSummary = { avatars: [], title: "" };
 
 /**
- * Batches the "BDs conectados" read: ONE query for every already-paginated
- * row's `person_bd_connection` rows (never per-row, never unbounded — the
- * `inArray` set is exactly the page/board-column/export ids the caller
- * already fetched, so this stays index-friendly on `person_bd_connection`'s
- * PK/`byBd` index no matter how large the full table gets).
+ * Batches the "BDs conectados" + "Última actividad" reads: TWO extra
+ * queries total (never per-row) for every already-paginated row's
+ * `person_bd_connection` rows and single most-recent `activity` row. The
+ * `inArray`/`DISTINCT ON` sets are exactly the page/board-column/export ids
+ * the caller already fetched, so this stays index-friendly
+ * (`person_bd_connection`'s PK, `activity_person_idx`/`activity_created_idx`)
+ * no matter how large the full tables get.
  */
-async function attachBdConnections(
-  rows: ContactListRowWithoutConnections[],
+async function attachDerivedColumns(
+  rows: ContactListRowBase[],
+  dict: Dict,
 ): Promise<ContactListRow[]> {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
-  const connectionRows = await db
-    .select({
-      personId: personBdConnection.personId,
-      bdId: personBdConnection.bdId,
-      bdName: bd.name,
-    })
-    .from(personBdConnection)
-    .innerJoin(bd, eq(bd.id, personBdConnection.bdId))
-    .where(inArray(personBdConnection.personId, ids));
 
-  const grouped = groupBdConnectionsByPerson(connectionRows);
+  const [connectionRows, activityRows] = await Promise.all([
+    db
+      .select({
+        personId: personBdConnection.personId,
+        bdId: personBdConnection.bdId,
+        bdName: bd.name,
+      })
+      .from(personBdConnection)
+      .innerJoin(bd, eq(bd.id, personBdConnection.bdId))
+      .where(inArray(personBdConnection.personId, ids)),
+    db
+      .selectDistinctOn([activity.personId], {
+        personId: activity.personId,
+        type: activity.type,
+        metadata: activity.metadata,
+        createdAt: activity.createdAt,
+      })
+      .from(activity)
+      .where(and(inArray(activity.personId, ids), sql`${activity.personId} is not null`))
+      .orderBy(activity.personId, desc(activity.createdAt)),
+  ]);
+
+  const groupedConnections = groupBdConnectionsByPerson(connectionRows);
+  const lastActivityMap = buildLastActivityEntries(
+    activityRows.map((r) => ({ ...r, personId: r.personId as string })),
+    dict,
+  );
+
   return rows.map((row) => ({
     ...row,
-    bdConnections: grouped.has(row.id)
-      ? buildBdConnectionSummaries(grouped.get(row.id)!)
+    bdConnections: groupedConnections.has(row.id)
+      ? buildBdConnectionSummaries(groupedConnections.get(row.id)!)
       : EMPTY_BD_CONNECTION_SUMMARY,
+    lastActivity: lastActivityMap.get(row.id) ?? null,
   }));
 }
 
@@ -170,12 +200,31 @@ export interface ContactListPage {
  * contacts" reproduced as a saved view). Rows with `merged_into_id` set are
  * always excluded — those are hidden from every read (design D1/D6).
  */
+/**
+ * Aggregate MAX(activity.createdAt) per person — used ONLY to ORDER BY
+ * "Última actividad" at the SQL level (so pagination/LIMIT-OFFSET happens
+ * on the correctly-sorted set, not re-sorted client-side after a page is
+ * already cut). Separate from `attachDerivedColumns`'s per-row DISTINCT ON
+ * fetch, which needs the *type* for the label, not just the max timestamp.
+ */
+const lastActivityAgg = db
+  .select({
+    personId: activity.personId,
+    lastActivityAt: sql<Date>`max(${activity.createdAt})`.as("last_activity_at"),
+  })
+  .from(activity)
+  .where(sql`${activity.personId} is not null`)
+  .groupBy(activity.personId)
+  .as("last_activity_agg");
+
 export async function getContactListPage(
   filters: ContactFilters,
   meBdId: string,
   q: string | undefined,
   page: number,
   pageSize: number,
+  dict: Dict,
+  sort: ContactSortKey = "lastActivity",
   hiringKeys?: Set<string>,
 ): Promise<ContactListPage> {
   const where = await baseContactFilterConditions(filters, meBdId, hiringKeys);
@@ -193,16 +242,22 @@ export async function getContactListPage(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
+  const orderBy =
+    sort === "lastActivity"
+      ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`]
+      : [asc(person.lastName), asc(person.firstName)];
+
   const baseRows = await db
     .select(CONTACT_LIST_ROW_COLUMNS)
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))
+    .leftJoin(lastActivityAgg, eq(lastActivityAgg.personId, person.id))
     .where(and(...where))
-    .orderBy(asc(person.lastName), asc(person.firstName))
+    .orderBy(...orderBy)
     .limit(pageSize)
     .offset((safePage - 1) * pageSize);
 
-  const rows = await attachBdConnections(baseRows);
+  const rows = await attachDerivedColumns(baseRows, dict);
 
   return { rows, total, page: safePage, pageSize, totalPages };
 }
@@ -229,6 +284,7 @@ export async function getContactBoardColumns(
   filters: ContactFilters,
   meBdId: string,
   q: string | undefined,
+  dict: Dict,
   hiringKeys?: Set<string>,
 ): Promise<ContactBoardColumn[]> {
   const base = await baseContactFilterConditions(filters, meBdId, hiringKeys);
@@ -256,7 +312,7 @@ export async function getContactBoardColumns(
               .orderBy(desc(person.createdAt))
               .limit(BOARD_COLUMN_LIMIT);
 
-      const rows = await attachBdConnections(baseRows);
+      const rows = await attachDerivedColumns(baseRows, dict);
 
       return { status: status as PersonStatus, rows, total };
     }),
@@ -271,14 +327,14 @@ export async function getContactBoardColumns(
  * every other read. No `total`/pagination — ids.length IS the row count,
  * already capped by sanitizeBulkPersonIds (MAX_BULK_SELECTION) upstream.
  */
-export async function getContactListRowsByIds(ids: string[]): Promise<ContactListRow[]> {
+export async function getContactListRowsByIds(ids: string[], dict: Dict): Promise<ContactListRow[]> {
   if (!ids.length) return [];
   const baseRows = await db
     .select(CONTACT_LIST_ROW_COLUMNS)
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))
     .where(and(sql`${person.mergedIntoId} is null`, inArray(person.id, ids)));
-  return attachBdConnections(baseRows);
+  return attachDerivedColumns(baseRows, dict);
 }
 
 /**

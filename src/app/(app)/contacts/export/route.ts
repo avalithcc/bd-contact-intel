@@ -30,6 +30,7 @@ export async function GET(request: Request): Promise<Response> {
     status: l.colStatus,
     email: l.colEmail,
     bdConnections: l.colBdConnections,
+    lastActivity: l.colLastActivity,
     roleGroup: l.colRoleGroup,
     industry: l.colIndustry,
     country: l.colCountry,
@@ -38,7 +39,7 @@ export async function GET(request: Request): Promise<Response> {
     seniority: l.colSeniority,
   };
 
-  const rows = ids.length ? await getContactListRowsByIds(ids) : [];
+  const rows = ids.length ? await getContactListRowsByIds(ids, dict) : [];
   const csv = buildContactsCsv(
     rows.map((row) => ({
       firstName: row.firstName,
@@ -48,6 +49,9 @@ export async function GET(request: Request): Promise<Response> {
       statusLabel: dict.leadStatuses[row.status as keyof typeof dict.leadStatuses] ?? row.status,
       email: row.email,
       bdConnectionNames: row.bdConnections.title,
+      lastActivityText: row.lastActivity
+        ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`
+        : "",
       roleGroup: row.roleGroup,
       industry: row.industry,
       country: row.country,
