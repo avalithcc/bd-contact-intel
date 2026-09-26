@@ -43,15 +43,15 @@ A new gated migration phase, `hubspot_import`, in `scripts/unify-contacts.ts`. T
 ### D4 — Identity: reuse `planIdentityWrites`, extended
 - **Mapper**: HubSpot rows become `IdentityIngestRow` with `legacyTable:'hubspot_contact'`, `profileKey = normalizeProfileKey(linkedin)` (≈0.6%), `emailStatus:'probable'`, `emailSource:'hubspot_import'`, and `sourceKey:'hubspot_import'`.
 - **Status vocabulary**: The spec's "unverified" maps to the existing `probable` status, so the `EmailStatus` union, filters and ranks stay as they are.
-- **Matcher change** (contact-identity delta, applies to every source):
+- **Matcher change** (contact-identity delta, scoped to `source: 'hubspot_import'` rows only):
   - Add `IdentityIndex.byEmail(email): PersonId[]` (live persons, any status).
-  - After the strong keys, an exact email match where either side is not `verified` returns `review` with the new reason `email_unverified`.
+  - After the strong keys, an exact email match where either side is not `verified` returns `review` with the new reason `email_unverified` — but only when the incoming row's `source` is `'hubspot_import'`. Plain `contact`/`lead` rows (live ingest, catch-up) never set `source`, so this rule never fires for them; they keep matching exactly as before.
   - Prefetch gains one indexed query on `email_normalized`.
   - `buildNameCompanyKey` prefers an explicit `companyKey`, so a domain-resolved key is used for matching.
 - **Resolver extensions**: optional `ownerBdId`, `company`, `city`, `country`, and `migrationRunId` on persons and map rows. `bdId` becomes nullable, with no `person_bd_connection` for HubSpot rows, because a HubSpot owner is not a LinkedIn connection. A `mergePolicy: 'r7' | 'fill_empty'` option, where HubSpot uses `fill_empty`.
 - **Owner**: `normalizeNameKey(hubspotOwner) === normalizeNameKey(bd.name)`. Blank or deactivated owners (the `(Deactivated…)` suffix, pinned from the real file) are unassigned. Unknown names are unassigned, and the report counts them per owner name. BD names are not contact PII.
 - **Re-import (R7/Q3)**: Rows already mapped skip the matcher. `planHubSpotRefill` fills only null/empty fields; the email fields move together and only fill when `email` is null. Every filled field writes `person_property_history(source:'import')`. A profile-key auto-match gets the same fill-empty treatment.
-- **Consequences**: Live lead ingest and catch-up will also start opening `email_unverified` pairs. The review UI needs a Spanish label for that reason.
+- **Consequences**: The `email_unverified` rule is scoped to `source: 'hubspot_import'` rows only — live CSV/lead ingest and catch-up are unaffected and never open this kind of pair. The review UI still needs a Spanish label for the reason, since HubSpot-imported rows do surface it.
 
 ### D5 — Past outreach → `status_backfill`
 `src/lib/hubspot/statusEvidence.ts` (pure) emits at most one stage backfill (the highest) plus at most one discard:
@@ -136,5 +136,5 @@ A new gated migration phase, `hubspot_import`, in `scripts/unify-contacts.ts`. T
 - [ ] `HUBSPOT_REVIEW_THRESHOLD` value (proposed 300, ≈5%).
 - [ ] Create companies only for those with linked contacts or a note (proposed), or all 3,230?
 - [ ] Accept the `company.domain` migration (required by the spec's domain-first rule)?
-- [ ] Should the `email_unverified` review rule also apply to live lead ingest (the spec says every source)?
+- [x] Should the `email_unverified` review rule also apply to live lead ingest (the spec says every source)? Resolved: no — scoped to `source: 'hubspot_import'` only (see D4 Consequences).
 - [ ] Spec wording: "unverified" is stored as `probable` with `emailSource='hubspot_import'`.
