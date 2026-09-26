@@ -7,6 +7,7 @@ import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/conta
 import { contactActionErrorHref } from "../actionErrors";
 import {
   addContactNoteAction,
+  addContactSignalAction,
   addContactTaskAction,
   discardContactAction,
   logContactMeetingAction,
@@ -21,7 +22,7 @@ export interface QuickActionsProps {
   email: string | null;
 }
 
-type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | null;
+type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | "signal" | null;
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -61,7 +62,9 @@ function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error:
 /**
  * Quick actions row (task 9.2): Nota/Correo/Tarea wired; Reunión/Descartar
  * wired in PR 10b (tasks 10.2/10.3) to logContactMeetingAction /
- * discardContactAction.
+ * discardContactAction. "Pegar señal" added in task 11.6 to close the
+ * feature-parity gap flagged in PR 11c (legacy `/leads/[id]` and
+ * `/contact/[id]` "+ Paste signal" composer had no equivalent here).
  */
 export function QuickActions({ personId, labels: l, email }: QuickActionsProps) {
   const router = useRouter();
@@ -95,6 +98,9 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
         </button>
         <button type="button" className={styles.qa} onClick={() => toggle("discard")}>
           {l.quickActionDiscard}
+        </button>
+        <button type="button" className={styles.qa} onClick={() => toggle("signal")}>
+          {l.quickActionSignal}
         </button>
       </div>
 
@@ -203,6 +209,27 @@ export function QuickActions({ personId, labels: l, email }: QuickActionsProps) 
             setBusy(true);
             setError(null);
             const result = await discardContactAction(personId, reason, note);
+            setBusy(false);
+            if (result.ok) {
+              closeQuickAction();
+              router.refresh();
+            } else {
+              setError({ message: contactActionErrorMessage(l, result.reason) });
+            }
+          }}
+        />
+      )}
+
+      {openAction === "signal" && (
+        <SignalForm
+          labels={l}
+          busy={busy}
+          error={error}
+          onCancel={closeQuickAction}
+          onSubmit={async (text) => {
+            setBusy(true);
+            setError(null);
+            const result = await addContactSignalAction(personId, text);
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -406,6 +433,36 @@ function DiscardForm({
           onClick={() => onSubmit(reason || null, note)}
         >
           {l.discardSubmit}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SignalForm({
+  labels: l,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+}: ComposerProps & { onSubmit: (text: string) => void }) {
+  const [text, setText] = useState("");
+  return (
+    <div className={styles.composer}>
+      {error && <ErrorNotice labels={l} error={error} />}
+      <textarea
+        className={styles.textarea}
+        placeholder={l.signalPlaceholder}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={busy}
+      />
+      <div className={styles.composerBar}>
+        <button type="button" onClick={onCancel} disabled={busy}>
+          {l.cancel}
+        </button>
+        <button type="button" onClick={() => text.trim() && onSubmit(text.trim())} disabled={busy || !text.trim()}>
+          {l.signalSave}
         </button>
       </div>
     </div>

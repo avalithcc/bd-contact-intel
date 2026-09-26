@@ -15,6 +15,7 @@ import { InvalidEmailError } from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/contacts/discard";
 import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
+import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
 
 export type ContactActionErrorReason =
   | "not_found"
@@ -27,6 +28,7 @@ export type ContactActionErrorReason =
   | "discard_reason_required"
   | "discard_note_required"
   | "meeting_date_required"
+  | "signal_text_required"
   | "unexpected";
 
 export type ContactActionResult = { ok: true } | { ok: false; reason: ContactActionErrorReason };
@@ -52,6 +54,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof DiscardReasonRequiredError) return "discard_reason_required";
   if (err instanceof DiscardNoteRequiredError) return "discard_note_required";
   if (err instanceof MeetingDateRequiredError) return "meeting_date_required";
+  if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
   return "unexpected";
 }
 

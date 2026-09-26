@@ -10,6 +10,7 @@ import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planDiscard } from "@/lib/contacts/discard";
+import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import {
   contactActionErrorReason,
   PropertyNotEditableError,
@@ -103,6 +104,24 @@ export async function discardContactAction(
     await assertContactEditableById(personId);
     const metadata = planDiscard(reason, note);
     await createActivityAction({ type: "discarded", personId, metadata: { ...metadata } });
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * "Pegar señal" quick action (task 11.6) — writes a `manual_paste` signal
+ * row for this Contact. Ports the legacy `/leads/[id]` and `/contact/[id]`
+ * "+ Paste signal" composer (`src/app/ManualSignal.tsx`) onto the record
+ * page; those legacy pages are now redirect-only (task 11.4/PR 11c).
+ */
+export async function addContactSignalAction(personId: string, text: string): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    const me = await getCurrentBd();
+    await addManualSignal(personId, text, me.id);
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

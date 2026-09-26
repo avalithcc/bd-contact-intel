@@ -42,6 +42,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorDiscardNoteRequired;
     case "meeting_date_required":
       return l.errorMeetingDateRequired;
+    case "signal_text_required":
+      return l.errorSignalTextRequired;
     case "unexpected":
       return l.genericError;
   }

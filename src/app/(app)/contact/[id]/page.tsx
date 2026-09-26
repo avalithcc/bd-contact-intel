@@ -15,10 +15,8 @@ interface ContactDetailPageProps {
  *
  * This page used to render the legacy per-BD contact detail directly
  * (activity timeline, task quick-add, manual signal paste). The record page
- * (/contacts/[id]) already covers the timeline and task actions. "Paste
- * signal" (manual signal entry, src/app/ManualSignal.tsx) has no equivalent
- * quick action on the new record yet — flagged as a Phase 11/12 gap in
- * tasks.md rather than silently dropped.
+ * (/contacts/[id]) now covers all of it, including "Pegar señal" (task
+ * 11.6, QuickActions.tsx) closing the gap flagged in PR 11c.
  */
 export default async function ContactDetailPage({ params }: ContactDetailPageProps) {
   const { id } = await params;
