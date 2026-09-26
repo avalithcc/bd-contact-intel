@@ -49,8 +49,10 @@ state) on 2026-09-26.
 
 ## Phase 5 — Account pages
 
-- [ ] 5.1 Redesign `/account`, `/account/password` pages per mockups (`account.html`, `account-password.html`, `account-email.html`).
-- [ ] 5.2 Spanish copy pass via `GLOSSARY.md`.
+- [x] 5.1 Redesign `/account`, `/account/password` pages per mockups (`account.html`, `account-password.html`, `account-email.html`). DONE — split into two branches (over the ~200-300 line forecast once the two full pages + shared icons/dict were counted together): `feat/mockup-parity-05-account` (account settings hub — profile card, preferences, connections/security list, sign-out) and `feat/mockup-parity-05b-account-email` (Gmail connection screen — status cards, props list, alerts, one-time success Toast). `/account/password` is intentionally left as-is: it's the `(auth)` route group's bare, no-shell layout (tasks.md 8.2 decision, shared with `/login`), reused for both first-time password setup and later changes — restyling it alone to the mockup's `.card`/`.field` language would fork it visually from `/login`, which is out of this phase's scope.
+- [x] 5.2 Spanish copy pass via `GLOSSARY.md`. DONE — new `accountSettings`/`accountEmail` dictionary namespaces (en+es); `/account/password` was already fully Spanish from an earlier phase.
+
+  Deviations from the mockups: no interactive Preferencias/Idioma toggle (product decision D10, `locales.ts` — Spanish-only, no `LocaleSwitcher`); no "Cambiada hace N meses" password meta (not tracked, replaced with a generic reminder); no "Desconectar" Gmail button (no disconnect server action/route exists yet — adding one would be a new feature, not a restyle; the connected card keeps the existing "Reconectar Gmail" action in that footer slot instead).
 
 ## Phase 6 — Legacy page restyle
 
