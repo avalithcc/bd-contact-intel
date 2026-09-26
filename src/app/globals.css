@@ -1437,3 +1437,126 @@ main {
 .duplicates-unmerge-confirm button.danger:hover:not(:disabled) {
   filter: brightness(0.92);
 }
+
+/* =========================================================================
+   Shared Avatar / Dialog components (mockup-parity Phase 2). Ported from
+   openspec/changes/crm-hubspot-ux/mockups/styles.css — see
+   src/components/Avatar.tsx and src/components/Dialog.tsx.
+   ========================================================================= */
+
+/* ---- avatar (src/components/Avatar.tsx) ---- */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--avatar-1);
+  color: var(--color-accent-fg);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.avatar-sm {
+  width: 22px;
+  height: 22px;
+  font-size: 0.6rem;
+}
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
+}
+.avatar.a1 {
+  background: var(--avatar-1);
+}
+.avatar.a2 {
+  background: var(--avatar-2);
+}
+.avatar.a3 {
+  background: var(--avatar-3);
+}
+.avatar.a4 {
+  background: var(--avatar-4);
+}
+.avatar.a5 {
+  background: var(--avatar-5);
+}
+.avatar.a6 {
+  background: var(--avatar-6);
+}
+/* Contacts are circles (default); BDs are rounded squares. */
+.avatar-bd {
+  border-radius: var(--radius-sm);
+}
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-base);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.avatar-stack {
+  display: inline-flex;
+}
+.avatar-stack .avatar {
+  box-shadow: 0 0 0 2px var(--color-surface-2);
+}
+.avatar-stack .avatar + .avatar {
+  margin-left: -6px;
+}
+
+/* ---- dialog (src/components/Dialog.tsx) ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--color-overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+}
+.dialog {
+  width: min(520px, 92vw);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  border: 1px solid var(--color-border);
+}
+.dialog.wide {
+  width: min(720px, 94vw);
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+}
+.dialog-header h2 {
+  font-size: var(--text-lg);
+}
+.dialog-header .close {
+  margin-left: auto;
+}
+.dialog-body {
+  padding: var(--space-xl);
+}
+.dialog-body > * + * {
+  margin-top: var(--space-lg);
+}
+.dialog-footer {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  padding: var(--space-md) var(--space-xl);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-1);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.dialog-footer .left {
+  margin-right: auto;
+}
