@@ -1,39 +1,104 @@
+.page {
+  max-width: 560px;
+}
+
 .backLink {
   display: inline-block;
   margin-bottom: var(--space-lg);
   color: var(--color-ink-soft);
   font-size: var(--text-sm);
+  text-decoration: none;
 }
 
-.header {
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.pageHeader {
   margin-bottom: var(--space-2xl);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-ink);
 }
 
 .error {
   margin-bottom: var(--space-lg);
-  color: var(--color-danger);
-  font-size: var(--text-base);
+  padding: var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-badge-danger-bg);
+  color: var(--color-danger-text);
+  font-size: var(--text-sm);
 }
 
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  max-width: 520px;
+  padding: var(--space-2xl);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
 }
 
-.field span {
-  color: var(--color-ink-soft);
-  font-size: var(--text-sm);
+.field input,
+.field select,
+.field textarea {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  font-weight: 400;
+  background: var(--color-surface-1);
+  color: var(--color-ink);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 .actions {
   display: flex;
-  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+.actions button {
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: white;
+  font-weight: 600;
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.actions button:hover {
+  background: var(--color-accent-hover);
 }
