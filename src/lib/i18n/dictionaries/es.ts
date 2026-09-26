@@ -624,6 +624,33 @@ export const es: typeof en = {
     passwordRowMeta: "Actualizá tu contraseña de acceso",
   },
 
+  accountEmail: {
+    eyebrow: "Cuenta",
+    title: "conexión con gmail",
+    subtitle:
+      "Permite enviar correos desde las fichas de contacto usando la cuenta de Gmail conectada.",
+    connectedTitle: "Estado: conectado",
+    notConfiguredTitle: "Estado: sin configurar",
+    disconnectedTitle: "Estado: sin conectar",
+    badgeConnected: "Conectado",
+    badgeNotAvailable: "No disponible",
+    addressLabel: "Dirección",
+    connectedLabel: "Conectado",
+    permissionsLabel: "Permisos",
+    permissionsValue: "Solo envío de correo",
+    syncNote:
+      "La sincronización de correo (registrar respuestas en la cronología) llegará más adelante y va a requerir reconectar con permiso de lectura.",
+    notConfiguredWarning: "Gmail no está configurado en el servidor.",
+    notConfiguredHint:
+      "Solicitá a un administrador que configure las credenciales de OAuth de Google. Aún es posible registrar los correos manualmente desde una ficha de contacto.",
+    connectDescription: "Conectá tu cuenta de Gmail para habilitar el envío de correos desde Avalith.",
+    connectNote: "Nota: el modo de prueba externa requiere reconectar cada 7 días.",
+    connectButton: "Conectar Gmail",
+    reconnectButton: "Reconectar Gmail",
+    connectedSuccessToast: "Gmail conectado correctamente.",
+    errorNotConfigured: "Gmail no está configurado en el servidor. Contactá a un administrador.",
+  },
+
   upload: {
     connectionsLabel: "Connections.csv de LinkedIn",
     import: "Importar",

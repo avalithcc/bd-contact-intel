@@ -731,6 +731,32 @@ export const en = {
     passwordRowMeta: "Update your sign-in password",
   },
 
+  accountEmail: {
+    eyebrow: "Account",
+    title: "gmail connection",
+    subtitle: "Lets you send emails from a contact record using the connected Gmail account.",
+    connectedTitle: "Status: connected",
+    notConfiguredTitle: "Status: not configured",
+    disconnectedTitle: "Status: not connected",
+    badgeConnected: "Connected",
+    badgeNotAvailable: "Not available",
+    addressLabel: "Address",
+    connectedLabel: "Connected",
+    permissionsLabel: "Permissions",
+    permissionsValue: "Send-only",
+    syncNote:
+      "Email sync (logging replies to the timeline) is coming later and will require reconnecting with read permission.",
+    notConfiguredWarning: "Gmail is not configured on the server.",
+    notConfiguredHint:
+      "Ask an admin to configure Google OAuth credentials. You can still log emails manually from a contact record.",
+    connectDescription: "Connect your Gmail account to enable email sending from Avalith.",
+    connectNote: "Note: external-testing mode requires reconnecting every 7 days.",
+    connectButton: "Connect Gmail",
+    reconnectButton: "Reconnect Gmail",
+    connectedSuccessToast: "Gmail connected successfully.",
+    errorNotConfigured: "Gmail is not configured on the server. Contact an admin.",
+  },
+
   upload: {
     connectionsLabel: "LinkedIn Connections.csv",
     import: "Import",
