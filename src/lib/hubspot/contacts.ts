@@ -6,6 +6,15 @@
  * src/lib/hubspot/columns.ts for the pinned header names used as keys.
  */
 
+/**
+ * The HubSpot portal this export comes from is set to Argentina time
+ * (confirmed by the owner): UTC-3, no daylight saving. Every "YYYY-MM-DD" /
+ * "YYYY-MM-DD HH:mm" timestamp in the export (e.g. "Último contacto") is in
+ * this timezone, not the process's local TZ.
+ */
+export const HUBSPOT_PORTAL_TIMEZONE = "America/Argentina/Buenos_Aires";
+const HUBSPOT_PORTAL_UTC_OFFSET_MINUTES = -180;
+
 export interface HubSpotContactRow {
   hubspotContactId: string;
   firstName: string | null;
@@ -47,10 +56,23 @@ function parseIntField(value: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * Parses a "YYYY-MM-DD" or "YYYY-MM-DD HH:mm" value as portal-local time
+ * (`HUBSPOT_PORTAL_TIMEZONE`, a fixed UTC-3 with no DST) into the equivalent
+ * UTC instant. Pure arithmetic via `Date.UTC` — never depends on the
+ * running process's TZ, unlike `new Date("YYYY-MM-DD HH:mm")` which parses
+ * that non-ISO form as local time.
+ */
 function parseDateField(value: string | undefined): Date | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
-  const d = new Date(trimmed);
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/.exec(trimmed);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  const utcMs =
+    Date.UTC(Number(year), Number(month) - 1, Number(day), hour ? Number(hour) : 0, minute ? Number(minute) : 0) -
+    HUBSPOT_PORTAL_UTC_OFFSET_MINUTES * 60_000;
+  const d = new Date(utcMs);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 

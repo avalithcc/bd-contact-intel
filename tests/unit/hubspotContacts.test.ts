@@ -87,3 +87,16 @@ test("falls back to 'URL de LinkedIn' when 'LinkedIn' is blank", () => {
 test("linkedinUrl is null when both LinkedIn columns are blank or absent", () => {
   assert.equal(mapHubSpotContactRow(row({ LinkedIn: "", "URL de LinkedIn": "" })).linkedinUrl, null);
 });
+
+test("parses 'YYYY-MM-DD HH:mm' portal-local timestamps as Argentina time (UTC-3), independent of process TZ", () => {
+  // 2026-09-21 16:34 in America/Argentina/Buenos_Aires (UTC-3, no DST) is
+  // 2026-09-21T19:34:00Z.
+  const mapped = mapHubSpotContactRow(row({ "Último contacto": "2026-09-21 16:34" }));
+  assert.ok(mapped.lastContactAt instanceof Date);
+  assert.equal(mapped.lastContactAt!.toISOString(), "2026-09-21T19:34:00.000Z");
+});
+
+test("parses a date-only value as portal-local midnight (Argentina, UTC-3)", () => {
+  const mapped = mapHubSpotContactRow(row({ "Fecha de creación": "2026-01-15" }));
+  assert.equal(mapped.createdAt!.toISOString(), "2026-01-15T03:00:00.000Z");
+});
