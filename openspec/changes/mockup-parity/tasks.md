@@ -56,8 +56,12 @@ state) on 2026-09-26.
 
 ## Phase 6 — Legacy page restyle
 
-- [ ] 6.1 `/hiring`, `/discovery`, `/whats-new` full restyle (beyond the Phase 1 header fix): migrate remaining ad hoc modals/dropdowns to `Dialog`/`Toast`, adopt shared `Avatar` where applicable.
+- [ ] 6.1 `/hiring`, `/discovery`, `/whats-new` full restyle (beyond the Phase 1 header fix): migrate remaining ad hoc modals/dropdowns to `Dialog`/`Toast`, adopt shared `Avatar` where applicable. NOT STARTED — see 6.2 note below for the branch that will pick this up.
 - [ ] 6.2 `/tasks`, `/companies`, company record restyle + modal migration.
+  - DONE (branch `feat/mockup-parity-06a-tasks`, chained on `05c-toast-param`): `/tasks` rebuilt per `mockups/tasks.html` — three-tier grouping (Vencidas/Hoy/Próximas) inside a shared table pattern (`.tableWrap`/`.table`, page-scoped module classes, not the mockup's literal global class names — same convention as Phase 5), `owner-chip` + `Avatar` (`variant="bd"`) for the responsable column, danger/warn/neutral due-date badges. `CompleteTaskButton` changed from a round ✓ button to a checkbox input (matches the mockup's `col-check` pattern) with the exact same `completeTaskAction` call/loading/error handling — no server action or query changed. New `tasksPage` dict namespace (en+es) replaces the page's hardcoded English strings and emoji.
+    - Deviation: the mockup's `view-tabs` (Mis tareas abiertas / Todas abiertas / Completadas) and "Nueva tarea" primary action were NOT implemented — both would require new queries/routes ("all tasks across BDs", "completed tasks", a task-creation form) that don't exist in the current codebase, which is out of scope for a presentation-only restyle ("keep every server action, query and filter behavior unchanged").
+    - Deviation: the mockup's "Asociado con" column links to `contact-record.html`; the current `getOpenTasks`/`getOverdueTasks` queries return `leadId`/`companyKey` as presence flags only (no contact/company name or a verified route), so the column renders a plain "Contacto"/"Empresa" label instead of a link, to avoid fabricating a navigation target.
+  - REMAINING (not started this batch): `/companies` list (~216-line CSS module + 120-line page + `EditCompanyModal`/`AddActivityModal` → `Dialog` migration) and `/companies/[key]` company record (~140-line CSS + 114-line page) and `/companies/new` (~107-line page). Combined surface is ~1,246 lines across 10 files before any rewrite — expect this to need its own chained branch(es) (`06b`+), per the Review Workload Forecast below. `/hiring`, `/discovery`, `/whats-new` (6.1) also remain, likely `06c`+.
 
 ## Phase 7 — Duplicates / import / migration polish
 
