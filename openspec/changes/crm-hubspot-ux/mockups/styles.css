@@ -559,6 +559,7 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .tl-icon.reply { color: var(--status-replied-text); background: var(--status-replied-bg); border-color: transparent; }
 .tl-icon.system { color: var(--color-ink-subtle); background: var(--color-surface-sunken); border-style: dashed; }
 .tl-icon.discard { color: var(--color-danger-text); background: var(--color-danger-bg); border-color: transparent; }
+.tl-icon.call { color: var(--status-contacted-text); background: var(--status-contacted-bg); border-color: transparent; }
 .tl-card { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg); }
 .tl-card.system { background: var(--color-surface-1); border-style: dashed; }
 .tl-head { display: flex; align-items: baseline; gap: var(--space-sm); flex-wrap: wrap; }
