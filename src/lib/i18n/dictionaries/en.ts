@@ -954,6 +954,9 @@ export const en = {
     boardMoveToLabel: "Move to…",
     boardColumnMore: (count: number) => `View all ${count} in the table`,
     boardColumnEmpty: "No contacts in this column.",
+    boardMoveConfirmTitlePrefix: "Move to",
+    boardMoveConfirmBody: "The contact will open to log the matching action.",
+    boardMoveConfirmConfirm: "Continue",
   },
 
   contactsImport: {

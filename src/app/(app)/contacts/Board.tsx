@@ -35,9 +35,15 @@ function cardSub(row: ContactListRow): string | null {
  */
 export function Board({ columns, dict, tableHref }: BoardProps) {
   const l = dict.contactList;
+  const moveConfirmLabels = {
+    titlePrefix: l.boardMoveConfirmTitlePrefix,
+    body: l.boardMoveConfirmBody,
+    confirm: l.boardMoveConfirmConfirm,
+    cancel: l.cancel,
+  };
 
   return (
-    <BoardDnD>
+    <BoardDnD labels={moveConfirmLabels}>
       <p className={styles.boardHint}>{l.boardDropHint}</p>
       <div className={styles.board}>
         {columns.map((col) => {
@@ -81,7 +87,11 @@ export function Board({ columns, dict, tableHref }: BoardProps) {
                         <summary aria-label={l.boardMoveToLabel}>{l.boardMoveToLabel}</summary>
                         <div className={styles.boardMoveMenuList}>
                           {targets.map((status) => (
-                            <Link key={status} href={`/contacts/${row.id}?openAction=${boardDropAction(status)}`}>
+                            <Link
+                              key={status}
+                              href={`/contacts/${row.id}?openAction=${boardDropAction(status)}`}
+                              data-board-move-label={dict.leadStatuses[status]}
+                            >
                               {dict.leadStatuses[status]}
                             </Link>
                           ))}

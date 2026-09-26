@@ -835,6 +835,9 @@ export const es: typeof en = {
     boardMoveToLabel: "Mover a…",
     boardColumnMore: (count: number) => `Ver los ${count} en la tabla`,
     boardColumnEmpty: "Sin contactos en esta columna.",
+    boardMoveConfirmTitlePrefix: "Mover a",
+    boardMoveConfirmBody: "Se abrirá el contacto para registrar la acción correspondiente.",
+    boardMoveConfirmConfirm: "Continuar",
   },
 
   // `/contacts/import` (task 14.2; mockups/import.html) — consolidates the

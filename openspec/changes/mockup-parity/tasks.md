@@ -41,11 +41,11 @@ state) on 2026-09-26.
 - [x] 3.2 TopBar account/avatar menu (same branch). DONE — replaces the ad hoc `UserMenu` on `/hiring`, `/discovery`, `/whats-new` (shell now covers it); `/outreach` keeps `UserMenu` (mid-flight on another branch, out of scope). New pure `initialsFromName` helper (RED→GREEN in `tests/unit/initials.test.ts`) derives the avatar initials from the BD's name.
 - [x] 3.3 Sidebar nav icons (branch `feat/mockup-parity-03b-sidebar-icons`, chained on 3a). DONE — per-item icons added, deferred from Phase 8. Item **counts** (`.nav-count`/`.pill-count`) are intentionally NOT added: no cheap count-only query exists yet for contacts/tasks/discovery (existing queries return full rows, not a count), and the apply instructions require counts to come from a cheap existing query or be left out — revisit once such a query exists.
 
-## Phase 4 — Contacts list + record quick actions
+## Phase 4 — Contacts list + record quick actions (branches `feat/mockup-parity-04a-list-avatars`, `04b-quickactions-dialog`, `04c-board-move-confirm`, chained on phase 3)
 
-- [ ] 4.1 Contacts list avatars + owner chips (`Avatar` component from 2.1).
-- [ ] 4.2 Record quick actions (discard, log meeting, etc.) migrated to `Dialog` (2.2) instead of ad hoc modals.
-- [ ] 4.3 Board move-confirm dialog using `Dialog`.
+- [x] 4.1 Contacts list avatars + owner chips (`Avatar` component from 2.1). DONE — `page.tsx` name cell (circle avatar) and owner column, `Board.tsx` card foot (rounded-square `avatar-bd` owner-chip). No query changes: `ContactListRow` already carried `ownerBdId`/`ownerName`.
+- [x] 4.2 Record quick actions (discard, log meeting, etc.) migrated to `Dialog` (2.2) instead of ad hoc modals. DONE — Task/Email/Meeting/Discard composers now render inside `Dialog`, matching mockups/contact-record.html's `#task`/`#email`/`#meeting`/`#discard` overlays; Note and "Pegar señal" stay inline (mockup's own `#log-note` composer isn't a dialog either). Every quick action also shows a success/failure Toast (2.3/2.4).
+- [x] 4.3 Board move-confirm dialog using `Dialog`. DONE — both the drag-and-drop drop and the native "Mover a..." menu now confirm through a shared `Dialog` before navigating to `/contacts/[id]?openAction=X`; no-JS fallback (the plain link) is unchanged.
 
 ## Phase 5 — Account pages
 
