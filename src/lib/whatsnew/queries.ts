@@ -152,6 +152,11 @@ function buildSuggestedContacts(
     const roleGroup = (c.roleGroup ?? null) as RoleGroupKey | null;
     return {
       id: c.id,
+      // Always true here: unlike /outreach's re-scoped person-based query,
+      // this feed still reads the legacy `contact` table directly (below),
+      // so `id` is always this BD's own contact row (fresh-review UX fix;
+      // see OutreachRow.hasOwnContact).
+      hasOwnContact: true,
       firstName: c.firstName,
       lastName: c.lastName,
       company: companyDisplayName,

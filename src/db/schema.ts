@@ -757,7 +757,7 @@ export const personPropertyHistory = pgTable(
     changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // 'edit' | 'merge' | 'import' | 'migration'
+    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration'
     source: text("source").notNull(),
     at: timestamp("at").notNull().defaultNow(),
   },
