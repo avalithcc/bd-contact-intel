@@ -847,4 +847,43 @@ export const en = {
       unexpected: "The action could not be completed. Please try again.",
     },
   },
+
+  // `/contacts` list (task 12.2-12.4; contact-list spec). System view labels
+  // for src/lib/contacts/views.ts#SYSTEM_VIEWS — a BD-created saved view's
+  // name is stored as free text in the DB and rendered as-is, not looked up
+  // here.
+  contactList: {
+    pageTitle: "Contacts",
+    subtitle: "A shared record per person. Status is derived from logged activity.",
+    views: {
+      all: "All contacts",
+      mine: "My contacts",
+      notContacted: "Not contacted",
+      newVerified: "New with verified email",
+      hiring: "Hiring companies",
+      outreachReady: "Outreach-ready",
+    },
+    colName: "Name",
+    colCompany: "Company",
+    colOwner: "Owner",
+    colStatus: "Status",
+    colEmail: "Email",
+    emailVerified: "Verified",
+    emailProbable: "Probable",
+    emailNone: "No email",
+    ownerNone: "—",
+    noResults: "No contacts match this view.",
+    showingRange: (from: number, to: number, total: number) =>
+      `Showing ${from}–${to} of ${total}`,
+    prevPage: "Previous",
+    nextPage: "Next",
+    pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
+    saveView: "Save view",
+    savedViewsGroupLabel: "Saved views",
+    saveViewNameLabel: "View name",
+    saveViewHelp: "Personal view. Team views (All, My contacts, Not contacted, Hiring companies, Outreach-ready) are defined by the product.",
+    save: "Save",
+    cancel: "Cancel",
+    deleteView: "Delete view",
+  },
 };
