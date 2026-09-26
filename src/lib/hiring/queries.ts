@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
@@ -350,8 +351,17 @@ export interface HiringMatch {
  * queries regardless of caller. `market`, `miamiOnly`, `hideOffshore` and
  * `startupsOnly` flow into resolveHiringCompanies' SQL WHERE clause, same as
  * getCompanyHiringSummaries above.
+ *
+ * Wrapped in React `cache()` (owner feedback round 18, perf pass): on the
+ * "Outreach" system view with no ad-hoc market/startups override, the
+ * `/contacts` "Contratando" badge call (page.tsx, zero args) and
+ * listOutreachCandidates' own call (src/lib/outreach/queries.ts, filters.*
+ * all `undefined` in that case) resolve to the exact same argument tuple —
+ * a genuine duplicate within one request. `cache()` dedupes by args for the
+ * lifetime of the request (same mechanism Next.js uses for `fetch`); it is
+ * a no-op the rest of the time, when the two call sites' args differ.
  */
-export async function getHiringMatchIndex(
+export const getHiringMatchIndex = cache(async function getHiringMatchIndex(
   market?: MarketKey,
   miamiOnly?: boolean,
   hideOffshore?: boolean,
@@ -373,7 +383,7 @@ export async function getHiringMatchIndex(
     for (const key of c.matchKeys) index.set(key, match);
   }
   return index;
-}
+});
 
 export interface CompanyPostingsForMessage {
   companyKey: string;

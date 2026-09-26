@@ -954,6 +954,7 @@ export const es: typeof en = {
     pageOf: (page, pageCount) => `Página ${page} de ${pageCount}`,
     saveView: "Guardar vista",
     savedViewsGroupLabel: "Vistas guardadas",
+    moreViews: "Más vistas",
     saveViewNameLabel: "Nombre de la vista",
     saveViewDialogTitle: "Guardar vista",
     saveViewIncludesLabel: "Incluye",

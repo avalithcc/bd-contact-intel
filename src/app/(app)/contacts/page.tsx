@@ -33,6 +33,9 @@ import {
 } from "@/lib/contacts/columns";
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
 import { buildActiveFilterChips } from "@/lib/contacts/filterChips";
+import { splitViewTabs, type ViewTabItem } from "@/lib/contacts/viewTabs";
+import { DropdownMenu } from "@/components/DropdownMenu";
+import { LinkPendingDot } from "./LinkPendingDot";
 import { FilterMenu } from "./FilterMenu";
 import { deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
@@ -485,6 +488,66 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const currentFiltersQuery = serializeContactFilters(effectiveFilters).toString();
   const saveViewSummaryChips = buildSaveViewSummary(activeFilterChips, visibleColumns.length, l.saveViewColumnsLabel);
 
+  // View-tabs overflow fix (owner-chosen option A, feedback round 18): split
+  // every view into pinned tabs (always visible, no horizontal scroll down
+  // to ~1024px) vs. a "Más vistas" dropdown — see viewTabs.ts for the pure
+  // split and PINNED_VIEW_TAB_KEYS for the owner-chosen set.
+  const viewTabItems: ViewTabItem[] = [
+    ...SYSTEM_VIEWS.map((v, i) => ({
+      key: v.key,
+      label: l.views[v.key],
+      href: `/contacts?view=${v.key}`,
+      active: activeView.viewKey === v.key,
+      count: systemViewCounts[i],
+    })),
+    {
+      key: "outreach",
+      label: dict.nav.outreach,
+      href: "/contacts?view=outreach",
+      active: isOutreachView,
+    },
+    ...savedViewRows.map((v) => ({
+      key: `saved:${v.id}`,
+      label: v.name,
+      href: `/contacts?view=saved:${v.id}`,
+      active: activeView.savedViewId === v.id,
+    })),
+  ];
+  const { pinned: pinnedViewTabs, overflow: overflowViewTabs, activeOverflowItem } = splitViewTabs(viewTabItems);
+  const savedViewIdByKey = new Map(savedViewRows.map((v) => [`saved:${v.id}`, v.id]));
+
+  function renderViewTab(item: ViewTabItem, inMenu = false) {
+    const baseClassName = inMenu ? "menu-item" : "view-tab";
+    const savedId = savedViewIdByKey.get(item.key);
+    if (savedId) {
+      return (
+        <span key={item.key} className={`${baseClassName}${item.active ? " active" : ""}`}>
+          <Link href={item.href} aria-current={item.active ? "page" : undefined}>
+            {item.label}
+          </Link>
+          <form action={deleteSavedViewAction} className="inline-block">
+            <input type="hidden" name="id" value={savedId} />
+            <button type="submit" className={styles.deleteView} aria-label={l.deleteView}>
+              ×
+            </button>
+          </form>
+        </span>
+      );
+    }
+    return (
+      <Link
+        key={item.key}
+        href={item.href}
+        className={`${baseClassName}${item.active ? " active" : ""}`}
+        aria-current={item.active ? "page" : undefined}
+      >
+        {item.label}
+        {item.count !== undefined && <span className="count">{item.count}</span>}
+        {!inMenu && <LinkPendingDot />}
+      </Link>
+    );
+  }
+
   return (
     <main className="page">
       <div className="page-header">
@@ -502,10 +565,12 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               <Link href={layoutHref("table")} className={isBoard ? "" : "on"} aria-current={isBoard ? undefined : "page"}>
                 <TableIcon className="icon" />
                 {l.layoutTable}
+                <LinkPendingDot />
               </Link>
               <Link href={layoutHref("board")} className={isBoard ? "on" : ""} aria-current={isBoard ? "page" : undefined}>
                 <BoardIcon className="icon" />
                 {l.layoutBoard}
+                <LinkPendingDot />
               </Link>
             </div>
           )}
@@ -517,45 +582,16 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       </div>
 
       <nav className="view-tabs" aria-label={l.savedViewsGroupLabel}>
-        {SYSTEM_VIEWS.map((v, i) => (
-          <Link
-            key={v.key}
-            href={`/contacts?view=${v.key}`}
-            className={`view-tab${activeView.viewKey === v.key ? " active" : ""}`}
-            aria-current={activeView.viewKey === v.key ? "page" : undefined}
-          >
-            {l.views[v.key]}
-            <span className="count">{systemViewCounts[i]}</span>
-          </Link>
-        ))}
-        {/* Task 15a-2 (owner decision 2026-09-26): same ranking as
-            /outreach, reused verbatim — see src/lib/contacts/outreachView.ts.
-            No count badge (unlike the SYSTEM_VIEWS tabs above): computing it
-            would mean running the hiring-index crossover on every /contacts
-            load regardless of active view, not just when this tab is open. */}
-        <Link
-          href="/contacts?view=outreach"
-          className={`view-tab${isOutreachView ? " active" : ""}`}
-          aria-current={isOutreachView ? "page" : undefined}
+        {pinnedViewTabs.map((item) => renderViewTab(item))}
+        {activeOverflowItem && renderViewTab(activeOverflowItem)}
+        <DropdownMenu
+          trigger={<>{l.moreViews} ▾</>}
+          triggerClassName="view-tab"
+          ariaLabel={l.moreViews}
+          align="left"
         >
-          {dict.nav.outreach}
-        </Link>
-        {savedViewRows.map((v) => (
-          <span key={v.id} className={`view-tab${activeView.savedViewId === v.id ? " active" : ""}`}>
-            <Link
-              href={`/contacts?view=saved:${v.id}`}
-              aria-current={activeView.savedViewId === v.id ? "page" : undefined}
-            >
-              {v.name}
-            </Link>
-            <form action={deleteSavedViewAction} className="inline-block">
-              <input type="hidden" name="id" value={v.id} />
-              <button type="submit" className={styles.deleteView} aria-label={l.deleteView}>
-                ×
-              </button>
-            </form>
-          </span>
-        ))}
+          {overflowViewTabs.map((item) => renderViewTab(item, true))}
+        </DropdownMenu>
         <SaveViewDialog
           labels={{
             triggerLabel: l.saveView,

@@ -1072,6 +1072,7 @@ export const en = {
     pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
     saveView: "Save view",
     savedViewsGroupLabel: "Saved views",
+    moreViews: "More views",
     saveViewNameLabel: "View name",
     saveViewDialogTitle: "Save view",
     saveViewIncludesLabel: "Includes",
