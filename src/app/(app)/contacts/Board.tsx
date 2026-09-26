@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { getDictionary } from "@/lib/i18n/server";
 import type { ContactBoardColumn, ContactListRow } from "@/lib/contacts/listQueries";
 import { BOARD_COLUMNS, boardDropAction } from "@/lib/contacts/board";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import { BoardDnD } from "./BoardDnD";
 import styles from "./page.module.css";
 
@@ -61,7 +63,19 @@ export function Board({ columns, dict, tableHref }: BoardProps) {
                     {cardSub(row) && <div className={styles.jobTitle}>{cardSub(row)}</div>}
                   </Link>
                   <div className={styles.boardCardFoot}>
-                    <span>{row.ownerName ?? l.ownerNone}</span>
+                    {row.ownerName ? (
+                      <span className="owner-chip">
+                        <Avatar
+                          id={row.ownerBdId ?? row.ownerName}
+                          initials={initialsFromName(row.ownerName)}
+                          variant="bd"
+                          size="sm"
+                        />
+                        {row.ownerName}
+                      </span>
+                    ) : (
+                      <span>{l.ownerNone}</span>
+                    )}
                     {targets.length > 0 && (
                       <details className={styles.boardMoveMenu}>
                         <summary aria-label={l.boardMoveToLabel}>{l.boardMoveToLabel}</summary>

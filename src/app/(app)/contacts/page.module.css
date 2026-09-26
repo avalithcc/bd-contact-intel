@@ -133,6 +133,13 @@
   font-size: var(--text-sm);
 }
 
+.cellPerson {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 220px;
+}
+
 .name {
   color: var(--color-ink);
   font-weight: 600;
