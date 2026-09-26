@@ -378,6 +378,32 @@ test("planCompanyResolution: unique compact-key match links to the existing comp
   assert.equal(result.byHubspotCompanyId.get("1")?.companyKey, "mercadolibre com");
   assert.equal(result.byHubspotCompanyId.get("1")?.matchReason, "compact");
   assert.equal(result.ambiguousCompactMatches, 0);
+  assert.deepEqual(result.compactMatches, [{ hubspotName: "MercadoLibre", existingCompanyKey: "mercadolibre com" }]);
+});
+
+test("planCompanyResolution: an ambiguous compact match is NOT recorded in compactMatches (owner review is only for confident matches)", () => {
+  const existing: ExistingCompanyRef[] = [
+    { companyKey: "acme io", domain: null },
+    { companyKey: "acme inc", domain: null },
+  ];
+  const result = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", name: "Acme", domain: "acme-new.com", additionalDomains: [] })],
+    existing,
+    new Map([["1", 1]]),
+    new Set(),
+  );
+  assert.deepEqual(result.compactMatches, []);
+});
+
+test("planCompanyResolution: a domain or exact-name match is NOT recorded in compactMatches — only the loose fallback needs owner review", () => {
+  const existing: ExistingCompanyRef[] = [{ companyKey: "acme corp", domain: "acme.com" }];
+  const result = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", domain: "acme.com" })],
+    existing,
+    new Map([["1", 1]]),
+    new Set(),
+  );
+  assert.deepEqual(result.compactMatches, []);
 });
 
 test("planCompanyResolution: compact match does not overwrite an existing non-empty domain", () => {

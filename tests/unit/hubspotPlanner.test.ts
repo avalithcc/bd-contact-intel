@@ -250,3 +250,20 @@ test("companyResolution passthrough exposes company-side counts (domain match, c
   );
   assert.equal(result.companyResolution.byHubspotCompanyId.get("co-1")?.matchReason, "domain");
 });
+
+test("report.companies.compactMatches carries the owner-review pairs (H6 fresh-review follow-up)", () => {
+  const existingCompanies: ExistingCompanyRef[] = [{ companyKey: "globant", domain: null }];
+  const companies: HubSpotCompanyRow[] = [
+    { hubspotCompanyId: "co-1", name: "Globant Labs", domain: null, additionalDomains: [], note: null, city: null, country: null, sector: null },
+  ];
+  const result = planHubSpotImport(
+    baseInput({
+      contacts: [contact({ hubspotContactId: "1", associatedCompanyIdPrimary: "co-1" })],
+      companies,
+      existingCompanies,
+    }),
+  );
+  assert.deepEqual(result.report.companies.compactMatches, [
+    { hubspotName: "Globant Labs", existingCompanyKey: "globant" },
+  ]);
+});

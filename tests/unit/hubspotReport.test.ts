@@ -23,7 +23,16 @@ function emptyReport(overrides: Partial<HubSpotImportReport["outcomes"]> = {}): 
     rowsRead: 1,
     outcomes: { new: 0, review: 0, profile_key: 0, skipped_own_company: 0, already_imported: 0, invalid: 0, ...overrides },
     owners: { mapped: { Ana: 3 }, unassigned: 1, unknown: { "John Doe": 2 } },
-    companies: { matchedByDomain: 1, matchedByName: 0, matchedByCompact: 0, created: 1, ownCompany: 0, noCompanyResolved: 0, notes: 0 },
+    companies: {
+      matchedByDomain: 1,
+      matchedByName: 0,
+      matchedByCompact: 0,
+      created: 1,
+      ownCompany: 0,
+      noCompanyResolved: 0,
+      notes: 0,
+      compactMatches: [],
+    },
     backfills: { contacted: 0, replied: 0, discarded: 0 },
     dateFallback: 0,
     warnings: {
@@ -69,6 +78,7 @@ function planResult(outcomes: HubSpotContactPlanOutcome[], reviewCount = 0): Pla
       domainConflicts: [],
       notesToCreate: [],
       ambiguousCompactMatches: 0,
+      compactMatches: [],
     },
     identityPlan: null,
     refillPlans: [],
@@ -145,6 +155,23 @@ test("redactReportForLog removes reviewSample and collapses owner maps to counts
   assert.equal(redacted.owners.mapped, 3);
   assert.equal(redacted.owners.unknown, 2);
   assert.equal(redacted.owners.unassigned, 1);
+});
+
+test("buildHubSpotRunReport passes companies.compactMatches through unchanged (owner review pairs)", () => {
+  const plan = planResult([]);
+  plan.report.companies.compactMatches = [{ hubspotName: "Globant Labs", existingCompanyKey: "globant" }];
+  const report = buildHubSpotRunReport(plan, new Map(), new Map());
+  assert.deepEqual(report.companies.compactMatches, [{ hubspotName: "Globant Labs", existingCompanyKey: "globant" }]);
+});
+
+test("redactReportForLog collapses companies.compactMatches to a count — the pair list never reaches stdout (H6 fresh-review follow-up)", () => {
+  const plan = planResult([]);
+  plan.report.companies.compactMatches = [{ hubspotName: "Globant Labs", existingCompanyKey: "globant" }];
+  const report = buildHubSpotRunReport(plan, new Map(), new Map());
+  const redacted = redactReportForLog(report);
+  assert.equal(redacted.companies.compactMatchesCount, 1);
+  assert.equal((redacted.companies as unknown as { compactMatches?: unknown }).compactMatches, undefined);
+  assert.ok(!JSON.stringify(redacted).includes("Globant Labs"));
 });
 
 test("redactReportForLog never leaks a name or email — only counts and company keys survive", () => {

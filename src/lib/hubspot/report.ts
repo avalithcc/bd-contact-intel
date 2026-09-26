@@ -128,17 +128,26 @@ export function buildHubSpotRunReport(
   };
 }
 
-export interface RedactedHubSpotRunReport extends Omit<HubSpotRunReport, "reviewSample" | "owners"> {
+export interface RedactedHubSpotRunReport extends Omit<HubSpotRunReport, "reviewSample" | "owners" | "companies"> {
   owners: { mapped: number; unassigned: number; unknown: number };
+  companies: Omit<HubSpotRunReport["companies"], "compactMatches"> & { compactMatchesCount: number };
 }
 
 /** PII-safe stdout projection (design D8): `reviewSample` is removed
  * entirely (it stays DB-only, admin-reviewed) and the owner name maps
  * collapse to counts — BD names aren't PII, but there's no reason for a
- * per-name breakdown to ever hit a log line. */
+ * per-name breakdown to ever hit a log line. `companies.compactMatches`
+ * (the owner-review pair list, H6 fresh-review follow-up) collapses to
+ * `compactMatchesCount` the same way — the CLI log keeps printing the
+ * count only, never the list. */
 export function redactReportForLog(report: HubSpotRunReport): RedactedHubSpotRunReport {
-  const { reviewSample: _reviewSample, owners, ...rest } = report;
+  const { reviewSample: _reviewSample, owners, companies, ...rest } = report;
   const mapped = Object.values(owners.mapped).reduce((sum, n) => sum + n, 0);
   const unknown = Object.values(owners.unknown).reduce((sum, n) => sum + n, 0);
-  return { ...rest, owners: { mapped, unassigned: owners.unassigned, unknown } };
+  const { compactMatches, ...companiesRest } = companies;
+  return {
+    ...rest,
+    owners: { mapped, unassigned: owners.unassigned, unknown },
+    companies: { ...companiesRest, compactMatchesCount: compactMatches.length },
+  };
 }

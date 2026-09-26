@@ -98,6 +98,19 @@ export interface CompanyResolutionResult {
    * right; the group still goes through normal creation-eligibility (H6
    * dry-run finding). */
   ambiguousCompactMatches: number;
+  /** Every UNIQUE compact-key match (see `ambiguousCompactMatches` for the
+   * ones NOT recorded here), made visible for owner review instead of
+   * silently trusting the generic stop-token stripping — a fresh review of
+   * H6 flagged that it can merge a HubSpot company into the wrong existing
+   * one (e.g. "Globant Labs" -> "Globant", "The Bridge" -> an unrelated
+   * "Bridge"). Company names are business data, not personal PII, so they
+   * are safe in the persisted report (unlike contact names/emails). */
+  compactMatches: HubSpotCompactMatch[];
+}
+
+export interface HubSpotCompactMatch {
+  hubspotName: string;
+  existingCompanyKey: string;
 }
 
 export interface CompanyGroup {
@@ -346,6 +359,7 @@ export function planCompanyResolution(
   const domainFills: DomainFill[] = [];
   const domainConflicts: DomainConflict[] = [];
   const notesToCreate: CompanyNoteToCreate[] = [];
+  const compactMatches: HubSpotCompactMatch[] = [];
 
   const addNotes = (companyKey: string, rows: readonly HubSpotCompanyRow[]) => {
     for (const row of rows) {
@@ -378,6 +392,7 @@ export function planCompanyResolution(
       if (matched) break;
     }
     let matchReason: "domain" | "name" | "compact" = "domain";
+    let compactMatchName: string | null = null;
     if (!matched) {
       for (const row of group.rows) {
         if (!row.name) continue;
@@ -407,11 +422,15 @@ export function planCompanyResolution(
         }
         matched = candidates[0];
         matchReason = "compact";
+        compactMatchName = row.name;
         break;
       }
     }
 
     if (matched) {
+      if (matchReason === "compact") {
+        compactMatches.push({ hubspotName: compactMatchName!, existingCompanyKey: matched.companyKey });
+      }
       if ((matchReason === "name" || matchReason === "compact") && group.domains.length > 0) {
         const groupDomain = group.domains[0]!;
         if (!matched.domain) {
@@ -468,7 +487,15 @@ export function planCompanyResolution(
     addNotes(companyKey, group.rows);
   }
 
-  return { byHubspotCompanyId, companiesToCreate, domainFills, domainConflicts, notesToCreate, ambiguousCompactMatches };
+  return {
+    byHubspotCompanyId,
+    companiesToCreate,
+    domainFills,
+    domainConflicts,
+    notesToCreate,
+    ambiguousCompactMatches,
+    compactMatches,
+  };
 }
 
 export interface ContactCompanyResolution {

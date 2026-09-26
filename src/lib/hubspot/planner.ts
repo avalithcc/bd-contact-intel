@@ -28,6 +28,7 @@ import {
   resolveContactCompanyKey,
   type CompanyResolutionResult,
   type ExistingCompanyRef,
+  type HubSpotCompactMatch,
   type HubSpotCompanyRow,
 } from "@/lib/hubspot/companies";
 import type { HubSpotContactRow } from "@/lib/hubspot/contacts";
@@ -99,6 +100,14 @@ export interface HubSpotImportReport {
     ownCompany: number;
     noCompanyResolved: number;
     notes: number;
+    /** Every unique compact-key match (design/H6 fresh-review follow-up):
+     * generic stop-token stripping can merge a HubSpot company into the
+     * wrong existing one (e.g. "Globant Labs" -> "Globant", "The Bridge" ->
+     * an unrelated "Bridge") — surfaced in full for owner review instead of
+     * trusting the heuristic silently. Company names are business data, not
+     * personal PII, so they are safe to persist here (unlike contact
+     * names/emails, which never appear outside `reviewSample`). */
+    compactMatches: HubSpotCompactMatch[];
   };
   backfills: { contacted: number; replied: number; discarded: number };
   dateFallback: number;
@@ -166,6 +175,7 @@ function emptyReport(rowsRead: number): HubSpotImportReport {
       ownCompany: 0,
       noCompanyResolved: 0,
       notes: 0,
+      compactMatches: [],
     },
     backfills: { contacted: 0, replied: 0, discarded: 0 },
     dateFallback: 0,
@@ -202,6 +212,7 @@ export function planHubSpotImport(input: PlanHubSpotImportInput): PlanHubSpotImp
     else if (resolution.matchReason === "own_company") report.companies.ownCompany++;
   }
   report.companies.notes = companyResolution.notesToCreate.length;
+  report.companies.compactMatches = companyResolution.compactMatches;
   report.warnings.domainConflicts = companyResolution.domainConflicts.length;
   report.warnings.ambiguousCompactMatches = companyResolution.ambiguousCompactMatches;
 

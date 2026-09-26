@@ -231,6 +231,28 @@ function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
         </tbody>
       </table>
 
+      <div className="eyebrow">{dict.compactMatchesReviewTitle}</div>
+      {report.companies.compactMatches.length === 0 ? (
+        <p className="muted">{dict.compactMatchesReviewEmpty}</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>{dict.compactMatchesIncoming}</th>
+              <th>{dict.compactMatchesExisting}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.companies.compactMatches.map((match, i) => (
+              <tr key={i}>
+                <td>{match.hubspotName}</td>
+                <td>{match.existingCompanyKey}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <div className="eyebrow">{dict.tableHubspotUnknownLeadStatusesTitle}</div>
       {Object.keys(report.warnings.unknownLeadStatuses).length === 0 ? (
         <p className="muted">{dict.tableHubspotUnknownLeadStatusesEmpty}</p>
