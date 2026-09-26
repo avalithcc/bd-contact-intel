@@ -590,6 +590,12 @@ export const es: typeof en = {
     taskMarkDone: "Marcar como hecha",
     taskReschedule: "Reprogramar",
     addFollowUpTask: "Agregar tarea de seguimiento",
+    linkedinRepliedPrefix: "Respuesta de LinkedIn recibida",
+    linkedinSentPrefix: "Mensaje de LinkedIn enviado",
+    linkedinConversationOfPrefix: "conversación de",
+    adminAuditAlertTitle: "Está viendo la conversación de otro BD",
+    adminNoConversationContent: "Sin contenido de conversación registrado.",
+    adminOpenAsPage: "Abrir en una página",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).
@@ -615,6 +621,9 @@ export const es: typeof en = {
       `se envió un mensaje de LinkedIn en la conversación de ${bdName}`,
     statusReasonSentence: (statusLabel: string, sourceDescription: string, dateLabel: string) =>
       `${statusLabel} porque ${sourceDescription} el ${dateLabel}.`,
+    timelineLockedOwnedBy: (bdName: string) =>
+      `Esta conversación pertenece a ${bdName}. Se puede ver que existe y cuándo ocurrió; su contenido es privado para ${bdName} (y los administradores).`,
+    adminAuditAlertBody: (bdName: string) => `Esta visualización quedó registrada en el registro de auditoría (conversación de ${bdName}).`,
   },
 
   adminConversation: {

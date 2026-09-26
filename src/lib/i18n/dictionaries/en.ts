@@ -693,6 +693,12 @@ export const en = {
     taskMarkDone: "Mark as done",
     taskReschedule: "Reschedule",
     addFollowUpTask: "Add follow-up task",
+    linkedinRepliedPrefix: "LinkedIn reply received",
+    linkedinSentPrefix: "LinkedIn message sent",
+    linkedinConversationOfPrefix: "conversation with",
+    adminAuditAlertTitle: "You are viewing another BD's conversation",
+    adminNoConversationContent: "No conversation content on file.",
+    adminOpenAsPage: "Open as a page",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.
@@ -712,6 +718,9 @@ export const en = {
       `a LinkedIn message was sent in ${bdName}'s conversation`,
     statusReasonSentence: (statusLabel: string, sourceDescription: string, dateLabel: string) =>
       `${statusLabel} because ${sourceDescription} on ${dateLabel}.`,
+    timelineLockedOwnedBy: (bdName: string) =>
+      `This conversation belongs to ${bdName}. You can see that it exists and when it happened; its content is private to ${bdName} (and admins).`,
+    adminAuditAlertBody: (bdName: string) => `This view was recorded in the audit log (conversation with ${bdName}).`,
   },
 
   // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;

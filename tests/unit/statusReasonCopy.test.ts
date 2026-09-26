@@ -24,6 +24,8 @@ const serverStrings: Dictionary["contactRecordServer"] = {
   statusReasonSourceConnectionReplied: (bdName) => `se recibió una respuesta de LinkedIn en la conversación de ${bdName}`,
   statusReasonSourceConnectionSent: (bdName) => `se envió un mensaje de LinkedIn en la conversación de ${bdName}`,
   statusReasonSentence: (a, b, c) => `${a} porque ${b} el ${c}.`,
+  timelineLockedOwnedBy: (bdName) => `Esta conversación pertenece a ${bdName}.`,
+  adminAuditAlertBody: (bdName) => `Auditado (${bdName}).`,
 };
 
 const leadStatuses = {

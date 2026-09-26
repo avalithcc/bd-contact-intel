@@ -42,6 +42,12 @@ export interface ContactConnectionRow {
   bdName: string | null;
   connectedOn: string | null;
   messageCount: number;
+  // Added mockup-port r02 (status "why" evidence) / r04 (LinkedIn timeline
+  // cards, contact-record.html:124-131) — same row `getContactRecord` was
+  // already selecting these two columns from, just not exposing on the
+  // public type until now.
+  sentCount: number;
+  receivedCount: number;
   lastMessageAt: Date | null;
 }
 

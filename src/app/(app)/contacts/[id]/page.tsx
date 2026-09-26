@@ -171,6 +171,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   <Timeline
                     personId={record.person.id}
                     labels={l}
+                    serverStrings={dict.contactRecordServer}
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
                     activeType={activityType}
@@ -180,6 +181,9 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       dueAt: t.dueAt,
                       assignedToName: t.assignedToName ?? null,
                     }))}
+                    connections={record.connections}
+                    viewerBdId={me.id}
+                    isAdmin={isAdmin}
                   />
                 ),
               },

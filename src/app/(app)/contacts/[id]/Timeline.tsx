@@ -4,16 +4,26 @@ import Link from "next/link";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
 import { TIMELINE_ACTIVITY_TYPES } from "@/lib/activity/queries";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
+import {
+  buildConnectionTimelineEntries,
+  linkedinEntryAccess,
+  type ConnectionForTimeline,
+  type LinkedinTimelineEntryType,
+} from "@/lib/contacts/connectionTimelineEntries";
 import {
   DiscardIcon,
   HistoryIcon,
+  LinkedInIcon,
+  LockIcon,
   MailIcon,
   MeetingIcon,
   NoteIcon,
   SearchIcon,
   TasksIcon,
 } from "@/components/icons";
+import { AdminConversationReveal } from "./AdminConversationReveal";
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { NoteComposer } from "./NoteComposer";
 import styles from "./page.module.css";
@@ -28,11 +38,24 @@ export interface TimelineTask {
 export interface TimelineProps {
   personId: string;
   labels: ContactRecordLabels;
+  // Server-only formatter templates (see the comment on `contactRecordServer`
+  // in dictionaries/es.ts) — Timeline.tsx is a server component, so it may
+  // receive these directly; only the composed plain-string RESULT is ever
+  // passed down to a client component (AdminConversationReveal).
+  serverStrings: Dictionary["contactRecordServer"];
   entries: TimelineEntry[];
   countsByType: Record<string, number>;
   activeType?: TimelineActivityType;
   openTasks: TimelineTask[];
+  connections: ConnectionForTimeline[];
+  viewerBdId: string;
+  isAdmin: boolean;
 }
+
+const LINKEDIN_PREFIX_KEY: Record<LinkedinTimelineEntryType, keyof ContactRecordLabels> = {
+  linkedin_replied: "linkedinRepliedPrefix",
+  linkedin_sent: "linkedinSentPrefix",
+};
 
 const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> = {
   note: "timelineFilterNote",
@@ -123,10 +146,29 @@ function entryBody(entry: TimelineEntry, l: ContactRecordLabels): string {
  * `entry.metadata === null` (isTimelineEntryVisible said no, design R6)
  * always renders the locked marker regardless of type.
  */
-export function Timeline({ personId, labels: l, entries, countsByType, activeType, openTasks }: TimelineProps) {
+export function Timeline({
+  personId,
+  labels: l,
+  serverStrings,
+  entries,
+  countsByType,
+  activeType,
+  openTasks,
+  connections,
+  viewerBdId,
+  isAdmin,
+}: TimelineProps) {
   const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-  const groups = groupTimelineEntries(entries);
+  // LinkedIn connection cards (contact-record.html:124-131) only show when
+  // no activity-type filter is active — they aren't one of the 6 filter
+  // pills, so a filtered view (e.g. "Correos") shouldn't include them.
+  const linkedinEntries = activeType ? [] : buildConnectionTimelineEntries(connections);
+  const groups = groupTimelineEntries([
+    ...entries,
+    ...linkedinEntries.map((e) => ({ id: e.id, type: e.type, createdAt: e.createdAt, metadata: e.metadata })),
+  ]);
   const upcoming = upcomingTasks(openTasks);
+  const linkedinMetaById = new Map(linkedinEntries.map((e) => [e.id, e.metadata]));
 
   return (
     <div>
@@ -212,26 +254,64 @@ export function Timeline({ personId, labels: l, entries, countsByType, activeTyp
             </div>
             <div className="tl">
               {group.items.map(({ entry }) => {
-                const Icon = TYPE_ICON[entry.type as TimelineActivityType] ?? NoteIcon;
-                const iconClass = TYPE_ICON_CLASS[entry.type as TimelineActivityType];
+                const linkedinMeta = linkedinMetaById.get(entry.id);
+                if (linkedinMeta) {
+                  const type = entry.type as LinkedinTimelineEntryType;
+                  const access = linkedinEntryAccess(linkedinMeta.bdId, viewerBdId, isAdmin);
+                  const bdName = linkedinMeta.bdName ?? l.emptyValue;
+                  return (
+                    <div key={entry.id} className="tl-item">
+                      <div className={type === "linkedin_replied" ? "tl-icon reply" : "tl-icon"}>
+                        <LinkedInIcon className="icon" />
+                      </div>
+                      <div className="tl-card">
+                        <div className="tl-head">
+                          <span className="what">
+                            {l[LINKEDIN_PREFIX_KEY[type]] as string} · {l.linkedinConversationOfPrefix} {bdName}
+                          </span>
+                          <span className="when">{formatWhen(entry.createdAt)}</span>
+                        </div>
+                        {access === "admin-bypass" ? (
+                          <AdminConversationReveal
+                            personId={personId}
+                            bdId={linkedinMeta.bdId}
+                            auditAlertBody={serverStrings.adminAuditAlertBody(bdName)}
+                            labels={l}
+                          />
+                        ) : access === "locked" ? (
+                          <div className="locked">
+                            <LockIcon className="icon" />
+                            <span>{serverStrings.timelineLockedOwnedBy(bdName)}</span>
+                          </div>
+                        ) : (
+                          <div className="tl-body">{l.connectionHistorySomePrefix}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const timelineEntry = entry as TimelineEntry;
+                const Icon = TYPE_ICON[timelineEntry.type as TimelineActivityType] ?? NoteIcon;
+                const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
                 return (
-                  <div key={entry.id} className="tl-item">
+                  <div key={timelineEntry.id} className="tl-item">
                     <div className={iconClass ? `tl-icon ${iconClass}` : "tl-icon"}>
                       <Icon className="icon" />
                     </div>
                     <div className={iconClass === "system" ? "tl-card system" : "tl-card"}>
                       <div className="tl-head">
                         <span className="what">
-                          {l[FILTER_LABEL_KEY[entry.type as TimelineActivityType]] as string} ·{" "}
-                          {entry.actorName ?? l.timelineSystemActor}
+                          {l[FILTER_LABEL_KEY[timelineEntry.type as TimelineActivityType]] as string} ·{" "}
+                          {timelineEntry.actorName ?? l.timelineSystemActor}
                         </span>
-                        <span className="when">{formatWhen(entry.createdAt)}</span>
+                        <span className="when">{formatWhen(timelineEntry.createdAt)}</span>
                       </div>
-                      <div className={entry.visible ? "tl-body" : "locked"}>
-                        {entry.type === "note" && entry.visible ? (
-                          <blockquote>{entryBody(entry, l)}</blockquote>
+                      <div className={timelineEntry.visible ? "tl-body" : "locked"}>
+                        {timelineEntry.type === "note" && timelineEntry.visible ? (
+                          <blockquote>{entryBody(timelineEntry, l)}</blockquote>
                         ) : (
-                          entryBody(entry, l)
+                          entryBody(timelineEntry, l)
                         )}
                       </div>
                     </div>

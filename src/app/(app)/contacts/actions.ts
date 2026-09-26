@@ -13,6 +13,10 @@ import { planDiscard } from "@/lib/contacts/discard";
 import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
 import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
+import { getConversationForAdmin, type AdminConversationData } from "@/lib/activity/getConversationForAdmin";
+import { isUuid } from "@/lib/uuid";
 import {
   contactActionErrorReason,
   OwnerReassignLockedError,
@@ -176,6 +180,39 @@ export async function addContactSignalAction(personId: string, text: string): Pr
   } catch (err) {
     return actionFailure(err);
   }
+}
+
+export type RevealAdminConversationResult =
+  | { ok: true; data: AdminConversationData }
+  | { ok: false; reason: "not_admin" | "invalid" | "not_found" };
+
+/**
+ * Inline "Ver conversación" reveal (mockup-port r04; contact-record-
+ * admin.html:130/137 — the mockup shows this expanded directly in the
+ * timeline, not only on the separate `/contacts/[id]/conversation/[bdId]`
+ * page). Goes through the EXACT SAME audited path that page already uses
+ * (`getConversationForAdmin` — writes `audit_log(view_conversation)` before
+ * returning content, and skips the audit write only when the viewer is
+ * looking at their own conversation, `shouldAuditConversationView`). The
+ * separate page stays as a deep link (bookmarkable, no client JS needed to
+ * reach it); this action is what powers the inline expand.
+ */
+export async function revealAdminConversationAction(
+  personId: string,
+  targetBdId: string,
+): Promise<RevealAdminConversationResult> {
+  if (!isUuid(personId) || !isUuid(targetBdId)) return { ok: false, reason: "invalid" };
+  let me;
+  try {
+    me = await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminRequiredError) return { ok: false, reason: "not_admin" };
+    throw err;
+  }
+  const result = await getConversationForAdmin(personId, targetBdId, me.id);
+  if (result.kind === "not_found") return { ok: false, reason: "not_found" };
+  const { kind: _kind, ...data } = result;
+  return { ok: true, data };
 }
 
 export type SendContactEmailResult = ContactActionResult;
