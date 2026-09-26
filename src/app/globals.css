@@ -240,6 +240,25 @@ h2 .dot {
   margin-bottom: var(--space-sm);
 }
 
+/* Page header shared by admin, import and list pages (mockups/styles.css). */
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.page-header .titles > * + * {
+  margin-top: var(--space-2xs);
+}
+
+.page-header .actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
 h1 {
   font-weight: 800;
   font-size: var(--text-2xl);
