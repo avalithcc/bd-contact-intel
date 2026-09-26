@@ -72,7 +72,7 @@
   --color-info-text: #1e40af;
 
   /* ---- solid status-tint backgrounds (mockup-port 01: mockups/styles.css'
-     alert-*/badge-verified/badge-probable/stat.* rules use flat tints, not
+     alert-, badge-verified, badge-probable and stat rules use flat tints, not
      the translucent --color-badge-*-bg overlays below). ---- */
   --color-success-bg: #e3f0e8;
   --color-warn-bg: #f6eae1;
