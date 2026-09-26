@@ -24,6 +24,7 @@ import {
 import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
+import { buildSinceIso } from "@/lib/contacts/effectiveActivityTime";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -118,14 +119,22 @@ async function baseContactFilterConditions(
   }
   // "Última actividad" ad-hoc filter (recency bucket) — same EXISTS
   // convention, bounded by `activity_person_idx`/`activity_created_idx`.
+  // Prod bug fix: `since` MUST be a plain string (`buildSinceIso`), never a
+  // raw JS `Date` interpolated into a `sql` template — postgres-js's raw
+  // template driver only accepts string/number/boolean/null/Buffer/
+  // ArrayBuffer, so a bare `${since}` Date threw across every
+  // `?lastActivityDays=` request. Explicitly cast on the SQL side too
+  // (`::timestamptz`) rather than relying on implicit coercion.
   if (filters.lastActivityDays) {
-    const since = new Date(Date.now() - filters.lastActivityDays * 24 * 60 * 60 * 1000);
+    const sinceIso = buildSinceIso(filters.lastActivityDays);
     where.push(
       exists(
         db
           .select({ one: sql`1` })
           .from(activity)
-          .where(and(eq(activity.personId, person.id), sql`${effectiveActivityAtSql()} >= ${since}`)),
+          .where(
+            and(eq(activity.personId, person.id), sql`${effectiveActivityAtSql()} >= ${sinceIso}::timestamptz`),
+          ),
       ),
     );
   }
@@ -239,8 +248,13 @@ async function attachDerivedColumns(
         metadata: activity.metadata,
         // Effective time (bug fix), not raw created_at — see
         // effectiveActivityAtSql's doc comment. Aliased `createdAt` so
-        // buildLastActivityEntries' output shape is unchanged.
-        createdAt: sql<Date>`${effectiveActivityAtSql()}`,
+        // buildLastActivityEntries' output shape is unchanged. Typed
+        // `Date | string` (not just `Date`): postgres-js returns this
+        // COMPUTED expression's wire value as a string at runtime (same
+        // class of bug src/lib/outreach/queries.ts already normalizes
+        // `lastMessageAt` for) — buildLastActivityEntries is the single
+        // place that gets coerced to a real Date.
+        createdAt: sql<Date | string>`${effectiveActivityAtSql()}`,
       })
       .from(activity)
       .where(and(inArray(activity.personId, ids), sql`${activity.personId} is not null`))

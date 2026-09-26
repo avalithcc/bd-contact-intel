@@ -38,3 +38,23 @@ export function isEffectiveActivityWithinDays(
   const since = new Date(now.getTime() - days * MS_PER_DAY);
   return resolveEffectiveActivityAt(row) >= since;
 }
+
+/**
+ * Prod bug fix: the `lastActivityDays` EXISTS filter (listQueries.ts)
+ * interpolated a raw JS `Date` directly into a `sql\`...\`` tagged
+ * template. postgres-js's raw-template driver only accepts a string,
+ * number, boolean, null, Buffer, or ArrayBuffer for an interpolated
+ * value — NOT a `Date` object (that conversion only happens for drizzle's
+ * typed column helpers like `gte()`, never for a raw `sql` template) — so
+ * every `?...lastActivityDays=N` request threw `The "string" argument
+ * must be of type string or an instance of Buffer or ArrayBuffer.
+ * Received an instance of Date` and 500'd the whole page.
+ *
+ * Extracted as its own pure function (day-arithmetic + `.toISOString()`)
+ * so the exact param shape the SQL site sends is unit-tested here; the SQL
+ * site casts the resulting string explicitly (`${iso}::timestamptz`)
+ * rather than relying on implicit coercion.
+ */
+export function buildSinceIso(days: number, now: Date = new Date()): string {
+  return new Date(now.getTime() - days * MS_PER_DAY).toISOString();
+}

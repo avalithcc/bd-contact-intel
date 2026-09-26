@@ -72,3 +72,13 @@ test("buildLastActivityEntries maps rows to a personId -> {type, label, createdA
   assert.deepEqual(map.get("p1"), { type: "email_sent", label: dict.contactList.lastActivityEmailSent, createdAt: at });
   assert.equal(map.get("missing"), undefined);
 });
+
+test("buildLastActivityEntries normalizes a raw-wire-format string createdAt (postgres-js returns a computed timestamptz expression as a string, e.g. '2026-09-25 13:30:00+00', not a Date — same class of bug src/lib/outreach/queries.ts already normalizes lastMessageAt for) into a real Date instance", () => {
+  const map = buildLastActivityEntries(
+    [{ personId: "p1", type: "email_sent", metadata: {}, createdAt: "2026-09-25 13:30:00+00" }],
+    dict,
+  );
+  const entry = map.get("p1");
+  assert.ok(entry?.createdAt instanceof Date, "createdAt must be a real Date instance, not a string");
+  assert.equal(entry?.createdAt.toISOString(), new Date("2026-09-25 13:30:00+00").toISOString());
+});

@@ -17,7 +17,17 @@ export interface LastActivityRawRow {
   personId: string;
   type: string;
   metadata: unknown;
-  createdAt: Date;
+  // A raw SQL *computed expression* (effectiveActivityAtSql() in
+  // listQueries.ts) — postgres-js does not always parse a computed
+  // timestamptz expression's wire value into a JS Date the way it does for
+  // a plain column reference, so this comes back as a string at runtime
+  // (e.g. "2026-09-25 13:30:00+00") even though it's typed `Date` at the
+  // call site. Same class of bug src/lib/outreach/queries.ts already
+  // normalizes `lastMessageAt` for. `buildLastActivityEntries` below is
+  // the single place this gets coerced to a real `Date` — every consumer
+  // (relative-time render, CSV export) reads the already-normalized
+  // `LastActivityEntry.createdAt`, never this raw field.
+  createdAt: Date | string;
 }
 
 export interface LastActivityEntry {
@@ -79,7 +89,7 @@ export function buildLastActivityEntries(
     map.set(row.personId, {
       type: row.type,
       label: formatLastActivityLabel(row, dict),
-      createdAt: row.createdAt,
+      createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
     });
   }
   return map;

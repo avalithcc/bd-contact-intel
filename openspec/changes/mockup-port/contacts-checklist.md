@@ -154,18 +154,54 @@ to close (branches 11-15) is now closed too, PLUS a prod bug fix (branch
 No row was left silently undone. See the per-row "notes" column above for
 the full reasoning behind every remaining item.
 
-## Prod bug fixed (branch 10)
+## Prod bugs fixed (branches 10, 16)
 
-"Última actividad" (column, sort, and the `lastActivityDays` filter) used
-`activity.created_at` for `status_backfill` rows (migration
-reconstructions) instead of `metadata.originalAt` — every backfill
-imported on the same day read as active that day, matching
-`lastActivityDays=30` and sorting to the top of the default list
-regardless of when the event actually happened. Fixed with one shared
-`effectiveActivityAtSql()` CASE expression, used consistently everywhere
-"last activity" is read or sorted or filtered — see
-src/lib/contacts/effectiveActivityTime.ts for the pure rule it mirrors
-(same as src/lib/status/deriveStatus.ts's status-derivation rule).
+**Branch 10**: "Última actividad" (column, sort, and the
+`lastActivityDays` filter) used `activity.created_at` for
+`status_backfill` rows (migration reconstructions) instead of
+`metadata.originalAt` — every backfill imported on the same day read as
+active that day, matching `lastActivityDays=30` and sorting to the top of
+the default list regardless of when the event actually happened. Fixed
+with one shared `effectiveActivityAtSql()` CASE expression, used
+consistently everywhere "last activity" is read or sorted or filtered —
+see src/lib/contacts/effectiveActivityTime.ts for the pure rule it
+mirrors (same as src/lib/status/deriveStatus.ts's status-derivation
+rule).
+
+**Branch 16** (owner's prod smoke test at 3e31603 found two more, both
+would have 500'd or crashed in prod, missed by branch 10's unit tests):
+
+1. **CRASH**: the `lastActivityDays` EXISTS filter interpolated a raw JS
+   `Date` (`since`) directly into a `sql\`...\`` tagged template.
+   postgres-js's raw-template driver only accepts string/number/boolean/
+   null/Buffer/ArrayBuffer for an interpolated value — never a `Date`
+   object (that conversion only exists for drizzle's typed column helpers
+   like `gte()`) — so every `?...lastActivityDays=N` request threw `The
+   "string" argument must be of type string or an instance of Buffer or
+   ArrayBuffer. Received an instance of Date` and 500'd. Fixed by
+   extracting `buildSinceIso(days, now)` (src/lib/contacts/
+   effectiveActivityTime.ts) — day-arithmetic + `.toISOString()` as one
+   pure, unit-tested function — and interpolating that string with an
+   explicit `::timestamptz` cast (`${sinceIso}::timestamptz`) instead of
+   the bare Date. Every other raw `sql\`` template in
+   src/lib/contacts/listQueries.ts (the only file with any) was
+   re-checked; none interpolates a `Date` — see the apply-progress
+   report's full per-file list.
+2. **TYPE**: `attachDerivedColumns`'s DISTINCT ON activity pick selects
+   `createdAt` as a raw computed `sql<Date>` expression
+   (`effectiveActivityAtSql()`), not a plain column reference — postgres-js
+   returns a computed timestamptz expression's wire value as a STRING at
+   runtime (e.g. `"2026-09-25 13:30:00+00"`), not a parsed `Date`, the same
+   class of bug src/lib/outreach/queries.ts already normalizes
+   `lastMessageAt` for. `LastActivityRawRow.createdAt` retyped to
+   `Date | string`; `buildLastActivityEntries` (src/lib/contacts/
+   lastActivity.ts) is the single place this gets coerced
+   (`new Date(...)`) into a real `Date` — every consumer (the relative-
+   time render in page.tsx, CSV export's `.toISOString()` call) reads the
+   already-normalized `LastActivityEntry.createdAt` and needed no changes.
+   Checked and confirmed no-op for: the board (doesn't render
+   `lastActivity` at all) and sort (`lastActivityAgg`'s value is only ever
+   used inside a SQL `ORDER BY` expression, never pulled into JS).
 
 ## Batch history
 

@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildSinceIso,
   isEffectiveActivityWithinDays,
   resolveEffectiveActivityAt,
 } from "@/lib/contacts/effectiveActivityTime";
@@ -91,4 +92,17 @@ test("isEffectiveActivityWithinDays: a backfill with a RECENT originalAt correct
     metadata: { originalAt: threeDaysAgo.toISOString() },
   };
   assert.equal(isEffectiveActivityWithinDays(row, 30, now), true);
+});
+
+test("buildSinceIso: returns a plain ISO string (never a Date), the exact shape a raw sql`` template can safely interpolate", () => {
+  const now = new Date("2026-09-26T12:00:00.000Z");
+  const iso = buildSinceIso(30, now);
+  assert.equal(typeof iso, "string");
+  assert.equal(iso, new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+});
+
+test("buildSinceIso: 0 or negative days still returns a valid ISO string (no NaN/Invalid Date)", () => {
+  const now = new Date("2026-09-26T12:00:00.000Z");
+  assert.equal(buildSinceIso(0, now), now.toISOString());
+  assert.doesNotThrow(() => new Date(buildSinceIso(7, now)).toISOString());
 });
