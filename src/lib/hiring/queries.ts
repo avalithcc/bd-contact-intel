@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { companyAlias, contact, jobPosting, targetCompany } from "@/db/schema";
+import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
 
@@ -235,13 +235,21 @@ export async function resolveHiringCompanies(
 
 /**
  * Target companies that currently have at least one open IT posting, along
- * with those postings for the expandable detail list on /hiring, and — for
- * the given BD — how many of their contacts work there and how many of
- * those are in a leadership role group (see LEADERSHIP_ROLE_GROUPS).
+ * with those postings for the expandable detail list on /hiring, and how
+ * many Contacts (company-wide, not per-BD) work there and how many of those
+ * are in a leadership role group (see LEADERSHIP_ROLE_GROUPS).
+ *
+ * Re-scoped off `bdId` (task 5.3; proposal success criterion "no `bdId`
+ * scoping on Contact queries"; contact-list spec "Central list, no per-BD
+ * scoping"): `contactCount`/`leadershipContactCount` now count every unified
+ * `person` at the company, not just the calling BD's own address book — a BD
+ * now sees the full team's crossover with a hiring company, not only their
+ * own. `bdId` is kept as a parameter for call-site stability (see
+ * src/app/hiring/page.tsx) even though this query no longer uses it.
  *
  * Three fixed queries regardless of how many companies/postings/contacts
  * exist: the two behind resolveHiringCompanies() above, plus one GROUP BY
- * over `contact` for every key (canonical + alias) that resolves to any
+ * over `person` for every key (canonical + alias) that resolves to any
  * hiring company. No per-company query loop (no N+1).
  *
  * `market`, `miamiOnly` and `hideOffshore`, when set, flow straight into
@@ -253,6 +261,7 @@ export async function getCompanyHiringSummaries(
   miamiOnly?: boolean,
   hideOffshore?: boolean,
 ): Promise<CompanyHiringSummary[]> {
+  void bdId; // kept for call-site stability — see doc comment above
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore);
@@ -265,16 +274,16 @@ export async function getCompanyHiringSummaries(
   const contactStats = allMatchKeys.length
     ? await db
         .select({
-          companyKey: contact.companyKey,
+          companyKey: person.companyKey,
           count: sql<number>`count(*)::int`,
           // `inArray` renders an IN (...) list; interpolating the array
           // directly would render a record literal, which Postgres cannot
           // cast to text[].
-          leadershipCount: sql<number>`count(*) filter (where ${inArray(contact.roleGroup, LEADERSHIP_ROLE_GROUPS)})::int`,
+          leadershipCount: sql<number>`count(*) filter (where ${inArray(person.roleGroup, LEADERSHIP_ROLE_GROUPS)})::int`,
         })
-        .from(contact)
-        .where(and(eq(contact.bdId, bdId), inArray(contact.companyKey, allMatchKeys)))
-        .groupBy(contact.companyKey)
+        .from(person)
+        .where(and(isNull(person.mergedIntoId), inArray(person.companyKey, allMatchKeys)))
+        .groupBy(person.companyKey)
     : [];
   const statsByKey = new Map(
     contactStats

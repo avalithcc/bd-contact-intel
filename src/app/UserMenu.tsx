@@ -29,21 +29,18 @@ function ChevronIcon() {
  * change-password link and sign-out into a single dropdown so the header
  * has room for the nav links.
  *
- * The locale-switcher form and the sign-out button are server-rendered
- * (they wire up server actions) and passed in as children/props from the
- * page, rather than reimplemented here.
+ * The sign-out button is server-rendered (it wires up a server action) and
+ * passed in as a prop from the page, rather than reimplemented here.
  */
 export function UserMenu({
   label,
   changePasswordHref,
   changePasswordLabel,
-  localeSwitcher,
   signOutButton,
 }: {
   label: string;
   changePasswordHref: string;
   changePasswordLabel: string;
-  localeSwitcher: ReactNode;
   signOutButton: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -91,9 +88,6 @@ export function UserMenu({
         <div className="user-menu-dropdown" role="menu">
           <div className="user-menu-name" role="none">
             {label}
-          </div>
-          <div className="user-menu-locale" role="none">
-            {localeSwitcher}
           </div>
           <Link
             className="user-menu-item"

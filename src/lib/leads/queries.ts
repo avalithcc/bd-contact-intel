@@ -17,6 +17,7 @@ import {
   prefetchIdentityIndex,
   withIdentityLock,
 } from "@/lib/identity/resolveDb";
+import { recomputePersonStatus } from "@/lib/status/recompute";
 
 // Cap on whitespace-separated search tokens in the free-text name filter, so
 // a pathological paste-in doesn't blow up the query into dozens of OR'd
@@ -464,13 +465,19 @@ export async function updateLeadStatus(
     if (!statusChange || !dualWriteEnabled) return;
     const lookup = resolvePersonIdLookup({ leadId: id });
     if (!lookup) return;
-    await tx.insert(activity).values({
-      leadId: id,
-      personId: personIdLookupSql(lookup),
-      actorBdId: updatedByBdId,
-      type: "status_change",
-      metadata: statusChange,
-    });
+    const [inserted] = await tx
+      .insert(activity)
+      .values({
+        leadId: id,
+        personId: personIdLookupSql(lookup),
+        actorBdId: updatedByBdId,
+        type: "status_change",
+        metadata: statusChange,
+      })
+      .returning({ personId: activity.personId });
+    // Task 5.2: same transaction as the activity write — a status_change
+    // activity is itself stage/discard evidence (design D4).
+    if (inserted?.personId) await recomputePersonStatus(tx, inserted.personId);
   });
 }
 

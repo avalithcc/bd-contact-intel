@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { getLocale } from "@/lib/i18n/server";
 import { NavigationTracker } from "./NavigationTracker";
-import { Sidebar } from "./Sidebar";
 import "./globals.css";
 
 const inter = Inter({
@@ -39,10 +38,7 @@ export default async function RootLayout({
     >
       <body>
         <NavigationTracker />
-        <Sidebar />
-        <div className="main-layout">
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

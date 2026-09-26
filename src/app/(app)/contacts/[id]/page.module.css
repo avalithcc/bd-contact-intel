@@ -1,0 +1,157 @@
+/* Three-pane record shell (mockups/contact-record.html) — CSS Modules over
+   the shared design tokens (src/app/globals.css), same convention as Phase
+   8's app shell (design D9). */
+.record {
+  display: grid;
+  grid-template-columns: 320px 1fr 300px;
+  gap: var(--space-2xl);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .record {
+    grid-template-columns: 1fr;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  background: var(--color-surface-1);
+}
+
+.cardTitle {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab,
+.tabActive {
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-ink-muted);
+  font-size: var(--text-md);
+}
+
+.tabActive {
+  color: var(--color-ink);
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-accent);
+}
+
+.placeholder {
+  padding: var(--space-2xl) 0;
+  color: var(--color-ink-muted);
+}
+
+.assocRow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assocRow:last-child {
+  border-bottom: none;
+}
+
+.assocRowStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assocRowStack:last-child {
+  border-bottom: none;
+}
+
+.assocMeta {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.assocLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.filterChip,
+.filterChipActive {
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.filterChipActive {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-color: var(--color-accent);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.timelineItem {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.timelineHead {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+.timelineWhen {
+  color: var(--color-ink-muted);
+  font-weight: 400;
+}
+
+.timelineBody {
+  color: var(--color-ink);
+}
+
+.timelineLocked {
+  color: var(--color-ink-muted);
+  font-style: italic;
+}
