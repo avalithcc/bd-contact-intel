@@ -159,7 +159,7 @@ function TaskRow({
   return (
     <tr>
       <td className={styles.colCheck}>
-        <CompleteTaskButton taskId={task.id} ariaLabel={l.completeAria} />
+        <CompleteTaskButton taskId={task.id} ariaLabel={l.completeAria} errorLabel={l.completeError} />
       </td>
       <td>
         <span className={styles.taskTitle}>{task.title}</span>
