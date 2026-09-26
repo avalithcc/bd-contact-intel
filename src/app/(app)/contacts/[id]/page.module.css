@@ -76,3 +76,59 @@
 .assocRow:last-child {
   border-bottom: none;
 }
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.filterChip,
+.filterChipActive {
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.filterChipActive {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-color: var(--color-accent);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.timelineItem {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.timelineHead {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+.timelineWhen {
+  color: var(--color-ink-muted);
+  font-weight: 400;
+}
+
+.timelineBody {
+  color: var(--color-ink);
+}
+
+.timelineLocked {
+  color: var(--color-ink-muted);
+  font-style: italic;
+}
