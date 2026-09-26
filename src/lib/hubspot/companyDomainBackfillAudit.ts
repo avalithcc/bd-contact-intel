@@ -18,7 +18,7 @@
  * the persisted key list (not a hard revert requirement for every run —
  * see the script header for the full-CSV re-derivation revert path when a
  * run is too large to list exhaustively). */
-export const COMPANY_DOMAIN_BACKFILL_AUDIT_KEY_CAP = 500;
+export const COMPANY_DOMAIN_BACKFILL_AUDIT_KEY_CAP = 5000;
 
 export interface CompanyDomainBackfillAuditMetadata {
   /** How many fills `planCompanyResolution` found (before this run started writing). */
