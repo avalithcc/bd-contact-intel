@@ -69,6 +69,25 @@ sanitized error if a *required* header name repeats.
 - [x] 2.7 RED/GREEN: `Associated Note` → `activity{companyKey, type:'note', actorBdId:null, metadata:{body, source:'hubspot_import', hubspotCompanyId}}`; skipped if one with the same `hubspotCompanyId` already exists. (`companies.ts#notesToCreate` plans the note; wiring it to an actual `activity` insert with `actorBdId:null` happens in Phase 4's execute transaction, since this PR stays DB-write-free.)
 - [x] 2.8 Test: no-company-resolved fallback counted as `noCompanyResolved` when `Associated Company IDs (Primary)` is absent or unresolved.
 
+**Post-review fixes (fresh review of PR H2):** `planCompanyResolution` built
+its existing-company lookup maps once from the DB snapshot and never
+updated them while processing groups, so two HubSpot company groups
+normalizing to the same `companyKey` (e.g. "Acme Corp" / "Acme Corp." with
+different domains, or both domain-less) both landed in `companiesToCreate`
+with the same key — a `company.company_key` primary-key violation at
+execute time — and the same gap let two groups name-match the same
+existing domain-less company and both queue a conflicting `DomainFill`.
+Groups are now processed in ascending `hubspotCompanyId` order
+(deterministic regardless of input row order) and each group's resolution
+is registered into the lookup maps as it resolves, so a later colliding
+group links to the earlier one's company instead of duplicating it; when
+two groups disagree on which domain a shared `companyKey` should carry,
+the first one processed keeps its domain and the second is reported in a
+new `domainConflicts` list on the result instead of being silently dropped
+or overwriting the winner. `normalizeDomain` also now strips a trailing
+port (`acme.com:8080`) and a trailing dot (`acme.com.`), both seen in real
+exports, which previously split one company's domain group into two.
+
 ## Phase 3: Identity Planning + Activities (PR H3, base: PR H2)
 
 - [ ] 3.1 RED/GREEN: `src/lib/identity/matcher.ts` — add `IdentityIndex.byEmail(email): PersonId[]`; after strong keys, exact email match where either side is not `verified` → `review` with reason `email_unverified`, scoped ONLY to rows sourced from `hubspot_import` (contact-identity delta — live ingest/`catch_up` unchanged).
