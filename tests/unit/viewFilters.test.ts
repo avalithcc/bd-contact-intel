@@ -144,3 +144,12 @@ test("applyAdHocContactFilterOverrides overrides an inherited view filter field-
     { owner: "me", status: ["new"], industryGroup: "SaaS", emailStatus: "probable" },
   );
 });
+
+test("applyAdHocContactFilterOverrides overrides status as a single ad-hoc pick (task 13.3 parity: ad-hoc status picker, not just system views)", () => {
+  const base: ContactFilters = { status: ["new", "contacted"] };
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "meeting" }), {
+    status: ["meeting"],
+  });
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "" }), {});
+  assert.deepEqual(applyAdHocContactFilterOverrides(base, { status: "bogus" }), base);
+});

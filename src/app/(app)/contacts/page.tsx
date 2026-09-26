@@ -17,6 +17,7 @@ import {
 } from "@/lib/contacts/views";
 import {
   applyAdHocContactFilterOverrides,
+  PERSON_STATUSES,
   serializeContactFilters,
   type ContactFilters,
 } from "@/lib/contacts/viewFilters";
@@ -55,6 +56,7 @@ interface ContactsPageProps {
     industryGroup?: string;
     seniority?: string;
     emailStatus?: string;
+    status?: string;
   }>;
 }
 
@@ -188,6 +190,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     industryGroup: sp.industryGroup,
     seniority: sp.seniority,
     emailStatus: sp.emailStatus,
+    status: sp.status,
   });
 
   // Column picker (task 13.1): a `?columns=` query override wins (used by
@@ -229,6 +232,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     if (sp.industryGroup !== undefined) params.set("industryGroup", sp.industryGroup);
     if (sp.seniority !== undefined) params.set("seniority", sp.seniority);
     if (sp.emailStatus !== undefined) params.set("emailStatus", sp.emailStatus);
+    if (sp.status !== undefined) params.set("status", sp.status);
     return params;
   }
 
@@ -391,6 +395,18 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               <option value="verified">{l.emailVerified}</option>
               <option value="probable">{l.emailProbable}</option>
               <option value="none">{l.emailNone}</option>
+            </select>
+          </label>
+
+          <label className={styles.columnCheck}>
+            {l.filterStatusLabel}
+            <select name="status" defaultValue={sp.status ?? ""}>
+              <option value="">{l.filterStatusAny}</option>
+              {PERSON_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {dict.leadStatuses[s]}
+                </option>
+              ))}
             </select>
           </label>
 

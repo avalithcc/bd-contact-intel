@@ -14,7 +14,7 @@ import { isUuid } from "@/lib/uuid";
 
 export type PersonStatus = "new" | "contacted" | "replied" | "meeting" | "discarded";
 
-const PERSON_STATUSES: readonly PersonStatus[] = [
+export const PERSON_STATUSES: readonly PersonStatus[] = [
   "new",
   "contacted",
   "replied",
@@ -138,6 +138,11 @@ export interface AdHocContactFilterInput {
   industryGroup?: string;
   seniority?: string;
   emailStatus?: string;
+  // Single-pick ad-hoc status (task 13.3 parity gap: "/leads has an ad-hoc
+  // status picker, /contacts only reaches status via a fixed system view").
+  // `ContactFilters.status` stays an array (system views can combine
+  // several), so a single ad-hoc pick becomes a one-element array.
+  status?: string;
 }
 
 /**
@@ -171,6 +176,11 @@ export function applyAdHocContactFilterOverrides(
   if (raw.emailStatus !== undefined) {
     if (raw.emailStatus === "") delete result.emailStatus;
     else if (isEmailStatusFilter(raw.emailStatus)) result.emailStatus = raw.emailStatus;
+  }
+
+  if (raw.status !== undefined) {
+    if (raw.status === "") delete result.status;
+    else if (isPersonStatus(raw.status)) result.status = [raw.status];
   }
 
   return result;

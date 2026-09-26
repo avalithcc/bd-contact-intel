@@ -87,7 +87,7 @@ export default async function WhatsNewPage({
           <Link className="secondary-btn" href="/hiring">
             {dict.common.hiringSignals}
           </Link>
-          <Link className="secondary-btn" href="/leads">
+          <Link className="secondary-btn" href="/contacts">
             {dict.common.leadsNav}
           </Link>
           <UserMenu
