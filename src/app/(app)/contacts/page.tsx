@@ -121,6 +121,8 @@ function columnLabel(
       return l.colStatus;
     case "email":
       return l.colEmail;
+    case "bdConnections":
+      return l.colBdConnections;
     case "roleGroup":
       return l.colRoleGroup;
     case "industry":
@@ -181,6 +183,16 @@ function columnCell(
       }
       return row.email ? row.email : <span className="badge badge-none">{l.emailNone}</span>;
     }
+    case "bdConnections":
+      return row.bdConnections.avatars.length ? (
+        <span className="avatar-stack" title={row.bdConnections.title}>
+          {row.bdConnections.avatars.map((a) => (
+            <Avatar key={a.bdId} id={a.bdId} initials={a.initials} variant="bd" size="sm" />
+          ))}
+        </span>
+      ) : (
+        l.ownerNone
+      );
     case "roleGroup":
       return row.roleGroup ?? l.ownerNone;
     case "industry":

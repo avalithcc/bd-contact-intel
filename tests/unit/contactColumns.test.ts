@@ -52,3 +52,9 @@ test("seniority is a selectable column (task 13.3 parity gap), not visible by de
   assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("seniority"));
   assert.deepEqual(resolveVisibleColumns(["seniority"]), ["seniority"]);
 });
+
+test("bdConnections (mockup 'BDs conectados') is a selectable column, not visible by default", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("bdConnections"));
+  assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("bdConnections"));
+  assert.deepEqual(resolveVisibleColumns(["bdConnections"]), ["bdConnections"]);
+});

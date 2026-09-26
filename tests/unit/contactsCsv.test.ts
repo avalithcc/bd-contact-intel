@@ -15,6 +15,7 @@ const HEADERS = {
   owner: "Responsable",
   status: "Estado",
   email: "Correo",
+  bdConnections: "BDs conectados",
   roleGroup: "Grupo de rol",
   industry: "Industria",
   country: "País",
@@ -37,9 +38,19 @@ function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
     sourceKey: null,
     createdAt: new Date("2026-01-15T00:00:00Z"),
     seniority: null,
+    bdConnectionNames: "",
     ...overrides,
   };
 }
+
+test("buildContactsCsv renders the bdConnections column as the comma-joined BD names", () => {
+  const csv = buildContactsCsv(
+    [row({ bdConnectionNames: "Ana Pereyra, Cristian Civita" })],
+    ["bdConnections"],
+    HEADERS,
+  );
+  assert.equal(csv.split("\r\n")[1], 'Ana Gomez,"Ana Pereyra, Cristian Civita"');
+});
 
 test("buildContactsCsv renders header + row for the selected columns, in column order", () => {
   const csv = buildContactsCsv([row()], ["company", "owner"], HEADERS);

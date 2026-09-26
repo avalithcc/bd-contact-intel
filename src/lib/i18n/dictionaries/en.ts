@@ -1017,6 +1017,7 @@ export const en = {
     colSource: "Source",
     colCreated: "Created",
     colSeniority: "Seniority",
+    colBdConnections: "Connected BDs",
     columnsPickerLabel: "Columns",
     columnsPickerHelp: "Visible columns",
     columnsApply: "Apply",

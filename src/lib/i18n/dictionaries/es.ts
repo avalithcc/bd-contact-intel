@@ -900,6 +900,7 @@ export const es: typeof en = {
     colSource: "Origen",
     colCreated: "Creado",
     colSeniority: "Seniority",
+    colBdConnections: "BDs conectados",
     columnsPickerLabel: "Columnas",
     columnsPickerHelp: "Columnas visibles",
     columnsApply: "Aplicar",

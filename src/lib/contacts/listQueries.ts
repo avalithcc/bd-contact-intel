@@ -11,11 +11,16 @@
  */
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, person } from "@/db/schema";
+import { bd, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 import { BOARD_COLUMNS } from "@/lib/contacts/board";
 import type { PersonStatus } from "@/lib/status/deriveStatus";
+import {
+  buildBdConnectionSummaries,
+  groupBdConnectionsByPerson,
+  type BdConnectionSummary,
+} from "@/lib/contacts/bdConnections";
 
 const LIKE_WILDCARD_RE = /[%_\\]/g;
 function escapeLikeWildcards(value: string): string {
@@ -92,6 +97,10 @@ export interface ContactListRow {
   // inventory: "seniority filter AND column" — `person.seniority` already
   // existed with zero UI surface).
   seniority: string | null;
+  // "BDs conectados" column (mockups/contacts.html avatar-stack cell) —
+  // populated by attachBdConnections() below, one extra batched query
+  // scoped to exactly this page's ids, never a per-row query.
+  bdConnections: BdConnectionSummary;
 }
 
 const CONTACT_LIST_ROW_COLUMNS = {
@@ -112,6 +121,41 @@ const CONTACT_LIST_ROW_COLUMNS = {
   createdAt: person.createdAt,
   seniority: person.seniority,
 } as const;
+
+type ContactListRowWithoutConnections = Omit<ContactListRow, "bdConnections">;
+
+const EMPTY_BD_CONNECTION_SUMMARY: BdConnectionSummary = { avatars: [], title: "" };
+
+/**
+ * Batches the "BDs conectados" read: ONE query for every already-paginated
+ * row's `person_bd_connection` rows (never per-row, never unbounded — the
+ * `inArray` set is exactly the page/board-column/export ids the caller
+ * already fetched, so this stays index-friendly on `person_bd_connection`'s
+ * PK/`byBd` index no matter how large the full table gets).
+ */
+async function attachBdConnections(
+  rows: ContactListRowWithoutConnections[],
+): Promise<ContactListRow[]> {
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.id);
+  const connectionRows = await db
+    .select({
+      personId: personBdConnection.personId,
+      bdId: personBdConnection.bdId,
+      bdName: bd.name,
+    })
+    .from(personBdConnection)
+    .innerJoin(bd, eq(bd.id, personBdConnection.bdId))
+    .where(inArray(personBdConnection.personId, ids));
+
+  const grouped = groupBdConnectionsByPerson(connectionRows);
+  return rows.map((row) => ({
+    ...row,
+    bdConnections: grouped.has(row.id)
+      ? buildBdConnectionSummaries(grouped.get(row.id)!)
+      : EMPTY_BD_CONNECTION_SUMMARY,
+  }));
+}
 
 export interface ContactListPage {
   rows: ContactListRow[];
@@ -149,7 +193,7 @@ export async function getContactListPage(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
-  const rows = await db
+  const baseRows = await db
     .select(CONTACT_LIST_ROW_COLUMNS)
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))
@@ -157,6 +201,8 @@ export async function getContactListPage(
     .orderBy(asc(person.lastName), asc(person.firstName))
     .limit(pageSize)
     .offset((safePage - 1) * pageSize);
+
+  const rows = await attachBdConnections(baseRows);
 
   return { rows, total, page: safePage, pageSize, totalPages };
 }
@@ -199,7 +245,7 @@ export async function getContactBoardColumns(
         .from(person)
         .where(where);
 
-      const rows =
+      const baseRows =
         total === 0
           ? []
           : await db
@@ -209,6 +255,8 @@ export async function getContactBoardColumns(
               .where(where)
               .orderBy(desc(person.createdAt))
               .limit(BOARD_COLUMN_LIMIT);
+
+      const rows = await attachBdConnections(baseRows);
 
       return { status: status as PersonStatus, rows, total };
     }),
@@ -225,11 +273,12 @@ export async function getContactBoardColumns(
  */
 export async function getContactListRowsByIds(ids: string[]): Promise<ContactListRow[]> {
   if (!ids.length) return [];
-  return db
+  const baseRows = await db
     .select(CONTACT_LIST_ROW_COLUMNS)
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))
     .where(and(sql`${person.mergedIntoId} is null`, inArray(person.id, ids)));
+  return attachBdConnections(baseRows);
 }
 
 /**
