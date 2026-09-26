@@ -53,7 +53,7 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "leads", href: "/contacts", icon: ContactsIcon },
       { labelKey: "companies", href: "/companies", icon: CompaniesIcon },
       { labelKey: "tasks", href: "/tasks", icon: TasksIcon },
-      { labelKey: "outreach", href: "/outreach", icon: OutreachIcon },
+      { labelKey: "outreach", href: "/contacts?view=outreach", icon: OutreachIcon },
     ],
   },
   {

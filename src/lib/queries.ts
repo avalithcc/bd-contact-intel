@@ -90,10 +90,13 @@ export const RELATIONSHIP_FILTERS = [
 ] as const;
 export type RelationshipFilterKey = (typeof RELATIONSHIP_FILTERS)[number]["key"];
 
-// Exported so other views that need the same "reciprocal but gone quiet"
-// signal (see src/lib/outreach/queries.ts) compute it identically instead of
-// re-deriving their own threshold.
-export const DORMANT_MONTHS = 12;
+// DB-free ranking module (src/lib/outreach/ranking.ts) is the single source
+// of truth for the "reciprocal but gone quiet" threshold — re-exported here
+// (rather than redefined) so this file's isDormant() below and other views
+// (src/lib/outreach/queries.ts, src/lib/contacts/outreachView.ts) can never
+// drift apart on the value.
+import { DORMANT_MONTHS } from "@/lib/outreach/ranking";
+export { DORMANT_MONTHS };
 
 export interface ContactFilters {
   // Single free-text search box on the home page (param `q`), matching

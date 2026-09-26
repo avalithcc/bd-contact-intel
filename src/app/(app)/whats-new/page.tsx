@@ -75,7 +75,9 @@ export default async function WhatsNewPage({
       {/* The page-local logo/header and cross-link nav row (BackButton +
           Outreach/Vacantes/Contactos secondary-btns) were removed here
           (mockup-parity 6.1) — the app shell ((app)/layout.tsx -> Sidebar
-          + TopBar breadcrumb) already covers both. */}
+          + TopBar breadcrumb) already covers both (including the
+          /contacts?view=outreach redirect added in
+          feat/crm-hubspot-ux-15b-outreach-redirect). */}
       <div className="mb-3xl">
         <div className="eyebrow">{dict.whatsNew.eyebrow}</div>
         <h1>
