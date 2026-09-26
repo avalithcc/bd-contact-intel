@@ -4,31 +4,35 @@ import { useState } from "react";
 import { completeTaskAction } from "./actions";
 import styles from "./page.module.css";
 
-export function CompleteTaskButton({ taskId }: { taskId: string }) {
+export function CompleteTaskButton({
+  taskId,
+  ariaLabel,
+}: {
+  taskId: string;
+  ariaLabel: string;
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleClick = async () => {
+  const handleChange = async () => {
     setIsLoading(true);
     setError(null);
     try {
       await completeTaskAction(taskId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete task");
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className={styles.completeButton}
+    <input
+      type="checkbox"
+      className={styles.completeCheckbox}
+      onChange={handleChange}
       disabled={isLoading}
-      title={error || "Mark complete"}
-      aria-label="Mark complete"
-    >
-      {isLoading ? "…" : "✓"}
-    </button>
+      title={error ?? ariaLabel}
+      aria-label={ariaLabel}
+    />
   );
 }
