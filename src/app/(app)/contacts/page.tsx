@@ -572,7 +572,26 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       {sp.bulkLimited === "1" && <p className={styles.resultBanner}>{l.bulkLimitedNotice}</p>}
 
       {isOutreachView ? (
-        outreachPage && outreachPage.rows.length > 0 ? (
+        outreachPage && !outreachPage.hiringCompanyCount ? (
+          // Same two-tier empty state as /outreach (parity gap closed): no
+          // hiring companies synced at all is a different, more actionable
+          // message than "synced, but none of your contacts match".
+          <p className="muted">
+            {dict.outreach.noHiringCompaniesPrefix}
+            <Link href="/hiring">{dict.outreach.noHiringCompaniesLinkText}</Link>
+            {dict.outreach.noHiringCompaniesSuffix}
+          </p>
+        ) : outreachPage && outreachPage.hiringCompanyCount > 0 && !outreachPage.rows.length ? (
+          <p className="muted">
+            {dict.outreach.noMatchingContacts(
+              outreachPage.hiringCompanyCount,
+              Boolean(sp.roleGroup),
+              sp.excludeNever === "on",
+              Boolean(sp.companyCategory),
+              sp.startupsOnly === "on",
+            )}
+          </p>
+        ) : outreachPage && outreachPage.rows.length > 0 ? (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
