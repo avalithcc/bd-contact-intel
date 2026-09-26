@@ -1375,15 +1375,27 @@ main {
   white-space: nowrap;
 }
 /* ---- dialog (src/components/Dialog.tsx) ---- */
+/* Bug fix: this rule used to set `display: flex` unconditionally, which
+   conflicted with design-system.css's `.overlay.open { display: flex; }`
+   (ported from mockups/styles.css, whose own base rule is
+   `.overlay { ...; display: none; }`). Every current overlay usage is
+   conditionally MOUNTED (React unmounts it entirely when closed) so this
+   was latent, not an active bug today — but a bare `.overlay` element
+   with no "open" class rendered anywhere would silently cover the whole
+   viewport (position: fixed, z-index: 50) and swallow every click. `open`
+   below is what actually shows it, mirroring the mockup. */
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
   background: var(--color-overlay);
-  display: flex;
+  display: none;
   align-items: flex-start;
   justify-content: center;
   padding-top: 10vh;
+}
+.overlay.open {
+  display: flex;
 }
 .dialog {
   width: min(520px, 92vw);

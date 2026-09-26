@@ -49,32 +49,47 @@ function backTo(formData: FormData, extra: Record<string, string>): string {
  * `idCap` (BULK_FILTER_TARGET_CAP for owner/task; export uses its own
  * separate cap in export/route.ts).
  */
-async function resolveBulkTargetIds(
-  formData: FormData,
-  meBdId: string,
-  idCap: number,
-): Promise<{ ids: string[]; wasLimited: boolean }> {
+interface ResolvedBulkTarget {
+  ids: string[];
+  wasLimited: boolean;
+  // Owner-approved audit requirement: bulkAssignOwnerAction forwards these
+  // straight through to bulkAssignOwner so the audit_log row records
+  // exactly which mode produced the id list.
+  mode: "ids" | "filter";
+  filtersQuery?: string;
+}
+
+async function resolveBulkTargetIds(formData: FormData, meBdId: string, idCap: number): Promise<ResolvedBulkTarget> {
   if (formData.get("mode") === "filter") {
-    const filters = parseContactFilters(new URLSearchParams(String(formData.get("filtersQuery") ?? "")));
+    const filtersQuery = String(formData.get("filtersQuery") ?? "");
+    const filters = parseContactFilters(new URLSearchParams(filtersQuery));
     const q = String(formData.get("q") ?? "") || undefined;
     const sort = parseContactSort(String(formData.get("sort") ?? "") || undefined);
     const dict = await getDictionary();
     const { ids, total } = await getContactIdsForFilters(filters, meBdId, q, sort, dict, idCap);
-    return { ids, wasLimited: total > ids.length };
+    return { ids, wasLimited: total > ids.length, mode: "filter", filtersQuery };
   }
   const rawIds = formData.getAll("personId");
   const ids = sanitizeBulkPersonIds(rawIds);
-  return { ids, wasLimited: rawIds.length > ids.length };
+  return { ids, wasLimited: rawIds.length > ids.length, mode: "ids" };
 }
 
 export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
-  const { ids: sanitizedIds, wasLimited } = await resolveBulkTargetIds(formData, me.id, BULK_FILTER_TARGET_CAP);
+  const { ids: sanitizedIds, wasLimited, mode, filtersQuery } = await resolveBulkTargetIds(
+    formData,
+    me.id,
+    BULK_FILTER_TARGET_CAP,
+  );
   const rawOwner = String(formData.get("ownerBdId") ?? "");
   const ownerBdId = rawOwner && isUuid(rawOwner) ? rawOwner : null;
   if (rawOwner && !ownerBdId) redirect(backTo(formData, { bulkResult: "owner:0:0" }));
 
-  const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, BULK_FILTER_TARGET_CAP);
+  const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, {
+    idCap: BULK_FILTER_TARGET_CAP,
+    mode,
+    filtersQuery,
+  });
   const assigned = plan.filter((p) => p.outcome === "assigned").length;
   const skipped = plan.filter((p) => p.outcome === "skipped_has_connection").length;
 

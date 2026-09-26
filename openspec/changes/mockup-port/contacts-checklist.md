@@ -56,7 +56,7 @@ Columns: element | mockup | status | evidence | notes
 | — drag to reorder | contacts.html:93 (`.drag` handles) | **done (branch 06)** | src/app/(app)/contacts/ColumnPicker.tsx, src/lib/contacts/columnOrder.ts | `sanitizeColumnKeys` now order-preserves (caller order, dedup by first occurrence) instead of always re-sorting to a fixed order — a real behavior change, existing tests updated. Drag-and-drop via native HTML5 DnD; also added Up/Down buttons per row for keyboard accessibility (task instruction), which the static mockup doesn't show but doesn't contradict either. |
 | — "Restablecer" | contacts.html:94 | **done (branch 06)** | ColumnPicker.tsx `reset()` | Resets both order and checked set to `DEFAULT_CONTACT_COLUMNS`. |
 | — "Aplicar" | contacts.html:94 | done | page.tsx:445-447 | |
-| "Exportar" (toolbar-level, whole filtered view) | contacts.html:95 | **done (branch 09b) — owner confirmation needed on the cap** | page.tsx `toolbarExportHref`, export/route.ts (whole-view mode) | Reuses `getContactListPage` with the current filters/sort and a page size of `MAX_VIEW_EXPORT_ROWS = 5000` instead of the usual 50, capped so an unfiltered 26,606-row view can't return an unbounded CSV. A capped response sets `X-Export-Truncated: 1` (no UI currently surfaces it). **The 5000 cap is a stopgap, not a spec'd number — same "needs owner confirmation" flag as the bulk-message-generation cap.** |
+| "Exportar" (toolbar-level, whole filtered view) | contacts.html:95 | **done (branch 09b) — cap confirmed by owner** | page.tsx `toolbarExportHref`, export/route.ts (whole-view mode) | Reuses `getContactListPage` with the current filters/sort and a page size of `MAX_VIEW_EXPORT_ROWS = 5000` instead of the usual 50, capped so an unfiltered 26,606-row view can't return an unbounded CSV. A capped response sets `X-Export-Truncated: 1` (no UI currently surfaces it). The 5,000 cap is confirmed final by the owner. |
 
 ## Bulk bar
 
@@ -65,7 +65,7 @@ Columns: element | mockup | status | evidence | notes
 | "N seleccionados" count | contacts.html:98 | done | BulkActionsBar.tsx | |
 | Asignar responsable | contacts.html:99 | done | BulkActionsBar.tsx, src/lib/contacts/bulkActions.ts | |
 | Crear tarea | contacts.html:100 | done | BulkActionsBar.tsx | |
-| Generar mensajes | contacts.html:101 | **done (branch 07) — owner confirmation needed on the cap** | src/app/(app)/contacts/BulkGenerateMessagesButton.tsx, bulkMessageActions.ts, src/lib/contacts/bulkMessages.ts | Smallest faithful version per owner decision: runs `generatePersonOutreachMessageAction` (the SAME person-scoped generator `/contacts/[id]` uses — NOT the legacy contact-scoped `generateOutreachMessage`, which would 404 for most unified Contacts) sequentially over the selection, capped at `MAX_BULK_GENERATE_MESSAGES = 25`. Results render in a dialog, one per contact, each with its own copy button (reusing the same copy/copied/error/pending strings as the per-contact button). **The 25 cap is a stopgap, not a spec'd number — needs explicit owner confirmation before this is considered final**, and a capped run shows a visible warning banner in the dialog. |
+| Generar mensajes | contacts.html:101 | **done (branch 07) — cap confirmed by owner** | src/app/(app)/contacts/BulkGenerateMessagesButton.tsx, bulkMessageActions.ts, src/lib/contacts/bulkMessages.ts | Smallest faithful version per owner decision: runs `generatePersonOutreachMessageAction` (the SAME person-scoped generator `/contacts/[id]` uses — NOT the legacy contact-scoped `generateOutreachMessage`, which would 404 for most unified Contacts) sequentially over the selection, capped at `MAX_BULK_GENERATE_MESSAGES = 25`. Results render in a dialog, one per contact, each with its own copy button. The 25 cap is confirmed final by the owner, and a capped run still shows a visible warning banner in the dialog. |
 | Exportar | contacts.html:102 | done | BulkActionsBar.tsx `buildExportHref` | Now includes the `bdConnections` column in the exported CSV when visible (this batch). |
 | "Seleccionar los N" | contacts.html:104 | **done, truly filter-wide (branch 14)** | BulkActionsBar.tsx `selectAllMatching`, src/lib/contacts/bulkTargetIds.ts, listQueries.ts `getContactIdsForFilters` | Owner/task/export now operate on ALL N: `mode=filter` + the same serialized `ContactFilters`/`sort` the toolbar itself uses, re-derived server-side (`getContactListPage(filters, meBdId, q, 1, cap, ...)` — the EXACT same function the list renders from, never a parallel reimplementation), capped at `BULK_FILTER_TARGET_CAP=2000` (owner/task) or `MAX_VIEW_EXPORT_ROWS=5000` (export). "Generar mensajes" stays capped at `MAX_BULK_GENERATE_MESSAGES=25` regardless of N — the existing `wasCapped` banner already says so. The client never computes or sends an id list in this mode. Existing bulk-owner path (`bulkOwnerDb.ts`) does **not** write to `audit_log` today, so per instruction ("if the existing path audits") no new audit write was added for the filter-wide case either — flagging in case this was assumed to already exist. |
 | Quitar selección | contacts.html:105 | done | BulkActionsBar.tsx `clearSelection` | |
@@ -135,18 +135,19 @@ to close (branches 11-15) is now closed too, PLUS a prod bug fix (branch
    fixed chip. The "never show own-company people" note is present; the
    underlying invariant already holds everywhere via the identity
    resolver's ingest-time skip.
-2. **Stopgap caps, kept as-is** (per explicit instruction; owner is
-   raising these separately) — bulk "Generar mensajes" (25), toolbar/
-   filter-wide "Exportar" (5,000 rows), filter-wide owner/task
-   (`BULK_FILTER_TARGET_CAP` = 2,000).
+2. **Caps — confirmed final by the owner**: bulk "Generar mensajes" (25),
+   toolbar/filter-wide "Exportar" (5,000 rows), filter-wide owner/task
+   (`BULK_FILTER_TARGET_CAP` = 2,000). No longer flagged as provisional.
 3. **"Agregar filtro" add-flow** — a real dropdown of the mockup's 10
    options -> per-item inline editor (branch 13), but industryGroup/
    seniority (pre-existing, not in the mockup's 10) are kept addable in a
    second "more filters" group rather than silently dropped.
-4. **Audit log** — the existing bulk-owner path does not write to
-   `audit_log` today, so per instruction ("if the existing path audits")
-   no new audit write was added for the filter-wide case either (branch
-   14) — flagging in case this was assumed to already exist.
+4. **Audit log — done (branch 17)**: every bulk "Asignar responsable"
+   (explicit ids or filter-wide) now writes one `audit_log` row inside the
+   same transaction as the update — actor, action (`bulk_owner_change`),
+   new owner, mode, filters query (filter-wide only), and the affected
+   person ids (capped at 100 in the row, `metadata.count` always the full
+   number) — see `src/lib/contacts/bulkOwnerAudit.ts`.
 5. **Company column** — logo chip + inline "Contratando" badge now done
    (branch 12); still no company-record-page-style extra detail beyond
    what the mockup itself shows.
@@ -154,7 +155,44 @@ to close (branches 11-15) is now closed too, PLUS a prod bug fix (branch
 No row was left silently undone. See the per-row "notes" column above for
 the full reasoning behind every remaining item.
 
-## Prod bugs fixed (branches 10, 16)
+## Prod bugs fixed (branches 10, 16, 17)
+
+**Branch 17**:
+
+1. **Bulk-selection bar never appeared.** Root cause: `BulkActionsBar.tsx`
+   wired its checkbox "change" listener imperatively via
+   `useEffect(() => form.addEventListener("change", ...), [])`, which
+   depends on `formRef.current` already being attached by the time the
+   effect body runs. Fixed by moving to a plain JSX `onChange` prop on the
+   `<form>` itself — React's own synthetic event delegation, attached
+   unconditionally from the very first render. The pure decision this
+   handler makes (is this change the header "select all on page" toggle,
+   and what should every row checkbox become) is extracted to
+   `src/lib/contacts/bulkSelection.ts` and unit-tested. "Seleccionar los
+   N" was already unaffected (it calls the count function directly, no
+   event listener involved).
+2. **"Tablero" not opening — investigated, one real defect found and
+   fixed, root cause not fully certain.** Static investigation (no browser
+   access) of every angle in the report: `layoutHref`/`withAdHocFilterParams`
+   param building (verified correct — `layout=board` is set and never
+   stripped by any redirect/param-normalization added in 11-16); props
+   crossing the Board/BoardDnD server->client boundary (verified
+   ClientStrings-safe, no functions/Dates); BoardDnD's render body and
+   effect (no `window` access outside the effect, no code path that would
+   throw on initial mount before any drag/click). **One real, verifiable
+   defect found**: `src/app/globals.css`'s pre-mockup-port `.overlay` rule
+   set `display: flex` UNCONDITIONALLY (not `display: none` by default),
+   conflicting with `design-system.css`'s `.overlay.open { display: flex; }`
+   (which assumes a `display: none` base, matching the mockup's own
+   `styles.css`). Every current overlay usage happens to be conditionally
+   MOUNTED (unmounted entirely when closed), so this was latent rather
+   than provably the active cause — but it's a real, fixed defect
+   regardless (a stray unconditional full-viewport `position: fixed;
+   z-index: 50` overlay would swallow every click on the page, including
+   the segmented control). **Confidence: low-to-medium that this alone
+   explains "no funciona"** — recommend checking the browser console for
+   a client-side exception on `/contacts?layout=board` in the next smoke
+   test; I could not reproduce or rule that out without running the app.
 
 **Branch 10**: "Última actividad" (column, sort, and the
 `lastActivityDays` filter) used `activity.created_at` for

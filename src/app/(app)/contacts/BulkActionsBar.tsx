@@ -17,8 +17,9 @@
  * from the checked ids — it never touches the shared form's action, so it
  * can't violate that invariant either.
  */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
+import { resolveSelectAllChecked } from "@/lib/contacts/bulkSelection";
 import { BulkGenerateMessagesButton } from "./BulkGenerateMessagesButton";
 import type { BulkActionsLabels } from "@/lib/contacts/labels";
 import type { ContactColumnKey } from "@/lib/contacts/columns";
@@ -96,24 +97,26 @@ export function BulkActionsBar({
     setSelectedCount(form.querySelectorAll('input[name="personId"]:checked').length);
   }
 
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
-
-    function onChange(e: Event) {
-      const target = e.target as HTMLInputElement;
-      if (target.id === "select-all-contacts") {
-        const boxes = formRef.current?.querySelectorAll<HTMLInputElement>('input[name="personId"]');
-        boxes?.forEach((box) => {
-          box.checked = target.checked;
-        });
-      }
-      recount();
+  /**
+   * Bug fix: was a `useEffect(() => form.addEventListener(...), [])` —
+   * fragile because it depends on `formRef.current` already being set by
+   * the time the effect runs, and on the native listener correctly seeing
+   * every bubbled checkbox "change" event. A plain JSX `onChange` on the
+   * `<form>` below uses React's own synthetic event delegation instead,
+   * which is attached unconditionally on first render — no ref-timing
+   * race, no dependency on manual DOM listener wiring at all.
+   */
+  function handleFormChange(e: React.ChangeEvent<HTMLFormElement>) {
+    const target = e.target as unknown as HTMLInputElement;
+    const selectAllChecked = resolveSelectAllChecked(target.id, target.checked);
+    if (selectAllChecked !== null) {
+      const boxes = formRef.current?.querySelectorAll<HTMLInputElement>('input[name="personId"]');
+      boxes?.forEach((box) => {
+        box.checked = selectAllChecked;
+      });
     }
-
-    form.addEventListener("change", onChange);
-    return () => form.removeEventListener("change", onChange);
-  }, []);
+    recount();
+  }
 
   function clearSelection() {
     const boxes = formRef.current?.querySelectorAll<HTMLInputElement>('input[name="personId"]');
@@ -144,7 +147,7 @@ export function BulkActionsBar({
   }
 
   return (
-    <form ref={formRef} action={bulkAssignOwnerAction}>
+    <form ref={formRef} action={bulkAssignOwnerAction} onChange={handleFormChange}>
       <input type="hidden" name="view" value={view} />
       {q && <input type="hidden" name="q" value={q} />}
       <input type="hidden" name="page" value={page} />
