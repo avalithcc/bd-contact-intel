@@ -685,6 +685,14 @@ export const en = {
     sourceLinkedInPrefix: "LinkedIn",
     sourceLinkedInBdSuffix: "BDs",
     sourceLeadListPrefix: "Lead list",
+    timelineGroupUpcoming: "Upcoming",
+    timelineGroupPreMigration: "Before the migration",
+    timelineSortNewestFirst: "Newest first",
+    timelineAssignedToPrefix: "Assigned to",
+    taskDueBadgePrefix: "Due",
+    taskMarkDone: "Mark as done",
+    taskReschedule: "Reschedule",
+    addFollowUpTask: "Add follow-up task",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.

@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
+import { getOpenTasksForPerson } from "@/lib/tasks/queries";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
@@ -56,9 +57,10 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const activityType = rawActivityType && isTimelineActivityType(rawActivityType) ? rawActivityType : undefined;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const [timeline, ownerOptions] = await Promise.all([
+  const [timeline, ownerOptions, openTasks] = await Promise.all([
     getPersonTimeline(record.person.id, me.id, { type: activityType }),
     listOwnerOptions(),
+    getOpenTasksForPerson(record.person.id),
   ]);
   // R3 (design.md): reassignment is only allowed while the person has no
   // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
@@ -172,6 +174,12 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
                     activeType={activityType}
+                    openTasks={openTasks.map((t) => ({
+                      id: t.id,
+                      title: t.title,
+                      dueAt: t.dueAt,
+                      assignedToName: t.assignedToName ?? null,
+                    }))}
                   />
                 ),
               },

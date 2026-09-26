@@ -111,6 +111,37 @@ export async function getOpenTasks(bdId: string, limit: number = 50): Promise<Ta
     .limit(limit);
 }
 
+/**
+ * Open tasks for one Contact (mockup-port r03/r05; contact-record.html's
+ * "Próximas" timeline bucket + right-panel "Tareas" card). Bounded to a
+ * single `personId` — no pagination needed, a Contact realistically has a
+ * handful of open tasks at most.
+ */
+export async function getOpenTasksForPerson(personId: string, limit: number = 50): Promise<TaskRow[]> {
+  return db
+    .select({
+      id: task.id,
+      leadId: task.leadId,
+      companyKey: task.companyKey,
+      contactId: task.contactId,
+      personId: task.personId,
+      actorBdId: task.actorBdId,
+      assignedToBdId: task.assignedToBdId,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      dueAt: task.dueAt,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      assignedToName: bd.name,
+    })
+    .from(task)
+    .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+    .where(and(eq(task.personId, personId), eq(task.status, "open")))
+    .orderBy(asc(task.dueAt), desc(task.createdAt))
+    .limit(limit);
+}
+
 export async function getOverdueTasks(bdId: string): Promise<TaskRow[]> {
   return db
     .select({

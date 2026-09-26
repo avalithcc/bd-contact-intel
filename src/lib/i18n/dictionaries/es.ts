@@ -582,6 +582,14 @@ export const es: typeof en = {
     sourceLinkedInPrefix: "LinkedIn",
     sourceLinkedInBdSuffix: "BDs",
     sourceLeadListPrefix: "Lista de leads",
+    timelineGroupUpcoming: "Próximas",
+    timelineGroupPreMigration: "Antes de la migración",
+    timelineSortNewestFirst: "Más recientes primero",
+    timelineAssignedToPrefix: "Asignada a",
+    taskDueBadgePrefix: "Vence",
+    taskMarkDone: "Marcar como hecha",
+    taskReschedule: "Reprogramar",
+    addFollowUpTask: "Agregar tarea de seguimiento",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).

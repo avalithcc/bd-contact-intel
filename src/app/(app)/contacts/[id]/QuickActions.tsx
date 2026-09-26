@@ -6,7 +6,6 @@ import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { contactActionErrorHref } from "../actionErrors";
 import {
-  addContactNoteAction,
   addContactSignalAction,
   addContactTaskAction,
   discardContactAction,
@@ -44,7 +43,7 @@ export interface QuickActionsProps {
   initialAction?: "email" | "meeting" | "discard" | null;
 }
 
-type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | "signal" | null;
+type QuickAction = "email" | "task" | "meeting" | "discard" | "signal" | null;
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -118,12 +117,16 @@ export function QuickActions({
   return (
     <>
       <div className="quick-actions" role="toolbar" aria-label={l.aboutSectionTitle}>
-        <button type="button" className="qa" onClick={() => toggle("note")}>
+        {/* Mockup's "Nota" quick action (contact-record.html:67) is a plain
+            `#log-note` anchor scrolling to the PINNED note composer
+            (NoteComposer.tsx, always visible above the timeline) — not its
+            own toggle panel like the other actions below. */}
+        <a className="qa" href="#log-note">
           <span className="qa-icon">
             <NoteIcon className="icon" />
           </span>
           {l.quickActionNote}
-        </button>
+        </a>
         <button type="button" className="qa" onClick={() => toggle("email")}>
           <span className="qa-icon">
             <MailIcon className="icon" />
@@ -159,30 +162,6 @@ export function QuickActions({
           {l.quickActionSignal}
         </button>
       </div>
-
-      {openAction === "note" && (
-        <NoteForm
-          labels={l}
-          busy={busy}
-          error={error}
-          onCancel={closeQuickAction}
-          onSubmit={async (note) => {
-            setBusy(true);
-            setError(null);
-            const result = await addContactNoteAction(personId, note);
-            setBusy(false);
-            if (result.ok) {
-              closeQuickAction();
-              showToast(l.toastNoteSaved);
-              router.refresh();
-            } else {
-              const message = contactActionErrorMessage(l, result.reason);
-              setError({ message, href: contactActionErrorHref(result.reason) });
-              showToast(message, "error");
-            }
-          }}
-        />
-      )}
 
       {openAction === "task" && (
         <TaskForm
@@ -312,36 +291,6 @@ export function QuickActions({
         />
       )}
     </>
-  );
-}
-
-function NoteForm({
-  labels: l,
-  busy,
-  error,
-  onCancel,
-  onSubmit,
-}: ComposerProps & { onSubmit: (note: string) => void }) {
-  const [note, setNote] = useState("");
-  return (
-    <div className="composer">
-      {error && <ErrorNotice labels={l} error={error} />}
-      <textarea
-        className="textarea"
-        placeholder={l.notePlaceholder}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        disabled={busy}
-      />
-      <div className="bar">
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {l.cancel}
-        </button>
-        <button type="button" onClick={() => note.trim() && onSubmit(note.trim())} disabled={busy || !note.trim()}>
-          {l.noteSave}
-        </button>
-      </div>
-    </div>
   );
 }
 
