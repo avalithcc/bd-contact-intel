@@ -616,6 +616,8 @@ export const es: typeof en = {
     channelEmail: "Correo enviado",
     channelNote: "Nota",
     useInEmailAction: "Usar en correo",
+    mergeCardWhat: "Unificado durante la migración",
+    reviewMergeAction: "Revisar / deshacer fusión",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).
@@ -655,6 +657,7 @@ export const es: typeof en = {
     hiringSignalText: (companyName: string, count: number) =>
       `${companyName} tiene ${count} puestos de IT abiertos.`,
     hiringSignalNewLast7Days: (count: number) => ` Publicó ${count} nuevos puestos esta semana.`,
+    mergeCardBody: (count: number) => `${count} registros combinados durante la migración.`,
   },
 
   adminConversation: {

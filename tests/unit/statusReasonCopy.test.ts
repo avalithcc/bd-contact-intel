@@ -34,6 +34,7 @@ const serverStrings: Dictionary["contactRecordServer"] = {
   openTaskLine: (title, dateLabel, assignedToName) => `${title} · vence ${dateLabel} · ${assignedToName}`,
   hiringSignalText: (companyName, count) => `${companyName} tiene ${count} puestos de IT abiertos.`,
   hiringSignalNewLast7Days: (count) => ` Publicó ${count} nuevos puestos esta semana.`,
+  mergeCardBody: (count) => `${count} registros combinados durante la migración.`,
 };
 
 const leadStatuses = {

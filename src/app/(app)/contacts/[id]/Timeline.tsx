@@ -12,6 +12,7 @@ import {
   type ConnectionForTimeline,
   type LinkedinTimelineEntryType,
 } from "@/lib/contacts/connectionTimelineEntries";
+import { groupEmailThreads } from "@/lib/contacts/emailThreads";
 import {
   DiscardIcon,
   HistoryIcon,
@@ -50,7 +51,13 @@ export interface TimelineProps {
   connections: ConnectionForTimeline[];
   viewerBdId: string;
   isAdmin: boolean;
+  // "Unificado a partir de N registros" system card (mockup-port r08;
+  // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
+  // person was never the survivor of a migration/merge.
+  mergeInfo: { unifiedFromCount: number; hasMergeEvent: boolean; at: Date } | null;
 }
+
+const MERGE_UNIFIED_TYPE = "merge_unified" as const;
 
 const LINKEDIN_PREFIX_KEY: Record<LinkedinTimelineEntryType, keyof ContactRecordLabels> = {
   linkedin_replied: "linkedinRepliedPrefix",
@@ -157,15 +164,43 @@ export function Timeline({
   connections,
   viewerBdId,
   isAdmin,
+  mergeInfo,
 }: TimelineProps) {
   const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
   // LinkedIn connection cards (contact-record.html:124-131) only show when
   // no activity-type filter is active — they aren't one of the 6 filter
   // pills, so a filtered view (e.g. "Correos") shouldn't include them.
   const linkedinEntries = activeType ? [] : buildConnectionTimelineEntries(connections);
+  const showMergeCard = !activeType && mergeInfo && mergeInfo.unifiedFromCount > 1;
+
+  // Email-thread grouping (contact-record.html:116-123) — done on the raw
+  // `entries` BEFORE merging in the LinkedIn/merge synthetic entries, so
+  // `groupEmailThreads` only ever sees real `TimelineEntry` rows (it needs
+  // `.visible`, which the synthetics don't carry).
+  const threaded = groupEmailThreads(entries);
+  const threadGroupsById = new Map(
+    threaded.filter((t) => t.kind === "thread").map((t) => [`thread-${t.group.threadId}`, t.group]),
+  );
+  const processedEntries = threaded.map((t) =>
+    t.kind === "single"
+      ? t.entry
+      : {
+          id: `thread-${t.group.threadId}`,
+          type: "email_sent",
+          createdAt: t.group.latestAt,
+          metadata: { isThread: true },
+          actorBdId: null,
+          actorName: null,
+          visible: t.group.visible,
+        },
+  );
+
   const groups = groupTimelineEntries([
-    ...entries,
+    ...processedEntries,
     ...linkedinEntries.map((e) => ({ id: e.id, type: e.type, createdAt: e.createdAt, metadata: e.metadata })),
+    ...(showMergeCard
+      ? [{ id: "merge-unified", type: MERGE_UNIFIED_TYPE, createdAt: mergeInfo!.at, metadata: null }]
+      : []),
   ]);
   const upcoming = upcomingTasks(openTasks);
   const linkedinMetaById = new Map(linkedinEntries.map((e) => [e.id, e.metadata]));
@@ -254,6 +289,70 @@ export function Timeline({
             </div>
             <div className="tl">
               {group.items.map(({ entry }) => {
+                if (entry.type === MERGE_UNIFIED_TYPE) {
+                  return (
+                    <div key={entry.id} className="tl-item">
+                      <div className="tl-icon system">
+                        <HistoryIcon className="icon" />
+                      </div>
+                      <div className="tl-card system">
+                        <div className="tl-head">
+                          <span className="what">{l.mergeCardWhat}</span>
+                          <span className="when">{formatWhen(entry.createdAt)}</span>
+                        </div>
+                        <div className="tl-body">
+                          {serverStrings.mergeCardBody(mergeInfo!.unifiedFromCount)}
+                          {isAdmin && mergeInfo!.hasMergeEvent && (
+                            <div className="row mt-lg">
+                              <Link href="/admin/duplicates#history" className="btn btn-secondary btn-sm">
+                                {l.reviewMergeAction}
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const threadGroup = threadGroupsById.get(entry.id);
+                if (threadGroup) {
+                  return (
+                    <div key={entry.id} className="tl-item">
+                      <div className="tl-icon email">
+                        <MailIcon className="icon" />
+                      </div>
+                      <div className="tl-card">
+                        <div className="tl-head">
+                          <span className="what">{l.timelineFilterEmail}</span>
+                          <span className="badge badge-info no-dot">
+                            {threadGroup.messages.length} {l.timelineFilterEmail.toLowerCase()}
+                          </span>
+                          <span className="when">{formatWhen(threadGroup.latestAt)}</span>
+                        </div>
+                        {threadGroup.visible ? (
+                          <div className="thread">
+                            {threadGroup.messages.map((m) => (
+                              <div key={m.id} className="thread-msg">
+                                <div>
+                                  <span className="from">{m.actorName ?? l.timelineSystemActor}</span>
+                                  <div className="snippet">{entryBody(m, l)}</div>
+                                </div>
+                                <span className="meta">{format(m.createdAt, "d MMM", { locale: es })}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="locked">
+                            <LockIcon className="icon" />
+                            <span>{l.timelineLockedContent}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const linkedinMeta = linkedinMetaById.get(entry.id);
                 if (linkedinMeta) {
                   const type = entry.type as LinkedinTimelineEntryType;

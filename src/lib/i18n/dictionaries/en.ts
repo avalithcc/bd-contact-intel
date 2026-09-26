@@ -719,6 +719,8 @@ export const en = {
     channelEmail: "Email sent",
     channelNote: "Note",
     useInEmailAction: "Use in email",
+    mergeCardWhat: "Unified during the migration",
+    reviewMergeAction: "Review / undo merge",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.
@@ -752,6 +754,7 @@ export const en = {
     hiringSignalText: (companyName: string, count: number) =>
       `${companyName} has ${count} open IT roles.`,
     hiringSignalNewLast7Days: (count: number) => ` Posted ${count} new roles this week.`,
+    mergeCardBody: (count: number) => `${count} records combined during the migration.`,
   },
 
   // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;

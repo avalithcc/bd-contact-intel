@@ -253,6 +253,11 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     connections={record.connections}
                     viewerBdId={me.id}
                     isAdmin={isAdmin}
+                    mergeInfo={
+                      record.merge.unifiedFromCount > 1
+                        ? { ...record.merge, at: record.person.createdAt }
+                        : null
+                    }
                   />
                 ),
               },

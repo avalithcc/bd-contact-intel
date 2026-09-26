@@ -10,6 +10,7 @@ import {
   activity,
   bd,
   lead,
+  mergeEvent,
   person,
   personBdConnection,
   personIdMap,
@@ -69,12 +70,25 @@ export interface ContactSourceEvidence {
   leadSourceKey: string | null;
 }
 
+/**
+ * Evidence for the timeline's "Unificado a partir de N registros" system
+ * card (mockup-port r08; contact-record.html:135-138 /
+ * contact-record-admin.html:142-145's "Revisar / deshacer fusión"). Bounded
+ * to this one person: how many legacy rows map to it (`person_id_map`) and
+ * whether a real `merge_event` exists to review/undo (admin-only action).
+ */
+export interface ContactMergeEvidence {
+  unifiedFromCount: number;
+  hasMergeEvent: boolean;
+}
+
 export interface ContactRecord {
   person: Person;
   ownerName: string | null;
   properties: ContactPropertyRow[];
   connections: ContactConnectionRow[];
   source: ContactSourceEvidence;
+  merge: ContactMergeEvidence;
   statusReason: StatusReasonEvidence | null;
 }
 
@@ -129,7 +143,8 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
     return survivor ? { kind: "redirect", personId: survivor.id } : { kind: "not_found" };
   }
 
-  const [ownerRow, connectionRows, historyRows, statusEventActivityRows, leadSourceRows] = await Promise.all([
+  const [ownerRow, connectionRows, historyRows, statusEventActivityRows, leadSourceRows, unifiedFromRows, mergeEventRows] =
+    await Promise.all([
     row.ownerBdId
       ? db.select({ name: bd.name }).from(bd).where(eq(bd.id, row.ownerBdId))
       : Promise.resolve([]),
@@ -171,6 +186,14 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       .innerJoin(lead, eq(lead.id, personIdMap.legacyId))
       .where(and(eq(personIdMap.personId, row.id), eq(personIdMap.legacyTable, "lead")))
       .limit(1),
+    // Bounded to this one person — "Unificado a partir de N registros"
+    // (contact-record.html:135-138): every legacy row that maps to this
+    // survivor, regardless of merge vs. direct identity-match.
+    db.select({ legacyId: personIdMap.legacyId }).from(personIdMap).where(eq(personIdMap.personId, row.id)),
+    // Bounded to this one person — whether a real `merge_event` exists to
+    // review/undo (admin-only "Revisar / deshacer fusión",
+    // contact-record-admin.html:145).
+    db.select({ id: mergeEvent.id }).from(mergeEvent).where(eq(mergeEvent.survivorId, row.id)).limit(1),
   ]);
 
   const statusEvents: StatusEvent[] = [
@@ -215,6 +238,10 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       source: {
         linkedinConnectionCount: connectionRows.length,
         leadSourceKey: leadSourceRows[0]?.sourceKey ?? null,
+      },
+      merge: {
+        unifiedFromCount: unifiedFromRows.length,
+        hasMergeEvent: mergeEventRows.length > 0,
       },
     },
   };

@@ -18,7 +18,12 @@
  * `dueAt` always form their own "Próximas" bucket first, regardless of
  * activity.
  */
-const PRE_MIGRATION_TYPES = new Set(["hunter_lookup", "status_backfill"]);
+// "merge_unified" (mockup-port r08) is a synthetic entry (never a real
+// `activity` row — see connectionTimelineEntries.ts's sibling pattern for
+// "linkedin_sent"/"linkedin_replied") representing the migration's own
+// "Unificado a partir de N registros" card; it belongs in the same bucket
+// as the other legacy-import evidence.
+const PRE_MIGRATION_TYPES = new Set(["hunter_lookup", "status_backfill", "merge_unified"]);
 import { activityRowToStatusEvent } from "@/lib/status/deriveStatus";
 
 export interface TimelineGroupingActivityEntry {
