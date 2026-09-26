@@ -697,6 +697,11 @@ export const es: typeof en = {
     reviewSampleTitle: "Muestra de revisión (solo administradores)",
     reviewSampleEmpty: "No hay pares de muestra para esta corrida.",
     reviewSampleReason: "Motivo",
+    reviewSampleReasonLabels: {
+      email_unverified: "Correo coincide (sin verificar)",
+      name_company: "Coincidencia: nombre + empresa",
+      conflicting_strong_keys: "Datos fuertes en conflicto",
+    } as Record<string, string>,
     reviewSampleIncoming: "Contacto entrante (HubSpot)",
     reviewSampleExisting: "Contacto existente",
     confirmThresholdCheckbox: (count: number) => `Confirmo ${count} contactos a revisar`,

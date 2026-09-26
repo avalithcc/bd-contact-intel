@@ -804,6 +804,11 @@ export const en = {
     reviewSampleTitle: "Review sample (admin only)",
     reviewSampleEmpty: "No sample pairs for this run.",
     reviewSampleReason: "Reason",
+    reviewSampleReasonLabels: {
+      email_unverified: "Email matches (unverified)",
+      name_company: "Match: name + company",
+      conflicting_strong_keys: "Conflicting strong keys",
+    } as Record<string, string>,
     reviewSampleIncoming: "Incoming contact (HubSpot)",
     reviewSampleExisting: "Existing contact",
     confirmThresholdCheckbox: (count: number) => `I confirm ${count} contacts to review`,

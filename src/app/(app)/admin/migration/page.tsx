@@ -238,7 +238,7 @@ function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
           <tbody>
             {report.reviewSample.map((entry, i) => (
               <tr key={i}>
-                <td>{entry.reason}</td>
+                <td>{dict.reviewSampleReasonLabels[entry.reason] ?? entry.reason}</td>
                 <td>
                   {entry.incoming.name ?? "—"} · {entry.incoming.companyKey ?? "—"} ·{" "}
                   {entry.incoming.emailDomain ?? "—"}
