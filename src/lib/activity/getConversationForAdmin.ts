@@ -12,6 +12,16 @@
  * a read that throws after the audit write still leaves an accurate trail;
  * a transaction rollback on failure means no content was ever returned
  * without its audit entry landing.
+ *
+ * `targetBdId` must be an existing `bd` row BEFORE the audit insert
+ * (fresh-review BLOCKER fix): `auditLog.targetBdId` is an FK, so inserting
+ * the audit row for a nonexistent bd would throw a raw FK-violation error
+ * (uncaught 500) instead of a handled 404 — and worse, if it somehow didn't
+ * throw, callers must never treat a nonexistent target as "audited". The
+ * caller (the page) is also responsible for validating `personId`/
+ * `targetBdId` as well-formed UUIDs first (src/lib/uuid.ts) — a malformed
+ * id hits the same FK-violation/driver-error problem even before this
+ * function's own existence check runs.
  */
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -37,11 +47,13 @@ export interface AdminConversationThread {
   messages: AdminConversationMessage[];
 }
 
-export interface AdminConversationResult {
-  targetBdName: string | null;
+export interface AdminConversationData {
+  targetBdName: string;
   emailEntries: AdminConversationEmailEntry[];
   linkedin: AdminConversationThread[];
 }
+
+export type AdminConversationResult = { kind: "not_found" } | ({ kind: "ok" } & AdminConversationData);
 
 export async function getConversationForAdmin(
   personId: string,
@@ -49,6 +61,14 @@ export async function getConversationForAdmin(
   actorBdId: string,
 ): Promise<AdminConversationResult> {
   return db.transaction(async (tx) => {
+    // Existence check BEFORE the audit insert (fresh-review BLOCKER fix):
+    // `targetBdId` must resolve to a real bd row before we ever write the
+    // FK-referencing audit entry, so a missing/deleted bd answers a clean
+    // "not_found" instead of an FK-violation error surfacing as an
+    // uncaught 500.
+    const [targetBdRow] = await tx.select({ name: bd.name }).from(bd).where(eq(bd.id, targetBdId));
+    if (!targetBdRow) return { kind: "not_found" };
+
     if (shouldAuditConversationView(actorBdId, targetBdId)) {
       await tx.insert(auditLog).values({
         actorBdId,
@@ -59,7 +79,6 @@ export async function getConversationForAdmin(
       });
     }
 
-    const [targetBdRow] = await tx.select({ name: bd.name }).from(bd).where(eq(bd.id, targetBdId));
     const [personRow] = await tx
       .select({ profileKey: person.profileKey })
       .from(person)
@@ -99,7 +118,8 @@ export async function getConversationForAdmin(
     }
 
     return {
-      targetBdName: targetBdRow?.name ?? null,
+      kind: "ok",
+      targetBdName: targetBdRow.name,
       emailEntries: emailRows.map((r) => ({
         id: r.id,
         createdAt: r.createdAt,

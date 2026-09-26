@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
@@ -6,6 +6,7 @@ import { getContactRecord } from "@/lib/contacts/queries";
 import { getConversationForAdmin } from "@/lib/activity/getConversationForAdmin";
 import { getDictionary } from "@/lib/i18n/server";
 import { formatDateTime } from "@/lib/i18n/format";
+import { isUuid } from "@/lib/uuid";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +23,19 @@ interface AdminConversationPageProps {
  * via getConversationForAdmin, unless the viewer is looking at their own
  * conversation (no bypass needed in that case, and none is offered in the
  * UI — see the associations pane's `canViewConversation` guard).
+ *
+ * `id`/`bdId` are validated as UUIDs FIRST (fresh-review BLOCKER fix) —
+ * both eventually reach a `where(eq(uuidColumn, value))` query
+ * (getContactRecord / getConversationForAdmin), and a malformed param
+ * throws an uncaught driver error (no error.tsx here) instead of a
+ * handled 404. A merged-away `id` follows the survivor chain via
+ * getContactRecord's own `redirect` kind, same as `/contacts/[id]`,
+ * instead of 404ing a still-valid contact.
  */
 export default async function AdminConversationPage({ params }: AdminConversationPageProps) {
   const { id, bdId } = await params;
+  if (!isUuid(id) || !isUuid(bdId)) notFound();
+
   let me;
   try {
     me = await requireAdmin();
@@ -35,10 +46,10 @@ export default async function AdminConversationPage({ params }: AdminConversatio
 
   const record = await getContactRecord(id);
   if (record.kind === "not_found") notFound();
-  if (record.kind === "redirect") notFound();
+  if (record.kind === "redirect") redirect(`/contacts/${record.personId}/conversation/${bdId}`);
 
   const conversationData = await getConversationForAdmin(id, bdId, me.id);
-  if (!conversationData.targetBdName) notFound();
+  if (conversationData.kind === "not_found") notFound();
 
   const dict = await getDictionary();
   const l = dict.adminConversation;
