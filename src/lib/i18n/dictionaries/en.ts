@@ -718,6 +718,7 @@ export const en = {
     channelLinkedIn: "LinkedIn",
     channelEmail: "Email sent",
     channelNote: "Note",
+    useInEmailAction: "Use in email",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.

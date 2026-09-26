@@ -615,6 +615,7 @@ export const es: typeof en = {
     channelLinkedIn: "LinkedIn",
     channelEmail: "Correo enviado",
     channelNote: "Nota",
+    useInEmailAction: "Usar en correo",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).

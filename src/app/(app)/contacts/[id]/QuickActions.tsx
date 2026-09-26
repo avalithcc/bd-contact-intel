@@ -23,6 +23,7 @@ import { useToast } from "@/components/ToastProvider";
 import {
   ClipboardIcon,
   DiscardIcon,
+  GenerateIcon,
   MailIcon,
   MeetingIcon,
   NoteIcon,
@@ -31,6 +32,7 @@ import {
 
 export interface QuickActionsProps {
   personId: string;
+  name: string;
   labels: ContactRecordLabels;
   email: string | null;
   // "Generar mensaje" (task 13.3) reuses /outreach's GenerateMessageButton —
@@ -43,7 +45,7 @@ export interface QuickActionsProps {
   initialAction?: "email" | "meeting" | "discard" | null;
 }
 
-type QuickAction = "email" | "task" | "meeting" | "discard" | "signal" | null;
+type QuickAction = "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -89,6 +91,7 @@ function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error:
  */
 export function QuickActions({
   personId,
+  name,
   labels: l,
   email,
   messageLabels,
@@ -162,6 +165,40 @@ export function QuickActions({
           {l.quickActionSignal}
         </button>
       </div>
+
+      <button type="button" className="btn btn-secondary btn-block mt-md" onClick={() => toggle("generate")}>
+        <GenerateIcon className="icon" />
+        {l.generateMessageCta}
+      </button>
+
+      {openAction === "generate" && (
+        <Dialog open onClose={closeQuickAction} title={`${l.generateMessageCta} · ${name}`} wide>
+          <div className="composer">
+            <GenerateMessageButton
+              boundAction={generatePersonOutreachMessageAction.bind(null, personId, locale)}
+              labels={messageLabels}
+              onGenerated={setGeneratedBody}
+            />
+            {/* Mockup's "Canal" select (contact-record.html:190) has no
+                backing implementation — generatePersonOutreachMessageAction
+                only ever produces an email-oriented draft today, no
+                LinkedIn-message generation path exists server-side. Same
+                gap for "Señales utilizadas" chips (contact-record.html:192):
+                the generator's result doesn't expose which signals fed the
+                draft, only the final text + a history-reuse count — showing
+                fabricated chips would misrepresent what actually happened.
+                Both flagged in the checklist as needing an owner decision
+                before being built for real, not silently invented here. */}
+            {generatedBody && (
+              <div className="dialog-footer">
+                <button type="button" className="btn btn-primary" onClick={() => setOpenAction("email")}>
+                  {l.useInEmailAction}
+                </button>
+              </div>
+            )}
+          </div>
+        </Dialog>
+      )}
 
       {openAction === "task" && (
         <TaskForm

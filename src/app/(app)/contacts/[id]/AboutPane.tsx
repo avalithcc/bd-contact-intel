@@ -7,7 +7,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
-import { GenerateIcon, HistoryIcon, LinkedInIcon } from "@/components/icons";
+import { HistoryIcon, LinkedInIcon } from "@/components/icons";
 import { PropertyList, type AboutPaneProperty, type OwnerOption } from "./PropertyList";
 import { QuickActions } from "./QuickActions";
 
@@ -112,17 +112,13 @@ export function AboutPane({
 
       <QuickActions
         personId={personId}
+        name={name}
         labels={l}
         email={email}
         messageLabels={messageLabels}
         locale={locale}
         initialAction={initialAction}
       />
-
-      <a className="btn btn-secondary btn-block mt-md" href="#generate">
-        <GenerateIcon className="icon" />
-        {l.generateMessageCta}
-      </a>
 
       <div className="section-title">
         {l.aboutSectionTitle}
