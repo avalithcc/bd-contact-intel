@@ -663,6 +663,7 @@ export const es: typeof en = {
     colOwner: "Responsable",
     colDue: "Vencimiento",
     completeAria: "Completar",
+    completeError: "No se pudo completar la tarea. Probá de nuevo.",
     subjectLead: "Contacto",
     subjectCompany: "Empresa",
     dueToday: "Hoy",

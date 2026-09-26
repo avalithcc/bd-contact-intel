@@ -769,6 +769,7 @@ export const en = {
     colOwner: "Owner",
     colDue: "Due",
     completeAria: "Mark complete",
+    completeError: "Could not complete the task. Try again.",
     subjectLead: "Contact",
     subjectCompany: "Company",
     dueToday: "Today",
