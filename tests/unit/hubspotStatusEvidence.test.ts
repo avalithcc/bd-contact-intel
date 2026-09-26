@@ -87,6 +87,42 @@ test("leadStatus 'No calificado' produces a discarded status_backfill with reaso
   assert.equal(plan.activities[0].metadata.reason, "wrong_profile");
 });
 
+// --- H6 dry-run fixes: real export lead status values ------------------------
+
+test("leadStatus 'Sin calificar' (the real export value) discards with reason wrong_profile", () => {
+  const plan = planStatusEvidence(contact({ leadStatus: "Sin calificar" }), null, RUN_AT);
+  assert.equal(plan.activities.length, 1);
+  assert.equal(plan.activities[0].status, "discarded");
+  assert.equal(plan.activities[0].reason, "wrong_profile");
+});
+
+test("leadStatus 'Intento de contacto' produces 'contacted'", () => {
+  const plan = planStatusEvidence(contact({ leadStatus: "Intento de contacto" }), null, RUN_AT);
+  assert.equal(plan.activities.length, 1);
+  assert.equal(plan.activities[0].status, "contacted");
+});
+
+test("leadStatus 'Negocio abierto' produces 'replied'", () => {
+  const plan = planStatusEvidence(contact({ leadStatus: "Negocio abierto" }), null, RUN_AT);
+  assert.equal(plan.activities.length, 1);
+  assert.equal(plan.activities[0].status, "replied");
+});
+
+test("an unrecognized non-empty leadStatus writes no activity but is reported as unknownLeadStatus", () => {
+  const plan = planStatusEvidence(contact({ leadStatus: "Algo Raro" }), null, RUN_AT);
+  assert.equal(plan.activities.length, 0);
+  assert.equal(plan.unknownLeadStatus, "Algo Raro");
+});
+
+test("a known leadStatus does not set unknownLeadStatus", () => {
+  assert.equal(planStatusEvidence(contact({ leadStatus: "Nuevo" }), null, RUN_AT).unknownLeadStatus, null);
+  assert.equal(planStatusEvidence(contact({ leadStatus: "Sin calificar" }), null, RUN_AT).unknownLeadStatus, null);
+});
+
+test("an empty leadStatus does not set unknownLeadStatus", () => {
+  assert.equal(planStatusEvidence(contact({ leadStatus: null }), null, RUN_AT).unknownLeadStatus, null);
+});
+
 test("'No calificado' with contacted evidence emits BOTH a stage and a discard activity, sharing the same originalAt", () => {
   const plan = planStatusEvidence(
     contact({ leadStatus: "No calificado", timesContacted: 2 }),

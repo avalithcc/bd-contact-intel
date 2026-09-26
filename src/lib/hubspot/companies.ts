@@ -44,7 +44,7 @@ export interface ExistingCompanyRef {
   domain: string | null;
 }
 
-export type CompanyMatchReason = "domain" | "name" | "created" | "own_company" | "unresolved";
+export type CompanyMatchReason = "domain" | "name" | "compact" | "created" | "own_company" | "unresolved";
 
 export interface CompanyResolution {
   /** Resolved/created company key, or null when unresolved or own-company. */
@@ -93,6 +93,11 @@ export interface CompanyResolutionResult {
   domainFills: DomainFill[];
   domainConflicts: DomainConflict[];
   notesToCreate: CompanyNoteToCreate[];
+  /** Groups whose compact key (see `normalizeCompactCompanyKey`) matched more
+   * than one existing company — reported instead of guessing which one is
+   * right; the group still goes through normal creation-eligibility (H6
+   * dry-run finding). */
+  ambiguousCompactMatches: number;
 }
 
 export interface CompanyGroup {
@@ -117,6 +122,60 @@ export function normalizeDomain(value: string | null | undefined): string | null
   const noPort = hostWithPort.replace(/:\d+$/, "");
   const noTrailingDot = noPort.replace(/\.+$/, "");
   return noTrailingDot || null;
+}
+
+/** Generic legal-entity/TLD/product-suffix tokens stripped anywhere in the
+ * word list (leading or trailing) when building a compact key — e.g. "the
+ * bridge" -> "bridge", "nisum technologies" -> "nisum" (H6 dry-run finding:
+ * ~60 real-export companies duplicate an existing one only by such a token,
+ * with no domain on file yet to disambiguate). `normalizeCompanyKey`
+ * already strips inc/llc/ltd/sa/srl/sas/corp/corporation — repeated here is
+ * harmless (a superset), the rest are new. */
+const COMPACT_STOP_TOKENS = new Set([
+  "inc",
+  "llc",
+  "ltd",
+  "sa",
+  "srl",
+  "sas",
+  "corp",
+  "corporation",
+  "company",
+  "co",
+  "com",
+  "io",
+  "ar",
+  "br",
+  "mx",
+  "holding",
+  "holdings",
+  "group",
+  "technologies",
+  "technology",
+  "software",
+  "labs",
+  "the",
+]);
+
+/** Loose fallback key used ONLY when a UNIQUE match against existing
+ * companies can't be established via domain or exact `companyKey` (design
+ * D3 steps 1-3): lowercases, strips a leading URL scheme/`www` (so a
+ * company name that is itself a URL, e.g. "https://www truelogic io/",
+ * never produces a key containing "https"), then removes every character
+ * that isn't a letter/digit and drops any `COMPACT_STOP_TOKENS` word,
+ * joining what's left with no separator. Accepts either a raw HubSpot
+ * company name or an already-`normalizeCompanyKey`-normalized existing
+ * `companyKey` — both are plain lowercase text, so the same pass works on
+ * either input. */
+export function normalizeCompactCompanyKey(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  const noScheme = lower.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+  const noWww = noScheme.replace(/^www[.\s]*/, "");
+  const words = noWww.split(/[^a-z0-9]+/).filter((w) => w.length > 0 && !COMPACT_STOP_TOKENS.has(w));
+  const compact = words.join("");
+  return compact || null;
 }
 
 function splitAdditionalDomains(value: string | undefined): string[] {
@@ -261,10 +320,21 @@ export function planCompanyResolution(
 ): CompanyResolutionResult {
   const existingByDomain = new Map<string, ExistingCompanyRef>();
   const existingByKey = new Map<string, ExistingCompanyRef>();
+  // Compact-key -> every existing company whose companyKey compacts to it.
+  // More than one entry means the compact key is ambiguous for THAT key.
+  const existingByCompact = new Map<string, ExistingCompanyRef[]>();
+  const addCompact = (key: string | null, ref: ExistingCompanyRef): void => {
+    if (!key) return;
+    const arr = existingByCompact.get(key);
+    if (arr) arr.push(ref);
+    else existingByCompact.set(key, [ref]);
+  };
   for (const c of existingCompanies) {
     existingByKey.set(c.companyKey, c);
     if (c.domain) existingByDomain.set(c.domain, c);
+    addCompact(normalizeCompactCompanyKey(c.companyKey), c);
   }
+  let ambiguousCompactMatches = 0;
   // companyKeys whose domain was set (filled or created) DURING this run —
   // only these can produce a domainConflict; a domain already on file
   // before this run is left untouched, matching the pre-existing
@@ -307,7 +377,7 @@ export function planCompanyResolution(
       matched = existingByDomain.get(d);
       if (matched) break;
     }
-    let matchReason: "domain" | "name" = "domain";
+    let matchReason: "domain" | "name" | "compact" = "domain";
     if (!matched) {
       for (const row of group.rows) {
         if (!row.name) continue;
@@ -319,9 +389,30 @@ export function planCompanyResolution(
         }
       }
     }
+    if (!matched) {
+      // Fallback (design D3 step 3b, H6 dry-run finding): company.domain is
+      // not populated yet for most existing rows, so exact-name matching
+      // alone misses near-duplicates like "kavak" vs "kavak com". Only used
+      // on a UNIQUE compact-key hit — an ambiguous one is reported and the
+      // group falls through to normal creation-eligibility below.
+      for (const row of group.rows) {
+        if (!row.name) continue;
+        const compact = normalizeCompactCompanyKey(row.name);
+        if (!compact) continue;
+        const candidates = existingByCompact.get(compact);
+        if (!candidates || candidates.length === 0) continue;
+        if (candidates.length > 1) {
+          ambiguousCompactMatches++;
+          break;
+        }
+        matched = candidates[0];
+        matchReason = "compact";
+        break;
+      }
+    }
 
     if (matched) {
-      if (matchReason === "name" && group.domains.length > 0) {
+      if ((matchReason === "name" || matchReason === "compact") && group.domains.length > 0) {
         const groupDomain = group.domains[0]!;
         if (!matched.domain) {
           matched.domain = groupDomain;
@@ -369,6 +460,7 @@ export function planCompanyResolution(
     const createdRef: ExistingCompanyRef = { companyKey, domain };
     existingByKey.set(companyKey, createdRef);
     if (domain) existingByDomain.set(domain, createdRef);
+    addCompact(normalizeCompactCompanyKey(companyKey), createdRef);
     filledOrCreatedKeys.add(companyKey);
     for (const row of group.rows) {
       byHubspotCompanyId.set(row.hubspotCompanyId, { companyKey, matchReason: "created", ownCompanyMatchReason: null });
@@ -376,7 +468,7 @@ export function planCompanyResolution(
     addNotes(companyKey, group.rows);
   }
 
-  return { byHubspotCompanyId, companiesToCreate, domainFills, domainConflicts, notesToCreate };
+  return { byHubspotCompanyId, companiesToCreate, domainFills, domainConflicts, notesToCreate, ambiguousCompactMatches };
 }
 
 export interface ContactCompanyResolution {

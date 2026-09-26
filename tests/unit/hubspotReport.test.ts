@@ -23,10 +23,17 @@ function emptyReport(overrides: Partial<HubSpotImportReport["outcomes"]> = {}): 
     rowsRead: 1,
     outcomes: { new: 0, review: 0, profile_key: 0, skipped_own_company: 0, already_imported: 0, invalid: 0, ...overrides },
     owners: { mapped: { Ana: 3 }, unassigned: 1, unknown: { "John Doe": 2 } },
-    companies: { matchedByDomain: 1, matchedByName: 0, created: 1, ownCompany: 0, noCompanyResolved: 0, notes: 0 },
+    companies: { matchedByDomain: 1, matchedByName: 0, matchedByCompact: 0, created: 1, ownCompany: 0, noCompanyResolved: 0, notes: 0 },
     backfills: { contacted: 0, replied: 0, discarded: 0 },
     dateFallback: 0,
-    warnings: { duplicateHubspotContactIds: [], associatedCompanyIdPrimaryMultiple: 0, noCompanyResolved: 0, domainConflicts: 0 },
+    warnings: {
+      duplicateHubspotContactIds: [],
+      associatedCompanyIdPrimaryMultiple: 0,
+      noCompanyResolved: 0,
+      domainConflicts: 0,
+      ambiguousCompactMatches: 0,
+      unknownLeadStatuses: {},
+    },
   };
 }
 
@@ -61,6 +68,7 @@ function planResult(outcomes: HubSpotContactPlanOutcome[], reviewCount = 0): Pla
       domainFills: [{ companyKey: "beta", domain: "beta.com" }],
       domainConflicts: [],
       notesToCreate: [],
+      ambiguousCompactMatches: 0,
     },
     identityPlan: null,
     refillPlans: [],

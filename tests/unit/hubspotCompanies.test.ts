@@ -10,6 +10,7 @@ import { test } from "node:test";
 import {
   mapHubSpotCompanyRow,
   normalizeDomain,
+  normalizeCompactCompanyKey,
   groupHubSpotCompanies,
   planCompanyResolution,
   resolveContactCompanyKey,
@@ -335,6 +336,86 @@ test("planCompanyResolution: two groups name-matching the same existing domain-l
   ]);
   assert.equal(result.byHubspotCompanyId.get("1")?.companyKey, "acme");
   assert.equal(result.byHubspotCompanyId.get("2")?.companyKey, "acme");
+});
+
+// --- H6 dry-run fix: compact-key fallback (company.domain not yet populated) --
+
+test("normalizeCompactCompanyKey strips spaces, punctuation and generic suffix tokens", () => {
+  assert.equal(normalizeCompactCompanyKey("mercadolibre com"), "mercadolibre");
+  assert.equal(normalizeCompactCompanyKey("mercadolibre"), "mercadolibre");
+  assert.equal(normalizeCompactCompanyKey("cook unity"), "cookunity");
+  assert.equal(normalizeCompactCompanyKey("kavak com"), "kavak");
+  assert.equal(normalizeCompactCompanyKey("thoughtworks holding"), "thoughtworks");
+  assert.equal(normalizeCompactCompanyKey("thoughtworks"), "thoughtworks");
+  assert.equal(normalizeCompactCompanyKey("the bridge"), "bridge");
+  assert.equal(normalizeCompactCompanyKey("bridge"), "bridge");
+  assert.equal(normalizeCompactCompanyKey("nisum technologies"), "nisum");
+  assert.equal(normalizeCompactCompanyKey("nisum"), "nisum");
+});
+
+test("normalizeCompactCompanyKey normalizes a URL-shaped name to the host label, never containing 'https'", () => {
+  const compact = normalizeCompactCompanyKey("https://www truelogic io/");
+  assert.equal(compact, "truelogic");
+  assert.ok(!compact!.includes("https"));
+  assert.equal(normalizeCompactCompanyKey("truelogic software"), "truelogic");
+});
+
+test("normalizeCompactCompanyKey returns null for blank input", () => {
+  assert.equal(normalizeCompactCompanyKey(""), null);
+  assert.equal(normalizeCompactCompanyKey(null), null);
+  assert.equal(normalizeCompactCompanyKey(undefined), null);
+});
+
+test("planCompanyResolution: unique compact-key match links to the existing company and fills its empty domain", () => {
+  const existing: ExistingCompanyRef[] = [{ companyKey: "mercadolibre com", domain: null }];
+  const result = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", name: "MercadoLibre", domain: null, additionalDomains: [] })],
+    existing,
+    new Map([["1", 1]]),
+    new Set(),
+  );
+  assert.equal(result.companiesToCreate.length, 0);
+  assert.equal(result.byHubspotCompanyId.get("1")?.companyKey, "mercadolibre com");
+  assert.equal(result.byHubspotCompanyId.get("1")?.matchReason, "compact");
+  assert.equal(result.ambiguousCompactMatches, 0);
+});
+
+test("planCompanyResolution: compact match does not overwrite an existing non-empty domain", () => {
+  const existing: ExistingCompanyRef[] = [{ companyKey: "kavak com", domain: "kavak.com.mx" }];
+  const result = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", name: "Kavak", domain: null, additionalDomains: [] })],
+    existing,
+    new Map([["1", 1]]),
+    new Set(),
+  );
+  assert.equal(result.byHubspotCompanyId.get("1")?.companyKey, "kavak com");
+  assert.equal(result.domainFills.length, 0);
+});
+
+test("planCompanyResolution: a compact key matching two DIFFERENT existing companies is ambiguous — creates instead of guessing", () => {
+  const existing: ExistingCompanyRef[] = [
+    { companyKey: "acme io", domain: null },
+    { companyKey: "acme inc", domain: null },
+  ];
+  const result = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", name: "Acme", domain: "acme-new.com", additionalDomains: [] })],
+    existing,
+    new Map([["1", 1]]),
+    new Set(),
+  );
+  assert.equal(result.ambiguousCompactMatches, 1);
+  assert.equal(result.companiesToCreate.length, 1);
+});
+
+test("planCompanyResolution: a company created earlier in the same run is compact-matched by a later group", () => {
+  const rows = [
+    row({ hubspotCompanyId: "1", name: "Nisum", domain: null, additionalDomains: [], note: null }),
+    row({ hubspotCompanyId: "2", name: "Nisum Technologies", domain: null, additionalDomains: [], note: null }),
+  ];
+  const result = planCompanyResolution(rows, [], new Map([["1", 1], ["2", 1]]), new Set());
+  assert.equal(result.companiesToCreate.length, 1);
+  assert.equal(result.byHubspotCompanyId.get("2")?.matchReason, "compact");
+  assert.equal(result.byHubspotCompanyId.get("2")?.companyKey, result.companiesToCreate[0]!.companyKey);
 });
 
 test("resolveContactCompanyKey: resolved company id returns its companyKey", () => {

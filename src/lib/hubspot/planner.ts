@@ -91,6 +91,10 @@ export interface HubSpotImportReport {
   companies: {
     matchedByDomain: number;
     matchedByName: number;
+    /** Matched via the compact-key fallback (H6 dry-run finding: company.domain
+     * is not populated yet, so exact-name matching alone missed ~60 near-
+     * duplicates). See src/lib/hubspot/companies.ts#normalizeCompactCompanyKey. */
+    matchedByCompact: number;
     created: number;
     ownCompany: number;
     noCompanyResolved: number;
@@ -103,6 +107,15 @@ export interface HubSpotImportReport {
     associatedCompanyIdPrimaryMultiple: number;
     noCompanyResolved: number;
     domainConflicts: number;
+    /** Compact-key candidates that matched more than one existing company —
+     * reported instead of guessing; the group still gets created (H6 dry-
+     * run finding). */
+    ambiguousCompactMatches: number;
+    /** Non-empty HubSpot lead status values this module doesn't recognize
+     * (value -> row count) — never used to plan evidence, just surfaced so
+     * an unmapped label doesn't silently disappear (H6 dry-run finding).
+     * Status labels are not PII. */
+    unknownLeadStatuses: Record<string, number>;
   };
 }
 
@@ -145,10 +158,25 @@ function emptyReport(rowsRead: number): HubSpotImportReport {
     rowsRead,
     outcomes: { new: 0, review: 0, profile_key: 0, skipped_own_company: 0, already_imported: 0, invalid: 0 },
     owners: { mapped: {}, unassigned: 0, unknown: {} },
-    companies: { matchedByDomain: 0, matchedByName: 0, created: 0, ownCompany: 0, noCompanyResolved: 0, notes: 0 },
+    companies: {
+      matchedByDomain: 0,
+      matchedByName: 0,
+      matchedByCompact: 0,
+      created: 0,
+      ownCompany: 0,
+      noCompanyResolved: 0,
+      notes: 0,
+    },
     backfills: { contacted: 0, replied: 0, discarded: 0 },
     dateFallback: 0,
-    warnings: { duplicateHubspotContactIds: [], associatedCompanyIdPrimaryMultiple: 0, noCompanyResolved: 0, domainConflicts: 0 },
+    warnings: {
+      duplicateHubspotContactIds: [],
+      associatedCompanyIdPrimaryMultiple: 0,
+      noCompanyResolved: 0,
+      domainConflicts: 0,
+      ambiguousCompactMatches: 0,
+      unknownLeadStatuses: {},
+    },
   };
 }
 
@@ -169,11 +197,13 @@ export function planHubSpotImport(input: PlanHubSpotImportInput): PlanHubSpotImp
   for (const resolution of companyResolution.byHubspotCompanyId.values()) {
     if (resolution.matchReason === "domain") report.companies.matchedByDomain++;
     else if (resolution.matchReason === "name") report.companies.matchedByName++;
+    else if (resolution.matchReason === "compact") report.companies.matchedByCompact++;
     else if (resolution.matchReason === "created") report.companies.created++;
     else if (resolution.matchReason === "own_company") report.companies.ownCompany++;
   }
   report.companies.notes = companyResolution.notesToCreate.length;
   report.warnings.domainConflicts = companyResolution.domainConflicts.length;
+  report.warnings.ambiguousCompactMatches = companyResolution.ambiguousCompactMatches;
 
   // Indexed by the row's position in input.contacts, so the final
   // `outcomes` array preserves original row order regardless of which
@@ -340,6 +370,10 @@ function trackStatusEvidence(
   runAt: Date,
 ): void {
   const plan = planStatusEvidence(contact, ownerBdId, runAt);
+  if (plan.unknownLeadStatus) {
+    report.warnings.unknownLeadStatuses[plan.unknownLeadStatus] =
+      (report.warnings.unknownLeadStatuses[plan.unknownLeadStatus] ?? 0) + 1;
+  }
   if (plan.activities.length === 0) return;
   statusEvidence.push({ hubspotContactId: contact.hubspotContactId, personRef, plan });
   if (plan.dateFallback) report.dateFallback++;

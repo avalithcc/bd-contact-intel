@@ -209,6 +209,20 @@ test("status evidence: a row with contacted evidence gets a planned status_backf
   assert.equal(result.report.backfills.contacted, 1);
 });
 
+test("an unrecognized leadStatus is counted under report.warnings.unknownLeadStatuses (H6 dry-run fix)", () => {
+  const result = planHubSpotImport(
+    baseInput({
+      contacts: [
+        contact({ hubspotContactId: "1", leadStatus: "Algo Raro" }),
+        contact({ hubspotContactId: "2", leadStatus: "Algo Raro" }),
+        contact({ hubspotContactId: "3", leadStatus: "Nuevo" }),
+      ],
+    }),
+  );
+  assert.equal(result.report.warnings.unknownLeadStatuses["Algo Raro"], 2);
+  assert.equal(result.report.warnings.unknownLeadStatuses["Nuevo"], undefined);
+});
+
 test("status evidence is not planned for a skipped own-company row", () => {
   const companies: HubSpotCompanyRow[] = [
     { hubspotCompanyId: "co-1", name: "Avalith", domain: null, additionalDomains: [], note: null, city: null, country: null, sector: null },

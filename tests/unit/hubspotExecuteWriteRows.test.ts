@@ -39,6 +39,7 @@ function outcome(overrides: Partial<HubSpotStatusEvidenceOutcome> = {}): HubSpot
       ],
       originalAt: new Date("2026-01-01T00:00:00.000Z"),
       dateFallback: false,
+      unknownLeadStatus: null,
     },
     ...overrides,
   };
@@ -97,6 +98,7 @@ test("buildStatusBackfillActivityRows never writes a plan-local ref as personId"
         ],
         originalAt: new Date("2026-01-02T00:00:00.000Z"),
         dateFallback: false,
+        unknownLeadStatus: null,
       },
     }),
   ];

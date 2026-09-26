@@ -197,6 +197,14 @@ function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
             <td>{report.companies.noCompanyResolved}</td>
           </tr>
           <tr>
+            <td>{dict.tableHubspotCompaniesMatchedByCompact}</td>
+            <td>{report.companies.matchedByCompact}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotAmbiguousCompactMatches}</td>
+            <td>{report.warnings.ambiguousCompactMatches}</td>
+          </tr>
+          <tr>
             <td>{dict.tableHubspotOwnersMapped}</td>
             <td>{ownersMapped}</td>
           </tr>
@@ -222,6 +230,22 @@ function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
           </tr>
         </tbody>
       </table>
+
+      <div className="eyebrow">{dict.tableHubspotUnknownLeadStatusesTitle}</div>
+      {Object.keys(report.warnings.unknownLeadStatuses).length === 0 ? (
+        <p className="muted">{dict.tableHubspotUnknownLeadStatusesEmpty}</p>
+      ) : (
+        <table>
+          <tbody>
+            {Object.entries(report.warnings.unknownLeadStatuses).map(([status, count]) => (
+              <tr key={status}>
+                <td>{status}</td>
+                <td>{count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <div className="eyebrow">{dict.reviewSampleTitle}</div>
       {report.reviewSample.length === 0 ? (

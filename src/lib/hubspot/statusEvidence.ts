@@ -44,17 +44,54 @@ export interface StatusEvidencePlan {
   /** True when every one of lastContactAt/lastActivityAt/createdAt was
    * missing and `originalAt` fell back to the import run time. */
   dateFallback: boolean;
+  /** The raw HubSpot lead status text when it is non-empty and NOT one of
+   * the known values below (H6 dry-run finding: the real export uses
+   * different labels than initially assumed) — reported by the caller
+   * under `report.warnings.unknownLeadStatuses`, never used to plan an
+   * activity. `null` for empty or recognized statuses. */
+  unknownLeadStatus: string | null;
 }
 
-const REPLIED_LEAD_STATUSES = new Set(["Conectado", "Mal momento"]);
-const DISCARD_LEAD_STATUS = "No calificado";
+/** Every lead status value this module knows how to interpret — anything
+ * else (non-empty) is reported as `unknownLeadStatus` instead of silently
+ * producing no evidence. `Nuevo`/`Abierto` are known but intentionally
+ * carry no evidence (design D5). */
+const KNOWN_LEAD_STATUSES = new Set([
+  "Nuevo",
+  "Abierto",
+  "En curso",
+  "Conectado",
+  "Mal momento",
+  "Negocio abierto",
+  "Intento de contacto",
+  "Sin calificar",
+  "No calificado",
+]);
+
+/** An open deal means the contact engaged (H6 dry-run finding). */
+const REPLIED_LEAD_STATUSES = new Set(["Conectado", "Mal momento", "Negocio abierto"]);
+/** `Sin calificar` is the value the real HubSpot export actually uses;
+ * `No calificado` is kept as an accepted alias (H6 dry-run finding: the
+ * initial mapping assumed the latter and the discarded count came out 0). */
+const DISCARD_LEAD_STATUSES = new Set(["Sin calificar", "No calificado"]);
+const CONTACTED_LEAD_STATUSES = new Set(["En curso", "Intento de contacto"]);
 
 function resolveStage(contact: HubSpotContactRow): StatusBackfillStage | null {
   if (contact.leadStatus && REPLIED_LEAD_STATUSES.has(contact.leadStatus)) return "replied";
-  if (contact.timesContacted > 0 || contact.lastContactAt !== null || contact.leadStatus === "En curso") {
+  if (
+    contact.timesContacted > 0 ||
+    contact.lastContactAt !== null ||
+    (contact.leadStatus !== null && CONTACTED_LEAD_STATUSES.has(contact.leadStatus))
+  ) {
     return "contacted";
   }
   return null;
+}
+
+function resolveUnknownLeadStatus(contact: HubSpotContactRow): string | null {
+  const status = contact.leadStatus;
+  if (!status || !status.trim()) return null;
+  return KNOWN_LEAD_STATUSES.has(status) ? null : status;
 }
 
 function resolveOriginalAt(contact: HubSpotContactRow, runAt: Date): { at: Date; dateFallback: boolean } {
@@ -105,9 +142,9 @@ export function planStatusEvidence(
   const stage = resolveStage(contact);
   if (stage) activities.push(buildActivity(contact, stage, undefined, ownerBdId, originalAt));
 
-  if (contact.leadStatus === DISCARD_LEAD_STATUS) {
+  if (contact.leadStatus !== null && DISCARD_LEAD_STATUSES.has(contact.leadStatus)) {
     activities.push(buildActivity(contact, "discarded", "wrong_profile", ownerBdId, originalAt));
   }
 
-  return { activities, originalAt, dateFallback };
+  return { activities, originalAt, dateFallback, unknownLeadStatus: resolveUnknownLeadStatus(contact) };
 }
