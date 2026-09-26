@@ -178,9 +178,9 @@ export default async function WhatsNewPage({
           <div key={c.companyKey} className="whats-new-company">
             <div className="whats-new-company-head">
               <span className="whats-new-company-name">{c.displayName}</span>
-              <span className="badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
+              <span className="legacy-badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
               {c.offshoreHeavy && (
-                <span className="badge offshore">
+                <span className="legacy-badge offshore">
                   {dict.common.offshoreBadge(c.offshoreItCount, c.latamItCount)}
                 </span>
               )}
@@ -204,7 +204,7 @@ export default async function WhatsNewPage({
                       {sc.name ?? dict.contact.unnamed}
                     </Link>
                     {sc.roleGroup && (
-                      <span className={sc.isLeadership ? "badge green" : "badge"}>
+                      <span className={sc.isLeadership ? "legacy-badge green" : "badge"}>
                         {dict.roleGroups[sc.roleGroup]}
                       </span>
                     )}

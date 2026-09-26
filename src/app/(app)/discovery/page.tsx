@@ -54,12 +54,12 @@ export default async function DiscoveryPage() {
               lastRun.hits,
             )}
             {lastRun.status === "error" && (
-              <span className="badge ml-sm">
+              <span className="legacy-badge ml-sm">
                 {dict.discovery.lastRunFailed}
               </span>
             )}
             {!lastRun.finishedAt && (
-              <span className="badge ml-sm">
+              <span className="legacy-badge ml-sm">
                 {dict.discovery.lastRunUnfinished}
               </span>
             )}
@@ -130,7 +130,7 @@ export default async function DiscoveryPage() {
                     </td>
                     <td>{dict.discovery.teamContactCount(c.contactCount)}</td>
                     <td>
-                      <div className="row row-xs">
+                      <div className="legacy-row legacy-row-xs">
                         <form action={approveCandidate}>
                           <input type="hidden" name="id" value={c.id} />
                           <button type="submit" className="secondary-btn">

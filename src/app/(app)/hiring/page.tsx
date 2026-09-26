@@ -105,10 +105,10 @@ export default async function HiringPage({
               <summary>
                 {s.displayName} — {dict.hiring.postingCount(s.openItCount)}
                 {s.newLast7Days > 0 && (
-                  <span className="badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
+                  <span className="legacy-badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
                 )}
                 {s.offshoreHeavy && (
-                  <span className="badge offshore">
+                  <span className="legacy-badge offshore">
                     {dict.common.offshoreBadge(s.offshoreItCount, s.latamItCount)}
                   </span>
                 )}

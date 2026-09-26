@@ -632,12 +632,12 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                     <td>
                       {r.company ?? "—"}
                       {r.isStartup && (
-                        <span className="badge startup" title={r.startupReason ?? undefined}>
+                        <span className="legacy-badge startup" title={r.startupReason ?? undefined}>
                           {dict.outreach.startupBadge}
                         </span>
                       )}
                       {r.offshoreHeavy && (
-                        <span className="badge offshore">
+                        <span className="legacy-badge offshore">
                           {dict.common.offshoreBadge(r.offshoreItCount, r.latamItCount)}
                         </span>
                       )}

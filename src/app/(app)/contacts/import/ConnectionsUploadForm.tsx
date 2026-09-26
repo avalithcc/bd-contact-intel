@@ -28,7 +28,7 @@ export function ConnectionsUploadForm({ labels: l }: { labels: ContactsImportLab
 
   return (
     <form action={action}>
-      <div className="row">
+      <div className="legacy-row">
         <div className="field-grow">
           <label htmlFor="connections-file">{l.connectionsFileLabel}</label>
           <input id="connections-file" name="file" type="file" accept=".csv" required />
