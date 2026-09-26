@@ -521,7 +521,11 @@ export async function upsertContacts(
           : () => upsertContactRows().then(() => [] as InsertedContactRow[]),
         toIdentityRows: contactRowsToIdentityRows,
         prefetch: (rows) => prefetchIdentityIndex(tx, rows),
-        apply: (plan) => applyIdentityWrites(tx, plan),
+        // applyIdentityWrites now returns the resolved legacyId->personId
+        // map (hubspot_import fresh-review fix); this ingest harness's
+        // `apply` contract is Promise<void>, and live ingestion has no
+        // caller-side use for the map, so it's discarded here.
+        apply: (plan) => applyIdentityWrites(tx, plan).then(() => undefined),
       });
       chunkReports.push(report);
     });

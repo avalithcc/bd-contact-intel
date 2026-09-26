@@ -18,6 +18,7 @@ import {
   buildIdentityWriteRows,
   buildPrefetchKeys,
   IDENTITY_LOCK_KEY,
+  personIdMapKey,
   repointIdentityWriteRows,
   type ExistingPersonCandidate,
   type IdentityIngestRow,
@@ -42,6 +43,10 @@ function toCandidate(r: typeof person.$inferSelect): ExistingPersonCandidate {
     emailStatus: r.emailStatus as EmailStatus,
     emailConfidence: r.emailConfidence,
     emailSource: r.emailSource,
+    company: r.company,
+    ownerBdId: r.ownerBdId,
+    city: r.city,
+    country: r.country,
   };
 }
 
@@ -51,15 +56,28 @@ function toCandidate(r: typeof person.$inferSelect): ExistingPersonCandidate {
  * company-key lookup is narrowed by the DB index and then filtered app-side
  * against each row's exact name+company key (the name index is on raw, not
  * accent-folded, names — same reasoning as foldPlanner.ts).
+ *
+ * A 4th query, scoped to `hubspotEmails` (fresh-review CRITICAL fix,
+ * contact-identity spec "not-verified-side exact-email review rule"),
+ * prefetches existing persons by email regardless of THEIR OWN
+ * `emailStatus` too — the `verifiedEmails` query above only ever matches an
+ * existing person whose stored email is `verified`, which would silently
+ * miss a `probable`-vs-`probable` collision the `email_unverified` rule is
+ * specifically meant to catch. `hubspotEmails` is empty for every live
+ * ingestion caller (contact/lead rows never populate it — see
+ * buildPrefetchKeys), so this query is a no-op outside hubspot_import.
+ * Batched via `chunk` (unlike the 3 queries above): a HubSpot export can
+ * carry ~9k rows in one call, well past a single `IN (...)` list's
+ * practical size.
  */
 export async function prefetchIdentityIndex(
   tx: DbTransaction,
   rows: readonly IdentityIngestRow[],
 ): Promise<ExistingPersonCandidate[]> {
-  const { profileKeys, verifiedEmails, companyKeys } = buildPrefetchKeys(rows);
+  const { profileKeys, verifiedEmails, companyKeys, hubspotEmails } = buildPrefetchKeys(rows);
   const byId = new Map<string, ExistingPersonCandidate>();
 
-  const [byProfile, byEmail, byCompany] = await Promise.all([
+  const [byProfile, byEmail, byCompany, byHubspotEmail] = await Promise.all([
     profileKeys.length
       ? tx.select().from(person).where(and(inArray(person.profileKey, profileKeys), isNull(person.mergedIntoId)))
       : Promise.resolve([]),
@@ -78,9 +96,19 @@ export async function prefetchIdentityIndex(
     companyKeys.length
       ? tx.select().from(person).where(and(inArray(person.companyKey, companyKeys), isNull(person.mergedIntoId)))
       : Promise.resolve([]),
+    hubspotEmails.length
+      ? Promise.all(
+          chunk(hubspotEmails, WRITE_BATCH_SIZE).map((batch) =>
+            tx
+              .select()
+              .from(person)
+              .where(and(inArray(person.emailNormalized, batch), isNull(person.mergedIntoId))),
+          ),
+        ).then((pages) => pages.flat())
+      : Promise.resolve([]),
   ]);
 
-  for (const r of [...byProfile, ...byEmail, ...byCompany]) byId.set(r.id, toCandidate(r));
+  for (const r of [...byProfile, ...byEmail, ...byCompany, ...byHubspotEmail]) byId.set(r.id, toCandidate(r));
   return [...byId.values()];
 }
 
@@ -115,8 +143,23 @@ export async function withIdentityLock<T>(tx: DbTransaction, fn: () => Promise<T
  * any dependent row (connections/idMap/duplicateCandidates) is inserted, so
  * a loser id from one batch can never slip into a dependent insert before
  * it's been repointed — see repointIdentityWriteRows in ./resolve.ts.
+ *
+ * Returns the FINAL, post-conflict-repoint `person_id_map` rows just
+ * written, keyed by `${legacyTable}:${legacyId}` (fresh-review CRITICAL
+ * fix): `rows.idMap` already resolves every row outcome — including
+ * `new`/`review` rows, whose `IdentityWritePlan` only ever carries a
+ * plan-local ref like `"np1"` until this function inserts the real row —
+ * to the real, persisted `person.id`. Callers that need to write a
+ * DEPENDENT row keyed by the same legacy id after this call returns (e.g.
+ * hubspot_import's status-evidence activities, keyed by
+ * `hubspotLegacyId(hubspotContactId)`) MUST resolve through this map
+ * instead of trusting an in-memory plan ref — see
+ * src/lib/hubspot/executeWriteRows.ts.
  */
-export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWritePlan): Promise<void> {
+export async function applyIdentityWrites(
+  tx: DbTransaction,
+  plan: IdentityWritePlan,
+): Promise<Map<string, string>> {
   const builtRows = buildIdentityWriteRows(plan, randomUUID);
   const winnerByLoserId = new Map<string, string>();
 
@@ -168,10 +211,14 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
       .set({
         firstName: update.merged.firstName,
         lastName: update.merged.lastName,
+        company: update.merged.company,
         companyKey: update.merged.companyKey,
         jobTitle: update.merged.jobTitle,
         roleGroup: update.merged.roleGroup,
         industry: update.merged.industry,
+        city: update.merged.city,
+        country: update.merged.country,
+        ownerBdId: update.merged.ownerBdId,
         email: update.merged.email,
         emailNormalized: update.merged.emailNormalized,
         emailStatus: update.merged.emailStatus,
@@ -181,6 +228,13 @@ export async function applyIdentityWrites(tx: DbTransaction, plan: IdentityWrite
       })
       .where(eq(person.id, update.personId));
   }
+
+  const legacyIdToPersonId = new Map<string, string>();
+  for (const row of rows.idMap) {
+    if (!row.personId) continue; // skipped_own_company rows have a null personId
+    legacyIdToPersonId.set(personIdMapKey(row.legacyTable as IdentityIngestRow["legacyTable"], row.legacyId), row.personId);
+  }
+  return legacyIdToPersonId;
 }
 
 /**

@@ -10,6 +10,7 @@ import {
 import type { CollapseReport } from "@/lib/migration/collapsePlanner";
 import type { FoldReport } from "@/lib/migration/foldPlanner";
 import type { CatchUpRunReport } from "@/lib/migration/catchUpRun";
+import type { HubSpotRunReport } from "@/lib/hubspot/report";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
 import { approveMigrationRunAction } from "./actions";
@@ -33,6 +34,10 @@ function isFoldReport(report: unknown): report is FoldReport {
 
 function isCatchUpReport(report: unknown): report is CatchUpRunReport {
   return !!report && typeof report === "object" && "rowsRead" in report && "leadsSkippedNoOwner" in report;
+}
+
+function isHubSpotReport(report: unknown): report is HubSpotRunReport {
+  return !!report && typeof report === "object" && "reviewSample" in report && "reviewThreshold" in report;
 }
 
 /**
@@ -168,6 +173,134 @@ function CatchUpReportTable({ report }: { report: CatchUpRunReport }) {
   );
 }
 
+function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
+  const ownersMapped = Object.values(report.owners.mapped).reduce((sum, n) => sum + n, 0);
+  const ownersUnknown = Object.values(report.owners.unknown).reduce((sum, n) => sum + n, 0);
+  return (
+    <div className="table-wrap">
+      <table>
+        <tbody>
+          <tr>
+            <td>{dict.tableHubspotNew}</td>
+            <td>{report.outcomes.new}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotReview}</td>
+            <td>{report.outcomes.review}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotSkippedOwnCompany}</td>
+            <td>{report.outcomes.skipped_own_company}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotNoCompany}</td>
+            <td>{report.companies.noCompanyResolved}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotCompaniesMatchedByCompact}</td>
+            <td>{report.companies.matchedByCompact}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotAmbiguousCompactMatches}</td>
+            <td>{report.warnings.ambiguousCompactMatches}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotOwnersMapped}</td>
+            <td>{ownersMapped}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotOwnersUnassigned}</td>
+            <td>{report.owners.unassigned}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotOwnersUnknown}</td>
+            <td>{ownersUnknown}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotContacted}</td>
+            <td>{report.backfills.contacted}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotReplied}</td>
+            <td>{report.backfills.replied}</td>
+          </tr>
+          <tr>
+            <td>{dict.tableHubspotDiscarded}</td>
+            <td>{report.backfills.discarded}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="eyebrow">{dict.compactMatchesReviewTitle}</div>
+      {report.companies.compactMatches.length === 0 ? (
+        <p className="muted">{dict.compactMatchesReviewEmpty}</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>{dict.compactMatchesIncoming}</th>
+              <th>{dict.compactMatchesExisting}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.companies.compactMatches.map((match, i) => (
+              <tr key={i}>
+                <td>{match.hubspotName}</td>
+                <td>{match.existingCompanyKey}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="eyebrow">{dict.tableHubspotUnknownLeadStatusesTitle}</div>
+      {Object.keys(report.warnings.unknownLeadStatuses).length === 0 ? (
+        <p className="muted">{dict.tableHubspotUnknownLeadStatusesEmpty}</p>
+      ) : (
+        <table>
+          <tbody>
+            {Object.entries(report.warnings.unknownLeadStatuses).map(([status, count]) => (
+              <tr key={status}>
+                <td>{status}</td>
+                <td>{count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="eyebrow">{dict.reviewSampleTitle}</div>
+      {report.reviewSample.length === 0 ? (
+        <p className="muted">{dict.reviewSampleEmpty}</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>{dict.reviewSampleReason}</th>
+              <th>{dict.reviewSampleIncoming}</th>
+              <th>{dict.reviewSampleExisting}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.reviewSample.map((entry, i) => (
+              <tr key={i}>
+                <td>{dict.reviewSampleReasonLabels[entry.reason] ?? entry.reason}</td>
+                <td>
+                  {entry.incoming.name ?? "—"} · {entry.incoming.companyKey ?? "—"} ·{" "}
+                  {entry.incoming.emailDomain ?? "—"}
+                </td>
+                <td>
+                  {entry.existing.name ?? "—"} · {entry.existing.companyKey ?? "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 /** One kind's panel: latest run (report + approve action) plus its history. */
 function MigrationKindSection({
   kind,
@@ -176,13 +309,17 @@ function MigrationKindSection({
   latest,
   history,
   renderReport,
+  renderApproveExtra,
 }: {
-  kind: "collapse" | "fold_leads" | "catch_up";
+  kind: "collapse" | "fold_leads" | "catch_up" | "hubspot_import";
   sectionTitle: string;
   reportTitle: string;
   latest: MigrationRunWithApprover | null;
   history: MigrationRunWithApprover[];
   renderReport: (report: unknown) => ReactNode;
+  /** Extra approve-form fields rendered above the submit button, e.g. the
+   * hubspot_import over-threshold confirmation checkbox (design D7). */
+  renderApproveExtra?: (report: unknown) => ReactNode;
 }) {
   return (
     <section>
@@ -218,6 +355,7 @@ function MigrationKindSection({
               <form action={approveMigrationRunAction}>
                 <input type="hidden" name="runId" value={latest.id} />
                 <input type="hidden" name="kind" value={kind} />
+                {renderApproveExtra?.(latest.report)}
                 <button type="submit" className="filter-submit">
                   {dict.approveButton}
                 </button>
@@ -296,6 +434,8 @@ export default async function MigrationAdminPage({
     foldHistory,
     catchUpLatest,
     catchUpHistory,
+    hubspotLatest,
+    hubspotHistory,
   ] = await Promise.all([
     searchParams,
     getLatestMigrationRun("collapse"),
@@ -304,6 +444,8 @@ export default async function MigrationAdminPage({
     listMigrationRuns("fold_leads"),
     getLatestMigrationRun("catch_up"),
     listMigrationRuns("catch_up"),
+    getLatestMigrationRun("hubspot_import"),
+    listMigrationRuns("hubspot_import"),
   ]);
 
   return (
@@ -343,6 +485,25 @@ export default async function MigrationAdminPage({
         latest={catchUpLatest}
         history={catchUpHistory}
         renderReport={(report) => (isCatchUpReport(report) ? <CatchUpReportTable report={report} /> : null)}
+      />
+
+      <MigrationKindSection
+        kind="hubspot_import"
+        sectionTitle={dict.sectionHubspotTitle}
+        reportTitle={dict.hubspotReportTitle}
+        latest={hubspotLatest}
+        history={hubspotHistory}
+        renderReport={(report) => (isHubSpotReport(report) ? <HubSpotReportTable report={report} /> : null)}
+        renderApproveExtra={(report) =>
+          isHubSpotReport(report) && report.overThreshold ? (
+            <p className="soft">
+              <label>
+                <input type="checkbox" name="confirmThreshold" />{" "}
+                {dict.confirmThresholdCheckbox(report.outcomes.review)}
+              </label>
+            </p>
+          ) : null
+        }
       />
     </main>
   );

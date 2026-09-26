@@ -19,6 +19,7 @@ function emptyIndex(overrides: Partial<IdentityIndex> = {}): IdentityIndex {
   return {
     byProfileKey: () => null,
     byVerifiedEmail: () => null,
+    byEmail: () => [],
     byNameCompany: () => [],
     ...overrides,
   };
@@ -158,6 +159,66 @@ test("A name with no Latin letters yields no name+company key, so it never match
   assert.deepEqual(result, { kind: "new" });
 });
 
+// --- email_unverified (contact-identity delta, scoped to hubspot_import) ---
+
+test("hubspot_import row with an exact email match to a not-verified existing Contact routes to review", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-4"] : []),
+  });
+  const result = matchIdentity(
+    { email: "Jane@Acme.com", emailStatus: "probable", company: "Acme", source: "hubspot_import" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "review", reason: "email_unverified", personIds: ["person-4"] });
+});
+
+test("hubspot_import row with a verified incoming email matching a not-verified existing Contact still routes to review (byVerifiedEmail found nothing)", () => {
+  const index = emptyIndex({
+    byVerifiedEmail: () => null,
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-4"] : []),
+  });
+  const result = matchIdentity(
+    { email: "jane@acme.com", emailStatus: "verified", company: "Acme", source: "hubspot_import" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "review", reason: "email_unverified", personIds: ["person-4"] });
+});
+
+test("email_unverified never applies to rows without source: hubspot_import (live ingest / catch_up unchanged)", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-4"] : []),
+    byNameCompany: () => [],
+  });
+  const result = matchIdentity(
+    { email: "jane@acme.com", emailStatus: "probable", company: "Acme" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "new" });
+});
+
+test("email_unverified never applies when source is hubspot_import but no email is present", () => {
+  const index = emptyIndex({
+    byEmail: () => ["person-should-not-match"],
+  });
+  const result = matchIdentity(
+    { firstName: "Jane", lastName: "Doe", company: "Acme", source: "hubspot_import" },
+    index,
+  );
+  assert.notEqual(result.kind, "review");
+});
+
+test("email_unverified is checked before name+company for hubspot_import rows", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-4"] : []),
+    byNameCompany: () => ["person-name-company-should-not-win"],
+  });
+  const result = matchIdentity(
+    { email: "jane@acme.com", emailStatus: "probable", firstName: "Jane", lastName: "Doe", company: "Acme", source: "hubspot_import" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "review", reason: "email_unverified", personIds: ["person-4"] });
+});
+
 test("Verified email is trimmed before lookup", () => {
   const index = emptyIndex({
     byVerifiedEmail: (email) => (email === "jane@acme.com" ? "person-2" : null),
@@ -174,6 +235,20 @@ test("Verified email is trimmed before lookup", () => {
 test("buildNameCompanyKey normalizes case, whitespace and company suffixes", () => {
   assert.equal(
     buildNameCompanyKey({ firstName: "  Jane ", lastName: "DOE", company: "Acme Inc." }),
+    "jane doe::acme",
+  );
+});
+
+test("buildNameCompanyKey prefers an explicit companyKey over deriving one from company", () => {
+  assert.equal(
+    buildNameCompanyKey({ firstName: "Jane", lastName: "Doe", company: "Acme Incorporated", companyKey: "acme" }),
+    "jane doe::acme",
+  );
+});
+
+test("buildNameCompanyKey falls back to deriving from company when companyKey is absent", () => {
+  assert.equal(
+    buildNameCompanyKey({ firstName: "Jane", lastName: "Doe", company: "Acme Inc.", companyKey: null }),
     "jane doe::acme",
   );
 });
