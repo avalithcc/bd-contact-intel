@@ -12,13 +12,18 @@
  * real `legacyTable`/`legacyId` from the old `contact`/`lead` schema being
  * migrated; a manually-typed new contact has no such row, so forcing one
  * through would mean inventing a fake legacy reference just to satisfy the
- * pipeline's shape. Two targeted, index-friendly reads build the same kind
- * of small `IdentityIndex` the planner's prefetch would (profile key exact
- * match; company-key-scoped rows filtered by normalized name in app code,
- * same convention as prefetchIdentityIndex in resolveDb.ts) — never an
- * unbounded scan. A manually typed email is never "verified" (see
- * createContact.ts), so the verified-email lookup the matcher would also
- * consult is never reachable here and is skipped entirely.
+ * pipeline's shape. Three targeted, index-friendly reads build the same
+ * kind of small `IdentityIndex` the planner's prefetch would (profile key
+ * exact match; company-key-scoped rows filtered by normalized name in app
+ * code, same convention as prefetchIdentityIndex in resolveDb.ts; email
+ * exact match on `emailNormalized`) — never an unbounded scan. A manually
+ * typed email is never "verified" (see createContact.ts), so the
+ * verified-email lookup the matcher would also consult is never reachable
+ * here and is skipped entirely. `matchableRowFromFields` tags the row
+ * `source: "manual_create"`, so an exact email hit against a live,
+ * non-merged person auto-matches here (matcher's manual_create rule) —
+ * same "already exists" UX as a profile_key hit — instead of the
+ * hubspot_import-only "review" outcome.
  *
  * "Crear de todas formas" on a name+company match writes a real
  * `duplicateCandidate` row (same table/shape the admin Duplicates screen
@@ -61,8 +66,10 @@ export async function createContactAction(
 
   const matchRow = matchableRowFromFields(fields);
 
-  // Two targeted, indexed reads — never an unbounded scan (NO DB access
-  // rule: bounded by profileKey uniqueness / companyKey index).
+  // Three targeted, indexed reads — never an unbounded scan (NO DB access
+  // rule: bounded by profileKey uniqueness / companyKey index / a single
+  // normalized-email equality).
+  const emailNormalized = fields.email ? fields.email.trim().toLowerCase() : null;
   const byProfile = fields.profileKey
     ? await db
         .select()
@@ -75,9 +82,15 @@ export async function createContactAction(
         .from(person)
         .where(and(eq(person.companyKey, fields.companyKey), isNull(person.mergedIntoId)))
     : [];
+  const byEmail = emailNormalized
+    ? await db
+        .select()
+        .from(person)
+        .where(and(eq(person.emailNormalized, emailNormalized), isNull(person.mergedIntoId)))
+    : [];
 
   const byId = new Map<string, typeof person.$inferSelect>();
-  for (const row of [...byProfile, ...byCompany]) byId.set(row.id, row);
+  for (const row of [...byProfile, ...byCompany, ...byEmail]) byId.set(row.id, row);
 
   const byNameCompanyIds = new Map<string, string[]>();
   for (const row of byId.values()) {
@@ -91,11 +104,11 @@ export async function createContactAction(
     // row's emailStatus is "verified", and buildNewContactFields never
     // produces that for a manually typed address (see its doc comment).
     byVerifiedEmail: () => null,
-    // Never reached: matchIdentity only consults this when row.source is
-    // "hubspot_import" (contact-identity delta's email_unverified review
-    // rule), and matchRow here never sets that — this is a manually typed
-    // contact, not a HubSpot import row.
-    byEmail: () => [],
+    // Backs the matcher's manual_create exact-email rule (matchRow's
+    // `source: "manual_create"`, set by matchableRowFromFields): every
+    // live, non-merged person whose stored email exactly matches, from the
+    // bounded `byEmail` prefetch above.
+    byEmail: (email) => byEmail.filter((r) => r.emailNormalized === email).map((r) => r.id),
     byNameCompany: (key) => byNameCompanyIds.get(key) ?? [],
   });
 

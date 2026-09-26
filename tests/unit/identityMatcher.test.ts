@@ -219,6 +219,73 @@ test("email_unverified is checked before name+company for hubspot_import rows", 
   assert.deepEqual(result, { kind: "review", reason: "email_unverified", personIds: ["person-4"] });
 });
 
+// --- manual_create exact-email auto-match (contact-identity delta, "Nuevo
+// contacto" duplicate check) ------------------------------------------------
+
+test("manual_create row with an exact email match to a live person auto-merges, same as profile_key — reuses the existing-match UX", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-5"] : []),
+  });
+  const result = matchIdentity(
+    { email: "Jane@Acme.com", emailStatus: "probable", company: "Acme", source: "manual_create" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "auto", personId: "person-5", key: "email_exact" });
+});
+
+test("manual_create exact-email auto-match doesn't require either side to be verified", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-5"] : []),
+  });
+  const result = matchIdentity(
+    { email: "jane@acme.com", emailStatus: "none", company: "Acme", source: "manual_create" },
+    index,
+  );
+  assert.equal(result.kind, "auto");
+});
+
+test("manual_create exact-email match outranks name+company", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-5"] : []),
+    byNameCompany: () => ["person-name-company-should-not-win"],
+  });
+  const result = matchIdentity(
+    {
+      email: "jane@acme.com",
+      emailStatus: "probable",
+      firstName: "Jane",
+      lastName: "Doe",
+      company: "Acme",
+      source: "manual_create",
+    },
+    index,
+  );
+  assert.deepEqual(result, { kind: "auto", personId: "person-5", key: "email_exact" });
+});
+
+test("manual_create with no email present falls through to name+company/new, same as before", () => {
+  const index = emptyIndex({
+    byEmail: () => ["person-should-not-match"],
+  });
+  const result = matchIdentity(
+    { firstName: "Jane", lastName: "Doe", company: "Acme", source: "manual_create" },
+    index,
+  );
+  assert.notEqual(result.kind, "auto");
+});
+
+test("manual_create source does NOT change live CSV/lead ingest behavior (no source set): an exact email match with neither side verified still becomes 'new', not auto", () => {
+  const index = emptyIndex({
+    byEmail: (email) => (email === "jane@acme.com" ? ["person-4"] : []),
+    byNameCompany: () => [],
+  });
+  const result = matchIdentity(
+    { email: "jane@acme.com", emailStatus: "probable", company: "Acme" },
+    index,
+  );
+  assert.deepEqual(result, { kind: "new" });
+});
+
 test("Verified email is trimmed before lookup", () => {
   const index = emptyIndex({
     byVerifiedEmail: (email) => (email === "jane@acme.com" ? "person-2" : null),
