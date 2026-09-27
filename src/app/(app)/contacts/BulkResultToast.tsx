@@ -23,7 +23,13 @@ export function BulkResultToast({ message }: { message: string | null }) {
   const shown = useRef(false);
 
   useEffect(() => {
-    if (!message || shown.current) return;
+    // Once the param is stripped the message goes back to null; re-arm so the
+    // next bulk action in the same session (no full reload) toasts again.
+    if (!message) {
+      shown.current = false;
+      return;
+    }
+    if (shown.current) return;
     shown.current = true;
     showToast(message, "success");
     // Read the query string client-side (not `useSearchParams`, which would
