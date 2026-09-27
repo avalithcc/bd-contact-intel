@@ -30,6 +30,17 @@ export interface ApprovedHubSpotRun extends MigrationRunForGate {
 
 export interface FinalizeHubSpotExecuteInput {
   plan: PlanHubSpotImportResult;
+  /**
+   * The full, persisted-report shape (design D7) — built via
+   * `buildHubSpotRunReport`, the SAME builder the dry run uses. Follow-up
+   * fix (prod run c9de8587): `finalizeExecute` used to persist
+   * `plan.report` directly (the planner's raw `HubSpotImportReport`), which
+   * lacks `reviewSample`/`reviewThreshold`/`overThreshold`/
+   * `createdCompanyKeys`/`domainFilledCompanyKeys` — so `/admin/migration`
+   * rendered nothing for an executed run. `finalizeExecute` must persist
+   * THIS field, not `plan.report`.
+   */
+  report: HubSpotRunReport;
   migrationRunId: string;
   actorBdId: string;
   backupPath: string;
@@ -100,6 +111,7 @@ export async function runHubSpotImportExecute(
   }
 
   const backupPath = await ports.snapshotBackup(run.id);
-  await ports.finalizeExecute({ plan, migrationRunId: run.id, actorBdId: run.approvedByBdId, backupPath });
-  return { migrationRunId: run.id, report: reportOf(input, plan) };
+  const report = reportOf(input, plan);
+  await ports.finalizeExecute({ plan, report, migrationRunId: run.id, actorBdId: run.approvedByBdId, backupPath });
+  return { migrationRunId: run.id, report };
 }

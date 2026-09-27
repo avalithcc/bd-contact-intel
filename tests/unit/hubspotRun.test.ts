@@ -146,6 +146,41 @@ test("execute backs up, finalizes, and returns the report when approved, hash ma
   assert.equal((finalizeCalls[0] as { backupPath: string }).backupPath, "backups/run-1.dump");
 });
 
+// --- Follow-up fix: /admin/migration showed no report for an executed run
+// (prod run c9de8587). `finalizeExecute` receives the FULL `HubSpotRunReport`
+// shape (reviewSample/reviewThreshold/overThreshold/createdCompanyKeys/
+// domainFilledCompanyKeys included) — the same shape the dry run persists —
+// not just the planner's raw `HubSpotImportReport`. -----------------------
+
+test("execute passes the full HubSpotRunReport shape (not just the raw planner report) to finalizeExecute", async () => {
+  const finalizeCalls: unknown[] = [];
+  await runHubSpotImportExecute(
+    baseInput(),
+    "hash-1",
+    {
+      id: "run-1",
+      kind: "hubspot_import",
+      approvedAt: new Date(),
+      executedAt: null,
+      inputHash: "hash-1",
+      approvedByBdId: "bd-1",
+    },
+    {
+      snapshotBackup: async (runId) => `backups/${runId}.dump`,
+      finalizeExecute: async (input) => {
+        finalizeCalls.push(input);
+      },
+    },
+  );
+  const finalizeInput = finalizeCalls[0] as { report?: { reviewSample?: unknown; reviewThreshold?: unknown } };
+  assert.ok(finalizeInput.report, "finalizeExecute must receive a `report` field");
+  assert.ok(
+    Array.isArray(finalizeInput.report!.reviewSample),
+    "finalizeExecute's report must include reviewSample (the full HubSpotRunReport shape)",
+  );
+  assert.equal(finalizeInput.report!.reviewThreshold, 300);
+});
+
 // --- idempotent re-import (task 4.13; hubspot-import spec "idempotent
 // re-import requirement") --------------------------------------------------
 
