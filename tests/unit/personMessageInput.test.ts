@@ -28,7 +28,8 @@ test("maps person fields into the contact block", () => {
     signalBodies: [],
     company: null,
     senderName: "Cristian Civita",
-    locale: "es",
+    language: "es",
+    channel: "email",
   });
   assert.equal(input.contact.firstName, "Ana");
   assert.equal(input.contact.lastName, "Gomez");
@@ -44,7 +45,8 @@ test("history is always empty — never another BD's message content (R6)", () =
     signalBodies: [],
     company: null,
     senderName: "Cristian Civita",
-    locale: "es",
+    language: "es",
+    channel: "email",
   });
   assert.deepEqual(input.history, []);
 });
@@ -56,7 +58,8 @@ test("no connection (teammate-only contact) leaves connectedOn unknown, still pr
     signalBodies: [],
     company: null,
     senderName: "Cristian Civita",
-    locale: "es",
+    language: "es",
+    channel: "email",
   });
   assert.equal(input.contact.connectedOn, null);
 });
@@ -68,7 +71,8 @@ test("a connection contributes connectedOn plus a counts/dates-only summary note
     signalBodies: [],
     company: null,
     senderName: "Cristian Civita",
-    locale: "es",
+    language: "es",
+    channel: "email",
   });
   assert.equal(input.contact.connectedOn, "2024-01-01");
   assert.equal(input.notes?.length, 1);
@@ -83,7 +87,8 @@ test("signal bodies pass through as additional notes, after the connection summa
     signalBodies: ["Recently promoted to VP", "Posted about hiring backend engineers"],
     company: null,
     senderName: "Cristian Civita",
-    locale: "es",
+    language: "es",
+    channel: "email",
   });
   assert.deepEqual(input.notes, ["Recently promoted to VP", "Posted about hiring backend engineers"]);
 });
@@ -96,10 +101,11 @@ test("senderTitle and locale pass through unchanged", () => {
     company: null,
     senderName: "Cristian Civita",
     senderTitle: "COO de Avalith",
-    locale: "en",
+    language: "en",
+    channel: "email",
   });
   assert.equal(input.senderTitle, "COO de Avalith");
-  assert.equal(input.locale, "en");
+  assert.equal(input.language, "en");
 });
 
 test("a null roleGroup is not treated as leadership", () => {
@@ -109,7 +115,8 @@ test("a null roleGroup is not treated as leadership", () => {
     signalBodies: [],
     company: null,
     senderName: "Cristian Civita",
-    locale: "es",
+    language: "es",
+    channel: "email",
   });
   assert.equal(input.contact.roleGroup, null);
   assert.equal(input.contact.isLeadership, false);

@@ -109,7 +109,8 @@ export function BulkGenerateMessagesButton({
             <p className="soft">{name}</p>
             {result.ok ? (
               <>
-                <p className="generate-message-text">{result.message}</p>
+                {result.subject && <p className="generate-message-subject">{result.subject}</p>}
+                <p className="generate-message-text">{result.subject ? result.body : result.message}</p>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"

@@ -321,6 +321,7 @@ export const en = {
       gatewayNotConfigured:
         "The AI Gateway isn't configured yet — set AI_GATEWAY_API_KEY (or sign in with Vercel OIDC) and try again.",
       generationFailed: "Couldn't generate a message right now. Try again in a moment.",
+      invalidModelOutput: "The generated draft came back in an unexpected format. Try again in a moment.",
     },
     // Shown above the generated message when prior LinkedIn history was fed
     // into the prompt (see historyCount in
@@ -339,7 +340,23 @@ export const en = {
     chooseMessageLanguage: "Choose the message language",
     messageLanguageEs: "Español",
     messageLanguageEn: "English",
+    messageLanguagePt: "Portuguese",
     cancelChooseLanguage: "Cancel",
+    generateMessageChannelLabel: "Channel",
+    generateMessageChannelEmail: "Email",
+    generateMessageChannelLinkedin: "LinkedIn message",
+    generateMessageLanguageLabel: "Language",
+    generateMessageSignalsLabel: "Signals used",
+    generateMessageSignalHiringOne: "Hiring · 1 IT role",
+    generateMessageSignalHiringMany: "Hiring · {n} IT roles",
+    generateMessageSignalLeadership: "Engineering leadership",
+    generateMessageSignalRepliedBefore: "Replied before",
+    generateMessageSignalNotesPresentOne: "Research note available",
+    generateMessageSignalNotesPresentMany: "{n} research notes available",
+    generateMessageSignalLastContact: "Last contact: {date}",
+    generateMessageDraftLabel: "Draft",
+    generateMessageDraftHelp: "AI draft. Review before sending. Nothing is logged until it's sent or copied.",
+    generateMessageGenerateAction: "Generate",
   },
 
   leads: {

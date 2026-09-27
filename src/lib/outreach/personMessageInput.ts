@@ -15,7 +15,8 @@
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import { LEADERSHIP_ROLE_GROUPS } from "@/lib/hiring/leadership";
 import type { OutreachMessageCompany, BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
-import type { Locale } from "@/lib/i18n/locales";
+import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
+import type { OutreachChannel } from "@/lib/outreach/channel";
 
 // Same rule as isLeadershipRoleGroup (src/lib/outreach/queries.ts) —
 // duplicated instead of imported so this module stays DB-free (that file
@@ -53,7 +54,8 @@ export interface BuildPersonMessageInputArgs {
   company: OutreachMessageCompany | null;
   senderName: string;
   senderTitle?: string;
-  locale: Locale;
+  language: MessageLanguage;
+  channel: OutreachChannel;
 }
 
 function connectionSummaryNote(connection: PersonConnectionSummary): string {
@@ -68,7 +70,7 @@ function connectionSummaryNote(connection: PersonConnectionSummary): string {
 }
 
 export function buildPersonMessageInput(args: BuildPersonMessageInputArgs): BuildOutreachMessagePromptInput {
-  const { person, connection, signalBodies, company, senderName, senderTitle, locale } = args;
+  const { person, connection, signalBodies, company, senderName, senderTitle, language, channel } = args;
 
   const notes = [
     ...(connection ? [connectionSummaryNote(connection)] : []),
@@ -91,6 +93,7 @@ export function buildPersonMessageInput(args: BuildPersonMessageInputArgs): Buil
     notes,
     senderName,
     senderTitle,
-    locale,
+    language,
+    channel,
   };
 }

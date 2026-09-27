@@ -1145,6 +1145,14 @@ a:hover {
   font-size: var(--text-sm);
   color: var(--color-ink);
 }
+/* Email channel's subject line, shown above the body (result.subject in
+   BulkGenerateMessagesButton.tsx / GenerateMessageButton.tsx). */
+.generate-message-subject {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
 .generate-message-error {
   margin: 0;
   font-size: var(--text-sm);
