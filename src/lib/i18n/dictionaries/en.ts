@@ -785,6 +785,21 @@ export const en = {
     mergeCardBody: (count: number) => `${count} records combined during the migration.`,
   },
 
+  // Server-only formatter templates for /companies/[key] (mockup-port c03).
+  // Kept separate from `companyRecord` — EditCompanyButton.tsx types its
+  // labels prop as `ClientStrings<Dictionary["companyRecord"]>`, which
+  // requires every value to be a plain string (or nested string record);
+  // function-valued templates live here instead, same split as
+  // contactRecordServer above.
+  companyRecordServer: {
+    noteBy: (actor: string) => `Note · ${actor}`,
+    emailSentTo: (to: string) => `Email sent to ${to}`,
+    stageChanged: (from: string, to: string) => `Stage changed from ${from} → ${to}`,
+    assocViewAll: (n: number) => `View all ${n} in Contacts`,
+    vacantesFooter: (total: number, latam: number, us: number) =>
+      `${total} open IT roles · ${latam} LATAM · ${us} US`,
+  },
+
   // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;
   // admin-access-audit spec). Server-rendered, no client component — plain
   // strings for consistency with the rest of the dictionary, not bound by
@@ -933,6 +948,71 @@ export const en = {
     notePlaceholder: "What happened?",
     addActivityError: "Couldn't add the activity",
     addActivitySuccess: "Activity added.",
+
+    // --- mockup-port c03 additions (company-record.html three-panel shell) ---
+    breadcrumb: "Companies",
+    emptyValue: "—",
+    edit: "Edit",
+    genericError: "Something went wrong. Try again.",
+    hiringBadge: "Hiring",
+    quickActionNote: "Note",
+    quickActionTask: "Task",
+    quickActionContact: "Contact",
+    quickActionMeeting: "Meeting",
+    quickActionMore: "More",
+    moreComingSoon: "Coming soon",
+    aboutSectionTitle: "Company information",
+    propStage: "Stage",
+    propOwner: "Owner",
+    propRevenuePotential: "Revenue potential",
+    propLocation: "Location",
+    propStartup: "Startup",
+    startupYes: "Yes",
+    startupNo: "No",
+    revenueHigh: "High",
+    revenueMedium: "Medium",
+    revenueLow: "Low",
+    tabActivity: "Activity",
+    tabHiring: "Hiring signals",
+    timelineFilterAll: "All",
+    timelineFilterNote: "Notes",
+    timelineFilterStageChange: "Stage changes",
+    timelineFilterContactActivity: "Contact activity",
+    timelineEmpty: "No activity logged yet.",
+    meetingLogged: "Meeting logged",
+    atNote: "Note",
+    atEmailSent: "Email sent",
+    atStatusChange: "Stage changed",
+    atMeetingLogged: "Meeting logged",
+    atCall: "Call logged",
+    atDiscarded: "Discarded",
+    atHunterLookup: "Email lookup",
+    atStatusBackfill: "Activity logged",
+    hiringTablePosition: "Position",
+    hiringTableLocation: "Location",
+    hiringTableMarket: "Market",
+    hiringTablePosted: "Posted",
+    hiringEmpty: "No open IT postings right now.",
+    assocContactsTitle: "Contacts",
+    assocVacantesTitle: "Openings",
+    assocTasksTitle: "Open tasks",
+    tasksEmpty: "No open tasks.",
+    taskMarkDone: "Mark done",
+    noteDialogTitle: "Note",
+    noteLabel: "Note",
+    noteSave: "Save note",
+    taskDialogTitle: "New task",
+    taskTitleLabel: "Task title",
+    taskDueLabel: "Due date",
+    taskCreate: "Create task",
+    meetingDialogTitle: "Log meeting",
+    meetingDateLabel: "Date",
+    meetingTimeLabel: "Time",
+    meetingNotesLabel: "Notes",
+    meetingSubmit: "Log meeting",
+    toastNoteSaved: "Note saved.",
+    toastTaskCreated: "Task created.",
+    toastMeetingLogged: "Meeting logged.",
   },
 
   companyForm: {

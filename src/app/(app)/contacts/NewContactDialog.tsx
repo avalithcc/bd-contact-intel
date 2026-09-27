@@ -35,17 +35,31 @@ export interface NewContactDialogLabels {
 
 const EMPTY_INPUT: NewContactFormInput = { firstName: "", lastName: "", linkedinUrl: "", email: "", company: "" };
 
-export function NewContactDialog({ labels: l }: { labels: NewContactDialogLabels }) {
+/**
+ * `initialCompany` (mockup-port c03): the company record's "Contacto" quick
+ * action (company-record.html:66) opens this SAME dialog prefilled with the
+ * company's display name — `NewContactFormInput.company` is already a free-
+ * text name resolved to a `companyKey` server-side (see createContact.ts),
+ * so no new field or action was needed, just this optional default.
+ */
+export function NewContactDialog({
+  labels: l,
+  initialCompany,
+}: {
+  labels: NewContactDialogLabels;
+  initialCompany?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [input, setInput] = useState<NewContactFormInput>(EMPTY_INPUT);
+  const emptyInput = initialCompany ? { ...EMPTY_INPUT, company: initialCompany } : EMPTY_INPUT;
+  const [input, setInput] = useState<NewContactFormInput>(emptyInput);
   const [result, setResult] = useState<CreateContactResult | null>(null);
 
   function close() {
     setOpen(false);
     setResult(null);
-    setInput(EMPTY_INPUT);
+    setInput(emptyInput);
   }
 
   async function submit(confirmDuplicate: boolean) {
