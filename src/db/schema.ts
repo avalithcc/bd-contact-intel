@@ -1011,16 +1011,66 @@ export const company = pgTable(
     // companies have no domain on file yet. Partial unique index (below)
     // so multiple NULLs are allowed but two companies can't share a domain.
     domain: text("domain"),
+    // Migration 0017 (company-fields): four HubSpot-style fields (Industria,
+    // Responsable, Ciudad, País), editable through
+    // src/lib/companies/propertyEdit.ts and filled by
+    // scripts/backfill-hubspot-company-fields.ts. `ownerBdId` is a real FK
+    // (unlike the denormalized createdByBdId/updatedByBdId above) since it
+    // drives an owner-scoped list filter (like person.ownerBdId) rather than
+    // just "who touched this row last" — `onDelete: "set null"` so removing
+    // a BD never blocks, matching person.ownerBdId's convention.
+    industry: text("industry"),
+    ownerBdId: uuid("owner_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    city: text("city"),
+    country: text("country"),
   },
   (t) => ({
     domainIdx: uniqueIndex("company_domain_idx")
       .on(t.domain)
       .where(sql`${t.domain} is not null`),
+    byOwner: index("company_owner_idx").on(t.ownerBdId),
+    byIndustry: index("company_industry_idx").on(t.industry),
   }),
 );
 
 export type Company = typeof company.$inferSelect;
 export type NewCompany = typeof company.$inferInsert;
+
+// Property-level change history for `company` (migration 0017,
+// company-fields change), mirroring `person_property_history` above —
+// same "one current value with change history" shape (contact-identity R7),
+// applied to the company record page's editable fields (industry, owner,
+// city, country) via src/lib/companies/propertyEdit.ts /
+// src/lib/companies/propertyEditDb.ts.
+export const companyPropertyHistory = pgTable(
+  "company_property_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyKey: text("company_key")
+      .notNull()
+      .references(() => company.companyKey, { onDelete: "cascade" }),
+    property: text("property").notNull(),
+    oldValue: text("old_value"),
+    newValue: text("new_value"),
+    changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
+      onDelete: "set null",
+    }),
+    // 'edit' | 'import' — mirrors person_property_history.source; company
+    // rows have no merge/unmerge concept yet, so those two source values
+    // never appear here.
+    source: text("source").notNull(),
+    at: timestamp("at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byCompany: index("company_property_history_company_idx").on(t.companyKey),
+  }),
+);
+
+export type CompanyPropertyHistory = typeof companyPropertyHistory.$inferSelect;
+export type NewCompanyPropertyHistory =
+  typeof companyPropertyHistory.$inferInsert;
 
 // Activity timeline for leads/companies/contacts. Exactly one of (leadId,
 // companyKey, contactId) is set (enforced by CHECK constraint). contactOwnerBdId
