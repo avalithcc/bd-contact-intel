@@ -633,8 +633,15 @@ tbody tr:hover td {
   background: var(--color-row-hover);
 }
 
+/* mockups/styles.css:132 resets every anchor to no underline at rest and
+   only re-adds it on :hover (design-system.css:28). This base rule never
+   carried that reset, so any unclassed `<a>` — e.g. the `.view-tab` saved
+   view tabs and FilterMenu's chip "x" remove link, both plain anchors with
+   no other text-decoration rule of their own — fell back to the browser's
+   default underline at rest, reading as leftover old-app link styling. */
 a {
   color: var(--color-accent);
+  text-decoration: none;
 }
 a:hover {
   color: var(--color-accent-hover);
