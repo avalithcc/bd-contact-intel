@@ -27,12 +27,13 @@
  *
  * Usage (do NOT run automatically — this reads the real CSV path and, on
  * --execute, writes the real database; requires migration 0017 applied):
- *   npx tsx --env-file=.env.local scripts/backfill-hubspot-company-fields.ts --file=hubspot/todas-las-empresas.csv
- *   npx tsx --env-file=.env.local scripts/backfill-hubspot-company-fields.ts --file=hubspot/todas-las-empresas.csv --execute --actor=<bd id>
+ *   npx tsx --env-file=.env.local scripts/backfill-hubspot-company-fields.ts --file=hubspot/todos-empresas.csv
+ *   npx tsx --env-file=.env.local scripts/backfill-hubspot-company-fields.ts --file=hubspot/todos-empresas.csv --execute --actor=<bd id>
  */
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog, bd } from "../src/db/schema";
+import { assertRequiredHeaders } from "../src/lib/hubspot/columns";
 import { parseHubSpotCsv } from "../src/lib/hubspot/parse";
 import { mapHubSpotCompanyRow, planCompanyResolution } from "../src/lib/hubspot/companies";
 import { readExistingCompanies, readExistingCompanyFields } from "../src/lib/hubspot/companyQueries";
@@ -78,6 +79,9 @@ async function main() {
   const { file, execute, actor } = parseArgs(process.argv.slice(2));
 
   const rawRows = await parseHubSpotCsv(file, REQUIRED_HEADERS);
+  // parseHubSpotCsv only rejects duplicated required headers; a missing one
+  // would silently read as empty and report zero fills. Fail loudly instead.
+  if (rawRows.length > 0) assertRequiredHeaders(Object.keys(rawRows[0]), REQUIRED_HEADERS);
   const hubspotCompanies = rawRows.map(mapHubSpotCompanyRow);
   const fieldRows = rawRows.map(mapCompanyFieldsBackfillRow);
 
