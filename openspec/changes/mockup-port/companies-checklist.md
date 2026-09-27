@@ -17,14 +17,14 @@ Columns: `element | mockup ref | status | evidence file:line | notes`
 |---|---|---|---|---|
 | Page header (eyebrow, h1 "empresas.", subtitle) | companies.html:64 | done | `src/app/(app)/companies/page.tsx` (`page-header`/`titles`), `companyList` dict (en/es) | |
 | "Nueva empresa" primary button | companies.html:64 | done | page.tsx (links to `/companies/new`) | |
-| View tabs: "Todas las empresas" / "Mis empresas" / "Contratando ahora" (counts) | companies.html:65 | done, "Mis empresas" interim | `src/lib/companies/listQueries.ts` `getCompanyViewCounts`, page.tsx | "Mis empresas" filters on `created_by_bd_id` — an interim stand-in for a real owner (see pending-D1 below), documented in the query's own doc comment. "Contratando ahora" = `company_key IN (hiring index keys)`, correct since the index is already alias-resolved. |
-| Filter chip: "Etapa: Cualquiera" (removable) | companies.html:66 | done | page.tsx (`chip`, `clearStageHref`) | |
-| "Agregar filtro" chip → dropdown | companies.html:66 | done, single field | page.tsx (`details.dropdown` + stage `<select>`) | Mockup itself only ever shows one filterable dimension (Etapa) for companies — no parity gap with contacts' 10-option panel to close here. |
+| View tabs: "Todas las empresas" / "Mis empresas" / "Contratando ahora" (counts) | companies.html:65 | done | `src/lib/companies/listQueries.ts` `getCompanyViewCounts`, page.tsx | "Mis empresas" now filters on the real `owner_bd_id` (c05) — was `created_by_bd_id` (interim stand-in) before D1 landed. "Contratando ahora" = `company_key IN (hiring index keys)`, correct since the index is already alias-resolved. |
+| Filter chip: "Etapa: Cualquiera" (removable) | companies.html:66 | done | page.tsx (`chip`, `clearFilterHref`) | |
+| "Agregar filtro" chip → dropdown | companies.html:66 | done, extended (c05) | page.tsx (`details.dropdown` + Etapa/Industria/Responsable) | Mockup itself only ever shows one filterable dimension (Etapa). Industria/Responsable added in c05 per explicit owner instruction, index-backed (`company_industry_idx`/`company_owner_idx`, migration 0017) — same "beyond-mockup filter" convention `/contacts` already established, documented in the code, not silent. |
 | "Columnas" button | companies.html:66 | **matches mockup as-is** | page.tsx (disabled, `title="Coming soon"/"Próximamente"`) | The approved mockup itself ships this as static chrome with no menu behind it (companies.html:66 has no menu markup) — not a deviation, a faithful port. Was previously flagged as D2; closed, no owner decision needed. |
 | Table column: Empresa (logo chip + name, links to record) | companies.html:67 | done | page.tsx, reuses `companyLogoInitials` (`src/lib/contacts/companyLogo.ts`) | Domain-based favicon chip not built — `company.domain` exists on 2,703 companies but the mockup itself only shows a letter-initial chip, never a favicon; kept as initials to match the approved mockup exactly. |
-| Table column: Industria | companies.html:67 | **pending D1** | `src/lib/companies/listMappers.ts` `industryLabel`, `listQueries.ts` (`industry: null` seam) | Owner-approved: `company.industry` is being added by the parallel data branch `feat/company-fields-01…`. The mapper already reads an optional `industry` field and shows "—"; once that branch merges, `listQueries.ts`'s row-building only needs to select the real column instead of hardcoding `null` — no page/mapper change. |
+| Table column: Industria | companies.html:67 | **done (c05)** | `src/lib/companies/listMappers.ts` `industryLabel`, `listQueries.ts` (real `company.industry`, joined) | D1 landed (migration 0017, `feat/company-fields-03-require-headers`, backfilled 2,345 companies in prod). "—" now means "genuinely no industry on file", not "field doesn't exist yet". |
 | Table column: Etapa (badge, tone by stage) | companies.html:67 | done | `listMappers.ts` `stageBadgeClass`, page.tsx | Ported onto `badge-info`/`badge-warn`/`badge-success`/`badge-outline`/`badge-neutral` (design tokens), not the old inline-hex `stageColor` map in `[key]/page.tsx`. |
-| Table column: Responsable (owner) | companies.html:67-68 | **pending D1** | `listMappers.ts` `ownerLabel`, `listQueries.ts` (`ownerName: null` seam) | Same seam as Industria — `owner_bd_id` is on the same parallel data branch. Shows "—" until merged. |
+| Table column: Responsable (owner) | companies.html:67-68 | **done (c05)** | `listMappers.ts` `ownerLabel`, `listQueries.ts` (`owner_bd_id` joined to `bd.name`) | D1 landed (backfilled 571 companies in prod). |
 | Table column: Contactos (count) | companies.html:67-68 | done | `listQueries.ts` (batched `person` count, current page's keys only) | Matches on `person.company_key` directly, not through `company_alias` — a person's `company_key` occasionally normalizes to an alias rather than the canonical key, which would undercount slightly. Flagged as a known limitation, not a deviation needing a decision (it's a real bug to fix, not a product call) — todo for a follow-up branch. |
 | Table column: Vacantes (badge or "—") | companies.html:68 | done | `listMappers.ts` `vacantesLabel`, `getHiringMatchIndex()` | |
 | Table column: Última actividad (relative time or "—") | companies.html:68 | done | `listQueries.ts` (`effectiveActivityAtSql`, batched MAX per page's keys) | Uses the real `effectiveActivityTime.ts` helper (corrected per owner note above), not a new one. |
@@ -33,20 +33,13 @@ Columns: `element | mockup ref | status | evidence file:line | notes`
 | Empty state (no rows) | contacts pattern | done | page.tsx (`l.noResults`) | |
 | Search box in topbar | companies.html:37 | n/a (shell chrome) | — | Global topbar, out of scope for this page. |
 
-## Pending D1 (owner-approved 2026-09-26 — not blocked, just waiting on the data branch)
+## D1 — resolved (c05)
 
-`company.industry`, `owner_bd_id`, `city`, `country` are being added by a parallel data-builder
-branch (`feat/company-fields-01…`, forked from this same base commit `33b834f`) along with a
-property-history table, an edit action, and the read-model fields in `getCompanyByKey`/the
-companies list query, per the owner's message. This UI branch does **not** touch schema or
-migrations (per instruction) — it only builds the seam:
-- `src/lib/companies/listMappers.ts`: `industryLabel`/`ownerLabel`/`locationLabel` already read
-  the optional fields and render "—" when absent (unit-tested).
-- `src/lib/companies/listQueries.ts`: `CompanyListRow.industry`/`ownerName` are typed and
-  currently hardcoded `null` with a comment pointing at the merge.
-- Once `feat/company-fields-01…` merges into this chain, the only change needed here is
-  selecting the real columns in `getCompanyListPage`'s row-building — no mapper, no page.tsx
-  change.
+`company.industry`/`owner_bd_id`/`city`/`country` landed via `feat/company-fields-03-require-headers`
+(migration 0017, merged into this chain at `75b2242`), backfilled in prod (industry 2,345, city
+2,326, country 2,535, owner 571). `listMappers.ts`'s seam (built ahead of the merge, unit-tested)
+needed no signature change — only `listQueries.ts`'s row-building started selecting the real
+columns. Zero `pending D1` rows remain in this checklist.
 
 ## Known limitation (not a deviation, just not yet fixed)
 
@@ -63,3 +56,7 @@ migrations (per instruction) — it only builds the seam:
   real — page header, view tabs, stage filter, full 7-column table, pager. New bounded queries
   (`listQueries.ts`), pure mappers with unit tests (`listMappers.ts`), `companyList` dictionary
   block (en/es). Industria/Responsable render through the pending-D1 seam.
+- **c05** (`feat/mockup-port-c05-wire-company-fields` @ `75b2242` merge, `5763391` wiring):
+  merged `feat/company-fields-03-require-headers` (D1 data layer), wired real Industria/
+  Responsable into the table, "Mis empresas" onto the real owner, and added
+  Industria/Responsable filters (index-backed).
