@@ -10,6 +10,8 @@ import type { NewTask } from "@/db/schema";
 /** Read side of the "Nueva tarea" dialog's subject picker (mockup-port
  * t04) — searches contacts/companies by name, bounded server-side. */
 export async function searchTaskSubjectsAction(query: string): Promise<TaskSubjectSearchResult[]> {
+  // Re-check the session inside the action, like every other server action.
+  await getCurrentBd();
   return searchTaskSubjects(query);
 }
 
