@@ -346,11 +346,24 @@ label {
   margin-bottom: var(--space-xs);
 }
 
-input[type="text"],
-input[type="password"],
-input[type="file"],
-select,
-textarea {
+/* ---- text inputs, selects and textareas ----
+ * Zero-specificity via :where(), for the same reason as the buttons below:
+ * these rules skin any unclassed legacy control, but must never outrank a
+ * design-system class (.input, .select, .textarea). Without :where(),
+ * `input[type="text"]` has specificity (0,1,1) and beat `.input` (0,1,0), so
+ * a design-system text input wore the legacy background and border instead —
+ * and `input[type="text"]:focus` (0,2,1) beat `.input:focus` (0,2,0) on
+ * border-color. Only controls that spell out `type="text"` were affected: the
+ * selector matches the attribute, not the resolved type, so a bare `<input>`
+ * never matched it. That made the bug an inconsistency landmine — two fields
+ * in one dialog could differ depending on whether someone wrote the type. */
+:where(
+  input[type="text"],
+  input[type="password"],
+  input[type="file"],
+  select,
+  textarea
+) {
   background: var(--color-canvas);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -365,26 +378,32 @@ textarea {
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
 }
-input[type="text"]:hover,
-input[type="password"]:hover,
-input[type="file"]:hover,
-select:hover,
-textarea:hover {
+:where(
+  input[type="text"]:hover,
+  input[type="password"]:hover,
+  input[type="file"]:hover,
+  select:hover,
+  textarea:hover
+) {
   border-color: var(--color-border-strong);
 }
-input[type="text"]:focus,
-input[type="password"]:focus,
-input[type="file"]:focus,
-select:focus,
-textarea:focus {
+:where(
+  input[type="text"]:focus,
+  input[type="password"]:focus,
+  input[type="file"]:focus,
+  select:focus,
+  textarea:focus
+) {
   outline: none;
   border-color: var(--color-accent);
 }
-input[type="text"]:disabled,
-input[type="password"]:disabled,
-input[type="file"]:disabled,
-select:disabled,
-textarea:disabled {
+:where(
+  input[type="text"]:disabled,
+  input[type="password"]:disabled,
+  input[type="file"]:disabled,
+  select:disabled,
+  textarea:disabled
+) {
   opacity: 0.55;
   cursor: default;
 }
