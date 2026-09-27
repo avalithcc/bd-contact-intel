@@ -45,3 +45,9 @@ Login gaps found while testing the crm-hubspot-ux preview (2026-09-24).
 - Global cross-object search.
 - Company record page and company pipeline board (`relationshipStage`).
 - Task queue filters and bulk actions.
+
+## ui-polish
+
+Visual details the owner flagged while reviewing the mockup-port previews.
+
+- /contacts filter labels (the small subtitles above/inside the filter controls) render underlined, which reads as the old app's style. Match the mockup's filter label style (no underline) and check for other legacy link/label rules leaking into design-system components (same class of issue as the legacy `button` rules fixed in mockup-port 25). Reported 2026-09-26.
