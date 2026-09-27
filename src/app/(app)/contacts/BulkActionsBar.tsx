@@ -10,7 +10,8 @@
  * delegation, no per-row React state).
  *
  * Only one `type="submit"` button ever exists in the DOM at a time (the
- * confirm button of whichever mini-panel is open) so pressing Enter in a
+ * confirm button of whichever action Dialog is open — a closed Dialog
+ * renders `null`, see @/components/Dialog) so pressing Enter in a
  * text/date input can't accidentally submit a different action with an
  * empty owner select (which would unassign every selected Contact).
  * "Exportar" stays `type="button"` and navigates via a plain GET href built
@@ -18,6 +19,7 @@
  * can't violate that invariant either.
  */
 import { useRef, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
 import { resolveSelectAllChecked } from "@/lib/contacts/bulkSelection";
 import { BulkGenerateMessagesButton } from "./BulkGenerateMessagesButton";
@@ -160,7 +162,11 @@ export function BulkActionsBar({
       )}
 
       {/* Bulk bar sits above the table, as in mockups/contacts.html, so it is
-          visible as soon as a row is checked (it used to render below all 50 rows). */}
+          visible as soon as a row is checked (it used to render below all 50 rows).
+          Fixed shape (count, action buttons, "Seleccionar los N", "Quitar
+          selección") regardless of which action is open — each action's own
+          fields now live in a Dialog (below), not inline in the bar, so
+          choosing one never changes the bar's size or look. */}
       {selectedCount > 0 && (
         <div className="bulk-bar" role="region" aria-label={l.bulkAssignOwner}>
           <span className="count">
@@ -168,98 +174,121 @@ export function BulkActionsBar({
           </span>
           <span className="sep" />
 
-          {panel === null && (
-            <>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("owner")}>
-                {l.bulkAssignOwner}
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("task")}>
-                {l.bulkCreateTask}
-              </button>
-              <BulkGenerateMessagesButton
-                formRef={formRef}
-                locale={locale}
-                labels={l}
-                messageLabels={messageLabels}
-                filterWideMode={filterWideMode}
-                filtersQuery={filtersQuery}
-                sort={sort}
-                q={q}
-              />
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  if (filterWideMode) {
-                    window.location.href = wholeViewExportHref;
-                    return;
-                  }
-                  const form = formRef.current;
-                  if (!form) return;
-                  window.location.href = buildExportHref(form, columns);
-                }}
-              >
-                {l.bulkExport}
-              </button>
-              {total > selectedCount && !filterWideMode && (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={selectAllMatching}>
-                  {l.bulkSelectAllMatching.replace("{n}", String(total))}
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={clearSelection}
-                aria-label={l.bulkClearSelection}
-              >
-                {l.bulkClearSelection}
-              </button>
-            </>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("owner")}>
+            {l.bulkAssignOwner}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("task")}>
+            {l.bulkCreateTask}
+          </button>
+          <BulkGenerateMessagesButton
+            formRef={formRef}
+            locale={locale}
+            labels={l}
+            messageLabels={messageLabels}
+            filterWideMode={filterWideMode}
+            filtersQuery={filtersQuery}
+            sort={sort}
+            q={q}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              if (filterWideMode) {
+                window.location.href = wholeViewExportHref;
+                return;
+              }
+              const form = formRef.current;
+              if (!form) return;
+              window.location.href = buildExportHref(form, columns);
+            }}
+          >
+            {l.bulkExport}
+          </button>
+          {total > selectedCount && !filterWideMode && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={selectAllMatching}>
+              {l.bulkSelectAllMatching.replace("{n}", String(total))}
+            </button>
           )}
           {filterWideMode && <span className="meta">{l.bulkSelectAllMatchingNotice}</span>}
-
-          {panel === "owner" && (
-            <>
-              <label>
-                {l.bulkOwnerLabel}
-                <select name="ownerBdId" defaultValue="">
-                  <option value="">{l.bulkOwnerUnassign}</option>
-                  {ownerOptions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit" className="btn btn-primary btn-sm">
-                {l.bulkConfirm}
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel(null)}>
-                {l.bulkCancel}
-              </button>
-            </>
-          )}
-
-          {panel === "task" && (
-            <>
-              <label>
-                {l.bulkTaskTitleLabel}
-                <input type="text" name="title" required />
-              </label>
-              <label>
-                {l.bulkTaskDueLabel}
-                <input type="date" name="dueAt" />
-              </label>
-              <button type="submit" formAction={bulkCreateTaskAction} className="btn btn-primary btn-sm">
-                {l.bulkConfirm}
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel(null)}>
-                {l.bulkCancel}
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={clearSelection}
+            aria-label={l.bulkClearSelection}
+          >
+            {l.bulkClearSelection}
+          </button>
         </div>
       )}
+
+      {/* "Asignar responsable" — same shared Dialog pattern as
+          SaveViewDialog.tsx/BulkGenerateMessagesButton.tsx. The <select>
+          stays inside the outer bulk-selection <form> (real DOM nesting,
+          Dialog renders no portal), so it submits with the same hidden
+          view/q/page/mode/filtersQuery/sort fields and the checked
+          personId boxes untouched. */}
+      <Dialog
+        open={panel === "owner"}
+        onClose={() => setPanel(null)}
+        title={l.bulkAssignOwner}
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setPanel(null)}>
+              {l.bulkCancel}
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {l.bulkConfirm}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label className="label" htmlFor="bulk-owner-select">
+            {l.bulkOwnerLabel}
+          </label>
+          <select id="bulk-owner-select" className="select" name="ownerBdId" defaultValue="">
+            <option value="">{l.bulkOwnerUnassign}</option>
+            {ownerOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </Dialog>
+
+      {/* "Crear tarea" — same pattern; submits via `formAction` so it hits
+          bulkCreateTaskAction instead of the form's default
+          bulkAssignOwnerAction, exactly as before the Dialog wrap. */}
+      <Dialog
+        open={panel === "task"}
+        onClose={() => setPanel(null)}
+        title={l.bulkCreateTask}
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setPanel(null)}>
+              {l.bulkCancel}
+            </button>
+            <button type="submit" formAction={bulkCreateTaskAction} className="btn btn-primary">
+              {l.bulkConfirm}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label className="label" htmlFor="bulk-task-title">
+            {l.bulkTaskTitleLabel}
+          </label>
+          <input id="bulk-task-title" className="input" type="text" name="title" required />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bulk-task-due">
+            {l.bulkTaskDueLabel}
+          </label>
+          <input id="bulk-task-due" className="input" type="date" name="dueAt" />
+        </div>
+      </Dialog>
 
       {children}
     </form>

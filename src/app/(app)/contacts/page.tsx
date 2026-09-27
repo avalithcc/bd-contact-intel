@@ -46,6 +46,7 @@ import { buildSaveViewSummary } from "@/lib/contacts/filterChips";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickBulkActionsLabels } from "@/lib/contacts/labels";
 import { BulkActionsBar } from "./BulkActionsBar";
+import { BulkResultToast } from "./BulkResultToast";
 import { Board } from "./Board";
 import { getOutreachContactsPage } from "@/lib/contacts/outreachViewDb";
 import {
@@ -765,11 +766,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         </div>
       )}
 
-      {bulkMessage && (
-        <div className="alert alert-info mb-lg">
-          <p>{bulkMessage}</p>
-        </div>
-      )}
+      <BulkResultToast message={bulkMessage} />
       {sp.bulkLimited === "1" && (
         <div className="alert alert-warn mb-lg">
           <p>{l.bulkLimitedNotice}</p>
