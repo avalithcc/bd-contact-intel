@@ -61,7 +61,7 @@ sanitized error if a *required* header name repeats.
 
 ## Phase 2: Company Resolution + Migration 0015 (PR H2, base: PR H1)
 
-- [ ] 2.1 **GATE (owner/orchestrator)**: apply migration `drizzle/0015_company_domain.sql` to prod BEFORE any dry run against production data.
+- [x] 2.1 **GATE (owner/orchestrator)**: apply migration `drizzle/0015_company_domain.sql` to prod BEFORE any dry run against production data. **Done.** Verified read-only against prod 2026-09-27: `company.domain` exists.
 - [x] 2.2 Write `drizzle/0015_company_domain.sql` + `drizzle/meta/*`: `company.domain text` + partial unique index (domain not null). `src/db/schema.ts` updated.
 - [x] 2.3 Test: `tests/unit/drizzleJournal.test.ts` — 0015's journal `when` exceeds 0014's `1790713471556`.
 - [x] 2.4 RED/GREEN: `src/lib/hubspot/companies.ts` (pure) — group by normalized domain (lowercase, no protocol/`www.`/path); per group, match by domain, then by `companyKey` of each name, else create; representative = most primary contacts, ties → lowest ID; name match fills empty `domain` only.
@@ -147,9 +147,9 @@ reason display.
 - [x] 4.7 `scripts/unify-contacts.ts` — wire `--phase=hubspot_import`; execute order: pre-check hash → `snapshotBackup` → one transaction (claim run → companies create/domain-fill/notes → `withIdentityLock`+`applyIdentityWrites` → refill → status-evidence activities, skipping any whose `(hubspotContactId, status)` idempotency key already exists → `recomputePersonStatuses` → report/`executedAt`/`audit_log(migration_execute)`). Batch size `WRITE_BATCH_SIZE=1000`. **Scope decision**: does NOT re-prefetch/re-hash a second time inside the lock — matches `catchUpQueries.ts#finalizeCatchUpExecute`'s already-documented residual-risk scope (the pre-transaction `assertExecutionAllowed` hash check + `snapshotBackup` is the same defense every other phase relies on); noted, not silently dropped. (PR H4b)
 - [x] 4.8 `src/lib/hubspot/report.ts` — `buildHubSpotRunReport` (adds `reviewThreshold`/`overThreshold`/`createdCompanyKeys`/`domainFilledCompanyKeys`/`reviewSample`) and `redactReportForLog(report)`: counts only, `reviewSample` removed, owner maps collapsed to counts. `parseHubSpotCsv` (Phase 1) already sanitizes its own parse errors; `scripts/unify-contacts.ts` never lets a raw report (with `reviewSample`) reach stdout. (PR H4a)
 - [x] 4.9 Test: dry-run mode never writes `person`/`company` rows (`tests/unit/hubspotRun.test.ts`); execute refuses on stale `input_hash`, missing approval, or unconfirmed over-threshold review count (`tests/unit/migrationExecutionGuard.test.ts`, `tests/unit/hubspotRun.test.ts`). (PR H4a)
-- [ ] 4.10 **GATE (owner)**: review the `hubspot_import` dry-run report in `/admin/migration` against the real export (read-only prod smoke: run `--dry-run` against prod DB snapshot reads only, zero writes) before approving.
-- [ ] 4.11 **GATE (owner)**: approve the run in `/admin/migration` (confirm-over-threshold checkbox if `review > 300`).
-- [ ] 4.12 **GATE (owner)**: `--execute --run=<id>` in the low-traffic window; verify `pg_dump` backup succeeded first.
+- [x] 4.10 **GATE (owner)**: review the `hubspot_import` dry-run report in `/admin/migration` against the real export (read-only prod smoke: run `--dry-run` against prod DB snapshot reads only, zero writes) before approving. **Done.** `migration_run` holds the `hubspot_import` dry run `dd9c3f87` (2026-09-26 22:39 UTC).
+- [x] 4.11 **GATE (owner)**: approve the run in `/admin/migration` (confirm-over-threshold checkbox if `review > 300`). **Done.** Run `c9de8587` carries `approved_by_bd_id` with `approved_at` 2026-09-26 23:03 UTC.
+- [x] 4.12 **GATE (owner)**: `--execute --run=<id>` in the low-traffic window; verify `pg_dump` backup succeeded first. **Done.** Run `c9de8587` has `executed_at` 2026-09-26 23:22 UTC; the pre-execute `pg_dump` is in `backups/`.
 - [x] 4.13 Test: re-running the dry-run after every contact is already-imported reports 0 `new` rows (idempotent re-import scenario) — `tests/unit/hubspotRun.test.ts`. (PR H4a)
 
 ## Phase 5: Admin UI + Labels (PR H5, base: PR H4b)
