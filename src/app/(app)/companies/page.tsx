@@ -1,171 +1,236 @@
 import Link from "next/link";
-import { getCompanies } from "@/lib/companies/queries";
-import { getDictionary } from "@/lib/i18n/server";
-import { Avatar } from "@/components/Avatar";
-import { initialsFromName } from "@/components/initials";
-import { PlusIcon } from "@/components/icons";
-import styles from "./page.module.css";
+import { getCurrentBd } from "@/lib/queries";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
+import { relativeTime } from "@/lib/i18n/format";
+import { getHiringMatchIndex } from "@/lib/hiring/queries";
+import { getCompanyListPage, getCompanyViewCounts, type CompanyListView } from "@/lib/companies/listQueries";
+import { companyLogoInitials } from "@/lib/contacts/companyLogo";
+import { industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
 
 export const dynamic = "force-dynamic";
 
-interface SearchParams {
-  search?: string;
-  stage?: string;
-  page?: string;
+const PAGE_SIZE = 50;
+const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
+type Stage = (typeof STAGES)[number];
+
+function isStage(value: string | undefined): value is Stage {
+  return !!value && (STAGES as readonly string[]).includes(value);
 }
 
-// Presentation-only restyle (mockup-parity 6.2, mockups/companies.html) —
-// `getCompanies` and its `search`/`relationshipStage` filters are unchanged.
-// The mockup's stage badges are keyed by the exact `relationshipStage`
-// column values (see db/schema.ts's company table).
-const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
+function isView(value: string | undefined): value is CompanyListView {
+  return value === "all" || value === "mine" || value === "hiring";
+}
 
-export default async function CompaniesPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
-  const params = await searchParams;
-  const page = Math.max(1, Number(params.page) || 1);
+interface CompaniesPageProps {
+  searchParams: Promise<{ view?: string; stage?: string; page?: string }>;
+}
+
+/**
+ * `/companies` list (mockup-port c02; mockups/companies.html). The mockup's
+ * own note: same index pattern as `/contacts` — header, view tabs, filter
+ * chips, table — companies-checklist.md has the full element-by-element
+ * mapping. Board/pipeline redesign stays out of scope (later change).
+ */
+export default async function CompaniesPage({ searchParams }: CompaniesPageProps) {
+  const sp = await searchParams;
+  const me = await getCurrentBd();
   const dict = await getDictionary();
-  const l = dict.companiesPage;
+  const l = dict.companyList;
+  const locale = await getLocale();
+  const relTime = (d: Date) => relativeTime(d, locale);
 
-  const { rows, totalPages } = await getCompanies(
-    {
-      search: params.search,
-      relationshipStage: params.stage,
-    },
-    page,
-    20,
-  );
+  const view: CompanyListView = isView(sp.view) ? sp.view : "all";
+  const stage = isStage(sp.stage) ? sp.stage : undefined;
+  const page = Math.max(1, Number(sp.page) || 1);
 
-  // Pagination keeps the active search and stage filters.
-  const pageHref = (p: number) => {
-    const qs = new URLSearchParams();
-    if (params.search) qs.set("search", params.search);
-    if (params.stage) qs.set("stage", params.stage);
-    qs.set("page", String(p));
-    return `/companies?${qs}`;
-  };
+  // Fetched once per request (React `cache()`, see getHiringMatchIndex's
+  // doc comment) and threaded through both the view-tab count and the list
+  // query below — never computed twice.
+  const hiringIndex = await getHiringMatchIndex();
 
-  const stageLabel = (stage: string) =>
-    ({
-      prospect: l.stageProspect,
-      qualified: l.stageQualified,
-      proposal_sent: l.stageProposalSent,
-      won: l.stageWon,
-      lost: l.stageLost,
-    })[stage] ?? stage;
+  const [{ rows, total, totalPages }, viewCounts] = await Promise.all([
+    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE),
+    getCompanyViewCounts(me.id, hiringIndex),
+  ]);
+
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, total);
+
+  function viewHref(target: CompanyListView): string {
+    const params = new URLSearchParams();
+    params.set("view", target);
+    if (stage) params.set("stage", stage);
+    return `/companies?${params.toString()}`;
+  }
+
+  function pageHref(target: number): string {
+    const params = new URLSearchParams();
+    params.set("view", view);
+    if (stage) params.set("stage", stage);
+    params.set("page", String(target));
+    return `/companies?${params.toString()}`;
+  }
+
+  function stageLabel(s: Stage): string {
+    switch (s) {
+      case "prospect":
+        return l.stageProspect;
+      case "qualified":
+        return l.stageQualified;
+      case "proposal_sent":
+        return l.stageProposalSent;
+      case "won":
+        return l.stageWon;
+      case "lost":
+        return l.stageLost;
+    }
+  }
+
+  function clearStageHref(): string {
+    const params = new URLSearchParams();
+    params.set("view", view);
+    return `/companies?${params.toString()}`;
+  }
 
   return (
-    <main className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div>
-          <div className={styles.eyebrow}>{l.eyebrow}</div>
-          <h1 className={styles.title}>{l.title}</h1>
-          <p className={styles.subtitle}>{l.subtitle}</p>
+    <main className="page">
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{l.eyebrow}</div>
+          <h1>
+            {l.pageTitle.replace(/\.$/, "")}
+            <span className="dot">.</span>
+          </h1>
+          <p className="meta">{l.subtitle}</p>
         </div>
-        <Link href="/companies/new" className={styles.newCompanyButton}>
-          <PlusIcon className={styles.icon} />
-          {l.newCompany}
-        </Link>
-      </div>
-
-      <form className={styles.toolbar}>
-        <input
-          type="search"
-          name="search"
-          placeholder={l.searchPlaceholder}
-          className={styles.searchInput}
-          defaultValue={params.search || ""}
-        />
-        <select name="stage" className={styles.stageFilter} defaultValue={params.stage || ""}>
-          <option value="">{l.stageAny}</option>
-          {STAGES.map((stage) => (
-            <option key={stage} value={stage}>
-              {stageLabel(stage)}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className={styles.searchButton}>
-          {l.searchButton}
-        </button>
-      </form>
-
-      {rows.length === 0 ? (
-        <div className={styles.emptyState}>
-          <p>{l.emptyState}</p>
-          <Link href="/companies/new" className={styles.createLink}>
-            {l.createLink}
+        <div className="actions">
+          <Link className="btn btn-primary" href="/companies/new">
+            {l.newCompany}
           </Link>
         </div>
+      </div>
+
+      <nav className="view-tabs">
+        <Link href={viewHref("all")} className={view === "all" ? "view-tab active" : "view-tab"} aria-current={view === "all" ? "page" : undefined}>
+          {l.viewAll}
+          <span className="count">{viewCounts.all}</span>
+        </Link>
+        <Link href={viewHref("mine")} className={view === "mine" ? "view-tab active" : "view-tab"} aria-current={view === "mine" ? "page" : undefined}>
+          {l.viewMine}
+          <span className="count">{viewCounts.mine}</span>
+        </Link>
+        <Link href={viewHref("hiring")} className={view === "hiring" ? "view-tab active" : "view-tab"} aria-current={view === "hiring" ? "page" : undefined}>
+          {l.viewHiring}
+          <span className="count">{viewCounts.hiring}</span>
+        </Link>
+      </nav>
+
+      <div className="toolbar">
+        <span className="chip">
+          <span className="k">{l.stageFilterLabel}</span> {stage ? stageLabel(stage) : l.stageAny}
+          {stage && (
+            <Link href={clearStageHref()} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          )}
+        </span>
+        <details className="dropdown">
+          <summary className="chip chip-add">{l.addFilter}</summary>
+          <form method="get" action="/companies" className="menu">
+            <input type="hidden" name="view" value={view} />
+            <label className="menu-item">
+              {l.stageFilterLabel}
+              <select name="stage" defaultValue={stage ?? ""}>
+                <option value="">{l.stageAny}</option>
+                {STAGES.map((s) => (
+                  <option key={s} value={s}>
+                    {stageLabel(s)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="btn btn-primary btn-sm">
+              {l.applyFilter}
+            </button>
+          </form>
+        </details>
+        <span className="spacer" />
+        {/* Mockup's own "Columnas" button (companies.html:66) is static
+            chrome with no menu behind it — matches the approved mockup
+            exactly, kept disabled here rather than inventing a column
+            picker the mockup itself doesn't show. See companies-checklist.md D2. */}
+        <button type="button" className="btn btn-secondary btn-sm" disabled title={l.columnsComingSoon}>
+          {l.columnsButton}
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="muted">{l.noResults}</p>
       ) : (
-        <>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>{l.colCompany}</th>
-                  <th>{l.colStage}</th>
-                  <th>{l.colNotes}</th>
-                  <th>{l.colRevenue}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((company) => (
-                  <tr key={company.companyKey}>
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{l.colCompany}</th>
+                <th>{l.colIndustry}</th>
+                <th>{l.colStage}</th>
+                <th>{l.colOwner}</th>
+                <th>{l.colContacts}</th>
+                <th>{l.colOpenings}</th>
+                <th>{l.colLastActivity}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const vacantes = vacantesLabel(row.hiring?.openItCount);
+                return (
+                  <tr key={row.companyKey}>
                     <td>
-                      <Link
-                        // Keys are derived from LinkedIn company names and
-                        // routinely contain spaces, pipes and slashes, none
-                        // of which survive an unencoded href.
-                        href={`/companies/${encodeURIComponent(company.companyKey)}`}
-                        className={styles.companyLink}
-                      >
-                        <Avatar
-                          id={company.companyKey}
-                          initials={initialsFromName(company.displayName)}
-                          variant="bd"
-                          size="sm"
-                        />
-                        <span className={styles.companyName}>{company.displayName}</span>
+                      <Link className="row" href={`/companies/${encodeURIComponent(row.companyKey)}`}>
+                        <span className="company-logo" aria-hidden="true">
+                          {companyLogoInitials(row.displayName)}
+                        </span>
+                        <span className="strong">{row.displayName}</span>
                       </Link>
                     </td>
+                    <td className="soft">{industryLabel(row)}</td>
                     <td>
-                      {company.relationshipStage && (
-                        <span
-                          className={`${styles.stage} ${styles[`stage-${company.relationshipStage}`] ?? ""}`}
-                        >
-                          {stageLabel(company.relationshipStage)}
-                        </span>
+                      <span className={stageBadgeClass(row.relationshipStage)}>
+                        {row.relationshipStage ? stageLabel(row.relationshipStage as Stage) : l.emptyValue}
+                      </span>
+                    </td>
+                    <td>{ownerLabel(row)}</td>
+                    <td className="num">{row.contactCount}</td>
+                    <td>
+                      {vacantes ? (
+                        <span className="badge badge-success no-dot">{vacantes}</span>
+                      ) : (
+                        <span className="meta">{l.emptyValue}</span>
                       )}
                     </td>
-                    <td className={styles.notes}>{company.notes ?? "—"}</td>
-                    <td className={styles.revenue}>
-                      {company.revenuePotential
-                        ? `$${company.revenuePotential.toLocaleString()}`
-                        : "—"}
-                    </td>
+                    <td className="meta">{row.lastActivityAt ? relTime(row.lastActivityAt) : l.emptyValue}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className={styles.pagination}>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <Link
-                  key={p}
-                  href={pageHref(p)}
-                  className={`${styles.pageLink} ${p === page ? styles.active : ""}`}
-                >
-                  {p}
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="table-footer">
+            <span>{l.showingRange(from, to, total)}</span>
+            <div className="row">
+              {page > 1 && (
+                <Link href={pageHref(page - 1)} className="btn btn-secondary btn-sm">
+                  {l.prevPage}
                 </Link>
-              ))}
+              )}
+              <span>{l.pageOf(page, totalPages)}</span>
+              {page < totalPages && (
+                <Link href={pageHref(page + 1)} className="btn btn-secondary btn-sm">
+                  {l.nextPage}
+                </Link>
+              )}
             </div>
-          )}
-        </>
+          </div>
+        </div>
       )}
     </main>
   );

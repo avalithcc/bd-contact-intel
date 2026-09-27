@@ -1277,6 +1277,45 @@ export const en = {
     boardMoveConfirmConfirm: "Continue",
   },
 
+  // --- companies section (mockup-port: /companies list + record) ---
+  // Kept as its own top-level block, separate from contactList, so the
+  // parallel tasks/outreach rebuilds never touch it (coordination note).
+  companyList: {
+    eyebrow: "Companies",
+    pageTitle: "companies.",
+    subtitle: "Team-shared accounts. Contacts are linked by company.",
+    newCompany: "New company",
+    viewAll: "All companies",
+    viewMine: "My companies",
+    viewHiring: "Hiring now",
+    stageAny: "Any",
+    stageFilterLabel: "Stage:",
+    addFilter: "Add filter",
+    removeFilter: "Remove filter",
+    stageProspect: "Prospect",
+    stageQualified: "Qualified",
+    stageProposalSent: "Proposal sent",
+    stageWon: "Won",
+    stageLost: "Lost",
+    columnsButton: "Columns",
+    columnsComingSoon: "Coming soon",
+    colCompany: "Company",
+    colIndustry: "Industry",
+    colStage: "Stage",
+    colOwner: "Owner",
+    colContacts: "Contacts",
+    colOpenings: "Openings",
+    colLastActivity: "Last activity",
+    emptyValue: "—",
+    noResults: "No companies match this view.",
+    showingRange: (from: number, to: number, total: number) =>
+      `Showing ${from}–${to} of ${total}`,
+    prevPage: "Previous",
+    nextPage: "Next",
+    pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
+    applyFilter: "Apply",
+  },
+
   contactsImport: {
     eyebrow: "Contacts",
     pageTitle: "Import contacts",

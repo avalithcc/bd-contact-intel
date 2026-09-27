@@ -1165,6 +1165,45 @@ export const es: typeof en = {
     boardMoveConfirmConfirm: "Continuar",
   },
 
+  // --- sección companies (mockup-port: /companies lista + ficha) ---
+  // Bloque propio, separado de contactList, para que los rediseños
+  // paralelos de tareas/outreach nunca lo toquen (nota de coordinación).
+  companyList: {
+    eyebrow: "Empresas",
+    pageTitle: "empresas.",
+    subtitle: "Cuentas compartidas por el equipo. Los contactos están vinculados por empresa.",
+    newCompany: "Nueva empresa",
+    viewAll: "Todas las empresas",
+    viewMine: "Mis empresas",
+    viewHiring: "Contratando ahora",
+    stageAny: "Cualquiera",
+    stageFilterLabel: "Etapa:",
+    addFilter: "Agregar filtro",
+    removeFilter: "Quitar filtro",
+    stageProspect: "Prospecto",
+    stageQualified: "Calificada",
+    stageProposalSent: "Propuesta enviada",
+    stageWon: "Ganada",
+    stageLost: "Perdida",
+    columnsButton: "Columnas",
+    columnsComingSoon: "Próximamente",
+    colCompany: "Empresa",
+    colIndustry: "Industria",
+    colStage: "Etapa",
+    colOwner: "Responsable",
+    colContacts: "Contactos",
+    colOpenings: "Vacantes",
+    colLastActivity: "Última actividad",
+    emptyValue: "—",
+    noResults: "Ninguna empresa coincide con esta vista.",
+    showingRange: (from: number, to: number, total: number) =>
+      `Mostrando ${from}–${to} de ${total}`,
+    prevPage: "Anterior",
+    nextPage: "Siguiente",
+    pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,
+    applyFilter: "Aplicar",
+  },
+
   // `/contacts/import` (task 14.2; mockups/import.html) — consolidates the
   // LinkedIn connections upload (previously only on `/`) and the leads CSV
   // upload (previously only on `/leads`) behind the SAME identity resolver
