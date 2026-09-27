@@ -19,7 +19,7 @@ import {
   type BuildOutreachMessagePromptInput,
 } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
-import { parseEmailModelOutput } from "@/lib/outreach/emailOutputParsing";
+import { parseEmailModelOutput, capBody, MAX_BODY_CHARS } from "@/lib/outreach/emailOutputParsing";
 import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
 
@@ -88,8 +88,12 @@ export async function runGenerateOutreachMessage(
 
     // Casual Spanish chat drops the opening "¿"/"¡"; the prompt asks for
     // that, and this guarantees it even if the model slips.
-    const message = (input.language === "es" ? text.replace(/[¿¡]/g, "") : text).trim();
-    if (!message) return { ok: false, errorKey: "generationFailed" };
+    const cleaned = (input.language === "es" ? text.replace(/[¿¡]/g, "") : text).trim();
+    if (!cleaned) return { ok: false, errorKey: "generationFailed" };
+    // Same cap as the email body (MAX_BODY_CHARS) — a degenerate or
+    // injection-influenced response could otherwise push an unbounded DM
+    // into the dialog just like an unbounded email body would.
+    const message = capBody(cleaned, MAX_BODY_CHARS);
     return { ok: true, channel: "linkedin", message, historyCount, signals };
   } catch (error) {
     // Missing/invalid AI Gateway credentials (no AI_GATEWAY_API_KEY locally,

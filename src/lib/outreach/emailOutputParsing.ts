@@ -18,11 +18,39 @@ export interface ParsedEmailMessage {
   body: string;
 }
 
+// Hard caps applied AFTER parsing/trimming — a degenerate or
+// injection-influenced model response (e.g. history/notes content trying
+// to steer the output, see messagePrompt.ts's untrusted-data handling)
+// could otherwise push an unbounded subject/body into the "Borrador"
+// dialog and the email composer it feeds. Capping (not rejecting) keeps a
+// too-long draft usable rather than a hard failure — same policy as the
+// LinkedIn DM cap below (generateMessage.ts applies MAX_BODY_CHARS there
+// too, "the same cap" per the fix request).
+export const MAX_SUBJECT_CHARS = 150;
+export const MAX_BODY_CHARS = 2000;
+
 // Strips a leading/trailing ```json ... ``` or ``` ... ``` fence, if present.
 function stripCodeFence(text: string): string {
   const trimmed = text.trim();
   const fenced = trimmed.match(/^```[a-zA-Z]*\n([\s\S]*?)\n?```$/);
   return fenced ? fenced[1]!.trim() : trimmed;
+}
+
+// A subject is a single-line UI field (dialog "Borrador" first line, email
+// composer's Asunto input) — any newline in it (model formatting slip, or
+// an attempt to inject extra "lines" via history/notes content) is
+// collapsed to a single space BEFORE the length cap, so the cap always
+// operates on the final single-line text (not e.g. hidden behind a
+// newline that later gets collapsed into something longer).
+export function capSubject(subject: string): string {
+  const collapsed = subject.replace(/\s*\n\s*/g, " ").trim();
+  return collapsed.length > MAX_SUBJECT_CHARS ? collapsed.slice(0, MAX_SUBJECT_CHARS) : collapsed;
+}
+
+// The body/DM text is multi-line by design (paragraphs) — only truncated,
+// newlines are left as-is.
+export function capBody(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max) : text;
 }
 
 export function parseEmailModelOutput(rawText: string): ParsedEmailMessage | null {
@@ -50,5 +78,8 @@ export function parseEmailModelOutput(rawText: string): ParsedEmailMessage | nul
     return null;
   }
 
-  return { subject: trimmedSubject, body: trimmedBody };
+  return {
+    subject: capSubject(trimmedSubject),
+    body: capBody(trimmedBody, MAX_BODY_CHARS),
+  };
 }

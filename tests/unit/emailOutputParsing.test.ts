@@ -8,7 +8,11 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseEmailModelOutput } from "@/lib/outreach/emailOutputParsing";
+import {
+  parseEmailModelOutput,
+  MAX_SUBJECT_CHARS,
+  MAX_BODY_CHARS,
+} from "@/lib/outreach/emailOutputParsing";
 
 test("parses a bare JSON object", () => {
   const result = parseEmailModelOutput('{"subject": "Hola", "body": "Cuerpo del correo"}');
@@ -64,4 +68,43 @@ test("returns null for a JSON array or primitive", () => {
 test("ignores extra unknown fields", () => {
   const result = parseEmailModelOutput('{"subject": "Hola", "body": "Cuerpo", "extra": true}');
   assert.deepEqual(result, { subject: "Hola", body: "Cuerpo" });
+});
+
+test("truncates a subject longer than MAX_SUBJECT_CHARS", () => {
+  const longSubject = "A".repeat(MAX_SUBJECT_CHARS + 50);
+  const result = parseEmailModelOutput(JSON.stringify({ subject: longSubject, body: "Cuerpo" }));
+  assert.equal(result?.subject.length, MAX_SUBJECT_CHARS);
+  assert.equal(result?.subject, "A".repeat(MAX_SUBJECT_CHARS));
+});
+
+test("truncates a body longer than MAX_BODY_CHARS", () => {
+  const longBody = "B".repeat(MAX_BODY_CHARS + 500);
+  const result = parseEmailModelOutput(JSON.stringify({ subject: "Hola", body: longBody }));
+  assert.equal(result?.body.length, MAX_BODY_CHARS);
+  assert.equal(result?.body, "B".repeat(MAX_BODY_CHARS));
+});
+
+test("collapses newlines inside the subject into spaces", () => {
+  const result = parseEmailModelOutput(
+    JSON.stringify({ subject: "Hola\ncómo\nva", body: "Cuerpo" }),
+  );
+  assert.equal(result?.subject, "Hola cómo va");
+});
+
+test("collapsing newlines in the subject happens before the length cap is applied", () => {
+  // Many short lines that only exceed the cap once joined by real spaces
+  // (a naive "cap first, then collapse" order could hide this).
+  const lines = Array.from({ length: MAX_SUBJECT_CHARS }, () => "a");
+  const subjectWithNewlines = lines.join("\n");
+  const result = parseEmailModelOutput(
+    JSON.stringify({ subject: subjectWithNewlines, body: "Cuerpo" }),
+  );
+  assert.ok(!result?.subject.includes("\n"));
+  assert.ok((result?.subject.length ?? 0) <= MAX_SUBJECT_CHARS);
+});
+
+test("does not collapse newlines inside the body — only truncates", () => {
+  const body = "Línea uno\nLínea dos\nLínea tres";
+  const result = parseEmailModelOutput(JSON.stringify({ subject: "Hola", body }));
+  assert.equal(result?.body, body);
 });
