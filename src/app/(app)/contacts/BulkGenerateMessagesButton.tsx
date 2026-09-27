@@ -11,6 +11,7 @@
  * so the wording never drifts between the single and bulk paths.
  */
 import { useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { bulkGenerateMessagesAction, type BulkGenerateMessageResult } from "./bulkMessageActions";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
 import { parseContactSort } from "@/lib/contacts/sort";
@@ -87,55 +88,42 @@ export function BulkGenerateMessagesButton({
       <button type="button" className="btn btn-ghost btn-sm" onClick={run}>
         {l.bulkGenerateMessages}
       </button>
-      {open && (
-        <div className="overlay open" role="dialog" aria-modal="true" aria-labelledby="bulk-generate-messages-title">
-          <div className="dialog">
-            <div className="dialog-header">
-              <h2 id="bulk-generate-messages-title">{l.bulkGenerateMessages}</h2>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm close"
-                aria-label={l.bulkCancel}
-                onClick={() => setOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="dialog-body">
-              {wasCapped && <p className="alert alert-warn">{l.bulkMessagesCapNotice}</p>}
-              {pending && (
-                <p role="status">
-                  <span className="spinner" aria-hidden="true" /> {m.generatingMessage}
-                </p>
-              )}
-              {results?.map(({ personId, name, result }) => (
-                <div key={personId} className="generate-message-result">
-                  <p className="soft">{name}</p>
-                  {result.ok ? (
-                    <>
-                      <p className="generate-message-text">{result.message}</p>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => copy(personId, result.message)}
-                      >
-                        {copiedId === personId ? m.copiedMessage : m.copyMessage}
-                      </button>
-                    </>
-                  ) : (
-                    <p className="text-danger">{m.generateMessageErrors[result.errorKey]}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="dialog-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
-                {l.bulkCancel}
-              </button>
-            </div>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={l.bulkGenerateMessages}
+        footer={
+          <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+            {l.bulkCancel}
+          </button>
+        }
+      >
+        {wasCapped && <p className="alert alert-warn">{l.bulkMessagesCapNotice}</p>}
+        {pending && (
+          <p role="status">
+            <span className="spinner" aria-hidden="true" /> {m.generatingMessage}
+          </p>
+        )}
+        {results?.map(({ personId, name, result }) => (
+          <div key={personId} className="generate-message-result">
+            <p className="soft">{name}</p>
+            {result.ok ? (
+              <>
+                <p className="generate-message-text">{result.message}</p>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => copy(personId, result.message)}
+                >
+                  {copiedId === personId ? m.copiedMessage : m.copyMessage}
+                </button>
+              </>
+            ) : (
+              <p className="text-danger">{m.generateMessageErrors[result.errorKey]}</p>
+            )}
           </div>
-        </div>
-      )}
+        ))}
+      </Dialog>
     </>
   );
 }

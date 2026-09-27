@@ -427,8 +427,15 @@ summary:focus-visible,
   outline-offset: 2px;
 }
 
-/* ---- buttons ---- */
-button {
+/* ---- buttons ----
+ * Zero-specificity via :where(): these rules style any unclassed legacy
+ * `<button>` (pages not yet ported to the mockup's design-system classes),
+ * but must never outrank a design-system class (.btn-secondary, .btn-ghost,
+ * .chip, .menu-item, .view-tab, …) or the legacy `.secondary`/`.ghost`
+ * variants below. Without :where(), `button:hover:not(:disabled)` has
+ * specificity (0,2,1), which beats a single class selector like
+ * `.view-tab:hover` and turned every design-system button red on hover. */
+:where(button) {
   background: var(--color-accent);
   color: var(--color-accent-fg);
   border: none;
@@ -442,23 +449,23 @@ button {
     background-color var(--transition-fast),
     filter var(--transition-fast);
 }
-button:hover:not(:disabled) {
+:where(button:hover:not(:disabled)) {
   background: var(--color-accent-hover);
   filter: none;
 }
-button:active:not(:disabled):not(.secondary):not(.ghost) {
+:where(button:active:not(:disabled):not(.secondary):not(.ghost)) {
   background: var(--color-accent-focus);
 }
-button:disabled {
+:where(button:disabled) {
   opacity: 0.55;
   cursor: default;
 }
-button.secondary {
+:where(button.secondary) {
   background: var(--color-surface-1);
   color: var(--color-ink-soft);
   border: 1px solid var(--color-border-strong);
 }
-button.secondary:hover:not(:disabled) {
+:where(button.secondary:hover:not(:disabled)) {
   background: var(--color-surface-1);
   color: var(--color-ink);
   border-color: var(--color-accent);
@@ -467,12 +474,12 @@ button.secondary:hover:not(:disabled) {
 /* Ghost button — transparent, text-only. Not wired to any screen yet, kept
    available for future secondary/tertiary actions (e.g. row-level actions
    inside dense tables) without introducing another one-off style. */
-.ghost {
+:where(.ghost) {
   background: transparent;
   color: var(--color-ink-soft);
   border: 1px solid transparent;
 }
-.ghost:hover:not(:disabled) {
+:where(.ghost:hover:not(:disabled)) {
   color: var(--color-ink);
   background: var(--color-surface-1);
 }
