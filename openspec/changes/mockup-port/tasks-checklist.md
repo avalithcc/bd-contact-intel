@@ -8,10 +8,10 @@ Columns: `element | mockup ref | status | evidence file:line | notes`.
 | element | mockup ref | status | evidence file:line | notes |
 | --- | --- | --- | --- | --- |
 | Page header (eyebrow/title/subtitle) | tasks.html page-header | done | src/app/(app)/tasks/page.tsx:51-57 | pre-existing |
-| "Nueva tarea" primary button | tasks.html `.page-header .actions .btn-primary` | todo | | opens create-task dialog (t01) |
-| View tabs: "Mis tareas abiertas" | tasks.html `.view-tabs` | todo | | filters to tasks assigned to the current BD |
-| View tabs: "Todas abiertas" | tasks.html `.view-tabs` | todo | | all open tasks, any assignee |
-| View tabs: "Completadas" | tasks.html `.view-tabs` | todo | | status=done, paginated |
+| "Nueva tarea" primary button | tasks.html `.page-header .actions .btn-primary` | todo | src/app/(app)/tasks/page.tsx:97-99 | wired as a plain link stub in t03; dialog lands in t04 |
+| View tabs: "Mis tareas abiertas" | tasks.html `.view-tabs` | done | src/lib/tasks/viewTabs.ts, src/app/(app)/tasks/page.tsx:120-130 | filters to tasks assigned to the current BD, default view |
+| View tabs: "Todas abiertas" | tasks.html `.view-tabs` | done | src/lib/tasks/queries.ts:119-129 (getAllOpenTasks), src/app/(app)/tasks/page.tsx | all open tasks, any assignee |
+| View tabs: "Completadas" | tasks.html `.view-tabs` | done | src/lib/tasks/queries.ts:131-143 (getCompletedTasks), src/app/(app)/tasks/page.tsx | status=done, bounded limit/offset |
 | Vencidas group + count badge | tasks.html `h3 Vencidas` | done | src/app/(app)/tasks/page.tsx:65-74 | pre-existing |
 | Hoy group + count badge | tasks.html `h3 Hoy` | done | src/app/(app)/tasks/page.tsx:75-84 | pre-existing |
 | Próximas group | tasks.html `h3 Próximas` | done | src/app/(app)/tasks/page.tsx:85-94 | pre-existing |

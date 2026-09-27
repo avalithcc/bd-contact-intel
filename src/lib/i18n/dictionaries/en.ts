@@ -870,9 +870,16 @@ export const en = {
     eyebrow: "Tasks",
     title: "tasks",
     subtitle: "Every task belongs to a contact or a company.",
+    // --- tasks: view tabs (mockup-port t03) ---
+    viewTabMine: "My open tasks",
+    viewTabAll: "All open",
+    viewTabDone: "Completed",
+    newTask: "New task",
+    // --- end tasks: view tabs ---
     overdueLabel: "Overdue",
     todayLabel: "Today",
     upcomingLabel: "Upcoming",
+    completedLabel: "Completed",
     colTask: "Task",
     colSubject: "Related to",
     colOwner: "Owner",
@@ -884,6 +891,22 @@ export const en = {
     dueToday: "Today",
     dueTomorrow: "Tomorrow",
     emptyState: "No open tasks — nice work.",
+    emptyStateAll: "No open tasks.",
+    emptyStateDone: "No completed tasks yet.",
+    // --- tasks: new task dialog (t04) ---
+    taskCreate: "Create task",
+    taskTitleLabel: "Title",
+    taskSubjectLabel: "Related to",
+    taskSubjectPlaceholder: "Search a contact by name...",
+    taskSubjectContactOption: "Contact",
+    taskSubjectCompanyOption: "Company",
+    taskSubjectSearching: "Searching...",
+    taskSubjectNoResults: "No matches.",
+    taskSubjectRequired: "Pick a contact or a company.",
+    taskDueLabel: "Due date",
+    taskCreateError: "Could not create the task. Try again.",
+    cancel: "Cancel",
+    // --- end tasks: new task dialog ---
   },
 
   companiesPage: {

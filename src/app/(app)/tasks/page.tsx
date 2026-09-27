@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
-import { getOpenTasks, getOverdueTasks } from "@/lib/tasks/queries";
+import {
+  getAllOpenTasks,
+  getCompletedTasks,
+  getOpenTasks,
+  getOverdueTasks,
+  getTaskViewCounts,
+} from "@/lib/tasks/queries";
 import { resolveTaskSubject } from "@/lib/tasks/subject";
+import { isTaskView, taskViewTabs, type TaskView } from "@/lib/tasks/viewTabs";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { CompleteTaskButton } from "./CompleteTaskButton";
@@ -12,6 +19,10 @@ export const dynamic = "force-dynamic";
 
 type Task = Awaited<ReturnType<typeof getOpenTasks>>[number];
 type Dict = Awaited<ReturnType<typeof getDictionary>>["tasksPage"];
+
+interface TasksPageProps {
+  searchParams: Promise<{ view?: string }>;
+}
 
 // Presentation-only grouping (mockup-parity 6.2): the mockup groups tasks
 // into vencidas/hoy/próximas within a single table pattern. The queries
@@ -30,13 +41,66 @@ function dueStatus(task: Task): "overdue" | "today" | "tomorrow" | "week" | null
   return "week";
 }
 
-export default async function TasksPage() {
+export default async function TasksPage({ searchParams }: TasksPageProps) {
+  const sp = await searchParams;
+  const view: TaskView = isTaskView(sp.view) ? sp.view : "mine";
+
   const me = await getCurrentBd();
   const dict = await getDictionary();
   const l = dict.tasksPage;
+  const counts = await getTaskViewCounts(me.id);
+  const tabs = taskViewTabs(counts, view, {
+    mine: l.viewTabMine,
+    all: l.viewTabAll,
+    done: l.viewTabDone,
+  });
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.pageHeader}>
+        <div>
+          <div className={styles.eyebrow}>{l.eyebrow}</div>
+          <h1 className={styles.title}>{l.title}</h1>
+          <p className={styles.subtitle}>{l.subtitle}</p>
+        </div>
+        <div className="actions">
+          <a className="btn btn-primary" href="#">
+            {l.newTask}
+          </a>
+        </div>
+      </div>
+
+      <nav className="view-tabs" aria-label={l.eyebrow}>
+        {tabs.map((tab) => (
+          <Link key={tab.key} className={`view-tab${tab.active ? " active" : ""}`} href={tab.href}>
+            {tab.label}
+            <span className="count">{tab.count}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {view === "done" ? (
+        <CompletedTasksView dict={dict} me={me} />
+      ) : (
+        <OpenTasksView view={view} dict={dict} me={me} />
+      )}
+    </main>
+  );
+}
+
+async function OpenTasksView({
+  view,
+  dict,
+  me,
+}: {
+  view: Extract<TaskView, "mine" | "all">;
+  dict: Awaited<ReturnType<typeof getDictionary>>;
+  me: Awaited<ReturnType<typeof getCurrentBd>>;
+}) {
+  const l = dict.tasksPage;
   const [openTasks, overdueTasks] = await Promise.all([
-    getOpenTasks(me.id, 100),
-    getOverdueTasks(me.id),
+    view === "mine" ? getOpenTasks(me.id, 100) : getAllOpenTasks(100),
+    view === "mine" ? getOverdueTasks(me.id) : [],
   ]);
 
   const todayTasks = openTasks.filter((t) => dueStatus(t) === "today");
@@ -48,55 +112,77 @@ export default async function TasksPage() {
   const hasAnyTasks =
     overdueTasks.length > 0 || todayTasks.length > 0 || upcomingTasks.length > 0;
 
-  return (
-    <main className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div>
-          <div className={styles.eyebrow}>{l.eyebrow}</div>
-          <h1 className={styles.title}>{l.title}</h1>
-          <p className={styles.subtitle}>{l.subtitle}</p>
-        </div>
+  if (!hasAnyTasks) {
+    return (
+      <div className={styles.emptyState}>
+        <p>{view === "mine" ? l.emptyState : l.emptyStateAll}</p>
       </div>
+    );
+  }
 
-      {!hasAnyTasks ? (
-        <div className={styles.emptyState}>
-          <p>{l.emptyState}</p>
-        </div>
-      ) : (
-        <>
-          {overdueTasks.length > 0 && (
-            <TaskGroup
-              title={l.overdueLabel}
-              count={overdueTasks.length}
-              badgeClass={styles.badgeDanger}
-              tasks={overdueTasks}
-              dict={dict}
-              me={me}
-            />
-          )}
-          {todayTasks.length > 0 && (
-            <TaskGroup
-              title={l.todayLabel}
-              count={todayTasks.length}
-              badgeClass={styles.badgeWarn}
-              tasks={todayTasks}
-              dict={dict}
-              me={me}
-            />
-          )}
-          {upcomingTasks.length > 0 && (
-            <TaskGroup
-              title={l.upcomingLabel}
-              count={null}
-              badgeClass={styles.badgeNeutral}
-              tasks={upcomingTasks}
-              dict={dict}
-              me={me}
-            />
-          )}
-        </>
+  return (
+    <>
+      {overdueTasks.length > 0 && (
+        <TaskGroup
+          title={l.overdueLabel}
+          count={overdueTasks.length}
+          badgeClass={styles.badgeDanger}
+          tasks={overdueTasks}
+          dict={dict}
+          me={me}
+        />
       )}
-    </main>
+      {todayTasks.length > 0 && (
+        <TaskGroup
+          title={l.todayLabel}
+          count={todayTasks.length}
+          badgeClass={styles.badgeWarn}
+          tasks={todayTasks}
+          dict={dict}
+          me={me}
+        />
+      )}
+      {upcomingTasks.length > 0 && (
+        <TaskGroup
+          title={l.upcomingLabel}
+          count={null}
+          badgeClass={styles.badgeNeutral}
+          tasks={upcomingTasks}
+          dict={dict}
+          me={me}
+        />
+      )}
+    </>
+  );
+}
+
+async function CompletedTasksView({
+  dict,
+  me,
+}: {
+  dict: Awaited<ReturnType<typeof getDictionary>>;
+  me: Awaited<ReturnType<typeof getCurrentBd>>;
+}) {
+  const l = dict.tasksPage;
+  const completedTasks = await getCompletedTasks(100);
+
+  if (completedTasks.length === 0) {
+    return (
+      <div className={styles.emptyState}>
+        <p>{l.emptyStateDone}</p>
+      </div>
+    );
+  }
+
+  return (
+    <TaskGroup
+      title={l.completedLabel}
+      count={null}
+      badgeClass={styles.badgeNeutral}
+      tasks={completedTasks}
+      dict={dict}
+      me={me}
+    />
   );
 }
 

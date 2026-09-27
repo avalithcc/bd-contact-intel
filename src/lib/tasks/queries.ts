@@ -142,6 +142,41 @@ export async function getCompletedTasks(limit: number = 50, offset: number = 0):
     .offset(offset);
 }
 
+export interface TaskViewCounts {
+  mine: number;
+  all: number;
+  completed: number;
+}
+
+/**
+ * Badge counts for the /tasks view tabs (mockup-port t03; tasks.html
+ * `.view-tabs .count`) — three bounded `count(*)` queries, each covered by
+ * `task_assignee_idx`/`task_status_idx`, instead of fetching every row just
+ * to `.length` it (that would defeat the point of bounding the tab reads).
+ */
+export async function getTaskViewCounts(bdId: string): Promise<TaskViewCounts> {
+  const [[mine], [all], [completed]] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(task)
+      .where(and(eq(task.assignedToBdId, bdId), eq(task.status, "open"))),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(task)
+      .where(eq(task.status, "open")),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(task)
+      .where(eq(task.status, "done")),
+  ]);
+
+  return {
+    mine: mine?.count ?? 0,
+    all: all?.count ?? 0,
+    completed: completed?.count ?? 0,
+  };
+}
+
 /**
  * Open tasks for one Contact (mockup-port r03/r05; contact-record.html's
  * "Próximas" timeline bucket + right-panel "Tareas" card). Bounded to a

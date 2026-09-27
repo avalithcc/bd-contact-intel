@@ -770,9 +770,16 @@ export const es: typeof en = {
     eyebrow: "Tareas",
     title: "tareas",
     subtitle: "Toda tarea pertenece a un contacto o una empresa.",
+    // --- tasks: view tabs (mockup-port t03) ---
+    viewTabMine: "Mis tareas abiertas",
+    viewTabAll: "Todas abiertas",
+    viewTabDone: "Completadas",
+    newTask: "Nueva tarea",
+    // --- end tasks: view tabs ---
     overdueLabel: "Vencidas",
     todayLabel: "Hoy",
     upcomingLabel: "Próximas",
+    completedLabel: "Completadas",
     colTask: "Tarea",
     colSubject: "Asociado con",
     colOwner: "Responsable",
@@ -784,6 +791,22 @@ export const es: typeof en = {
     dueToday: "Hoy",
     dueTomorrow: "Mañana",
     emptyState: "No tenés tareas abiertas — buen trabajo.",
+    emptyStateAll: "No hay tareas abiertas.",
+    emptyStateDone: "Todavía no hay tareas completadas.",
+    // --- tasks: new task dialog (t04) ---
+    taskCreate: "Crear tarea",
+    taskTitleLabel: "Título",
+    taskSubjectLabel: "Asociado con",
+    taskSubjectPlaceholder: "Buscar un contacto por nombre...",
+    taskSubjectContactOption: "Contacto",
+    taskSubjectCompanyOption: "Empresa",
+    taskSubjectSearching: "Buscando...",
+    taskSubjectNoResults: "Sin resultados.",
+    taskSubjectRequired: "Elegí un contacto o una empresa.",
+    taskDueLabel: "Vencimiento",
+    taskCreateError: "No se pudo crear la tarea. Probá de nuevo.",
+    cancel: "Cancelar",
+    // --- end tasks: new task dialog ---
   },
 
   companiesPage: {
