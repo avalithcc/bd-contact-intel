@@ -13,6 +13,7 @@ import { isTaskView, taskViewTabs, type TaskView } from "@/lib/tasks/viewTabs";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { CompleteTaskButton } from "./CompleteTaskButton";
+import { NewTaskButton } from "./NewTaskButton";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -64,9 +65,23 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           <p className={styles.subtitle}>{l.subtitle}</p>
         </div>
         <div className="actions">
-          <a className="btn btn-primary" href="#">
-            {l.newTask}
-          </a>
+          <NewTaskButton
+            labels={{
+              newTask: l.newTask,
+              taskCreate: l.taskCreate,
+              taskTitleLabel: l.taskTitleLabel,
+              taskSubjectLabel: l.taskSubjectLabel,
+              taskSubjectPlaceholder: l.taskSubjectPlaceholder,
+              taskSubjectContactOption: l.taskSubjectContactOption,
+              taskSubjectCompanyOption: l.taskSubjectCompanyOption,
+              taskSubjectSearching: l.taskSubjectSearching,
+              taskSubjectNoResults: l.taskSubjectNoResults,
+              taskSubjectRequired: l.taskSubjectRequired,
+              taskDueLabel: l.taskDueLabel,
+              taskCreateError: l.taskCreateError,
+              cancel: l.cancel,
+            }}
+          />
         </div>
       </div>
 

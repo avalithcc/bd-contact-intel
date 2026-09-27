@@ -8,7 +8,7 @@ Columns: `element | mockup ref | status | evidence file:line | notes`.
 | element | mockup ref | status | evidence file:line | notes |
 | --- | --- | --- | --- | --- |
 | Page header (eyebrow/title/subtitle) | tasks.html page-header | done | src/app/(app)/tasks/page.tsx:51-57 | pre-existing |
-| "Nueva tarea" primary button | tasks.html `.page-header .actions .btn-primary` | todo | src/app/(app)/tasks/page.tsx:97-99 | wired as a plain link stub in t03; dialog lands in t04 |
+| "Nueva tarea" primary button | tasks.html `.page-header .actions .btn-primary` | done | src/app/(app)/tasks/NewTaskButton.tsx | opens the create-task dialog (t04) |
 | View tabs: "Mis tareas abiertas" | tasks.html `.view-tabs` | done | src/lib/tasks/viewTabs.ts, src/app/(app)/tasks/page.tsx:120-130 | filters to tasks assigned to the current BD, default view |
 | View tabs: "Todas abiertas" | tasks.html `.view-tabs` | done | src/lib/tasks/queries.ts:119-129 (getAllOpenTasks), src/app/(app)/tasks/page.tsx | all open tasks, any assignee |
 | View tabs: "Completadas" | tasks.html `.view-tabs` | done | src/lib/tasks/queries.ts:131-143 (getCompletedTasks), src/app/(app)/tasks/page.tsx | status=done, bounded limit/offset |
@@ -21,7 +21,7 @@ Columns: `element | mockup ref | status | evidence file:line | notes`.
 | Table: Responsable column (owner chip) | tasks.html `.owner-chip` | done | src/app/(app)/tasks/page.tsx:173-178 | pre-existing |
 | Table: Vencimiento column (badges) | tasks.html `.badge` | done | src/app/(app)/tasks/page.tsx:179-193 | pre-existing |
 | Empty state | tasks.html (n/a, not shown in mockup but existing app behavior kept) | done | src/app/(app)/tasks/page.tsx:59-62 | pre-existing, kept |
-| "Nueva tarea" dialog: title field | tasks.html (dialog not in mockup; behavior requested by owner) | todo | | |
-| "Nueva tarea" dialog: subject picker (contact or company, searches contacts by name) | owner instruction | todo | | reuses createTaskAction |
-| "Nueva tarea" dialog: due date field | owner instruction, same shape as record-page TaskForm | todo | | |
-| "Nueva tarea" dialog: submit reuses createTaskAction | owner instruction — no new write path | todo | | |
+| "Nueva tarea" dialog: title field | tasks.html (dialog not in mockup; behavior requested by owner) | done | src/app/(app)/tasks/NewTaskButton.tsx | |
+| "Nueva tarea" dialog: subject picker (contact or company, searches contacts by name) | owner instruction | done | src/lib/tasks/subjectSearch.ts, src/lib/tasks/subjectSearchDb.ts, src/app/(app)/tasks/NewTaskButton.tsx | reuses createTaskAction; bounded ilike search (8 contacts, 5 companies) |
+| "Nueva tarea" dialog: due date field | owner instruction, same shape as record-page TaskForm | done | src/app/(app)/tasks/NewTaskButton.tsx | |
+| "Nueva tarea" dialog: submit reuses createTaskAction | owner instruction — no new write path | done | src/app/(app)/tasks/NewTaskButton.tsx | calls createTaskAction directly, same action as QuickActions "Tarea" and bulkCreateTaskAction |
