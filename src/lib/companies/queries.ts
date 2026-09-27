@@ -1,6 +1,9 @@
 import { and, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { company, type Company, type NewCompany } from "@/db/schema";
+import { bd, company, type Company, type NewCompany } from "@/db/schema";
+
+const owner = alias(bd, "owner");
 
 const MAX_SEARCH_TOKENS = 5;
 
@@ -22,6 +25,15 @@ export interface CompanyRow {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
+  // company-fields change (owner-approved 2026-09-26): HubSpot-style fields.
+  industry: string | null;
+  ownerBdId: string | null;
+  // Bounded join against `bd` (one row per company, joined once here, never
+  // per-row in a loop) — the list filter needs the owner's name, not just
+  // the id.
+  ownerName: string | null;
+  city: string | null;
+  country: string | null;
 }
 
 export interface CompaniesPage {
@@ -73,8 +85,22 @@ export async function getCompanies(
 
   const offset = (page - 1) * pageSize;
   const rows = await db
-    .select()
+    .select({
+      companyKey: company.companyKey,
+      displayName: company.displayName,
+      relationshipStage: company.relationshipStage,
+      revenuePotential: company.revenuePotential,
+      notes: company.notes,
+      createdAt: company.createdAt,
+      updatedAt: company.updatedAt,
+      industry: company.industry,
+      ownerBdId: company.ownerBdId,
+      ownerName: owner.name,
+      city: company.city,
+      country: company.country,
+    })
     .from(company)
+    .leftJoin(owner, eq(company.ownerBdId, owner.id))
     .where(whereCondition)
     .orderBy(company.displayName)
     .limit(pageSize)
@@ -89,8 +115,42 @@ export async function getCompanies(
   };
 }
 
-export async function getCompanyByKey(companyKey: string): Promise<Company | null> {
-  const [row] = await db.select().from(company).where(eq(company.companyKey, companyKey));
+/**
+ * "N contactos en esta empresa" (mockup-port r05; contact-record.html:163).
+ * Bounded to one company — excludes merged-away rows (design D6), same
+ * convention as every other Contact read (queries.ts's `findPersonById`).
+ */
+export async function getCompanyContactCount(companyKey: string): Promise<number> {
+  const [row] = await db.execute<{ count: string }>(
+    sql`select count(*)::text as count from person where company_key = ${companyKey} and merged_into_id is null`,
+  );
+  return row ? Number(row.count) : 0;
+}
+
+export type CompanyWithOwner = Company & { ownerName: string | null };
+
+export async function getCompanyByKey(companyKey: string): Promise<CompanyWithOwner | null> {
+  const [row] = await db
+    .select({
+      companyKey: company.companyKey,
+      displayName: company.displayName,
+      relationshipStage: company.relationshipStage,
+      revenuePotential: company.revenuePotential,
+      notes: company.notes,
+      createdByBdId: company.createdByBdId,
+      updatedByBdId: company.updatedByBdId,
+      createdAt: company.createdAt,
+      updatedAt: company.updatedAt,
+      domain: company.domain,
+      industry: company.industry,
+      ownerBdId: company.ownerBdId,
+      ownerName: owner.name,
+      city: company.city,
+      country: company.country,
+    })
+    .from(company)
+    .leftJoin(owner, eq(company.ownerBdId, owner.id))
+    .where(eq(company.companyKey, companyKey));
   return row ?? null;
 }
 

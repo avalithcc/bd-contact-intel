@@ -1,34 +1,47 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ToastProvider";
 import { completeTaskAction } from "./actions";
 import styles from "./page.module.css";
 
-export function CompleteTaskButton({ taskId }: { taskId: string }) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Controlled so the checkbox only stays checked once the server action
+ * succeeds: while saving it shows checked and disabled, on success it stays
+ * that way until revalidation removes the row, and on failure it unchecks
+ * and reports the error as a toast.
+ */
+export function CompleteTaskButton({
+  taskId,
+  ariaLabel,
+  errorLabel,
+}: {
+  taskId: string;
+  ariaLabel: string;
+  errorLabel: string;
+}) {
+  const { showToast } = useToast();
+  const [state, setState] = useState<"idle" | "saving" | "done">("idle");
 
-  const handleClick = async () => {
-    setIsLoading(true);
-    setError(null);
+  const handleChange = async () => {
+    setState("saving");
     try {
       await completeTaskAction(taskId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete task");
-    } finally {
-      setIsLoading(false);
+      setState("done");
+    } catch {
+      setState("idle");
+      showToast(errorLabel, "error");
     }
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className={styles.completeButton}
-      disabled={isLoading}
-      title={error || "Mark complete"}
-      aria-label="Mark complete"
-    >
-      {isLoading ? "…" : "✓"}
-    </button>
+    <input
+      type="checkbox"
+      className={styles.completeCheckbox}
+      checked={state !== "idle"}
+      onChange={handleChange}
+      disabled={state !== "idle"}
+      aria-label={ariaLabel}
+    />
   );
 }

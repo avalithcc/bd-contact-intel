@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BOARD_COLUMNS, boardDropAction, isBoardStatus } from "@/lib/contacts/board";
+import { BOARD_COLUMNS, boardDropAction, isBoardDropAction, isBoardStatus } from "@/lib/contacts/board";
 
 test("14.1 RED->GREEN: BOARD_COLUMNS orders the five derived statuses new->contacted->replied->meeting->discarded", () => {
   assert.deepEqual(BOARD_COLUMNS, ["new", "contacted", "replied", "meeting", "discarded"]);
@@ -26,4 +26,12 @@ test("boardDropAction: Nuevo and Respondió have no supported manual log action,
 test("isBoardStatus: rejects an unknown/arbitrary string (query-string safety)", () => {
   assert.equal(isBoardStatus("new"), true);
   assert.equal(isBoardStatus("bogus"), false);
+});
+
+test("isBoardDropAction: accepts exactly the three quick-action kinds a board drop can open (BoardDnD.tsx parses ?openAction= from a menu link's href)", () => {
+  assert.equal(isBoardDropAction("email"), true);
+  assert.equal(isBoardDropAction("meeting"), true);
+  assert.equal(isBoardDropAction("discard"), true);
+  assert.equal(isBoardDropAction("bogus"), false);
+  assert.equal(isBoardDropAction(""), false);
 });

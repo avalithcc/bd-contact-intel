@@ -11,6 +11,7 @@
  * this, never the other way around.
  */
 import { isUuid } from "@/lib/uuid";
+import { MARKETS, type MarketKey } from "@/lib/hiring/markets";
 
 export type PersonStatus = "new" | "contacted" | "replied" | "meeting" | "discarded";
 
@@ -24,6 +25,10 @@ export const PERSON_STATUSES: readonly PersonStatus[] = [
 
 function isPersonStatus(value: unknown): value is PersonStatus {
   return typeof value === "string" && (PERSON_STATUSES as readonly string[]).includes(value);
+}
+
+function isMarketKey(value: unknown): value is MarketKey {
+  return typeof value === "string" && (MARKETS as readonly string[]).includes(value);
 }
 
 /** 'probable'/'none' close the `/leads` parity gap (task 13.3 inventory,
@@ -60,6 +65,25 @@ export interface ContactFilters {
   industryGroup?: string;
   seniority?: string;
   emailStatus?: EmailStatusFilter;
+  // Closes the remaining 6 of 10 "Agregar filtro" options (contacts.html
+  // toolbar menu) this batch adds ad-hoc-filter parity for.
+  /** Raw `person.company` substring match — "Empresa" filter. */
+  company?: string;
+  /** Hiring-market crossover — reuses getHiringMatchIndex the same way the
+   * Outreach view does (src/lib/outreach/queries.ts listOutreachCandidates). */
+  market?: MarketKey;
+  /** "Startup" filter — same getHiringMatchIndex crossover as `market`. */
+  startupsOnly?: boolean;
+  roleGroup?: string;
+  /** "BD conectado" — a specific BD's uuid; filters to persons with a
+   * `person_bd_connection` row for that BD. */
+  bdConnected?: string;
+  /** "Última actividad" recency bucket, in days (7/30/90/…) — filters to
+   * persons whose most recent `activity` row is within the last N days. */
+  lastActivityDays?: number;
+  /** "Tiene teléfono" ad-hoc filter (migration 0016) — `person.phone` or
+   * `person.mobilePhone` is set. */
+  hasPhone?: boolean;
 }
 
 export function serializeContactFilters(filters: ContactFilters): URLSearchParams {
@@ -71,6 +95,13 @@ export function serializeContactFilters(filters: ContactFilters): URLSearchParam
   if (filters.industryGroup) params.set("industryGroup", filters.industryGroup);
   if (filters.seniority) params.set("seniority", filters.seniority);
   if (filters.emailStatus) params.set("emailStatus", filters.emailStatus);
+  if (filters.company) params.set("company", filters.company);
+  if (filters.market) params.set("market", filters.market);
+  if (filters.startupsOnly) params.set("startupsOnly", "1");
+  if (filters.roleGroup) params.set("roleGroup", filters.roleGroup);
+  if (filters.bdConnected) params.set("bdConnected", filters.bdConnected);
+  if (filters.lastActivityDays) params.set("lastActivityDays", String(filters.lastActivityDays));
+  if (filters.hasPhone) params.set("hasPhone", "1");
   return params;
 }
 
@@ -98,6 +129,28 @@ export function parseContactFilters(params: URLSearchParams): ContactFilters {
   const emailStatus = params.get("emailStatus");
   if (isEmailStatusFilter(emailStatus)) filters.emailStatus = emailStatus;
 
+  const company = params.get("company");
+  if (company) filters.company = company;
+
+  const market = params.get("market");
+  if (isMarketKey(market)) filters.market = market;
+
+  if (params.get("startupsOnly") === "1") filters.startupsOnly = true;
+
+  const roleGroup = params.get("roleGroup");
+  if (roleGroup) filters.roleGroup = roleGroup;
+
+  const bdConnected = params.get("bdConnected");
+  if (bdConnected && isUuid(bdConnected)) filters.bdConnected = bdConnected;
+
+  const lastActivityDaysRaw = params.get("lastActivityDays");
+  if (lastActivityDaysRaw) {
+    const n = Number(lastActivityDaysRaw);
+    if (Number.isFinite(n) && n > 0) filters.lastActivityDays = n;
+  }
+
+  if (params.get("hasPhone") === "1") filters.hasPhone = true;
+
   return filters;
 }
 
@@ -123,13 +176,23 @@ export function sanitizeContactFilters(value: unknown): ContactFilters {
   if (typeof raw.industryGroup === "string" && raw.industryGroup) filters.industryGroup = raw.industryGroup;
   if (typeof raw.seniority === "string" && raw.seniority) filters.seniority = raw.seniority;
   if (isEmailStatusFilter(raw.emailStatus)) filters.emailStatus = raw.emailStatus;
+  if (typeof raw.company === "string" && raw.company) filters.company = raw.company;
+  if (isMarketKey(raw.market)) filters.market = raw.market;
+  if (raw.startupsOnly === true) filters.startupsOnly = true;
+  if (typeof raw.roleGroup === "string" && raw.roleGroup) filters.roleGroup = raw.roleGroup;
+  if (typeof raw.bdConnected === "string" && isUuid(raw.bdConnected)) filters.bdConnected = raw.bdConnected;
+  if (typeof raw.lastActivityDays === "number" && raw.lastActivityDays > 0) {
+    filters.lastActivityDays = raw.lastActivityDays;
+  }
+  if (raw.hasPhone === true) filters.hasPhone = true;
 
   return filters;
 }
 
 /** Raw ad-hoc filter query values as read straight off `searchParams` (task
  * 13.3 parity gaps: the ad-hoc "Agregar filtro" panel, task 13.1's deferred
- * scope). `undefined` means "field absent from the query string, leave the
+ * scope; extended this batch to cover all 10 mockup filter types).
+ * `undefined` means "field absent from the query string, leave the
  * inherited view value untouched"; `""` means "field present but cleared —
  * remove the inherited view value"; any other value is validated the same
  * way parseContactFilters validates it and ignored (base kept) if invalid. */
@@ -138,19 +201,23 @@ export interface AdHocContactFilterInput {
   industryGroup?: string;
   seniority?: string;
   emailStatus?: string;
-  // Single-pick ad-hoc status (task 13.3 parity gap: "/leads has an ad-hoc
-  // status picker, /contacts only reaches status via a fixed system view").
-  // `ContactFilters.status` stays an array (system views can combine
-  // several), so a single ad-hoc pick becomes a one-element array.
+  // Single OR comma-joined multi-select — the mockup's status chip can show
+  // several values at once ("Nuevo, Contactado").
   status?: string;
+  hiring?: string;
+  company?: string;
+  market?: string;
+  startupsOnly?: string;
+  roleGroup?: string;
+  bdConnected?: string;
+  lastActivityDays?: string;
+  hasPhone?: string;
 }
 
 /**
- * Layers ad-hoc filter selections (a plain `<select>` panel, no saved-view
- * jsonb involved) on top of a base filter set (the active system/saved
- * view), field by field. Only these four fields are ad-hoc-overridable —
- * `status`/`emailVerified`/`hiring` stay view-defined, per the system-views
- * design (D7) and task 12.2's scope.
+ * Layers ad-hoc filter selections (a plain `<select>`/checkbox panel, no
+ * saved-view jsonb involved) on top of a base filter set (the active
+ * system/saved view), field by field.
  */
 export function applyAdHocContactFilterOverrides(
   base: ContactFilters,
@@ -180,7 +247,53 @@ export function applyAdHocContactFilterOverrides(
 
   if (raw.status !== undefined) {
     if (raw.status === "") delete result.status;
-    else if (isPersonStatus(raw.status)) result.status = [raw.status];
+    else {
+      const values = raw.status.split(",").filter(isPersonStatus);
+      if (values.length) result.status = values;
+    }
+  }
+
+  if (raw.hiring !== undefined) {
+    if (raw.hiring === "" || raw.hiring === "0") delete result.hiring;
+    else if (raw.hiring === "1") result.hiring = true;
+  }
+
+  if (raw.company !== undefined) {
+    if (raw.company === "") delete result.company;
+    else result.company = raw.company;
+  }
+
+  if (raw.market !== undefined) {
+    if (raw.market === "") delete result.market;
+    else if (isMarketKey(raw.market)) result.market = raw.market;
+  }
+
+  if (raw.startupsOnly !== undefined) {
+    if (raw.startupsOnly === "" || raw.startupsOnly === "0") delete result.startupsOnly;
+    else result.startupsOnly = true;
+  }
+
+  if (raw.roleGroup !== undefined) {
+    if (raw.roleGroup === "") delete result.roleGroup;
+    else result.roleGroup = raw.roleGroup;
+  }
+
+  if (raw.bdConnected !== undefined) {
+    if (raw.bdConnected === "") delete result.bdConnected;
+    else if (isUuid(raw.bdConnected)) result.bdConnected = raw.bdConnected;
+  }
+
+  if (raw.lastActivityDays !== undefined) {
+    if (raw.lastActivityDays === "") delete result.lastActivityDays;
+    else {
+      const n = Number(raw.lastActivityDays);
+      if (Number.isFinite(n) && n > 0) result.lastActivityDays = n;
+    }
+  }
+
+  if (raw.hasPhone !== undefined) {
+    if (raw.hasPhone === "" || raw.hasPhone === "0") delete result.hasPhone;
+    else result.hasPhone = true;
   }
 
   return result;

@@ -16,6 +16,7 @@
  */
 import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
 import { splitEmail } from "@/lib/emailPatterns";
+import { isValidPhoneFormat } from "@/lib/phone";
 
 export type InvalidEmailReason = "invalid_format";
 
@@ -32,6 +33,22 @@ export class InvalidEmailError extends Error {
   }
 }
 
+export type InvalidPhoneReason = "invalid_format";
+
+/**
+ * Thrown by planPropertyEdit before building any plan (migration 0016):
+ * mirrors InvalidEmailError above for `phone`/`mobilePhone` — a value that
+ * doesn't look like a phone number (src/lib/phone.ts#isValidPhoneFormat)
+ * never reaches the DB. Not thrown when the new value is blank (clearing
+ * the property is always allowed).
+ */
+export class InvalidPhoneError extends Error {
+  constructor(public readonly reason: InvalidPhoneReason) {
+    super(`Invalid phone: ${reason}`);
+    this.name = "InvalidPhoneError";
+  }
+}
+
 /** Same "local@domain-with-a-dot" bar as splitEmail, plus a literal dot in the domain. */
 function isValidEmailFormat(value: string): boolean {
   const split = splitEmail(value);
@@ -40,6 +57,8 @@ function isValidEmailFormat(value: string): boolean {
 
 export const EDITABLE_PERSON_PROPERTIES = [
   "email",
+  "phone",
+  "mobilePhone",
   "jobTitle",
   "roleGroup",
   "seniority",
@@ -48,6 +67,8 @@ export const EDITABLE_PERSON_PROPERTIES = [
   "country",
   "industry",
 ] as const;
+
+const PHONE_PROPERTIES = new Set(["phone", "mobilePhone"]);
 
 export type EditablePersonProperty = (typeof EDITABLE_PERSON_PROPERTIES)[number];
 
@@ -112,6 +133,10 @@ export function planPropertyEdit(
 
   if (property === "email" && newValue !== null && !isValidEmailFormat(newValue)) {
     throw new InvalidEmailError("invalid_format");
+  }
+
+  if (PHONE_PROPERTIES.has(property) && newValue !== null && !isValidPhoneFormat(newValue)) {
+    throw new InvalidPhoneError("invalid_format");
   }
 
   const personUpdate: Partial<NewPerson> = {

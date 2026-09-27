@@ -31,7 +31,7 @@ export function UploadLeadsForm({
 
   return (
     <form action={action}>
-      <div className="row row-md" style={{ flexWrap: "wrap" }}>
+      <div className="legacy-row legacy-row-md" style={{ flexWrap: "wrap" }}>
         <div className="field-grow">
           <label htmlFor="sourceKey">{labels.sourceKeyLabel}</label>
           <input
@@ -53,7 +53,7 @@ export function UploadLeadsForm({
         </div>
       </div>
 
-      <div className="row row-md" style={{ flexWrap: "wrap" }}>
+      <div className="legacy-row legacy-row-md" style={{ flexWrap: "wrap" }}>
         <div className="field-grow">
           <label htmlFor="attendees">{labels.attendeesFileLabel}</label>
           <input id="attendees" name="attendees" type="file" accept=".csv" />
@@ -64,7 +64,7 @@ export function UploadLeadsForm({
         </div>
       </div>
 
-      <div className="row row-md" style={{ flexWrap: "wrap" }}>
+      <div className="legacy-row legacy-row-md" style={{ flexWrap: "wrap" }}>
         <div className="field-grow">
           <label htmlFor="hunter">{labels.hunterFileLabel}</label>
           <input id="hunter" name="hunter" type="file" accept=".csv" />
@@ -75,7 +75,7 @@ export function UploadLeadsForm({
         </div>
       </div>
 
-      <div className="row row-md" style={{ flexWrap: "wrap" }}>
+      <div className="legacy-row legacy-row-md" style={{ flexWrap: "wrap" }}>
         <div className="field-grow">
           <label htmlFor="correosFinal">{labels.correosFinalFileLabel}</label>
           <input id="correosFinal" name="correosFinal" type="file" accept=".csv" />
@@ -86,7 +86,7 @@ export function UploadLeadsForm({
         </div>
       </div>
 
-      <div className="row">
+      <div className="legacy-row">
         <button type="submit" disabled={pending}>
           {pending ? labels.importing : labels.import}
         </button>

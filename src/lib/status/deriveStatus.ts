@@ -58,6 +58,13 @@ export interface ActivityStatusEvent {
   type: string;
   at: Date;
   status?: PersonStatus;
+  // `call` rows only (migration 0016) — read from metadata.outcome/direction
+  // by activityRowToStatusEvent below, and used by activityStageCandidate's
+  // dedicated `call` case (owner rule 2026-09-26: an outbound call with any
+  // outcome is contact evidence; an outcome of `connected` in either
+  // direction is a reply).
+  callOutcome?: string;
+  callDirection?: string;
 }
 
 /**
@@ -87,18 +94,18 @@ const FIXED_STAGE_BY_TYPE: Partial<Record<string, StatusStage>> = {
   meeting_logged: "meeting",
 };
 
-interface StageCandidate {
+export interface StageCandidate {
   rank: number;
   at: Date;
   because: StatusBecause;
 }
 
-interface DiscardCandidate {
+export interface DiscardCandidate {
   at: Date;
   because: StatusBecause;
 }
 
-function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
+export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
   const fixed = FIXED_STAGE_BY_TYPE[event.type];
   if (fixed) {
     return { rank: STAGE_RANK[fixed], at: event.at, because: { source: "activity", activityId: event.id } };
@@ -110,10 +117,30 @@ function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | nu
       because: { source: "activity", activityId: event.id },
     };
   }
+  if (event.type === "call") {
+    const stage = callStage(event.callOutcome, event.callDirection);
+    if (!stage) return null;
+    return { rank: STAGE_RANK[stage], at: event.at, because: { source: "activity", activityId: event.id } };
+  }
   return null;
 }
 
-function activityDiscardCandidate(event: ActivityStatusEvent): DiscardCandidate | null {
+/**
+ * Owner rule (2026-09-26): an outbound call with ANY outcome counts as
+ * contact evidence (`contacted`); an outcome of `connected` in EITHER
+ * direction counts as a reply (`replied`, the higher rank, so it wins
+ * regardless of direction). An inbound call that didn't connect (e.g. a
+ * missed inbound call) contributes no stage — HubSpot draws the same line:
+ * only a completed conversation or an outbound attempt is evidence the BD
+ * did something.
+ */
+function callStage(outcome: string | undefined, direction: string | undefined): StatusStage | null {
+  if (outcome === "connected") return "replied";
+  if (direction === "outbound") return "contacted";
+  return null;
+}
+
+export function activityDiscardCandidate(event: ActivityStatusEvent): DiscardCandidate | null {
   const isDiscard =
     event.type === "discarded" ||
     ((event.type === "status_change" || event.type === "status_backfill") && event.status === "discarded");
@@ -121,7 +148,7 @@ function activityDiscardCandidate(event: ActivityStatusEvent): DiscardCandidate 
   return { at: event.at, because: { source: "activity", activityId: event.id } };
 }
 
-function connectionStageCandidate(event: ConnectionStatusEvent): StageCandidate | null {
+export function connectionStageCandidate(event: ConnectionStatusEvent): StageCandidate | null {
   if (!event.at) return null;
   if (event.receivedCount > 0) {
     return { rank: STAGE_RANK.replied, at: event.at, because: { source: "connection", bdId: event.bdId } };
@@ -133,13 +160,13 @@ function connectionStageCandidate(event: ConnectionStatusEvent): StageCandidate 
 }
 
 /** Later candidate wins; a strictly higher rank always wins regardless of time (design: "stage = max rank over events"). */
-function pickHigherStage(a: StageCandidate | null, b: StageCandidate): StageCandidate {
+export function pickHigherStage(a: StageCandidate | null, b: StageCandidate): StageCandidate {
   if (!a) return b;
   if (b.rank !== a.rank) return b.rank > a.rank ? b : a;
   return b.at >= a.at ? b : a;
 }
 
-function pickLaterDiscard(a: DiscardCandidate | null, b: DiscardCandidate): DiscardCandidate {
+export function pickLaterDiscard(a: DiscardCandidate | null, b: DiscardCandidate): DiscardCandidate {
   if (!a) return b;
   return b.at >= a.at ? b : a;
 }
@@ -156,12 +183,26 @@ function readMetadataStatus(metadata: unknown): PersonStatus | undefined {
   return isPersonStatus(status) ? status : undefined;
 }
 
-function readMetadataOriginalAt(metadata: unknown): Date | undefined {
+function readMetadataDate(metadata: unknown, key: string): Date | undefined {
   if (!metadata || typeof metadata !== "object") return undefined;
-  const originalAt = (metadata as Record<string, unknown>).originalAt;
-  if (typeof originalAt !== "string" && !(originalAt instanceof Date)) return undefined;
-  const parsed = new Date(originalAt);
+  const value = (metadata as Record<string, unknown>)[key];
+  if (typeof value !== "string" && !(value instanceof Date)) return undefined;
+  const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function readMetadataOriginalAt(metadata: unknown): Date | undefined {
+  return readMetadataDate(metadata, "originalAt");
+}
+
+function readMetadataOccurredAt(metadata: unknown): Date | undefined {
+  return readMetadataDate(metadata, "occurredAt");
+}
+
+function readMetadataString(metadata: unknown, key: string): string | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 /** Raw `activity` row shape (see src/db/schema.ts's `activity` table) status derivation needs. */
@@ -182,14 +223,23 @@ export interface ActivityRowForStatus {
  */
 export function activityRowToStatusEvent(row: ActivityRowForStatus): ActivityStatusEvent {
   const at =
-    row.type === "status_backfill" ? (readMetadataOriginalAt(row.metadata) ?? row.createdAt) : row.createdAt;
+    row.type === "status_backfill"
+      ? (readMetadataOriginalAt(row.metadata) ?? row.createdAt)
+      : row.type === "call"
+        ? (readMetadataOccurredAt(row.metadata) ?? row.createdAt)
+        : row.createdAt;
   const status =
     row.type === "status_change" || row.type === "status_backfill"
       ? readMetadataStatus(row.metadata)
       : row.type === "discarded"
         ? "discarded"
         : undefined;
-  return { kind: "activity", id: row.id, type: row.type, at, status };
+  const event: ActivityStatusEvent = { kind: "activity", id: row.id, type: row.type, at, status };
+  if (row.type === "call") {
+    event.callOutcome = readMetadataString(row.metadata, "outcome");
+    event.callDirection = readMetadataString(row.metadata, "direction");
+  }
+  return event;
 }
 
 /** Raw `person_bd_connection` row shape (see src/db/schema.ts) status derivation needs. */
@@ -256,7 +306,20 @@ export function buildPersonStatusUpdates(
   });
 }
 
-export function deriveStatus(events: readonly StatusEvent[]): DerivedStatus {
+/**
+ * `deriveStatus` plus the effective timestamp (`at`) of whichever event
+ * decided the status — the record page's "why" hint (mockup-port r02;
+ * contact-record.html "Respondió porque ... el 12 oct") needs a date to
+ * render, and re-deriving here (rather than adding a field to `DerivedStatus`
+ * itself) keeps every existing `deriveStatus`/`buildPersonStatusUpdates`
+ * caller and test byte-identical — `deriveStatus` below is now a thin
+ * wrapper that drops `at` from this result.
+ */
+export interface DerivedStatusFull extends DerivedStatus {
+  at: Date | null;
+}
+
+export function deriveStatusFull(events: readonly StatusEvent[]): DerivedStatusFull {
   let stage: StageCandidate | null = null;
   let discard: DiscardCandidate | null = null;
 
@@ -277,10 +340,56 @@ export function deriveStatus(events: readonly StatusEvent[]): DerivedStatus {
   // with zero recorded activity) still lands on `discarded`.
   const discardWins = discard !== null && (stage === null || discard.at >= stage.at);
   if (discardWins) {
-    return { status: "discarded", because: discard!.because };
+    return { status: "discarded", because: discard!.because, at: discard!.at };
   }
 
-  if (!stage) return { status: "new", because: null };
+  if (!stage) return { status: "new", because: null, at: null };
   const stageKey = (Object.keys(STAGE_RANK) as StatusStage[]).find((k) => STAGE_RANK[k] === stage!.rank)!;
-  return { status: stageKey, because: stage.because };
+  return { status: stageKey, because: stage.because, at: stage.at };
+}
+
+export function deriveStatus(events: readonly StatusEvent[]): DerivedStatus {
+  const { status, because } = deriveStatusFull(events);
+  return { status, because };
+}
+
+/**
+ * Evidence for the record page's "why" hint (mockup-port r02;
+ * contact-record.html:77 "Respondió porque ... el 12 oct."). Pure — the
+ * caller (src/lib/contacts/queries.ts) resolves `connectionRows`/
+ * `activityRows` from data it already fetched for other reasons, no second
+ * query. `null` when `deriveStatusFull` found no evidence at all (status
+ * "new" with nothing recorded yet — the mockup shows no "why" line then).
+ */
+export interface StatusReasonEvidence {
+  status: PersonStatus;
+  because: StatusBecause;
+  at: Date;
+  bdName: string | null;
+  activityType: string | null;
+}
+
+export function buildStatusReasonEvidence(
+  derived: DerivedStatusFull,
+  connectionRows: readonly { bdId: string; bdName: string | null }[],
+  activityRows: readonly { id: string; type: string }[],
+): StatusReasonEvidence | null {
+  const { because, at, status } = derived;
+  if (!because || !at) return null;
+  if (because.source === "connection") {
+    return {
+      status,
+      because,
+      at,
+      bdName: connectionRows.find((c) => c.bdId === because.bdId)?.bdName ?? null,
+      activityType: null,
+    };
+  }
+  return {
+    status,
+    because,
+    at,
+    bdName: null,
+    activityType: activityRows.find((a) => a.id === because.activityId)?.type ?? null,
+  };
 }

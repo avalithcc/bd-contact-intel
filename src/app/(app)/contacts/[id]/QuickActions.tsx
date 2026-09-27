@@ -6,23 +6,36 @@ import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { contactActionErrorHref } from "../actionErrors";
 import {
-  addContactNoteAction,
   addContactSignalAction,
   addContactTaskAction,
   discardContactAction,
+  logCallAction,
   logContactMeetingAction,
   sendContactEmailAction,
 } from "../actions";
+import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
 import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { Locale } from "@/lib/i18n/locales";
 import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
-import styles from "./AboutPane.module.css";
+import { Dialog } from "@/components/Dialog";
+import { useToast } from "@/components/ToastProvider";
+import {
+  CallIcon,
+  ClipboardIcon,
+  DiscardIcon,
+  GenerateIcon,
+  MailIcon,
+  MeetingIcon,
+  NoteIcon,
+  TasksIcon,
+} from "@/components/icons";
 
 export interface QuickActionsProps {
   personId: string;
+  name: string;
   labels: ContactRecordLabels;
   email: string | null;
   // "Generar mensaje" (task 13.3) reuses /outreach's GenerateMessageButton —
@@ -35,7 +48,20 @@ export interface QuickActionsProps {
   initialAction?: "email" | "meeting" | "discard" | null;
 }
 
-type QuickAction = "note" | "email" | "task" | "meeting" | "discard" | "signal" | null;
+type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
+
+const CALL_OUTCOME_LABEL_KEY: Record<CallOutcomeCode, keyof ContactRecordLabels> = {
+  connected: "callOutcomeConnected",
+  busy: "callOutcomeBusy",
+  no_answer: "callOutcomeNoAnswer",
+  voicemail: "callOutcomeVoicemail",
+  wrong_number: "callOutcomeWrongNumber",
+};
+
+const CALL_DIRECTION_LABEL_KEY: Record<CallDirection, keyof ContactRecordLabels> = {
+  outbound: "callDirectionOutbound",
+  inbound: "callDirectionInbound",
+};
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -46,12 +72,12 @@ const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLab
   other: "discardReasonOther",
 };
 
-interface ActionError {
+export interface ActionError {
   message: string;
   href?: string;
 }
 
-interface ComposerProps {
+export interface ComposerProps {
   labels: ContactRecordLabels;
   busy: boolean;
   error: ActionError | null;
@@ -60,7 +86,7 @@ interface ComposerProps {
 
 function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error: ActionError }) {
   return (
-    <div className={styles.error} role="alert">
+    <div className={"error-text"} role="alert">
       {error.message}
       {error.href && (
         <>
@@ -81,6 +107,7 @@ function ErrorNotice({ labels: l, error }: { labels: ContactRecordLabels; error:
  */
 export function QuickActions({
   personId,
+  name,
   labels: l,
   email,
   messageLabels,
@@ -88,6 +115,7 @@ export function QuickActions({
   initialAction,
 }: QuickActionsProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [openAction, setOpenAction] = useState<QuickAction>(initialAction ?? null);
   const [error, setError] = useState<ActionError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,46 +135,112 @@ export function QuickActions({
 
   return (
     <>
-      <div className={styles.quickActions} role="toolbar" aria-label={l.aboutSectionTitle}>
-        <button type="button" className={styles.qa} onClick={() => toggle("note")}>
+      <div className="quick-actions" role="toolbar" aria-label={l.aboutSectionTitle}>
+        {/* Mockup's "Nota" quick action (contact-record.html:67) is a plain
+            `#log-note` anchor scrolling to the PINNED note composer
+            (NoteComposer.tsx, always visible above the timeline) — not its
+            own toggle panel like the other actions below. */}
+        <a className="qa" href="#log-note">
+          <span className="qa-icon">
+            <NoteIcon className="icon" />
+          </span>
           {l.quickActionNote}
+        </a>
+        <button type="button" className="qa" onClick={() => toggle("call")}>
+          <span className="qa-icon">
+            <CallIcon className="icon" />
+          </span>
+          {l.quickActionCall}
         </button>
-        <button type="button" className={styles.qa} onClick={() => toggle("email")}>
+        <button type="button" className="qa" onClick={() => toggle("email")}>
+          <span className="qa-icon">
+            <MailIcon className="icon" />
+          </span>
           {l.quickActionEmail}
         </button>
-        <button type="button" className={styles.qa} onClick={() => toggle("task")}>
+        <button type="button" className="qa" onClick={() => toggle("task")}>
+          <span className="qa-icon">
+            <TasksIcon className="icon" />
+          </span>
           {l.quickActionTask}
         </button>
-        <button type="button" className={styles.qa} onClick={() => toggle("meeting")}>
+        <button type="button" className="qa" onClick={() => toggle("meeting")}>
+          <span className="qa-icon">
+            <MeetingIcon className="icon" />
+          </span>
           {l.quickActionMeeting}
         </button>
-        <button type="button" className={styles.qa} onClick={() => toggle("discard")}>
+        <button type="button" className="qa danger" onClick={() => toggle("discard")}>
+          <span className="qa-icon">
+            <DiscardIcon className="icon" />
+          </span>
           {l.quickActionDiscard}
         </button>
-        <button type="button" className={styles.qa} onClick={() => toggle("signal")}>
+        {/* "Pegar señal" (task 11.6) is not one of this mockup's 5 quick
+            actions — an intentional superset kept per owner decision
+            (2026-09-26): styled identically to the other five so it reads
+            as a first-class action, not a bolted-on extra. */}
+        <button type="button" className="qa" onClick={() => toggle("signal")}>
+          <span className="qa-icon">
+            <ClipboardIcon className="icon" />
+          </span>
           {l.quickActionSignal}
         </button>
       </div>
 
-      {openAction === "note" && (
-        <NoteForm
+      <button type="button" className="btn btn-secondary btn-block mt-md" onClick={() => toggle("generate")}>
+        <GenerateIcon className="icon" />
+        {l.generateMessageCta}
+      </button>
+
+      {openAction === "generate" && (
+        <Dialog open onClose={closeQuickAction} title={`${l.generateMessageCta} · ${name}`} wide>
+          <div className="composer">
+            <GenerateMessageButton
+              boundAction={generatePersonOutreachMessageAction.bind(null, personId, locale)}
+              labels={messageLabels}
+              onGenerated={setGeneratedBody}
+            />
+            {/* Mockup's "Canal" select (contact-record.html:190) has no
+                backing implementation — generatePersonOutreachMessageAction
+                only ever produces an email-oriented draft today, no
+                LinkedIn-message generation path exists server-side. Same
+                gap for "Señales utilizadas" chips (contact-record.html:192):
+                the generator's result doesn't expose which signals fed the
+                draft, only the final text + a history-reuse count — showing
+                fabricated chips would misrepresent what actually happened.
+                Both flagged in the checklist as needing an owner decision
+                before being built for real, not silently invented here. */}
+            {generatedBody && (
+              <div className="dialog-footer">
+                <button type="button" className="btn btn-primary" onClick={() => setOpenAction("email")}>
+                  {l.useInEmailAction}
+                </button>
+              </div>
+            )}
+          </div>
+        </Dialog>
+      )}
+
+      {openAction === "call" && (
+        <CallForm
           labels={l}
           busy={busy}
           error={error}
           onCancel={closeQuickAction}
-          onSubmit={async (note) => {
+          onSubmit={async (outcome, direction, date, time, durationMinutes, notes) => {
             setBusy(true);
             setError(null);
-            const result = await addContactNoteAction(personId, note);
+            const result = await logCallAction(personId, outcome, direction, date, time, durationMinutes, notes);
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
+              showToast(l.toastCallLogged);
               router.refresh();
             } else {
-              setError({
-                message: contactActionErrorMessage(l, result.reason),
-                href: contactActionErrorHref(result.reason),
-              });
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message });
+              showToast(message, "error");
             }
           }}
         />
@@ -165,12 +259,12 @@ export function QuickActions({
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
+              showToast(l.toastTaskCreated);
               router.refresh();
             } else {
-              setError({
-                message: contactActionErrorMessage(l, result.reason),
-                href: contactActionErrorHref(result.reason),
-              });
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message, href: contactActionErrorHref(result.reason) });
+              showToast(message, "error");
             }
           }}
         />
@@ -197,12 +291,12 @@ export function QuickActions({
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
+              showToast(l.toastEmailSent);
               router.refresh();
             } else {
-              setError({
-                message: contactActionErrorMessage(l, result.reason),
-                href: contactActionErrorHref(result.reason),
-              });
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message, href: contactActionErrorHref(result.reason) });
+              showToast(message, "error");
             }
           }}
         />
@@ -221,9 +315,12 @@ export function QuickActions({
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
+              showToast(l.toastMeetingLogged);
               router.refresh();
             } else {
-              setError({ message: contactActionErrorMessage(l, result.reason) });
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message });
+              showToast(message, "error");
             }
           }}
         />
@@ -242,9 +339,12 @@ export function QuickActions({
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
+              showToast(l.toastDiscarded);
               router.refresh();
             } else {
-              setError({ message: contactActionErrorMessage(l, result.reason) });
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message });
+              showToast(message, "error");
             }
           }}
         />
@@ -263,44 +363,17 @@ export function QuickActions({
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
+              showToast(l.toastSignalSaved);
               router.refresh();
             } else {
-              setError({ message: contactActionErrorMessage(l, result.reason) });
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message });
+              showToast(message, "error");
             }
           }}
         />
       )}
     </>
-  );
-}
-
-function NoteForm({
-  labels: l,
-  busy,
-  error,
-  onCancel,
-  onSubmit,
-}: ComposerProps & { onSubmit: (note: string) => void }) {
-  const [note, setNote] = useState("");
-  return (
-    <div className={styles.composer}>
-      {error && <ErrorNotice labels={l} error={error} />}
-      <textarea
-        className={styles.textarea}
-        placeholder={l.notePlaceholder}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        disabled={busy}
-      />
-      <div className={styles.composerBar}>
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {l.cancel}
-        </button>
-        <button type="button" onClick={() => note.trim() && onSubmit(note.trim())} disabled={busy || !note.trim()}>
-          {l.noteSave}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -314,31 +387,33 @@ function TaskForm({
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   return (
-    <div className={styles.composer}>
-      {error && <ErrorNotice labels={l} error={error} />}
-      <label className={styles.label}>
-        {l.taskTitleLabel}
-        <input className={styles.input} value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
-      </label>
-      <label className={styles.label}>
-        {l.taskDueLabel}
-        <input
-          className={styles.input}
-          type="date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          disabled={busy}
-        />
-      </label>
-      <div className={styles.composerBar}>
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {l.cancel}
-        </button>
-        <button type="button" disabled={busy || !title.trim()} onClick={() => title.trim() && onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined)}>
-          {l.taskCreate}
-        </button>
+    <Dialog open onClose={onCancel} title={l.taskCreate}>
+      <div className="composer">
+        {error && <ErrorNotice labels={l} error={error} />}
+        <label className="field">
+          {l.taskTitleLabel}
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.taskDueLabel}
+          <input
+            className="input"
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+        <div className="bar">
+          <button type="button" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+          <button type="button" disabled={busy || !title.trim()} onClick={() => title.trim() && onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined)}>
+            {l.taskCreate}
+          </button>
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -374,47 +449,169 @@ function EmailForm({
   const [body, setBody] = useState(initialBody ?? "");
 
   if (!to) {
-    return <div className={styles.composer}>{l.emailNoAddress}</div>;
+    return (
+      <Dialog open onClose={onCancel} title={l.quickActionEmail}>
+        <div className="composer">{l.emailNoAddress}</div>
+      </Dialog>
+    );
   }
 
   return (
-    <div className={styles.composer}>
-      {error && <ErrorNotice labels={l} error={error} />}
-      <label className={styles.label}>
-        {l.emailToLabel}
-        <input className={styles.input} value={to} disabled />
-      </label>
-      <label className={styles.label}>
-        {l.emailSubjectLabel}
-        <input className={styles.input} value={subject} onChange={(e) => setSubject(e.target.value)} disabled={busy} />
-      </label>
-      <label className={styles.label}>
-        {l.emailBodyLabel}
-        <textarea className={styles.textarea} value={body} onChange={(e) => setBody(e.target.value)} disabled={busy} />
-      </label>
-      {generate && (
-        <GenerateMessageButton
-          boundAction={generate.boundAction}
-          labels={generate.labels}
-          onGenerated={(message) => {
-            generate.onGenerated(message);
-            setBody(message);
-          }}
-        />
-      )}
-      <div className={styles.composerBar}>
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {l.cancel}
-        </button>
-        <button type="button" disabled={busy || !body.trim()} onClick={() => body.trim() && onSubmit(subject.trim(), body.trim())}>
-          {l.emailSend}
-        </button>
+    <Dialog open onClose={onCancel} title={l.quickActionEmail} wide>
+      <div className="composer">
+        {error && <ErrorNotice labels={l} error={error} />}
+        <label className="field">
+          {l.emailToLabel}
+          <input className="input" value={to} disabled />
+        </label>
+        <label className="field">
+          {l.emailSubjectLabel}
+          <input className="input" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.emailBodyLabel}
+          <textarea className="textarea" value={body} onChange={(e) => setBody(e.target.value)} disabled={busy} />
+        </label>
+        {generate && (
+          <GenerateMessageButton
+            boundAction={generate.boundAction}
+            labels={generate.labels}
+            onGenerated={(message) => {
+              generate.onGenerated(message);
+              setBody(message);
+            }}
+          />
+        )}
+        <div className="bar">
+          <button type="button" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+          <button type="button" disabled={busy || !body.trim()} onClick={() => body.trim() && onSubmit(subject.trim(), body.trim())}>
+            {l.emailSend}
+          </button>
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
-function MeetingForm({
+export function CallForm({
+  labels: l,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+}: ComposerProps & {
+  onSubmit: (
+    outcome: string,
+    direction: string,
+    date: string,
+    time: string,
+    durationMinutes: string,
+    notes: string,
+  ) => void;
+}) {
+  const [outcome, setOutcome] = useState("");
+  const [direction, setDirection] = useState<CallDirection>("outbound");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Client-side "no future call" guard (fresh-review WARNING fix) —
+  // mirrors planCall's server-side FUTURE_CLOCK_SKEW_TOLERANCE_MS check
+  // (src/lib/contacts/call.ts), which is the actual source of truth; this
+  // only keeps the date/time pickers from offering an obviously-rejected
+  // value in the first place. `timeMax` only applies when the picked date
+  // is today (or still blank, which defaults to today) — a past date has
+  // no future hour to guard against.
+  const now = new Date();
+  const dateMax = now.toISOString().slice(0, 10);
+  const timeMax = date === "" || date === dateMax ? now.toTimeString().slice(0, 5) : undefined;
+
+  return (
+    <Dialog open onClose={onCancel} title={l.callSubmit}>
+      <div className="composer">
+        {error && <ErrorNotice labels={l} error={error} />}
+        <label className="field">
+          {l.callOutcomeLabel}
+          <select className="input" value={outcome} onChange={(e) => setOutcome(e.target.value)} disabled={busy}>
+            <option value="">{l.callOutcomePlaceholder}</option>
+            {CALL_OUTCOME_CODES.map((code) => (
+              <option key={code} value={code}>
+                {l[CALL_OUTCOME_LABEL_KEY[code]] as string}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          {l.callDirectionLabel}
+          <select
+            className="input"
+            value={direction}
+            onChange={(e) => setDirection(e.target.value as CallDirection)}
+            disabled={busy}
+          >
+            {CALL_DIRECTIONS.map((code) => (
+              <option key={code} value={code}>
+                {l[CALL_DIRECTION_LABEL_KEY[code]] as string}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          {l.callDateLabel}
+          <input
+            className="input"
+            type="date"
+            value={date}
+            max={dateMax}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={busy}
+          />
+          <input
+            className="input"
+            type="time"
+            value={time}
+            max={timeMax}
+            onChange={(e) => setTime(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+        <label className="field">
+          {l.callDurationLabel}
+          <input
+            className="input"
+            type="number"
+            min={0}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+        <label className="field">
+          {l.callNotesLabel}
+          <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+        </label>
+        <p className="hint">{l.callHelp}</p>
+        <div className="bar">
+          <button type="button" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={busy || !outcome}
+            onClick={() => outcome && onSubmit(outcome, direction, date, time, durationMinutes, notes)}
+          >
+            {l.callSubmit}
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+export function MeetingForm({
   labels: l,
   busy,
   error,
@@ -426,34 +623,36 @@ function MeetingForm({
   const [notes, setNotes] = useState("");
 
   return (
-    <div className={styles.composer}>
-      {error && <ErrorNotice labels={l} error={error} />}
-      <label className={styles.label}>
-        {l.meetingDateLabel}
-        <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} />
-      </label>
-      <label className={styles.label}>
-        {l.meetingTimeLabel}
-        <input className={styles.input} type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
-      </label>
-      <label className={styles.label}>
-        {l.meetingNotesLabel}
-        <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
-      </label>
-      <p className={styles.hint}>{l.meetingHelp}</p>
-      <div className={styles.composerBar}>
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {l.cancel}
-        </button>
-        <button type="button" disabled={busy || !date} onClick={() => date && onSubmit(date, time, notes)}>
-          {l.meetingSubmit}
-        </button>
+    <Dialog open onClose={onCancel} title={l.meetingSubmit}>
+      <div className="composer">
+        {error && <ErrorNotice labels={l} error={error} />}
+        <label className="field">
+          {l.meetingDateLabel}
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.meetingTimeLabel}
+          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.meetingNotesLabel}
+          <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+        </label>
+        <p className="hint">{l.meetingHelp}</p>
+        <div className="bar">
+          <button type="button" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+          <button type="button" disabled={busy || !date} onClick={() => date && onSubmit(date, time, notes)}>
+            {l.meetingSubmit}
+          </button>
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
-function DiscardForm({
+export function DiscardForm({
   labels: l,
   busy,
   error,
@@ -465,37 +664,39 @@ function DiscardForm({
   const requiresNote = reason === "other";
 
   return (
-    <div className={styles.composer}>
-      {error && <ErrorNotice labels={l} error={error} />}
-      <label className={styles.label}>
-        {l.discardReasonLabel}
-        <select className={styles.input} value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy}>
-          <option value="">{l.discardReasonPlaceholder}</option>
-          {DISCARD_REASON_CODES.map((code) => (
-            <option key={code} value={code}>
-              {l[DISCARD_REASON_LABEL_KEY[code]] as string}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={styles.label}>
-        {l.discardNoteLabel}
-        <textarea className={styles.textarea} value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} />
-      </label>
-      {requiresNote && <p className={styles.hint}>{l.discardNoteRequiredHint}</p>}
-      <div className={styles.composerBar}>
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {l.cancel}
-        </button>
-        <button
-          type="button"
-          disabled={busy || !reason || (requiresNote && !note.trim())}
-          onClick={() => onSubmit(reason || null, note)}
-        >
-          {l.discardSubmit}
-        </button>
+    <Dialog open onClose={onCancel} title={l.discardSubmit}>
+      <div className="composer">
+        {error && <ErrorNotice labels={l} error={error} />}
+        <label className="field">
+          {l.discardReasonLabel}
+          <select className="input" value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy}>
+            <option value="">{l.discardReasonPlaceholder}</option>
+            {DISCARD_REASON_CODES.map((code) => (
+              <option key={code} value={code}>
+                {l[DISCARD_REASON_LABEL_KEY[code]] as string}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          {l.discardNoteLabel}
+          <textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} />
+        </label>
+        {requiresNote && <p className="hint">{l.discardNoteRequiredHint}</p>}
+        <div className="bar">
+          <button type="button" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={busy || !reason || (requiresNote && !note.trim())}
+            onClick={() => onSubmit(reason || null, note)}
+          >
+            {l.discardSubmit}
+          </button>
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -508,16 +709,16 @@ function SignalForm({
 }: ComposerProps & { onSubmit: (text: string) => void }) {
   const [text, setText] = useState("");
   return (
-    <div className={styles.composer}>
+    <div className="composer">
       {error && <ErrorNotice labels={l} error={error} />}
       <textarea
-        className={styles.textarea}
+        className="textarea"
         placeholder={l.signalPlaceholder}
         value={text}
         onChange={(e) => setText(e.target.value)}
         disabled={busy}
       />
-      <div className={styles.composerBar}>
+      <div className="bar">
         <button type="button" onClick={onCancel} disabled={busy}>
           {l.cancel}
         </button>

@@ -1,66 +1,16 @@
-/* App shell top bar (design.md D9, Phase 8), matching
-   mockups/styles.css `.topbar`/`.search`/`.breadcrumbs`. */
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  height: var(--topbar-height);
-  display: flex;
-  align-items: center;
-  gap: var(--space-lg);
-  padding: 0 var(--space-2xl);
-  background: var(--color-surface-2);
-  border-bottom: 1px solid var(--color-border);
+/* mockup-port 02: everything else in TopBar now uses design-system.css's
+   global classes (`.topbar`, `.breadcrumbs`, `.search`, `.topbar-actions`,
+   `.btn`, `.menu-item`, `.menu-label`, `.menu-sep`, `.meta`) — matching
+   contacts.html's app shell 1:1. This file only keeps the one composition
+   the static mockup has no equivalent for: a full-width, left-aligned
+   button standing in for the mockup's plain "Cerrar sesión" link. */
+.menuSignOut {
+  padding: 0;
 }
 
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  font-size: var(--text-sm);
-  color: var(--color-ink-soft);
-}
-
-.search {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  width: min(440px, 45%);
-  height: var(--control-height-sm);
-  padding: 0 var(--space-sm);
-  background: var(--color-canvas);
-  border: 1px solid var(--color-border);
+.menuSignOut button {
+  width: 100%;
+  text-align: left;
   border-radius: var(--radius-sm);
-  color: var(--color-ink-soft);
-  font-size: var(--text-base);
-}
-
-.search input {
-  border: 0;
-  background: transparent;
-  flex: 1;
-  font: inherit;
-  color: var(--color-ink);
-  outline: none;
-}
-
-.search input::placeholder {
-  color: var(--color-ink-soft);
-}
-
-.search:focus-within {
-  border-color: var(--color-accent-focus);
-  box-shadow: var(--focus-ring, none);
-}
-
-@media (max-width: 768px) {
-  .topbar {
-    padding: 0 var(--space-lg) 0 calc(40px + var(--space-2xl));
-  }
-
-  .search {
-    width: auto;
-    flex: 1;
-  }
+  padding: 0.4rem var(--space-sm);
 }

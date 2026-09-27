@@ -7,5 +7,5 @@ import type { ClientStrings } from "@/lib/i18n/clientStrings";
 export type NavLabels = ClientStrings<Dictionary["nav"]>;
 
 export function pickNavLabels(dict: Dictionary): NavLabels {
-  return dict.nav;
+  return { ...dict.nav };
 }

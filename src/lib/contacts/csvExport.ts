@@ -15,6 +15,9 @@
  * (rare) false positive.
  */
 import type { ContactColumnKey } from "@/lib/contacts/columns";
+// Type-only import (erased at build time, no `@/db` runtime dependency) —
+// keeps this module's "pure, no DB" guarantee intact.
+import type { ContactListRow } from "@/lib/contacts/listQueries";
 
 /** Prepended to the CSV text by the route handler so Excel opens UTF-8
  * (accented Spanish headers) correctly instead of guessing Latin-1. */
@@ -41,12 +44,23 @@ export interface ContactExportRow {
   // dictionary-agnostic beyond the header labels passed in.
   statusLabel: string;
   email: string | null;
+  // "Teléfono" column export value — display prefers `phone`, falls back
+  // to `mobilePhone` (mapContactRowToExportRow below).
+  phone: string | null;
   roleGroup: string | null;
   industry: string | null;
   country: string | null;
   sourceKey: string | null;
   createdAt: Date;
   seniority: string | null;
+  // Comma-joined connected-BD full names (mockup avatar-stack's tooltip
+  // text) — the CSV has no room for per-BD avatars, so it exports the same
+  // names the tooltip shows, already flattened by buildBdConnectionSummaries.
+  bdConnectionNames: string;
+  // Pre-formatted "Última actividad" text (label + ISO date), same
+  // dictionary-agnostic convention as bdConnectionNames — the route handler
+  // has already resolved the label via lastActivity.ts before this point.
+  lastActivityText: string;
 }
 
 export type ContactCsvHeaders = Record<"name" | ContactColumnKey, string>;
@@ -61,6 +75,8 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.statusLabel;
     case "email":
       return row.email ?? "";
+    case "phone":
+      return row.phone ?? "";
     case "roleGroup":
       return row.roleGroup ?? "";
     case "industry":
@@ -73,11 +89,43 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.createdAt.toISOString().slice(0, 10);
     case "seniority":
       return row.seniority ?? "";
+    case "bdConnections":
+      return row.bdConnectionNames;
+    case "lastActivity":
+      return row.lastActivityText;
   }
 }
 
 function nameValue(row: ContactExportRow): string {
   return [row.firstName, row.lastName].filter(Boolean).join(" ");
+}
+
+/**
+ * Maps one `ContactListRow` (whatever read produced it — a single bulk
+ * selection, or a whole filtered view) into the CSV builder's row shape.
+ * Shared by both `/contacts/export` modes (route.ts) so the two never
+ * drift on which fields get exported or how they're formatted.
+ */
+export function mapContactRowToExportRow(row: ContactListRow, statusLabel: string): ContactExportRow {
+  return {
+    firstName: row.firstName,
+    lastName: row.lastName,
+    company: row.company,
+    ownerName: row.ownerName,
+    statusLabel,
+    email: row.email,
+    phone: row.phone ?? row.mobilePhone,
+    bdConnectionNames: row.bdConnections.title,
+    lastActivityText: row.lastActivity
+      ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`
+      : "",
+    roleGroup: row.roleGroup,
+    industry: row.industry,
+    country: row.country,
+    sourceKey: row.sourceKey,
+    createdAt: row.createdAt,
+    seniority: row.seniority,
+  };
 }
 
 /** Builds the full CSV text (no BOM — the caller prepends CSV_BOM), "Nombre"

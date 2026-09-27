@@ -28,12 +28,24 @@
      owner-approved accessibility fix, 2026-09-24. */
   --color-accent-hover: #b81f27;
   --color-accent-focus: #b81f27;
+  /* mockup-parity 1.2: aliases, not new hex — --color-accent-strong is the
+     same approved darker hover value as --color-accent-hover/-focus above
+     (mockups/styles.css names it "strong" instead of "hover"). Only
+     --color-accent-press is a genuinely new value, taken from the
+     owner-approved mockup (design-system.html's own accessibility note
+     covers this palette; not an unreviewed proposal). */
+  --color-accent-strong: var(--color-accent-hover);
+  --color-accent-press: #9c1a21;
+  /* mockup-port 01: pressed danger button state (mockups/styles.css). */
+  --color-danger-press: #991b1b;
   /* proposed (mockups/styles.css): active sidebar item tint, Phase 8 shell. */
   --color-accent-soft: #fae5e6;
 
   /* ---- text hierarchy ---- */
   --color-ink: #17151c;
   --color-ink-soft: #5b5865;
+  /* mockup-parity 1.2: meta text/placeholders (mockups/styles.css), 5.2:1. */
+  --color-ink-subtle: #6e6b78;
   --color-ink-muted: #8b8894;
 
   /* ---- borders ---- */
@@ -59,13 +71,42 @@
   --color-danger-text: #b91c1c;
   --color-info-text: #1e40af;
 
+  /* ---- solid status-tint backgrounds (mockup-port 01: mockups/styles.css'
+     alert-, badge-verified, badge-probable and stat rules use flat tints, not
+     the translucent --color-badge-*-bg overlays below). ---- */
+  --color-success-bg: #e3f0e8;
+  --color-warn-bg: #f6eae1;
+  --color-danger-bg: #fbe5e5;
+  --color-info-bg: #e4eafa;
+
   /* ---- translucent fills (badges, row hover) ---- */
   --color-badge-accent-bg: rgba(213, 37, 47, 0.12);
   --color-badge-success-bg: rgba(21, 128, 61, 0.12);
   --color-badge-warn-bg: rgba(180, 83, 9, 0.12);
   --color-badge-danger-bg: rgba(220, 38, 38, 0.12);
   --color-badge-info-bg: rgba(29, 78, 216, 0.12);
-  --color-row-hover: rgba(0, 0, 0, 0.03);
+  /* mockup-port 01: aligned to mockups/styles.css's --color-row-hover. */
+  --color-row-hover: rgba(0, 0, 0, 0.025);
+  /* mockup-parity 1.2 (mockups/styles.css): Dialog overlay backdrop. */
+  --color-overlay: rgba(23, 21, 28, 0.42);
+
+  /* ---- on-dark (Toast surfaces — dark chip on the light canvas, mockup-parity 1.2) ---- */
+  --color-on-dark: #f4f3f7;
+  --color-on-dark-hover: rgba(255, 255, 255, 0.1);
+  --color-on-dark-sep: rgba(255, 255, 255, 0.2);
+  --color-on-dark-success: #86efac;
+  --color-on-dark-link: #fecaca;
+
+  /* ---- avatars (mockup-parity 1.2 — mockups/styles.css; darkened for AA
+     contrast with white initials text, see design-system.html's own
+     accessibility note; DESIGN.md's avatar-2/4/5/6 were stale pastel
+     values that fail AA, see DESIGN.md update in the same task) ---- */
+  --avatar-1: #6b5b95;
+  --avatar-2: #7a6653;
+  --avatar-3: #88398a;
+  --avatar-4: #8a5a2b;
+  --avatar-5: #3f6f5f;
+  --avatar-6: #4b6380;
 
   /* ---- status badges (contact lifecycle, proposed — mockups/styles.css) ----
      Used by record/list pages (Phase 9+) and the leads/companies detail
@@ -95,6 +136,9 @@
   --text-2xl: 1.6rem;
 
   /* ---- spacing scale ---- */
+  /* mockup-port 01 (mockups/styles.css): tightest gap, e.g. badge dot/icon
+     spacing. */
+  --space-3xs: 0.2rem;
   --space-2xs: 0.35rem;
   --space-xs: 0.4rem;
   --space-sm: 0.5rem;
@@ -103,26 +147,43 @@
   --space-xl: 1.25rem;
   --space-2xl: 1.5rem;
   --space-3xl: 1.75rem;
+  /* mockup-port 01 (mockups/styles.css): empty-state padding. */
+  --space-4xl: 2.5rem;
 
   /* ---- radii ---- */
   --radius-sm: 6px;
   --radius-md: 8px;
+  /* mockup-parity 1.2 (mockups/styles.css): Dialog corner radius. */
+  --radius-lg: 12px;
   --radius-pill: 999px;
 
   /* ---- controls ----
      One height for every form control (text inputs, selects, submit
      buttons, checkbox rows) so filter toolbars line up on one baseline
      regardless of each browser's native select/input metrics. */
-  --control-height: 2.5rem;
+  /* mockup-port 01: aligned to mockups/styles.css's --control-height
+     (was 2.5rem) so every control — inputs, buttons, selects — matches the
+     approved mockup's sizing app-wide. */
+  --control-height: 2.25rem;
   /* Phase 8 shell: the top bar's search field uses a shorter control than
      the app's default form controls (mockups/styles.css --control-height-sm). */
   --control-height-sm: 1.85rem;
   --topbar-height: 52px;
   --sidebar-width: 232px;
+  /* mockup-parity 1.2 (mockups/styles.css): contact record page's two-rail
+     layout (left summary rail / right activity rail widths). */
+  --record-left: 320px;
+  --record-right: 300px;
 
   /* ---- elevation ----
      Soft shadow on light canvas. */
   --shadow-dropdown: 0 8px 24px rgba(23, 21, 28, 0.12);
+  /* mockup-parity 1.2 (mockups/styles.css): Dialog/Toast elevation. */
+  --shadow-dialog: 0 24px 48px rgba(23, 21, 28, 0.2);
+  /* mockup-parity 1.2 (mockups/styles.css): shared focus-visible ring,
+     built from --color-accent-strong so it tracks the same darker accent
+     as the hover/press states above. */
+  --focus-ring: 0 0 0 2px var(--color-surface-2), 0 0 0 4px var(--color-accent-strong);
 
   /* ---- motion ---- */
   --transition-fast: 0.15s ease;
@@ -196,6 +257,25 @@ h2 .dot {
   letter-spacing: 0.04em;
   color: var(--color-accent);
   margin-bottom: var(--space-sm);
+}
+
+/* Page header shared by admin, import and list pages (mockups/styles.css). */
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.page-header .titles > * + * {
+  margin-top: var(--space-2xs);
+}
+
+.page-header .actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
 }
 
 h1 {
@@ -347,8 +427,15 @@ summary:focus-visible,
   outline-offset: 2px;
 }
 
-/* ---- buttons ---- */
-button {
+/* ---- buttons ----
+ * Zero-specificity via :where(): these rules style any unclassed legacy
+ * `<button>` (pages not yet ported to the mockup's design-system classes),
+ * but must never outrank a design-system class (.btn-secondary, .btn-ghost,
+ * .chip, .menu-item, .view-tab, …) or the legacy `.secondary`/`.ghost`
+ * variants below. Without :where(), `button:hover:not(:disabled)` has
+ * specificity (0,2,1), which beats a single class selector like
+ * `.view-tab:hover` and turned every design-system button red on hover. */
+:where(button) {
   background: var(--color-accent);
   color: var(--color-accent-fg);
   border: none;
@@ -362,23 +449,23 @@ button {
     background-color var(--transition-fast),
     filter var(--transition-fast);
 }
-button:hover:not(:disabled) {
+:where(button:hover:not(:disabled)) {
   background: var(--color-accent-hover);
   filter: none;
 }
-button:active:not(:disabled):not(.secondary):not(.ghost) {
+:where(button:active:not(:disabled):not(.secondary):not(.ghost)) {
   background: var(--color-accent-focus);
 }
-button:disabled {
+:where(button:disabled) {
   opacity: 0.55;
   cursor: default;
 }
-button.secondary {
+:where(button.secondary) {
   background: var(--color-surface-1);
   color: var(--color-ink-soft);
   border: 1px solid var(--color-border-strong);
 }
-button.secondary:hover:not(:disabled) {
+:where(button.secondary:hover:not(:disabled)) {
   background: var(--color-surface-1);
   color: var(--color-ink);
   border-color: var(--color-accent);
@@ -387,18 +474,22 @@ button.secondary:hover:not(:disabled) {
 /* Ghost button — transparent, text-only. Not wired to any screen yet, kept
    available for future secondary/tertiary actions (e.g. row-level actions
    inside dense tables) without introducing another one-off style. */
-.ghost {
+:where(.ghost) {
   background: transparent;
   color: var(--color-ink-soft);
   border: 1px solid transparent;
 }
-.ghost:hover:not(:disabled) {
+:where(.ghost:hover:not(:disabled)) {
   color: var(--color-ink);
   background: var(--color-surface-1);
 }
 
-/* ---- layout helpers ---- */
-.row {
+/* ---- legacy layout helpers (mockup-port 01) ----
+ * Renamed from `.row` to free that name for the mockup's row utility (see
+ * design-system.css), whose default alignment/gap differ (center + tighter
+ * gap vs. this flex-end + looser gap). Still used by pages not yet ported to
+ * mockup markup (login, leads upload, admin/duplicates, home upload forms). */
+.legacy-row {
   display: flex;
   gap: var(--space-lg);
   align-items: flex-end;
@@ -412,15 +503,15 @@ button.secondary:hover:not(:disabled) {
   gap: var(--space-md);
   margin-bottom: var(--space-3xl);
 }
-.header .row {
+.header .legacy-row {
   flex-wrap: wrap;
   align-items: center;
 }
-.row.between {
+.legacy-row.between {
   justify-content: space-between;
   align-items: center;
 }
-.row.end {
+.legacy-row.end {
   justify-content: flex-end;
 }
 
@@ -446,8 +537,13 @@ th {
   letter-spacing: 0.01em;
 }
 
-/* ---- badges ---- */
-.badge {
+/* ---- legacy badges (mockup-port 01) ----
+ * Renamed from `.badge` to free that name for the mockup's status-dot badge
+ * system (see design-system.css). Still used by pages not yet ported to the
+ * mockup markup (discovery, hiring, whats-new, admin/duplicates, account,
+ * the home hub, and contacts/page.tsx pending mockup-port 03) — rename
+ * these call sites to the new `.badge-*` classes as each page is ported. */
+.legacy-badge {
   display: inline-block;
   font-family: var(--font-mono);
   font-weight: 700;
@@ -457,29 +553,30 @@ th {
   padding: 0.12rem 0.55rem;
   font-size: var(--text-xs);
 }
-.badge.green {
+.legacy-badge.green {
   background: var(--color-badge-success-bg);
   color: var(--color-success-text);
 }
 /* "medium" confidence chip on a suggested email (see
  * src/lib/emailSuggestion.ts#SuggestionConfidence) — "high" reuses
- * .badge.green above, "low" reuses the default .badge (accent) styling. */
-.badge.warn {
+ * .legacy-badge.green above, "low" reuses the default .legacy-badge (accent)
+ * styling. */
+.legacy-badge.warn {
   background: var(--color-badge-warn-bg);
   color: var(--color-warn-text);
 }
 /* Marks a contact whose company is currently hiring IT (see /hiring). */
-.badge.hiring {
+.legacy-badge.hiring {
   background: var(--color-badge-success-bg);
   color: var(--color-success-text);
   margin-left: var(--space-xs);
 }
 /* Marks a contact's company classified as a startup (see
  * src/lib/hiring/startupClassification.ts) — a positive prospecting signal,
- * so it reuses .badge.hiring's success green rather than inventing a new
- * color, with the same margin-left spacing as the other company-cell
+ * so it reuses .legacy-badge.hiring's success green rather than inventing a
+ * new color, with the same margin-left spacing as the other company-cell
  * badges above/below. */
-.badge.startup {
+.legacy-badge.startup {
   background: var(--color-badge-success-bg);
   color: var(--color-success-text);
   margin-left: var(--space-xs);
@@ -487,10 +584,10 @@ th {
 /* Marks a company that also hires in an offshore delivery hub (India,
  * Philippines, etc. — see src/lib/hiring/markets.ts#isOffshoreHub). A
  * factual, deprioritizing signal, not a danger or a positive one, so it
- * deliberately does NOT reuse .badge's red or .badge.green's green — it
- * uses --color-surface-tint (an otherwise-unused neutral-warm token) with
- * --color-ink-soft text. */
-.badge.offshore {
+ * deliberately does NOT reuse .legacy-badge's red or .legacy-badge.green's
+ * green — it uses --color-surface-tint (an otherwise-unused neutral-warm
+ * token) with --color-ink-soft text. */
+.legacy-badge.offshore {
   background: var(--color-surface-tint);
   color: var(--color-ink-soft);
   margin-left: var(--space-xs);
@@ -567,36 +664,6 @@ a:hover {
   opacity: 0.4;
   cursor: default;
   pointer-events: none;
-}
-
-/* ---- locale switcher ---- */
-.locale-switcher {
-  display: inline-flex;
-  gap: var(--space-2xs);
-  margin: 0;
-}
-.locale-btn {
-  padding: 0.5rem 0.65rem;
-  font-family: var(--font-mono);
-}
-.locale-btn.active {
-  color: var(--color-ink);
-  border-color: var(--color-accent);
-}
-
-/* ---- theme switcher (Light / Dark / System, in the user menu) ---- */
-.theme-switcher {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-2xs);
-  margin: 0;
-}
-.theme-btn {
-  padding: 0.5rem 0.65rem;
-}
-.theme-btn.active {
-  color: var(--color-ink);
-  border-color: var(--color-accent);
 }
 
 /* ---- back button (header, icon-only "go back") ---- */
@@ -676,21 +743,6 @@ a:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.user-menu-locale {
-  display: flex;
-  justify-content: flex-start;
-}
-.user-menu-theme {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-}
-.user-menu-section-label {
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .user-menu-item {
   display: block;
@@ -815,7 +867,11 @@ a:hover {
   gap: var(--space-sm);
   margin-top: var(--space-lg);
 }
-.chip {
+/* mockup-port 01: renamed from `.chip` to free that name for the mockup's
+   chip component (see design-system.css) — same "active filter" concept,
+   but a different remove-control markup (mockup's `.chip button` vs. this
+   `.chip a`) and sizing, so the two can't share one rule set yet. */
+.legacy-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -826,14 +882,14 @@ a:hover {
   font-size: var(--text-sm);
   color: var(--color-ink-soft);
 }
-.chip a {
+.legacy-chip a {
   color: var(--color-ink-muted);
   text-decoration: none;
   font-family: var(--font-mono);
   line-height: 1;
   padding: 0 0.3rem;
 }
-.chip a:hover {
+.legacy-chip a:hover {
   color: var(--color-accent);
 }
 .clear-all {
@@ -988,126 +1044,6 @@ a:hover {
   }
 }
 
-/* ---- detail fields ---- */
-.field {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: var(--space-lg);
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.field:last-child {
-  border-bottom: none;
-}
-.field-label {
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--color-ink-soft);
-}
-.field-value {
-  font-size: 0.92rem;
-  word-break: break-word;
-}
-.field-value.empty {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  font-style: italic;
-}
-
-/* Suggested (unverified) email on the contact detail page — see
- * src/lib/emailSuggestion.ts. Reuses --color-accent/--color-badge-accent-bg
- * (same tokens as .badge) so it reads as "flagged, not confirmed" rather
- * than a real value, consistently in both light and dark themes. */
-.suggestion-value {
-  font-family: var(--font-mono);
-  color: var(--color-accent);
-  background: var(--color-badge-accent-bg);
-  border-radius: var(--radius-sm);
-  padding: 0.1rem 0.4rem;
-  display: inline-block;
-}
-.suggestion-note {
-  display: block;
-  margin-top: 0.3rem;
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-}
-
-/* ---- conversation history (contact detail) ---- */
-.thread-notice {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  background: var(--color-surface-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.55rem 0.8rem;
-  margin: 0 0 var(--space-lg);
-}
-.thread {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-lg);
-  overflow: hidden;
-}
-.thread:last-child {
-  margin-bottom: 0;
-}
-.thread-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  background: var(--color-surface-1);
-  border-bottom: 1px solid var(--color-border);
-  padding: 0.6rem 0.9rem;
-}
-.thread-title {
-  font-weight: 700;
-  font-size: var(--text-base);
-}
-.thread-meta {
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-.thread-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  padding: 0.9rem;
-}
-.message {
-  min-width: 0;
-}
-.message-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-sm);
-  margin-bottom: 0.25rem;
-}
-.message-sender {
-  font-weight: 600;
-  font-size: var(--text-base);
-}
-.message-time {
-  font-size: 0.75rem;
-}
-.message-content {
-  font-size: var(--text-md);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-@media (max-width: 560px) {
-  .thread-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
 /* =========================================================================
    Layout & spacing utilities
    Small, composable classes that replace one-off inline `style={{...}}`
@@ -1145,9 +1081,6 @@ a:hover {
 .mb-lg {
   margin-bottom: var(--space-lg);
 }
-.mb-2xl {
-  margin-bottom: var(--space-2xl);
-}
 .mb-3xl {
   margin-bottom: var(--space-3xl);
 }
@@ -1155,10 +1088,13 @@ a:hover {
   margin-left: var(--space-sm);
 }
 
-.row-md {
+/* mockup-port 01: renamed alongside .legacy-row above. .row-xs is renamed
+   (not just namespaced) because mockups/styles.css defines its own
+   `.row-xs` with a different gap (--space-2xs vs. this --space-xs). */
+.legacy-row-md {
   gap: var(--space-md);
 }
-.row-xs {
+.legacy-row-xs {
   gap: var(--space-xs);
 }
 
@@ -1169,9 +1105,6 @@ a:hover {
 
 .form-narrow {
   max-width: 25rem; /* 400px */
-}
-.detail-narrow {
-  max-width: 45rem; /* 720px */
 }
 
 .inline-block {
@@ -1284,15 +1217,11 @@ a:hover {
 
 /* =========================================================================
    Layout with sidebar (Phase 8 shell: src/app/contacts/Sidebar.tsx +
-   TopBar.tsx; width/height now driven by the --sidebar-width/--topbar-height
-   tokens those components' own CSS modules use).
+   TopBar.tsx; width/height driven by the --sidebar-width/--topbar-height
+   tokens; mockup-port 02: the `.app`/`.main` grid itself now lives in
+   design-system.css, matching contacts.html — this file just keeps the
+   bare `<main>` element's padding for pages that don't wrap it in `.page`).
    ========================================================================= */
-.main-layout {
-  margin-left: var(--sidebar-width, 232px);
-  min-height: 100vh;
-  transition: margin-left var(--transition-fast);
-}
-
 main {
   max-width: none;
   padding: var(--space-2xl) var(--space-3xl);
@@ -1300,12 +1229,8 @@ main {
 }
 
 @media (max-width: 768px) {
-  .main-layout {
-    margin-left: 0;
-  }
-
   main {
-    padding: calc(60px + var(--space-2xl)) var(--space-lg) var(--space-2xl);
+    padding: var(--space-lg);
   }
 }
 
@@ -1394,4 +1319,167 @@ main {
 }
 .duplicates-unmerge-confirm button.danger:hover:not(:disabled) {
   filter: brightness(0.92);
+}
+
+/* =========================================================================
+   Shared Avatar / Dialog components (mockup-parity Phase 2). Ported from
+   openspec/changes/crm-hubspot-ux/mockups/styles.css — see
+   src/components/Avatar.tsx and src/components/Dialog.tsx.
+   ========================================================================= */
+
+/* ---- avatar (src/components/Avatar.tsx) ---- */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--avatar-1);
+  color: var(--color-accent-fg);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.avatar-sm {
+  width: 22px;
+  height: 22px;
+  font-size: 0.6rem;
+}
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
+}
+.avatar.a1 {
+  background: var(--avatar-1);
+}
+.avatar.a2 {
+  background: var(--avatar-2);
+}
+.avatar.a3 {
+  background: var(--avatar-3);
+}
+.avatar.a4 {
+  background: var(--avatar-4);
+}
+.avatar.a5 {
+  background: var(--avatar-5);
+}
+.avatar.a6 {
+  background: var(--avatar-6);
+}
+/* Contacts are circles (default); BDs are rounded squares. */
+.avatar-bd {
+  border-radius: var(--radius-sm);
+}
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-base);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+/* ---- dialog (src/components/Dialog.tsx) ---- */
+/* Bug fix: this rule used to set `display: flex` unconditionally, which
+   conflicted with design-system.css's `.overlay.open { display: flex; }`
+   (ported from mockups/styles.css, whose own base rule is
+   `.overlay { ...; display: none; }`). Every current overlay usage is
+   conditionally MOUNTED (React unmounts it entirely when closed) so this
+   was latent, not an active bug today — but a bare `.overlay` element
+   with no "open" class rendered anywhere would silently cover the whole
+   viewport (position: fixed, z-index: 50) and swallow every click. `open`
+   below is what actually shows it, mirroring the mockup. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--color-overlay);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+}
+.overlay.open {
+  display: flex;
+}
+.dialog {
+  width: min(520px, 92vw);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  border: 1px solid var(--color-border);
+}
+.dialog.wide {
+  width: min(720px, 94vw);
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+}
+.dialog-header h2 {
+  font-size: var(--text-lg);
+}
+.dialog-header .close {
+  margin-left: auto;
+}
+.dialog-body {
+  padding: var(--space-xl);
+}
+.dialog-body > * + * {
+  margin-top: var(--space-lg);
+}
+.dialog-footer {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  padding: var(--space-md) var(--space-xl);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-1);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.dialog-footer .left {
+  margin-right: auto;
+}
+
+/* ---- toast (src/components/Toast.tsx, ToastProvider.tsx) ---- */
+.toast-region {
+  position: fixed;
+  right: var(--space-2xl);
+  bottom: var(--space-2xl);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 300px;
+  max-width: 420px;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-ink);
+  color: var(--color-on-dark);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dialog);
+  font-size: var(--text-base);
+}
+.toast .ok {
+  color: var(--color-on-dark-success);
+}
+.toast .err {
+  color: var(--color-on-dark-link);
+}
+.toast a {
+  color: var(--color-on-dark-link);
+  font-weight: 600;
+  margin-left: auto;
+}
+.toast .close {
+  color: var(--color-on-dark);
 }

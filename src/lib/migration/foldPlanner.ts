@@ -63,10 +63,13 @@ export interface FoldLeadRow {
 
 // Same vocabulary as collapsePlanner's CollapseLegacyMethod, plus
 // 'skipped_own_company' (leads can be own-company too — matchIdentity
-// checks it the same way for every ingestion source).
+// checks it the same way for every ingestion source). Includes
+// "email_exact" for parity with the matcher's MatchResult.key — never
+// actually produced here, since leads never set `source: "manual_create"`.
 export type FoldLeadMethod =
   | "profile_key"
   | "verified_email"
+  | "email_exact"
   | "new"
   | "review"
   | "skipped_own_company";

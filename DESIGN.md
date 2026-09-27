@@ -32,6 +32,17 @@ colors:
   warn-text: "#92400e"
   danger-text: "#b91c1c"
   info-text: "#1e40af"
+  # Avatar palette — distinct colors for contact initials. Darkened
+  # 2026-09 (mockup-parity 1.3): avatar-2/4/5/6 were pastel values that
+  # fail AA contrast for white initials text on top of them; the mockup
+  # (design-system.html's own accessibility note) ships the darker,
+  # owner-approved replacements below.
+  avatar-1: "#6b5b95"
+  avatar-2: "#7a6653"
+  avatar-3: "#88398a"
+  avatar-4: "#8a5a2b"
+  avatar-5: "#3f6f5f"
+  avatar-6: "#4b6380"
 
 typography:
   h1:
@@ -241,6 +252,23 @@ The app is **light-only**. There is no dark theme, no theme cookie, no `ThemeSwi
 The app is **Spanish-only** (owner decision D10, `design.md`). There is no `LocaleSwitcher` and no cookie-driven locale selection. `src/lib/i18n/server.ts#getLocale()` always returns `DEFAULT_LOCALE` (`"es"`); all user-facing copy resolves through the single `es` dictionary. The `{ en, es }` dictionary structure (`src/lib/i18n/dictionaries/`) and the `Locale`/`LOCALES` types are kept intact so English can be re-added cheaply later, and because `isLocale` still validates the *outreach message* generation language (English/Spanish is a per-message business choice, unrelated to UI chrome locale) — but nothing in the UI imports or renders the `en` dictionary. Glossary terms in `mockups/GLOSSARY.md` are the source of truth for Spanish copy and must be used consistently across screens.
 
 Two more tokens exist purely for the select chevron icon: `--icon-select-chevron` is a data-URI SVG with its stroke color baked in (it can't use `currentColor`), so the whole `background-image` is a token rather than an inline literal.
+
+### Shell/component tokens (mockup-parity, added 2026-09-26)
+
+`openspec/changes/crm-hubspot-ux/mockups/styles.css` is the source for the Dialog/Toast/Avatar primitives and the contact-record two-rail layout. These tokens were added to `globals.css` to match it:
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-ink-subtle` | `#6e6b78` | Meta text, placeholders (5.2:1 on white) |
+| `--color-accent-strong` | `var(--color-accent-hover)` (`#b81f27`) | Alias, not a new color — same approved darker-hover value as `--color-accent-hover`/`--color-accent-focus` above, named "strong" by the mockup |
+| `--color-accent-press` | `#9c1a21` | Pressed state — the one genuinely new value here, taken from the owner-approved mockup palette |
+| `--color-overlay` | `rgba(23, 21, 28, 0.42)` | Dialog backdrop |
+| `--color-on-dark` / `-hover` / `-sep` / `-success` / `-link` | see `globals.css` | Toast surface (dark chip on the light canvas) |
+| `--shadow-dialog` | `0 24px 48px rgba(23, 21, 28, 0.2)` | Dialog/Toast elevation |
+| `--focus-ring` | `0 0 0 2px surface-2, 0 0 0 4px accent-strong` | Shared focus-visible ring for the new components |
+| `--radius-lg` | `12px` | Dialog corner radius |
+| `--record-left` / `--record-right` | `320px` / `300px` | Contact record page's two-rail layout |
+| `--avatar-1..6` | see avatar palette above | Shared `Avatar` component (mockup-parity Phase 2) |
 
 ## Typography
 

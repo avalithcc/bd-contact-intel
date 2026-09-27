@@ -2,8 +2,10 @@ import Link from "next/link";
 import type { getDictionary } from "@/lib/i18n/server";
 import type { ContactBoardColumn, ContactListRow } from "@/lib/contacts/listQueries";
 import { BOARD_COLUMNS, boardDropAction } from "@/lib/contacts/board";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import { BoardDnD } from "./BoardDnD";
-import styles from "./page.module.css";
+import { pickContactRecordLabels } from "@/lib/contacts/labels";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
 
@@ -33,41 +35,66 @@ function cardSub(row: ContactListRow): string | null {
  */
 export function Board({ columns, dict, tableHref }: BoardProps) {
   const l = dict.contactList;
+  const moveConfirmLabels = {
+    titlePrefix: l.boardMoveConfirmTitlePrefix,
+    body: l.boardMoveConfirmBody,
+    confirm: l.boardMoveConfirmConfirm,
+    cancel: l.cancel,
+  };
 
   return (
-    <BoardDnD>
-      <p className={styles.boardHint}>{l.boardDropHint}</p>
-      <div className={styles.board}>
+    <BoardDnD labels={moveConfirmLabels} recordLabels={pickContactRecordLabels(dict)}>
+      <p className="meta mb-lg">{l.boardDropHint}</p>
+      <div className="board">
         {columns.map((col) => {
           const targets = BOARD_COLUMNS.filter((s) => s !== col.status && boardDropAction(s));
           return (
             <section
               key={col.status}
-              className={styles.boardCol}
+              className="board-col"
               aria-label={dict.leadStatuses[col.status]}
               data-board-status={col.status}
             >
-              <div className={styles.boardColHeader}>
-                <span className={styles.statusBadge}>{dict.leadStatuses[col.status]}</span>
-                <span>{col.total}</span>
+              <div className="col-header">
+                <span className={`badge badge-${col.status}`}>{dict.leadStatuses[col.status]}</span>
+                <span className="n">{col.total}</span>
               </div>
 
-              {col.rows.length === 0 && <p className={styles.boardEmpty}>{l.boardColumnEmpty}</p>}
+              {col.rows.length === 0 && <p className="meta small">{l.boardColumnEmpty}</p>}
 
               {col.rows.map((row) => (
-                <div key={row.id} className={styles.boardCard} draggable data-person-id={row.id}>
-                  <Link href={`/contacts/${row.id}`} className={styles.boardCardLink}>
-                    <div className={styles.name}>{cardTitle(row)}</div>
-                    {cardSub(row) && <div className={styles.jobTitle}>{cardSub(row)}</div>}
+                <div key={row.id} className="board-card" draggable data-person-id={row.id}>
+                  <Link href={`/contacts/${row.id}`} className="title">
+                    {cardTitle(row)}
                   </Link>
-                  <div className={styles.boardCardFoot}>
-                    <span>{row.ownerName ?? l.ownerNone}</span>
+                  {cardSub(row) && <div className="sub">{cardSub(row)}</div>}
+                  <div className="foot">
+                    {row.ownerName ? (
+                      <span className="owner-chip">
+                        <Avatar
+                          id={row.ownerBdId ?? row.ownerName}
+                          initials={initialsFromName(row.ownerName)}
+                          variant="bd"
+                          size="sm"
+                        />
+                        {row.ownerName}
+                      </span>
+                    ) : (
+                      <span className="meta">{l.ownerNone}</span>
+                    )}
                     {targets.length > 0 && (
-                      <details className={styles.boardMoveMenu}>
-                        <summary aria-label={l.boardMoveToLabel}>{l.boardMoveToLabel}</summary>
-                        <div className={styles.boardMoveMenuList}>
+                      <details className="dropdown">
+                        <summary className="meta" aria-label={l.boardMoveToLabel}>
+                          {l.boardMoveToLabel}
+                        </summary>
+                        <div className="menu">
                           {targets.map((status) => (
-                            <Link key={status} href={`/contacts/${row.id}?openAction=${boardDropAction(status)}`}>
+                            <Link
+                              key={status}
+                              href={`/contacts/${row.id}?openAction=${boardDropAction(status)}`}
+                              className="menu-item"
+                              data-board-move-label={dict.leadStatuses[status]}
+                            >
                               {dict.leadStatuses[status]}
                             </Link>
                           ))}
@@ -79,7 +106,7 @@ export function Board({ columns, dict, tableHref }: BoardProps) {
               ))}
 
               {col.total > col.rows.length && (
-                <Link href={tableHref} className={styles.boardColMore}>
+                <Link href={tableHref} className="col-more">
                   {l.boardColumnMore(col.total)}
                 </Link>
               )}

@@ -112,7 +112,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
             required
           />
         </div>
-        <div className="row">
+        <div className="legacy-row">
           <button type="submit" disabled={busy}>
             {busy ? dict.common.ellipsis : dict.login.signIn}
           </button>

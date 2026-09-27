@@ -14,6 +14,9 @@ export type ContactColumnKey =
   | "owner"
   | "status"
   | "email"
+  | "phone"
+  | "bdConnections"
+  | "lastActivity"
   | "roleGroup"
   | "industry"
   | "country"
@@ -21,14 +24,17 @@ export type ContactColumnKey =
   | "created"
   | "seniority";
 
-/** Mockup order (contacts.html column-picker menu, minus "BDs conectados"
- * and "Última actividad" — those need a join this phase's budget doesn't
- * cover; see tasks.md 13.1 deviation note). */
+/** Mockup order (contacts.html column-picker menu) — every column the
+ * mockup lists is now selectable. */
 export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "company",
   "owner",
   "status",
   "email",
+  // Migration 0016 — "Teléfono" column (contacts.html "Columnas" picker).
+  "phone",
+  "bdConnections",
+  "lastActivity",
   "roleGroup",
   "industry",
   "country",
@@ -56,14 +62,24 @@ function isContactColumnKey(value: unknown): value is ContactColumnKey {
 }
 
 /**
- * Keeps only recognized column keys, drops duplicates, and always returns
- * them in `ALL_CONTACT_COLUMNS` order regardless of input order — same
- * "never throw on unexpected shape" convention as sanitizeContactFilters.
+ * Keeps only recognized column keys, drops duplicates (first occurrence
+ * wins), and preserves the CALLER's order — not a fixed order — so the
+ * "Columnas" picker's drag-and-drop reorder (mockup: "arrastrar para
+ * reordenar") actually persists through the same `?columns=`/saved-view
+ * round-trip visibility already uses. Same "never throw on unexpected
+ * shape" convention as sanitizeContactFilters.
  */
 export function sanitizeColumnKeys(value: unknown): ContactColumnKey[] {
   if (!Array.isArray(value)) return [];
-  const requested = new Set(value.filter(isContactColumnKey));
-  return ALL_CONTACT_COLUMNS.filter((key) => requested.has(key));
+  const seen = new Set<ContactColumnKey>();
+  const result: ContactColumnKey[] = [];
+  for (const entry of value) {
+    if (isContactColumnKey(entry) && !seen.has(entry)) {
+      seen.add(entry);
+      result.push(entry);
+    }
+  }
+  return result;
 }
 
 /**

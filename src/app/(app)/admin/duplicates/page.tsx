@@ -9,6 +9,8 @@ import {
   type DuplicateCandidateDetail,
   type DuplicateCandidateSidePerson,
 } from "@/lib/identity/duplicateReviewQueries";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
 import { mergeDuplicateCandidateAction, markNotDuplicateAction, unmergeDuplicateAction } from "./actions";
@@ -33,7 +35,7 @@ function fieldRow(label: string, valueA: string, valueB: string, keepA: boolean,
   const differs = valueA !== valueB;
   return (
     <tr key={label}>
-      <th scope="row">{label}</th>
+      <th scope="legacy-row">{label}</th>
       <td className={differs ? "differs" : "match"}>
         {valueA}
         {keepA && <span className="keep">✓</span>}
@@ -57,8 +59,8 @@ function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; 
 
   return (
     <section className="panel">
-      <div className="row between">
-        <span className="badge warn">{reasonLabel(detail.reason)}</span>
+      <div className="legacy-row between">
+        <span className="legacy-badge warn">{reasonLabel(detail.reason)}</span>
         <span className="soft">{pairMeta}</span>
       </div>
 
@@ -69,8 +71,18 @@ function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; 
           <thead>
             <tr>
               <th></th>
-              <th>Ficha A · {detail.personA.name}</th>
-              <th>Ficha B · {detail.personB.name}</th>
+              <th>
+                <div className="legacy-row">
+                  <Avatar id={detail.personA.id} initials={initialsFromName(detail.personA.name)} size="sm" />
+                  <span>Ficha A · {detail.personA.name}</span>
+                </div>
+              </th>
+              <th>
+                <div className="legacy-row">
+                  <Avatar id={detail.personB.id} initials={initialsFromName(detail.personB.name)} size="sm" />
+                  <span>Ficha B · {detail.personB.name}</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -109,7 +121,7 @@ function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; 
         </table>
       </div>
 
-      <div className="row end mt-lg">
+      <div className="legacy-row end mt-lg">
         <form action={markNotDuplicateAction}>
           <input type="hidden" name="candidateId" value={detail.id} />
           <button type="submit" className="secondary">
@@ -135,7 +147,7 @@ function UnmergeConfirmPanel({ mergeEventId, survivorName }: { mergeEventId: str
           <li key={bullet}>{bullet}</li>
         ))}
       </ul>
-      <div className="row end mt-lg">
+      <div className="legacy-row end mt-lg">
         <Link href="/admin/duplicates" className="secondary-btn">
           {dict.cancelButton}
         </Link>
@@ -189,15 +201,19 @@ export default async function DuplicatesAdminPage({
 
   return (
     <main>
-      <div className="eyebrow">{dict.eyebrow}</div>
-      <div className="row between">
-        <h1 className="m-0">
-          {dict.title}
-          <span className="dot">.</span>
-        </h1>
-        <span className="badge">{dict.adminOnlyBadge}</span>
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{dict.eyebrow}</div>
+          <h1 className="m-0">
+            {dict.title}
+            <span className="dot">.</span>
+          </h1>
+          <p className="soft">{dict.subtitle(list.total)}</p>
+        </div>
+        <div className="actions">
+          <span className="legacy-badge">{dict.adminOnlyBadge}</span>
+        </div>
       </div>
-      <p className="soft">{dict.subtitle(list.total)}</p>
 
       {isActionErrorReason(actionError) && (
         <section className="panel">
@@ -222,7 +238,7 @@ export default async function DuplicatesAdminPage({
             </Link>
           ))}
           {list.pageCount > 1 && (
-            <div className="row between mt-md">
+            <div className="legacy-row between mt-md">
               <Link
                 href={`/admin/duplicates?page=${page - 1}`}
                 className={page <= 1 ? "rowlink disabled" : "rowlink"}
@@ -269,7 +285,7 @@ export default async function DuplicatesAdminPage({
               <tr key={h.mergeEventId}>
                 <td>
                   {h.survivorName}
-                  {h.undoneAt && <span className="badge">{dict.historyUndone}</span>}
+                  {h.undoneAt && <span className="legacy-badge">{dict.historyUndone}</span>}
                 </td>
                 <td>{reasonLabel(h.reason)}</td>
                 <td className="soft">{h.actorName ?? dict.migrationActor}</td>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import styles from "./page.module.css";
 
 export interface RecordTab {
   id: string;
@@ -10,17 +9,18 @@ export interface RecordTab {
 }
 
 /**
- * Mockup's clickable Actividad/Resumen tabs (contact-record.html) — content
- * per tab is filled in by the page. Fresh-review SUGGESTION fix: wires the
- * tab/tabpanel pair together (id/aria-controls/aria-labelledby) instead of
- * only marking the tab buttons themselves.
+ * Mockup's clickable Actividad/Resumen tabs (contact-record.html:89-91;
+ * mockup-port r03 markup rework onto design-system.css's `.tabs`/`.tab`
+ * classes) — content per tab is filled in by the page. Fresh-review
+ * SUGGESTION fix (kept): wires the tab/tabpanel pair together (id/
+ * aria-controls/aria-labelledby) instead of only marking the tab buttons.
  */
 export function RecordTabs({ tabs }: { tabs: RecordTab[] }) {
   const [activeId, setActiveId] = useState(tabs[0]?.id);
 
   return (
     <div>
-      <div className={styles.tabs} role="tablist">
+      <div className="tabs" role="tablist" aria-label="Secciones de la ficha">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -28,7 +28,7 @@ export function RecordTabs({ tabs }: { tabs: RecordTab[] }) {
             role="tab"
             aria-selected={tab.id === activeId}
             aria-controls={`tabpanel-${tab.id}`}
-            className={tab.id === activeId ? styles.tabActive : styles.tab}
+            className="tab"
             onClick={() => setActiveId(tab.id)}
           >
             {tab.label}
