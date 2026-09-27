@@ -20,6 +20,7 @@ import {
 } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
 import { parseEmailModelOutput } from "@/lib/outreach/emailOutputParsing";
+import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
 
 // Model id verified against the live AI Gateway catalog
@@ -77,7 +78,7 @@ export async function runGenerateOutreachMessage(
       return {
         ok: true,
         channel: "email",
-        message: `Asunto: ${parsed.subject}\n\n${parsed.body}`,
+        message: formatEmailDraft(parsed.subject, parsed.body),
         subject: parsed.subject,
         body: parsed.body,
         historyCount,

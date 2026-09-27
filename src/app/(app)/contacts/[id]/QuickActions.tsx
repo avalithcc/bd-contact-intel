@@ -16,6 +16,8 @@ import {
 import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
+import { GenerateMessageDialog } from "./GenerateMessageDialog";
+import { splitEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { Locale } from "@/lib/i18n/locales";
@@ -123,6 +125,7 @@ export function QuickActions({
   // here (not inside EmailForm's own state) so a fresh generation before
   // the email panel is opened still has somewhere to land.
   const [generatedBody, setGeneratedBody] = useState<string | null>(null);
+  const [generatedSubject, setGeneratedSubject] = useState<string | null>(null);
 
   function closeQuickAction() {
     setOpenAction(null);
@@ -195,30 +198,16 @@ export function QuickActions({
 
       {openAction === "generate" && (
         <Dialog open onClose={closeQuickAction} title={`${l.generateMessageCta} · ${name}`} wide>
-          <div className="composer">
-            <GenerateMessageButton
-              boundAction={generatePersonOutreachMessageAction.bind(null, personId, locale)}
-              labels={messageLabels}
-              onGenerated={setGeneratedBody}
-            />
-            {/* Mockup's "Canal" select (contact-record.html:190) has no
-                backing implementation — generatePersonOutreachMessageAction
-                only ever produces an email-oriented draft today, no
-                LinkedIn-message generation path exists server-side. Same
-                gap for "Señales utilizadas" chips (contact-record.html:192):
-                the generator's result doesn't expose which signals fed the
-                draft, only the final text + a history-reuse count — showing
-                fabricated chips would misrepresent what actually happened.
-                Both flagged in the checklist as needing an owner decision
-                before being built for real, not silently invented here. */}
-            {generatedBody && (
-              <div className="dialog-footer">
-                <button type="button" className="btn btn-primary" onClick={() => setOpenAction("email")}>
-                  {l.useInEmailAction}
-                </button>
-              </div>
-            )}
-          </div>
+          <GenerateMessageDialog
+            boundAction={generatePersonOutreachMessageAction.bind(null, personId, locale)}
+            labels={messageLabels}
+            useInEmailLabel={l.useInEmailAction}
+            onUseInEmail={(subject, body) => {
+              setGeneratedSubject(subject);
+              setGeneratedBody(body);
+              setOpenAction("email");
+            }}
+          />
         </Dialog>
       )}
 
@@ -276,6 +265,7 @@ export function QuickActions({
           to={email}
           busy={busy}
           error={error}
+          initialSubject={generatedSubject}
           initialBody={generatedBody}
           generate={{
             labels: messageLabels,
@@ -431,12 +421,14 @@ function EmailForm({
   to,
   busy,
   error,
+  initialSubject,
   initialBody,
   generate,
   onCancel,
   onSubmit,
 }: ComposerProps & {
   to: string | null;
+  initialSubject?: string | null;
   initialBody?: string | null;
   // "Generar mensaje" (task 13.3) — omitted entirely (rather than rendered
   // disabled) when the caller has nothing to bind, keeping this composer
@@ -445,7 +437,7 @@ function EmailForm({
   generate?: EmailGenerateProps;
   onSubmit: (subject: string, body: string) => void;
 }) {
-  const [subject, setSubject] = useState("");
+  const [subject, setSubject] = useState(initialSubject ?? "");
   const [body, setBody] = useState(initialBody ?? "");
 
   if (!to) {
@@ -478,7 +470,12 @@ function EmailForm({
             labels={generate.labels}
             onGenerated={(message) => {
               generate.onGenerated(message);
-              setBody(message);
+              // "Redactar con IA" here always uses this action's default
+              // channel (email) — split the "Asunto: ...\n\n<body>"
+              // combined draft back into the two separate fields.
+              const split = splitEmailDraft(message);
+              if (split.subject) setSubject(split.subject);
+              setBody(split.subject ? split.body : message);
             }}
           />
         )}

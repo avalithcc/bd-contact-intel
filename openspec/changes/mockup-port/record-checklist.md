@@ -38,7 +38,7 @@ Columns: element | mockup ref | status | evidence file:line | notes
 |---|---|---|---|---|
 | Nota / Correo / Tarea / Reunión / Descartar qa buttons | contact-record.html:66-72 | done (r02/r03) | QuickActions.tsx | Icons added (r02); "Nota" is now a `#log-note` anchor to the pinned composer (r03), not its own toggle. |
 | "Pegar señal" (6th action) | n/a in either mockup | deviation, kept (owner decision) | QuickActions.tsx | Owner decision (this session): keep it, style identically to the other five. Documented inline. |
-| "Generar mensaje con IA" secondary block button + standalone dialog | contact-record.html:73, 186-196 | done (r07) | QuickActions.tsx (`generate` quick action + `Dialog`) | Wraps the existing `GenerateMessageButton`/`generatePersonOutreachMessageAction`. **Deviation flagged, needs owner input**: no "Canal" select (only email-oriented generation exists server-side) and no "Señales utilizadas" chips (the generator doesn't expose which signals fed the draft) — both would require new backend work to build for real, not fabricated here. |
+| "Generar mensaje con IA" secondary block button + standalone dialog | contact-record.html:73, 186-196 | done (email-gen-03) | QuickActions.tsx (`generate` quick action + `Dialog` + `GenerateMessageDialog.tsx`) | Owner direction 2026-09-26 closed the two gaps below: "Canal" select (email default / linkedin) posts `channel` to `generatePersonOutreachMessageAction`; "Señales utilizadas" chips render `state.signals` (src/lib/outreach/messageSignals.ts — derived from the prompt input, never the model's output) via `formatOutreachSignalLabel`. |
 | "Sobre este contacto" section title + "Historial" ghost button | contact-record.html:74 | done (r02) | AboutPane.tsx | "Historial" kept as the mockup's own inert `href="#"` (no destination in the approved design either). |
 
 ## Left pane — property list
@@ -121,7 +121,7 @@ Columns: element | mockup ref | status | evidence file:line | notes
 
 | element | mockup ref | status | evidence file:line | notes |
 |---|---|---|---|---|
-| "Generar mensaje" wide dialog | contact-record.html:186-196 | done (r07), with flagged gaps | QuickActions.tsx | See the quick-actions row above for the "Canal"/"Señales utilizadas" gaps. |
+| "Generar mensaje" wide dialog | contact-record.html:186-196 | done (email-gen-03) | QuickActions.tsx / GenerateMessageDialog.tsx | See the quick-actions row above — "Canal"/"Señales utilizadas" now implemented. |
 | "Registrar reunión" / "Descartar contacto" / "Crear tarea" / "Enviar correo" dialogs | contact-record.html:197-219 | done (pre-existing) | QuickActions.tsx | Unchanged this session — already matched closely; markup now uses `.field`/`.input`/`.textarea`/`.bar` global classes (r02) instead of local CSS. "Crear tarea" still has no "Asignado a" picker (pre-existing gap, not touched). |
 
 ## Summary counts (updated after r02-r08)
@@ -130,12 +130,10 @@ Columns: element | mockup ref | status | evidence file:line | notes
 - todo rows remaining: 0
 - n/a (superseded by a design decision, not a gap): 1 (post-reveal toast on the separate audited page — the inline reveal path this session shipped doesn't navigate away, so there's no "return" moment; the deep-link page's own toast, if still wanted, is a tiny separate follow-up)
 - deviations applied per owner decision this session: 2 (admin inline reveal is click-to-expand, not eager; "Pegar señal" kept and styled)
-- flagged for future owner input (not silently built): 2 (Generar mensaje's missing "Canal" select and "Señales utilizadas" chips — no backend support exists for either yet; documented in QuickActions.tsx and here, not fabricated)
+- flagged for future owner input (not silently built): 0 (the two Generar-mensaje gaps — "Canal" select, "Señales utilizadas" chips — were closed per owner direction 2026-09-26; see the email-gen-01..03 branch chain)
 
-**Checklist status: no open "todo" rows.** Every remaining gap is either
-`n/a` (superseded by a documented owner-approved design decision) or
-explicitly flagged as needing NEW backend work + an owner decision before
-it can be built for real (the two Generar-mensaje gaps above).
+**Checklist status: no open "todo" rows.** Every remaining gap is `n/a`
+(superseded by a documented owner-approved design decision).
 
 Everything server-action-preserving: every existing server action kept its
 exact signature and semantics; only new bounded reads and two new actions
