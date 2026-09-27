@@ -525,6 +525,7 @@ export const es: typeof en = {
     errorDiscardNoteRequired: "Se requiere una nota cuando el motivo es «Otro».",
     errorMeetingDateRequired: "Se requiere una fecha para registrar la reunión.",
     errorCallOutcomeRequired: "Seleccionar un resultado para registrar la llamada.",
+    errorCallOccurredAtInFuture: "No se puede registrar una llamada con fecha y hora futuras.",
     errorSignalTextRequired: "Se requiere el texto de la señal.",
     meetingDateLabel: "Fecha",
     meetingTimeLabel: "Hora",

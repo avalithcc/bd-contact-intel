@@ -99,6 +99,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorMeetingDateRequired;
     case "call_outcome_required":
       return l.errorCallOutcomeRequired;
+    case "call_occurred_at_in_future":
+      return l.errorCallOccurredAtInFuture;
     case "signal_text_required":
       return l.errorSignalTextRequired;
     case "owner_invalid":

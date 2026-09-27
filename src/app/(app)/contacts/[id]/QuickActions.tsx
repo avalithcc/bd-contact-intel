@@ -518,6 +518,17 @@ export function CallForm({
   const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Client-side "no future call" guard (fresh-review WARNING fix) —
+  // mirrors planCall's server-side FUTURE_CLOCK_SKEW_TOLERANCE_MS check
+  // (src/lib/contacts/call.ts), which is the actual source of truth; this
+  // only keeps the date/time pickers from offering an obviously-rejected
+  // value in the first place. `timeMax` only applies when the picked date
+  // is today (or still blank, which defaults to today) — a past date has
+  // no future hour to guard against.
+  const now = new Date();
+  const dateMax = now.toISOString().slice(0, 10);
+  const timeMax = date === "" || date === dateMax ? now.toTimeString().slice(0, 5) : undefined;
+
   return (
     <Dialog open onClose={onCancel} title={l.callSubmit}>
       <div className="composer">
@@ -550,8 +561,22 @@ export function CallForm({
         </label>
         <label className="field">
           {l.callDateLabel}
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} />
-          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
+          <input
+            className="input"
+            type="date"
+            value={date}
+            max={dateMax}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={busy}
+          />
+          <input
+            className="input"
+            type="time"
+            value={time}
+            max={timeMax}
+            onChange={(e) => setTime(e.target.value)}
+            disabled={busy}
+          />
         </label>
         <label className="field">
           {l.callDurationLabel}

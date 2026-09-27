@@ -8,6 +8,7 @@ import { test } from "node:test";
 import {
   CALL_OUTCOME_CODES,
   CALL_DIRECTIONS,
+  CallOccurredAtInFutureError,
   CallOutcomeRequiredError,
   isCallOutcomeCode,
   isCallDirection,
@@ -69,4 +70,36 @@ test("duration is parsed as a non-negative integer of minutes, optional", () => 
 test("notes are trimmed, blank collapses to null", () => {
   assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "", "  Great talk  ").notes, "Great talk");
   assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "", "   ").notes, null);
+});
+
+// --- occurredAt must not be in the future (fresh-review WARNING fix) -------
+
+test("an occurredAt more than 5 minutes in the future is rejected", () => {
+  const now = new Date("2026-09-26T12:00:00");
+  assert.throws(
+    () => planCall("connected", "outbound", "2026-09-26", "12:06", "", "", now),
+    CallOccurredAtInFutureError,
+  );
+  assert.throws(
+    () => planCall("connected", "outbound", "2026-09-27", "00:00", "", "", now),
+    CallOccurredAtInFutureError,
+  );
+});
+
+test("an occurredAt within the 5-minute clock-skew tolerance is accepted", () => {
+  const now = new Date("2026-09-26T12:00:00");
+  const plan = planCall("connected", "outbound", "2026-09-26", "12:05", "", "", now);
+  assert.equal(plan.occurredAt, new Date("2026-09-26T12:05:00").toISOString());
+});
+
+test("an occurredAt in the past is always accepted", () => {
+  const now = new Date("2026-09-26T12:00:00");
+  const plan = planCall("connected", "outbound", "2020-01-01", "00:00", "", "", now);
+  assert.equal(plan.occurredAt, new Date("2020-01-01T00:00:00").toISOString());
+});
+
+test("a blank date (defaults to `now`) never trips the future guard", () => {
+  const now = new Date("2026-09-26T12:00:00");
+  const plan = planCall("connected", "outbound", "", "", "", "", now);
+  assert.equal(plan.occurredAt, now.toISOString());
 });

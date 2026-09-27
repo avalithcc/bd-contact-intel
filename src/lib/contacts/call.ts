@@ -38,6 +38,24 @@ export class CallOutcomeRequiredError extends Error {
   }
 }
 
+/**
+ * Thrown by planCall (fresh-review WARNING fix) when the requested
+ * date/time is more than FUTURE_CLOCK_SKEW_TOLERANCE_MS ahead of `now`: a
+ * future call would skew "Última actividad" (deriveStatus.ts reads
+ * metadata.occurredAt as the effective time) and the "why" status-reason
+ * hint, both of which assume every recorded event already happened.
+ */
+export class CallOccurredAtInFutureError extends Error {
+  constructor() {
+    super("A call cannot be logged with a future date/time");
+    this.name = "CallOccurredAtInFutureError";
+  }
+}
+
+/** Small allowance for client/server clock skew — not a real grace window
+ * for "logging a call slightly ahead of time". */
+const FUTURE_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+
 export interface CallActivityMetadata {
   outcome: CallOutcomeCode;
   direction: CallDirection;
@@ -58,12 +76,16 @@ function parseDurationMinutes(rawDurationMinutes: string): number | null {
 }
 
 /**
- * `rawDate` is a `YYYY-MM-DD` input value (blank defaults to now, unlike
+ * `rawDate` is a `YYYY-MM-DD` input value (blank defaults to `now`, unlike
  * meeting.ts's required date — a call is usually logged right after it
  * happens); `rawTime` an optional `HH:mm`, defaulting to midnight local time
  * when a date IS given. An unrecognized `rawDirection` defaults to
  * `"outbound"` (same defensive default as a blank one) rather than
  * rejecting the whole log over a corrupted `<select>` value.
+ *
+ * `now` defaults to the real current time and is only ever overridden by
+ * tests — it is BOTH the "blank date" fallback and the future-date guard's
+ * reference point, so the two can never disagree about what "now" means.
  */
 export function planCall(
   rawOutcome: string,
@@ -72,6 +94,7 @@ export function planCall(
   rawTime: string,
   rawDurationMinutes: string,
   rawNotes: string,
+  now: Date = new Date(),
 ): CallActivityMetadata {
   const outcome = rawOutcome.trim();
   if (!isCallOutcomeCode(outcome)) throw new CallOutcomeRequiredError();
@@ -79,12 +102,14 @@ export function planCall(
   const direction = isCallDirection(rawDirection.trim()) ? (rawDirection.trim() as CallDirection) : "outbound";
 
   const date = rawDate.trim();
-  const occurredAt = date
-    ? new Date(`${date}T${rawTime.trim() || "00:00"}:00`).toISOString()
-    : new Date().toISOString();
+  const occurredAtDate = date ? new Date(`${date}T${rawTime.trim() || "00:00"}:00`) : now;
+
+  if (occurredAtDate.getTime() - now.getTime() > FUTURE_CLOCK_SKEW_TOLERANCE_MS) {
+    throw new CallOccurredAtInFutureError();
+  }
 
   const durationMinutes = parseDurationMinutes(rawDurationMinutes);
   const notes = rawNotes.trim() || null;
 
-  return { outcome, direction, durationMinutes, occurredAt, notes };
+  return { outcome, direction, durationMinutes, occurredAt: occurredAtDate.toISOString(), notes };
 }
