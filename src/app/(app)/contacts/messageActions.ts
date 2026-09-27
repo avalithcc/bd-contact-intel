@@ -22,7 +22,8 @@ import { buildOutreachMessagePrompt } from "@/lib/outreach/messagePrompt";
 import { buildPersonMessageInput } from "@/lib/outreach/personMessageInput";
 import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
 import type { RoleGroupKey } from "@/lib/roleGroups";
-import { isLocale, type Locale } from "@/lib/i18n/locales";
+import type { Locale } from "@/lib/i18n/locales";
+import { isMessageLanguage, type MessageLanguage } from "@/lib/outreach/messageLanguage";
 
 // Same gateway catalog check as OUTREACH_MODEL in src/app/outreach/actions.ts
 // — kept as a separate constant (not imported) since that file's constant
@@ -49,8 +50,10 @@ export async function generatePersonOutreachMessageAction(
   const me = await getCurrentBd();
 
   const rawMessageLanguage = formData.get("messageLanguage");
-  const messageLanguage: Locale =
-    typeof rawMessageLanguage === "string" && isLocale(rawMessageLanguage) ? rawMessageLanguage : locale;
+  const messageLanguage: MessageLanguage =
+    typeof rawMessageLanguage === "string" && isMessageLanguage(rawMessageLanguage)
+      ? rawMessageLanguage
+      : locale;
 
   const [row] = await db.select().from(person).where(eq(person.id, personId));
   if (!row || row.mergedIntoId) return { ok: false, errorKey: "notFound" };
@@ -94,7 +97,13 @@ export async function generatePersonOutreachMessageAction(
     company,
     senderName,
     senderTitle,
-    locale: messageLanguage,
+    language: messageLanguage,
+    // TODO(email-gen-02): switch to the email channel by default here and
+    // parse the {subject, body} JSON output — this branch only carries the
+    // channel-aware prompt builder + signal extraction, not the action-layer
+    // wiring, to keep the change chain reviewable (see change description:
+    // "About 400 lines per chained branch").
+    channel: "linkedin",
   });
 
   const { system, prompt } = buildOutreachMessagePrompt(input);

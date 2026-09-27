@@ -10,7 +10,8 @@ import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { getRecentOutreachHistory, isLeadershipRoleGroup } from "@/lib/outreach/queries";
 import { buildOutreachMessagePrompt } from "@/lib/outreach/messagePrompt";
 import type { RoleGroupKey } from "@/lib/roleGroups";
-import { isLocale, type Locale } from "@/lib/i18n/locales";
+import type { Locale } from "@/lib/i18n/locales";
+import { isMessageLanguage, type MessageLanguage } from "@/lib/outreach/messageLanguage";
 
 // Model id verified against the live AI Gateway catalog
 // (https://ai-gateway.vercel.sh/v1/models) at implementation time — highest
@@ -50,8 +51,8 @@ export async function generateOutreachMessage(
   const me = await getCurrentBd();
 
   const rawMessageLanguage = formData.get("messageLanguage");
-  const messageLanguage: Locale =
-    typeof rawMessageLanguage === "string" && isLocale(rawMessageLanguage)
+  const messageLanguage: MessageLanguage =
+    typeof rawMessageLanguage === "string" && isMessageLanguage(rawMessageLanguage)
       ? rawMessageLanguage
       : locale;
 
@@ -84,7 +85,11 @@ export async function generateOutreachMessage(
     history,
     senderName,
     senderTitle,
-    locale: messageLanguage,
+    language: messageLanguage,
+    // /outreach is the LinkedIn-triage view (owner direction, 2026-09-26:
+    // "BDs use LinkedIn only for the first touch") — email-channel
+    // generation lives on the record page and the bulk action instead.
+    channel: "linkedin",
   });
 
   try {
