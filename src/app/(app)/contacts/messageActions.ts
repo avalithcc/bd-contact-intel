@@ -2,34 +2,29 @@
 
 /**
  * "Generar mensaje" on the `/contacts/[id]` record page (task 13.3, PR
- * 13c). Reuses the same prompt/generator as `/outreach`'s
- * generateOutreachMessage (src/app/outreach/actions.ts), but builds the
- * input from the unified `person` record instead of the legacy `contact`
- * table (src/lib/outreach/personMessageInput.ts) — so it works for ANY
- * person, including a teammate-only Contact the calling BD has no
+ * 13c; email-first per owner direction 2026-09-26). Reuses the same
+ * prompt/generator as `/outreach`'s generateOutreachMessage
+ * (src/app/outreach/actions.ts), but builds the input from the unified
+ * `person` record instead of the legacy `contact` table
+ * (src/lib/outreach/personMessageInput.ts) — so it works for ANY person,
+ * including a teammate-only Contact the calling BD has no
  * `person_bd_connection` row for. Never reads message content (R6): only
  * the calling BD's own connection counts/dates and shared `signal.data.body`
  * research notes feed the prompt.
  */
 import { and, desc, eq } from "drizzle-orm";
-import { generateText } from "ai";
-import { GatewayError } from "@ai-sdk/gateway";
 import { db } from "@/db";
 import { person, personBdConnection, signal } from "@/db/schema";
 import { getCurrentBd } from "@/lib/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { buildOutreachMessagePrompt } from "@/lib/outreach/messagePrompt";
 import { buildPersonMessageInput } from "@/lib/outreach/personMessageInput";
-import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
+import { runGenerateOutreachMessage, type GenerateOutreachMessageResult } from "@/lib/outreach/generateMessage";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { Locale } from "@/lib/i18n/locales";
 import { isMessageLanguage, type MessageLanguage } from "@/lib/outreach/messageLanguage";
+import { isOutreachChannel, DEFAULT_OUTREACH_CHANNEL } from "@/lib/outreach/channel";
 
-// Same gateway catalog check as OUTREACH_MODEL in src/app/outreach/actions.ts
-// — kept as a separate constant (not imported) since that file's constant
-// isn't exported, and duplicating one string id isn't worth widening that
-// module's public surface.
-const OUTREACH_MODEL = "anthropic/claude-sonnet-5";
+export type { GenerateOutreachMessageResult };
 
 // Same budget as draftLeadEmailAction's signal fetch (src/app/leads/actions.ts).
 const MAX_SIGNALS = 10;
@@ -40,6 +35,9 @@ const MAX_SIGNALS = 10;
  * (prevState, formData) signature is what GenerateMessageButton's
  * useActionState expects; `messageLanguage` in formData picks the
  * generated message's actual language, independent of the UI locale.
+ * `channel` in formData picks email vs linkedin (the dialog's "Canal"
+ * select) — defaults to `email` (owner direction 2026-09-26: "The AI
+ * message generator becomes email-first").
  */
 export async function generatePersonOutreachMessageAction(
   personId: string,
@@ -54,6 +52,9 @@ export async function generatePersonOutreachMessageAction(
     typeof rawMessageLanguage === "string" && isMessageLanguage(rawMessageLanguage)
       ? rawMessageLanguage
       : locale;
+
+  const rawChannel = formData.get("channel");
+  const channel = typeof rawChannel === "string" && isOutreachChannel(rawChannel) ? rawChannel : DEFAULT_OUTREACH_CHANNEL;
 
   const [row] = await db.select().from(person).where(eq(person.id, personId));
   if (!row || row.mergedIntoId) return { ok: false, errorKey: "notFound" };
@@ -98,35 +99,12 @@ export async function generatePersonOutreachMessageAction(
     senderName,
     senderTitle,
     language: messageLanguage,
-    // TODO(email-gen-02): switch to the email channel by default here and
-    // parse the {subject, body} JSON output — this branch only carries the
-    // channel-aware prompt builder + signal extraction, not the action-layer
-    // wiring, to keep the change chain reviewable (see change description:
-    // "About 400 lines per chained branch").
-    channel: "linkedin",
+    channel,
   });
 
-  const { system, prompt } = buildOutreachMessagePrompt(input);
-
-  try {
-    const { text } = await generateText({
-      model: OUTREACH_MODEL,
-      system,
-      prompt,
-      maxOutputTokens: 350,
-    });
-    const message = (messageLanguage === "es" ? text.replace(/[¿¡]/g, "") : text).trim();
-    if (!message) return { ok: false, errorKey: "generationFailed" };
-    // historyCount is always 0 here (not signalBodies.length): the existing
-    // hint copy ("Tiene en cuenta N mensajes anteriores") describes prior
-    // CONVERSATION messages, which this variant never reads (R6) — reusing
-    // it for the signal-note count would misrepresent what was used.
-    return { ok: true, message, historyCount: 0 };
-  } catch (error) {
-    console.error("generatePersonOutreachMessageAction failed", error);
-    if (GatewayError.isInstance(error) && (error.statusCode === 401 || error.statusCode === 403)) {
-      return { ok: false, errorKey: "gatewayNotConfigured" };
-    }
-    return { ok: false, errorKey: "generationFailed" };
-  }
+  // historyCount is always 0 here (not signalBodies.length): the existing
+  // hint copy ("Tiene en cuenta N mensajes anteriores") describes prior
+  // CONVERSATION messages, which this variant never reads (R6) — reusing
+  // it for the signal-note count would misrepresent what was used.
+  return runGenerateOutreachMessage(input, 0);
 }

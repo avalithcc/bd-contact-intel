@@ -321,6 +321,7 @@ export const en = {
       gatewayNotConfigured:
         "The AI Gateway isn't configured yet — set AI_GATEWAY_API_KEY (or sign in with Vercel OIDC) and try again.",
       generationFailed: "Couldn't generate a message right now. Try again in a moment.",
+      invalidModelOutput: "The generated draft came back in an unexpected format. Try again in a moment.",
     },
     // Shown above the generated message when prior LinkedIn history was fed
     // into the prompt (see historyCount in

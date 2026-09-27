@@ -139,7 +139,8 @@ export function GenerateMessageButton({
               ).replace("{n}", String(state.historyCount))}
             </p>
           )}
-          <p className="generate-message-text">{state.message}</p>
+          {state.subject && <p className="generate-message-subject">{state.subject}</p>}
+          <p className="generate-message-text">{state.subject ? state.body : state.message}</p>
           <button
             type="button"
             className="secondary-btn"
