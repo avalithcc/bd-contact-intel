@@ -966,6 +966,14 @@ export const en = {
     propOwner: "Owner",
     propRevenuePotential: "Revenue potential",
     propLocation: "Location",
+    // c05: Industria/Ciudad/País wired as their own inline-editable rows
+    // (owner-directed addition — the mockup only shows industry inside the
+    // headline text, but exposing an edit affordance needs a dedicated row).
+    propIndustry: "Industry",
+    propCity: "City",
+    propCountry: "Country",
+    ownerUnassignedOption: "Unassigned",
+    lastUpdatedByPrefix: "Last updated by",
     propStartup: "Startup",
     startupYes: "Yes",
     startupNo: "No",
@@ -1372,6 +1380,10 @@ export const en = {
     stageFilterLabel: "Stage:",
     addFilter: "Add filter",
     removeFilter: "Remove filter",
+    filterIndustryLabel: "Industry:",
+    filterIndustryAny: "Any",
+    filterOwnerLabel: "Owner:",
+    filterOwnerAny: "Any",
     stageProspect: "Prospect",
     stageQualified: "Qualified",
     stageProposalSent: "Proposal sent",

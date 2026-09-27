@@ -2,10 +2,16 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCompanyByKey } from "@/lib/companies/queries";
-import { getCompanyOpenTasks, getCompanyPeople, getCompanyTimeline } from "@/lib/companies/recordQueries";
+import {
+  getCompanyOpenTasks,
+  getCompanyPeople,
+  getCompanyPropertyHistory,
+  getCompanyTimeline,
+} from "@/lib/companies/recordQueries";
 import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { industryLabel, ownerLabel, locationLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
-import { marketBreakdown, startupLabel, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
+import { industryLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
+import { latestEditByProperty, marketBreakdown, startupLabel, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
+import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { Avatar } from "@/components/Avatar";
@@ -64,16 +70,21 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     );
   }
 
-  const [hiringIndex, people, timelineRows, openTasks, postings] = await Promise.all([
+  const [hiringIndex, people, timelineRows, openTasks, postings, propertyHistoryRows, ownerOptions] = await Promise.all([
     getHiringMatchIndex(),
     getCompanyPeople(key),
     getCompanyTimeline(key),
     getCompanyOpenTasks(key),
     getCompanyPostingsForKey(key),
+    getCompanyPropertyHistory(key),
+    listOwnerOptions(),
   ]);
 
   const hiring = hiringIndex.get(key) ?? null;
   const breakdown = marketBreakdown(postings?.postings ?? []);
+  // Plain object (not the Map recordMappers.ts returns) — see
+  // CompanyAboutPane.tsx's `lastEditByProperty` prop doc comment on why.
+  const lastEditByProperty = Object.fromEntries(latestEditByProperty(propertyHistoryRows));
 
   function stageLabelOf(stage: string): string {
     switch (stage) {
@@ -113,8 +124,6 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     invalidRequiresName: dict.contactList.newContactInvalidRequiresName,
   };
 
-  const pendingD1Fields = {}; // industry/ownerName/city/country: seam, see listMappers.ts
-
   return (
     <main>
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -128,13 +137,18 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           companyKey={key}
           companyName={company.displayName}
           logoInitials={companyLogoInitials(company.displayName)}
-          headline={[company.domain, industryLabel(pendingD1Fields)].filter(Boolean).join(" · ")}
+          headline={[company.domain, industryLabel(company)].filter(Boolean).join(" · ")}
           stage={company.relationshipStage}
           stageBadgeClass={stageBadgeClass(company.relationshipStage)}
           hiringBadgeText={hiring && hiring.openItCount > 0 ? l.hiringBadge : null}
           revenuePotential={company.revenuePotential}
-          ownerText={ownerLabel(pendingD1Fields)}
-          locationText={locationLabel(pendingD1Fields)}
+          industry={company.industry}
+          ownerBdId={company.ownerBdId}
+          ownerName={company.ownerName}
+          city={company.city}
+          country={company.country}
+          ownerOptions={ownerOptions}
+          lastEditByProperty={lastEditByProperty}
           startupText={startupLabel(hiring, l.startupYes, l.startupNo)}
           labels={{ ...l, ...lc }}
           newContactLabels={newContactLabels}

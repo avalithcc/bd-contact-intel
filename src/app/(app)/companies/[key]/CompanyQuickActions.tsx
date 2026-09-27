@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
-import { NoteIcon, TasksIcon, MeetingIcon } from "@/components/icons";
+import { NoteIcon, TasksIcon, MeetingIcon, ContactsIcon } from "@/components/icons";
 import { NewContactDialog, type NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import {
   addCompanyNoteAction,
@@ -90,9 +90,22 @@ export function CompanyQuickActions({
           </span>
           {l.quickActionTask}
         </button>
-        <div className="qa">
-          <NewContactDialog labels={newContactLabels} initialCompany={companyName} />
-        </div>
+        {/* mockup-port c05: styled to match the other 4 icon buttons
+            (company-record.html:66 shows Contacto as a plain `.qa` icon,
+            same as Nota/Tarea/Reunión/Más) instead of NewContactDialog's
+            default `.btn.btn-primary` trigger. */}
+        <NewContactDialog
+          labels={newContactLabels}
+          initialCompany={companyName}
+          renderTrigger={(onClick) => (
+            <button type="button" className="qa" onClick={onClick}>
+              <span className="qa-icon">
+                <ContactsIcon className="icon" />
+              </span>
+              {l.quickActionContact}
+            </button>
+          )}
+        />
         <button type="button" className="qa" onClick={() => setOpen("meeting")}>
           <span className="qa-icon">
             <MeetingIcon className="icon" />

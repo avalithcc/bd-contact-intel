@@ -2,11 +2,17 @@
  * Unit tests for src/lib/companies/recordMappers.ts — pure logic for the
  * `/companies/[key]` record rebuild (mockups/company-record.html):
  * per-market posting breakdown (Vacantes card), the Activity tab's filter
- * pills, and the Startup property's "—" seam.
+ * pills, the Startup property's "—" seam, and (mockup-port c05) reducing
+ * `company_property_history` rows into a last-edit-per-property map.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { filterTimelineRows, marketBreakdown, startupLabel } from "@/lib/companies/recordMappers";
+import {
+  filterTimelineRows,
+  latestEditByProperty,
+  marketBreakdown,
+  startupLabel,
+} from "@/lib/companies/recordMappers";
 
 test("marketBreakdown: tallies postings by market bucket", () => {
   const postings = [
@@ -69,4 +75,20 @@ test("startupLabel: renders yes/no plus the reason when classified", () => {
 
 test("startupLabel: renders yes/no with no reason suffix when startupReason is absent", () => {
   assert.equal(startupLabel({ isStartup: true, startupReason: null }, "Sí", "No"), "Sí");
+});
+
+test("latestEditByProperty: keeps the first (newest, per caller's ordering) row per property", () => {
+  const rows = [
+    { property: "industry", bdName: "Ana Pereyra", at: new Date("2026-09-20") },
+    { property: "industry", bdName: "Cristian Civita", at: new Date("2026-09-01") },
+    { property: "city", bdName: null, at: new Date("2026-09-15") },
+  ];
+  const map = latestEditByProperty(rows);
+  assert.deepEqual(map.get("industry"), { bdName: "Ana Pereyra", at: new Date("2026-09-20") });
+  assert.deepEqual(map.get("city"), { bdName: null, at: new Date("2026-09-15") });
+  assert.equal(map.get("ownerBdId"), undefined);
+});
+
+test("latestEditByProperty: empty input yields an empty map", () => {
+  assert.equal(latestEditByProperty([]).size, 0);
 });

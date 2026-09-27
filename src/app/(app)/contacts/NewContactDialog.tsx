@@ -41,13 +41,22 @@ const EMPTY_INPUT: NewContactFormInput = { firstName: "", lastName: "", linkedin
  * company's display name — `NewContactFormInput.company` is already a free-
  * text name resolved to a `companyKey` server-side (see createContact.ts),
  * so no new field or action was needed, just this optional default.
+ *
+ * `renderTrigger` (mockup-port c05, small open item closed): lets a caller
+ * swap the default `.btn.btn-primary` trigger for its own markup — the
+ * company record's quick actions row needs the mockup's uniform `.qa`/
+ * `.qa-icon` icon-button style (company-record.html:66), not a standalone
+ * primary button, while `/contacts`' own "Nuevo contacto" trigger keeps the
+ * default. Receives the same `onClick` the default button would use.
  */
 export function NewContactDialog({
   labels: l,
   initialCompany,
+  renderTrigger,
 }: {
   labels: NewContactDialogLabels;
   initialCompany?: string;
+  renderTrigger?: (onClick: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -76,9 +85,13 @@ export function NewContactDialog({
 
   return (
     <>
-      <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
-        {l.triggerLabel}
-      </button>
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : (
+        <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
+          {l.triggerLabel}
+        </button>
+      )}
       {open && (
         <div className="overlay open" role="dialog" aria-modal="true" aria-labelledby="new-contact-title">
           <div className="dialog">

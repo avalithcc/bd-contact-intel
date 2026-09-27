@@ -41,29 +41,32 @@ export function vacantesLabel(openItCount: number | null | undefined): string | 
 }
 
 /**
- * D1 (owner-approved 2026-09-26): `company.industry`/`owner_bd_id`/`city`/
- * `country` are being added by a parallel data branch
- * (feat/company-fields-01…, forked from the same base commit as this one).
- * This is the seam these mappers read: optional fields, "—" when absent.
- * Once that branch merges and the list/record queries start selecting the
- * real columns, no mapper change is needed here — only the query call site.
+ * D1 (owner-approved 2026-09-26): resolved in mockup-port c05.
+ * `company.industry`/`owner_bd_id`/`city`/`country` landed via
+ * `feat/company-fields-03-require-headers` (migration 0017, backfilled in
+ * prod) and are now selected for real by `getCompanyListPage`/
+ * `getCompanyByKey`. These mappers were built as the read seam before that
+ * merge (optional fields, "—" when absent) and still fill that role for a
+ * company that genuinely has no value for one of these fields (e.g. no
+ * owner assigned yet) — kept as-is, no signature change needed now that the
+ * query call sites pass real values instead of always-null placeholders.
  */
-export interface PendingD1Fields {
+export interface CompanyIdentityFields {
   industry?: string | null;
   ownerName?: string | null;
   city?: string | null;
   country?: string | null;
 }
 
-export function industryLabel(row: PendingD1Fields): string {
+export function industryLabel(row: CompanyIdentityFields): string {
   return row.industry ?? EMPTY_VALUE;
 }
 
-export function ownerLabel(row: PendingD1Fields): string {
+export function ownerLabel(row: CompanyIdentityFields): string {
   return row.ownerName ?? EMPTY_VALUE;
 }
 
-export function locationLabel(row: PendingD1Fields): string {
+export function locationLabel(row: CompanyIdentityFields): string {
   const parts = [row.city, row.country].filter((v): v is string => Boolean(v && v.trim()));
   return parts.length ? parts.join(", ") : EMPTY_VALUE;
 }

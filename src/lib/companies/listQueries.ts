@@ -1,8 +1,11 @@
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { activity, company, person } from "@/db/schema";
+import { activity, bd, company, person } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import type { HiringMatch } from "@/lib/hiring/queries";
+
+const owner = alias(bd, "company_list_owner");
 
 export type CompanyListView = "all" | "mine" | "hiring";
 
@@ -14,11 +17,14 @@ export interface CompanyListRow {
   contactCount: number;
   hiring: HiringMatch | null;
   lastActivityAt: Date | null;
-  // Pending D1 (owner-approved 2026-09-26) — see listMappers.ts. `null`
-  // until the parallel data branch (feat/company-fields-01…) adds these
-  // columns to `company` and this query starts selecting them for real.
+  // Wired for real in mockup-port c05 (D1 resolved — migration 0017,
+  // feat/company-fields-03-require-headers). `industry`/`city`/`country`
+  // come straight off `company`; `ownerName` needs the join below.
   industry: string | null;
+  ownerBdId: string | null;
   ownerName: string | null;
+  city: string | null;
+  country: string | null;
 }
 
 export interface CompanyListPage {
@@ -38,11 +44,10 @@ export interface CompanyListPage {
  *
  * `view` narrows the WHERE clause in SQL, not a post-fetch JS filter:
  * - "all": no extra condition.
- * - "mine": `created_by_bd_id = meBdId`. Interim stand-in for a real
- *   "owner" concept — `company` has no `owner_bd_id` yet (pending D1,
- *   being added by feat/company-fields-01…). Documented in
- *   companies-checklist.md; swap to the real owner column once that
- *   branch merges.
+ * - "mine": `owner_bd_id = meBdId` (mockup-port c05: now the real owner
+ *   column — this used `created_by_bd_id` as an interim stand-in before D1
+ *   landed; that was never a real "owner" concept, just whoever happened to
+ *   create the row).
  * - "hiring": `company_key IN (hiringIndex keys)`. The index (see
  *   getHiringMatchIndex) is already keyed by every canonical company key
  *   AND every company_alias pointing at it, resolving to the same
@@ -52,6 +57,11 @@ export interface CompanyListPage {
  * `hiringIndex` is fetched once per request by the caller (page.tsx) via
  * the cached `getHiringMatchIndex()` and threaded through here — this
  * function never calls it itself, so it's never computed twice.
+ *
+ * `industry`/`ownerBdId` filters (mockup-port c05) are index-backed
+ * (`company_industry_idx`/`company_owner_idx`, migration 0017) — the only
+ * two D1 fields the list filters on, per the owner's instruction to only
+ * add filters the new indexes actually support.
  */
 export async function getCompanyListPage(
   view: CompanyListView,
@@ -60,10 +70,14 @@ export async function getCompanyListPage(
   hiringIndex: Map<string, HiringMatch>,
   page: number,
   pageSize: number,
+  industryFilter?: string,
+  ownerFilter?: string,
 ): Promise<CompanyListPage> {
   const conditions: SQL[] = [];
   if (stage) conditions.push(eq(company.relationshipStage, stage));
-  if (view === "mine") conditions.push(eq(company.createdByBdId, meBdId));
+  if (view === "mine") conditions.push(eq(company.ownerBdId, meBdId));
+  if (industryFilter) conditions.push(eq(company.industry, industryFilter));
+  if (ownerFilter) conditions.push(eq(company.ownerBdId, ownerFilter));
 
   let hiringKeys: string[] | null = null;
   if (view === "hiring") {
@@ -82,8 +96,19 @@ export async function getCompanyListPage(
 
   const offset = (page - 1) * pageSize;
   const companyRows = await db
-    .select()
+    .select({
+      companyKey: company.companyKey,
+      displayName: company.displayName,
+      domain: company.domain,
+      relationshipStage: company.relationshipStage,
+      industry: company.industry,
+      ownerBdId: company.ownerBdId,
+      ownerName: owner.name,
+      city: company.city,
+      country: company.country,
+    })
     .from(company)
+    .leftJoin(owner, eq(company.ownerBdId, owner.id))
     .where(where)
     .orderBy(company.displayName)
     .limit(pageSize)
@@ -136,8 +161,11 @@ export async function getCompanyListPage(
       contactCount: contactCountByKey.get(r.companyKey) ?? 0,
       hiring: hiringIndex.get(r.companyKey) ?? null,
       lastActivityAt: rawAt ? new Date(rawAt) : null,
-      industry: null,
-      ownerName: null,
+      industry: r.industry,
+      ownerBdId: r.ownerBdId,
+      ownerName: r.ownerName,
+      city: r.city,
+      country: r.country,
     };
   });
 
@@ -158,7 +186,7 @@ export async function getCompanyViewCounts(
   const hiringKeys = [...hiringIndex.keys()];
   const [[allRow], [mineRow], hiringRows] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(company),
-    db.select({ count: sql<number>`count(*)::int` }).from(company).where(eq(company.createdByBdId, meBdId)),
+    db.select({ count: sql<number>`count(*)::int` }).from(company).where(eq(company.ownerBdId, meBdId)),
     hiringKeys.length
       ? db.select({ count: sql<number>`count(*)::int` }).from(company).where(inArray(company.companyKey, hiringKeys))
       : Promise.resolve([{ count: 0 }]),
@@ -168,4 +196,29 @@ export async function getCompanyViewCounts(
     mine: mineRow?.count ?? 0,
     hiring: hiringRows[0]?.count ?? 0,
   };
+}
+
+export interface CompanyFilterOptions {
+  industries: string[];
+}
+
+const MAX_INDUSTRY_OPTIONS = 100;
+
+/**
+ * Distinct industry values for the "Agregar filtro" → Industria select
+ * (mockup-port c05). Bounded (`MAX_INDUSTRY_OPTIONS`) and index-backed
+ * (`company_industry_idx`, migration 0017) — a `DISTINCT` scan over a
+ * text column with 14,240 rows, capped so a long tail of one-off values
+ * can never make this list unbounded. Owner options reuse
+ * `listOwnerOptions()` (src/lib/contacts/bulkOwnerDb.ts) directly — it's
+ * already a generic `bd` list, not Contact-specific.
+ */
+export async function getCompanyFilterOptions(): Promise<CompanyFilterOptions> {
+  const rows = await db
+    .selectDistinct({ industry: company.industry })
+    .from(company)
+    .where(isNotNull(company.industry))
+    .orderBy(asc(company.industry))
+    .limit(MAX_INDUSTRY_OPTIONS);
+  return { industries: rows.map((r) => r.industry).filter((v): v is string => v !== null) };
 }

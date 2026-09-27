@@ -3,7 +3,13 @@ import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringMatchIndex } from "@/lib/hiring/queries";
-import { getCompanyListPage, getCompanyViewCounts, type CompanyListView } from "@/lib/companies/listQueries";
+import {
+  getCompanyFilterOptions,
+  getCompanyListPage,
+  getCompanyViewCounts,
+  type CompanyListView,
+} from "@/lib/companies/listQueries";
+import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
 
@@ -22,7 +28,7 @@ function isView(value: string | undefined): value is CompanyListView {
 }
 
 interface CompaniesPageProps {
-  searchParams: Promise<{ view?: string; stage?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; stage?: string; page?: string; industry?: string; owner?: string }>;
 }
 
 /**
@@ -42,31 +48,41 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const view: CompanyListView = isView(sp.view) ? sp.view : "all";
   const stage = isStage(sp.stage) ? sp.stage : undefined;
   const page = Math.max(1, Number(sp.page) || 1);
+  const industry = sp.industry || undefined;
+  const owner = sp.owner || undefined;
 
   // Fetched once per request (React `cache()`, see getHiringMatchIndex's
   // doc comment) and threaded through both the view-tab count and the list
   // query below — never computed twice.
   const hiringIndex = await getHiringMatchIndex();
 
-  const [{ rows, total, totalPages }, viewCounts] = await Promise.all([
-    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE),
+  const [{ rows, total, totalPages }, viewCounts, filterOptions, ownerOptions] = await Promise.all([
+    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner),
     getCompanyViewCounts(me.id, hiringIndex),
+    getCompanyFilterOptions(),
+    listOwnerOptions(),
   ]);
 
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
 
-  function viewHref(target: CompanyListView): string {
+  function baseParams(): URLSearchParams {
     const params = new URLSearchParams();
-    params.set("view", target);
     if (stage) params.set("stage", stage);
+    if (industry) params.set("industry", industry);
+    if (owner) params.set("owner", owner);
+    return params;
+  }
+
+  function viewHref(target: CompanyListView): string {
+    const params = baseParams();
+    params.set("view", target);
     return `/companies?${params.toString()}`;
   }
 
   function pageHref(target: number): string {
-    const params = new URLSearchParams();
+    const params = baseParams();
     params.set("view", view);
-    if (stage) params.set("stage", stage);
     params.set("page", String(target));
     return `/companies?${params.toString()}`;
   }
@@ -86,10 +102,15 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     }
   }
 
-  function clearStageHref(): string {
-    const params = new URLSearchParams();
+  function clearFilterHref(key: "stage" | "industry" | "owner"): string {
+    const params = baseParams();
+    params.delete(key);
     params.set("view", view);
     return `/companies?${params.toString()}`;
+  }
+
+  function ownerNameFor(id: string): string {
+    return ownerOptions.find((o) => o.id === id)?.name ?? l.emptyValue;
   }
 
   return (
@@ -129,11 +150,33 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         <span className="chip">
           <span className="k">{l.stageFilterLabel}</span> {stage ? stageLabel(stage) : l.stageAny}
           {stage && (
-            <Link href={clearStageHref()} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("stage")} aria-label={l.removeFilter}>
               ×
             </Link>
           )}
         </span>
+        {/* Industria/Responsable chips (mockup-port c05, owner-directed
+            addition — companies.html itself shows only the Etapa chip, but
+            the mockup's "Agregar filtro" affordance exists precisely for
+            adding more, same as /contacts' own beyond-mockup filters). Both
+            are index-backed (company_industry_idx/company_owner_idx,
+            migration 0017). */}
+        {industry && (
+          <span className="chip">
+            <span className="k">{l.filterIndustryLabel}</span> {industry}
+            <Link href={clearFilterHref("industry")} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          </span>
+        )}
+        {owner && (
+          <span className="chip">
+            <span className="k">{l.filterOwnerLabel}</span> {ownerNameFor(owner)}
+            <Link href={clearFilterHref("owner")} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          </span>
+        )}
         <details className="dropdown">
           <summary className="chip chip-add">{l.addFilter}</summary>
           <form method="get" action="/companies" className="menu">
@@ -145,6 +188,28 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
                     {stageLabel(s)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="menu-item">
+              {l.filterIndustryLabel}
+              <select name="industry" defaultValue={industry ?? ""}>
+                <option value="">{l.filterIndustryAny}</option>
+                {filterOptions.industries.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="menu-item">
+              {l.filterOwnerLabel}
+              <select name="owner" defaultValue={owner ?? ""}>
+                <option value="">{l.filterOwnerAny}</option>
+                {ownerOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
                   </option>
                 ))}
               </select>

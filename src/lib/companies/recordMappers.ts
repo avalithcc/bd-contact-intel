@@ -80,3 +80,32 @@ export function startupLabel(signal: StartupSignal | null, yesLabel: string, noL
   const base = signal.isStartup ? yesLabel : noLabel;
   return signal.startupReason ? `${base} · ${signal.startupReason}` : base;
 }
+
+export interface CompanyPropertyHistoryRow {
+  property: string;
+  bdName: string | null;
+  at: Date;
+}
+
+export interface LastEdit {
+  bdName: string | null;
+  at: Date;
+}
+
+/**
+ * Reduces `company_property_history` rows into a last-edit-per-property
+ * map (mockup-port c05, wiring D1) — same reduction contacts/queries.ts
+ * does inline for `personPropertyHistory` ("first row per property wins").
+ * The caller MUST pass rows already ordered newest-first (recordQueries.ts
+ * does this in SQL via `ORDER BY at DESC`); this function does no sorting
+ * of its own, so it stays a plain, cheap reduction.
+ */
+export function latestEditByProperty(rows: readonly CompanyPropertyHistoryRow[]): Map<string, LastEdit> {
+  const map = new Map<string, LastEdit>();
+  for (const row of rows) {
+    if (!map.has(row.property)) {
+      map.set(row.property, { bdName: row.bdName, at: row.at });
+    }
+  }
+  return map;
+}

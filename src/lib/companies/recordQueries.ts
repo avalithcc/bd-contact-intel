@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, bd, person, task } from "@/db/schema";
+import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import type { CompanyPropertyHistoryRow } from "@/lib/companies/recordMappers";
 
 const PEOPLE_LIMIT = 200; // bounded crossover set for the timeline/tasks joins below
 const TIMELINE_LIMIT = 50;
@@ -150,4 +151,21 @@ export async function getCompanyOpenTasks(companyKey: string): Promise<CompanyOp
     .limit(OPEN_TASKS_LIMIT);
 
   return rows;
+}
+
+/**
+ * Last-edit-per-property hint for the About pane's Industria/Responsable/
+ * Ciudad/País rows (mockup-port c05, wiring D1) — mirrors
+ * src/lib/contacts/queries.ts's `personPropertyHistory` read exactly:
+ * bounded to this one company, joined to `bd` for the "changed by" name,
+ * ordered newest-first so `latestEditByProperty` (recordMappers.ts) can
+ * take the first row per property.
+ */
+export async function getCompanyPropertyHistory(companyKey: string): Promise<CompanyPropertyHistoryRow[]> {
+  return db
+    .select({ property: companyPropertyHistory.property, bdName: bd.name, at: companyPropertyHistory.at })
+    .from(companyPropertyHistory)
+    .leftJoin(bd, eq(bd.id, companyPropertyHistory.changedByBdId))
+    .where(eq(companyPropertyHistory.companyKey, companyKey))
+    .orderBy(desc(companyPropertyHistory.at));
 }
