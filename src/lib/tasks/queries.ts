@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, gt, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, task, type Task, type NewTask } from "@/db/schema";
+import { bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
+import type { TaskSubjectInput } from "@/lib/tasks/subject";
 
 export interface TaskFilters {
   leadId?: string;
@@ -13,8 +14,48 @@ export interface TaskFilters {
   status?: "open" | "done" | "cancelled";
 }
 
-export interface TaskRow extends Task {
+export interface TaskRow extends Task, TaskSubjectInput {
   assignedToName?: string | null;
+}
+
+/**
+ * One select shape shared by every /tasks read below (mockup-port t02): the
+ * "Asociado con" column needs the real Contact/Company name, not just the
+ * `personId`/`companyKey` foreign key — so every task list left-joins
+ * `person` (on its PK) and `company` (on its PK) once, here, instead of
+ * each read building its own ad-hoc join (data-builder rule: no per-row
+ * queries — this is a single bounded join, not a loop).
+ */
+function taskSubjectSelect() {
+  return {
+    id: task.id,
+    leadId: task.leadId,
+    companyKey: task.companyKey,
+    contactId: task.contactId,
+    personId: task.personId,
+    actorBdId: task.actorBdId,
+    assignedToBdId: task.assignedToBdId,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    dueAt: task.dueAt,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    assignedToName: bd.name,
+    subjectPersonFirstName: person.firstName,
+    subjectPersonLastName: person.lastName,
+    subjectPersonCompany: person.company,
+    subjectCompanyName: company.displayName,
+  } as const;
+}
+
+function baseTaskSubjectQuery() {
+  return db
+    .select(taskSubjectSelect())
+    .from(task)
+    .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+    .leftJoin(person, eq(task.personId, person.id))
+    .leftJoin(company, eq(task.companyKey, company.companyKey));
 }
 
 export interface TasksPage {
@@ -56,25 +97,7 @@ export async function getTasks(
     .from(task)
     .where(whereCondition);
 
-  const rows = await db
-    .select({
-      id: task.id,
-      leadId: task.leadId,
-      companyKey: task.companyKey,
-      contactId: task.contactId,
-      personId: task.personId,
-      actorBdId: task.actorBdId,
-      assignedToBdId: task.assignedToBdId,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      dueAt: task.dueAt,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      assignedToName: bd.name,
-    })
-    .from(task)
-    .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+  const rows = await baseTaskSubjectQuery()
     .where(whereCondition)
     .orderBy(asc(task.dueAt), desc(task.createdAt))
     .limit(limit)
@@ -87,28 +110,36 @@ export async function getTasks(
 }
 
 export async function getOpenTasks(bdId: string, limit: number = 50): Promise<TaskRow[]> {
-  return db
-    .select({
-      id: task.id,
-      leadId: task.leadId,
-      companyKey: task.companyKey,
-      contactId: task.contactId,
-      personId: task.personId,
-      actorBdId: task.actorBdId,
-      assignedToBdId: task.assignedToBdId,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      dueAt: task.dueAt,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      assignedToName: bd.name,
-    })
-    .from(task)
-    .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+  return baseTaskSubjectQuery()
     .where(and(eq(task.assignedToBdId, bdId), eq(task.status, "open")))
     .orderBy(asc(task.dueAt), desc(task.createdAt))
     .limit(limit);
+}
+
+/**
+ * "Todas abiertas" view tab (mockup-port t01; tasks.html `.view-tabs`) — the
+ * same open-task shape as `getOpenTasks`, just without the assignee filter,
+ * since this tab shows every BD's open tasks, not only the current one's.
+ */
+export async function getAllOpenTasks(limit: number = 100): Promise<TaskRow[]> {
+  return baseTaskSubjectQuery()
+    .where(eq(task.status, "open"))
+    .orderBy(asc(task.dueAt), desc(task.createdAt))
+    .limit(limit);
+}
+
+/**
+ * "Completadas" view tab (mockup-port t01) — `status = 'done'`, most
+ * recently updated first (a completed task has no meaningful `dueAt`
+ * ordering left), bounded by `limit`/`offset` since this list can grow
+ * unbounded over time (task_status_idx covers the filter).
+ */
+export async function getCompletedTasks(limit: number = 50, offset: number = 0): Promise<TaskRow[]> {
+  return baseTaskSubjectQuery()
+    .where(eq(task.status, "done"))
+    .orderBy(desc(task.updatedAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 /**
@@ -118,50 +149,14 @@ export async function getOpenTasks(bdId: string, limit: number = 50): Promise<Ta
  * handful of open tasks at most.
  */
 export async function getOpenTasksForPerson(personId: string, limit: number = 50): Promise<TaskRow[]> {
-  return db
-    .select({
-      id: task.id,
-      leadId: task.leadId,
-      companyKey: task.companyKey,
-      contactId: task.contactId,
-      personId: task.personId,
-      actorBdId: task.actorBdId,
-      assignedToBdId: task.assignedToBdId,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      dueAt: task.dueAt,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      assignedToName: bd.name,
-    })
-    .from(task)
-    .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+  return baseTaskSubjectQuery()
     .where(and(eq(task.personId, personId), eq(task.status, "open")))
     .orderBy(asc(task.dueAt), desc(task.createdAt))
     .limit(limit);
 }
 
 export async function getOverdueTasks(bdId: string): Promise<TaskRow[]> {
-  return db
-    .select({
-      id: task.id,
-      leadId: task.leadId,
-      companyKey: task.companyKey,
-      contactId: task.contactId,
-      personId: task.personId,
-      actorBdId: task.actorBdId,
-      assignedToBdId: task.assignedToBdId,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      dueAt: task.dueAt,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      assignedToName: bd.name,
-    })
-    .from(task)
-    .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+  return baseTaskSubjectQuery()
     .where(
       and(
         eq(task.assignedToBdId, bdId),

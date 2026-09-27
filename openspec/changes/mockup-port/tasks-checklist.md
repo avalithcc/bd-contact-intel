@@ -17,7 +17,7 @@ Columns: `element | mockup ref | status | evidence file:line | notes`.
 | Próximas group | tasks.html `h3 Próximas` | done | src/app/(app)/tasks/page.tsx:85-94 | pre-existing |
 | Table: check column (complete task) | tasks.html `.col-check` | done | src/app/(app)/tasks/CompleteTaskButton.tsx | keep as-is, tests cover it |
 | Table: Tarea column (title + description) | tasks.html `<span class="strong">` | done | src/app/(app)/tasks/page.tsx:164-167 | pre-existing |
-| Table: Asociado con column — real contact/company name, linked | tasks.html `<a href="contact-record.html">Name · Company</a>` | todo | | needs join in getTasks-family queries; currently shows literal "Contacto"/"Empresa" label only |
+| Table: Asociado con column — real contact/company name, linked | tasks.html `<a href="contact-record.html">Name · Company</a>` | done | src/lib/tasks/subject.ts, src/lib/tasks/queries.ts:29-58, src/app/(app)/tasks/page.tsx:157,168-170 | bounded leftJoin on person/company PKs, no per-row queries; see t02 |
 | Table: Responsable column (owner chip) | tasks.html `.owner-chip` | done | src/app/(app)/tasks/page.tsx:173-178 | pre-existing |
 | Table: Vencimiento column (badges) | tasks.html `.badge` | done | src/app/(app)/tasks/page.tsx:179-193 | pre-existing |
 | Empty state | tasks.html (n/a, not shown in mockup but existing app behavior kept) | done | src/app/(app)/tasks/page.tsx:59-62 | pre-existing, kept |

@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { getOpenTasks, getOverdueTasks } from "@/lib/tasks/queries";
+import { resolveTaskSubject } from "@/lib/tasks/subject";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { CompleteTaskButton } from "./CompleteTaskButton";
@@ -155,6 +157,7 @@ function TaskRow({
   const l = dict.tasksPage;
   const status = dueStatus(task);
   const ownerName = task.assignedToName ?? me.name;
+  const subject = resolveTaskSubject(task);
 
   return (
     <tr>
@@ -166,9 +169,7 @@ function TaskRow({
         {task.description && <p className={styles.taskDescription}>{task.description}</p>}
       </td>
       <td>
-        {task.leadId && l.subjectLead}
-        {task.companyKey && !task.leadId && l.subjectCompany}
-        {!task.leadId && !task.companyKey && "—"}
+        {subject ? <Link href={subject.href}>{subject.label}</Link> : "—"}
       </td>
       <td>
         <span className={styles.ownerChip}>
