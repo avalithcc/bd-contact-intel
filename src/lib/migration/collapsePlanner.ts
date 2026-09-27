@@ -52,7 +52,11 @@ export interface CollapseConnection {
 // 'new' — this row is the first sighting of this person.
 // 'review' — this row is the first sighting, but it was ALSO flagged
 // against an existing person (never auto-merged) — see design D3.
-export type CollapseLegacyMethod = "profile_key" | "verified_email" | "new" | "review";
+// Includes "email_exact" for type-vocabulary parity with the matcher's
+// MatchResult.key (matcher.ts) — never actually produced here, since this
+// planner's rows never set `source: "manual_create"` (that rule is
+// manual_create-only; see matcher.ts's manual_create block).
+export type CollapseLegacyMethod = "profile_key" | "verified_email" | "email_exact" | "new" | "review";
 
 export interface CollapseLegacyMapping {
   legacyContactId: string;

@@ -259,7 +259,7 @@ export function Timeline({
               {group.kind === "pre-migration" ? l.timelineGroupPreMigration : monthLabel(group.items[0].at)}
             </div>
             <div className="tl">
-              {group.items.map(({ entry }) => {
+              {group.items.map(({ entry, at }) => {
                 if (entry.type === MERGE_UNIFIED_TYPE) {
                   return (
                     <div key={entry.id} className="tl-item">
@@ -269,7 +269,7 @@ export function Timeline({
                       <div className="tl-card system">
                         <div className="tl-head">
                           <span className="what">{l.mergeCardWhat}</span>
-                          <span className="when">{formatWhen(entry.createdAt)}</span>
+                          <span className="when">{formatWhen(at)}</span>
                         </div>
                         <div className="tl-body">
                           {serverStrings.mergeCardBody(mergeInfo!.unifiedFromCount)}
@@ -339,7 +339,7 @@ export function Timeline({
                           <span className="what">
                             {l[LINKEDIN_PREFIX_KEY[type]] as string} · {l.linkedinConversationOfPrefix} {bdName}
                           </span>
-                          <span className="when">{formatWhen(entry.createdAt)}</span>
+                          <span className="when">{formatWhen(at)}</span>
                         </div>
                         {access === "admin-bypass" ? (
                           <AdminConversationReveal
@@ -381,7 +381,7 @@ export function Timeline({
                             </>
                           )}
                         </span>
-                        <span className="when">{formatWhen(timelineEntry.createdAt)}</span>
+                        <span className="when">{formatWhen(at)}</span>
                       </div>
                       <div className={timelineEntry.visible ? "tl-body" : "locked"}>
                         {timelineEntry.type === "note" && timelineEntry.visible ? (

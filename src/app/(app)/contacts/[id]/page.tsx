@@ -15,7 +15,6 @@ import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { getCompanyByKey, getCompanyContactCount } from "@/lib/companies/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
-import { effectiveActivityAt } from "@/lib/contacts/timelineGrouping";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
@@ -175,7 +174,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // reuses data already fetched above for the Actividad tab/right panel.
   const lastActivityCandidates: RecentActivityCandidate[] = [
     ...timeline.entries.map((e) => ({
-      at: effectiveActivityAt(e),
+      at: e.at,
       channelLabel:
         e.type === "email_sent" ? l.channelEmail : e.type === "note" ? l.channelNote : l.timelineSystemActor,
       actorName: e.actorName,

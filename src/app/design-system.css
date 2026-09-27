@@ -278,7 +278,9 @@ details.card[open] > summary .chev { transform: rotate(180deg); }
 details.card:not([open]) > summary { border-bottom: 0; }
 
 /* ---------------------------------------------------------------- tabs */
-.view-tabs { display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-md); overflow-x: auto; }
+/* No overflow clipping: the "Más vistas" dropdown hangs below the tab row,
+   and pinned tabs + overflow menu keep the row within the page width. */
+.view-tabs { display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-md); }
 .view-tab {
   display: inline-flex; align-items: center; gap: var(--space-2xs); padding: var(--space-sm) var(--space-md);
   font-size: var(--text-base); font-weight: 500; color: var(--color-ink-soft); white-space: nowrap;
@@ -301,7 +303,9 @@ details.card:not([open]) > summary { border-bottom: 0; }
 /* -------------------------------------------------------------- toolbar */
 .toolbar { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-md); }
 .toolbar .spacer { flex: 1; }
+/* Sticky so the bar stays in view while checking rows further down the table. */
 .bulk-bar {
+  position: sticky; top: var(--space-sm); z-index: 20;
   display: flex; align-items: center; gap: var(--space-sm);
   padding: var(--space-2xs) var(--space-sm) var(--space-2xs) var(--space-md); margin-bottom: var(--space-md);
   background: var(--color-ink); color: var(--color-surface-2); border-radius: var(--radius-md);

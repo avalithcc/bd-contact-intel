@@ -75,7 +75,20 @@ test("matchableRowFromFields maps NewContactFields to the matcher's MatchableRow
     firstName: fields.firstName,
     lastName: fields.lastName,
     company: fields.company,
+    source: "manual_create",
   });
+});
+
+test("matchableRowFromFields tags the row source: manual_create so the matcher's manual-create exact-email rule applies (contact-identity delta)", () => {
+  const fields = buildNewContactFields({
+    firstName: "Ana",
+    lastName: "Gomez",
+    linkedinUrl: "",
+    email: "ana@acme.com",
+    company: "Acme",
+  });
+  const row = matchableRowFromFields(fields);
+  assert.equal(row.source, "manual_create");
 });
 
 test("classifyMatchResultForCreate: an exact auto match (profile key or verified email) means the person already exists — never create", () => {

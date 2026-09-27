@@ -70,6 +70,11 @@ export function matchableRowFromFields(fields: NewContactFields): MatchableRow {
     firstName: fields.firstName,
     lastName: fields.lastName,
     company: fields.company,
+    // Tags this row for the matcher's manual_create exact-email rule
+    // (contact-identity delta): an exact email match to a live person
+    // auto-merges here (same "already exists" UX as profile_key), unlike
+    // the hubspot_import email_unverified rule, which only ever reviews.
+    source: "manual_create",
   };
 }
 
