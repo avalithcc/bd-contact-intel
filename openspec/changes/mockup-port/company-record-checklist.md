@@ -11,7 +11,32 @@ Reference implementation: `src/app/(app)/contacts/[id]/page.tsx` +
 Current state before this change: `src/app/(app)/companies/[key]/page.tsx` is flat (back-link,
 header, stage badge via inline styles, notes box, `ActivityTimeline`, two admin buttons) — no
 three-panel layout, no quick actions, no tabs, no associations panel. Every row is `todo` unless
-noted.
+noted. **Not started yet** — c02 spent this session's remaining budget on the list page; this
+page is next (c03+).
+
+**Corrections (owner, after c01):**
+- `effectiveActivityTime.ts` and `contacts-checklist.md` DO exist at base `33b834f` — see the
+  correction note at the top of companies-checklist.md.
+- The "cambio posterior" mockup note means the redesign was *scheduled* for a later change —
+  and per the owner, **this change is that later change**. Build the record exactly as
+  `company-record.html` shows it, not as a shell stub.
+- D1 is owner-approved: `industry`/`owner_bd_id`/`city`/`country` are being added by the
+  parallel `feat/company-fields-01…` data branch. Build everything else now; render those
+  properties through the same pending-D1 seam as the list (`listMappers.ts`), "—" until merged.
+- Startup: use `getHiringMatchIndex()`'s `isStartup`/`startupReason` (already present on
+  `HiringMatch`, straight from `target_company.is_startup` — see `src/lib/hiring/queries.ts:65-70,
+  339-341`) when the company is a hiring target. Otherwise "—". No new data source needed, no
+  owner decision — this was a research gap in c01, not a real blocker.
+- Tasks: `task` table has `companyKey` AND `personId` columns directly
+  (`src/db/schema.ts:1083-1108`, `task_company_idx`/`task_person_idx`) — a company↔task link
+  already exists. "Tareas abiertas" is buildable now (bounded: `companyKey = X OR personId IN
+  (people at X)`, `status = 'open'`), not blocked on the parallel tasks rebuild. Still don't
+  touch `src/app/(app)/tasks/*` itself (coordination note) — only read from `task` here.
+- Quick actions: "Contacto" opens the existing `NewContactDialog` prefilled with this company;
+  "Reunión" logs a meeting activity with `companyKey` (extend `logContactMeetingAction`'s
+  underlying logic with TDD if it only supports a `personId` today — needs verifying against
+  `src/lib/contacts/call.ts`/the meeting action's actual signature, not yet checked). "Nota"/
+  "Tarea" stay as originally planned (company-scoped `activity`/`task` rows).
 
 | element | mockup ref | status | evidence | notes |
 |---|---|---|---|---|
@@ -22,38 +47,43 @@ noted.
 | Prop: Etapa (badge + inline edit pencil) | company-record.html:69 | todo | — | Wraps existing `updateCompany` action; edit UX mirrors contact record's inline property edit (PR 09b2 per contacts/[id]/page.tsx:37 comment). |
 | Prop: Responsable (owner chip + edit) | company-record.html:70 | deviation | — | Same D1 dependency as the list — no real owner field yet. |
 | Prop: Potencial de ingresos (edit) | company-record.html:71 | todo | — | Maps to existing `revenuePotential` column. |
-| Prop: Sede (Buenos Aires, Argentina) | company-record.html:72 | deviation | — | No location field on `company`. Same options as D1 (migrate a column, or derive from linked contacts' city/country) — owner decision. |
-| Prop: Startup classification + "Clasificación por IA" hint | company-record.html:73 | deviation | — | No AI-startup-classification data source found on `company` or `person`; `isStartup`/`startupReason` exist per-person in outreach (`src/lib/contacts/outreachViewParams.ts` references), not per-company. Needs an owner decision on whether to aggregate from contacts or skip this prop entirely. |
+| Prop: Sede (Buenos Aires, Argentina) | company-record.html:72 | pending D1 | — | `city`/`country` on the parallel data branch — same seam as Industria/Responsable. |
+| Prop: Startup classification + "Clasificación por IA" hint | company-record.html:73 | todo | — | **Corrected**: `getHiringMatchIndex()`'s `HiringMatch.isStartup`/`startupReason` (company-level, from `target_company.is_startup`) is a real, already-available source when the company is a hiring target — no owner decision needed, no aggregation from contacts. Shows "—" for a company that isn't a current hiring target (not classified either way). |
 | Tabs: "Actividad" / "Señales de contratación" | company-record.html:76 | todo | — | Reuse `RecordTabs.tsx` verbatim (same component, new tab content). |
 | Activity tab: timeline toolbar filter pills (Todas/Notas/Cambios de etapa/Actividad de contactos) | company-record.html:78 | todo | — | "Actividad de contactos" is a new filter dimension: activity rows belonging to *people at this company*, not just company-scoped activity rows — needs a query that unions both, bounded and paginated like `Timeline.tsx`. |
 | Activity tab: timeline entries (email/stage-change/note icons+cards) | company-record.html:80-82 | todo | — | Reuse `Timeline.tsx` rendering; effective time via `deriveStatus.ts`'s `originalAt` handling (see companies-checklist.md notes), not `created_at` directly. |
 | Hiring signals tab: table (Cargo, Ubicación, Mercado, Publicado) | company-record.html:84-87 | todo | — | Source: `getHiringMatchIndex`'s postings for this company + aliases; bounded (cap rows, paginate if a company has many postings). |
 | Right panel: "Contactos" assoc card (count, up to N rows: avatar, name→contact record, title, status badge) + "Ver los N en Contactos" link | company-record.html:90 | todo | — | Query `person` by `companyKey` (+ aliases), cap the inline list (e.g. 3-5 like the mockup), link to `/contacts?...` filtered by company for the "ver todos" link. |
 | Right panel: "Vacantes" stat card (value + "N vacantes de IT abiertas · X LATAM · Y US") | company-record.html:91 | todo | — | Same `getHiringMatchIndex` result as the list's Vacantes column and the hiring-signals tab, computed once per request (already cached per the task brief) and reused across all three. |
-| Right panel: "Tareas abiertas" card | company-record.html:92 | deviation | — | No task-to-company association found (tasks are being rebuilt by another agent in parallel on `src/app/(app)/tasks/*`, out of scope for this branch per coordination note). D4: stub as empty/"Próximamente" until the tasks work lands and exposes a company-scoped query; revisit once that agent's branch merges. |
+| Right panel: "Tareas abiertas" card | company-record.html:92 | todo | — | **Corrected**: `task.companyKey`/`task.personId` already exist (`src/db/schema.ts:1083-1108`) — buildable now with a bounded query (`status='open' AND (company_key = X OR person_id IN (people at X))`), reading only from `task`, never touching `src/app/(app)/tasks/*` itself. |
 | Breadcrumb "Empresas / <company name>" | company-record.html:36 | todo | — | Simple breadcrumb, same pattern as topbar chrome elsewhere. |
 
-## Deviations needing an owner decision
+## Resolved (were flagged as owner decisions in c01, closed after the owner's correction)
 
-- **D1** — see companies-checklist.md: no `industry`, `owner_bd_id`, or location columns on
-  `company`. Affects Industria/Responsable (list) and Responsable/Sede (record) consistently —
-  should be decided once, not per-page.
-- **D3** — company-scoped quick actions: build Nota/Tarea now (data model supports it via
-  `activity.companyKey`); "Contacto" (new contact under this company) and "Reunión" have no
-  existing action to bind to. Recommend building Nota/Tarea for real and shipping
-  Contacto/Reunión as `title="Próximamente"` until scoped, rather than silently omitting them
-  (ui-builder.md's "never omit an element silently" rule).
-- **D4** — "Tareas abiertas" card depends on a company↔task association that doesn't exist yet
-  and belongs to the tasks rebuild happening in parallel (`src/app/(app)/tasks/*`, explicitly
-  out of scope here per the coordination note). Ship the card shell with an empty/coming-soon
-  state now; wire the real query once that work exposes one.
-- **Startup classification prop** — no per-company AI classification data source was found.
-  Needs an explicit decision: aggregate from `person`-level startup signals, or drop the prop
-  from this page until a real source exists.
+- **D1** — pending, not blocked: owner-approved, data lands via `feat/company-fields-01…`. Build
+  the seam now (as the list already does), wire the real select once it merges.
+- Quick actions Contacto/Reunión — resolved: reuse `NewContactDialog` (prefilled company) and
+  extend the meeting-logging action to accept `companyKey` if it's `personId`-only today.
+- "Tareas abiertas" — resolved: `task.companyKey`/`personId` already exist; buildable now.
+- Startup classification — resolved: `getHiringMatchIndex()`'s `isStartup`/`startupReason`.
+
+## Still open (real product/scope calls, not yet decided)
+
+- Whether the "Más" quick action (5th icon, company-record.html:66) needs a menu of its own or
+  is out of scope for this pass — mockup doesn't specify its contents.
+- Whether the meeting-logging action's extension (personId-only → companyKey too) changes its
+  existing person-scoped callers' behavior; needs the actual signature checked before writing
+  the TDD cycle for it (not yet done — c03 work).
 
 ## Notes
 
 - `/companies/new` is in scope per the task but has no dedicated mockup in
   `openspec/changes/crm-hubspot-ux/mockups/` (no `company-new.html`). Treat the contact-creation
-  flow's form conventions (if any) as the pattern, or keep the existing form's fields but restyle
-  with the shared design tokens — flagged as its own row set once list+record are done.
+  flow's form conventions as the pattern, or keep the existing form's fields but restyle with the
+  shared design tokens — flagged as its own row set once list+record are done.
+- **Status: not started this session.** c02 used the remaining budget on `/companies` (list).
+  This record rebuild — three-panel shell, company-scoped quick actions (Nota/Tarea done via
+  existing `activity.companyKey`; Contacto/Reunión need the two extensions noted above),
+  hiring-signals tab, associations panel (Contactos/Vacantes/Tareas abiertas) — is the next
+  branch (c03), same TDD/build discipline as c02. Progress saved to engram under
+  `sdd/mockup-port/companies-apply-progress` for continuation.

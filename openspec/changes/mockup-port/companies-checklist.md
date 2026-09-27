@@ -1,57 +1,65 @@
 # /companies (list) — checklist vs `openspec/changes/crm-hubspot-ux/mockups/companies.html`
 
-Mockup note (companies.html line 63): this change is shell-only for the list — same index
-pattern as `/contacts` (header, view tabs, filter chips, table). The companies board/pipeline
-redesign is explicitly out of scope (later change). Reference implementation for the pattern:
-`src/app/(app)/contacts/page.tsx`.
+Mockup note (companies.html line 63): same index pattern as `/contacts` (header, view tabs,
+filter chips, table). The companies board/pipeline redesign is explicitly out of scope (later
+change). Reference implementation for the pattern: `src/app/(app)/contacts/page.tsx`.
 
-Current state before this change: `src/app/(app)/companies/page.tsx` is the pre-reskin page —
-plain search input + `<select>` stage filter + card list, no design tokens, no view tabs, no
-table, no owner/industry/openings/last-activity columns. Every row below is `todo` unless noted.
+**Correction (owner, after c01):** the checklist below originally claimed
+`src/lib/contacts/effectiveActivityTime.ts` and `openspec/changes/mockup-port/contacts-checklist.md`
+don't exist. Both exist at the base commit (`33b834f`) — that was a base-commit mismatch from
+reading outside this worktree while other agents were merging PRs into the main checkout
+concurrently. Corrected in c02: `resolveEffectiveActivityAt`/`effectiveActivityAtSql` from
+`effectiveActivityTime.ts` is what this page's Última actividad column uses.
 
 Columns: `element | mockup ref | status | evidence file:line | notes`
 
 | element | mockup ref | status | evidence | notes |
 |---|---|---|---|---|
-| Page header (eyebrow "Empresas", h1 "empresas.", subtitle) | companies.html:64 | todo | — | Port `page-header`/`titles` pattern from contacts, own dictionary keys under `companyList`. |
-| "Nueva empresa" primary button | companies.html:64 | todo | — | Links to `/companies/new`, already exists as a route. |
-| View tabs: "Todas las empresas" (count), "Mis empresas" (count), "Contratando ahora" (count) | companies.html:65 | todo | — | "Mis empresas" needs an owner concept — see deviation D1. "Contratando ahora" = companies with >=1 open posting via `getHiringMatchIndex`. |
-| Filter chip: "Etapa: Cualquiera" (removable) | companies.html:66 | todo | — | Maps to `relationshipStage` (`getCompanies` already filters by it). |
-| "Agregar filtro" chip button | companies.html:66 | todo | — | Mockup only shows the affordance; contacts' filter panel (`details`/`columnPicker`) is the working pattern to reuse, not a dead button. |
-| "Columnas" button | companies.html:66 | deviation | — | Mockup shows it disabled/decorative (no menu markup, unlike contacts' real column picker). D2: build a real column picker like contacts, or ship disabled with `title="Próximamente"` — owner decides. |
-| Table column: Empresa (logo chip + name, links to record) | companies.html:67 | todo | — | Logo chip = first letter(s) of `displayName`; `href` uses `domain` when present for a favicon-style chip per the task brief, else initials. |
-| Table column: Industria | companies.html:67 | deviation | — | **D1: `company` table has no `industry` column** (`src/db/schema.ts:971-999`). Options: (a) migrate a new column, (b) derive from the most common `person.industry` among linked contacts. Needs owner decision before building for real; ship "—" until decided. |
-| Table column: Etapa (badge, tone by stage) | companies.html:67 | todo | — | `relationshipStage`; badge tone mapping already exists in `[key]/page.tsx:45-52`, needs porting to badge classes instead of inline styles. |
-| Table column: Responsable (owner chip, avatar+name) | companies.html:67-68 | deviation | — | **D1 continued: `company` has no `owner_bd_id`.** Only `createdByBdId`/`updatedByBdId` (denormalized, not really "owner"). Needs an owner field (migration) or reuse `createdByBdId` as a stand-in — owner must decide. |
-| Table column: Contactos (count, numeric) | companies.html:67-68 | todo | — | `count(*)` from `person` where `companyKey` (+ aliases) matches, bounded per-page (batch query, not N+1). |
-| Table column: Vacantes (badge "N vacantes de IT" or "—") | companies.html:68 | todo | — | `getHiringMatchIndex()` per task brief; cached per request, matched by `companyKey` + aliases. |
-| Table column: Última actividad (relative time or "—") | companies.html:68 | todo | — | From `activity` table scoped to the company (`getActivitiesByCompany` exists) using effective time — see note below on `deriveStatus.ts`. |
-| Table footer: "Mostrando N–M de TOTAL" | companies.html:76 | todo | — | Same pattern as contacts' `showingRange`. |
-| Table footer: Anterior/Siguiente pager | companies.html:76 | todo | — | Same pattern as contacts' `pageHref`/pager, bounded (14,240 companies → must paginate, never full-scan). |
-| Empty state (no rows) | contacts pattern (companies.html has none, mirrors contacts' `l.noResults`) | todo | — | Reuse contacts' `styles.empty` pattern. |
-| Search box in topbar ("Buscar contactos por...") | companies.html:37 | n/a (shell chrome) | — | Global topbar, not page-owned; out of scope for this page rebuild. |
+| Page header (eyebrow, h1 "empresas.", subtitle) | companies.html:64 | done | `src/app/(app)/companies/page.tsx` (`page-header`/`titles`), `companyList` dict (en/es) | |
+| "Nueva empresa" primary button | companies.html:64 | done | page.tsx (links to `/companies/new`) | |
+| View tabs: "Todas las empresas" / "Mis empresas" / "Contratando ahora" (counts) | companies.html:65 | done, "Mis empresas" interim | `src/lib/companies/listQueries.ts` `getCompanyViewCounts`, page.tsx | "Mis empresas" filters on `created_by_bd_id` — an interim stand-in for a real owner (see pending-D1 below), documented in the query's own doc comment. "Contratando ahora" = `company_key IN (hiring index keys)`, correct since the index is already alias-resolved. |
+| Filter chip: "Etapa: Cualquiera" (removable) | companies.html:66 | done | page.tsx (`chip`, `clearStageHref`) | |
+| "Agregar filtro" chip → dropdown | companies.html:66 | done, single field | page.tsx (`details.dropdown` + stage `<select>`) | Mockup itself only ever shows one filterable dimension (Etapa) for companies — no parity gap with contacts' 10-option panel to close here. |
+| "Columnas" button | companies.html:66 | **matches mockup as-is** | page.tsx (disabled, `title="Coming soon"/"Próximamente"`) | The approved mockup itself ships this as static chrome with no menu behind it (companies.html:66 has no menu markup) — not a deviation, a faithful port. Was previously flagged as D2; closed, no owner decision needed. |
+| Table column: Empresa (logo chip + name, links to record) | companies.html:67 | done | page.tsx, reuses `companyLogoInitials` (`src/lib/contacts/companyLogo.ts`) | Domain-based favicon chip not built — `company.domain` exists on 2,703 companies but the mockup itself only shows a letter-initial chip, never a favicon; kept as initials to match the approved mockup exactly. |
+| Table column: Industria | companies.html:67 | **pending D1** | `src/lib/companies/listMappers.ts` `industryLabel`, `listQueries.ts` (`industry: null` seam) | Owner-approved: `company.industry` is being added by the parallel data branch `feat/company-fields-01…`. The mapper already reads an optional `industry` field and shows "—"; once that branch merges, `listQueries.ts`'s row-building only needs to select the real column instead of hardcoding `null` — no page/mapper change. |
+| Table column: Etapa (badge, tone by stage) | companies.html:67 | done | `listMappers.ts` `stageBadgeClass`, page.tsx | Ported onto `badge-info`/`badge-warn`/`badge-success`/`badge-outline`/`badge-neutral` (design tokens), not the old inline-hex `stageColor` map in `[key]/page.tsx`. |
+| Table column: Responsable (owner) | companies.html:67-68 | **pending D1** | `listMappers.ts` `ownerLabel`, `listQueries.ts` (`ownerName: null` seam) | Same seam as Industria — `owner_bd_id` is on the same parallel data branch. Shows "—" until merged. |
+| Table column: Contactos (count) | companies.html:67-68 | done | `listQueries.ts` (batched `person` count, current page's keys only) | Matches on `person.company_key` directly, not through `company_alias` — a person's `company_key` occasionally normalizes to an alias rather than the canonical key, which would undercount slightly. Flagged as a known limitation, not a deviation needing a decision (it's a real bug to fix, not a product call) — todo for a follow-up branch. |
+| Table column: Vacantes (badge or "—") | companies.html:68 | done | `listMappers.ts` `vacantesLabel`, `getHiringMatchIndex()` | |
+| Table column: Última actividad (relative time or "—") | companies.html:68 | done | `listQueries.ts` (`effectiveActivityAtSql`, batched MAX per page's keys) | Uses the real `effectiveActivityTime.ts` helper (corrected per owner note above), not a new one. |
+| Table footer: "Mostrando N–M de TOTAL" | companies.html:76 | done | page.tsx (`l.showingRange`) | |
+| Table footer: Anterior/Siguiente pager | companies.html:76 | done | page.tsx (`pageHref`), bounded (`PAGE_SIZE=50`, never a full 14,240-row scan) | |
+| Empty state (no rows) | contacts pattern | done | page.tsx (`l.noResults`) | |
+| Search box in topbar | companies.html:37 | n/a (shell chrome) | — | Global topbar, out of scope for this page. |
 
-## Deviations needing an owner decision
+## Pending D1 (owner-approved 2026-09-26 — not blocked, just waiting on the data branch)
 
-- **D1 — no `industry` / no `owner` column on `company`.** The mockup's Industria and
-  Responsable columns need data the current schema doesn't have. Two real options: (1) add
-  `industry` and `owner_bd_id` columns via a gated migration (`src/lib/migration/*` pattern,
-  dry run → approval → execute), or (2) derive both from the linked `person` rows (most common
-  `industry`, and treat `createdByBdId` as a stand-in owner). Recommend (1) for Responsable
-  (an owner is a real assignment, not a guess) and (2) for Industria (already-known signal,
-  no new write path needed) — but this is a product call, not an engineering one.
-- **D2 — "Columnas" button.** Mockup shows it as static chrome (no menu). Build a real column
-  picker (parity with contacts) or ship a disabled control with `title="Próximamente"` per
-  ui-builder.md's rule that disabled/`Próximamente` controls are allowed only for structural
-  chrome when the orchestrator says so.
+`company.industry`, `owner_bd_id`, `city`, `country` are being added by a parallel data-builder
+branch (`feat/company-fields-01…`, forked from this same base commit `33b834f`) along with a
+property-history table, an edit action, and the read-model fields in `getCompanyByKey`/the
+companies list query, per the owner's message. This UI branch does **not** touch schema or
+migrations (per instruction) — it only builds the seam:
+- `src/lib/companies/listMappers.ts`: `industryLabel`/`ownerLabel`/`locationLabel` already read
+  the optional fields and render "—" when absent (unit-tested).
+- `src/lib/companies/listQueries.ts`: `CompanyListRow.industry`/`ownerName` are typed and
+  currently hardcoded `null` with a comment pointing at the merge.
+- Once `feat/company-fields-01…` merges into this chain, the only change needed here is
+  selecting the real columns in `getCompanyListPage`'s row-building — no mapper, no page.tsx
+  change.
 
-## Notes
+## Known limitation (not a deviation, just not yet fixed)
 
-- The task brief pointed at `src/lib/contacts/effectiveActivityTime.ts` for the effective
-  activity time helper; that file does not exist. The actual logic (using `metadata.originalAt`
-  for `status_backfill` rows instead of `created_at`) lives in
-  `src/lib/status/deriveStatus.ts:161-179`. Reuse that, not a new helper.
-- No `openspec/changes/mockup-port/contacts-checklist.md` exists in the repo to use as a model
-  (referenced by `.claude/agents/ui-builder.md:32` but never created) — this checklist follows
-  the column format described there directly against `contacts/page.tsx` as the working
-  reference implementation instead.
+- Contacts-per-company count matches `person.company_key` directly, not through
+  `company_alias`. `getHiringMatchIndex`/`resolveHiringCompanies` already resolve aliases for
+  the Vacantes badge; the contacts count doesn't yet. Todo for a follow-up branch — low
+  priority, doesn't block the owner-decision items above.
+
+## Batch history
+
+- **c01** (`feat/mockup-port-c01-companies-checklist` @ `e4a17e3`): this checklist + the record
+  checklist, docs only.
+- **c02** (`feat/mockup-port-c02-companies-list` @ `580eb33`/`aa7b28e`): list page rebuilt for
+  real — page header, view tabs, stage filter, full 7-column table, pager. New bounded queries
+  (`listQueries.ts`), pure mappers with unit tests (`listMappers.ts`), `companyList` dictionary
+  block (en/es). Industria/Responsable render through the pending-D1 seam.
