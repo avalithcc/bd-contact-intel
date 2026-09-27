@@ -207,6 +207,23 @@ Response (`200`):
 `leads`, or a batch where every lead was skipped), with an `error` message
 and, where applicable, the same `skipped` array.
 
+## Deployments and branches
+
+Only two kinds of branch build on Vercel:
+
+- `main` — the production deployment.
+- `release/*` — the single preview the owner reviews before a release merges.
+
+`feat/*`, `fix/*`, `chore/*` and `docs/*` never build (`git.deploymentEnabled`
+in `vercel.json`). Work chains freely on those branches; when a chain is ready,
+merge its tip into a `release/*` branch and let that one preview cover the whole
+batch.
+
+This is a build-budget rule, not a style rule. Every branch push used to trigger
+its own preview build, so a chain of ~40 branches burned the daily build quota
+and left every check failing with `Deployment rate limited — retry in 24 hours`,
+which also blocks production deploys.
+
 ## v1 scope
 - BD identity (env stand-in; Supabase Auth comes in v2)
 - CSV import → parse → upsert into the BD's private base
