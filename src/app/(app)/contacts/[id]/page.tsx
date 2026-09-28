@@ -6,7 +6,6 @@ import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
 import { getOpenTasksForPerson } from "@/lib/tasks/queries";
-import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
@@ -18,7 +17,7 @@ import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
-import { EditPencilIcon, LockIcon, PlusIcon } from "@/components/icons";
+import { EditPencilIcon, PlusIcon } from "@/components/icons";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
@@ -164,12 +163,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     return stageLabels[stage] ?? stage;
   }
 
-  // Right panel — "Historial de conversaciones" (contact-record.html:172-178)
-  // is a SEPARATE card from "BDs conectados" — only BDs with real message
-  // history, reusing the same describeConnectionHistory summary the old
-  // combined card already computed.
-  const connectionsWithHistory = record.connections.filter((c) => describeConnectionHistory(c).kind === "some");
-
   // Resumen tab (contact-record.html:151-157; mockup-port r06) — every stat
   // reuses data already fetched above for the Actividad tab/right panel.
   const lastActivityCandidates: RecentActivityCandidate[] = [
@@ -249,8 +242,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       dueAt: t.dueAt,
                       assignedToName: t.assignedToName ?? null,
                     }))}
-                    connections={record.connections}
-                    viewerBdId={me.id}
                     isAdmin={isAdmin}
                     mergeInfo={
                       record.merge.unifiedFromCount > 1
@@ -370,60 +361,20 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
             </div>
           </div>
 
-          {connectionsWithHistory.length > 0 && (
-            <div className="card assoc">
-              <div className="card-header">
-                <h3>{l.conversationHistoryTitle}</h3>
-              </div>
-              <div className="card-body">
-                <p className="small">
-                  {l.conversationHistoryIntroPrefix}{" "}
-                  {connectionsWithHistory.map((c, i) => (
-                    <span key={c.bdId}>
-                      {i > 0 && ", "}
-                      <strong>{c.bdName ?? l.emptyValue}</strong>
-                    </span>
-                  ))}
-                  .
-                </p>
-                {connectionsWithHistory.map((c) => {
-                  const history = describeConnectionHistory(c);
-                  const canViewConversation = isAdmin && c.bdId !== me.id;
-                  return (
-                    <div key={c.bdId} className="assoc-row">
-                      <div className="grow">
-                        <div className="n">{c.bdName ?? l.emptyValue}</div>
-                        <div className="s">
-                          {history.kind === "some"
-                            ? dict.contactRecordServer.conversationHistorySummary(
-                                history.count,
-                                history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue,
-                              )
-                            : l.connectionHistoryNone}
-                        </div>
-                      </div>
-                      {canViewConversation ? (
-                        <Link
-                          href={`/contacts/${record.person.id}/conversation/${c.bdId}`}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          <LockIcon className="icon" />
-                          {l.viewConversationLink}
-                        </Link>
-                      ) : (
-                        <span className="meta">
-                          <LockIcon className="icon" />
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-                <p className="meta mt-lg">
-                  {isAdmin ? l.conversationHistoryAdminFooter : l.conversationHistoryPrivateFooter}
-                </p>
-              </div>
-            </div>
-          )}
+          {/*
+            "Historial de conversaciones" card (contact-record.html:172-178)
+            is intentionally hidden — the owner turned LinkedIn off. This card
+            was entirely driven by `person_bd_connection.messageCount`
+            (LinkedIn message history) and its "Ver conversación" link was the
+            only UI entry point (besides the Timeline's now-hidden
+            AdminConversationReveal, see Timeline.tsx) into the audited admin
+            bypass (getConversationForAdmin.ts / conversationAudit.ts). Data,
+            actions and the /contacts/[id]/conversation/[bdId] route are all
+            untouched — restore by re-adding the
+            `describeConnectionHistory`/`LockIcon` imports, the
+            `connectionsWithHistory` filter above, and this block (see git
+            history of this file).
+          */}
 
           <div className="card assoc">
             <div className="card-header">
