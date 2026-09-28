@@ -4,18 +4,14 @@ import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
 import { LEADERSHIP_ROLE_GROUPS } from "@/lib/hiring/leadership";
+import {
+  resolveCanonicalCompanyKey,
+  toOpenPosting,
+  type OpenPosting,
+} from "@/lib/hiring/postingRow";
 
-export { LEADERSHIP_ROLE_GROUPS };
-
-export interface OpenPosting {
-  id: string;
-  title: string;
-  location: string;
-  market: MarketKey;
-  url: string;
-  postedAt: Date | null;
-  firstSeen: Date;
-}
+export { LEADERSHIP_ROLE_GROUPS, resolveCanonicalCompanyKey, toOpenPosting };
+export type { OpenPosting };
 
 export interface CompanyHiringSummary {
   companyKey: string;
@@ -188,21 +184,10 @@ export async function resolveHiringCompanies(
       isStartup: p.isStartup,
       startupReason: p.startupReason,
     };
-    // Rows synced before the market column was backfilled are null; treat
-    // those as "other" rather than crashing the UI on an unclassified value
-    // (see scripts/backfill-posting-markets.ts).
-    const market = (p.market as MarketKey | null) ?? "other";
-    entry.postings.push({
-      id: p.id,
-      title: p.title,
-      location: p.location,
-      market,
-      url: p.url,
-      postedAt: p.postedAt,
-      firstSeen: p.firstSeen,
-    });
+    const posting = toOpenPosting(p);
+    entry.postings.push(posting);
     if (p.isOffshoreHub) entry.offshoreItCount++;
-    if (market === "latam") entry.latamItCount++;
+    if (posting.market === "latam") entry.latamItCount++;
     byCompany.set(p.companyKey, entry);
   }
 
@@ -412,23 +397,67 @@ export interface CompanyPostingsForMessage {
  * hiring company a single contact's `company_key` resolves to — including
  * via a `company_alias` match, same alias resolution as
  * getCompanyHiringSummaries/getHiringMatchIndex above. Used by the outreach
- * message generator (see src/app/outreach/actions.ts), which needs the
- * actual posting titles/locations rather than just the aggregate counts
- * HiringMatch carries. Not BD-scoped — job postings/target companies are
- * shared data. Two fixed queries (via resolveHiringCompanies), regardless of
- * caller. Returns null if the key doesn't resolve to any company currently
- * hiring IT.
+ * message generator (see src/app/outreach/actions.ts) and the /companies/[key]
+ * record page, which need the actual posting titles/locations rather than
+ * just the aggregate counts HiringMatch carries. Not BD-scoped — job
+ * postings/target companies are shared data.
+ *
+ * Company-scoped, NOT resolveHiringCompanies() (perf fix, measured 2.3s on
+ * production for a single-company call before this change — see
+ * src/app/(app)/companies/[key]/page.tsx and outreach/actions.ts): loading
+ * every open IT posting across all target companies plus every
+ * `company_alias` row just to loop-scan in JS for one company was the single
+ * most expensive call on the contact/company record pages. Two small,
+ * indexed queries instead — (1) resolve `companyKey` to its canonical
+ * `target_company.company_key`, trying it as a canonical key first and
+ * falling back to a `company_alias.alias_key` match (UNION, LIMIT 1: a
+ * `company_key` and an `alias_key` for the same normalized name never
+ * disagree in practice), then (2) `job_posting` filtered to that one
+ * `company_key` — instead of every company's postings. Returns null if the
+ * key doesn't resolve to any company, or resolves to one with no open IT
+ * postings (same "no result" behavior as before).
  */
 export async function getCompanyPostingsForKey(
   companyKey: string,
 ): Promise<CompanyPostingsForMessage | null> {
-  const companies = await resolveHiringCompanies();
-  for (const c of companies.values()) {
-    if (c.matchKeys.has(companyKey)) {
-      return { companyKey: c.companyKey, displayName: c.displayName, postings: c.postings };
-    }
-  }
-  return null;
+  const canonicalRows = await db.execute<{ company_key: string }>(sql`
+    select company_key from target_company where company_key = ${companyKey}
+    union
+    select company_key from company_alias where alias_key = ${companyKey}
+    limit 1
+  `);
+  const canonicalKey = resolveCanonicalCompanyKey(canonicalRows);
+  if (!canonicalKey) return null;
+
+  const rows = await db
+    .select({
+      id: jobPosting.id,
+      displayName: targetCompany.displayName,
+      title: jobPosting.title,
+      location: jobPosting.location,
+      market: jobPosting.market,
+      url: jobPosting.url,
+      postedAt: jobPosting.postedAt,
+      firstSeen: jobPosting.firstSeen,
+    })
+    .from(jobPosting)
+    .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
+    .where(
+      and(
+        eq(jobPosting.companyKey, canonicalKey),
+        eq(jobPosting.isIt, true),
+        isNull(jobPosting.closedAt),
+      ),
+    )
+    .orderBy(desc(jobPosting.postedAt));
+
+  if (!rows.length) return null;
+
+  return {
+    companyKey: canonicalKey,
+    displayName: rows[0].displayName,
+    postings: rows.map(toOpenPosting),
+  };
 }
 
 /**
