@@ -43,10 +43,33 @@ const globalForDb = globalThis as unknown as {
 // of the wrong measurement. Preview deployments share that same 15, so every
 // warm preview competes with production for it.
 //
-// Do not raise this again without first either moving DATABASE_URL to
-// Supavisor's transaction-mode pooler (port 6543, which is what `prepare:
-// false` below already anticipates) or raising the pooler's own pool_size.
-// Measuring Postgres does not tell you the pooler's limit.
+// Do not raise this again without first raising the pooler's own
+// session-mode pool_size (Supabase dashboard -> Database -> Connection
+// pooling). Measuring Postgres does not tell you the pooler's limit.
+//
+// DO NOT switch DATABASE_URL to the transaction-mode pooler (port 6543) as
+// the way around this. It was the planned fix and it HANGS the app, measured
+// 2026-09-28 against production with the real `/contacts` query set:
+//
+//   session     5432  max:1  ok    2482ms   (production today)
+//   session     5432  max:3  ok    1642ms
+//   transaction 6543  max:1  HUNG
+//   transaction 6543  max:3  HUNG
+//   transaction 6543  max:5  ok    1624ms
+//
+// Cause: postgres.js pipelines queued queries onto a busy connection, and
+// Supavisor in transaction mode deadlocks on pipelined queries that carry
+// NO bound parameters (simple query protocol). Several of ours have none —
+// `getHiringCompanyKeys`, the filter-option DISTINCTs, `listOwnerOptions` —
+// and a page fires them together. Synthetic probe: it hangs as soon as the
+// number of concurrent parameterless queries exceeds `max`
+// (max:1 hangs at 3, max:3 at 4, max:5 at 6). Parameterized queries never
+// hung at any size, and session mode never hung at all.
+//
+// So `max:5` "working" above is not safety, it is headroom that the next
+// page with more concurrent reads will exhaust — as a hang, with no error.
+// Session mode with a larger pool_size buys the same speed (1642ms vs
+// 1624ms) with none of that risk.
 const client =
   globalForDb.client ??
   postgres(connectionString, {
