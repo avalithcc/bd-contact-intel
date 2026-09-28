@@ -1,5 +1,5 @@
 /**
- * Curated, owner-approved list of the 12 partner-account contacts that
+ * Curated, owner-approved list of the 16 partner-account contacts that
  * currently exist only as free text inside `company.notes`. These are the
  * human contacts at accounts Avalith already works with.
  *
@@ -25,6 +25,16 @@ export interface PartnerAccountContactRow {
   displayName: string;
   email: string;
   companyDisplay: string;
+  /** Job title as recorded in the source notes, when one was written down. */
+  jobTitle?: string | null;
+  /**
+   * Human-verified override for this ONE row's first/last split, for the
+   * rare case where the generic last-token rule (`splitDisplayName`) would
+   * misjudge a name — e.g. a compound surname. The curated list is exactly
+   * the place for this kind of hand-checked exception; the generic rule
+   * stays simple and unconditional for every other row.
+   */
+  nameSplit?: SplitDisplayName;
 }
 
 export const PARTNER_ACCOUNT_CONTACT_ROWS: PartnerAccountContactRow[] = [
@@ -34,7 +44,16 @@ export const PARTNER_ACCOUNT_CONTACT_ROWS: PartnerAccountContactRow[] = [
   { displayName: "Javier Jimenez", email: "jjimenez@opentech.com.py", companyDisplay: "OpenTech" },
   { displayName: "Aleksandra Makowska", email: "alm@spyro-soft.com", companyDisplay: "Spyro" },
   { displayName: "Javier Minsky", email: "jminsky@virtualmind.com", companyDisplay: "Virtual Mind" },
-  { displayName: "Eliseo Cohen Imach", email: "eliseo.cohenimach@agnos.io", companyDisplay: "Agnos" },
+  {
+    displayName: "Eliseo Cohen Imach",
+    email: "eliseo.cohenimach@agnos.io",
+    companyDisplay: "Agnos",
+    // "Cohen Imach" is a recognised Argentine compound surname — the
+    // generic last-token rule would misjudge this as firstName "Eliseo
+    // Cohen" / lastName "Imach". Human-verified exception, not a rule
+    // change.
+    nameSplit: { firstName: "Eliseo", lastName: "Cohen Imach" },
+  },
   { displayName: "Samuel Levy", email: "samuel.levy@agnos.io", companyDisplay: "Agnos" },
   {
     displayName: "Mónica Rubio",
@@ -44,6 +63,22 @@ export const PARTNER_ACCOUNT_CONTACT_ROWS: PartnerAccountContactRow[] = [
   { displayName: "Anton Strakatov", email: "anton.strakatov@innowise-group.com", companyDisplay: "InnoWise" },
   { displayName: "Matias Mazzucchelli", email: "mmazzucchelli@kopiustech.com", companyDisplay: "Kopious" },
   { displayName: "Malena Garilli", email: "mgarilli@kopiustech.com", companyDisplay: "Kopious" },
+  {
+    displayName: "Claudio De Vita",
+    email: "cdevita@aconcaguasoftware.com",
+    companyDisplay: "Aconcagua Software",
+    jobTitle: "Country Manager",
+  },
+  {
+    displayName: "Mafalda Ricca",
+    email: "mafaldaricca@goxplora.com",
+    companyDisplay: "Vizitar - Go Xplora",
+    jobTitle: "Founder & CEO",
+  },
+  // Owner decision: recorded in the source notes with a first name only —
+  // keep it that way. No fabricated surname.
+  { displayName: "Mercedes", email: "mercedes@amalgama.co", companyDisplay: "Amalgama" },
+  { displayName: "Milagros", email: "milagros@amalgama.co", companyDisplay: "Amalgama" },
 ];
 
 /** Provenance tag for these rows — follows the same single-token vocabulary
@@ -88,6 +123,7 @@ export interface PlannedPartnerAccountContactRow {
   emailNormalized: string;
   company: string;
   companyKey: string;
+  jobTitle: string | null;
   sourceKey: string;
 }
 
@@ -124,6 +160,14 @@ export interface PartnerAccountContactPlan {
  *      key / name+company / own-company guard) still runs downstream via
  *      `runCreateContactFlow`; this planner only handles the two checks the
  *      task calls out as pre-conditions to even attempting a create.
+ *
+ * The first/last split uses the row's `nameSplit` override when present
+ * (a human-verified exception for a name the generic rule would misjudge),
+ * otherwise falls back to `splitDisplayName`'s generic last-token rule. A
+ * single-token display name (e.g. "Mercedes") is never padded with a
+ * fabricated surname — `splitDisplayName` already returns `lastName: ""`
+ * for it, and `person.last_name` is a nullable column, so a firstName-only
+ * row is a legitimate, intentional shape here, not a defect.
  */
 export function planPartnerAccountContactRows(
   rows: readonly PartnerAccountContactRow[],
@@ -149,7 +193,7 @@ export function planPartnerAccountContactRows(
       continue;
     }
 
-    const { firstName, lastName } = splitDisplayName(row.displayName);
+    const { firstName, lastName } = row.nameSplit ?? splitDisplayName(row.displayName);
     toCreate.push({
       displayName: row.displayName,
       firstName,
@@ -158,6 +202,7 @@ export function planPartnerAccountContactRows(
       emailNormalized,
       company: row.companyDisplay,
       companyKey,
+      jobTitle: row.jobTitle ?? null,
       sourceKey: PARTNER_ACCOUNT_CONTACT_SOURCE_KEY,
     });
   }

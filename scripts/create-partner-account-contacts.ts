@@ -1,5 +1,5 @@
 /**
- * Creates the 12 curated, owner-approved partner-account contacts
+ * Creates the 16 curated, owner-approved partner-account contacts
  * (src/lib/contacts/partnerAccountContacts.ts) — human contacts at accounts
  * Avalith already works with, today only free text inside `company.notes`.
  *
@@ -214,7 +214,8 @@ async function main() {
             emailStatus: f.emailStatus,
             company: f.company,
             companyKey: f.companyKey,
-            roleGroup: classifyPosition(null),
+            jobTitle: row.jobTitle,
+            roleGroup: classifyPosition(row.jobTitle),
             ownerBdId: null,
             sourceKey: row.sourceKey,
           });

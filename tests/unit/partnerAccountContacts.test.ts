@@ -24,6 +24,11 @@ test("splitDisplayName: three-token name keeps everything but the last token as 
     firstName: "Nathalie Denise",
     lastName: "Szlafsztein",
   });
+  // "Cohen Imach" is a recognised Argentine compound surname — the generic
+  // last-token rule would misjudge it as "Eliseo Cohen"/"Imach". That one
+  // row carries a human-verified `nameSplit` override in the curated list
+  // instead (see the "curated-list override" tests below); the generic
+  // splitter itself keeps the simple last-token rule unconditionally.
   assert.deepEqual(splitDisplayName("Eliseo Cohen Imach"), {
     firstName: "Eliseo Cohen",
     lastName: "Imach",
@@ -41,13 +46,34 @@ test("splitDisplayName: collapses repeated internal whitespace", () => {
   });
 });
 
-test("the curated list has exactly the 12 owner-approved rows, each with an email and a company", () => {
-  assert.equal(PARTNER_ACCOUNT_CONTACT_ROWS.length, 12);
+test("the curated list has exactly the 16 owner-approved rows, each with an email and a company", () => {
+  assert.equal(PARTNER_ACCOUNT_CONTACT_ROWS.length, 16);
   for (const row of PARTNER_ACCOUNT_CONTACT_ROWS) {
     assert.ok(row.displayName.trim().length > 0, `missing displayName for ${JSON.stringify(row)}`);
     assert.ok(row.email.includes("@"), `missing/invalid email for ${row.displayName}`);
     assert.ok(row.companyDisplay.trim().length > 0, `missing companyDisplay for ${row.displayName}`);
   }
+});
+
+test("the curated list carries the job title from the notes when one was recorded", () => {
+  const claudio = PARTNER_ACCOUNT_CONTACT_ROWS.find((r) => r.displayName === "Claudio De Vita");
+  const mafalda = PARTNER_ACCOUNT_CONTACT_ROWS.find((r) => r.displayName === "Mafalda Ricca");
+  assert.equal(claudio?.jobTitle, "Country Manager");
+  assert.equal(mafalda?.jobTitle, "Founder & CEO");
+});
+
+test("Mercedes and Milagros (Amalgama) keep a first-name-only row, per owner decision — no fabricated surname", () => {
+  const mercedes = PARTNER_ACCOUNT_CONTACT_ROWS.find((r) => r.displayName === "Mercedes");
+  const milagros = PARTNER_ACCOUNT_CONTACT_ROWS.find((r) => r.displayName === "Milagros");
+  assert.ok(mercedes);
+  assert.ok(milagros);
+  assert.equal(mercedes?.companyDisplay, "Amalgama");
+  assert.equal(milagros?.companyDisplay, "Amalgama");
+});
+
+test("Eliseo Cohen Imach's curated row overrides the generic split with the human-verified compound surname", () => {
+  const eliseo = PARTNER_ACCOUNT_CONTACT_ROWS.find((r) => r.displayName === "Eliseo Cohen Imach");
+  assert.deepEqual(eliseo?.nameSplit, { firstName: "Eliseo", lastName: "Cohen Imach" });
 });
 
 test("planPartnerAccountContactRows: resolves companyKey via normalizeCompanyKey, not a trusted column", () => {
@@ -95,9 +121,52 @@ test("planPartnerAccountContactRows: a resolvable row builds the full create row
       emailNormalized: "ana@acme.com",
       company: "Acme",
       companyKey: "acme",
+      jobTitle: null,
       sourceKey: PARTNER_ACCOUNT_CONTACT_SOURCE_KEY,
     },
   ]);
+});
+
+test("planPartnerAccountContactRows: a single-token display name becomes firstName-only — never an empty firstName padded with the name as lastName", () => {
+  const rows = [{ displayName: "Mercedes", email: "mercedes@amalgama.co", companyDisplay: "Amalgama" }];
+  const plan = planPartnerAccountContactRows(rows, new Map(), new Set(["amalgama"]));
+  assert.deepEqual(plan.toCreate, [
+    {
+      displayName: "Mercedes",
+      firstName: "Mercedes",
+      lastName: "",
+      email: "mercedes@amalgama.co",
+      emailNormalized: "mercedes@amalgama.co",
+      company: "Amalgama",
+      companyKey: "amalgama",
+      jobTitle: null,
+      sourceKey: PARTNER_ACCOUNT_CONTACT_SOURCE_KEY,
+    },
+  ]);
+});
+
+test("planPartnerAccountContactRows: a row's nameSplit override wins over the generic last-token split", () => {
+  const rows = [
+    {
+      displayName: "Eliseo Cohen Imach",
+      email: "eliseo.cohenimach@agnos.io",
+      companyDisplay: "Agnos",
+      nameSplit: { firstName: "Eliseo", lastName: "Cohen Imach" },
+    },
+  ];
+  const plan = planPartnerAccountContactRows(rows, new Map(), new Set(["agnos"]));
+  assert.equal(plan.toCreate[0].firstName, "Eliseo");
+  assert.equal(plan.toCreate[0].lastName, "Cohen Imach");
+});
+
+test("planPartnerAccountContactRows: carries jobTitle through to the create row when present, null otherwise", () => {
+  const rows = [
+    { displayName: "Claudio De Vita", email: "cdevita@aconcaguasoftware.com", companyDisplay: "Aconcagua Software", jobTitle: "Country Manager" },
+    { displayName: "Angela Leon", email: "angela.leon@ackstorm.com", companyDisplay: "ACK Storm" },
+  ];
+  const plan = planPartnerAccountContactRows(rows, new Map(), new Set(["aconcagua software", "ack storm"]));
+  assert.equal(plan.toCreate[0].jobTitle, "Country Manager");
+  assert.equal(plan.toCreate[1].jobTitle, null);
 });
 
 test("planPartnerAccountContactRows is a pure planner: calling it twice with the same input gives the same result and never mutates the input rows", () => {
