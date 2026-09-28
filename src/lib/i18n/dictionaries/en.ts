@@ -153,12 +153,6 @@ export const en = {
     account: "Account",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
-    // TopBar "Create" menu (tasks.md mockup-parity 3.1). Only items backed
-    // by a real existing flow are shown — see TopBar.tsx's comment on the
-    // mockup items intentionally omitted (no standalone new-contact/
-    // new-task/log-note flow exists yet).
-    create: "Create",
-    importContacts: "Import contacts",
     // TopBar account menu (tasks.md mockup-parity 3.2).
     accountMenuLabel: "Account menu",
     signedInLabel: "Signed in",

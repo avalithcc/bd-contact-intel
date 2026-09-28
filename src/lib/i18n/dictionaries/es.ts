@@ -120,8 +120,6 @@ export const es: typeof en = {
     account: "Cuenta",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
-    create: "Crear",
-    importContacts: "Importar contactos",
     accountMenuLabel: "Menú de cuenta",
     signedInLabel: "Sesión iniciada",
     roleAdmin: "Administrador",
