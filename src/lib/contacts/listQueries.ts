@@ -9,12 +9,13 @@
  * company_key). `count(*)::int` casts the aggregate — Postgres returns
  * bigint aggregates as strings over the wire otherwise.
  */
-import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 import { BOARD_COLUMNS } from "@/lib/contacts/board";
+import { SYSTEM_VIEWS, type SystemViewKey } from "@/lib/contacts/views";
 import type { PersonStatus } from "@/lib/status/deriveStatus";
 import {
   buildBdConnectionSummaries,
@@ -453,9 +454,9 @@ export async function getContactListRowsByIds(ids: string[], dict: Dict): Promis
 }
 
 /**
- * Per-view result counts for the tab badges (mockup: "Todos los
- * contactos<span class='count'>16,642</span>"). One count query per system
- * view — small, fixed number of views, each hitting an indexed column.
+ * One arbitrary-filter count (e.g. a saved view's own count, or an ad-hoc
+ * preview) — a single round trip for that one filter set. NOT used for the
+ * `SYSTEM_VIEWS` tab badges anymore; see `getSystemViewCounts` below for why.
  */
 export async function getContactCountForFilters(
   filters: ContactFilters,
@@ -469,6 +470,46 @@ export async function getContactCountForFilters(
     .from(person)
     .where(and(...where));
   return total;
+}
+
+/**
+ * Per-view result counts for the tab badges (mockup: "Todos los
+ * contactos<span class='count'>16,642</span>"), positionally aligned with
+ * `SYSTEM_VIEWS` (same convention page.tsx already relies on:
+ * `count={systemViewCounts[i]}`).
+ *
+ * Perf fix (owner report: ~3.0s for this block alone): the previous version
+ * ran `getContactCountForFilters` once per system view — SIX full-table
+ * `count(*)` round trips on EVERY `/contacts` render, including a plain
+ * pagination click or sort that changes none of these filters. This now
+ * runs ONE query with a `count(*) filter (where ...)` per view, computed in
+ * a single pass over `person` — one round trip regardless of how many
+ * system views exist.
+ *
+ * Freshness tradeoff: none — this is not a cache, it recomputes from the
+ * live table on every call, so a status/owner/hiring change is reflected
+ * immediately (same freshness as the old per-view queries, just cheaper).
+ * The lever here was round trips, not staleness.
+ */
+export async function getSystemViewCounts(
+  meBdId: string,
+  hiringKeys?: Set<string>,
+): Promise<number[]> {
+  const conditionsByView = await Promise.all(
+    SYSTEM_VIEWS.map(async (view) => {
+      const where = await baseContactFilterConditions(view.filters, meBdId, hiringKeys);
+      if (view.filters.status?.length) where.push(inArray(person.status, view.filters.status));
+      return where;
+    }),
+  );
+
+  const selection: Record<string, SQL<number>> = {};
+  SYSTEM_VIEWS.forEach((view, i) => {
+    selection[view.key] = sql<number>`count(*) filter (where ${and(...conditionsByView[i])})::int`;
+  });
+
+  const [row] = (await db.select(selection).from(person)) as [Record<SystemViewKey, number>];
+  return SYSTEM_VIEWS.map((view) => row[view.key]);
 }
 
 /**
