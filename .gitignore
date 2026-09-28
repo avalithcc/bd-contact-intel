@@ -19,3 +19,7 @@ backups/
 
 # HubSpot exports with personal data (never commit)
 /hubspot/
+
+# TypeScript incremental build cache — a build artifact, never committed.
+# It was tracked until 2026-09-28, so every `npm run build` dirtied the tree.
+*.tsbuildinfo
