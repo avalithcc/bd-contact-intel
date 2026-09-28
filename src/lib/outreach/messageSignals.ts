@@ -33,8 +33,12 @@ export function extractOutreachSignals(input: OutreachSignalInput): OutreachSign
   const { contact, company, history, notes = [] } = input;
   const signals: OutreachSignal[] = [];
 
-  if (company && company.postings.length > 0) {
-    signals.push({ kind: "hiring", count: company.postings.length });
+  // `company.postings` is a bounded sample (see getCompanyPostingsForKey's
+  // DETAIL_ROW_LIMIT, src/lib/hiring/queries.ts) — the chip must show the
+  // real total, not the sample size, or a company with more open postings
+  // than the cap would show a shrunk count here.
+  if (company && company.totalCount > 0) {
+    signals.push({ kind: "hiring", count: company.totalCount });
   }
 
   if (contact.isLeadership) {

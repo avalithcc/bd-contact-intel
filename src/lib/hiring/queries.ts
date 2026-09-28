@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
@@ -167,7 +167,14 @@ export async function resolveHiringCompanies(
           : undefined,
       ),
     )
-    .orderBy(desc(jobPosting.postedAt));
+    // `postedAt desc` alone is not a deterministic order: same-date postings
+    // (common — a company posts a batch on the same day) came back in
+    // whatever order Postgres felt like, which could reshuffle between
+    // renders for no reason visible to the user. `id asc` breaks every tie
+    // (see the equivalent ordering in getCompanyPostingsForKey below, kept
+    // in sync so the whole-map and single-company paths return the exact
+    // same order for a given company).
+    .orderBy(desc(jobPosting.postedAt), asc(jobPosting.id));
 
   const byCompany = new Map<string, ResolvedHiringCompany>();
   if (!openPostings.length) return byCompany;
@@ -389,7 +396,48 @@ export function getHiringMatchIndex(
 export interface CompanyPostingsForMessage {
   companyKey: string;
   displayName: string;
+  // Bounded to DETAIL_ROW_LIMIT most recent postings (postedAt desc, id asc
+  // tiebreak) — NOT every open posting for companies above that cap (e.g.
+  // databricks: 525 open IT postings in production). Every count field below
+  // is computed over the FULL open-posting set regardless of this cap, so
+  // callers must read counts from those fields, never from
+  // `postings.length` or by re-deriving from this array.
   postings: OpenPosting[];
+  totalCount: number;
+  newLast7DaysCount: number;
+  latamCount: number;
+  usCount: number;
+  otherCount: number;
+  miamiCount: number;
+  offshoreCount: number;
+}
+
+// Cap on how many full posting rows (title/location/url) get fetched and
+// returned for one company. Perf fix (owner-measured on production,
+// 2026-09-28): with the whole-dataset scan removed, the single call still
+// took ~970-1006ms for a company with many open postings — dominated by
+// transferring hundreds of full rows just to render/sample a handful
+// (databricks has 525 open IT postings, speechify 254). Every *count* below
+// still reflects the full set via SQL aggregates, so this only bounds the
+// row-level detail (titles, urls, per-posting locations/dates), not any
+// number shown to a BD or fed to the outreach model.
+const DETAIL_ROW_LIMIT = 100;
+
+type CompanyPostingsRawRow = {
+  id: string;
+  title: string;
+  location: string;
+  market: string | null;
+  url: string;
+  postedAt: Date | string | null;
+  firstSeen: Date | string;
+  displayName: string;
+  totalCount: number | string;
+  newLast7Days: number | string;
+  latamCount: number | string;
+  usCount: number | string;
+  miamiCount: number | string;
+  offshoreCount: number | string;
 }
 
 /**
@@ -407,15 +455,20 @@ export interface CompanyPostingsForMessage {
  * src/app/(app)/companies/[key]/page.tsx and outreach/actions.ts): loading
  * every open IT posting across all target companies plus every
  * `company_alias` row just to loop-scan in JS for one company was the single
- * most expensive call on the contact/company record pages. Two small,
- * indexed queries instead — (1) resolve `companyKey` to its canonical
- * `target_company.company_key`, trying it as a canonical key first and
- * falling back to a `company_alias.alias_key` match (UNION, LIMIT 1: a
- * `company_key` and an `alias_key` for the same normalized name never
- * disagree in practice), then (2) `job_posting` filtered to that one
- * `company_key` — instead of every company's postings. Returns null if the
- * key doesn't resolve to any company, or resolves to one with no open IT
- * postings (same "no result" behavior as before).
+ * most expensive call on the contact/company record pages. Two queries
+ * instead of resolveHiringCompanies' two-plus-fan-out — (1) resolve
+ * `companyKey` to its canonical `target_company.company_key`, trying it as a
+ * canonical key first and falling back to a `company_alias.alias_key` match
+ * (UNION, LIMIT 1: a `company_key` and an `alias_key` for the same
+ * normalized name never disagree in practice), then (2) one query that joins
+ * `job_posting`/`target_company` for a LIMITed, deterministically-ordered
+ * page of detail rows AND cross-joins a same-company, non-correlated
+ * subquery that computes every count (total, last-7-days, per-market,
+ * miami, offshore) over the FULL open-posting set — computed once (the
+ * subquery is independent of the outer row, not a per-row correlated
+ * subquery), not per returned row. Returns null if the key doesn't resolve
+ * to any company, or resolves to one with no open IT postings (same
+ * "no result" behavior as before).
  */
 export async function getCompanyPostingsForKey(
   companyKey: string,
@@ -429,34 +482,78 @@ export async function getCompanyPostingsForKey(
   const canonicalKey = resolveCanonicalCompanyKey(canonicalRows);
   if (!canonicalKey) return null;
 
-  const rows = await db
-    .select({
-      id: jobPosting.id,
-      displayName: targetCompany.displayName,
-      title: jobPosting.title,
-      location: jobPosting.location,
-      market: jobPosting.market,
-      url: jobPosting.url,
-      postedAt: jobPosting.postedAt,
-      firstSeen: jobPosting.firstSeen,
-    })
-    .from(jobPosting)
-    .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
-    .where(
-      and(
-        eq(jobPosting.companyKey, canonicalKey),
-        eq(jobPosting.isIt, true),
-        isNull(jobPosting.closedAt),
-      ),
-    )
-    .orderBy(desc(jobPosting.postedAt));
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const rows = await db.execute<CompanyPostingsRawRow>(sql`
+    select
+      jp.id as id,
+      jp.title as title,
+      jp.location as location,
+      jp.market as market,
+      jp.url as url,
+      jp.posted_at as "postedAt",
+      jp.first_seen as "firstSeen",
+      tc.display_name as "displayName",
+      stats.total_count as "totalCount",
+      stats.new_last_7_days as "newLast7Days",
+      stats.latam_count as "latamCount",
+      stats.us_count as "usCount",
+      stats.miami_count as "miamiCount",
+      stats.offshore_count as "offshoreCount"
+    from job_posting jp
+    inner join target_company tc on tc.company_key = jp.company_key
+    cross join (
+      select
+        count(*)::int as total_count,
+        // Matches the contacts/[id] record's original "new" definition
+        // (postedAt-based), not getCompanyHiringSummaries' firstSeen-based
+        // one — same field this replaces (companyPostings.postings.filter
+        // ((p) => p.postedAt && p.postedAt > sevenDaysAgo)), unchanged.
+        count(*) filter (where jp2.posted_at > ${sevenDaysAgoIso}::timestamptz)::int as new_last_7_days,
+        count(*) filter (where jp2.market = 'latam')::int as latam_count,
+        count(*) filter (where jp2.market = 'us')::int as us_count,
+        count(*) filter (where jp2.is_miami = true)::int as miami_count,
+        count(*) filter (where jp2.is_offshore_hub = true)::int as offshore_count
+      from job_posting jp2
+      where jp2.company_key = ${canonicalKey}
+        and jp2.is_it = true
+        and jp2.closed_at is null
+    ) stats
+    where jp.company_key = ${canonicalKey}
+      and jp.is_it = true
+      and jp.closed_at is null
+    order by jp.posted_at desc nulls last, jp.id asc
+    limit ${DETAIL_ROW_LIMIT}
+  `);
 
   if (!rows.length) return null;
 
+  const first = rows[0];
+  const totalCount = Number(first.totalCount);
+  const latamCount = Number(first.latamCount);
+  const usCount = Number(first.usCount);
+
   return {
     companyKey: canonicalKey,
-    displayName: rows[0].displayName,
-    postings: rows.map(toOpenPosting),
+    displayName: first.displayName,
+    postings: rows.map((r) =>
+      toOpenPosting({
+        id: r.id,
+        title: r.title,
+        location: r.location,
+        market: r.market,
+        url: r.url,
+        postedAt: r.postedAt ? new Date(r.postedAt) : null,
+        firstSeen: new Date(r.firstSeen),
+      }),
+    ),
+    totalCount,
+    newLast7DaysCount: Number(first.newLast7Days),
+    latamCount,
+    usCount,
+    otherCount: totalCount - latamCount - usCount,
+    miamiCount: Number(first.miamiCount),
+    offshoreCount: Number(first.offshoreCount),
   };
 }
 
