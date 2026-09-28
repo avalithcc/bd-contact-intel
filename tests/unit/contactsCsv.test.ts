@@ -7,7 +7,8 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildContactsCsv, CSV_BOM, type ContactExportRow } from "@/lib/contacts/csvExport";
+import { buildContactsCsv, CSV_BOM, mapContactRowToExportRow, type ContactExportRow } from "@/lib/contacts/csvExport";
+import type { ContactListRow } from "@/lib/contacts/listQueries";
 
 const HEADERS = {
   name: "Nombre",
@@ -15,6 +16,9 @@ const HEADERS = {
   owner: "Responsable",
   status: "Estado",
   email: "Correo",
+  phone: "Teléfono",
+  bdConnections: "BDs conectados",
+  lastActivity: "Última actividad",
   roleGroup: "Grupo de rol",
   industry: "Industria",
   country: "País",
@@ -31,15 +35,27 @@ function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
     ownerName: "Bruno",
     statusLabel: "Nuevo",
     email: "ana@acme.com",
+    phone: null,
     roleGroup: null,
     industry: null,
     country: null,
     sourceKey: null,
     createdAt: new Date("2026-01-15T00:00:00Z"),
     seniority: null,
+    bdConnectionNames: "",
+    lastActivityText: "",
     ...overrides,
   };
 }
+
+test("buildContactsCsv renders the bdConnections column as the comma-joined BD names", () => {
+  const csv = buildContactsCsv(
+    [row({ bdConnectionNames: "Ana Pereyra, Cristian Civita" })],
+    ["bdConnections"],
+    HEADERS,
+  );
+  assert.equal(csv.split("\r\n")[1], 'Ana Gomez,"Ana Pereyra, Cristian Civita"');
+});
 
 test("buildContactsCsv renders header + row for the selected columns, in column order", () => {
   const csv = buildContactsCsv([row()], ["company", "owner"], HEADERS);
@@ -90,4 +106,59 @@ test("buildContactsCsv does not prefix ordinary text", () => {
 
 test("CSV_BOM is the UTF-8 byte-order-mark character", () => {
   assert.equal(CSV_BOM, "﻿");
+});
+
+function contactListRow(overrides: Partial<ContactListRow> = {}): ContactListRow {
+  return {
+    id: "p1",
+    firstName: "Ana",
+    lastName: "Gomez",
+    jobTitle: null,
+    company: "Acme",
+    companyKey: "acme",
+    ownerBdId: null,
+    ownerName: "Bruno",
+    status: "new",
+    email: "ana@acme.com",
+    emailStatus: "verified",
+    phone: null,
+    mobilePhone: null,
+    roleGroup: null,
+    industry: null,
+    country: null,
+    sourceKey: null,
+    createdAt: new Date("2026-01-15T00:00:00Z"),
+    seniority: null,
+    bdConnections: { avatars: [], title: "" },
+    lastActivity: null,
+    ...overrides,
+  };
+}
+
+test("mapContactRowToExportRow: no BDs connected / no activity renders as empty strings, not 'null'", () => {
+  const row = mapContactRowToExportRow(contactListRow(), "Nuevo");
+  assert.equal(row.bdConnectionNames, "");
+  assert.equal(row.lastActivityText, "");
+  assert.equal(row.statusLabel, "Nuevo");
+});
+
+test("mapContactRowToExportRow: bdConnections title and formatted last-activity text carry through", () => {
+  const row = mapContactRowToExportRow(
+    contactListRow({
+      bdConnections: { avatars: [{ bdId: "bd1", name: "Ana Pereyra", initials: "AP" }], title: "Ana Pereyra" },
+      lastActivity: { type: "email_sent", label: "Correo enviado", createdAt: new Date("2026-02-01T00:00:00Z") },
+    }),
+    "Nuevo",
+  );
+  assert.equal(row.bdConnectionNames, "Ana Pereyra");
+  assert.equal(row.lastActivityText, "Correo enviado (2026-02-01)");
+});
+
+test("mapContactRowToExportRow: phone prefers `phone`, falls back to `mobilePhone`", () => {
+  assert.equal(mapContactRowToExportRow(contactListRow({ phone: "+54 11 4000-0000" }), "Nuevo").phone, "+54 11 4000-0000");
+  assert.equal(
+    mapContactRowToExportRow(contactListRow({ phone: null, mobilePhone: "+54 9 11 4123-4567" }), "Nuevo").phone,
+    "+54 9 11 4123-4567",
+  );
+  assert.equal(mapContactRowToExportRow(contactListRow(), "Nuevo").phone, null);
 });

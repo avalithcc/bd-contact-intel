@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
@@ -350,8 +351,17 @@ export interface HiringMatch {
  * queries regardless of caller. `market`, `miamiOnly`, `hideOffshore` and
  * `startupsOnly` flow into resolveHiringCompanies' SQL WHERE clause, same as
  * getCompanyHiringSummaries above.
+ *
+ * Wrapped in React `cache()` (owner feedback round 18, perf pass): on the
+ * "Outreach" system view with no ad-hoc market/startups override, the
+ * `/contacts` "Contratando" badge call (page.tsx, zero args) and
+ * listOutreachCandidates' own call (src/lib/outreach/queries.ts, filters.*
+ * all `undefined` in that case) resolve to the exact same argument tuple —
+ * a genuine duplicate within one request. `cache()` dedupes by args for the
+ * lifetime of the request (same mechanism Next.js uses for `fetch`); it is
+ * a no-op the rest of the time, when the two call sites' args differ.
  */
-export async function getHiringMatchIndex(
+const getHiringMatchIndexCached = cache(async function getHiringMatchIndexUncached(
   market?: MarketKey,
   miamiOnly?: boolean,
   hideOffshore?: boolean,
@@ -373,6 +383,22 @@ export async function getHiringMatchIndex(
     for (const key of c.matchKeys) index.set(key, match);
   }
   return index;
+});
+
+/**
+ * Fixed-arity entry point: React `cache()` keys on the argument list
+ * including its length, so `getHiringMatchIndex()` and
+ * `getHiringMatchIndex(undefined, undefined, undefined, undefined)` would
+ * otherwise miss each other. Always forwarding all four arguments makes the
+ * two call sites above share one cached result.
+ */
+export function getHiringMatchIndex(
+  market?: MarketKey,
+  miamiOnly?: boolean,
+  hideOffshore?: boolean,
+  startupsOnly?: boolean,
+): Promise<Map<string, HiringMatch>> {
+  return getHiringMatchIndexCached(market, miamiOnly, hideOffshore, startupsOnly);
 }
 
 export interface CompanyPostingsForMessage {

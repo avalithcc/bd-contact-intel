@@ -1,11 +1,27 @@
-.header {
-  margin-bottom: var(--space-3xl);
+.page {
+  max-width: 1100px;
 }
 
-.header h1 {
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-2xl);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+
+.title {
   font-size: var(--text-2xl);
   font-weight: 800;
-  margin: 0 0 var(--space-md);
+  margin: 0 0 var(--space-sm);
   color: var(--color-ink);
 }
 
@@ -16,112 +32,129 @@
 }
 
 .section {
-  margin-bottom: var(--space-3xl);
+  margin-bottom: var(--space-2xl);
 }
 
 .sectionTitle {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 700;
   color: var(--color-ink);
   margin: 0 0 var(--space-lg);
-  padding-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.groupBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-badge-danger-bg);
+  color: var(--color-danger-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
 }
 
-.tasksList {
-  display: grid;
-  gap: var(--space-lg);
-}
-
-.taskCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-lg);
+.table th {
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
   background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-accent);
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
 }
 
-.taskCard:hover {
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
   background: var(--color-row-hover);
-  border-color: var(--color-border-strong);
 }
 
-.taskCard.status-overdue {
-  border-left-color: var(--color-danger);
-  background: rgba(220, 38, 38, 0.04);
+.colCheck {
+  width: 2.5rem;
 }
 
-.taskCard.status-today {
-  border-left-color: var(--color-warn);
-  background: rgba(180, 83, 9, 0.04);
-}
-
-.taskCard.status-tomorrow {
-  border-left-color: var(--color-success);
-}
-
-.taskCard.status-this-week {
-  border-left-color: var(--color-accent);
-}
-
-.taskContent {
-  flex: 1;
+.completeCheckbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+  accent-color: var(--color-success);
 }
 
 .taskTitle {
-  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--color-ink);
-  margin: 0 0 var(--space-sm);
 }
 
 .taskDescription {
   color: var(--color-ink-soft);
-  font-size: var(--text-md);
-  margin: 0 0 var(--space-md);
+  font-size: var(--text-sm);
+  margin: var(--space-xs) 0 0;
 }
 
-.taskMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-md);
-  font-size: var(--text-base);
-  color: var(--color-ink-muted);
-}
-
-.assignee,
-.dueDate,
-.subject {
+.ownerChip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
+  font-size: var(--text-base);
+  color: var(--color-ink);
   white-space: nowrap;
 }
 
-.completeButton {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border: 2px solid var(--color-border-strong);
-  background: var(--color-surface-1);
-  border-radius: 50%;
-  color: var(--color-ink-soft);
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.badgeDanger {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: var(--color-badge-danger-bg);
+  color: var(--color-danger-text);
+  border-radius: var(--radius-pill);
+  padding: 0.12rem 0.55rem;
+  font-size: var(--text-xs);
 }
 
-.completeButton:hover {
-  background: var(--color-success);
-  color: white;
-  border-color: var(--color-success);
+.badgeWarn {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: var(--color-badge-warn-bg);
+  color: var(--color-warn-text);
+  border-radius: var(--radius-pill);
+  padding: 0.12rem 0.55rem;
+  font-size: var(--text-xs);
+}
+
+.badgeNeutral {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: var(--color-surface-tint);
+  color: var(--color-ink-soft);
+  border-radius: var(--radius-pill);
+  padding: 0.12rem 0.55rem;
+  font-size: var(--text-xs);
 }
 
 .emptyState {

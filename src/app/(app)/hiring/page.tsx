@@ -5,9 +5,6 @@ import { getCurrentBd } from "@/lib/queries";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate } from "@/lib/i18n/format";
-import { SignOutButton } from "../../SignOutButton";
-import { UserMenu } from "../../UserMenu";
-import { BackButton } from "../../BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -35,30 +32,13 @@ export default async function HiringPage({
 
   return (
     <main>
-      <div className="header">
-        <span className="logo">
-          avalith<span className="dot">.</span>
-        </span>
-        <div className="row row-md">
-          <BackButton label={dict.common.goBack} fallbackHref="/" />
-          <Link className="secondary-btn" href="/contacts?view=outreach">
-            {dict.common.priorityOutreach}
-          </Link>
-          <Link className="secondary-btn" href="/whats-new">
-            {dict.common.whatsNew}
-          </Link>
-          <Link className="secondary-btn" href="/contacts">
-            {dict.common.leadsNav}
-          </Link>
-          <UserMenu
-            label={me.name || dict.common.account}
-            changePasswordHref="/account/password"
-            changePasswordLabel={dict.common.changePassword}
-            signOutButton={<SignOutButton locale={locale} />}
-          />
-        </div>
-      </div>
-
+      {/* The page-local logo/header and cross-link nav row (BackButton +
+          Outreach/Novedades/Contactos secondary-btns) were removed here
+          (mockup-parity 6.1) — the app shell ((app)/layout.tsx -> Sidebar
+          + TopBar breadcrumb) already covers both: the sidenav lists this
+          same set of routes (including the /contacts?view=outreach redirect
+          added in feat/crm-hubspot-ux-15b-outreach-redirect), and the
+          breadcrumb shows where you are. */}
       <div className="mb-3xl">
         <div className="eyebrow">{dict.hiring.eyebrow}</div>
         <h1>
@@ -125,10 +105,10 @@ export default async function HiringPage({
               <summary>
                 {s.displayName} — {dict.hiring.postingCount(s.openItCount)}
                 {s.newLast7Days > 0 && (
-                  <span className="badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
+                  <span className="legacy-badge green">{dict.hiring.newBadge(s.newLast7Days)}</span>
                 )}
                 {s.offshoreHeavy && (
-                  <span className="badge offshore">
+                  <span className="legacy-badge offshore">
                     {dict.common.offshoreBadge(s.offshoreItCount, s.latamItCount)}
                   </span>
                 )}

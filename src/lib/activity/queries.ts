@@ -5,7 +5,10 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { recomputePersonStatus } from "@/lib/status/recompute";
-import { isTimelineEntryVisible } from "@/lib/activity/timelineVisibility";
+import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { buildTimelineEntry, type TimelineEntry } from "@/lib/activity/timelineEntry";
+
+export type { TimelineEntry } from "@/lib/activity/timelineEntry";
 
 /** Activity types the Contact record's timeline pane renders (task 10.1). */
 export const TIMELINE_ACTIVITY_TYPES = [
@@ -14,6 +17,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "hunter_lookup",
   "status_change",
   "meeting_logged",
+  "call",
   "discarded",
   "status_backfill",
 ] as const;
@@ -22,18 +26,6 @@ export type TimelineActivityType = (typeof TIMELINE_ACTIVITY_TYPES)[number];
 
 export function isTimelineActivityType(value: string): value is TimelineActivityType {
   return (TIMELINE_ACTIVITY_TYPES as readonly string[]).includes(value);
-}
-
-export interface TimelineEntry {
-  id: string;
-  type: string;
-  createdAt: Date;
-  actorBdId: string | null;
-  actorName: string | null;
-  // Redacted to null when isTimelineEntryVisible() says this viewer may not
-  // see this entry's content (design R6 / admin-access-audit).
-  metadata: Record<string, unknown> | null;
-  visible: boolean;
 }
 
 export interface PersonTimelinePage {
@@ -163,8 +155,17 @@ export async function createActivity(input: NewActivity): Promise<Activity> {
  * Read side of the Contact record's timeline pane (task 10.1; contact-record
  * spec "Filtered activity timeline"). Not `bdId`-scoped at the row level —
  * same as getContactRecord (queries.ts) — but redacts `metadata` per entry
- * via `isTimelineEntryVisible` (design R6) before returning, so the caller
- * never has to remember to redact.
+ * via `buildTimelineEntry` (design R6) before returning, so the caller never
+ * has to remember to redact.
+ *
+ * Bug fix (prod smoke test): ordered by `effectiveActivityAtSql()` (the ONE
+ * shared SQL helper listQueries.ts also uses), not raw `activity.createdAt`
+ * — a HubSpot-imported `status_backfill` row's real time is
+ * `metadata.originalAt`, not `created_at` (the migration's own run date), so
+ * ordering (and therefore which rows the `limit` keeps) by `created_at`
+ * could both mis-rank and wrongly truncate imported history. Each returned
+ * entry exposes `at` (effective time, from `buildTimelineEntry`) alongside
+ * `createdAt` — see src/lib/activity/timelineEntry.ts.
  */
 export async function getPersonTimeline(
   personId: string,
@@ -188,7 +189,7 @@ export async function getPersonTimeline(
       .from(activity)
       .leftJoin(bd, eq(bd.id, activity.actorBdId))
       .where(typeCondition)
-      .orderBy(desc(activity.createdAt))
+      .orderBy(desc(effectiveActivityAtSql()))
       .limit(opts.limit ?? 100),
     db
       .select({ type: activity.type, count: sql<number>`count(*)` })
@@ -197,18 +198,7 @@ export async function getPersonTimeline(
       .groupBy(activity.type),
   ]);
 
-  const entries: TimelineEntry[] = rows.map((row) => {
-    const visible = isTimelineEntryVisible({ type: row.type, actorBdId: row.actorBdId }, viewerBdId);
-    return {
-      id: row.id,
-      type: row.type,
-      createdAt: row.createdAt,
-      actorBdId: row.actorBdId,
-      actorName: row.actorName,
-      metadata: visible ? (row.metadata as Record<string, unknown>) : null,
-      visible,
-    };
-  });
+  const entries: TimelineEntry[] = rows.map((row) => buildTimelineEntry(row, viewerBdId));
 
   const countsByType: Record<string, number> = {};
   for (const r of countRows) countsByType[r.type] = Number(r.count);

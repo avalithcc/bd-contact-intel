@@ -2,8 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { createTask, updateTask, completeTask } from "@/lib/tasks/queries";
+import { searchTaskSubjects } from "@/lib/tasks/subjectSearchDb";
+import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
 import { getCurrentBd } from "@/lib/queries";
 import type { NewTask } from "@/db/schema";
+
+/** Read side of the "Nueva tarea" dialog's subject picker (mockup-port
+ * t04) — searches contacts/companies by name, bounded server-side. */
+export async function searchTaskSubjectsAction(query: string): Promise<TaskSubjectSearchResult[]> {
+  // Re-check the session inside the action, like every other server action.
+  await getCurrentBd();
+  return searchTaskSubjects(query);
+}
 
 export async function createTaskAction(input: {
   title: string;

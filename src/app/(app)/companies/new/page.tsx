@@ -2,20 +2,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { getCompanyByKey } from "@/lib/companies/queries";
+import { getDictionary } from "@/lib/i18n/server";
 import { createCompanyAction } from "../actions";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
-import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
 const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 
 /**
- * Create form behind the "+ Add company" link on /companies. The company
- * key is derived from the display name with the same normalization the
- * rest of the app uses (see normalizeCompanyKey), so a company created
- * here lines up with contact/lead company keys instead of a hand-typed
- * variant.
+ * Create form behind the "Nueva empresa" button on /companies
+ * (companies.html:64). No dedicated mockup exists for this screen (the
+ * mockups folder has no company-new.html; companies.html only links to it)
+ * — restyled onto the same global design-system classes (`page-header`,
+ * `form-grid`/`field`/`input`) the rest of the mockup-port pages use,
+ * instead of this route's own `page.module.css` (removed). The company key
+ * is derived from the display name with the same normalization the rest of
+ * the app uses (normalizeCompanyKey), so a company created here lines up
+ * with contact/lead company keys instead of a hand-typed variant.
  */
 export default async function NewCompanyPage({
   searchParams,
@@ -24,6 +28,15 @@ export default async function NewCompanyPage({
 }) {
   const { error } = await searchParams;
   await getCurrentBd();
+  const dict = await getDictionary();
+  const l = dict.companyForm;
+  const stageLabels: Record<string, string> = {
+    prospect: dict.companyList.stageProspect,
+    qualified: dict.companyList.stageQualified,
+    proposal_sent: dict.companyList.stageProposalSent,
+    won: dict.companyList.stageWon,
+    lost: dict.companyList.stageLost,
+  };
 
   async function create(formData: FormData) {
     "use server";
@@ -54,52 +67,54 @@ export default async function NewCompanyPage({
   }
 
   return (
-    <main>
-      <Link href="/companies" className={styles.backLink}>
-        ← Back to companies
-      </Link>
+    <main className="page">
+      <Link href="/companies">{l.backLink}</Link>
 
-      <div className={styles.header}>
-        <h1>Add company</h1>
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{l.eyebrow}</div>
+          <h1>{l.title}</h1>
+        </div>
       </div>
 
-      {error && (
-        <p className={styles.error}>
-          {error === "duplicate"
-            ? "A company with that name already exists."
-            : "Enter a company name first."}
-        </p>
-      )}
+      {error && <p className="alert alert-warn">{error === "duplicate" ? l.errorDuplicate : l.errorMissingName}</p>}
 
-      <form action={create} className={styles.form}>
-        <label className={styles.field}>
-          <span>Company name</span>
-          <input name="displayName" type="text" required autoFocus />
+      <form action={create} className="composer">
+        <label className="field">
+          {l.companyNameLabel}
+          <input className="input" name="displayName" type="text" required autoFocus />
         </label>
 
-        <label className={styles.field}>
-          <span>Stage</span>
-          <select name="relationshipStage" defaultValue="prospect">
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace("_", " ")}
-              </option>
-            ))}
-          </select>
+        <div className="form-grid">
+          <label className="field">
+            {l.stageLabel}
+            <select className="input" name="relationshipStage" defaultValue="prospect">
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {stageLabels[s] ?? s}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            {l.revenueLabel}
+            <input className="input" name="revenuePotential" type="number" min="0" step="1" />
+          </label>
+        </div>
+
+        <label className="field">
+          {l.notesLabel}
+          <textarea className="textarea" name="notes" rows={4} />
         </label>
 
-        <label className={styles.field}>
-          <span>Revenue potential</span>
-          <input name="revenuePotential" type="number" min="0" step="1" />
-        </label>
-
-        <label className={styles.field}>
-          <span>Notes</span>
-          <textarea name="notes" rows={4} />
-        </label>
-
-        <div className={styles.actions}>
-          <button type="submit">Create company</button>
+        <div className="bar">
+          <Link href="/companies" className="btn btn-secondary">
+            {dict.companyRecord.cancel}
+          </Link>
+          <button type="submit" className="btn btn-primary">
+            {l.submit}
+          </button>
         </div>
       </form>
     </main>

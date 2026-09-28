@@ -197,7 +197,7 @@ export default async function Home({
         {(sp.q || roleGroup || companyCategory || sp.companyKey || relationship) && (
           <div className="active-filters">
             {sp.companyKey && (
-              <span className="chip">
+              <span className="legacy-chip">
                 {dict.home.companyFromHiringChip(sp.companyKey)}
                 <Link href={qsWithout("companyKey")} aria-label={dict.home.removeCompanyKeyFilter}>
                   ×
@@ -205,7 +205,7 @@ export default async function Home({
               </span>
             )}
             {sp.q && (
-              <span className="chip">
+              <span className="legacy-chip">
                 {dict.home.searchChip(sp.q)}
                 <Link href={qsWithout("q")} aria-label={dict.home.removeSearchFilter}>
                   ×
@@ -213,7 +213,7 @@ export default async function Home({
               </span>
             )}
             {roleGroup && (
-              <span className="chip">
+              <span className="legacy-chip">
                 {dict.home.roleChip(dict.roleGroups[roleGroup])}
                 <Link href={qsWithout("roleGroup")} aria-label={dict.home.removeRoleGroupFilter}>
                   ×
@@ -221,7 +221,7 @@ export default async function Home({
               </span>
             )}
             {companyCategory && (
-              <span className="chip">
+              <span className="legacy-chip">
                 {dict.home.categoryChip(dict.companyCategories[companyCategory])}
                 <Link
                   href={qsWithout("companyCategory")}
@@ -232,7 +232,7 @@ export default async function Home({
               </span>
             )}
             {relationship && (
-              <span className="chip">
+              <span className="legacy-chip">
                 {dict.home.relationshipChip(dict.relationshipFilters[relationship])}
                 <Link
                   href={qsWithout("relationship")}
@@ -331,7 +331,7 @@ export default async function Home({
                   <td>
                     {c.company ?? "—"}
                     {c.companyKey && hiringCompanyKeys.has(c.companyKey) && (
-                      <span className="badge hiring">{dict.common.hiringBadge}</span>
+                      <span className="legacy-badge hiring">{dict.common.hiringBadge}</span>
                     )}
                   </td>
                   <td>{c.position ?? "—"}</td>
@@ -342,7 +342,7 @@ export default async function Home({
                         {c.lastMessageAt && (
                           <> · {relativeTime(new Date(c.lastMessageAt), locale)}</>
                         )}
-                        {c.dormant && <span className="badge dormant">{dict.common.dormantBadge}</span>}
+                        {c.dormant && <span className="legacy-badge dormant">{dict.common.dormantBadge}</span>}
                       </span>
                     ) : (
                       <span className="muted">—</span>
@@ -350,7 +350,7 @@ export default async function Home({
                   </td>
                   <td>
                     {c.overlapWith.length ? (
-                      <span className="badge">{dict.common.alsoIn(c.overlapWith.join(", "))}</span>
+                      <span className="legacy-badge">{dict.common.alsoIn(c.overlapWith.join(", "))}</span>
                     ) : (
                       <span className="muted">—</span>
                     )}

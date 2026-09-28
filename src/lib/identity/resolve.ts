@@ -144,10 +144,16 @@ export interface IdentityMergedFields {
 
 // 'skipped_own_company' | 'new' | 'review' | one of the matcher's strong
 // keys — same vocabulary as person_id_map.method (collapsePlanner/
-// foldPlanner already use this exact set).
+// foldPlanner already use this exact set). Includes "email_exact" for
+// parity with the matcher's MatchResult.key — never actually produced
+// here, since IdentityIngestRow only ever sets `source: "hubspot_import"`
+// or leaves it unset (see buildPrefetchKeys/the mapping above); the
+// manual_create rule that produces "email_exact" is scoped to
+// createContactActions.ts.
 export type IdentityRowMethod =
   | "profile_key"
   | "verified_email"
+  | "email_exact"
   | "new"
   | "review"
   | "skipped_own_company";

@@ -33,8 +33,10 @@ export interface IdentityIndex {
   /**
    * Every live person whose stored email exactly matches, regardless of
    * `emailStatus` — unlike byVerifiedEmail, which only ever returns a hit
-   * whose OWN stored email is `verified`. Backs the hubspot_import-only
-   * `email_unverified` review rule (contact-identity delta).
+   * whose OWN stored email is `verified`. Backs two source-scoped rules:
+   * hubspot_import's `email_unverified` review rule (never auto-merges) and
+   * manual_create's exact-email auto-match (contact-identity delta, "Nuevo
+   * contacto" duplicate check — DOES auto-merge, same UX as profile_key).
    */
   byEmail(email: string): PersonId[];
   byNameCompany(key: string): PersonId[];
@@ -44,7 +46,7 @@ export type ReviewReason = "name_company" | "conflicting_strong_keys" | "email_u
 
 export type MatchResult =
   | { kind: "skip_own_company"; reason: "name" | "domain" }
-  | { kind: "auto"; personId: PersonId; key: "profile_key" | "verified_email" }
+  | { kind: "auto"; personId: PersonId; key: "profile_key" | "verified_email" | "email_exact" }
   // Goes to the admin duplicate-review queue, never auto-merged. One shape
   // for every review case so the queue handles them uniformly; `reason`
   // tells the review UI why it was flagged:
@@ -59,9 +61,12 @@ export type MatchResult =
  * Batch-source tag (contact-identity delta "Matcher precedence"). The
  * not-verified-side exact-email review rule applies ONLY when `source` is
  * `"hubspot_import"` — live lead ingest and the `catch_up` migration phase
- * never set this, so they keep the prior behavior unchanged.
+ * never set this, so they keep the prior behavior unchanged. `manual_create`
+ * is the "Nuevo contacto" quick-add dialog (createContactActions.ts): its
+ * exact-email rule auto-merges instead of routing to review — see
+ * `matchIdentity`'s manual_create block below.
  */
-export type MatchSource = "hubspot_import";
+export type MatchSource = "hubspot_import" | "manual_create";
 
 export interface MatchableRow {
   profileKey?: string | null;
@@ -102,8 +107,9 @@ export function buildNameCompanyKey(
  * identity spec "Matcher precedence"): own-company skip, then profile key
  * and verified email together (auto only when they agree; a disagreement
  * between the two strong keys is a review case, never an auto-merge — see
- * "Conflicting strong-key matches"), then name+company (review only), then
- * new.
+ * "Conflicting strong-key matches"), then the source-scoped exact-email
+ * rule (hubspot_import: review only; manual_create: auto), then
+ * name+company (review only), then new.
  */
 export function matchIdentity(row: MatchableRow, index: IdentityIndex): MatchResult {
   const domain = row.email ? (splitEmail(row.email)?.domain ?? null) : null;
@@ -148,6 +154,26 @@ export function matchIdentity(row: MatchableRow, index: IdentityIndex): MatchRes
     const candidates = index.byEmail(emailKey);
     if (candidates.length > 0) {
       return { kind: "review", reason: "email_unverified", personIds: candidates };
+    }
+  }
+
+  // manual_create-only rule (contact-identity delta, "Nuevo contacto"
+  // duplicate check): an exact email match against a live, non-merged
+  // person means "this is the same person" — auto, the same "already
+  // exists" UX profile_key already gets — regardless of either side's
+  // emailStatus. Unlike the hubspot_import email_unverified rule above
+  // (never auto-merges, always goes to review, because a bulk import batch
+  // can plausibly collide two different people on a shared/generic
+  // address), a manually created contact is one person typing one email
+  // for themselves right now: there is no batch-collision risk to protect
+  // against, so widening this to auto is what stops the entered email from
+  // creating a duplicate person. Checked before name+company so a stronger
+  // exact-email hit always outranks a weaker name+company one.
+  if (row.source === "manual_create" && row.email) {
+    const emailKey = row.email.trim().toLowerCase();
+    const candidates = index.byEmail(emailKey);
+    if (candidates.length > 0) {
+      return { kind: "auto", personId: candidates[0], key: "email_exact" };
     }
   }
 

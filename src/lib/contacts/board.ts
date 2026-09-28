@@ -33,6 +33,15 @@ export function isBoardStatus(value: string): value is PersonStatus {
 /** The `QuickActions` composer a drop on this column's target should open, or `null` if unsupported. */
 export type BoardDropAction = "email" | "meeting" | "discard";
 
+const BOARD_DROP_ACTION_SET: ReadonlySet<string> = new Set(["email", "meeting", "discard"]);
+
+/** Query-string safety for BoardDnD.tsx, which parses `?openAction=` back
+ * off a "Mover a..." menu link's own href rather than trusting a DOM
+ * dataset attribute. */
+export function isBoardDropAction(value: string): value is BoardDropAction {
+  return BOARD_DROP_ACTION_SET.has(value);
+}
+
 const DROP_ACTION_BY_STATUS: Partial<Record<PersonStatus, BoardDropAction>> = {
   contacted: "email",
   meeting: "meeting",

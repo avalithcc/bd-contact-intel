@@ -11,6 +11,7 @@ import type { CollapseReport } from "@/lib/migration/collapsePlanner";
 import type { FoldReport } from "@/lib/migration/foldPlanner";
 import type { CatchUpRunReport } from "@/lib/migration/catchUpRun";
 import type { HubSpotRunReport } from "@/lib/hubspot/report";
+import { hubspotOverThreshold, hubspotReviewSample, isHubSpotReport } from "@/lib/hubspot/reportGuard";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
 import { approveMigrationRunAction } from "./actions";
@@ -34,10 +35,6 @@ function isFoldReport(report: unknown): report is FoldReport {
 
 function isCatchUpReport(report: unknown): report is CatchUpRunReport {
   return !!report && typeof report === "object" && "rowsRead" in report && "leadsSkippedNoOwner" in report;
-}
-
-function isHubSpotReport(report: unknown): report is HubSpotRunReport {
-  return !!report && typeof report === "object" && "reviewSample" in report && "reviewThreshold" in report;
 }
 
 /**
@@ -270,7 +267,7 @@ function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
       )}
 
       <div className="eyebrow">{dict.reviewSampleTitle}</div>
-      {report.reviewSample.length === 0 ? (
+      {hubspotReviewSample(report).length === 0 ? (
         <p className="muted">{dict.reviewSampleEmpty}</p>
       ) : (
         <table>
@@ -282,7 +279,7 @@ function HubSpotReportTable({ report }: { report: HubSpotRunReport }) {
             </tr>
           </thead>
           <tbody>
-            {report.reviewSample.map((entry, i) => (
+            {hubspotReviewSample(report).map((entry, i) => (
               <tr key={i}>
                 <td>{dict.reviewSampleReasonLabels[entry.reason] ?? entry.reason}</td>
                 <td>
@@ -450,9 +447,16 @@ export default async function MigrationAdminPage({
 
   return (
     <main>
-      <div className="eyebrow">{dict.eyebrow}</div>
-      <h1 className="m-0">{dict.title}</h1>
-      <p className="soft">{dict.subtitle}</p>
+      <div className="page-header">
+        <div className="titles">
+          <div className="eyebrow">{dict.eyebrow}</div>
+          <h1 className="m-0">
+            {dict.title}
+            <span className="dot">.</span>
+          </h1>
+          <p className="soft">{dict.subtitle}</p>
+        </div>
+      </div>
 
       {isApproveErrorReason(approveError) && (
         <section className="panel">
@@ -495,7 +499,7 @@ export default async function MigrationAdminPage({
         history={hubspotHistory}
         renderReport={(report) => (isHubSpotReport(report) ? <HubSpotReportTable report={report} /> : null)}
         renderApproveExtra={(report) =>
-          isHubSpotReport(report) && report.overThreshold ? (
+          isHubSpotReport(report) && hubspotOverThreshold(report) ? (
             <p className="soft">
               <label>
                 <input type="checkbox" name="confirmThreshold" />{" "}

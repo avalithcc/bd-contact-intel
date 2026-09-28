@@ -14,6 +14,7 @@ import {
   groupHubSpotCompanies,
   planCompanyResolution,
   resolveContactCompanyKey,
+  domainClaimedByOtherCompany,
   type HubSpotCompanyRow,
   type ExistingCompanyRef,
 } from "@/lib/hubspot/companies";
@@ -454,4 +455,74 @@ test("resolveContactCompanyKey: resolved company id returns its companyKey", () 
   const resolved = resolveContactCompanyKey("1", result.byHubspotCompanyId);
   assert.equal(resolved.companyKey, "acme");
   assert.equal(resolved.noCompanyResolved, false);
+});
+
+// --- Follow-up fix: domain fills must never assign a domain already
+// claimed by a DIFFERENT existing company (the partial unique index
+// `company_domain_idx` — a blind UPDATE would throw and abort the whole
+// execute transaction). Both `planCompanyResolution` and the standalone
+// backfill script (scripts/backfill-company-domains.ts) route every
+// candidate fill through this one pure check first. ------------------------
+
+test("domainClaimedByOtherCompany: returns null when the domain is unclaimed", () => {
+  const existingByDomain = new Map<string, ExistingCompanyRef>();
+  assert.equal(domainClaimedByOtherCompany("acme", "acme.com", existingByDomain), null);
+});
+
+test("domainClaimedByOtherCompany: returns null when the SAME companyKey already owns the domain", () => {
+  const owner: ExistingCompanyRef = { companyKey: "acme", domain: "acme.com" };
+  const existingByDomain = new Map([["acme.com", owner]]);
+  assert.equal(domainClaimedByOtherCompany("acme", "acme.com", existingByDomain), null);
+});
+
+test("domainClaimedByOtherCompany: returns the owner when a DIFFERENT companyKey already owns the domain", () => {
+  const owner: ExistingCompanyRef = { companyKey: "acme-holdings", domain: "acme.com" };
+  const existingByDomain = new Map([["acme.com", owner]]);
+  assert.equal(domainClaimedByOtherCompany("acme", "acme.com", existingByDomain), owner);
+});
+
+// --- REAL root cause of "110 name matches + 21 compact matches produced
+// zero domain fills" (prod run c9de8587): `planCompanyResolution` MUTATES
+// the `ExistingCompanyRef` objects it's handed (`matched.domain = ...`)
+// instead of treating `existingCompanies` as read-only input. This module's
+// own header calls it "Pure company resolution planning" — but a caller
+// that (legitimately, per its own contract) invokes it TWICE against the
+// SAME `existingCompanies` array reference — exactly what
+// scripts/unify-contacts.ts does: once directly (to prefetch
+// `identityIndex`, scripts/unify-contacts.ts:280) and once more indirectly
+// via `planHubSpotImport` inside `runHubSpotImportDryRun`/
+// `runHubSpotImportExecute` (scripts/unify-contacts.ts:295, the SAME
+// `existingCompanies` array flows into `input.existingCompanies`) — gets a
+// SECOND call whose inputs were already silently mutated by the FIRST.
+// The SECOND call is the one whose `domainFills` actually reaches the
+// persisted report and the execute-time `UPDATE company SET domain`
+// (src/lib/hubspot/importQueries.ts) — so every fill the first call
+// "found" in memory only, never a real write, vanishes before it can ever
+// be applied. Matching itself (matchedByName/matchedByCompact) is
+// unaffected, since it doesn't depend on `matched.domain`'s value — which
+// is exactly why the report's match counts (110/21) looked correct while
+// zero domains were ever written. ------------------------------------------
+
+test("planCompanyResolution must not mutate its existingCompanies input — calling it twice with the SAME array must produce the SAME domainFills both times", () => {
+  const existing: ExistingCompanyRef[] = [{ companyKey: "acme", domain: null }];
+  const rows = [row({ hubspotCompanyId: "1", name: "Acme Corp", domain: "acme.com" })];
+  const primaryContactCounts = new Map([["1", 1]]);
+
+  // First call — mirrors the throwaway `companyResolution` computation
+  // scripts/unify-contacts.ts:280 does purely to prefetch `identityIndex`.
+  const first = planCompanyResolution(rows, existing, primaryContactCounts, new Set());
+  assert.deepEqual(first.domainFills, [{ companyKey: "acme", domain: "acme.com" }]);
+
+  // Second call — mirrors `planHubSpotImport` being invoked again inside
+  // `runHubSpotImportDryRun`/`runHubSpotImportExecute`, reusing the SAME
+  // `existing` array reference (scripts/unify-contacts.ts:295's
+  // `input.existingCompanies`). This is the one whose domainFills actually
+  // reaches the persisted report and the execute-time UPDATE — it must
+  // find the SAME fill, not an empty array.
+  const second = planCompanyResolution(rows, existing, primaryContactCounts, new Set());
+  assert.deepEqual(
+    second.domainFills,
+    [{ companyKey: "acme", domain: "acme.com" }],
+    "a second call against the SAME existingCompanies array must still report the fill — planCompanyResolution must not mutate its input",
+  );
 });

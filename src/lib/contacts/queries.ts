@@ -6,10 +6,28 @@
  */
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, person, personBdConnection, personPropertyHistory, type Person } from "@/db/schema";
+import {
+  activity,
+  bd,
+  lead,
+  mergeEvent,
+  person,
+  personBdConnection,
+  personIdMap,
+  personPropertyHistory,
+  type Person,
+} from "@/db/schema";
 import { EDITABLE_PERSON_PROPERTIES, type EditablePersonProperty } from "@/lib/contacts/propertyEdit";
 import { assertContactEditable } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
+import {
+  activityRowToStatusEvent,
+  buildStatusReasonEvidence,
+  connectionRowToStatusEvent,
+  deriveStatusFull,
+  type StatusEvent,
+  type StatusReasonEvidence,
+} from "@/lib/status/deriveStatus";
 
 export interface ContactPropertyRow {
   key: EditablePersonProperty;
@@ -25,7 +43,43 @@ export interface ContactConnectionRow {
   bdName: string | null;
   connectedOn: string | null;
   messageCount: number;
+  // Added mockup-port r02 (status "why" evidence) / r04 (LinkedIn timeline
+  // cards, contact-record.html:124-131) — same row `getContactRecord` was
+  // already selecting these two columns from, just not exposing on the
+  // public type until now.
+  sentCount: number;
+  receivedCount: number;
   lastMessageAt: Date | null;
+}
+
+export type { StatusReasonEvidence };
+
+/**
+ * Raw evidence for the record page's "Origen" row (mockup-port r02;
+ * contact-record.html:85 "LinkedIn (3 BDs) · Lista de leads fi-arg-2026").
+ * `linkedinConnectionCount` is just `connections.length` (already fetched);
+ * `leadSourceKey` comes from a single bounded `person_id_map` lookup
+ * (WHERE personId = this one person, legacyTable = 'lead') joined to that
+ * lead's `sourceKey` — the free-text source-file/event identifier the
+ * mockup's "Lista de leads X" is describing. `null` when this person was
+ * never mapped from a legacy `lead` row (e.g. created directly as a
+ * Contact, or LinkedIn-only).
+ */
+export interface ContactSourceEvidence {
+  linkedinConnectionCount: number;
+  leadSourceKey: string | null;
+}
+
+/**
+ * Evidence for the timeline's "Unificado a partir de N registros" system
+ * card (mockup-port r08; contact-record.html:135-138 /
+ * contact-record-admin.html:142-145's "Revisar / deshacer fusión"). Bounded
+ * to this one person: how many legacy rows map to it (`person_id_map`) and
+ * whether a real `merge_event` exists to review/undo (admin-only action).
+ */
+export interface ContactMergeEvidence {
+  unifiedFromCount: number;
+  hasMergeEvent: boolean;
 }
 
 export interface ContactRecord {
@@ -33,6 +87,9 @@ export interface ContactRecord {
   ownerName: string | null;
   properties: ContactPropertyRow[];
   connections: ContactConnectionRow[];
+  source: ContactSourceEvidence;
+  merge: ContactMergeEvidence;
+  statusReason: StatusReasonEvidence | null;
 }
 
 export type ContactRecordResult =
@@ -86,7 +143,8 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
     return survivor ? { kind: "redirect", personId: survivor.id } : { kind: "not_found" };
   }
 
-  const [ownerRow, connectionRows, historyRows] = await Promise.all([
+  const [ownerRow, connectionRows, historyRows, statusEventActivityRows, leadSourceRows, unifiedFromRows, mergeEventRows] =
+    await Promise.all([
     row.ownerBdId
       ? db.select({ name: bd.name }).from(bd).where(eq(bd.id, row.ownerBdId))
       : Promise.resolve([]),
@@ -96,6 +154,8 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
         bdName: bd.name,
         connectedOn: personBdConnection.connectedOn,
         messageCount: personBdConnection.messageCount,
+        sentCount: personBdConnection.sentCount,
+        receivedCount: personBdConnection.receivedCount,
         lastMessageAt: personBdConnection.lastMessageAt,
       })
       .from(personBdConnection)
@@ -108,7 +168,50 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       .leftJoin(bd, eq(bd.id, personPropertyHistory.changedByBdId))
       .where(and(eq(personPropertyHistory.personId, row.id)))
       .orderBy(desc(personPropertyHistory.at)),
+    // Bounded to this one person (task instruction: "keep new queries
+    // bounded to the single person or company") — feeds the "why" hint
+    // below via the SAME deriveStatus algorithm the status cache itself
+    // uses (src/lib/status/recompute.ts), so the reason can never disagree
+    // with `person.status`.
+    db
+      .select({ id: activity.id, type: activity.type, createdAt: activity.createdAt, metadata: activity.metadata })
+      .from(activity)
+      .where(eq(activity.personId, row.id)),
+    // Bounded to this one person (task instruction): the "Origen" row's
+    // lead-list evidence, if this person was ever mapped from a legacy
+    // `lead` row during the collapse/fold-leads migration.
+    db
+      .select({ sourceKey: lead.sourceKey })
+      .from(personIdMap)
+      .innerJoin(lead, eq(lead.id, personIdMap.legacyId))
+      .where(and(eq(personIdMap.personId, row.id), eq(personIdMap.legacyTable, "lead")))
+      .limit(1),
+    // Bounded to this one person — "Unificado a partir de N registros"
+    // (contact-record.html:135-138): every legacy row that maps to this
+    // survivor, regardless of merge vs. direct identity-match.
+    db.select({ legacyId: personIdMap.legacyId }).from(personIdMap).where(eq(personIdMap.personId, row.id)),
+    // Bounded to this one person — whether a real `merge_event` exists to
+    // review/undo (admin-only "Revisar / deshacer fusión",
+    // contact-record-admin.html:145).
+    db.select({ id: mergeEvent.id }).from(mergeEvent).where(eq(mergeEvent.survivorId, row.id)).limit(1),
   ]);
+
+  const statusEvents: StatusEvent[] = [
+    ...statusEventActivityRows.map((r) => activityRowToStatusEvent(r)),
+    ...connectionRows.map((c) =>
+      connectionRowToStatusEvent({
+        bdId: c.bdId,
+        sentCount: c.sentCount,
+        receivedCount: c.receivedCount,
+        lastMessageAt: c.lastMessageAt,
+      }),
+    ),
+  ];
+  const statusReason = buildStatusReasonEvidence(
+    deriveStatusFull(statusEvents),
+    connectionRows,
+    statusEventActivityRows,
+  );
 
   // First row per property wins (rows are ordered newest-first).
   const latestEditByProperty = new Map<string, { bdName: string | null; at: Date }>();
@@ -131,6 +234,15 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       ownerName: ownerRow[0]?.name ?? null,
       properties,
       connections: connectionRows,
+      statusReason,
+      source: {
+        linkedinConnectionCount: connectionRows.length,
+        leadSourceKey: leadSourceRows[0]?.sourceKey ?? null,
+      },
+      merge: {
+        unifiedFromCount: unifiedFromRows.length,
+        hasMergeEvent: mergeEventRows.length > 0,
+      },
     },
   };
 }

@@ -14,9 +14,9 @@ import {
   sanitizeColumnKeys,
 } from "@/lib/contacts/columns";
 
-test("sanitizeColumnKeys keeps only known keys, dedups, preserves ALL_CONTACT_COLUMNS order", () => {
+test("sanitizeColumnKeys keeps only known keys, dedups (first occurrence wins), and preserves the CALLER's order — not a fixed order — so column drag-reorder (mockup 'arrastrar para reordenar') actually persists", () => {
   const result = sanitizeColumnKeys(["email", "bogus", "company", "email", "owner"]);
-  assert.deepEqual(result, ["company", "owner", "email"]);
+  assert.deepEqual(result, ["email", "company", "owner"]);
 });
 
 test("sanitizeColumnKeys drops non-string entries and non-array input", () => {
@@ -30,6 +30,11 @@ test("sanitizeColumnKeys never includes the always-visible name column", () => {
   assert.deepEqual(result, ["company"]);
 });
 
+test("phone (migration 0016) is a recognized, selectable column", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("phone"));
+  assert.deepEqual(sanitizeColumnKeys(["phone", "bogus"]), ["phone"]);
+});
+
 test("resolveVisibleColumns falls back to DEFAULT_CONTACT_COLUMNS when given no valid selection", () => {
   assert.deepEqual(resolveVisibleColumns(undefined), DEFAULT_CONTACT_COLUMNS);
   assert.deepEqual(resolveVisibleColumns([]), DEFAULT_CONTACT_COLUMNS);
@@ -38,7 +43,7 @@ test("resolveVisibleColumns falls back to DEFAULT_CONTACT_COLUMNS when given no 
 
 test("resolveVisibleColumns honors a valid explicit selection, including a subset", () => {
   assert.deepEqual(resolveVisibleColumns(["status"]), ["status"]);
-  assert.deepEqual(resolveVisibleColumns(["industry", "company"]), ["company", "industry"]);
+  assert.deepEqual(resolveVisibleColumns(["industry", "company"]), ["industry", "company"]);
 });
 
 test("ALL_CONTACT_COLUMNS contains every DEFAULT_CONTACT_COLUMNS entry", () => {
@@ -51,4 +56,16 @@ test("seniority is a selectable column (task 13.3 parity gap), not visible by de
   assert.ok(ALL_CONTACT_COLUMNS.includes("seniority"));
   assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("seniority"));
   assert.deepEqual(resolveVisibleColumns(["seniority"]), ["seniority"]);
+});
+
+test("bdConnections (mockup 'BDs conectados') is a selectable column, not visible by default", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("bdConnections"));
+  assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("bdConnections"));
+  assert.deepEqual(resolveVisibleColumns(["bdConnections"]), ["bdConnections"]);
+});
+
+test("lastActivity (mockup 'Última actividad') is a selectable column, not visible by default", () => {
+  assert.ok(ALL_CONTACT_COLUMNS.includes("lastActivity"));
+  assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("lastActivity"));
+  assert.deepEqual(resolveVisibleColumns(["lastActivity"]), ["lastActivity"]);
 });

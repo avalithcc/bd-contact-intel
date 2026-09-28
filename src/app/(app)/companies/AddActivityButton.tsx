@@ -1,14 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createActivityAction } from "@/app/activity/actions";
+import { Dialog } from "@/components/Dialog";
+import { useToast } from "@/components/ToastProvider";
+import type { CompanyRecordLabels } from "./EditCompanyButton";
 import styles from "./AddActivityModal.module.css";
 
-export function AddActivityButton({ companyKey }: { companyKey: string }) {
+export function AddActivityButton({
+  companyKey,
+  labels: l,
+}: {
+  companyKey: string;
+  labels: CompanyRecordLabels;
+}) {
+  const router = useRouter();
+  const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function close() {
+    setIsOpen(false);
+    setNote("");
+    setError(null);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,62 +42,48 @@ export function AddActivityButton({ companyKey }: { companyKey: string }) {
       });
       setNote("");
       setIsOpen(false);
+      showToast(l.addActivitySuccess);
+      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add activity");
+      const message = err instanceof Error ? err.message : l.addActivityError;
+      setError(message);
+      showToast(message, "error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        className={styles.openButton}
-        onClick={() => setIsOpen(true)}
-      >
-        Add activity
-      </button>
-    );
-  }
-
   return (
-    <div className={styles.modal}>
-      <div className={styles.overlay} onClick={() => setIsOpen(false)} />
-      <div className={styles.content}>
-        <h2>Add Activity</h2>
-        {error && <div className={styles.error}>{error}</div>}
-        <form onSubmit={handleSubmit}>
+    <>
+      <button type="button" className={styles.openButton} onClick={() => setIsOpen(true)}>
+        {l.addActivity}
+      </button>
+
+      <Dialog open={isOpen} onClose={close} title={l.addActivityDialogTitle}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          {error && (
+            <div className={styles.error} role="alert">
+              {error}
+            </div>
+          )}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="What happened?"
+            placeholder={l.notePlaceholder}
             className={styles.textarea}
             autoFocus
             disabled={isSubmitting}
           />
           <div className={styles.actions}>
-            <button
-              type="submit"
-              className={styles.submitButton}
-              disabled={!note.trim() || isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : "Save"}
+            <button type="button" onClick={close} disabled={isSubmitting}>
+              {l.cancel}
             </button>
-            <button
-              type="button"
-              className={styles.cancelButton}
-              onClick={() => {
-                setIsOpen(false);
-                setNote("");
-                setError(null);
-              }}
-              disabled={isSubmitting}
-            >
-              Cancel
+            <button type="submit" disabled={!note.trim() || isSubmitting}>
+              {isSubmitting ? l.saving : l.save}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
+    </>
   );
 }

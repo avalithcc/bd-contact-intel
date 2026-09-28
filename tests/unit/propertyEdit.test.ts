@@ -11,6 +11,7 @@ import { test } from "node:test";
 import {
   EDITABLE_PERSON_PROPERTIES,
   InvalidEmailError,
+  InvalidPhoneError,
   isEditablePersonProperty,
   planPropertyEdit,
 } from "@/lib/contacts/propertyEdit";
@@ -28,6 +29,8 @@ const BASE_PERSON = {
   region: null,
   country: null,
   industry: null,
+  phone: "+54 11 4000-0000",
+  mobilePhone: null,
 };
 
 test("isEditablePersonProperty accepts only the allow-listed columns", () => {
@@ -109,4 +112,44 @@ test("invalid email format is rejected before any plan is built", () => {
 test("no-op email edit (same trimmed value) reports changed: false and does not re-validate format", () => {
   const plan = planPropertyEdit(BASE_PERSON, "email", " old@example.com ", "bd-1");
   assert.deepEqual(plan, { changed: false, personUpdate: null, historyRows: [] });
+});
+
+// --- phone/mobilePhone (migration 0016) -------------------------------------
+
+test("phone and mobilePhone are editable properties", () => {
+  assert.equal(isEditablePersonProperty("phone"), true);
+  assert.equal(isEditablePersonProperty("mobilePhone"), true);
+});
+
+test("a valid phone edit produces a plain personUpdate/history row, no derived columns", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "mobilePhone", "+54 9 11 4123-4567", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.mobilePhone, "+54 9 11 4123-4567");
+  assert.deepEqual(plan.historyRows, [
+    {
+      personId: BASE_PERSON.id,
+      property: "mobilePhone",
+      oldValue: null,
+      newValue: "+54 9 11 4123-4567",
+      changedByBdId: "bd-1",
+      source: "edit",
+    },
+  ]);
+});
+
+test("clearing a phone property is always allowed (no format check on blank)", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "phone", "   ", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.phone, null);
+});
+
+test("an invalid phone format is rejected before any plan is built", () => {
+  assert.throws(
+    () => planPropertyEdit(BASE_PERSON, "phone", "call me maybe", "bd-1"),
+    InvalidPhoneError,
+  );
+  assert.throws(
+    () => planPropertyEdit(BASE_PERSON, "mobilePhone", "123", "bd-1"),
+    InvalidPhoneError,
+  );
 });

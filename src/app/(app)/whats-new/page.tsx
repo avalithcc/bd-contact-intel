@@ -9,9 +9,6 @@ import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDate, formatDateTime } from "@/lib/i18n/format";
-import { SignOutButton } from "../../SignOutButton";
-import { UserMenu } from "../../UserMenu";
-import { BackButton } from "../../BackButton";
 import { FilterCheckbox } from "./FilterCheckbox";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { generateOutreachMessage } from "../outreach/actions";
@@ -75,30 +72,12 @@ export default async function WhatsNewPage({
 
   return (
     <main>
-      <div className="header">
-        <span className="logo">
-          avalith<span className="dot">.</span>
-        </span>
-        <div className="row row-md">
-          <BackButton label={dict.common.goBack} fallbackHref="/" />
-          <Link className="secondary-btn" href="/contacts?view=outreach">
-            {dict.common.priorityOutreach}
-          </Link>
-          <Link className="secondary-btn" href="/hiring">
-            {dict.common.hiringSignals}
-          </Link>
-          <Link className="secondary-btn" href="/contacts">
-            {dict.common.leadsNav}
-          </Link>
-          <UserMenu
-            label={me.name || dict.common.account}
-            changePasswordHref="/account/password"
-            changePasswordLabel={dict.common.changePassword}
-            signOutButton={<SignOutButton locale={locale} />}
-          />
-        </div>
-      </div>
-
+      {/* The page-local logo/header and cross-link nav row (BackButton +
+          Outreach/Vacantes/Contactos secondary-btns) were removed here
+          (mockup-parity 6.1) — the app shell ((app)/layout.tsx -> Sidebar
+          + TopBar breadcrumb) already covers both (including the
+          /contacts?view=outreach redirect added in
+          feat/crm-hubspot-ux-15b-outreach-redirect). */}
       <div className="mb-3xl">
         <div className="eyebrow">{dict.whatsNew.eyebrow}</div>
         <h1>
@@ -199,9 +178,9 @@ export default async function WhatsNewPage({
           <div key={c.companyKey} className="whats-new-company">
             <div className="whats-new-company-head">
               <span className="whats-new-company-name">{c.displayName}</span>
-              <span className="badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
+              <span className="legacy-badge green">{dict.whatsNew.newPostingsCount(c.newPostingCount)}</span>
               {c.offshoreHeavy && (
-                <span className="badge offshore">
+                <span className="legacy-badge offshore">
                   {dict.common.offshoreBadge(c.offshoreItCount, c.latamItCount)}
                 </span>
               )}
@@ -225,7 +204,7 @@ export default async function WhatsNewPage({
                       {sc.name ?? dict.contact.unnamed}
                     </Link>
                     {sc.roleGroup && (
-                      <span className={sc.isLeadership ? "badge green" : "badge"}>
+                      <span className={sc.isLeadership ? "legacy-badge green" : "badge"}>
                         {dict.roleGroups[sc.roleGroup]}
                       </span>
                     )}

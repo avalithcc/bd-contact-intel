@@ -9,19 +9,38 @@
  */
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, person, personBdConnection, personPropertyHistory } from "@/db/schema";
+import { auditLog, bd, person, personBdConnection, personPropertyHistory } from "@/db/schema";
 import {
   planBulkOwnerAssignment,
   sanitizeBulkPersonIds,
   type BulkOwnerPlanRow,
 } from "@/lib/contacts/bulkOwner";
+import { buildBulkOwnerAuditRow, type BulkOwnerAuditMode } from "@/lib/contacts/bulkOwnerAudit";
 
+export interface BulkAssignOwnerOptions {
+  idCap?: number;
+  /** Owner-approved requirement: every bulk owner change writes one
+   * audit_log row, in the SAME transaction as the update below — see
+   * src/lib/contacts/bulkOwnerAudit.ts for the row shape. */
+  mode?: BulkOwnerAuditMode;
+  filtersQuery?: string;
+}
+
+/**
+ * `idCap` defaults to MAX_BULK_SELECTION (the plain checked-boxes path);
+ * "Seleccionar los N" filter-wide mode passes BULK_FILTER_TARGET_CAP —
+ * `rawPersonIds` there is already a server-derived id list (see
+ * getContactIdsForFilters), not raw client input, but still runs through
+ * the same uuid/dedup validation here, just against a higher cap.
+ */
 export async function bulkAssignOwner(
   rawPersonIds: unknown,
   ownerBdId: string | null,
   changedByBdId: string,
+  options: BulkAssignOwnerOptions = {},
 ): Promise<BulkOwnerPlanRow[]> {
-  const personIds = sanitizeBulkPersonIds(rawPersonIds);
+  const { idCap, mode = "ids", filtersQuery } = options;
+  const personIds = sanitizeBulkPersonIds(rawPersonIds, idCap);
   if (!personIds.length) return [];
 
   return db.transaction(async (tx) => {
@@ -69,6 +88,15 @@ export async function bulkAssignOwner(
         })
         .filter((h): h is NonNullable<typeof h> => h !== null);
       if (historyRows.length) await tx.insert(personPropertyHistory).values(historyRows);
+
+      const auditRow = buildBulkOwnerAuditRow({
+        actorBdId: changedByBdId,
+        ownerBdId,
+        mode,
+        filtersQuery,
+        personIds: toAssign,
+      });
+      await tx.insert(auditLog).values(auditRow);
     }
 
     return plan;
