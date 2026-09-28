@@ -13,7 +13,10 @@ import {
   InvalidEmailError,
   InvalidPhoneError,
   isEditablePersonProperty,
+  planLocationEdit,
   planPropertyEdit,
+  planPropertyEditBatch,
+  PropertyBatchEditError,
 } from "@/lib/contacts/propertyEdit";
 
 const BASE_PERSON = {
@@ -151,5 +154,128 @@ test("an invalid phone format is rejected before any plan is built", () => {
   assert.throws(
     () => planPropertyEdit(BASE_PERSON, "mobilePhone", "123", "bd-1"),
     InvalidPhoneError,
+  );
+});
+
+// --- planPropertyEditBatch / planLocationEdit (fresh-review CRITICAL fix:
+// LocationPropertyRow used to call updateContactPropertyAction three times
+// sequentially, so a rejected second/third field left the first one already
+// persisted) ------------------------------------------------------------
+
+test("batch: all-or-nothing — a rejected entry throws before any entry is merged into a plan", () => {
+  // jobTitle would be accepted on its own, but it comes BEFORE the rejected
+  // "email" entry; the whole batch must still throw with nothing returned,
+  // proving the accepted jobTitle change was never exposed to a caller.
+  assert.throws(
+    () =>
+      planPropertyEditBatch(
+        BASE_PERSON,
+        [
+          { property: "jobTitle", rawNewValue: "VP of Engineering" },
+          { property: "email", rawNewValue: "not-an-email" },
+        ],
+        "bd-1",
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof PropertyBatchEditError);
+      assert.equal(err.property, "email");
+      assert.ok(err.cause instanceof InvalidEmailError);
+      return true;
+    },
+  );
+});
+
+test("batch: only entries whose value actually changed are written", () => {
+  const plan = planPropertyEditBatch(
+    BASE_PERSON,
+    [
+      { property: "jobTitle", rawNewValue: "VP of Engineering" },
+      { property: "roleGroup", rawNewValue: "   " }, // null -> null, a no-op
+    ],
+    "bd-1",
+  );
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.jobTitle, "VP of Engineering");
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(
+    plan.historyRows.map((r) => r.property),
+    ["jobTitle"],
+  );
+});
+
+test("batch: one history row per changed field (plus email's derived columns), merged from every entry", () => {
+  const plan = planPropertyEditBatch(
+    BASE_PERSON,
+    [
+      { property: "jobTitle", rawNewValue: "VP of Engineering" },
+      { property: "email", rawNewValue: "new.person@example.com" },
+    ],
+    "bd-1",
+  );
+  assert.equal(plan.changed, true);
+  assert.deepEqual(
+    plan.historyRows.map((r) => r.property).sort(),
+    ["email", "emailNormalized", "emailSource", "emailStatus", "jobTitle"],
+  );
+});
+
+test("batch planner never mutates its inputs — calling it twice with the same input gives the same result", () => {
+  const person = { ...BASE_PERSON };
+  const entries = [
+    { property: "jobTitle" as const, rawNewValue: "VP of Engineering" },
+    { property: "city" as const, rawNewValue: "Buenos Aires" },
+  ];
+  const entriesSnapshot = JSON.parse(JSON.stringify(entries));
+  const personSnapshot = JSON.parse(JSON.stringify(person));
+
+  const first = planPropertyEditBatch(person, entries, "bd-1");
+  const second = planPropertyEditBatch(person, entries, "bd-1");
+
+  assert.deepEqual(JSON.parse(JSON.stringify(entries)), entriesSnapshot);
+  assert.deepEqual(JSON.parse(JSON.stringify(person)), personSnapshot);
+  assert.equal(first.personUpdate?.jobTitle, second.personUpdate?.jobTitle);
+  assert.equal(first.personUpdate?.city, second.personUpdate?.city);
+  assert.deepEqual(
+    first.historyRows.map(({ ...r }) => r),
+    second.historyRows.map(({ ...r }) => r),
+  );
+});
+
+test("planLocationEdit: no field changed reports changed: false", () => {
+  const plan = planLocationEdit(BASE_PERSON, { city: "", region: "", country: "" }, "bd-1");
+  assert.deepEqual(plan, { changed: false, personUpdate: null, historyRows: [] });
+});
+
+test("planLocationEdit: only the changed location field gets a person update and a history row", () => {
+  const plan = planLocationEdit(BASE_PERSON, { city: "Buenos Aires", region: "", country: "" }, "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.city, "Buenos Aires");
+  assert.equal("region" in (plan.personUpdate ?? {}), false);
+  assert.equal("country" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows, [
+    {
+      personId: BASE_PERSON.id,
+      property: "city",
+      oldValue: null,
+      newValue: "Buenos Aires",
+      changedByBdId: "bd-1",
+      source: "edit",
+    },
+  ]);
+});
+
+test("planLocationEdit: all three changed fields each get their own history row", () => {
+  const plan = planLocationEdit(
+    BASE_PERSON,
+    { city: "Buenos Aires", region: "CABA", country: "Argentina" },
+    "bd-1",
+  );
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.city, "Buenos Aires");
+  assert.equal(plan.personUpdate?.region, "CABA");
+  assert.equal(plan.personUpdate?.country, "Argentina");
+  assert.deepEqual(
+    plan.historyRows.map((r) => r.property).sort(),
+    ["city", "country", "region"],
   );
 });

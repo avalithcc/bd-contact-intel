@@ -2,7 +2,11 @@
 
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
-import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
+import {
+  contactActionErrorMessage,
+  contactLocationActionErrorMessage,
+  type ContactRecordLabels,
+} from "@/lib/contacts/labels";
 import type { EditablePersonProperty } from "@/lib/contacts/propertyEdit";
 import { composeLocation } from "@/lib/contacts/locationDisplay";
 import { Avatar } from "@/components/Avatar";
@@ -10,7 +14,7 @@ import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon } from "@/components/icons";
 import { toTelHref } from "@/lib/phone";
-import { updateContactOwnerAction, updateContactPropertyAction } from "../actions";
+import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 
 export interface AboutPaneProperty {
   key: EditablePersonProperty;
@@ -385,25 +389,27 @@ function LocationPropertyRow({
   const [error, setError] = useState<string | null>(null);
 
   if (editing) {
-    const fields: Array<{ prop: AboutPaneProperty; draft: string }> = [
-      { prop: city, draft: cityDraft },
-      { prop: region, draft: regionDraft },
-      { prop: country, draft: countryDraft },
-    ];
-
+    // Fresh-review CRITICAL fix: one server-action call plans and writes
+    // city/region/country together in a single transaction
+    // (updateContactLocationAction -> planLocationEdit), instead of three
+    // sequential per-field calls where a rejected second/third field left
+    // the first one already persisted. A rejected field leaves every field
+    // exactly as it was, so the drafts below are only ever reset from the
+    // props on Cancelar, never left stale after a partial failure.
     const handleSave = async () => {
       setBusy(true);
       setError(null);
       try {
-        for (const { prop, draft } of fields) {
-          if (draft.trim() === (prop.value ?? "")) continue;
-          const result = await updateContactPropertyAction(personId, prop.key, draft);
-          if (!result.ok) {
-            setError(contactActionErrorMessage(l, result.reason));
-            return;
-          }
+        const result = await updateContactLocationAction(personId, {
+          city: cityDraft,
+          region: regionDraft,
+          country: countryDraft,
+        });
+        if (result.ok) {
+          onSaved();
+        } else {
+          setError(contactLocationActionErrorMessage(l, result));
         }
-        onSaved();
       } catch {
         setError(genericError);
       } finally {

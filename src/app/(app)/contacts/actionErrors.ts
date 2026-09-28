@@ -11,7 +11,12 @@
  */
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
-import { InvalidEmailError, InvalidPhoneError } from "@/lib/contacts/propertyEdit";
+import {
+  InvalidEmailError,
+  InvalidPhoneError,
+  PropertyBatchEditError,
+  type LocationProperty,
+} from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/contacts/discard";
 import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
@@ -58,6 +63,19 @@ export class OwnerReassignLockedError extends Error {
 
 export type ContactActionResult = { ok: true } | { ok: false; reason: ContactActionErrorReason };
 
+/**
+ * Result of the atomic "Ubicación" save (fresh-review CRITICAL fix). Same
+ * shape as `ContactActionResult` plus WHICH of the three fields was
+ * rejected, since a single `updateContactLocationAction` call now covers
+ * city/region/country together and the UI must say which one failed and
+ * why — not just that "the save" failed. `property` is `null` for a
+ * failure that isn't attributable to one field (e.g. the contact was
+ * merged/not found before any field was even planned).
+ */
+export type ContactLocationActionResult =
+  | { ok: true }
+  | { ok: false; reason: ContactActionErrorReason; property: LocationProperty | null };
+
 /** A property outside EDITABLE_PERSON_PROPERTIES was requested for edit. */
 export class PropertyNotEditableError extends Error {
   constructor(public readonly property: string) {
@@ -86,6 +104,27 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof OwnerValueInvalidError) return "owner_invalid";
   if (err instanceof OwnerReassignLockedError) return "owner_locked";
   return "unexpected";
+}
+
+/**
+ * Unwraps a `PropertyBatchEditError` thrown by `planLocationEdit` into the
+ * rejected field plus the SAME reason a single-field edit would report for
+ * its `cause` (so "city" rejected for an invalid format maps to
+ * `invalid_email`/`invalid_phone` exactly like `updateContactPropertyAction`
+ * does today — one mapping table, not two).
+ */
+const LOCATION_PROPERTIES = new Set<string>(["city", "region", "country"] satisfies LocationProperty[]);
+
+export function contactLocationActionErrorReason(
+  err: unknown,
+): { reason: ContactActionErrorReason; property: LocationProperty } | null {
+  if (!(err instanceof PropertyBatchEditError)) return null;
+  // `planLocationEdit` only ever plans city/region/country, so a
+  // `PropertyBatchEditError` reaching here can only name one of those three
+  // — this check documents (and enforces) that assumption rather than
+  // silently casting.
+  if (!LOCATION_PROPERTIES.has(err.property)) return null;
+  return { reason: contactActionErrorReason(err.cause), property: err.property as LocationProperty };
 }
 
 /**

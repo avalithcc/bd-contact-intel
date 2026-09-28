@@ -166,3 +166,110 @@ export function planPropertyEdit(
     historyRows: rows.filter((r): r is HistoryRow => r !== null),
   };
 }
+
+/** The three fields the "Ubicación" composite row (contact-record.html:86)
+ * edits together — see `planLocationEdit` below. */
+export type LocationProperty = "city" | "region" | "country";
+
+export interface LocationEditFields {
+  city: string;
+  region: string;
+  country: string;
+}
+
+export interface PropertyBatchEditPlan {
+  changed: boolean;
+  personUpdate: Partial<NewPerson> | null;
+  historyRows: HistoryRow[];
+}
+
+/**
+ * Thrown by `planPropertyEditBatch` (and, through it, `planLocationEdit`)
+ * before any field's plan is merged (fresh-review CRITICAL fix —
+ * PropertyList.tsx's `LocationPropertyRow` used to call
+ * `updateContactPropertyAction` three times sequentially, so a rejected
+ * second/third field left the first already persisted). Names WHICH field
+ * failed and preserves the original per-field error as `cause` (an
+ * `InvalidEmailError`/`InvalidPhoneError` today) so the UI can report
+ * "which field, and why".
+ */
+export class PropertyBatchEditError extends Error {
+  constructor(
+    public readonly property: EditablePersonProperty,
+    public readonly cause: unknown,
+  ) {
+    super(`Batch edit rejected at property: ${property}`);
+    this.name = "PropertyBatchEditError";
+  }
+}
+
+/**
+ * Plans an arbitrary set of properties as ONE atomic edit. Reuses
+ * `planPropertyEdit`'s per-field validation and old/new-value diffing
+ * unchanged (so a no-op field never gets a history row, and a changed field
+ * still gets exactly its own history rows, exactly as the single-property
+ * path does), but only MERGES the per-field plans into one combined plan
+ * instead of applying each one as it's produced. If any entry fails
+ * validation, this throws `PropertyBatchEditError` before merging that
+ * entry (or any entry after it) into the combined plan — entries already
+ * merged are only ever returned to the caller inside the SAME successful
+ * return value, never written or exposed on a throw, so the DB glue
+ * (`updateContactProperties`) either gets one fully-merged plan to write in
+ * one transaction, or an exception and nothing to write at all.
+ *
+ * Pure: never mutates `person` or `entries` (rule: pure planners never
+ * mutate their inputs) — every value read is only read, never assigned
+ * back into; calling this twice with the same `person`/`entries` produces
+ * the same `personUpdate`/`historyRows` (module clock aside).
+ */
+export function planPropertyEditBatch(
+  person: EditablePersonForPlan,
+  entries: Array<{ property: EditablePersonProperty; rawNewValue: string }>,
+  changedByBdId: string,
+): PropertyBatchEditPlan {
+  const personUpdate: Partial<NewPerson> = {};
+  const historyRows: HistoryRow[] = [];
+  let changed = false;
+
+  for (const { property, rawNewValue } of entries) {
+    let fieldPlan: PropertyEditPlan;
+    try {
+      fieldPlan = planPropertyEdit(person, property, rawNewValue, changedByBdId);
+    } catch (cause) {
+      throw new PropertyBatchEditError(property, cause);
+    }
+    if (!fieldPlan.changed) continue;
+    changed = true;
+    Object.assign(personUpdate, fieldPlan.personUpdate);
+    historyRows.push(...fieldPlan.historyRows);
+  }
+
+  if (!changed) return { changed: false, personUpdate: null, historyRows: [] };
+
+  return {
+    changed: true,
+    personUpdate: { ...personUpdate, updatedAt: new Date(), updatedByBdId: changedByBdId },
+    historyRows,
+  };
+}
+
+/**
+ * Plans all three "Ubicación" fields (contact-record.html:86) as one
+ * atomic edit — a thin, fixed-field wrapper over `planPropertyEditBatch`
+ * (see its doc comment for the atomicity guarantee).
+ */
+export function planLocationEdit(
+  person: EditablePersonForPlan,
+  fields: LocationEditFields,
+  changedByBdId: string,
+): PropertyBatchEditPlan {
+  return planPropertyEditBatch(
+    person,
+    [
+      { property: "city", rawNewValue: fields.city },
+      { property: "region", rawNewValue: fields.region },
+      { property: "country", rawNewValue: fields.country },
+    ],
+    changedByBdId,
+  );
+}

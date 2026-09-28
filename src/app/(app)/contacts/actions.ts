@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
-import { updateContactProperty } from "@/lib/contacts/propertyEditDb";
-import { isEditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
+import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contacts/propertyEdit";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
 import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
@@ -20,10 +20,12 @@ import { getConversationForAdmin, type AdminConversationData } from "@/lib/activ
 import { isUuid } from "@/lib/uuid";
 import {
   contactActionErrorReason,
+  contactLocationActionErrorReason,
   OwnerReassignLockedError,
   OwnerValueInvalidError,
   PropertyNotEditableError,
   type ContactActionResult,
+  type ContactLocationActionResult,
 } from "./actionErrors";
 
 // Unclassified errors reach the client only as "unexpected"; log them here so
@@ -56,6 +58,38 @@ export async function updateContactPropertyAction(
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
+  }
+}
+
+/**
+ * Atomic save for the "Ubicación" composite row (fresh-review CRITICAL fix
+ * — see `LocationPropertyRow` in PropertyList.tsx and `planLocationEdit`'s
+ * doc comment). Replaces three sequential
+ * `updateContactPropertyAction(personId, "city"|"region"|"country", ...)`
+ * calls with ONE call that plans and writes all three fields in a single
+ * transaction: a rejected field leaves `city`/`region`/`country` exactly as
+ * they were, and only fields whose trimmed value actually changed get a
+ * `person_property_history` row (same per-field diffing as the
+ * single-property action — see `planLocationEdit`).
+ */
+export async function updateContactLocationAction(
+  personId: string,
+  fields: LocationEditFields,
+): Promise<ContactLocationActionResult> {
+  try {
+    const me = await getCurrentBd();
+    await updateContactProperties(personId, fields, me.id);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    const located = contactLocationActionErrorReason(err);
+    if (located) return { ok: false, ...located };
+    // A non-batch failure (e.g. the contact was merged/not found) happened
+    // before any field was even planned — it isn't attributable to one
+    // field, so the UI shows it as a plain row-level error instead of
+    // pointing at city/region/country.
+    const { reason } = actionFailure(err);
+    return { ok: false, reason, property: null };
   }
 }
 
