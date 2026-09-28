@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
-import { TIMELINE_ACTIVITY_TYPES } from "@/lib/activity/queries";
+import { TIMELINE_PILL_KEYS, sumPillCount, type TimelinePillKey } from "@/lib/activity/timelinePills";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
@@ -51,7 +51,7 @@ export interface TimelineProps {
   serverStrings: Dictionary["contactRecordServer"];
   entries: TimelineEntry[];
   countsByType: Record<string, number>;
-  activeType?: TimelineActivityType;
+  activePill?: TimelinePillKey;
   openTasks: TimelineTask[];
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
@@ -96,8 +96,28 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   status_backfill: "system",
 };
 
-function filterHref(personId: string, type?: TimelineActivityType): string {
-  return type ? `/contacts/${personId}?activityType=${type}#activity` : `/contacts/${personId}#activity`;
+// contact-record.html:97-106's 6 pills (Todo/Notas/Llamadas/Correos/
+// Reuniones/Sistema — mockup-port fix). Grouping/counting itself lives in
+// @/lib/activity/timelinePills (one data map, TIMELINE_PILL_GROUPS); this
+// component only maps each pill to its label/icon.
+const PILL_LABEL_KEY: Record<TimelinePillKey, keyof ContactRecordLabels> = {
+  note: "timelinePillNotes",
+  call: "timelinePillCalls",
+  email_sent: "timelinePillEmails",
+  meeting_logged: "timelinePillMeetings",
+  system: "timelinePillSystem",
+};
+
+const PILL_ICON: Record<TimelinePillKey, (props: { className?: string }) => React.ReactElement> = {
+  note: NoteIcon,
+  call: CallIcon,
+  email_sent: MailIcon,
+  meeting_logged: MeetingIcon,
+  system: HistoryIcon,
+};
+
+function filterHref(personId: string, pill?: TimelinePillKey): string {
+  return pill ? `/contacts/${personId}?activityType=${pill}#activity` : `/contacts/${personId}#activity`;
 }
 
 function formatWhen(at: Date): string {
@@ -126,13 +146,13 @@ export function Timeline({
   serverStrings,
   entries,
   countsByType,
-  activeType,
+  activePill,
   openTasks,
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
   const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-  const showMergeCard = !activeType && mergeInfo && mergeInfo.unifiedFromCount > 1;
+  const showMergeCard = !activePill && mergeInfo && mergeInfo.unifiedFromCount > 1;
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
   // `entries` BEFORE merging in the merge synthetic entry, so
@@ -167,19 +187,19 @@ export function Timeline({
   return (
     <div>
       <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterGroupLabel}>
-        <Link href={filterHref(personId)} className={activeType ? "filter-pill" : "filter-pill on"}>
+        <Link href={filterHref(personId)} className={activePill ? "filter-pill" : "filter-pill on"}>
           {l.timelineFilterAll} <span className="n">{total}</span>
         </Link>
-        {TIMELINE_ACTIVITY_TYPES.map((type) => {
-          const Icon = TYPE_ICON[type];
+        {TIMELINE_PILL_KEYS.map((pill) => {
+          const Icon = PILL_ICON[pill];
           return (
             <Link
-              key={type}
-              href={filterHref(personId, type)}
-              className={activeType === type ? "filter-pill on" : "filter-pill"}
+              key={pill}
+              href={filterHref(personId, pill)}
+              className={activePill === pill ? "filter-pill on" : "filter-pill"}
             >
               <Icon className="icon" />
-              {l[FILTER_LABEL_KEY[type]] as string} <span className="n">{countsByType[type] ?? 0}</span>
+              {l[PILL_LABEL_KEY[pill]] as string} <span className="n">{sumPillCount(countsByType, pill)}</span>
             </Link>
           );
         })}

@@ -7,6 +7,9 @@ import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { buildTimelineEntry, type TimelineEntry } from "@/lib/activity/timelineEntry";
+import { TIMELINE_PILL_GROUPS, type TimelinePillKey } from "@/lib/activity/timelinePills";
+
+export type { TimelinePillKey } from "@/lib/activity/timelinePills";
 
 export type { TimelineEntry } from "@/lib/activity/timelineEntry";
 
@@ -166,15 +169,21 @@ export async function createActivity(input: NewActivity): Promise<Activity> {
  * could both mis-rank and wrongly truncate imported history. Each returned
  * entry exposes `at` (effective time, from `buildTimelineEntry`) alongside
  * `createdAt` — see src/lib/activity/timelineEntry.ts.
+ *
+ * Filters by `pill` (mockup-port fix; contact-record.html:97-106's 6 pills:
+ * Todo/Notas/Llamadas/Correos/Reuniones/Sistema), not by a raw
+ * `TimelineActivityType`: `TIMELINE_PILL_GROUPS` (timelinePills.ts) is the
+ * one place that expands a pill into the DB types it covers, so `system`
+ * fans out to all 4 internal/migration types in a single `OR` here instead
+ * of the caller (or this function) ever filtering on one raw type alone.
  */
 export async function getPersonTimeline(
   personId: string,
   viewerBdId: string,
-  opts: { type?: TimelineActivityType; limit?: number } = {},
+  opts: { pill?: TimelinePillKey; limit?: number } = {},
 ): Promise<PersonTimelinePage> {
-  const typeCondition = opts.type
-    ? and(eq(activity.personId, personId), eq(activity.type, opts.type))
-    : and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t))));
+  const types = opts.pill ? TIMELINE_PILL_GROUPS[opts.pill] : TIMELINE_ACTIVITY_TYPES;
+  const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))));
 
   const [rows, countRows] = await Promise.all([
     db

@@ -598,6 +598,9 @@ export const en = {
     propCity: "City",
     propRegion: "Region",
     propCountry: "Country",
+    // Composed "Location" row (contact-record.html:86; mockup-port fix) —
+    // city/region/country stay separately editable; see LocationPropertyRow.
+    propLocation: "Location",
     propIndustry: "Industry",
     propOwner: "Owner",
     propStatus: "Status",
@@ -705,6 +708,14 @@ export const en = {
     timelineFilterCall: "Calls",
     timelineFilterDiscarded: "Discard",
     timelineFilterStatusBackfill: "Backfilled status",
+    // Filter PILLS (contact-record.html:97-106), grouped per
+    // @/lib/activity/timelinePills — distinct from the singular
+    // `timelineFilter*` keys above, which label individual timeline entries.
+    timelinePillNotes: "Notes",
+    timelinePillCalls: "Calls",
+    timelinePillEmails: "Emails",
+    timelinePillMeetings: "Meetings",
+    timelinePillSystem: "System",
     timelineEmpty: "No activity recorded for this contact yet.",
     timelineLockedContent: "Private to the BD who logged it (and admins).",
     timelineSystemActor: "System",
