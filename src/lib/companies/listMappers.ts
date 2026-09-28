@@ -102,3 +102,29 @@ export function locationLabel(row: CompanyIdentityFields): string {
   const parts = [row.city, row.country].filter((v): v is string => Boolean(v && v.trim()));
   return parts.length ? parts.join(", ") : EMPTY_VALUE;
 }
+
+export type AccountTypeLabels = Pick<
+  Dictionary["companyRecord"],
+  "accountTypePartner" | "accountTypeClient" | "accountTypeStrategicOrg"
+>;
+
+/**
+ * `company.account_type` (curated import — 30 partner / 2 client / rest
+ * null in prod as of this writing) -> its Spanish label for the record
+ * page's "Tipo de cuenta" row (CompanyAboutPane.tsx). `null` falls back to
+ * the caller's em-dash, same convention as `industryLabel`; an unrecognized
+ * value is returned as-is (same graceful-degradation choice as
+ * `stageLabelOf`) instead of silently hiding data if the enum grows.
+ */
+export function accountTypeLabel(accountType: string | null, l: AccountTypeLabels): string {
+  switch (accountType) {
+    case "partner":
+      return l.accountTypePartner;
+    case "client":
+      return l.accountTypeClient;
+    case "strategic_org":
+      return l.accountTypeStrategicOrg;
+    default:
+      return accountType ?? EMPTY_VALUE;
+  }
+}
