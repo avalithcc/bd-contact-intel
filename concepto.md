@@ -1,5 +1,13 @@
 # BD Contact Intelligence — Concept (v0)
 
+> **Historical — written 2026-09-15, kept as a record of the original intent.**
+> This is the v0 concept, from before the CRM existed. Its "Not decided yet" and
+> "Next step" sections describe decisions that have since been made and, in
+> places, reversed. Do not read it as current.
+>
+> For what the product is today: `openspec/` for the changes that shipped,
+> `DESIGN.md` for the design system, `PERFORMANCE.md` for what it costs.
+
 > Status: framing / not yet scoped for build. Owner: Cristian (COO).
 > Started 2026-09-15. Separate initiative from the YPF strategy.
 

@@ -1,5 +1,14 @@
 # BD Contact Intelligence — Technical Design (v1)
 
+> **Historical — written 2026-09-15, kept as a record of the original design.**
+> This is the v1 technical design, from when the app was a CSV upload with
+> filters. The data model it describes has been superseded: `contact` and
+> `lead` were collapsed into `person`, identity resolution and a HubSpot import
+> arrived, and the schema is now 18 migrations past this document.
+>
+> For the current shape: `src/db/schema.ts` is the source of truth, `openspec/`
+> holds the changes that got it there, and `README.md` covers migrations.
+
 > Status: design, pre-scaffold. Decided 2026-09-15.
 
 ## Stack
