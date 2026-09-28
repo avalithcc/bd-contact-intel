@@ -1,8 +1,9 @@
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
+import { company, contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
 import { isDormant } from "@/lib/queries";
 import { getHiringMatchIndex, type HiringMatch } from "@/lib/hiring/queries";
+import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { OutreachHistoryMessage } from "./messagePrompt";
 import {
@@ -187,6 +188,13 @@ export async function listOutreachCandidates(
       firstName: person.firstName,
       lastName: person.lastName,
       company: person.company,
+      // max(): `company.company_key` is the PK (1:1 with the join
+      // predicate), but this query is grouped by person.id, and Postgres
+      // only infers functional dependency for columns of the SAME table as
+      // the GROUP BY key — a joined table's column still needs an aggregate
+      // wrapper (bug fix: Empresa recovery, same join every other
+      // person-company render now shares, see companyDisplayName.ts).
+      companyCanonicalName: sql<string | null>`max(${company.displayName})`,
       companyKey: person.companyKey,
       position: person.jobTitle,
       roleGroup: person.roleGroup,
@@ -201,6 +209,7 @@ export async function listOutreachCandidates(
       and(eq(personIdMap.personId, person.id), eq(personIdMap.legacyTable, "contact")),
     )
     .leftJoin(contact, eq(contact.id, personIdMap.legacyId))
+    .leftJoin(company, eq(company.companyKey, person.companyKey))
     .where(and(...where))
     .groupBy(person.id)
     .$dynamic();
@@ -218,13 +227,17 @@ export async function listOutreachCandidates(
     const hiring: HiringMatch | undefined = r.companyKey
       ? hiringIndex.get(r.companyKey)
       : undefined;
+    // Same free-text-wins-fallback rule as the /contacts list (bug fix:
+    // Empresa recovery) — resolves the ~quarter of persons with a null
+    // `person.company` but a `company_key` that matches a `company` row.
+    const resolvedCompany = resolveCompanyDisplayName(r.company, r.companyCanonicalName);
     return {
       id: r.id,
       hasOwnContact: r.hasOwnContact,
       personId: r.personId,
       firstName: r.firstName,
       lastName: r.lastName,
-      company: r.company,
+      company: resolvedCompany,
       position: r.position,
       roleGroup: (r.roleGroup ?? null) as RoleGroupKey | null,
       messageCount: r.messageCount,
@@ -233,7 +246,7 @@ export async function listOutreachCandidates(
       dormant,
       isLeadership: isLeadershipRoleGroup(r.roleGroup),
       relationshipTier: relationshipTierOf(r.reciprocal, dormant, r.messageCount),
-      companyDisplayName: hiring?.displayName ?? r.company ?? "",
+      companyDisplayName: hiring?.displayName ?? resolvedCompany ?? "",
       openItCount: hiring?.openItCount ?? 0,
       isStartup: hiring?.isStartup ?? null,
       startupReason: hiring?.startupReason ?? null,
