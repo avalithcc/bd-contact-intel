@@ -9,7 +9,7 @@ import type { NavLabels } from "@/lib/i18n/navLabels";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
-import { PlusIcon, ChevronDownIcon, ImportIcon, AccountIcon } from "@/components/icons";
+import { ChevronDownIcon, AccountIcon } from "@/components/icons";
 import { SignOutButton } from "../SignOutButton";
 import type { Locale } from "@/lib/i18n/locales";
 
@@ -31,22 +31,30 @@ function breadcrumbFor(pathname: string, labels: NavLabels): string {
 }
 
 /**
- * App shell top bar (design.md D9, Phase 8; "Crear"/account menus added in
- * tasks.md mockup-parity 3.1/3.2). Search is contacts-only (owner decision,
+ * App shell top bar (design.md D9, Phase 8; account menu added in tasks.md
+ * mockup-parity 3.1/3.2 — see below for the "Crear" menu it shipped
+ * alongside, later removed). Search is contacts-only (owner decision,
  * tasks.md 8.2): it submits to `/contacts` (task 12.2 — this route didn't
  * exist yet when the shell shipped, so it targeted `/`), using the same `q`
  * param that page reads (getContactListPage's search condition,
  * listQueries.ts).
  *
- * The mockup's "Crear" menu (design-system.html) lists Contacto/Tarea/Nota
- * en un contacto/Importar contactos. Only "Importar contactos" links to a
- * real existing flow (`/contacts/import`) — there is no standalone
- * new-contact form, global new-task modal, or contact picker to log a note
- * against anywhere in the app yet (contacts arrive via LinkedIn
- * import/sync; tasks and notes are created from within a contact record's
- * QuickActions). Per the apply instructions ("Crear items link to existing
- * create flows only... omit if a flow doesn't exist"), those three items
- * are omitted rather than pointed at a route that doesn't exist.
+ * The mockup's "Crear" menu (contacts.html:40-47, design-system.html) lists
+ * Contacto/Tarea/Nota en un contacto/Importar contactos. It shipped here
+ * with only that last item wired up (the other three had no real flow to
+ * link to yet — see the removed history of this comment). Once
+ * NewContactDialog and the "Nueva tarea" dialog landed, the menu was never
+ * revisited: it sat next to the page's own "Nuevo contacto" button holding
+ * a single link, which read as a redundant one-item dropdown.
+ *
+ * Owner decision (2026-09-28): drop the "Crear" menu entirely — "ese botón
+ * de crear no tiene sentido, no lo implementemos." This is a deliberate
+ * divergence from the approved mockup, not an oversight; do not restore it
+ * in a future mockup-parity pass. "Importar contactos" — the only working
+ * link the menu held — moved to the `/contacts` page's own toolbar, next
+ * to "Nuevo contacto" (see `src/app/(app)/contacts/page.tsx`), since a
+ * contacts-scoped import belongs on that page rather than in the global
+ * shell.
  *
  * mockup-port 02: markup now uses design-system.css's global classes
  * (`.topbar`, `.breadcrumbs`, `.search`, `.topbar-actions`, `.btn`,
@@ -95,22 +103,6 @@ export function TopBar({
         />
       </form>
       <div className="topbar-actions">
-        <DropdownMenu
-          triggerClassName="btn btn-primary btn-sm"
-          trigger={
-            <>
-              <PlusIcon className="icon" />
-              {labels.create}
-              <ChevronDownIcon className="icon" />
-            </>
-          }
-        >
-          <Link className="menu-item" role="menuitem" href="/contacts/import">
-            <ImportIcon className="icon" />
-            {labels.importContacts}
-          </Link>
-        </DropdownMenu>
-
         <DropdownMenu
           ariaLabel={labels.accountMenuLabel}
           triggerClassName="btn btn-ghost btn-sm"
