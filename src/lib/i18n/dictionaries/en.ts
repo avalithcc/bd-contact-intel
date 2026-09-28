@@ -743,6 +743,7 @@ export const en = {
     timelineGroupUpcoming: "Upcoming",
     timelineGroupPreMigration: "Before the migration",
     timelineSortNewestFirst: "Newest first",
+    timelineFilterLoading: "Loading…",
     timelineAssignedToPrefix: "Assigned to",
     taskDueBadgePrefix: "Due",
     taskMarkDone: "Mark as done",

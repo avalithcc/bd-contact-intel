@@ -1,13 +1,22 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
-import { TIMELINE_PILL_KEYS, sumPillCount, type TimelinePillKey } from "@/lib/activity/timelinePills";
+import {
+  TIMELINE_PILL_KEYS,
+  sumPillCount,
+  filterEntriesForPill,
+  isPillSelectionComplete,
+  type TimelinePillKey,
+} from "@/lib/activity/timelinePills";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
-import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { groupEmailThreads } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
+import { useToast } from "@/components/ToastProvider";
 import {
   CallIcon,
   DiscardIcon,
@@ -21,6 +30,7 @@ import {
 } from "@/components/icons";
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { NoteComposer } from "./NoteComposer";
+import { getTimelinePillEntriesAction } from "../actions";
 import styles from "./page.module.css";
 
 export interface TimelineTask {
@@ -45,19 +55,33 @@ export interface TimelineTask {
 export interface TimelineProps {
   personId: string;
   labels: ContactRecordLabels;
-  // Server-only formatter templates (see the comment on `contactRecordServer`
-  // in dictionaries/es.ts) — Timeline.tsx is a server component, so it may
-  // receive these directly.
-  serverStrings: Dictionary["contactRecordServer"];
+  // Server-fetched initial page for `activePill` (or the unfiltered "Todo"
+  // page when `activePill` is undefined) — see the "Instant pill filtering"
+  // comment on the component below for how this seeds client-side state.
   entries: TimelineEntry[];
+  // TRUE per-type totals, computed server-side over every row (never capped
+  // by the query's `limit` — see getPersonTimeline) — the ground truth the
+  // client compares its own loaded pool against (isPillSelectionComplete).
   countsByType: Record<string, number>;
   activePill?: TimelinePillKey;
   openTasks: TimelineTask[];
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
-  // person was never the survivor of a migration/merge.
-  mergeInfo: { unifiedFromCount: number; hasMergeEvent: boolean; at: Date } | null;
+  // person was never the survivor of a migration/merge. `bodyText` is
+  // `dict.contactRecordServer.mergeCardBody(...)`'s RESULT, rendered
+  // server-side in page.tsx — this is a Client Component, so it can never
+  // receive the function template itself (see the doc comment on
+  // `contactRecordServer` in dictionaries/es.ts).
+  mergeInfo: { unifiedFromCount: number; hasMergeEvent: boolean; at: Date; bodyText: string } | null;
+}
+
+/** Cache key for the "Todo" (unfiltered) scope — `TimelinePillKey` never collides with this string. */
+const ALL_SCOPE = "all" as const;
+type TimelineScope = TimelinePillKey | typeof ALL_SCOPE;
+
+function scopeOf(pill: TimelinePillKey | undefined): TimelineScope {
+  return pill ?? ALL_SCOPE;
 }
 
 const MERGE_UNIFIED_TYPE = "merge_unified" as const;
@@ -134,16 +158,41 @@ function monthLabel(at: Date): string {
  * activity timeline"; mockup-port r03 markup rework onto design-system.css's
  * `.filter-pill`/`.tl-group`/`.tl`/`.tl-item`/`.tl-icon`/`.tl-card` classes,
  * plus contact-record.html:107-149's date grouping — see
- * groupTimelineEntries, src/lib/contacts/timelineGrouping.ts). Server
- * component — filtering is a plain link to `?activityType=`, so the page
- * re-fetches server-side instead of shipping client JS for it.
+ * groupTimelineEntries, src/lib/contacts/timelineGrouping.ts).
+ *
+ * Instant pill filtering (fix/timeline-filter-no-reload): a pill click used
+ * to be a plain `<Link href="?activityType=...">`, so every click
+ * re-rendered the ENTIRE record page server-side just to filter a list
+ * already on screen. Now a click only ever does one of two things:
+ *
+ *  1. Filter the already-loaded `entries` pool locally (no network at all)
+ *     when it's PROVEN to already contain every row for that pill —
+ *     `isPillSelectionComplete` compares the pool against `countsByType`,
+ *     the record's TRUE per-type totals (never capped by the query limit).
+ *     True for the vast majority of contacts (prod average: 1.09 activities
+ *     — the initial "Todo" page already holds everything).
+ *  2. Fetch just that pill's own page via `getTimelinePillEntriesAction`
+ *     (one query, no page render) when the pool is proven incomplete — e.g.
+ *     a busy contact (prod max: 335 activities) whose "Todo" page is capped
+ *     well below that and can be dominated by a more-recent type, silently
+ *     under-representing an older one if filtered purely client-side.
+ *
+ * Each scope's result is cached in `cache` (keyed by pill, or `ALL_SCOPE`
+ * for "Todo") for the lifetime of this mount, so re-visiting a pill is
+ * always instant after its first load. The URL's `?activityType=` is kept
+ * in sync via `history.replaceState` (no navigation — see `syncScopeUrl`),
+ * and `entries`/`countsByType`/`activePill` are the server's ground truth
+ * again on every fresh server render (e.g. `router.refresh()` after adding
+ * a note) — the effect below resets the cache whenever those props change,
+ * so mutations elsewhere on the page (NoteComposer, CompleteTaskButton)
+ * still show up without a stale client cache masking them.
+ *
  * `entry.metadata === null` (isTimelineEntryVisible said no, design R6)
  * always renders the locked marker regardless of type.
  */
 export function Timeline({
   personId,
   labels: l,
-  serverStrings,
   entries,
   countsByType,
   activePill,
@@ -151,14 +200,86 @@ export function Timeline({
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
+  const { showToast } = useToast();
+  const [cache, setCache] = useState<Partial<Record<TimelineScope, TimelineEntry[]>>>(() => ({
+    [scopeOf(activePill)]: entries,
+  }));
+  const [activeScope, setActiveScope] = useState<TimelineScope>(() => scopeOf(activePill));
+  const [pendingScope, setPendingScope] = useState<TimelineScope | null>(null);
+  // Guards the reset effect below against firing redundantly on mount (the
+  // `useState` initializers above already seed the right state for the
+  // first render) — it should only re-seed when the SERVER sends new props.
+  const mountedProps = useRef({ entries, activePill });
+
+  useEffect(() => {
+    if (mountedProps.current.entries === entries && mountedProps.current.activePill === activePill) return;
+    mountedProps.current = { entries, activePill };
+    setCache({ [scopeOf(activePill)]: entries });
+    setActiveScope(scopeOf(activePill));
+    setPendingScope(null);
+  }, [entries, activePill]);
+
+  function syncScopeUrl(pill: TimelinePillKey | undefined) {
+    if (typeof window === "undefined") return;
+    // Raw History API, not `router.push`/`replace` — the App Router shallow-
+    // routing pattern for updating the URL bar without triggering a server
+    // render. Passing the router's own `history.state` back (instead of
+    // `null`) keeps whatever Next.js already attached there (scroll
+    // restoration, segment cache keys) intact.
+    window.history.replaceState(window.history.state, "", filterHref(personId, pill));
+  }
+
+  function selectPill(pill: TimelinePillKey | undefined) {
+    const scope = scopeOf(pill);
+    if (scope === activeScope) return;
+    syncScopeUrl(pill);
+
+    const cached = cache[scope];
+    if (cached) {
+      setActiveScope(scope);
+      return;
+    }
+
+    const referencePool = cache[activeScope] ?? entries;
+    if (isPillSelectionComplete(referencePool, countsByType, pill)) {
+      setCache((prev) => ({ ...prev, [scope]: filterEntriesForPill(referencePool, pill) }));
+      setActiveScope(scope);
+      return;
+    }
+
+    setPendingScope(scope);
+    getTimelinePillEntriesAction(personId, pill)
+      .then((result) => {
+        setPendingScope(null);
+        if (!result.ok) {
+          showToast(l.genericError, "error");
+          return;
+        }
+        setCache((prev) => ({ ...prev, [scope]: result.entries }));
+        setActiveScope(scope);
+      })
+      .catch(() => {
+        setPendingScope(null);
+        showToast(l.genericError, "error");
+      });
+  }
+
+  function handlePillClick(e: React.MouseEvent<HTMLAnchorElement>, pill: TimelinePillKey | undefined) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    selectPill(pill);
+  }
+
+  const displayedEntries = cache[activeScope] ?? entries;
+  const activePillNow = activeScope === ALL_SCOPE ? undefined : activeScope;
   const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-  const showMergeCard = !activePill && mergeInfo && mergeInfo.unifiedFromCount > 1;
+  const showMergeCard = !activePillNow && mergeInfo && mergeInfo.unifiedFromCount > 1;
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
-  // `entries` BEFORE merging in the merge synthetic entry, so
+  // `displayedEntries` BEFORE merging in the merge synthetic entry, so
   // `groupEmailThreads` only ever sees real `TimelineEntry` rows (it needs
   // `.visible`, which the synthetic doesn't carry).
-  const threaded = groupEmailThreads(entries);
+  const threaded = groupEmailThreads(displayedEntries);
   const threadGroupsById = new Map(
     threaded.filter((t) => t.kind === "thread").map((t) => [`thread-${t.group.threadId}`, t.group]),
   );
@@ -186,9 +307,15 @@ export function Timeline({
 
   return (
     <div>
-      <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterGroupLabel}>
-        <Link href={filterHref(personId)} className={activePill ? "filter-pill" : "filter-pill on"}>
+      <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterGroupLabel} aria-busy={pendingScope !== null}>
+        <Link
+          href={filterHref(personId)}
+          className={activePillNow ? "filter-pill" : "filter-pill on"}
+          onClick={(e) => handlePillClick(e, undefined)}
+          aria-current={activePillNow ? undefined : "true"}
+        >
           {l.timelineFilterAll} <span className="n">{total}</span>
+          {pendingScope === ALL_SCOPE && <span className="spinner" aria-hidden="true" />}
         </Link>
         {TIMELINE_PILL_KEYS.map((pill) => {
           const Icon = PILL_ICON[pill];
@@ -196,10 +323,13 @@ export function Timeline({
             <Link
               key={pill}
               href={filterHref(personId, pill)}
-              className={activePill === pill ? "filter-pill on" : "filter-pill"}
+              className={activePillNow === pill ? "filter-pill on" : "filter-pill"}
+              onClick={(e) => handlePillClick(e, pill)}
+              aria-current={activePillNow === pill ? "true" : undefined}
             >
               <Icon className="icon" />
               {l[PILL_LABEL_KEY[pill]] as string} <span className="n">{sumPillCount(countsByType, pill)}</span>
+              {pendingScope === pill && <span className="spinner" aria-hidden="true" />}
             </Link>
           );
         })}
@@ -258,7 +388,7 @@ export function Timeline({
         </>
       )}
 
-      {entries.length === 0 && upcoming.length === 0 ? (
+      {displayedEntries.length === 0 && upcoming.length === 0 ? (
         <div className={styles.placeholder}>{l.timelineEmpty}</div>
       ) : (
         groups.map((group, i) => (
@@ -280,7 +410,7 @@ export function Timeline({
                           <span className="when">{formatWhen(at)}</span>
                         </div>
                         <div className="tl-body">
-                          {serverStrings.mergeCardBody(mergeInfo!.unifiedFromCount)}
+                          {mergeInfo!.bodyText}
                           {isAdmin && mergeInfo!.hasMergeEvent && (
                             <div className="row mt-lg">
                               <Link href="/admin/duplicates#history" className="btn btn-secondary btn-sm">
