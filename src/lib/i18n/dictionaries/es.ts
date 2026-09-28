@@ -1174,6 +1174,7 @@ export const es: typeof en = {
       newVerified: "Nuevos con correo verificado",
       hiring: "Con vacantes abiertas",
       outreachReady: "Listos para Outreach",
+      moveToEmail: "Pasar a correo",
     },
     colName: "Nombre",
     colCompany: "Empresa",
