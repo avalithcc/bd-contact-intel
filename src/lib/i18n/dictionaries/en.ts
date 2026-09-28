@@ -1023,6 +1023,12 @@ export const en = {
     propStartup: "Startup",
     startupYes: "Yes",
     startupNo: "No",
+    // Display-only — see CompanyAboutPane.tsx's `propAccountType` row comment
+    // for why this isn't wired to `updateCompanyPropertyAction` yet.
+    propAccountType: "Account type",
+    accountTypePartner: "Partner",
+    accountTypeClient: "Client",
+    accountTypeStrategicOrg: "Strategic organization",
     revenueHigh: "High",
     revenueMedium: "Medium",
     revenueLow: "Low",

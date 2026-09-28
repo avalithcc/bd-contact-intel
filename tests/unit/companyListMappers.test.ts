@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  accountTypeLabel,
   industryLabel,
   locationLabel,
   ownerLabel,
@@ -15,6 +16,12 @@ import {
   stageLabelOf,
   vacantesLabel,
 } from "@/lib/companies/listMappers";
+
+const ACCOUNT_TYPE_LABELS = {
+  accountTypePartner: "Partner",
+  accountTypeClient: "Cliente",
+  accountTypeStrategicOrg: "Organización estratégica",
+};
 
 const STAGE_LABELS = {
   stageProspect: "Prospecto",
@@ -80,4 +87,18 @@ test("locationLabel: joins only the parts of a location that are present", () =>
   assert.equal(locationLabel({ city: "Buenos Aires" }), "Buenos Aires");
   assert.equal(locationLabel({ country: "Argentina" }), "Argentina");
   assert.equal(locationLabel({ city: "  ", country: null }), "—");
+});
+
+test("accountTypeLabel: maps each known account type to its Spanish label", () => {
+  assert.equal(accountTypeLabel("partner", ACCOUNT_TYPE_LABELS), "Partner");
+  assert.equal(accountTypeLabel("client", ACCOUNT_TYPE_LABELS), "Cliente");
+  assert.equal(accountTypeLabel("strategic_org", ACCOUNT_TYPE_LABELS), "Organización estratégica");
+});
+
+test("accountTypeLabel: falls back to the em-dash when null", () => {
+  assert.equal(accountTypeLabel(null, ACCOUNT_TYPE_LABELS), "—");
+});
+
+test("accountTypeLabel: returns an unrecognized value as-is instead of hiding it", () => {
+  assert.equal(accountTypeLabel("prospect_partner", ACCOUNT_TYPE_LABELS), "prospect_partner");
 });
