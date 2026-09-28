@@ -1,0 +1,1 @@
+ALTER TABLE "company" ADD COLUMN "account_type" text;
