@@ -1025,6 +1025,15 @@ export const company = pgTable(
     }),
     city: text("city"),
     country: text("country"),
+    // Migration 0018 (company-account-type): relationship TYPE — 'partner'
+    // | 'client' | 'strategic_org' — deliberately a separate axis from
+    // `relationshipStage` (a sales pipeline: Prospecto → ... → Ganada/
+    // Perdida). A partner can sit at any pipeline stage, so conflating the
+    // two would make both questions unanswerable. Sourced from the
+    // Airtable account-tracking export's `Categoría` column via
+    // scripts/backfill-company-account-type.ts. Nullable — most companies
+    // have no tracked account type yet.
+    accountType: text("account_type"),
   },
   (t) => ({
     domainIdx: uniqueIndex("company_domain_idx")
