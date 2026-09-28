@@ -6,19 +6,12 @@ import { TIMELINE_ACTIVITY_TYPES } from "@/lib/activity/queries";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
-import {
-  buildConnectionTimelineEntries,
-  linkedinEntryAccess,
-  type ConnectionForTimeline,
-  type LinkedinTimelineEntryType,
-} from "@/lib/contacts/connectionTimelineEntries";
 import { groupEmailThreads } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
 import {
   CallIcon,
   DiscardIcon,
   HistoryIcon,
-  LinkedInIcon,
   LockIcon,
   MailIcon,
   MeetingIcon,
@@ -26,7 +19,6 @@ import {
   SearchIcon,
   TasksIcon,
 } from "@/components/icons";
-import { AdminConversationReveal } from "./AdminConversationReveal";
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { NoteComposer } from "./NoteComposer";
 import styles from "./page.module.css";
@@ -38,20 +30,29 @@ export interface TimelineTask {
   assignedToName: string | null;
 }
 
+// NOTE: LinkedIn is hidden here on purpose — the owner turned LinkedIn
+// ingestion off (see chore/hide-linkedin-imports). `connections`
+// (ConnectionForTimeline[]) and `viewerBdId` used to be TimelineProps,
+// feeding `buildConnectionTimelineEntries`/`linkedinEntryAccess`
+// (src/lib/contacts/connectionTimelineEntries.ts) to synthesize the
+// "Mensaje de LinkedIn enviado"/"Respuesta de LinkedIn recibida" cards
+// (contact-record.html:124-131) and gate `AdminConversationReveal`
+// (./AdminConversationReveal.tsx). All of that is untouched in the DB and
+// in connectionTimelineEntries.ts; to restore, re-add both props here and
+// in page.tsx's <Timeline connections={record.connections}
+// viewerBdId={me.id} />, then bring back the imports/const/render branch
+// this file used to have (see git history).
 export interface TimelineProps {
   personId: string;
   labels: ContactRecordLabels;
   // Server-only formatter templates (see the comment on `contactRecordServer`
   // in dictionaries/es.ts) — Timeline.tsx is a server component, so it may
-  // receive these directly; only the composed plain-string RESULT is ever
-  // passed down to a client component (AdminConversationReveal).
+  // receive these directly.
   serverStrings: Dictionary["contactRecordServer"];
   entries: TimelineEntry[];
   countsByType: Record<string, number>;
   activeType?: TimelineActivityType;
   openTasks: TimelineTask[];
-  connections: ConnectionForTimeline[];
-  viewerBdId: string;
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
@@ -60,11 +61,6 @@ export interface TimelineProps {
 }
 
 const MERGE_UNIFIED_TYPE = "merge_unified" as const;
-
-const LINKEDIN_PREFIX_KEY: Record<LinkedinTimelineEntryType, keyof ContactRecordLabels> = {
-  linkedin_replied: "linkedinRepliedPrefix",
-  linkedin_sent: "linkedinSentPrefix",
-};
 
 const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> = {
   note: "timelineFilterNote",
@@ -132,22 +128,16 @@ export function Timeline({
   countsByType,
   activeType,
   openTasks,
-  connections,
-  viewerBdId,
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
   const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-  // LinkedIn connection cards (contact-record.html:124-131) only show when
-  // no activity-type filter is active — they aren't one of the 6 filter
-  // pills, so a filtered view (e.g. "Correos") shouldn't include them.
-  const linkedinEntries = activeType ? [] : buildConnectionTimelineEntries(connections);
   const showMergeCard = !activeType && mergeInfo && mergeInfo.unifiedFromCount > 1;
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
-  // `entries` BEFORE merging in the LinkedIn/merge synthetic entries, so
+  // `entries` BEFORE merging in the merge synthetic entry, so
   // `groupEmailThreads` only ever sees real `TimelineEntry` rows (it needs
-  // `.visible`, which the synthetics don't carry).
+  // `.visible`, which the synthetic doesn't carry).
   const threaded = groupEmailThreads(entries);
   const threadGroupsById = new Map(
     threaded.filter((t) => t.kind === "thread").map((t) => [`thread-${t.group.threadId}`, t.group]),
@@ -168,13 +158,11 @@ export function Timeline({
 
   const groups = groupTimelineEntries([
     ...processedEntries,
-    ...linkedinEntries.map((e) => ({ id: e.id, type: e.type, createdAt: e.createdAt, metadata: e.metadata })),
     ...(showMergeCard
       ? [{ id: "merge-unified", type: MERGE_UNIFIED_TYPE, createdAt: mergeInfo!.at, metadata: null }]
       : []),
   ]);
   const upcoming = upcomingTasks(openTasks);
-  const linkedinMetaById = new Map(linkedinEntries.map((e) => [e.id, e.metadata]));
 
   return (
     <div>
@@ -318,43 +306,6 @@ export function Timeline({
                             <LockIcon className="icon" />
                             <span>{l.timelineLockedContent}</span>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                const linkedinMeta = linkedinMetaById.get(entry.id);
-                if (linkedinMeta) {
-                  const type = entry.type as LinkedinTimelineEntryType;
-                  const access = linkedinEntryAccess(linkedinMeta.bdId, viewerBdId, isAdmin);
-                  const bdName = linkedinMeta.bdName ?? l.emptyValue;
-                  return (
-                    <div key={entry.id} className="tl-item">
-                      <div className={type === "linkedin_replied" ? "tl-icon reply" : "tl-icon"}>
-                        <LinkedInIcon className="icon" />
-                      </div>
-                      <div className="tl-card">
-                        <div className="tl-head">
-                          <span className="what">
-                            {l[LINKEDIN_PREFIX_KEY[type]] as string} · {l.linkedinConversationOfPrefix} {bdName}
-                          </span>
-                          <span className="when">{formatWhen(at)}</span>
-                        </div>
-                        {access === "admin-bypass" ? (
-                          <AdminConversationReveal
-                            personId={personId}
-                            bdId={linkedinMeta.bdId}
-                            auditAlertBody={serverStrings.adminAuditAlertBody(bdName)}
-                            labels={l}
-                          />
-                        ) : access === "locked" ? (
-                          <div className="locked">
-                            <LockIcon className="icon" />
-                            <span>{serverStrings.timelineLockedOwnedBy(bdName)}</span>
-                          </div>
-                        ) : (
-                          <div className="tl-body">{l.connectionHistorySomePrefix}</div>
                         )}
                       </div>
                     </div>
