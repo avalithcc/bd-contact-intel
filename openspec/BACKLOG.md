@@ -1,65 +1,211 @@
 # Backlog
 
-Changes agreed with the owner but not started. Each becomes its own SDD change under `openspec/changes/` when picked up.
+Ordered by what unblocks what, not by how much anyone wants it. The question this
+list answers is **what has to be true before the BD team is let in**, because the
+app is finished enough to look ready and has never been used by anyone.
 
-## bd-playbook
+Inventoried against production on 2026-09-28. Every number below was measured,
+not estimated.
 
-Requested by the owner on 2026-09-26, to pick up once `crm-hubspot-ux` is finished.
+## Where we actually are
 
-- An in-app manual for BDs: which target roles to write to and contact, and **why** each role is worth reaching (what they decide, what pain Avalith solves for them, when they are the wrong person).
-- Organized by the role groups the system already classifies (`src/lib/roleGroups.ts`): c_level_tech, c_level_business, eng_leadership, engineering_manager, tech_lead_architect, product, project_delivery, developers, hr_recruiting, sales_bd, operations. Include which groups are not worth prioritizing and why.
-- Ground every rationale in facts about Avalith's offering (the knowledge base in `avalith/contexto/`); mark anything unconfirmed as an assumption for the owner to validate.
-- Surface it where BDs decide who to contact (e.g. a "Por qué este rol" hint on the record, the outreach-ready view and the list's role filter), not only as a standalone page.
-- Owner decides the content; the product only presents it. Spanish copy, one design language.
+Everything in the database arrived by import. Nothing in it was produced by a BD
+working in the app — deliberately, since the team was told to stay out while it
+is in development.
 
-## email-sync
+| Source | Contacts |
+| --- | --- |
+| `linkedin_import` (now hidden from the UI) | 19,684 |
+| `hubspot_import` (one run, 2026-09-26) | 5,867 |
+| leads CSV (`fi-arg-2026`) | 1,053 |
+| `partner_account_notes` (curated, by script) | 16 |
+| **total** | **26,620** |
 
+What the app itself has recorded, ever:
+
+| | Count | Note |
+| --- | --- | --- |
+| notes | 334 | |
+| emails sent | 1 | a self-test |
+| calls | 0 | feature complete and reachable |
+| meetings | 0 | feature complete and reachable |
+| tasks | 0 | four separate creation paths |
+| discards | 0 | structured reason codes already defined |
+
+Contact statuses (`new` 17,882 · `contacted` 5,835 · `replied` 2,902 ·
+`meeting` 0) are **entirely derived** from the HubSpot backfill and LinkedIn
+connection counters. No status in production came from an action taken in this
+app.
+
+**So the risk is not that features are missing. It is that nothing has been
+exercised by a real user.** The first BD through the door is the test.
+
+## Layer 0 — the blocker
+
+Nothing about email outreach can work until this is fixed, and everything below
+assumes it is.
+
+### email-coverage
+
+| | |
+| --- | --- |
+| verified | **11** |
+| probable | 5,218 |
+| none | 21,391 |
+
+Email is the declared primary channel. Four out of five contacts have no address
+at all, and eleven have a verified one. Open tracking, sequences, templates and
+reporting are all theatre on top of this.
+
+Decide, before anything else: which slice of the base is actually reachable by
+email, how the rest gets enriched (Hunter is already wired — `hunter_lookup`
+activity type exists and has never fired in production), and whether `probable`
+is good enough to send to. That last one is a deliverability decision, not a
+technical one — bouncing 5,000 addresses costs the sending domain.
+
+## Layer 1 — before the team comes in
+
+These are the things that make the first week survivable.
+
+### launch-readiness
+Calls, meetings, tasks and discards are complete, reachable, and have **never
+run once** outside a test. Before the team arrives, each needs one real
+end-to-end pass against production data by someone who will not forgive a rough
+edge. This is not QA theatre — `task.description` and `task.leadId` have full
+schema, indexes, joins and rendering with **no write path anywhere**, which is
+exactly the class of gap that only surfaces when a human tries to use the thing.
+
+### task-essentials
+Every task creation path captures only **title and due date**.
+- `description` is stored, read and rendered — and no form writes it.
+- `leadId` is joined and selected — and no UI sets it.
+- `assignedToBdId` is hard-set to the creator; there is no way to assign a task
+  to a teammate.
+- Overdue tasks surface only in "Mis tareas"; a teammate's overdue task never
+  appears as overdue in "Todas abiertas".
+- There are **no reminders of any kind** — no cron, no notification. A BD learns
+  a task is due by opening `/tasks`.
+
+A task system nobody is reminded about is a list nobody reads.
+
+### gmail-connection
+One Gmail account is connected (the owner's). Every BD needs to connect theirs
+before they can send anything, and the flow has only ever been walked by one
+person.
+
+## Layer 2 — closing the loop
+
+### email-sync
 Two-way email logging on the Contact timeline, HubSpot-style.
 
-- Log emails sent from the platform and from the BD's own mail client, plus replies, as threads.
-- Only threads with contacts that exist in the CRM; never the whole mailbox.
-- Requires a read scope (`gmail.readonly`). The OAuth app is Internal, so no Google verification is needed, but every BD must reconnect Gmail.
-- Sync via Gmail push notifications (Pub/Sub `users.watch`) or a cron over the history API.
+**Why it is Layer 2 and not a nice-to-have:** `person.status` can only reach
+`replied` from an inbound signal, and nothing captures inbound mail. Without
+this, the pipeline physically cannot advance past `contacted` from anything a BD
+does in the app. The board's `replied` column is a documented no-op for the same
+reason.
+
+- Log emails sent from the platform and from the BD's own client, plus replies,
+  as threads. Only threads with contacts that exist in the CRM; never the whole
+  mailbox.
+- Requires `gmail.readonly`. The OAuth app is Internal, so no Google
+  verification is needed, but every BD must reconnect.
+- Sync via Gmail push (Pub/Sub `users.watch`) or a cron over the history API.
 - Deduplicate messages already sent from the platform.
-- Admins can always view every conversation; each admin view of another BD's conversation is recorded in an audit log.
-- Depends on `crm-hubspot-ux` (the Contact timeline is designed to render email threads).
+- Admins can always view every conversation; each admin view of another BD's
+  conversation is audit-logged.
 
-## owner-reporting
+### follow-up-cadence
+Nothing sequences follow-up. Nothing says "nobody has touched this contact in N
+days". The closest thing is the Outreach view's `dormant` tier, which keys off
+message history with a **12-month** threshold — useless for working a pipeline
+week to week.
 
-Reports for the platform owner (admin) to act on pipeline data.
+Decide what the cadence is before building it: a BD needs to know what to do
+today, not a ranked list of everyone.
 
-- Discard reasons breakdown (e.g. share of "not the right profile" points at list sourcing, not outreach).
-- Funnel conversion by stage and by contact source (LinkedIn, imported list, scraping).
-- Activity per BD over time.
-- Depends on `crm-hubspot-ux` storing these facts as structured data: discard reason as a fixed code (not free text), contact source provenance, and timestamped activities.
+## Layer 3 — the pipeline nobody is using yet
 
-## auth-ux
+### company-pipeline-adoption
+`company.relationship_stage` (`prospect → qualified → proposal_sent → won →
+lost`) **has a working write path** — an inline edit control on the company
+record, and "Nueva empresa" defaults to `prospect`. It is null on all 14,255
+companies because nothing backfilled the bulk-imported ones and nobody has used
+the control.
 
-Login gaps found while testing the crm-hubspot-ux preview (2026-09-24).
+This is not "build the pipeline". It is: pick a sensible default for imported
+companies, and give a BD a reason to move a company along.
 
-- No "forgot password" flow: a BD without an open session is locked out and needs a manual reset in Supabase. Add Supabase password recovery (email link → `/auth/confirm` → set new password).
-- After login the app always lands on `/`, ignoring the page that was requested. Return to the original URL (a validated, same-origin `next` parameter), as HubSpot does.
+### account-type-filter
+`company.account_type` (30 partner, 2 client) renders on the company record but
+has no list filter, so the 32 accounts cannot be seen as a group. Deliberately
+display-only until there is a decision on who may reclassify an account.
+
+### owner-reporting
+Reports for the owner to act on pipeline data: discard-reason breakdown, funnel
+conversion by stage and by source, activity per BD over time.
+
+**Correction to this item's original premise:** it claimed discard reasons must
+first become a fixed code rather than free text. **They already are** —
+`wrong_profile`, `not_interested`, `other_vendor`, `left_company`, `bad_data`,
+`other`, validated, with a note required for `other`. They are stored in
+`activity.metadata` JSONB, so they are queryable but not independently indexed.
+What is missing is not the vocabulary; it is that zero discards exist to report
+on.
+
+## Layer 4 — product depth
+
+### bd-playbook
+An in-app manual: which roles to contact and **why** each is worth reaching —
+what they decide, what pain Avalith solves for them, when they are the wrong
+person. Organised by the role groups the system already classifies
+(`src/lib/roleGroups.ts`), including which groups are not worth prioritising.
+
+Ground every rationale in facts from `avalith/contexto/`; mark anything
+unconfirmed as an assumption. Surface it where BDs choose who to contact — a
+"por qué este rol" hint on the record, the outreach view, the role filter — not
+only as a standalone page.
+
+### auth-ux
+- No "forgot password" flow: a BD without a session is locked out and needs a
+  manual reset in Supabase.
+- After login the app always lands on `/`, ignoring the requested page. Return
+  to a validated, same-origin `next` parameter.
+
+Both bite on day one of a real launch.
+
+### admin-email-conversation-access
+`getConversationForAdmin` serves unredacted `email_sent` content as well as
+LinkedIn threads, and both its UI entry points were LinkedIn surfaces that are
+now hidden — so admins have no UI path to another BD's email content. The route
+and its audit trail still work. Near-zero impact today (one `email_sent` row),
+but it matters as email becomes the channel. Needs a LinkedIn-independent entry
+point of its own design.
+
+## Known defects
+
+### company-contact-counts
+The `/companies` list's "Contactos" column and the company record's contacts
+card match `person.company_key` directly instead of resolving through
+`company_alias`, so both undercount. **Latent today** — `company_alias` is
+empty. The fix is written and waiting on the branch
+`fix/company-contact-count-alias`; ship it the day an alias is created.
+
+### tasks-timeline-pill
+The contact record's timeline has no `Tareas` filter pill, which the mockup
+specifies (`contact-record.html:97-106`). Tasks are not timeline entries today,
+so this is a feature rather than a markup port. Deliberately left unbuilt rather
+than faked.
 
 ## Deferred from crm-hubspot-ux
 
 - Global cross-object search.
-- Company record page and company pipeline board (`relationshipStage`).
+- Company pipeline board (`relationshipStage`).
 - Task queue filters and bulk actions.
 
-## company-contact-counts
+## What is NOT a lead-generation path
 
-A known undercount found while porting the companies pages (2026-09-26), recorded here so it does not stay buried in a checklist note.
-
-- The `/companies` list's "Contactos" column (`src/lib/companies/listQueries.ts`) and the company record's contacts card (`getCompanyPeople`) match `person.company_key` directly instead of resolving through `company_alias`.
-- A person's `company_key` sometimes normalizes to an alias rather than the canonical key, so both reads undercount that company's contacts.
-- It is a bug, not a product decision: the owner does not need to choose anything, the count is simply wrong.
-- Fixing it means resolving through `company_alias` on both paths, and checking whether any other read matches `company_key` directly.
-
-## admin-email-conversation-access
-
-A side effect of turning the LinkedIn surface off (2026-09-28), recorded so it is a decision rather than a silent loss.
-
-- `getConversationForAdmin` returns BOTH the unredacted `email_sent` content a BD wrote AND that BD's LinkedIn threads, in one audited bypass gated on the contact having a `person_bd_connection` row.
-- Both of its UI entry points were LinkedIn surfaces — the timeline's conversation reveal and the "Historial de conversaciones" panel card — so hiding LinkedIn left admins with no UI path to another BD's email content either. The route and the audit trail still work for anyone who knows the URL; nothing was deleted.
-- Impact today is near zero: production holds a single `email_sent` activity row. But email is now the primary channel, so this will matter as outreach moves there.
-- Fixing it means a LinkedIn-independent admin entry point, gated on the contact rather than on a LinkedIn connection, keeping the same audit record. It is an access-control surface and deserves its own design rather than being bolted onto a "hide LinkedIn" change.
+Recorded because it is easy to plan around wrongly: the discovery and hiring
+crons (`/api/hiring/sync`, `/api/hiring/discover`) populate `target_company`
+(88 rows) and `job_posting` (5,259) and feed a review queue. **They never write
+a person, contact or lead.** That is company-level hiring intelligence, not
+ingestion.
