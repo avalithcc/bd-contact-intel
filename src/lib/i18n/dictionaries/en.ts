@@ -712,6 +712,7 @@ export const en = {
     // @/lib/activity/timelinePills — distinct from the singular
     // `timelineFilter*` keys above, which label individual timeline entries.
     timelinePillNotes: "Notes",
+    timelinePillCalls: "Calls",
     timelinePillEmails: "Emails",
     timelinePillMeetings: "Meetings",
     timelinePillSystem: "System",

@@ -610,6 +610,7 @@ export const es: typeof en = {
     // @/lib/activity/timelinePills — distinct from the singular
     // `timelineFilter*` keys above, which label individual timeline entries.
     timelinePillNotes: "Notas",
+    timelinePillCalls: "Llamadas",
     timelinePillEmails: "Correos",
     timelinePillMeetings: "Reuniones",
     timelinePillSystem: "Sistema",

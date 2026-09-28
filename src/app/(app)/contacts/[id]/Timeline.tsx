@@ -102,7 +102,7 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
 // component only maps each pill to its label/icon.
 const PILL_LABEL_KEY: Record<TimelinePillKey, keyof ContactRecordLabels> = {
   note: "timelinePillNotes",
-  call: "timelineFilterCall",
+  call: "timelinePillCalls",
   email_sent: "timelinePillEmails",
   meeting_logged: "timelinePillMeetings",
   system: "timelinePillSystem",
