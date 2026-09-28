@@ -13,6 +13,8 @@ import {
   isTimelinePillKey,
   resolveTimelinePillKey,
   sumPillCount,
+  filterEntriesForPill,
+  isPillSelectionComplete,
 } from "@/lib/activity/timelinePills";
 
 test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the 4 internal types under system", () => {
@@ -51,4 +53,53 @@ test("sumPillCount sums the counts of every type a pill groups", () => {
   assert.equal(sumPillCount(countsByType, "system"), 7);
   assert.equal(sumPillCount(countsByType, "note"), 3);
   assert.equal(sumPillCount(countsByType, "call"), 0);
+});
+
+test("filterEntriesForPill keeps only entries matching the pill's grouped types", () => {
+  const entries = [
+    { id: "1", type: "note" },
+    { id: "2", type: "status_backfill" },
+    { id: "3", type: "call" },
+    { id: "4", type: "hunter_lookup" },
+  ];
+  assert.deepEqual(
+    filterEntriesForPill(entries, "system").map((e) => e.id),
+    ["2", "4"],
+  );
+  assert.deepEqual(
+    filterEntriesForPill(entries, "note").map((e) => e.id),
+    ["1"],
+  );
+});
+
+test("filterEntriesForPill returns every entry unchanged when pill is undefined (the 'Todo' scope)", () => {
+  const entries = [{ id: "1", type: "note" }, { id: "2", type: "call" }];
+  assert.deepEqual(filterEntriesForPill(entries, undefined), entries);
+});
+
+test("isPillSelectionComplete: a single-pill fetch that already covers the true count is complete", () => {
+  const countsByType = { note: 3 };
+  const loaded = [{ type: "note" }, { type: "note" }, { type: "note" }];
+  assert.equal(isPillSelectionComplete(loaded, countsByType, "note"), true);
+});
+
+test("isPillSelectionComplete: 'Todo' scope is complete only when every loaded row across all types equals the grand total", () => {
+  const countsByType = { note: 2, call: 1 };
+  assert.equal(isPillSelectionComplete([{ type: "note" }, { type: "note" }, { type: "call" }], countsByType, undefined), true);
+  assert.equal(isPillSelectionComplete([{ type: "note" }, { type: "call" }], countsByType, undefined), false);
+});
+
+test("isPillSelectionComplete: busy-contact case — a top-N 'Todo' page can under-represent one pill", () => {
+  // Mirrors the production shape called out in the fix: the busiest contact
+  // has 335 activities but the server-side 'Todo' page is capped well below
+  // that, so its top rows can be dominated by other, more recent types.
+  const countsByType = { note: 40, status_backfill: 295 };
+  // Only 8 of the 100 most-recent rows happen to be notes — the rest are
+  // status_backfill entries pushed to the front by recency.
+  const loadedTodoPage = [
+    ...Array.from({ length: 8 }, () => ({ type: "note" })),
+    ...Array.from({ length: 92 }, () => ({ type: "status_backfill" })),
+  ];
+  assert.equal(isPillSelectionComplete(loadedTodoPage, countsByType, "note"), false);
+  assert.equal(isPillSelectionComplete(loadedTodoPage, countsByType, "system"), false);
 });

@@ -61,3 +61,47 @@ export function resolveTimelinePillKey(value: string | undefined): TimelinePillK
 export function sumPillCount(countsByType: Record<string, number>, pill: TimelinePillKey): number {
   return TIMELINE_PILL_GROUPS[pill].reduce((sum, type) => sum + (countsByType[type] ?? 0), 0);
 }
+
+/**
+ * Narrows an already-loaded entry pool down to one pill's grouped types
+ * (fix/timeline-filter-no-reload: the client-side counterpart of
+ * `getPersonTimeline({ pill })`'s SQL `WHERE type IN (...)`). `pill ===
+ * undefined` is the "Todo" scope — every loaded entry matches it, so it's
+ * returned unfiltered.
+ */
+export function filterEntriesForPill<T extends { type: string }>(
+  entries: readonly T[],
+  pill: TimelinePillKey | undefined,
+): T[] {
+  if (!pill) return [...entries];
+  const types: readonly string[] = TIMELINE_PILL_GROUPS[pill];
+  return entries.filter((e) => types.includes(e.type));
+}
+
+/**
+ * Decides whether an already-loaded entry pool is a safe substitute for a
+ * fresh server fetch scoped to `pill` (fix/timeline-filter-no-reload: the
+ * pill click must render instantly instead of re-navigating the whole
+ * record page, but a busy contact's server page is capped well below its
+ * true activity count — see getPersonTimeline's `limit` — so a purely
+ * client-side filter over that capped page can silently under-represent an
+ * older-skewing type).
+ *
+ * `countsByType` is the record's TRUE per-type totals (computed server-side
+ * over every row, never capped by the page limit — see getPersonTimeline),
+ * so comparing the loaded pool's matching count against it is exact: equal
+ * or more loaded rows than the true count means every row for that pill is
+ * already in hand; fewer means the pool is missing some and the caller must
+ * fetch that pill's own page instead of trusting the local filter.
+ */
+export function isPillSelectionComplete(
+  loadedEntries: readonly { type: string }[],
+  countsByType: Record<string, number>,
+  pill: TimelinePillKey | undefined,
+): boolean {
+  if (!pill) {
+    const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
+    return loadedEntries.length >= total;
+  }
+  return filterEntriesForPill(loadedEntries, pill).length >= sumPillCount(countsByType, pill);
+}
