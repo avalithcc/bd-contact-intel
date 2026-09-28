@@ -13,6 +13,11 @@
  * normalization every other company key in this app uses (see
  * src/lib/companyCategories.ts#normalizeCompanyKey), so "Avalith", "AVALITH",
  * "Avalith LLC" and "Avalith S.A." all resolve to the same key.
+ *
+ * Matching is always exact-key equality against this explicit list, never a
+ * substring/`includes` check — "avalith" as a substring would also catch a
+ * legitimately-named prospect (e.g. "Avalith Ventures"), which is exactly
+ * the false positive src/lib/ownCompany.test.ts guards against.
  */
 import { normalizeCompanyKey } from "@/lib/companyCategories";
 import { splitEmail } from "@/lib/emailPatterns";
@@ -20,7 +25,16 @@ import { splitEmail } from "@/lib/emailPatterns";
 // Display-name variants of Avalith itself. Kept as one list so adding
 // another own-company (e.g. after a rebrand or a second internal entity)
 // is a one-line change here rather than scattered conditionals.
-const OWN_COMPANY_NAMES = ["Avalith"] as const;
+//
+// "Avalith.net" and "avalith.es" are two production `company` rows created
+// from imports before this guard existed (found while cleaning up own-
+// company leakage — see scripts/remove-own-company-contacts.ts): the
+// company field was free-text and picked up the coworker's personal-site-
+// style spelling instead of the plain "Avalith" name, so they normalized to
+// a different key ("avalith net" / "avalith es") that the guard didn't
+// recognize. Listed here as their own entries rather than folded into a
+// substring rule so the match stays exact-key equality.
+const OWN_COMPANY_NAMES = ["Avalith", "Avalith.net", "avalith.es"] as const;
 
 const OWN_COMPANY_KEYS = new Set(OWN_COMPANY_NAMES.map(normalizeCompanyKey));
 
@@ -56,6 +70,16 @@ export function ownCompanyMatchReason(
     if (d && OWN_COMPANY_DOMAINS.has(d)) return "domain";
   }
   return null;
+}
+
+/**
+ * Every normalized company key that identifies Avalith itself — the source
+ * of truth for scripts/remove-own-company-contacts.ts, so the cleanup
+ * script never re-derives or hardcodes its own copy of this list and stays
+ * in lockstep with whatever variants OWN_COMPANY_NAMES holds above.
+ */
+export function ownCompanyKeys(): string[] {
+  return [...OWN_COMPANY_KEYS];
 }
 
 /**
