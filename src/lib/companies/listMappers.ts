@@ -3,8 +3,40 @@
  * No DB import — kept importable and unit-testable without a live
  * DATABASE_URL, same convention as src/lib/contacts/companyLogo.ts.
  */
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 const EMPTY_VALUE = "—";
+
+export type StageLabels = Pick<
+  Dictionary["companyList"],
+  "stageProspect" | "stageQualified" | "stageProposalSent" | "stageWon" | "stageLost"
+>;
+
+/**
+ * Maps a raw `relationship_stage` value (e.g. "qualified") to its localized
+ * label (e.g. "Calificada") — extracted from a closure the Company record
+ * page (`page.tsx`) used to define inline (fix/company-timeline-filter-no-
+ * reload): the same mapping is now also needed server-side inside
+ * `getCompanyTimelineFilterEntriesAction` (companies/actions.ts) to format a
+ * scoped-fetch page's stage-change rows, so it had to stop being a
+ * page-local closure.
+ */
+export function stageLabelOf(stage: string, l: StageLabels): string {
+  switch (stage) {
+    case "prospect":
+      return l.stageProspect;
+    case "qualified":
+      return l.stageQualified;
+    case "proposal_sent":
+      return l.stageProposalSent;
+    case "won":
+      return l.stageWon;
+    case "lost":
+      return l.stageLost;
+    default:
+      return stage;
+  }
+}
 
 /**
  * Etapa badge tone (companies.html:67 — `badge-info`/`badge-warn`/

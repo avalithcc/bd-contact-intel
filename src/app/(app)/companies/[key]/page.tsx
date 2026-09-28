@@ -7,10 +7,18 @@ import {
   getCompanyPeople,
   getCompanyPropertyHistory,
   getCompanyTimeline,
+  getCompanyTimelineFilterCounts,
 } from "@/lib/companies/recordQueries";
 import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { industryLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
-import { latestEditByProperty, startupLabel, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
+import { industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/lib/companies/listMappers";
+import {
+  isCompanyActivityFilter,
+  latestEditByProperty,
+  marketBreakdown,
+  startupLabel,
+  type CompanyActivityFilter,
+} from "@/lib/companies/recordMappers";
+import { buildCompanyTimelineViewRows } from "@/lib/companies/timelineView";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickCompanyRecordLabels } from "@/lib/companies/labels";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
@@ -29,11 +37,6 @@ export const dynamic = "force-dynamic";
 const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 type Stage = (typeof STAGES)[number];
 
-const ACTIVITY_FILTERS: CompanyActivityFilter[] = ["all", "note", "stage_change", "contact_activity"];
-function isActivityFilter(value: string | undefined): value is CompanyActivityFilter {
-  return !!value && (ACTIVITY_FILTERS as readonly string[]).includes(value);
-}
-
 interface CompanyDetailPageProps {
   params: Promise<{ key: string }>;
   searchParams: Promise<{ activityFilter?: string }>;
@@ -51,7 +54,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   const { key: rawKey } = await params;
   const { activityFilter: rawActivityFilter } = await searchParams;
   const key = decodeURIComponent(rawKey);
-  const activityFilter = isActivityFilter(rawActivityFilter) ? rawActivityFilter : "all";
+  const activityFilter = isCompanyActivityFilter(rawActivityFilter) ? rawActivityFilter : "all";
 
   const dict = await getDictionary();
   const l = dict.companyRecord;
@@ -71,15 +74,25 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     );
   }
 
-  const [hiringIndex, people, timelineRows, openTasks, postings, propertyHistoryRows, ownerOptions] = await Promise.all([
-    getHiringMatchIndex(),
-    getCompanyPeople(key),
-    getCompanyTimeline(key),
-    getCompanyOpenTasks(key),
-    getCompanyPostingsForKey(key),
-    getCompanyPropertyHistory(key),
-    listOwnerOptions(),
-  ]);
+  const [hiringIndex, people, timelineRows, timelineCounts, openTasks, postings, propertyHistoryRows, ownerOptions] =
+    await Promise.all([
+      getHiringMatchIndex(),
+      getCompanyPeople(key),
+      // Scoped to `activityFilter` (fix/company-timeline-filter-no-reload) —
+      // a deep link (e.g. `?activityFilter=contact_activity`) must render
+      // that filter's own true page on first paint, not the unfiltered
+      // "Todas" pool filtered down client-side (which the OLD component did,
+      // capped by TIMELINE_LIMIT — see getCompanyTimeline's doc comment).
+      getCompanyTimeline(key, { filter: activityFilter }),
+      // TRUE per-filter totals, unbounded — the ground truth
+      // CompanyTimeline.tsx compares its own loaded pool against before
+      // trusting a purely local filter switch (isCompanyFilterSelectionComplete).
+      getCompanyTimelineFilterCounts(key),
+      getCompanyOpenTasks(key),
+      getCompanyPostingsForKey(key),
+      getCompanyPropertyHistory(key),
+      listOwnerOptions(),
+    ]);
 
   const hiring = hiringIndex.get(key) ?? null;
   // marketBreakdown expects a full posting array; postings.postings is now
@@ -92,22 +105,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   // CompanyAboutPane.tsx's `lastEditByProperty` prop doc comment on why.
   const lastEditByProperty = Object.fromEntries(latestEditByProperty(propertyHistoryRows));
 
-  function stageLabelOf(stage: string): string {
-    switch (stage) {
-      case "prospect":
-        return lc.stageProspect;
-      case "qualified":
-        return lc.stageQualified;
-      case "proposal_sent":
-        return lc.stageProposalSent;
-      case "won":
-        return lc.stageWon;
-      case "lost":
-        return lc.stageLost;
-      default:
-        return stage;
-    }
-  }
+  // Formats each row's "what"/"body" SERVER-SIDE, using `dict.companyRecordServer`'s
+  // FORMATTER FUNCTIONS — see buildCompanyTimelineViewRows's doc comment for
+  // why that step can never move into the "use client" CompanyTimeline.tsx.
+  const timelineViewRows = buildCompanyTimelineViewRows(timelineRows, dict.companyRecordServer, l, (stage) =>
+    stageLabelOf(stage, lc),
+  );
 
   const newContactLabels: NewContactDialogLabels = {
     triggerLabel: dict.contactList.newContactTrigger,
@@ -169,11 +172,10 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                 content: (
                   <CompanyTimeline
                     companyKey={key}
-                    rows={timelineRows}
+                    rows={timelineViewRows}
+                    counts={timelineCounts}
                     activeFilter={activityFilter}
                     labels={l}
-                    serverStrings={dict.companyRecordServer}
-                    stageLabelOf={stageLabelOf}
                   />
                 ),
               },

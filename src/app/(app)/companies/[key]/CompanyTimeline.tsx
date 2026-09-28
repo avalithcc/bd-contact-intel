@@ -1,11 +1,17 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
-import type { CompanyTimelineRow } from "@/lib/companies/recordQueries";
-import { filterTimelineRows, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
+import type { CompanyActivityFilter } from "@/lib/companies/recordMappers";
+import { resolveCompanyScopeRows, type CompanyTimelineFilterCounts } from "@/lib/companies/recordMappers";
+import { isRequestCurrent } from "@/lib/activity/requestGeneration";
+import type { CompanyTimelineViewRow } from "@/lib/companies/timelineView";
 import { groupTimelineEntries } from "@/lib/contacts/timelineGrouping";
 import { MailIcon, HistoryIcon, NoteIcon, MeetingIcon } from "@/components/icons";
-import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { useToast } from "@/components/ToastProvider";
+import { getCompanyTimelineFilterEntriesAction } from "../actions";
 
 export interface CompanyTimelineLabels {
   timelineFilterAll: string;
@@ -13,15 +19,7 @@ export interface CompanyTimelineLabels {
   timelineFilterStageChange: string;
   timelineFilterContactActivity: string;
   timelineEmpty: string;
-  meetingLogged: string;
-  atNote: string;
-  atEmailSent: string;
-  atStatusChange: string;
-  atMeetingLogged: string;
-  atCall: string;
-  atDiscarded: string;
-  atHunterLookup: string;
-  atStatusBackfill: string;
+  genericError: string;
 }
 
 const FILTERS: CompanyActivityFilter[] = ["all", "note", "stage_change", "contact_activity"];
@@ -44,28 +42,6 @@ function filterLabel(l: CompanyTimelineLabels, filter: CompanyActivityFilter): s
   }
 }
 
-function typeLabel(l: CompanyTimelineLabels, type: string): string {
-  switch (type) {
-    case "note":
-      return l.atNote;
-    case "email_sent":
-      return l.atEmailSent;
-    case "status_change":
-    case "status_backfill":
-      return type === "status_backfill" ? l.atStatusBackfill : l.atStatusChange;
-    case "meeting_logged":
-      return l.atMeetingLogged;
-    case "call":
-      return l.atCall;
-    case "discarded":
-      return l.atDiscarded;
-    case "hunter_lookup":
-      return l.atHunterLookup;
-    default:
-      return type;
-  }
-}
-
 const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactElement> = {
   note: NoteIcon,
   email_sent: MailIcon,
@@ -85,47 +61,183 @@ function formatWhen(at: Date): string {
  * connection cards, email-thread grouping, admin conversation reveal, merge
  * cards) that doesn't apply to a company. It DOES reuse the shared, generic
  * `groupTimelineEntries` (month bucketing) — the one piece of that module
- * that's subject-agnostic.
+ * that's subject-agnostic — and, as of fix/company-timeline-filter-no-reload,
+ * the same instant-filter machinery Contact's `Timeline.tsx` uses
+ * (`isRequestCurrent`/a per-mount cache/a resolve-or-fetch decision), applied
+ * to this tab's OWN filter vocabulary (all/note/stage_change/contact_activity)
+ * rather than activity-type pills — see `resolveCompanyScopeRows`
+ * (recordMappers.ts) for the one place that vocabulary difference lives.
+ *
+ * Before this fix, a filter pill was a plain `<Link href="?activityFilter=...">`,
+ * so every click re-rendered the ENTIRE record page server-side (`getCompanyByKey`
+ * plus a several-query `Promise.all`) just to filter a list already on
+ * screen — the identical bug already fixed on the Contact record. Now a
+ * click only ever does one of two things:
+ *
+ *  1. Filter the already-loaded row pool locally (no network) when it's
+ *     PROVEN to already contain every row for that filter —
+ *     `resolveCompanyScopeRows` compares the pool against `counts`, the
+ *     record's TRUE per-filter totals (never capped by the query's
+ *     `TIMELINE_LIMIT` — see `getCompanyTimelineFilterCounts`).
+ *  2. Fetch just that filter's own page via
+ *     `getCompanyTimelineFilterEntriesAction` (one query, no page render)
+ *     when the pool is proven incomplete.
+ *
+ * Rows arrive PRE-FORMATTED (`CompanyTimelineViewRow`'s `what`/`body`) — see
+ * `buildCompanyTimelineViewRows` (timelineView.ts) for why the "what" text's
+ * formatter functions (`serverStrings`) can never themselves cross into this
+ * Client Component.
  */
 export function CompanyTimeline({
   companyKey,
   rows,
+  counts,
   activeFilter,
   labels: l,
-  serverStrings,
-  stageLabelOf,
 }: {
   companyKey: string;
-  rows: CompanyTimelineRow[];
+  rows: CompanyTimelineViewRow[];
+  counts: CompanyTimelineFilterCounts;
   activeFilter: CompanyActivityFilter;
   labels: CompanyTimelineLabels;
-  serverStrings: Dictionary["companyRecordServer"];
-  /** Maps a raw `relationship_stage` value (e.g. "qualified") to its
-   * localized label (e.g. "Calificada") — reuses the same map `/companies`
-   * and the About pane use, so a stage is never labeled two different ways
-   * on the same page. */
-  stageLabelOf: (stage: string) => string;
 }) {
-  const filtered = filterTimelineRows(rows, activeFilter);
+  const { showToast } = useToast();
+  const [cache, setCache] = useState<Partial<Record<CompanyActivityFilter, CompanyTimelineViewRow[]>>>(() => ({
+    [activeFilter]: rows,
+  }));
+  const [activeScope, setActiveScope] = useState<CompanyActivityFilter>(activeFilter);
+  const [pendingScope, setPendingScope] = useState<CompanyActivityFilter | null>(null);
+  // See Contact record's Timeline.tsx for the full reasoning behind each of
+  // these refs — this mirrors that component's guards exactly, just against
+  // this tab's own filter vocabulary instead of a pill key.
+  const mountedProps = useRef({ rows, activeFilter });
+  const activeScopeRef = useRef(activeScope);
+  activeScopeRef.current = activeScope;
+  const generationRef = useRef(0);
+
+  function bumpGeneration(): void {
+    generationRef.current += 1;
+  }
+
+  function syncFilterUrl(filter: CompanyActivityFilter) {
+    if (typeof window === "undefined") return;
+    // Raw History API, not the Next.js router — same deliberate choice
+    // Contact record's Timeline.tsx makes (see its `syncScopeUrl`'s doc
+    // comment): a filter click is not a new place in history, and must not
+    // trigger the server render `router.replace` would cause.
+    window.history.replaceState(window.history.state, "", filterHref(companyKey, filter));
+  }
+
+  function fetchScope(filter: CompanyActivityFilter) {
+    const requestGeneration = generationRef.current;
+    setPendingScope(filter);
+    getCompanyTimelineFilterEntriesAction(companyKey, filter)
+      .then((result) => {
+        if (!isRequestCurrent(requestGeneration, generationRef.current)) return;
+        setPendingScope(null);
+        if (!result.ok) {
+          showToast(l.genericError, "error");
+          return;
+        }
+        setCache((prev) => ({ ...prev, [filter]: result.rows }));
+        setActiveScope(filter);
+      })
+      .catch(() => {
+        if (!isRequestCurrent(requestGeneration, generationRef.current)) return;
+        setPendingScope(null);
+        showToast(l.genericError, "error");
+      });
+  }
+
+  // Re-derives the client's own still-active filter from fresh server props
+  // (e.g. after `router.refresh()` following a note/task mutation elsewhere
+  // on the page) — see Contact record's Timeline.tsx's matching effect for
+  // the full "why" (the same fresh-review fix applies here verbatim).
+  useEffect(() => {
+    if (mountedProps.current.rows === rows && mountedProps.current.activeFilter === activeFilter) return;
+    mountedProps.current = { rows, activeFilter };
+    bumpGeneration();
+    setPendingScope(null);
+
+    const targetScope = activeScopeRef.current;
+
+    setCache((prev) => {
+      const next: Partial<Record<CompanyActivityFilter, CompanyTimelineViewRow[]>> = { [activeFilter]: rows };
+      if (targetScope !== activeFilter && prev[targetScope]) next[targetScope] = prev[targetScope];
+      return next;
+    });
+
+    if (targetScope === activeFilter) {
+      syncFilterUrl(targetScope);
+      return;
+    }
+
+    const resolved = resolveCompanyScopeRows(rows, counts, targetScope);
+    if (resolved.kind === "ready") {
+      setCache((prev) => ({ ...prev, [targetScope]: resolved.rows }));
+      syncFilterUrl(targetScope);
+      return;
+    }
+
+    syncFilterUrl(targetScope);
+    fetchScope(targetScope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rows`/`activeFilter`
+    // (the server round-trip signal) intentionally gate this effect alone;
+    // `counts` always arrives from the same load as `rows`, and
+    // `companyKey`/`l`/`showToast` are stable for the life of this page.
+  }, [rows, activeFilter]);
+
+  function selectFilter(filter: CompanyActivityFilter) {
+    if (filter === activeScope) return;
+    bumpGeneration();
+    syncFilterUrl(filter);
+
+    const cached = cache[filter];
+    if (cached) {
+      setActiveScope(filter);
+      return;
+    }
+
+    const referencePool = cache[activeScope] ?? rows;
+    const resolved = resolveCompanyScopeRows(referencePool, counts, filter);
+    if (resolved.kind === "ready") {
+      setCache((prev) => ({ ...prev, [filter]: resolved.rows }));
+      setActiveScope(filter);
+      return;
+    }
+
+    fetchScope(filter);
+  }
+
+  function handleFilterClick(e: React.MouseEvent<HTMLAnchorElement>, filter: CompanyActivityFilter) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    selectFilter(filter);
+  }
+
+  const displayedRows = cache[activeScope] ?? rows;
   const groups = groupTimelineEntries(
-    filtered.map((r) => ({ id: r.id, type: r.type, createdAt: r.createdAt, metadata: r.metadata })),
+    displayedRows.map((r) => ({ id: r.id, type: r.type, createdAt: r.createdAt, metadata: r.metadata })),
   );
 
   return (
     <div id="activity">
-      <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterAll}>
+      <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterAll} aria-busy={pendingScope !== null}>
         {FILTERS.map((filter) => (
           <Link
             key={filter}
             href={filterHref(companyKey, filter)}
-            className={activeFilter === filter ? "filter-pill on" : "filter-pill"}
+            className={activeScope === filter ? "filter-pill on" : "filter-pill"}
+            onClick={(e) => handleFilterClick(e, filter)}
+            aria-current={activeScope === filter ? "true" : undefined}
           >
             {filterLabel(l, filter)}
+            {pendingScope === filter && <span className="spinner" aria-hidden="true" />}
           </Link>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {displayedRows.length === 0 ? (
         <p className="muted">{l.timelineEmpty}</p>
       ) : (
         groups.map((group, i) => (
@@ -137,24 +249,8 @@ export function CompanyTimeline({
             </div>
             <div className="tl">
               {group.items.map(({ entry, at }) => {
-                const row = filtered.find((r) => r.id === entry.id)!;
+                const row = displayedRows.find((r) => r.id === entry.id)!;
                 const Icon = TYPE_ICON[entry.type] ?? NoteIcon;
-                const metadata = entry.metadata ?? {};
-                let what: string;
-                if (row.scope === "company") {
-                  if (entry.type === "note") what = serverStrings.noteBy(row.actorName ?? "");
-                  else if (entry.type === "email_sent")
-                    what = serverStrings.emailSentTo(typeof metadata.to === "string" ? metadata.to : "");
-                  else if (entry.type === "status_change") {
-                    const from = typeof metadata.from === "string" ? stageLabelOf(metadata.from) : "";
-                    const to = typeof metadata.status === "string" ? stageLabelOf(metadata.status) : "";
-                    what = serverStrings.stageChanged(from, to);
-                  } else if (entry.type === "meeting_logged") what = l.meetingLogged;
-                  else what = typeLabel(l, entry.type);
-                } else {
-                  what = row.personName ? `${typeLabel(l, entry.type)} · ${row.personName}` : typeLabel(l, entry.type);
-                }
-                const body = entry.type === "note" && typeof metadata.note === "string" ? metadata.note : null;
                 return (
                   <div key={entry.id} className="tl-item">
                     <div className="tl-icon">
@@ -164,16 +260,16 @@ export function CompanyTimeline({
                       <div className="tl-head">
                         <span className="what">
                           {row.scope === "contact" && row.personId ? (
-                            <Link href={`/contacts/${row.personId}`}>{what}</Link>
+                            <Link href={`/contacts/${row.personId}`}>{row.what}</Link>
                           ) : (
-                            what
+                            row.what
                           )}
                         </span>
                         <span className="when">{formatWhen(at)}</span>
                       </div>
-                      {body && (
+                      {row.body && (
                         <div className="tl-body">
-                          <blockquote>{body}</blockquote>
+                          <blockquote>{row.body}</blockquote>
                         </div>
                       )}
                     </div>

@@ -12,6 +12,11 @@ import {
   isEditableCompanyProperty,
   type EditableCompanyProperty,
 } from "@/lib/companies/propertyEdit";
+import { getCompanyTimeline } from "@/lib/companies/recordQueries";
+import { isCompanyActivityFilter } from "@/lib/companies/recordMappers";
+import { buildCompanyTimelineViewRows, type CompanyTimelineViewRow } from "@/lib/companies/timelineView";
+import { stageLabelOf } from "@/lib/companies/listMappers";
+import { getDictionary } from "@/lib/i18n/server";
 
 export async function createCompanyAction(input: {
   companyKey: string;
@@ -181,5 +186,42 @@ export async function completeCompanyTaskAction(taskId: string, companyKey: stri
     return { ok: true };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type CompanyTimelineFilterFetchResult = { ok: true; rows: CompanyTimelineViewRow[] } | { ok: false };
+
+/**
+ * Scoped fetch for one Activity-tab filter (fix/company-timeline-filter-no-
+ * reload) — the company-timeline counterpart of `getTimelinePillEntriesAction`
+ * (contacts/actions.ts). `CompanyTimeline.tsx` calls this only when the
+ * already-loaded pool can't be trusted for `filter` (see
+ * `resolveCompanyScopeRows`, recordMappers.ts), never on every click.
+ *
+ * `filter` is re-validated here via `isCompanyActivityFilter` rather than
+ * trusted from the client, same rule `getTimelinePillEntriesAction` follows
+ * for `pillKey`. Returns already-formatted `CompanyTimelineViewRow`s (see
+ * `buildCompanyTimelineViewRows`'s doc comment) — never the raw rows plus a
+ * formatter, since this result crosses back into the "use client"
+ * `CompanyTimeline.tsx`.
+ */
+export async function getCompanyTimelineFilterEntriesAction(
+  companyKey: string,
+  filter: string | undefined,
+): Promise<CompanyTimelineFilterFetchResult> {
+  try {
+    await getCurrentBd();
+    const validFilter = isCompanyActivityFilter(filter) ? filter : undefined;
+    const [rows, dict] = await Promise.all([
+      getCompanyTimeline(companyKey, { filter: validFilter }),
+      getDictionary(),
+    ]);
+    const l = dict.companyRecord;
+    const lc = dict.companyList;
+    const viewRows = buildCompanyTimelineViewRows(rows, dict.companyRecordServer, l, (stage) => stageLabelOf(stage, lc));
+    return { ok: true, rows: viewRows };
+  } catch (err) {
+    console.error("[companies] getCompanyTimelineFilterEntriesAction failed", err);
+    return { ok: false };
   }
 }

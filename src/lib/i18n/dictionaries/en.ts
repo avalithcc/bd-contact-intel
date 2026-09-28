@@ -1480,4 +1480,22 @@ export const en = {
     outcomeReviewQueueLink: "View review queue",
     outcomeUnavailable: "The dedup outcome isn't available for this import.",
   },
+
+  // Error boundaries (fix/robustness). Consumed directly via `t(DEFAULT_LOCALE)`
+  // (not `getDictionary()`), since `error.tsx`/`global-error.tsx`/`not-found.tsx`
+  // are framework-invoked "use client" components with no server parent that
+  // could otherwise hand them a dictionary slice as a prop. Every field here
+  // is a plain string — safe for that direct client import (no formatter
+  // functions), same rule `ClientStrings<T>` enforces for props.
+  errorBoundary: {
+    title: "Something went wrong",
+    body: "We couldn't load this page. You can try again or go back to a known page.",
+    retry: "Try again",
+    backHome: "Back to home",
+  },
+  notFoundPage: {
+    title: "Page not found",
+    body: "The page you're looking for doesn't exist or was moved.",
+    backHome: "Back to home",
+  },
 };
