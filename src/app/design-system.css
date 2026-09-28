@@ -245,9 +245,23 @@ kbd, .kbd {
   background: var(--color-surface-2); border: 1px solid var(--color-border-strong);
   font-size: var(--text-sm); color: var(--color-ink);
 }
-.chip .k { color: var(--color-ink-subtle); }
-.chip button { border: 0; background: transparent; color: var(--color-ink-subtle); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
-.chip button:hover { background: var(--color-surface-sunken); color: var(--color-ink); }
+/* `.k` is the chip's clickable label (reopens its filter's editor) — a real
+   `<button>` for keyboard/AT support, unlike the mockup's plain `<span
+   class="k">`. It must reset to inline text, NOT the 18x18 circle below:
+   an earlier version of this rule targeted every `button` inside `.chip`,
+   which also matched `.k` and squashed its label into an 18px box, forcing
+   the text to wrap and overlap the chip's value (owner report: "se rompe
+   la ui en los filtros, se superponen y no se ve nada" — reproduced with as
+   few as one active filter, so this predates any specific view). */
+.chip .k {
+  color: var(--color-ink-subtle); border: 0; background: transparent; padding: 0;
+  font: inherit; font-weight: 600; cursor: pointer; flex: none; white-space: nowrap;
+}
+/* Only the remove control ("×") gets the circular icon-button treatment —
+   scoped to its own class instead of the bare `button` element so no other
+   button-like child of `.chip` can collide with it again. */
+.chip .chip-remove { border: 0; background: transparent; color: var(--color-ink-subtle); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; display: inline-grid; place-items: center; padding: 0; flex: none; }
+.chip .chip-remove:hover { background: var(--color-surface-sunken); color: var(--color-ink); }
 .chip-add { border-style: dashed; color: var(--color-ink-soft); padding-right: 0.6rem; background: transparent; cursor: pointer; font: inherit; font-size: var(--text-sm); }
 
 /* -------------------------------------------------------------- avatars

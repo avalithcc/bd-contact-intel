@@ -1286,6 +1286,7 @@ export const en = {
       newVerified: "New with verified email",
       hiring: "Hiring companies",
       outreachReady: "Outreach-ready",
+      moveToEmail: "Move to email",
     },
     colName: "Name",
     colCompany: "Company",

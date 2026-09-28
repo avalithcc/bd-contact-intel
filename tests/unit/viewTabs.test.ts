@@ -14,16 +14,25 @@ function tab(key: string, active = false): ViewTabItem {
   return { key, label: key, href: `/contacts?view=${key}`, active };
 }
 
+// Guards the owner's choice, so changing the pinned set must be deliberate.
+// `outreachReady` was swapped for `moveToEmail` on 2026-09-28: measured against
+// production, outreachReady held 22 contacts and moveToEmail held 3,460.
 test("PINNED_VIEW_TAB_KEYS matches the owner-chosen pinned set", () => {
-  assert.deepEqual(PINNED_VIEW_TAB_KEYS, ["all", "mine", "notContacted", "outreachReady"]);
+  assert.deepEqual(PINNED_VIEW_TAB_KEYS, ["all", "mine", "notContacted", "moveToEmail"]);
+});
+
+// The set stays at four: this row competes for horizontal width, and the bulk
+// actions bar on the same page needed flex-wrap after overflowing at 1024px.
+test("PINNED_VIEW_TAB_KEYS stays at four tabs", () => {
+  assert.equal(PINNED_VIEW_TAB_KEYS.length, 4);
 });
 
 test("splitViewTabs: pinned tabs come first, in PINNED_VIEW_TAB_KEYS order, regardless of input order", () => {
-  const items = [tab("notContacted"), tab("hiring"), tab("all"), tab("mine"), tab("outreachReady")];
+  const items = [tab("notContacted"), tab("hiring"), tab("all"), tab("mine"), tab("moveToEmail")];
   const result = splitViewTabs(items);
   assert.deepEqual(
     result.pinned.map((t) => t.key),
-    ["all", "mine", "notContacted", "outreachReady"],
+    ["all", "mine", "notContacted", "moveToEmail"],
   );
 });
 

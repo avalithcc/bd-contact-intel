@@ -13,7 +13,8 @@ export type SystemViewKey =
   | "notContacted"
   | "newVerified"
   | "hiring"
-  | "outreachReady";
+  | "outreachReady"
+  | "moveToEmail";
 
 export interface SystemView {
   key: SystemViewKey;
@@ -30,6 +31,24 @@ export const SYSTEM_VIEWS: readonly SystemView[] = [
     key: "outreachReady",
     filters: { status: ["new"], emailVerified: true, hiring: true },
   },
+  // "Pasar a correo" — already-contacted (LinkedIn) contacts with a verified
+  // email address: the warmest segment to move off LinkedIn onto email, per
+  // the product strategy that LinkedIn is only the first touch. Deliberately
+  // reuses the existing `status`/`emailVerified` filter keys (no new
+  // vocabulary, no new SQL branch): `emailVerified` maps to
+  // `email_status = 'verified'` in `baseContactFilterConditions`, which
+  // excludes the `probable` (pattern-/Hunter-derived) addresses on purpose —
+  // this view is "ready to email", not "might have an email".
+  //
+  // Self-maintaining by design: a contact leaves this view the moment
+  // `status` moves to `replied` (or the contact is discarded) — no manual
+  // "mark as done" needed, so none should ever be added here.
+  //
+  // Deliberately does NOT exclude contacts who already received an email
+  // touch. A `contacted` person who was emailed once and has not replied yet
+  // still needs a follow-up; filtering them out would hide exactly the
+  // people who need a second touch, not the people who need none.
+  { key: "moveToEmail", filters: { status: ["contacted"], emailVerified: true } },
 ];
 
 export const DEFAULT_SYSTEM_VIEW_KEY: SystemViewKey = "all";
