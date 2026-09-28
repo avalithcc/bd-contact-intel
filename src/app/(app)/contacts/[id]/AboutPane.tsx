@@ -38,6 +38,8 @@ export interface AboutPaneProps {
   sourceText: string | null;
   createdText: string;
   properties: AboutPaneProperty[];
+  // "Ubicación" composite row (contact-record.html:86) — see PropertyList.
+  locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   messageLabels: GenerateMessageLabels;
   locale: Locale;
   // Board drag/keyboard-menu handoff (task 10.5, 14.1): opens the matching
@@ -75,6 +77,7 @@ export function AboutPane({
   sourceText,
   createdText,
   properties,
+  locationProperties,
   messageLabels,
   locale,
   initialAction,
@@ -150,6 +153,7 @@ export function AboutPane({
         sourceText={sourceText}
         createdText={createdText}
         properties={properties}
+        locationProperties={locationProperties}
       />
     </aside>
   );

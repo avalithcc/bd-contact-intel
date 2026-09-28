@@ -79,14 +79,30 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
 
-  const properties: AboutPaneProperty[] = record.properties.map((p) => ({
+  const toAboutPaneProperty = (p: (typeof record.properties)[number]): AboutPaneProperty => ({
     key: p.key,
     label: l[`prop${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}` as keyof typeof l] as string,
     value: p.value,
     lastUpdatedLabel: p.lastEdit
       ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${format(p.lastEdit.at, "d MMM", { locale: es })}`
       : null,
-  }));
+  });
+
+  // "Ubicación" (contact-record.html:86) is ONE row in the mockup, composed
+  // from city+country (region never shown) — city/region/country stay
+  // separately editable properties with their own audit history (design
+  // R7), so they're pulled out of the flat `properties` list and handed to
+  // PropertyList as their own trio for the composite row's expanded edit
+  // form (see composeLocation, @/lib/contacts/locationDisplay).
+  const LOCATION_KEYS = new Set(["city", "region", "country"]);
+  const properties: AboutPaneProperty[] = record.properties
+    .filter((p) => !LOCATION_KEYS.has(p.key))
+    .map(toAboutPaneProperty);
+  const locationProperties = {
+    city: toAboutPaneProperty(record.properties.find((p) => p.key === "city")!),
+    region: toAboutPaneProperty(record.properties.find((p) => p.key === "region")!),
+    country: toAboutPaneProperty(record.properties.find((p) => p.key === "country")!),
+  };
 
   // "Estado" derivation "why" hint (contact-record.html:77) — composed
   // server-side from `record.statusReason` via `dict.contactRecordServer`'s
@@ -218,6 +234,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           sourceText={sourceText}
           createdText={createdText}
           properties={properties}
+          locationProperties={locationProperties}
           messageLabels={messageLabels}
           locale={locale}
           initialAction={openAction}

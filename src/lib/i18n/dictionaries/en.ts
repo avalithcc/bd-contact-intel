@@ -598,6 +598,9 @@ export const en = {
     propCity: "City",
     propRegion: "Region",
     propCountry: "Country",
+    // Composed "Location" row (contact-record.html:86; mockup-port fix) —
+    // city/region/country stay separately editable; see LocationPropertyRow.
+    propLocation: "Location",
     propIndustry: "Industry",
     propOwner: "Owner",
     propStatus: "Status",

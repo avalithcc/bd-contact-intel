@@ -496,6 +496,9 @@ export const es: typeof en = {
     propCity: "Ciudad",
     propRegion: "Región",
     propCountry: "País",
+    // Composed "Ubicación" row (contact-record.html:86; mockup-port fix) —
+    // city/region/country stay separately editable; see LocationPropertyRow.
+    propLocation: "Ubicación",
     propIndustry: "Industria",
     propOwner: "Responsable",
     propStatus: "Estado",

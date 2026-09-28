@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import type { EditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import { composeLocation } from "@/lib/contacts/locationDisplay";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
@@ -43,6 +44,11 @@ export interface PropertyListProps {
   sourceText: string | null;
   createdText: string;
   properties: AboutPaneProperty[];
+  // "Ubicación" composite row (contact-record.html:86) — city/region/country
+  // stay independently editable, real properties with their own audit
+  // history; this only composes how the collapsed row displays and expands
+  // its own inline edit form (see LocationPropertyRow below).
+  locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
 }
 
 /**
@@ -70,10 +76,12 @@ export function PropertyList({
   sourceText,
   createdText,
   properties,
+  locationProperties,
 }: PropertyListProps) {
   const router = useRouter();
   const [editingKey, setEditingKey] = useState<EditablePersonProperty | null>(null);
   const [ownerEditing, setOwnerEditing] = useState(false);
+  const [locationEditing, setLocationEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ownerError, setOwnerError] = useState<string | null>(null);
@@ -178,42 +186,62 @@ export function PropertyList({
       </div>
 
       {properties.map((prop) => (
-        <PropertyRow
-          key={prop.key}
-          labels={l}
-          prop={prop}
-          emailVerified={prop.key === "email" && emailVerified}
-          hunterHint={prop.key === "email" ? hunterHint : null}
-          editing={editingKey === prop.key}
-          busy={busy}
-          error={editingKey === prop.key ? error : null}
-          onStartEdit={() => {
-            setError(null);
-            setEditingKey(prop.key);
-          }}
-          onCancel={() => {
-            setError(null);
-            setEditingKey(null);
-          }}
-          onSave={async (value) => {
-            setBusy(true);
-            setError(null);
-            try {
-              // Fresh-review WARNING fix: check the typed result and keep
-              // the field in edit mode (with the user's value) on error,
-              // instead of silently swallowing a rejected save.
-              const result = await updateContactPropertyAction(personId, prop.key, value);
-              if (result.ok) {
-                setEditingKey(null);
+        <Fragment key={prop.key}>
+          {prop.key === "industry" && (
+            <LocationPropertyRow
+              key="location"
+              personId={personId}
+              labels={l}
+              city={locationProperties.city}
+              region={locationProperties.region}
+              country={locationProperties.country}
+              editing={locationEditing}
+              onStartEdit={() => setLocationEditing(true)}
+              onCancel={() => setLocationEditing(false)}
+              onSaved={() => {
+                setLocationEditing(false);
                 router.refresh();
-              } else {
-                setError(contactActionErrorMessage(l, result.reason));
+              }}
+              genericError={l.genericError}
+            />
+          )}
+          <PropertyRow
+            key={prop.key}
+            labels={l}
+            prop={prop}
+            emailVerified={prop.key === "email" && emailVerified}
+            hunterHint={prop.key === "email" ? hunterHint : null}
+            editing={editingKey === prop.key}
+            busy={busy}
+            error={editingKey === prop.key ? error : null}
+            onStartEdit={() => {
+              setError(null);
+              setEditingKey(prop.key);
+            }}
+            onCancel={() => {
+              setError(null);
+              setEditingKey(null);
+            }}
+            onSave={async (value) => {
+              setBusy(true);
+              setError(null);
+              try {
+                // Fresh-review WARNING fix: check the typed result and keep
+                // the field in edit mode (with the user's value) on error,
+                // instead of silently swallowing a rejected save.
+                const result = await updateContactPropertyAction(personId, prop.key, value);
+                if (result.ok) {
+                  setEditingKey(null);
+                  router.refresh();
+                } else {
+                  setError(contactActionErrorMessage(l, result.reason));
+                }
+              } finally {
+                setBusy(false);
               }
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
+            }}
+          />
+        </Fragment>
       ))}
 
       {sourceText && (
@@ -310,6 +338,150 @@ function PropertyRow({
       ) : (
         prop.lastUpdatedLabel && <dd className="hint">{prop.lastUpdatedLabel}</dd>
       )}
+    </div>
+  );
+}
+
+/**
+ * The record's "Ubicación" row (contact-record.html:86) — a single row
+ * displaying `composeLocation(city, country)`, matching the mockup exactly
+ * (region is never shown collapsed). `city`/`region`/`country` are real,
+ * independently editable columns with their own audit history (design R7:
+ * contact-identity's "keep one current value per property"/who-last-
+ * updated-it rule) — this is NOT a lossy free-text field: editing expands
+ * the row into its 3 underlying inputs, each saved through the same
+ * `updateContactPropertyAction` every other property row uses, so history
+ * and validation (propertyEdit.ts) stay per-field. Only fields whose draft
+ * actually changed are sent, so an untouched field never writes a no-op
+ * history row.
+ */
+function LocationPropertyRow({
+  personId,
+  labels: l,
+  city,
+  region,
+  country,
+  editing,
+  onStartEdit,
+  onCancel,
+  onSaved,
+  genericError,
+}: {
+  personId: string;
+  labels: ContactRecordLabels;
+  city: AboutPaneProperty;
+  region: AboutPaneProperty;
+  country: AboutPaneProperty;
+  editing: boolean;
+  onStartEdit: () => void;
+  onCancel: () => void;
+  onSaved: () => void;
+  genericError: string;
+}) {
+  const [cityDraft, setCityDraft] = useState(city.value ?? "");
+  const [regionDraft, setRegionDraft] = useState(region.value ?? "");
+  const [countryDraft, setCountryDraft] = useState(country.value ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (editing) {
+    const fields: Array<{ prop: AboutPaneProperty; draft: string }> = [
+      { prop: city, draft: cityDraft },
+      { prop: region, draft: regionDraft },
+      { prop: country, draft: countryDraft },
+    ];
+
+    const handleSave = async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        for (const { prop, draft } of fields) {
+          if (draft.trim() === (prop.value ?? "")) continue;
+          const result = await updateContactPropertyAction(personId, prop.key, draft);
+          if (!result.ok) {
+            setError(contactActionErrorMessage(l, result.reason));
+            return;
+          }
+        }
+        onSaved();
+      } catch {
+        setError(genericError);
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    return (
+      <div className="prop">
+        <dt id="contact-prop-location-label">{l.propLocation}</dt>
+        <dd>
+          <input
+            aria-label={l.propCity}
+            className="input"
+            placeholder={l.propCity}
+            value={cityDraft}
+            onChange={(e) => setCityDraft(e.target.value)}
+            disabled={busy}
+            autoFocus
+          />
+        </dd>
+        <dd>
+          <input
+            aria-label={l.propRegion}
+            className="input"
+            placeholder={l.propRegion}
+            value={regionDraft}
+            onChange={(e) => setRegionDraft(e.target.value)}
+            disabled={busy}
+          />
+        </dd>
+        <dd>
+          <input
+            aria-label={l.propCountry}
+            className="input"
+            placeholder={l.propCountry}
+            value={countryDraft}
+            onChange={(e) => setCountryDraft(e.target.value)}
+            disabled={busy}
+          />
+        </dd>
+        {error && (
+          <dd className="error-text" role="alert">
+            {error}
+          </dd>
+        )}
+        <dd className="row">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleSave} disabled={busy}>
+            {l.save}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={busy}
+            onClick={() => {
+              setCityDraft(city.value ?? "");
+              setRegionDraft(region.value ?? "");
+              setCountryDraft(country.value ?? "");
+              setError(null);
+              onCancel();
+            }}
+          >
+            {l.cancel}
+          </button>
+        </dd>
+      </div>
+    );
+  }
+
+  return (
+    <div className="prop">
+      <dt>{l.propLocation}</dt>
+      <dd>
+        {composeLocation(city.value, country.value) ?? l.emptyValue}
+        <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
+          <EditPencilIcon className="icon" />
+        </button>
+      </dd>
     </div>
   );
 }
