@@ -11,6 +11,7 @@ import {
   resolveScopeEntries,
   type TimelinePillKey,
 } from "@/lib/activity/timelinePills";
+import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { groupEmailThreads } from "@/lib/contacts/emailThreads";
@@ -217,6 +218,17 @@ export function Timeline({
   // means. Assigning during render is the standard React pattern for this.
   const activeScopeRef = useRef(activeScope);
   activeScopeRef.current = activeScope;
+  // Fresh-review follow-up WARNING: a scoped fetch (fetchScope) can be
+  // superseded either by a NEWER fetch (another pill clicked before the
+  // first resolves) or by a background data refresh (the reset effect
+  // below) — this counter is bumped at both of those points, and a
+  // resolving fetch discards its own result once it's no longer current
+  // (see fetchScope / isRequestCurrent, @/lib/activity/requestGeneration).
+  const generationRef = useRef(0);
+
+  function bumpGeneration(): void {
+    generationRef.current += 1;
+  }
 
   function syncScopeUrl(pill: TimelinePillKey | undefined) {
     if (typeof window === "undefined") return;
@@ -246,11 +258,22 @@ export function Timeline({
    * `selectPill` (a fresh click) and the reset effect (re-deriving the
    * still-active pill after a background data refresh) so a fetch's
    * success/error handling can't drift between the two call sites.
+   *
+   * Callers are expected to have already called `bumpGeneration()` for
+   * whatever event triggered this fetch (a click, a refresh) — this only
+   * CAPTURES the resulting generation and, once the promise settles,
+   * refuses to touch cache/activeScope/pendingScope if a LATER event (a
+   * newer fetch, or another refresh) has since moved the generation past
+   * it (`isRequestCurrent`). Without this, a slow fetch that's since been
+   * superseded could resolve after the fact and silently jump the view
+   * back to its (now stale) pill.
    */
   function fetchScope(pill: TimelinePillKey | undefined, scope: TimelineScope) {
+    const requestGeneration = generationRef.current;
     setPendingScope(scope);
     getTimelinePillEntriesAction(personId, pill)
       .then((result) => {
+        if (!isRequestCurrent(requestGeneration, generationRef.current)) return;
         setPendingScope(null);
         if (!result.ok) {
           showToast(l.genericError, "error");
@@ -260,6 +283,7 @@ export function Timeline({
         setActiveScope(scope);
       })
       .catch(() => {
+        if (!isRequestCurrent(requestGeneration, generationRef.current)) return;
         setPendingScope(null);
         showToast(l.genericError, "error");
       });
@@ -283,10 +307,23 @@ export function Timeline({
    * locally when possible (`resolveScopeEntries`), via one scoped fetch
    * otherwise — then re-asserts the URL, since the refresh may have
    * reverted it.
+   *
+   * Fresh-review follow-up WARNING: fresh server props always supersede
+   * whatever fetch might be in flight (the pool it was fetching against no
+   * longer reflects the current data), so this bumps the generation
+   * unconditionally before anything else. That bump is exactly what makes
+   * the very next line — `setPendingScope(null)` — safe to call
+   * unconditionally too: if a fetch WAS in flight, it just became stale by
+   * construction (its captured generation can no longer equal the new
+   * current one), so clearing its spinner here is clearing a spinner this
+   * effect just superseded, never one that still belongs to a fetch this
+   * effect has no opinion on. If none was in flight, clearing `null` to
+   * `null` is a no-op.
    */
   useEffect(() => {
     if (mountedProps.current.entries === entries && mountedProps.current.activePill === activePill) return;
     mountedProps.current = { entries, activePill };
+    bumpGeneration();
     setPendingScope(null);
 
     const serverScope = scopeOf(activePill);
@@ -331,6 +368,15 @@ export function Timeline({
   function selectPill(pill: TimelinePillKey | undefined) {
     const scope = scopeOf(pill);
     if (scope === activeScope) return;
+    // Every branch below moves the active scope away from whatever it was —
+    // including the cache-hit/local-derive ones that never call
+    // `fetchScope` at all — so this must supersede any fetch already in
+    // flight from a PREVIOUS click here too, not just the two triggers the
+    // fetch-vs-fetch/refresh race was first reported for: otherwise that
+    // earlier fetch could still resolve later and jump the view back to its
+    // pill even though the BD already moved on to this one via a cheaper
+    // path.
+    bumpGeneration();
     syncScopeUrl(pill);
 
     const cached = cache[scope];
