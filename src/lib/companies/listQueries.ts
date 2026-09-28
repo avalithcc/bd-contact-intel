@@ -3,6 +3,8 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, bd, company, person } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { buildCompanyMatchKeys } from "@/lib/companies/aliasResolution";
+import { getCompanyAliasRows } from "@/lib/companies/aliasResolutionDb";
 import type { HiringMatch } from "@/lib/hiring/queries";
 
 const owner = alias(bd, "company_list_owner");
@@ -42,6 +44,17 @@ export interface CompanyListPage {
  * count and a batched last-activity MAX for exactly this page's company
  * keys (never one query per row).
  *
+ * The contacts-per-company count is alias-resolved (bug:
+ * company-contact-counts, fixed): a person's `company_key` sometimes
+ * normalizes to a `company_alias.alias_key` rather than the target
+ * company's own canonical key, so counting only exact `company_key` matches
+ * undercounts. `getCompanyAliasRows`/`buildCompanyMatchKeys`
+ * (src/lib/companies/aliasResolution*.ts) widen the match set to the
+ * canonical key plus every alias pointing at it, same alias-resolution
+ * pattern as src/lib/hiring/queries.ts#resolveHiringCompanies — still one
+ * extra batched query for the whole page, never per-company.
+ *
+
  * `view` narrows the WHERE clause in SQL, not a post-fetch JS filter:
  * - "all": no extra condition.
  * - "mine": `owner_bd_id = meBdId` (mockup-port c05: now the real owner
@@ -120,14 +133,28 @@ export async function getCompanyListPage(
 
   const keys = companyRows.map((r) => r.companyKey);
 
+  // Contact counts must be alias-resolved (bug: company-contact-counts) — a
+  // person's `company_key` sometimes normalizes to a `company_alias`
+  // pointing at one of this page's companies rather than that company's own
+  // canonical key, so a plain `company_key = keys[i]` match undercounts. One
+  // extra batched query for exactly this page's keys (never a per-company
+  // lookup — see src/lib/companies/aliasResolutionDb.ts), then the contact
+  // count query below is widened to every canonical key AND every alias
+  // pointing at it, still one query for the whole page.
+  const aliasRows = await getCompanyAliasRows(keys);
+  const matchKeyMap = buildCompanyMatchKeys(keys, aliasRows);
+  const allMatchKeys = [...new Set([...matchKeyMap.values()].flat())];
+
   // Two batched queries for exactly this page's keys — never N+1, never an
   // unbounded scan (data-builder.md rule 5/7).
   const [contactCounts, lastActivityRows] = await Promise.all([
-    db
-      .select({ companyKey: person.companyKey, count: sql<number>`count(*)::int` })
-      .from(person)
-      .where(inArray(person.companyKey, keys))
-      .groupBy(person.companyKey),
+    allMatchKeys.length
+      ? db
+          .select({ companyKey: person.companyKey, count: sql<number>`count(*)::int` })
+          .from(person)
+          .where(inArray(person.companyKey, allMatchKeys))
+          .groupBy(person.companyKey)
+      : Promise.resolve([]),
     db
       .select({
         companyKey: activity.companyKey,
@@ -142,8 +169,19 @@ export async function getCompanyListPage(
       .groupBy(activity.companyKey),
   ]);
 
-  const contactCountByKey = new Map(
+  // Raw per-match-key counts, then summed per canonical company over its own
+  // match-key set (matchKeyMap) — a company with N aliases sums N+1 groups
+  // into one number, never double-counted since each match key is grouped
+  // exactly once above.
+  const countByRawKey = new Map(
     contactCounts.filter((c): c is typeof c & { companyKey: string } => c.companyKey !== null).map((c) => [c.companyKey, c.count]),
+  );
+  const contactCountByKey = new Map(
+    keys.map((key) => {
+      const matchKeys = matchKeyMap.get(key) ?? [key];
+      const total = matchKeys.reduce((sum, mk) => sum + (countByRawKey.get(mk) ?? 0), 0);
+      return [key, total];
+    }),
   );
   const lastActivityByKey = new Map(
     lastActivityRows

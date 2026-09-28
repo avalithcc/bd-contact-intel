@@ -2,6 +2,8 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { buildCompanyMatchKeys } from "@/lib/companies/aliasResolution";
+import { getCompanyAliasRows } from "@/lib/companies/aliasResolutionDb";
 import type { CompanyPropertyHistoryRow } from "@/lib/companies/recordMappers";
 
 const PEOPLE_LIMIT = 200; // bounded crossover set for the timeline/tasks joins below
@@ -24,12 +26,19 @@ export interface CompanyPeoplePage {
 
 /**
  * People at this company (companies-checklist.md's Contactos card /
- * company-record.html:90) — matches `person.company_key` directly, same
- * known limitation as the list's contacts count (not alias-resolved yet,
- * flagged as a todo, not a blocker).
+ * company-record.html:90) — alias-resolved (bug: company-contact-counts,
+ * fixed): a person's `company_key` sometimes normalizes to a
+ * `company_alias.alias_key` rather than this company's own canonical key,
+ * so matching `company_key` alone undercounted (same fix as the list's
+ * contacts count in listQueries.ts and `getCompanyContactCount` above).
+ * `getCompanyPersonIds` below (used by the Activity tab and Open Tasks
+ * card) still matches `company_key` directly and has the same limitation —
+ * not fixed here (out of scope for this bug, see report).
  */
 export async function getCompanyPeople(companyKey: string, limit: number = ASSOC_PEOPLE_PREVIEW): Promise<CompanyPeoplePage> {
-  const where = and(eq(person.companyKey, companyKey), isNull(person.mergedIntoId));
+  const aliasRows = await getCompanyAliasRows([companyKey]);
+  const matchKeys = buildCompanyMatchKeys([companyKey], aliasRows).get(companyKey) ?? [companyKey];
+  const where = and(inArray(person.companyKey, matchKeys), isNull(person.mergedIntoId));
   const [[totalRow], rows] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(person).where(where),
     db
