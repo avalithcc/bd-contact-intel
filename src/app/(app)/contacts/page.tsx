@@ -10,9 +10,9 @@ import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries"
 import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
   getContactBoardColumns,
-  getContactCountForFilters,
   getContactFilterOptions,
   getContactListPage,
+  getSystemViewCounts,
   type ContactListRow,
 } from "@/lib/contacts/listQueries";
 import {
@@ -377,7 +377,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     isOutreachView || isBoard
       ? null
       : getContactListPage(effectiveFilters, me.id, sp.q, page, PAGE_SIZE, dict, sort, hiringKeys),
-    Promise.all(SYSTEM_VIEWS.map((v) => getContactCountForFilters(v.filters, me.id, hiringKeys))),
+    getSystemViewCounts(me.id, hiringKeys),
     isBoard ? getContactBoardColumns(effectiveFilters, me.id, sp.q, dict, hiringKeys) : null,
     isOutreachView
       ? getOutreachContactsPage(me.id, outreachFilters, page, PAGE_SIZE, relTime, dict)
