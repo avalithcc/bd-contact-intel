@@ -34,10 +34,23 @@ const globalForDb = globalThis as unknown as {
 // round-trip-bound, prefer removing round trips (combine several small reads
 // into one statement) over raising this further — that is the lever that
 // actually shortens the work, and it does not spend connections.
+//
+// INCIDENT 2026-09-28: raised to 3, reverted to 1 the same day. Production
+// threw `EMAXCONNSESSION: max clients reached in session mode - max clients
+// are limited to pool_size: 15`. The governing limit is **Supavisor's
+// session-mode pool_size of 15**, not Postgres's `max_connections` of 60 —
+// the comment this replaced said so, and it was overridden on the strength
+// of the wrong measurement. Preview deployments share that same 15, so every
+// warm preview competes with production for it.
+//
+// Do not raise this again without first either moving DATABASE_URL to
+// Supavisor's transaction-mode pooler (port 6543, which is what `prepare:
+// false` below already anticipates) or raising the pooler's own pool_size.
+// Measuring Postgres does not tell you the pooler's limit.
 const client =
   globalForDb.client ??
   postgres(connectionString, {
-    max: process.env.NODE_ENV === "production" ? 3 : 5,
+    max: process.env.NODE_ENV === "production" ? 1 : 5,
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false,
