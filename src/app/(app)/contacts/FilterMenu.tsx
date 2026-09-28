@@ -177,7 +177,7 @@ export function FilterMenu({
               {chip.label}:
             </button>{" "}
             {chip.valueText ?? l.anyLabel}
-            <a href={removeHref} aria-label={l.removeFilterLabel}>
+            <a href={removeHref} aria-label={l.removeFilterLabel} className="chip-remove">
               ×
             </a>
           </span>
