@@ -5,6 +5,9 @@ import { getCurrentBd } from "@/lib/queries";
 import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contacts/propertyEdit";
 import { assertContactEditableById } from "@/lib/contacts/queries";
+import { changeContactCompany } from "@/lib/contacts/companyChangeDb";
+import { searchContactCompanies } from "@/lib/contacts/companySearchDb";
+import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
 import { createActivityAction } from "@/app/activity/actions";
 import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
@@ -118,6 +121,40 @@ export async function updateContactOwnerAction(
     // so (see bulkOwnerAudit.ts's "owner_change" vs "bulk_owner_change").
     const plan = await bulkAssignOwner([personId], ownerBdId, me.id, { mode: "single" });
     if (plan[0]?.outcome === "skipped_has_connection") throw new OwnerReassignLockedError();
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * Company-only search for the "Cambiar empresa" dialog (contact-record.html
+ * :160's pencil icon — previously inert, see page.tsx's comment history).
+ * Same bounded-query/debounce shape as searchTaskSubjectsAction, but a
+ * dedicated company-only query (companySearchDb.ts) rather than the task
+ * dialog's person+company search, which would scan persons pointlessly.
+ */
+export async function searchContactCompaniesAction(query: string): Promise<TaskSubjectSearchResult[]> {
+  await getCurrentBd();
+  return searchContactCompanies(query);
+}
+
+/**
+ * Changes (or clears) a contact's company by picking one already on file —
+ * never by typing free text (see companyChange.ts's doc comment for why:
+ * `company`/`companyKey` must move together, and a free-text path would let
+ * the base fill with "Globant", "globant SA" and "Globant." as three
+ * companies). `companyKey: null` detaches the contact from its current
+ * company.
+ */
+export async function changeContactCompanyAction(
+  personId: string,
+  companyKey: string | null,
+): Promise<ContactActionResult> {
+  try {
+    const me = await getCurrentBd();
+    await changeContactCompany(personId, companyKey, me.id);
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

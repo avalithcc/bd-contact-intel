@@ -18,8 +18,9 @@ import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
-import { EditPencilIcon, PlusIcon } from "@/components/icons";
+import { PlusIcon } from "@/components/icons";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
+import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
@@ -317,15 +318,26 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           <div className="card assoc">
             <div className="card-header">
               <h3>{l.companyCardTitle}</h3>
-              {record.person.companyKey && (
-                <span className="actions">
-                  {/* Mockup itself has no wired destination for "Cambiar
-                      empresa" (contact-record.html:160) — kept inert. */}
-                  <a className="btn btn-ghost btn-sm btn-icon" href="#" aria-label={l.changeCompanyAria}>
-                    <EditPencilIcon className="icon" />
-                  </a>
-                </span>
-              )}
+              <span className="actions">
+                <ChangeCompanyButton
+                  personId={record.person.id}
+                  // Detach must stay available for every person that HAS a
+                  // companyKey, even the ~1,100 in production whose key has
+                  // no matching `company` row (a pre-existing data gap:
+                  // person.companyKey has no FK — see companyChange.ts).
+                  // Display name prefers the company table's own
+                  // displayName (companyRow), falls back to the person's
+                  // own `company` text when there's no matching row, and
+                  // finally the raw key so the dialog is never blank for a
+                  // person that clearly has SOME company on file.
+                  currentCompany={
+                    companyKey
+                      ? { companyKey, displayName: companyRow?.displayName ?? record.person.company ?? companyKey }
+                      : null
+                  }
+                  labels={l}
+                />
+              </span>
             </div>
             <div className="card-body">
               {record.person.companyKey ? (

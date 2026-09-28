@@ -11,6 +11,7 @@
  */
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
+import { CompanyNotFoundError } from "@/lib/companies/errors";
 import {
   InvalidEmailError,
   InvalidPhoneError,
@@ -40,6 +41,7 @@ export type ContactActionErrorReason =
   | "signal_text_required"
   | "owner_invalid"
   | "owner_locked"
+  | "company_not_found"
   | "unexpected";
 
 /** A `?owner=` `<select>` value that isn't blank and isn't a well-formed
@@ -103,6 +105,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
   if (err instanceof OwnerValueInvalidError) return "owner_invalid";
   if (err instanceof OwnerReassignLockedError) return "owner_locked";
+  if (err instanceof CompanyNotFoundError) return "company_not_found";
   return "unexpected";
 }
 
