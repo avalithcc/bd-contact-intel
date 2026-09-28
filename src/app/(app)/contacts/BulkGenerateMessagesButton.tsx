@@ -12,6 +12,7 @@
  */
 import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
+import { GenerateIcon } from "@/components/icons";
 import { bulkGenerateMessagesAction, type BulkGenerateMessageResult } from "./bulkMessageActions";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
 import { parseContactSort } from "@/lib/contacts/sort";
@@ -86,6 +87,7 @@ export function BulkGenerateMessagesButton({
   return (
     <>
       <button type="button" className="btn btn-ghost btn-sm" onClick={run}>
+        <GenerateIcon className="icon" />
         {l.bulkGenerateMessages}
       </button>
       <Dialog
