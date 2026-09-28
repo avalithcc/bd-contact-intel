@@ -49,7 +49,7 @@ Columns: element | mockup ref | status | evidence file:line | notes
 | Estado "why" derivation reason line | contact-record.html:77 | done (r02) | `src/lib/status/deriveStatus.ts` (`deriveStatusFull`, `buildStatusReasonEvidence`), `src/lib/contacts/labels.ts` (`describeStatusReason`), `queries.ts` | Fully unit-tested (deriveStatusFull, buildStatusReasonEvidence, describeStatusReason). Reuses the SAME effective-time logic the status cache itself uses — the reason can never disagree with `person.status`. |
 | Responsable row (owner chip w/ avatar + hint) | contact-record.html:78 | done (r02) | PropertyList.tsx, `ownerHintOldestConnection` | |
 | Correo electrónico row + Verified badge + Hunter hint | contact-record.html:79 | done (r02) | PropertyList.tsx, `hunterHint` | |
-| Cargo / Grupo de rol / Nivel / Ubicación / Industria rows | contact-record.html:80-84 | done (already existed) | PropertyList.tsx (`EDITABLE_PERSON_PROPERTIES`) | Corrected from the r01 checklist's "todo?" flags — all already implemented pre-r02, only markup changed. |
+| Cargo / Grupo de rol / Nivel / Ubicación / Industria rows | contact-record.html:80-84 | done (corrected 2026-09-28) | PropertyList.tsx, `src/lib/contacts/locationDisplay.ts` | **This row previously claimed "done" and was wrong.** The mockup shows ONE `Ubicación` row composing city and country (region is never shown); the build rendered three separate editable rows, Ciudad / Región / País, and an em-dash row when region was null. Now a single composed row that expands into the three real inputs on edit, so each field keeps its own audit history. |
 | Origen row | contact-record.html:85 | done (r02) | `queries.ts` (`ContactSourceEvidence`, bounded `person_id_map`/`lead` join) | "LinkedIn (N BDs)" from connection count + "Lista de leads X" from the mapped legacy lead's `sourceKey`, when one exists. |
 | Creado row | contact-record.html:86 | done (r02) | page.tsx (`createdText`) | |
 
@@ -63,7 +63,7 @@ Columns: element | mockup ref | status | evidence file:line | notes
 
 | element | mockup ref | status | evidence file:line | notes |
 |---|---|---|---|---|
-| Filter pills w/ icons + counts | contact-record.html:95-101 | done (r03) | Timeline.tsx | |
+| Filter pills w/ icons + counts | contact-record.html:95-101 | done (corrected 2026-09-28) | Timeline.tsx, `src/lib/activity/timelinePills.ts` | **This row previously claimed "done (r03)" and was wrong.** The build rendered the raw activity enum — `Nota · Correo · Búsqueda de correo · Cambio de estado · Reunión · Llamadas · Descarte · Estado respaldado` — where the mockup groups for the reader. `status_backfill` alone holds 3,517 production rows, so a migration artifact was the page's most prominent filter. Pills are now `Todo · Notas · Llamadas · Correos · Reuniones · Sistema`, with `Sistema` grouping hunter_lookup + status_change + discarded + status_backfill. Two mockup pills are deliberately absent: **LinkedIn** (that surface is being turned off) and **Tareas** (tasks are not timeline entries — a real feature, see below). |
 | "Más recientes primero" sort toggle | contact-record.html:102 | done, static (r03) | Timeline.tsx | Inert — the timeline has exactly one sort order today, same as the static mockup shows no alternate state. |
 | Pinned note composer (`#log-note`) + "Agregar tarea de seguimiento" | contact-record.html:104-105 | done (r03) | NoteComposer.tsx | Follow-up toggle reveals a title input and creates a real task via the existing `addContactTaskAction`, no due date — documented interpretation (mockup shows no sub-fields). |
 | "Próximas" upcoming-task group + "Marcar como hecha"/"Reprogramar" | contact-record.html:107-111 | done (r03), partial | Timeline.tsx, CompleteTaskButton.tsx, `getOpenTasksForPerson`, `completeContactTaskAction` | "Marcar como hecha" is real (new bounded query + reused `completeTaskAction`). "Reprogramar" stays inert (mockup has no wired destination for it either). |
@@ -132,8 +132,21 @@ Columns: element | mockup ref | status | evidence file:line | notes
 - deviations applied per owner decision this session: 2 (admin inline reveal is click-to-expand, not eager; "Pegar señal" kept and styled)
 - flagged for future owner input (not silently built): 0 (the two Generar-mensaje gaps — "Canal" select, "Señales utilizadas" chips — were closed per owner direction 2026-09-26; see the email-gen-01..03 branch chain)
 
-**Checklist status: no open "todo" rows.** Every remaining gap is `n/a`
-(superseded by a documented owner-approved design decision).
+**Checklist status: one open row.**
+
+- **open:** a `Tareas` filter pill (`contact-record.html:97-106`). Tasks are not
+  timeline entries today, so this is a feature, not a markup port. It was
+  deliberately left unbuilt rather than faked.
+- **deliberately absent:** the `LinkedIn` pill, because that whole surface is
+  being turned off (2026-09-28).
+
+**Read this before trusting any row above.** On 2026-09-28 the owner reviewed
+the live page and said it did not match the mockup, while this checklist
+claimed zero open rows. An element-by-element audit found two rows marked
+"done" that did not hold — the filter pills and the Ubicación row, both
+corrected above. A row here means someone believed the work was done, not that
+anyone diffed it against the mockup. The mockup HTML is the standard; this file
+is a record of intent.
 
 Everything server-action-preserving: every existing server action kept its
 exact signature and semantics; only new bounded reads and two new actions
