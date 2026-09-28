@@ -34,7 +34,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute = path.startsWith("/login") || path.startsWith("/auth");
+  const isAuthRoute =
+    path.startsWith("/login") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/forgot-password");
   // Authenticated via a bearer token instead of a Supabase session — see
   // src/app/api/hiring/sync/route.ts, src/app/api/hiring/discover/route.ts
   // (CRON_SECRET) and src/app/api/leads/ingest/route.ts
@@ -48,8 +51,14 @@ export async function updateSession(request: NextRequest) {
   );
 
   if (!user && !isAuthRoute && !isCronRoute) {
+    const requestedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "";
+    // Always our own current request path — safe by construction. Still
+    // re-validated with sanitizeNextPath() when it is read back on the
+    // login page, since that read happens after a round trip over a URL.
+    url.searchParams.set("next", requestedPath);
     return NextResponse.redirect(url);
   }
 

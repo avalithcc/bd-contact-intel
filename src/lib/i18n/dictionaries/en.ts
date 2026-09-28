@@ -860,6 +860,19 @@ export const en = {
     domainRestricted: (domain: string) => `Accounts are limited to ${domain} emails.`,
     passwordTooShort: "Use at least 8 characters for your password.",
     accountCreated: "Account created. Check your inbox to confirm, then sign in.",
+    forgotPasswordLink: "Forgot your password?",
+    expiredLinkError: "That link expired or is invalid. Request a new one.",
+  },
+
+  forgotPassword: {
+    eyebrow: "// recover access",
+    title: "Reset password",
+    subtitle: "Enter your work email and we'll send you a link to choose a new password.",
+    workEmail: "Work email",
+    submit: "Send link",
+    genericConfirmation:
+      "If that email has an account, you'll receive a link to reset your password.",
+    backToLogin: "Back to sign in",
   },
 
   account: {
