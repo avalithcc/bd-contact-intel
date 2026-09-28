@@ -43,3 +43,11 @@ data" is expected; anything earlier is a finding).
 Start with `blocks push: yes/no` (or the verdict the orchestrator asked for). Then findings ranked
 CRITICAL / WARNING / SUGGESTION, each with `file:line` and a concrete failure scenario, then the test
 results. Verify claims against the code before reporting them; say when you are unsure.
+
+## Performance
+
+`PERFORMANCE.md` is the standard for cost in this repo. Hold changes to it — especially: an
+interaction that re-runs work unrelated to what changed, a single-entity question that loads a whole
+dataset, a per-bucket loop where one grouped query would do, a raw primitive called where a
+`cache()` wrapper exists, a read with no `LIMIT`, and a `Promise.all` added as if it were
+parallelism. Ask for the before/after measurement when a change claims to be faster.
