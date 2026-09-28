@@ -245,17 +245,23 @@ kbd, .kbd {
   background: var(--color-surface-2); border: 1px solid var(--color-border-strong);
   font-size: var(--text-sm); color: var(--color-ink);
 }
-/* `.k` is the chip's clickable label (reopens its filter's editor) — a real
-   `<button>` for keyboard/AT support, unlike the mockup's plain `<span
-   class="k">`. It must reset to inline text, NOT the 18x18 circle below:
-   an earlier version of this rule targeted every `button` inside `.chip`,
-   which also matched `.k` and squashed its label into an 18px box, forcing
-   the text to wrap and overlap the chip's value (owner report: "se rompe
-   la ui en los filtros, se superponen y no se ve nada" — reproduced with as
-   few as one active filter, so this predates any specific view). */
+/* `.chip-target` wraps BOTH the field label and its current value in one
+   clickable control (reopens the field's editor) — a user expects to click
+   the value ("Todos") to change it just as much as the label, and the
+   whole chip already reads as one control. Reset to plain inline text
+   (button chrome removed) so it renders exactly like the mockup's chip
+   text, just with a bigger hit target than the mockup's label-only `.k`. */
+.chip-target { display: inline-flex; align-items: center; gap: 0.2rem; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+/* `.k` is the label span inside `.chip-target` — kept as its own class so
+   it still gets the mockup's subtler label color while the value text
+   (a plain text node next to it) keeps the chip's own ink color. An
+   earlier version of this rule targeted every `button` inside `.chip`,
+   which squashed the label into an 18px circular box and forced its text
+   to wrap and overlap the chip's value (owner report: "se rompe la ui en
+   los filtros, se superponen y no se ve nada" — reproduced with as few as
+   one active filter, so this predates any specific view). */
 .chip .k {
-  color: var(--color-ink-subtle); border: 0; background: transparent; padding: 0;
-  font: inherit; font-weight: 600; cursor: pointer; flex: none; white-space: nowrap;
+  color: var(--color-ink-subtle); font-weight: 600; white-space: nowrap;
 }
 /* Only the remove control ("×") gets the circular icon-button treatment —
    scoped to its own class instead of the bare `button` element so no other
