@@ -6,7 +6,7 @@ import { initialsFromName } from "@/components/initials";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { toTelHref } from "@/lib/phone";
 import { relativeTime } from "@/lib/i18n/format";
-import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
+import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
   getContactBoardColumns,
@@ -278,18 +278,31 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const l = dict.contactList;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [savedViewRows, hiringKeys, ownerOptions, filterOptions, hiringMatchIndex] = await Promise.all([
+  const [savedViewRows, hiringKeys, ownerOptions, filterOptions] = await Promise.all([
     listSavedViews(me.id),
     getHiringCompanyKeys(),
     listOwnerOptions(),
     getContactFilterOptions(),
-    // "Empresa" column's inline "Contratando" badge (mockup) — ONE call for
-    // the whole page, never per-row, same function the market/startup
-    // ad-hoc filters already reuse (listQueries.ts), so the badge and
-    // those filters can never disagree on which companies count as hiring.
-    getHiringMatchIndex(),
   ]);
-  const hiringCompanyKeysForBadge = new Set(hiringMatchIndex.keys());
+  /**
+   * "Empresa" column's inline "Contratando" badge (mockup) — ONE set for the
+   * whole page, never a per-row lookup.
+   *
+   * Perf fix (owner report: "demora bastante cuando busco"). This used to
+   * call `getHiringMatchIndex()`, which resolves every hiring company WITH
+   * its full posting set, and then threw all of that away to keep
+   * `.keys()`. `getHiringCompanyKeys()` — already awaited right here for the
+   * list and count queries — returns the identical set: verified against
+   * production, 75 keys each, zero difference in either direction.
+   *
+   * It also settles what the old comment only hoped for. It claimed the
+   * match index kept the badge and the hiring filter from disagreeing, but
+   * the filter has always been handed `hiringKeys` from
+   * `getHiringCompanyKeys()` (see `getContactListPage` below) — so the two
+   * were separate queries that merely happened to agree. Now they are the
+   * same set, and cannot drift.
+   */
+  const hiringCompanyKeysForBadge = hiringKeys;
   const bulkLabels = pickBulkActionsLabels(dict);
   const bulkMessage = bulkResultMessage(sp.bulkResult, l);
   const savedViewsForResolve: ActiveViewSavedInput[] = savedViewRows.map((v) => ({

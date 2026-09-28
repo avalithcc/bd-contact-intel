@@ -49,3 +49,37 @@ export function withResolvedCompanyName<T extends RowWithCompanyCanonicalName>(
     return { ...rest, company: resolveCompanyDisplayName(row.company, companyCanonicalName) };
   });
 }
+
+/**
+ * Does the name this row DISPLAYS contain `term`?
+ *
+ * The authoritative rule for the "Empresa" ad-hoc filter and the global
+ * search box, kept here beside `resolveCompanyDisplayName` because it must
+ * agree with it case by case: a row matches a company term if and only if
+ * the name a BD can actually see on that row matches it.
+ * `listQueries.ts#companyNameMatchCondition` is the SQL translation of this
+ * function — change one and the other is wrong.
+ *
+ * Why not simply OR both columns: free text wins the display, so a contact
+ * whose free text says "Acme" while its `company_key` resolves to "Nubiral"
+ * (225 in production) must NOT come back for "nubiral", or the list would
+ * return a row whose Empresa cell shows an unrelated name.
+ */
+export function companyNameMatchesTerm(
+  freeText: string | null | undefined,
+  canonicalDisplayName: string | null | undefined,
+  term: string,
+): boolean {
+  // `|| null` and not `?? null`: an empty free-text string is "absent" for
+  // matching, exactly as the SQL's `(company is null or company = '')` guard
+  // treats it, so a blank import value still falls through to the canonical
+  // name instead of matching nothing.
+  //
+  // Whitespace-only free text ("   ") is deliberately NOT trimmed here: the
+  // SQL guard is `company = ''`, so trimming on this side only would make
+  // the two disagree. Zero production rows are in that shape today (checked);
+  // if that changes, BOTH sides move together or neither does.
+  const displayed = resolveCompanyDisplayName(freeText || null, canonicalDisplayName);
+  if (displayed === null) return false;
+  return displayed.toLowerCase().includes(term.toLowerCase());
+}

@@ -16,7 +16,7 @@
  * OWN field's key(s) removed, so submitting one field's edit can never
  * accidentally drop an unrelated filter.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FilterChip, FilterChipField } from "@/lib/contacts/filterChips";
 import { FILTER_FIELD_LABEL } from "@/lib/contacts/filterChips";
 import { EXTRA_FILTER_MENU_ORDER, FILTER_FIELD_KIND, FILTER_MENU_ORDER } from "@/lib/contacts/filterFieldKinds";
@@ -109,11 +109,44 @@ export function FilterMenu({
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState<FilterChipField | null>(null);
   const current = new URLSearchParams(baseParamsQuery);
+  const editorRef = useRef<HTMLFormElement>(null);
+  const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  function openEditor(field: FilterChipField) {
+  function openEditor(field: FilterChipField, trigger?: HTMLButtonElement | null) {
+    lastTriggerRef.current = trigger ?? null;
     setEditing(field);
     setMenuOpen(false);
   }
+
+  function closeEditor() {
+    setEditing(null);
+    lastTriggerRef.current?.focus();
+  }
+
+  // Same "Escape closes, outside click closes" contract as DropdownMenu
+  // (src/components/DropdownMenu.tsx) — the editor is a positioned overlay
+  // just like that menu, so it must not trap a keyboard user once open.
+  useEffect(() => {
+    if (!editing) return;
+
+    function onPointerDown(e: MouseEvent) {
+      if (!editorRef.current?.contains(e.target as Node)) {
+        setEditing(null);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        closeEditor();
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   function renderEditorFields(field: FilterChipField) {
     const kind = FILTER_FIELD_KIND[field];
@@ -167,19 +200,54 @@ export function FilterMenu({
     return <input type="text" name={name} defaultValue={current.get(name) ?? ""} />;
   }
 
+  function renderEditor(field: FilterChipField) {
+    return (
+      <form ref={editorRef} method="get" action="/contacts" className="menu left">
+        {[...hiddenParamsForEditor(baseParamsQuery, field).entries()].map(([name, value], i) => (
+          <input key={`${name}-${i}`} type="hidden" name={name} value={value} />
+        ))}
+        <div className="menu-label">{FILTER_FIELD_LABEL[field]}</div>
+        {renderEditorFields(field)}
+        <div className="menu-sep" />
+        <button type="submit" className="btn btn-primary btn-sm">
+          {l.applyLabel}
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm mt-lg" onClick={closeEditor}>
+          {l.cancelLabel}
+        </button>
+      </form>
+    );
+  }
+
+  const chipFields = new Set(chips.map((chip) => chip.field));
+  // The editor must share a positioned ancestor with whatever opened it
+  // (`.menu` is `position: absolute` — see design-system.css) so it lands
+  // on screen next to that control instead of at the document's initial
+  // containing block. An existing chip's editor anchors inside that
+  // chip's own `.dropdown` wrapper; a field picked from the "Agregar
+  // filtro" menu (not yet an active chip) has no chip to anchor to, so it
+  // anchors inside that add-filter `.dropdown` instead.
+  const editingFromMenu = editing !== null && !chipFields.has(editing);
+
   return (
     <>
       {chips.map((chip) => {
         const removeHref = `?${paramsForRemoval(baseParamsQuery, chip.field).toString()}`;
         return (
-          <span key={chip.field} className="chip">
-            <button type="button" className="k" onClick={() => openEditor(chip.field)}>
-              {chip.label}:
-            </button>{" "}
-            {chip.valueText ?? l.anyLabel}
-            <a href={removeHref} aria-label={l.removeFilterLabel} className="chip-remove">
-              ×
-            </a>
+          <span key={chip.field} className="dropdown">
+            <span className="chip">
+              <button
+                type="button"
+                className="chip-target"
+                onClick={(e) => openEditor(chip.field, e.currentTarget)}
+              >
+                <span className="k">{chip.label}:</span> {chip.valueText ?? l.anyLabel}
+              </button>
+              <a href={removeHref} aria-label={l.removeFilterLabel} className="chip-remove">
+                ×
+              </a>
+            </span>
+            {editing === chip.field && renderEditor(chip.field)}
           </span>
         );
       })}
@@ -192,36 +260,30 @@ export function FilterMenu({
           <div className="menu left">
             <div className="menu-label">{l.addFilterLabel}</div>
             {FILTER_MENU_ORDER.map((field) => (
-              <button key={field} type="button" className="menu-item" onClick={() => openEditor(field)}>
+              <button
+                key={field}
+                type="button"
+                className="menu-item"
+                onClick={(e) => openEditor(field, e.currentTarget)}
+              >
                 {FILTER_FIELD_LABEL[field]}
               </button>
             ))}
             <div className="menu-sep" />
             {EXTRA_FILTER_MENU_ORDER.map((field) => (
-              <button key={field} type="button" className="menu-item" onClick={() => openEditor(field)}>
+              <button
+                key={field}
+                type="button"
+                className="menu-item"
+                onClick={(e) => openEditor(field, e.currentTarget)}
+              >
                 {FILTER_FIELD_LABEL[field]}
               </button>
             ))}
           </div>
         )}
+        {editingFromMenu && renderEditor(editing)}
       </div>
-
-      {editing && (
-        <form method="get" action="/contacts" className="menu left">
-          {[...hiddenParamsForEditor(baseParamsQuery, editing).entries()].map(([name, value], i) => (
-            <input key={`${name}-${i}`} type="hidden" name={name} value={value} />
-          ))}
-          <div className="menu-label">{FILTER_FIELD_LABEL[editing]}</div>
-          {renderEditorFields(editing)}
-          <div className="menu-sep" />
-          <button type="submit" className="btn btn-primary btn-sm">
-            {l.applyLabel}
-          </button>
-          <button type="button" className="btn btn-secondary btn-sm mt-lg" onClick={() => setEditing(null)}>
-            {l.cancelLabel}
-          </button>
-        </form>
-      )}
     </>
   );
 }

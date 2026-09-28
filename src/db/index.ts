@@ -12,45 +12,63 @@ const globalForDb = globalThis as unknown as {
   client?: ReturnType<typeof postgres>;
 };
 
-// Each serverless instance gets its own pool, and many instances can be warm
-// at once, so `max` trades page latency against the database's connection
-// budget. `prepare: false` is required if DATABASE_URL points at a
-// transaction-mode pooler and is harmless otherwise.
+// `max` is how many Postgres connections ONE serverless instance may hold.
+// It trades page latency against a connection budget that every warm
+// instance draws from: production, every warm preview, the crons, and any
+// local `next dev` pointed at the same DATABASE_URL (which uses 5).
 //
-// This was `max: 1`, which made every `Promise.all` in the app serialize at
-// the database: one connection processes one query at a time, so the promises
-// interleave but the queries do not. Measured against production on
-// 2026-09-28, three concurrent `pg_sleep(1)` queries took 5132ms at `max: 1`
-// and 2501ms at `max: 5` — every multi-query page was paying roughly double.
+// Why it matters: at `max: 1` every `Promise.all` in the app serializes at
+// the database. One connection runs one query at a time, so the promises
+// interleave but the queries do not. Measured 2026-09-28 against production
+// with the real `/contacts` query set: 2482ms at `max: 1`, 1642ms at `max: 3`.
 //
-// Why 3 is safe here, measured the same day rather than assumed: connections
-// go through Supavisor (it shows up by name in `pg_stat_activity`), so
-// instances talk to the pooler and the pooler multiplexes onto Postgres —
-// the server's 60 `max_connections` are Supavisor's budget, not one slot per
-// instance. At the time of the change 14 of the 57 non-reserved connections
-// were in use, with one active.
+// The budget is Supavisor's session-mode pool_size, NOT Postgres's
+// `max_connections` (60). In session mode each client connection holds one
+// pooler slot for its whole life (released after `idle_timeout` seconds
+// idle), so the sum of `max` across all warm instances must stay under
+// pool_size.
 //
-// It is a deliberate small step, not a ceiling. If page latency still looks
-// round-trip-bound, prefer removing round trips (combine several small reads
-// into one statement) over raising this further — that is the lever that
-// actually shortens the work, and it does not spend connections.
+// History, 2026-09-28:
+// - Raised 1 -> 3 while pool_size was 15, reasoning from Postgres's 60.
+//   Production threw `EMAXCONNSESSION: max clients reached in session mode -
+//   max clients are limited to pool_size: 15` and it was reverted the same
+//   day. Measuring Postgres does not tell you the pooler's limit.
+// - The owner then raised pool_size in the Supabase dashboard (Database ->
+//   Connection pooling). A probe held 20 concurrent session clients on top
+//   of 4 already in use with no failure, so the pool admits at least 24.
+//   Raised 1 -> 3 again on that basis.
 //
-// INCIDENT 2026-09-28: raised to 3, reverted to 1 the same day. Production
-// threw `EMAXCONNSESSION: max clients reached in session mode - max clients
-// are limited to pool_size: 15`. The governing limit is **Supavisor's
-// session-mode pool_size of 15**, not Postgres's `max_connections` of 60 —
-// the comment this replaced said so, and it was overridden on the strength
-// of the wrong measurement. Preview deployments share that same 15, so every
-// warm preview competes with production for it.
+// Before raising this further, re-check pool_size against the number of
+// warm instances. If a page still looks round-trip-bound, prefer removing
+// round trips (combine several small reads into one statement): that
+// shortens the work and does not spend connections.
 //
-// Do not raise this again without first either moving DATABASE_URL to
-// Supavisor's transaction-mode pooler (port 6543, which is what `prepare:
-// false` below already anticipates) or raising the pooler's own pool_size.
-// Measuring Postgres does not tell you the pooler's limit.
+// DO NOT switch DATABASE_URL to the transaction-mode pooler (port 6543) to
+// get around the budget. It was the planned fix and it HANGS the app,
+// measured the same day with the real `/contacts` query set:
+//
+//   session     5432  max:1  ok    2482ms
+//   session     5432  max:3  ok    1642ms
+//   transaction 6543  max:1  HUNG
+//   transaction 6543  max:3  HUNG
+//   transaction 6543  max:5  ok    1624ms
+//
+// Cause: postgres.js pipelines queued queries onto a busy connection, and
+// Supavisor in transaction mode deadlocks on pipelined queries that carry
+// NO bound parameters (simple query protocol). Several of ours have none —
+// `getHiringCompanyKeys`, the filter-option DISTINCTs, `listOwnerOptions` —
+// and a page fires them together. A synthetic probe stepping 2, 3, 4, 6 and
+// 10 concurrent parameterless queries hung at 3 with max:1, at 4 with max:3
+// and at 6 with max:5. Parameterized queries never hung at any size, and
+// session mode never hung at all. So `max:5` "working" above is headroom,
+// not safety: the next page with more concurrent reads hangs, silently.
+//
+// `prepare: false` stays: harmless in session mode, and required by any
+// transaction-mode pooler if that is ever revisited with a fix for the above.
 const client =
   globalForDb.client ??
   postgres(connectionString, {
-    max: process.env.NODE_ENV === "production" ? 1 : 5,
+    max: process.env.NODE_ENV === "production" ? 3 : 5,
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false,

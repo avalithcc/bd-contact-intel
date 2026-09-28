@@ -344,14 +344,14 @@ export interface HiringMatch {
  * `startupsOnly` flow into resolveHiringCompanies' SQL WHERE clause, same as
  * getCompanyHiringSummaries above.
  *
- * Wrapped in React `cache()` (owner feedback round 18, perf pass): on the
- * "Outreach" system view with no ad-hoc market/startups override, the
- * `/contacts` "Contratando" badge call (page.tsx, zero args) and
- * listOutreachCandidates' own call (src/lib/outreach/queries.ts, filters.*
- * all `undefined` in that case) resolve to the exact same argument tuple —
- * a genuine duplicate within one request. `cache()` dedupes by args for the
- * lifetime of the request (same mechanism Next.js uses for `fetch`); it is
- * a no-op the rest of the time, when the two call sites' args differ.
+ * Wrapped in React `cache()`: dedupes identical argument tuples for the
+ * lifetime of one request (same mechanism Next.js uses for `fetch`). It was
+ * added when the `/contacts` "Contratando" badge (page.tsx, zero args) and
+ * listOutreachCandidates (src/lib/outreach/queries.ts) both called this in
+ * the same request. The badge no longer does — it only ever needed the key
+ * set, which `getHiringCompanyKeys()` returns identically by construction
+ * for the zero-arg case — so today the wrapper only pays off if some request
+ * calls this twice with the same arguments. Harmless to keep.
  */
 const getHiringMatchIndexCached = cache(async function getHiringMatchIndexUncached(
   market?: MarketKey,

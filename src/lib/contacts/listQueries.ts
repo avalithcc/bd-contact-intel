@@ -91,10 +91,9 @@ async function baseContactFilterConditions(
     const matchKeys = [...new Set([...hiringIndex.values()].map((m) => m.companyKey))];
     where.push(matchKeys.length ? inArray(person.companyKey, matchKeys) : sql`false`);
   }
-  // "Empresa" ad-hoc filter — substring match on the raw company name (not
-  // companyKey — a BD types a free-text company name, same convention as
-  // the global search's company token).
-  if (filters.company) where.push(ilike(person.company, `%${escapeLikeWildcards(filters.company)}%`));
+  // "Empresa" ad-hoc filter — matches the name the row actually DISPLAYS,
+  // see companyNameMatchCondition.
+  if (filters.company) where.push(companyNameMatchCondition(`%${escapeLikeWildcards(filters.company)}%`));
   // "Grupo de rol" ad-hoc filter.
   if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
   // "Tiene teléfono" ad-hoc filter (migration 0016) — either phone column set.
@@ -139,6 +138,48 @@ async function baseContactFilterConditions(
   return where;
 }
 
+/**
+ * "Empresa" matching for both the ad-hoc filter and the global search box.
+ *
+ * The list DISPLAYS `resolveCompanyDisplayName(person.company,
+ * company.display_name)` — the free-text name when it is set, otherwise the
+ * canonical name reached through `company_key`. Matching only
+ * `person.company` therefore made every contact whose free text is null
+ * invisible to a search for the very name its own row shows (owner report:
+ * "Empresa: nubiral" returned 0 rows inside "Pasar a correo" while 5 rows in
+ * that view displayed "Nubiral"; 6,448 contacts are in that shape).
+ *
+ * This mirrors the display rule exactly rather than OR-ing both columns: a
+ * row matches a company term if and only if the name a BD can actually see
+ * matches it. A contact whose free text disagrees with its canonical company
+ * keeps matching its free text only, so the filter never returns a row whose
+ * "Empresa" cell shows an unrelated name.
+ *
+ * The rule with all its cases lives in
+ * `companyDisplayName.ts#companyNameMatchesTerm`, a pure unit-tested
+ * function this SQL is the translation of — change one and the other is
+ * wrong.
+ *
+ * EXISTS against the `company` primary key, never a join —
+ * `baseContactFilterConditions` feeds four separate reads (table, board,
+ * total count, per-view counts) and none of them can be assumed to join
+ * `company`.
+ */
+function companyNameMatchCondition(pattern: string): SQL {
+  return or(
+    ilike(person.company, pattern),
+    and(
+      sql`(${person.company} is null or ${person.company} = '')`,
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(company)
+          .where(and(eq(company.companyKey, person.companyKey), ilike(company.displayName, pattern))),
+      ),
+    ),
+  )!;
+}
+
 function searchCondition(q: string) {
   const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
   if (!tokens.length) return undefined;
@@ -147,7 +188,7 @@ function searchCondition(q: string) {
     return or(
       ilike(person.firstName, pattern),
       ilike(person.lastName, pattern),
-      ilike(person.company, pattern),
+      companyNameMatchCondition(pattern),
       ilike(person.email, pattern),
     );
   });
