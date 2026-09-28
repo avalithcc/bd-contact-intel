@@ -771,6 +771,16 @@ export const en = {
     useInEmailAction: "Use in email",
     mergeCardWhat: "Unified during the migration",
     reviewMergeAction: "Review / undo merge",
+    changeCompanySearchLabel: "Search for a company",
+    changeCompanySearchPlaceholder: "Type to search for a company…",
+    changeCompanySearching: "Searching…",
+    changeCompanyNoResults: "No results. Doesn't exist yet? Create it from Companies.",
+    changeCompanyCreateLink: "Create company",
+    changeCompanyCurrentLabel: "Current company",
+    changeCompanyDetach: "Remove company",
+    changeCompanySave: "Save",
+    toastCompanyChanged: "Company updated.",
+    errorCompanyNotFound: "The selected company no longer exists.",
   },
 
   // Server-only formatter templates — see the matching comment in es.ts.

@@ -673,6 +673,16 @@ export const es: typeof en = {
     useInEmailAction: "Usar en correo",
     mergeCardWhat: "Unificado durante la migración",
     reviewMergeAction: "Revisar / deshacer fusión",
+    changeCompanySearchLabel: "Buscar empresa",
+    changeCompanySearchPlaceholder: "Escribí para buscar una empresa…",
+    changeCompanySearching: "Buscando…",
+    changeCompanyNoResults: "Sin resultados. ¿No existe todavía? Creala desde Empresas.",
+    changeCompanyCreateLink: "Crear empresa",
+    changeCompanyCurrentLabel: "Empresa actual",
+    changeCompanyDetach: "Quitar empresa",
+    changeCompanySave: "Guardar",
+    toastCompanyChanged: "Empresa actualizada.",
+    errorCompanyNotFound: "La empresa seleccionada ya no existe.",
   },
 
   // Server-only formatter templates for the record page (mockup-port r02).

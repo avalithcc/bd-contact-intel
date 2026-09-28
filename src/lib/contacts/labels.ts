@@ -108,6 +108,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorOwnerInvalid;
     case "owner_locked":
       return l.errorOwnerLocked;
+    case "company_not_found":
+      return l.errorCompanyNotFound;
     case "unexpected":
       return l.genericError;
   }
