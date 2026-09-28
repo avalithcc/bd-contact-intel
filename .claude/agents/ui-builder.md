@@ -61,6 +61,15 @@ activity time (`metadata.originalAt` for `status_backfill`). List every new or c
 - Keyboard access, visible focus, `aria-*` on menus and dialogs, labels on form controls.
 - No horizontal page scroll at 1024px.
 
+## Performance
+
+Read `PERFORMANCE.md` before writing a query, a page, or a control. It is measured against this
+production database, not general advice, and it inverts the usual instinct: the pool is small, so
+`Promise.all` does not parallelize database work here — **round trips are the budget**, and
+combining reads beats rearranging them.
+
+Put before/after numbers in your report. "Faster" is not a measurement.
+
 ## Verification before every commit
 
 - Strict TDD for logic: failing test first, report the RED line, then green. `npm run test:unit`.
