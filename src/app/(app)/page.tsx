@@ -10,7 +10,6 @@ import {
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
-import { UploadForm, UploadMessagesForm } from "../UploadForm";
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { relativeTime } from "@/lib/i18n/format";
@@ -125,19 +124,16 @@ export default async function Home({
   return (
     <main>
 
-      <details className="import-block">
-        <summary>{dict.home.importConnectionsSummary}</summary>
-        <div className="import-body">
-          <UploadForm locale={locale} />
-        </div>
-      </details>
-
-      <details className="import-block">
-        <summary>{dict.home.importMessagesSummary}</summary>
-        <div className="import-body">
-          <UploadMessagesForm locale={locale} />
-        </div>
-      </details>
+      {/*
+        `UploadForm` (LinkedIn connections CSV, `uploadCsv`) and
+        `UploadMessagesForm` (LinkedIn messages CSV, `uploadMessagesCsv`) are
+        intentionally hidden here — the owner is not using LinkedIn ingestion
+        for now. Both server actions, `src/lib/messagesCsv.ts` and the
+        storage bucket wiring are untouched; re-add
+        `import { UploadForm, UploadMessagesForm } from "../UploadForm";` and
+        render the two `<details className="import-block">` blocks again
+        (see git history of this file) to bring them back.
+      */}
 
       <section className="panel">
         <div className="eyebrow">{dict.common.filterEyebrow}</div>

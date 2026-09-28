@@ -1,24 +1,26 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
-import { TIMELINE_ACTIVITY_TYPES } from "@/lib/activity/queries";
-import type { ContactRecordLabels } from "@/lib/contacts/labels";
-import type { Dictionary } from "@/lib/i18n/dictionaries";
-import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import {
-  buildConnectionTimelineEntries,
-  linkedinEntryAccess,
-  type ConnectionForTimeline,
-  type LinkedinTimelineEntryType,
-} from "@/lib/contacts/connectionTimelineEntries";
+  TIMELINE_PILL_KEYS,
+  sumPillCount,
+  resolveScopeEntries,
+  type TimelinePillKey,
+} from "@/lib/activity/timelinePills";
+import { isRequestCurrent } from "@/lib/activity/requestGeneration";
+import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { groupEmailThreads } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
+import { useToast } from "@/components/ToastProvider";
 import {
   CallIcon,
   DiscardIcon,
   HistoryIcon,
-  LinkedInIcon,
   LockIcon,
   MailIcon,
   MeetingIcon,
@@ -26,9 +28,9 @@ import {
   SearchIcon,
   TasksIcon,
 } from "@/components/icons";
-import { AdminConversationReveal } from "./AdminConversationReveal";
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { NoteComposer } from "./NoteComposer";
+import { getTimelinePillEntriesAction } from "../actions";
 import styles from "./page.module.css";
 
 export interface TimelineTask {
@@ -38,33 +40,51 @@ export interface TimelineTask {
   assignedToName: string | null;
 }
 
+// NOTE: LinkedIn is hidden here on purpose — the owner turned LinkedIn
+// ingestion off (see chore/hide-linkedin-imports). `connections`
+// (ConnectionForTimeline[]) and `viewerBdId` used to be TimelineProps,
+// feeding `buildConnectionTimelineEntries`/`linkedinEntryAccess`
+// (src/lib/contacts/connectionTimelineEntries.ts) to synthesize the
+// "Mensaje de LinkedIn enviado"/"Respuesta de LinkedIn recibida" cards
+// (contact-record.html:124-131) and gate `AdminConversationReveal`
+// (./AdminConversationReveal.tsx). All of that is untouched in the DB and
+// in connectionTimelineEntries.ts; to restore, re-add both props here and
+// in page.tsx's <Timeline connections={record.connections}
+// viewerBdId={me.id} />, then bring back the imports/const/render branch
+// this file used to have (see git history).
 export interface TimelineProps {
   personId: string;
   labels: ContactRecordLabels;
-  // Server-only formatter templates (see the comment on `contactRecordServer`
-  // in dictionaries/es.ts) — Timeline.tsx is a server component, so it may
-  // receive these directly; only the composed plain-string RESULT is ever
-  // passed down to a client component (AdminConversationReveal).
-  serverStrings: Dictionary["contactRecordServer"];
+  // Server-fetched initial page for `activePill` (or the unfiltered "Todo"
+  // page when `activePill` is undefined) — see the "Instant pill filtering"
+  // comment on the component below for how this seeds client-side state.
   entries: TimelineEntry[];
+  // TRUE per-type totals, computed server-side over every row (never capped
+  // by the query's `limit` — see getPersonTimeline) — the ground truth the
+  // client compares its own loaded pool against (isPillSelectionComplete).
   countsByType: Record<string, number>;
-  activeType?: TimelineActivityType;
+  activePill?: TimelinePillKey;
   openTasks: TimelineTask[];
-  connections: ConnectionForTimeline[];
-  viewerBdId: string;
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
-  // person was never the survivor of a migration/merge.
-  mergeInfo: { unifiedFromCount: number; hasMergeEvent: boolean; at: Date } | null;
+  // person was never the survivor of a migration/merge. `bodyText` is
+  // `dict.contactRecordServer.mergeCardBody(...)`'s RESULT, rendered
+  // server-side in page.tsx — this is a Client Component, so it can never
+  // receive the function template itself (see the doc comment on
+  // `contactRecordServer` in dictionaries/es.ts).
+  mergeInfo: { unifiedFromCount: number; hasMergeEvent: boolean; at: Date; bodyText: string } | null;
+}
+
+/** Cache key for the "Todo" (unfiltered) scope — `TimelinePillKey` never collides with this string. */
+const ALL_SCOPE = "all" as const;
+type TimelineScope = TimelinePillKey | typeof ALL_SCOPE;
+
+function scopeOf(pill: TimelinePillKey | undefined): TimelineScope {
+  return pill ?? ALL_SCOPE;
 }
 
 const MERGE_UNIFIED_TYPE = "merge_unified" as const;
-
-const LINKEDIN_PREFIX_KEY: Record<LinkedinTimelineEntryType, keyof ContactRecordLabels> = {
-  linkedin_replied: "linkedinRepliedPrefix",
-  linkedin_sent: "linkedinSentPrefix",
-};
 
 const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> = {
   note: "timelineFilterNote",
@@ -100,8 +120,28 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   status_backfill: "system",
 };
 
-function filterHref(personId: string, type?: TimelineActivityType): string {
-  return type ? `/contacts/${personId}?activityType=${type}#activity` : `/contacts/${personId}#activity`;
+// contact-record.html:97-106's 6 pills (Todo/Notas/Llamadas/Correos/
+// Reuniones/Sistema — mockup-port fix). Grouping/counting itself lives in
+// @/lib/activity/timelinePills (one data map, TIMELINE_PILL_GROUPS); this
+// component only maps each pill to its label/icon.
+const PILL_LABEL_KEY: Record<TimelinePillKey, keyof ContactRecordLabels> = {
+  note: "timelinePillNotes",
+  call: "timelinePillCalls",
+  email_sent: "timelinePillEmails",
+  meeting_logged: "timelinePillMeetings",
+  system: "timelinePillSystem",
+};
+
+const PILL_ICON: Record<TimelinePillKey, (props: { className?: string }) => React.ReactElement> = {
+  note: NoteIcon,
+  call: CallIcon,
+  email_sent: MailIcon,
+  meeting_logged: MeetingIcon,
+  system: HistoryIcon,
+};
+
+function filterHref(personId: string, pill?: TimelinePillKey): string {
+  return pill ? `/contacts/${personId}?activityType=${pill}#activity` : `/contacts/${personId}#activity`;
 }
 
 function formatWhen(at: Date): string {
@@ -118,37 +158,260 @@ function monthLabel(at: Date): string {
  * activity timeline"; mockup-port r03 markup rework onto design-system.css's
  * `.filter-pill`/`.tl-group`/`.tl`/`.tl-item`/`.tl-icon`/`.tl-card` classes,
  * plus contact-record.html:107-149's date grouping — see
- * groupTimelineEntries, src/lib/contacts/timelineGrouping.ts). Server
- * component — filtering is a plain link to `?activityType=`, so the page
- * re-fetches server-side instead of shipping client JS for it.
+ * groupTimelineEntries, src/lib/contacts/timelineGrouping.ts).
+ *
+ * Instant pill filtering (fix/timeline-filter-no-reload): a pill click used
+ * to be a plain `<Link href="?activityType=...">`, so every click
+ * re-rendered the ENTIRE record page server-side just to filter a list
+ * already on screen. Now a click only ever does one of two things:
+ *
+ *  1. Filter the already-loaded `entries` pool locally (no network at all)
+ *     when it's PROVEN to already contain every row for that pill —
+ *     `isPillSelectionComplete` compares the pool against `countsByType`,
+ *     the record's TRUE per-type totals (never capped by the query limit).
+ *     True for the vast majority of contacts (prod average: 1.09 activities
+ *     — the initial "Todo" page already holds everything).
+ *  2. Fetch just that pill's own page via `getTimelinePillEntriesAction`
+ *     (one query, no page render) when the pool is proven incomplete — e.g.
+ *     a busy contact (prod max: 335 activities) whose "Todo" page is capped
+ *     well below that and can be dominated by a more-recent type, silently
+ *     under-representing an older one if filtered purely client-side.
+ *
+ * Each scope's result is cached in `cache` (keyed by pill, or `ALL_SCOPE`
+ * for "Todo") for the lifetime of this mount, so re-visiting a pill is
+ * always instant after its first load. The URL's `?activityType=` is kept
+ * in sync via `history.replaceState` (no navigation — see `syncScopeUrl`),
+ * and `entries`/`countsByType`/`activePill` are the server's ground truth
+ * again on every fresh server render (e.g. `router.refresh()` after adding
+ * a note) — the effect below resets the cache whenever those props change,
+ * so mutations elsewhere on the page (NoteComposer, CompleteTaskButton)
+ * still show up without a stale client cache masking them.
+ *
  * `entry.metadata === null` (isTimelineEntryVisible said no, design R6)
  * always renders the locked marker regardless of type.
  */
 export function Timeline({
   personId,
   labels: l,
-  serverStrings,
   entries,
   countsByType,
-  activeType,
+  activePill,
   openTasks,
-  connections,
-  viewerBdId,
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
+  const { showToast } = useToast();
+  const [cache, setCache] = useState<Partial<Record<TimelineScope, TimelineEntry[]>>>(() => ({
+    [scopeOf(activePill)]: entries,
+  }));
+  const [activeScope, setActiveScope] = useState<TimelineScope>(() => scopeOf(activePill));
+  const [pendingScope, setPendingScope] = useState<TimelineScope | null>(null);
+  // Guards the reset effect below against firing redundantly on mount (the
+  // `useState` initializers above already seed the right state for the
+  // first render) — it should only re-derive when the SERVER sends new props.
+  const mountedProps = useRef({ entries, activePill });
+  // "Latest value" ref (fresh-review CRITICAL fix): the reset effect below
+  // must read whatever pill the CLIENT currently has selected, not the one
+  // it was seeded with — reading `activeScope` state directly from the
+  // effect would make the effect depend on it and re-run on every pill
+  // click, which is not what "reset only when the server sends new props"
+  // means. Assigning during render is the standard React pattern for this.
+  const activeScopeRef = useRef(activeScope);
+  activeScopeRef.current = activeScope;
+  // Fresh-review follow-up WARNING: a scoped fetch (fetchScope) can be
+  // superseded either by a NEWER fetch (another pill clicked before the
+  // first resolves) or by a background data refresh (the reset effect
+  // below) — this counter is bumped at both of those points, and a
+  // resolving fetch discards its own result once it's no longer current
+  // (see fetchScope / isRequestCurrent, @/lib/activity/requestGeneration).
+  const generationRef = useRef(0);
+
+  function bumpGeneration(): void {
+    generationRef.current += 1;
+  }
+
+  function syncScopeUrl(pill: TimelinePillKey | undefined) {
+    if (typeof window === "undefined") return;
+    // Raw History API, not `router.push`/`router.replace` — deliberate:
+    // 1) `replaceState`, not `pushState` — a filter pill is not a new place
+    //    in the page's history; it must not spam Back with one entry per
+    //    click, and Back from the record page should leave the record, not
+    //    walk through every pill the BD tried.
+    // 2) Raw `history`, not the Next.js router — this is the App Router
+    //    shallow-routing workaround (Next has no first-class shallow
+    //    routing yet): it updates the visible URL without the server render
+    //    a `router.replace` would trigger, which is the whole point of this
+    //    fix. Passing the router's own `history.state` back (instead of
+    //    `null`) keeps whatever Next.js already attached there (scroll
+    //    restoration, segment cache keys) intact.
+    //
+    // Trade-off this buys: Next's OWN internal `canonicalUrl` (written only
+    // by a real `router.push`/`replace`) is untouched by this call and can
+    // still diverge from the address bar — see the reset effect below for
+    // why that no longer matters for correctness.
+    window.history.replaceState(window.history.state, "", filterHref(personId, pill));
+  }
+
+  /**
+   * Fetches one pill's own page (getTimelinePillEntriesAction) and, on
+   * success, both caches it and makes it the active scope. Shared by
+   * `selectPill` (a fresh click) and the reset effect (re-deriving the
+   * still-active pill after a background data refresh) so a fetch's
+   * success/error handling can't drift between the two call sites.
+   *
+   * Callers are expected to have already called `bumpGeneration()` for
+   * whatever event triggered this fetch (a click, a refresh) — this only
+   * CAPTURES the resulting generation and, once the promise settles,
+   * refuses to touch cache/activeScope/pendingScope if a LATER event (a
+   * newer fetch, or another refresh) has since moved the generation past
+   * it (`isRequestCurrent`). Without this, a slow fetch that's since been
+   * superseded could resolve after the fact and silently jump the view
+   * back to its (now stale) pill.
+   */
+  function fetchScope(pill: TimelinePillKey | undefined, scope: TimelineScope) {
+    const requestGeneration = generationRef.current;
+    setPendingScope(scope);
+    getTimelinePillEntriesAction(personId, pill)
+      .then((result) => {
+        if (!isRequestCurrent(requestGeneration, generationRef.current)) return;
+        setPendingScope(null);
+        if (!result.ok) {
+          showToast(l.genericError, "error");
+          return;
+        }
+        setCache((prev) => ({ ...prev, [scope]: result.entries }));
+        setActiveScope(scope);
+      })
+      .catch(() => {
+        if (!isRequestCurrent(requestGeneration, generationRef.current)) return;
+        setPendingScope(null);
+        showToast(l.genericError, "error");
+      });
+  }
+
+  /**
+   * Fresh-review CRITICAL fix: `router.refresh()` (NoteComposer/
+   * CompleteTaskButton, after a mutation) re-fetches Next's own
+   * `canonicalUrl` — the pill active at the LAST REAL navigation — not
+   * `window.location`, so it's blind to any `syncScopeUrl` calls a pill
+   * click made since. The server therefore recomputes `activePill` (this
+   * `activePill` prop) for whatever pill THAT was, not what the BD is
+   * currently looking at, and can even revert the visible URL back to it.
+   *
+   * The underlying data DID change (that's the whole reason the refresh
+   * fired) and every previously cached scope may now be stale, so this
+   * drops the cache — but it must NOT let the server's `activePill` decide
+   * what's on screen: `activeScopeRef` (the CLIENT's own last selection)
+   * is the one source of truth for the active pill after first paint, and
+   * this only ever re-derives THAT pill's view from the fresh pool —
+   * locally when possible (`resolveScopeEntries`), via one scoped fetch
+   * otherwise — then re-asserts the URL, since the refresh may have
+   * reverted it.
+   *
+   * Fresh-review follow-up WARNING: fresh server props always supersede
+   * whatever fetch might be in flight (the pool it was fetching against no
+   * longer reflects the current data), so this bumps the generation
+   * unconditionally before anything else. That bump is exactly what makes
+   * the very next line — `setPendingScope(null)` — safe to call
+   * unconditionally too: if a fetch WAS in flight, it just became stale by
+   * construction (its captured generation can no longer equal the new
+   * current one), so clearing its spinner here is clearing a spinner this
+   * effect just superseded, never one that still belongs to a fetch this
+   * effect has no opinion on. If none was in flight, clearing `null` to
+   * `null` is a no-op.
+   */
+  useEffect(() => {
+    if (mountedProps.current.entries === entries && mountedProps.current.activePill === activePill) return;
+    mountedProps.current = { entries, activePill };
+    bumpGeneration();
+    setPendingScope(null);
+
+    const serverScope = scopeOf(activePill);
+    const targetScope = activeScopeRef.current;
+    const targetPill = targetScope === ALL_SCOPE ? undefined : targetScope;
+
+    // Always refresh the scope the server just delivered. Every OTHER
+    // previously cached scope is dropped — the data changed, so a stale
+    // cache entry can't be trusted blindly the next time that pill is
+    // clicked (`selectPill`'s cache-hit fast path) — EXCEPT the currently
+    // active one, if different: its OLD (pre-mutation, but still correctly-
+    // scoped) entries stay in place until its replacement below is ready,
+    // so the visible list never flashes to a DIFFERENT scope's data while
+    // re-deriving it.
+    setCache((prev) => {
+      const next: Partial<Record<TimelineScope, TimelineEntry[]>> = { [serverScope]: entries };
+      if (targetScope !== serverScope && prev[targetScope]) next[targetScope] = prev[targetScope];
+      return next;
+    });
+
+    if (targetScope === serverScope) {
+      syncScopeUrl(targetPill);
+      return;
+    }
+
+    const resolved = resolveScopeEntries(entries, countsByType, targetPill);
+    if (resolved.kind === "ready") {
+      setCache((prev) => ({ ...prev, [targetScope]: resolved.entries }));
+      syncScopeUrl(targetPill);
+      return;
+    }
+
+    syncScopeUrl(targetPill);
+    fetchScope(targetPill, targetScope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `entries`/
+    // `activePill` (the server round-trip signal) intentionally gate this
+    // effect alone; `countsByType` always arrives from the same
+    // getPersonTimeline call as `entries`, and `personId`/`l`/`showToast`
+    // are stable for the life of this record page.
+  }, [entries, activePill]);
+
+  function selectPill(pill: TimelinePillKey | undefined) {
+    const scope = scopeOf(pill);
+    if (scope === activeScope) return;
+    // Every branch below moves the active scope away from whatever it was —
+    // including the cache-hit/local-derive ones that never call
+    // `fetchScope` at all — so this must supersede any fetch already in
+    // flight from a PREVIOUS click here too, not just the two triggers the
+    // fetch-vs-fetch/refresh race was first reported for: otherwise that
+    // earlier fetch could still resolve later and jump the view back to its
+    // pill even though the BD already moved on to this one via a cheaper
+    // path.
+    bumpGeneration();
+    syncScopeUrl(pill);
+
+    const cached = cache[scope];
+    if (cached) {
+      setActiveScope(scope);
+      return;
+    }
+
+    const referencePool = cache[activeScope] ?? entries;
+    const resolved = resolveScopeEntries(referencePool, countsByType, pill);
+    if (resolved.kind === "ready") {
+      setCache((prev) => ({ ...prev, [scope]: resolved.entries }));
+      setActiveScope(scope);
+      return;
+    }
+
+    fetchScope(pill, scope);
+  }
+
+  function handlePillClick(e: React.MouseEvent<HTMLAnchorElement>, pill: TimelinePillKey | undefined) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    selectPill(pill);
+  }
+
+  const displayedEntries = cache[activeScope] ?? entries;
+  const activePillNow = activeScope === ALL_SCOPE ? undefined : activeScope;
   const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-  // LinkedIn connection cards (contact-record.html:124-131) only show when
-  // no activity-type filter is active — they aren't one of the 6 filter
-  // pills, so a filtered view (e.g. "Correos") shouldn't include them.
-  const linkedinEntries = activeType ? [] : buildConnectionTimelineEntries(connections);
-  const showMergeCard = !activeType && mergeInfo && mergeInfo.unifiedFromCount > 1;
+  const showMergeCard = !activePillNow && mergeInfo && mergeInfo.unifiedFromCount > 1;
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
-  // `entries` BEFORE merging in the LinkedIn/merge synthetic entries, so
+  // `displayedEntries` BEFORE merging in the merge synthetic entry, so
   // `groupEmailThreads` only ever sees real `TimelineEntry` rows (it needs
-  // `.visible`, which the synthetics don't carry).
-  const threaded = groupEmailThreads(entries);
+  // `.visible`, which the synthetic doesn't carry).
+  const threaded = groupEmailThreads(displayedEntries);
   const threadGroupsById = new Map(
     threaded.filter((t) => t.kind === "thread").map((t) => [`thread-${t.group.threadId}`, t.group]),
   );
@@ -168,30 +431,37 @@ export function Timeline({
 
   const groups = groupTimelineEntries([
     ...processedEntries,
-    ...linkedinEntries.map((e) => ({ id: e.id, type: e.type, createdAt: e.createdAt, metadata: e.metadata })),
     ...(showMergeCard
       ? [{ id: "merge-unified", type: MERGE_UNIFIED_TYPE, createdAt: mergeInfo!.at, metadata: null }]
       : []),
   ]);
   const upcoming = upcomingTasks(openTasks);
-  const linkedinMetaById = new Map(linkedinEntries.map((e) => [e.id, e.metadata]));
 
   return (
     <div>
-      <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterGroupLabel}>
-        <Link href={filterHref(personId)} className={activeType ? "filter-pill" : "filter-pill on"}>
+      <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterGroupLabel} aria-busy={pendingScope !== null}>
+        <Link
+          href={filterHref(personId)}
+          className={activePillNow ? "filter-pill" : "filter-pill on"}
+          onClick={(e) => handlePillClick(e, undefined)}
+          aria-current={activePillNow ? undefined : "true"}
+        >
           {l.timelineFilterAll} <span className="n">{total}</span>
+          {pendingScope === ALL_SCOPE && <span className="spinner" aria-hidden="true" />}
         </Link>
-        {TIMELINE_ACTIVITY_TYPES.map((type) => {
-          const Icon = TYPE_ICON[type];
+        {TIMELINE_PILL_KEYS.map((pill) => {
+          const Icon = PILL_ICON[pill];
           return (
             <Link
-              key={type}
-              href={filterHref(personId, type)}
-              className={activeType === type ? "filter-pill on" : "filter-pill"}
+              key={pill}
+              href={filterHref(personId, pill)}
+              className={activePillNow === pill ? "filter-pill on" : "filter-pill"}
+              onClick={(e) => handlePillClick(e, pill)}
+              aria-current={activePillNow === pill ? "true" : undefined}
             >
               <Icon className="icon" />
-              {l[FILTER_LABEL_KEY[type]] as string} <span className="n">{countsByType[type] ?? 0}</span>
+              {l[PILL_LABEL_KEY[pill]] as string} <span className="n">{sumPillCount(countsByType, pill)}</span>
+              {pendingScope === pill && <span className="spinner" aria-hidden="true" />}
             </Link>
           );
         })}
@@ -250,7 +520,7 @@ export function Timeline({
         </>
       )}
 
-      {entries.length === 0 && upcoming.length === 0 ? (
+      {displayedEntries.length === 0 && upcoming.length === 0 ? (
         <div className={styles.placeholder}>{l.timelineEmpty}</div>
       ) : (
         groups.map((group, i) => (
@@ -272,7 +542,7 @@ export function Timeline({
                           <span className="when">{formatWhen(at)}</span>
                         </div>
                         <div className="tl-body">
-                          {serverStrings.mergeCardBody(mergeInfo!.unifiedFromCount)}
+                          {mergeInfo!.bodyText}
                           {isAdmin && mergeInfo!.hasMergeEvent && (
                             <div className="row mt-lg">
                               <Link href="/admin/duplicates#history" className="btn btn-secondary btn-sm">
@@ -318,43 +588,6 @@ export function Timeline({
                             <LockIcon className="icon" />
                             <span>{l.timelineLockedContent}</span>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                const linkedinMeta = linkedinMetaById.get(entry.id);
-                if (linkedinMeta) {
-                  const type = entry.type as LinkedinTimelineEntryType;
-                  const access = linkedinEntryAccess(linkedinMeta.bdId, viewerBdId, isAdmin);
-                  const bdName = linkedinMeta.bdName ?? l.emptyValue;
-                  return (
-                    <div key={entry.id} className="tl-item">
-                      <div className={type === "linkedin_replied" ? "tl-icon reply" : "tl-icon"}>
-                        <LinkedInIcon className="icon" />
-                      </div>
-                      <div className="tl-card">
-                        <div className="tl-head">
-                          <span className="what">
-                            {l[LINKEDIN_PREFIX_KEY[type]] as string} · {l.linkedinConversationOfPrefix} {bdName}
-                          </span>
-                          <span className="when">{formatWhen(at)}</span>
-                        </div>
-                        {access === "admin-bypass" ? (
-                          <AdminConversationReveal
-                            personId={personId}
-                            bdId={linkedinMeta.bdId}
-                            auditAlertBody={serverStrings.adminAuditAlertBody(bdName)}
-                            labels={l}
-                          />
-                        ) : access === "locked" ? (
-                          <div className="locked">
-                            <LockIcon className="icon" />
-                            <span>{serverStrings.timelineLockedOwnedBy(bdName)}</span>
-                          </div>
-                        ) : (
-                          <div className="tl-body">{l.connectionHistorySomePrefix}</div>
                         )}
                       </div>
                     </div>

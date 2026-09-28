@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
-import { updateContactProperty } from "@/lib/contacts/propertyEditDb";
-import { isEditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
+import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contacts/propertyEdit";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { createActivityAction } from "@/app/activity/actions";
 import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
@@ -17,13 +17,17 @@ import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { getConversationForAdmin, type AdminConversationData } from "@/lib/activity/getConversationForAdmin";
+import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
+import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
 import {
   contactActionErrorReason,
+  contactLocationActionErrorReason,
   OwnerReassignLockedError,
   OwnerValueInvalidError,
   PropertyNotEditableError,
   type ContactActionResult,
+  type ContactLocationActionResult,
 } from "./actionErrors";
 
 // Unclassified errors reach the client only as "unexpected"; log them here so
@@ -56,6 +60,38 @@ export async function updateContactPropertyAction(
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
+  }
+}
+
+/**
+ * Atomic save for the "Ubicación" composite row (fresh-review CRITICAL fix
+ * — see `LocationPropertyRow` in PropertyList.tsx and `planLocationEdit`'s
+ * doc comment). Replaces three sequential
+ * `updateContactPropertyAction(personId, "city"|"region"|"country", ...)`
+ * calls with ONE call that plans and writes all three fields in a single
+ * transaction: a rejected field leaves `city`/`region`/`country` exactly as
+ * they were, and only fields whose trimmed value actually changed get a
+ * `person_property_history` row (same per-field diffing as the
+ * single-property action — see `planLocationEdit`).
+ */
+export async function updateContactLocationAction(
+  personId: string,
+  fields: LocationEditFields,
+): Promise<ContactLocationActionResult> {
+  try {
+    const me = await getCurrentBd();
+    await updateContactProperties(personId, fields, me.id);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    const located = contactLocationActionErrorReason(err);
+    if (located) return { ok: false, ...located };
+    // A non-batch failure (e.g. the contact was merged/not found) happened
+    // before any field was even planned — it isn't attributable to one
+    // field, so the UI shows it as a plain row-level error instead of
+    // pointing at city/region/country.
+    const { reason } = actionFailure(err);
+    return { ok: false, reason, property: null };
   }
 }
 
@@ -260,5 +296,38 @@ export async function sendContactEmailAction(
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
+  }
+}
+
+export type TimelinePillFetchResult = { ok: true; entries: TimelineEntry[] } | { ok: false };
+
+/**
+ * Read side of the record page's instant pill filter (fix/timeline-filter-
+ * no-reload). Called from the client only when the entry pool Timeline.tsx
+ * already holds is proven NOT to cover a pill's true count (see
+ * isPillSelectionComplete, timelinePills.ts) — the same `getPersonTimeline`
+ * query a `?activityType=` navigation used to trigger, minus the full-page
+ * server render (no dictionary/session/company lookups, no other tab's
+ * data — just this one query).
+ *
+ * `personId`/`pillKey` arrive from the client as plain strings (a Server
+ * Action is a public endpoint, not a type-checked function call) —
+ * `personId` is re-validated via `isUuid` (same convention as
+ * `getConversationForAdminAction` above) and `pillKey` via
+ * `isTimelinePillKey`, rather than either being trusted.
+ */
+export async function getTimelinePillEntriesAction(
+  personId: string,
+  pillKey: string | undefined,
+): Promise<TimelinePillFetchResult> {
+  try {
+    if (!isUuid(personId)) return { ok: false };
+    const me = await getCurrentBd();
+    const pill = pillKey && isTimelinePillKey(pillKey) ? pillKey : undefined;
+    const { entries } = await getPersonTimeline(personId, me.id, { pill });
+    return { ok: true, entries };
+  } catch (err) {
+    console.error("[contacts] getTimelinePillEntriesAction failed", err);
+    return { ok: false };
   }
 }

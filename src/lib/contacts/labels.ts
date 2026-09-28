@@ -1,6 +1,7 @@
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
-import type { ContactActionErrorReason } from "@/app/(app)/contacts/actionErrors";
+import type { ContactActionErrorReason, ContactLocationActionResult } from "@/app/(app)/contacts/actionErrors";
+import type { LocationProperty } from "@/lib/contacts/propertyEdit";
 import type { StatusReasonEvidence } from "@/lib/status/deriveStatus";
 
 // AboutPane (`/contacts/[id]`) is a client component — same ClientStrings
@@ -110,6 +111,32 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
     case "unexpected":
       return l.genericError;
   }
+}
+
+const LOCATION_FIELD_LABEL_KEY: Record<LocationProperty, keyof ContactRecordLabels> = {
+  city: "propCity",
+  region: "propRegion",
+  country: "propCountry",
+};
+
+/**
+ * Builds the "which field, and why" message for a rejected
+ * `updateContactLocationAction` result (fresh-review CRITICAL fix): prefixes
+ * the generic `contactActionErrorMessage` string with the rejected field's
+ * own label (`l.propCity`/`l.propRegion`/`l.propCountry`) so the user sees,
+ * e.g., "Ciudad: <reason>" instead of one ambiguous error for a row that now
+ * edits three fields at once. Falls back to the plain message when the
+ * failure isn't attributable to one field (`property: null` — see
+ * `ContactLocationActionResult`).
+ */
+export function contactLocationActionErrorMessage(
+  l: ContactRecordLabels,
+  result: Extract<ContactLocationActionResult, { ok: false }>,
+): string {
+  const message = contactActionErrorMessage(l, result.reason);
+  if (result.property === null) return message;
+  const fieldLabel = l[LOCATION_FIELD_LABEL_KEY[result.property]];
+  return `${fieldLabel}: ${message}`;
 }
 
 /**

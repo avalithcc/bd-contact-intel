@@ -1,3 +1,10 @@
+// Intentionally unreferenced for now. This was rendered by Timeline.tsx's
+// LinkedIn conversation card, which is hidden while LinkedIn ingestion is off
+// (2026-09-28). The component, its route
+// (/contacts/[id]/conversation/[bdId]) and the audit trail all still work —
+// restore the render in Timeline.tsx to bring it back. See
+// openspec/BACKLOG.md, "admin-email-conversation-access".
+
 "use client";
 
 import { useState } from "react";

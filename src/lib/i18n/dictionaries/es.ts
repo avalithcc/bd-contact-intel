@@ -496,6 +496,9 @@ export const es: typeof en = {
     propCity: "Ciudad",
     propRegion: "Región",
     propCountry: "País",
+    // Composed "Ubicación" row (contact-record.html:86; mockup-port fix) —
+    // city/region/country stay separately editable; see LocationPropertyRow.
+    propLocation: "Ubicación",
     propIndustry: "Industria",
     propOwner: "Responsable",
     propStatus: "Estado",
@@ -603,6 +606,14 @@ export const es: typeof en = {
     timelineFilterCall: "Llamadas",
     timelineFilterDiscarded: "Descarte",
     timelineFilterStatusBackfill: "Estado respaldado",
+    // Filter PILLS (contact-record.html:97-106), grouped per
+    // @/lib/activity/timelinePills — distinct from the singular
+    // `timelineFilter*` keys above, which label individual timeline entries.
+    timelinePillNotes: "Notas",
+    timelinePillCalls: "Llamadas",
+    timelinePillEmails: "Correos",
+    timelinePillMeetings: "Reuniones",
+    timelinePillSystem: "Sistema",
     timelineEmpty: "Todavía no hay actividad registrada para este contacto.",
     timelineLockedContent: "Contenido privado para el BD que lo registró (y los administradores).",
     timelineSystemActor: "Sistema",
@@ -630,6 +641,7 @@ export const es: typeof en = {
     timelineGroupUpcoming: "Próximas",
     timelineGroupPreMigration: "Antes de la migración",
     timelineSortNewestFirst: "Más recientes primero",
+    timelineFilterLoading: "Cargando…",
     timelineAssignedToPrefix: "Asignada a",
     taskDueBadgePrefix: "Vence",
     taskMarkDone: "Marcar como hecha",
