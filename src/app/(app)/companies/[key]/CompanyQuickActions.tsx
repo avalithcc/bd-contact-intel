@@ -6,38 +6,46 @@ import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
 import { NoteIcon, TasksIcon, MeetingIcon, ContactsIcon } from "@/components/icons";
 import { NewContactDialog, type NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
+import type { ClientStrings } from "@/lib/i18n/clientStrings";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 import {
   addCompanyNoteAction,
   addCompanyTaskAction,
   logCompanyMeetingAction,
 } from "../actions";
 
-export interface CompanyQuickActionsLabels {
-  quickActionNote: string;
-  quickActionTask: string;
-  quickActionContact: string;
-  quickActionMeeting: string;
-  quickActionMore: string;
-  moreComingSoon: string;
-  cancel: string;
-  save: string;
-  genericError: string;
-  noteDialogTitle: string;
-  noteLabel: string;
-  noteSave: string;
-  taskDialogTitle: string;
-  taskTitleLabel: string;
-  taskDueLabel: string;
-  taskCreate: string;
-  meetingDialogTitle: string;
-  meetingDateLabel: string;
-  meetingTimeLabel: string;
-  meetingNotesLabel: string;
-  meetingSubmit: string;
-  toastNoteSaved: string;
-  toastTaskCreated: string;
-  toastMeetingLogged: string;
-}
+// ClientStrings-wrapped (see src/lib/companies/labels.ts's doc comment): a
+// Pick<...> straight off `Dictionary["companyRecord"]` fails to compile if
+// any of these keys is ever turned into a formatter function.
+export type CompanyQuickActionsLabels = ClientStrings<
+  Pick<
+    Dictionary["companyRecord"],
+    | "quickActionNote"
+    | "quickActionTask"
+    | "quickActionContact"
+    | "quickActionMeeting"
+    | "quickActionMore"
+    | "moreComingSoon"
+    | "cancel"
+    | "save"
+    | "genericError"
+    | "noteDialogTitle"
+    | "noteLabel"
+    | "noteSave"
+    | "taskDialogTitle"
+    | "taskTitleLabel"
+    | "taskDueLabel"
+    | "taskCreate"
+    | "meetingDialogTitle"
+    | "meetingDateLabel"
+    | "meetingTimeLabel"
+    | "meetingNotesLabel"
+    | "meetingSubmit"
+    | "toastNoteSaved"
+    | "toastTaskCreated"
+    | "toastMeetingLogged"
+  >
+>;
 
 type OpenAction = "note" | "task" | "contact" | "meeting" | null;
 

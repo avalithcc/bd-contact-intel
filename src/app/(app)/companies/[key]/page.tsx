@@ -12,6 +12,7 @@ import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/quer
 import { industryLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
 import { latestEditByProperty, marketBreakdown, startupLabel, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
+import { pickCompanyRecordLabels } from "@/lib/companies/labels";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { Avatar } from "@/components/Avatar";
@@ -150,7 +151,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           ownerOptions={ownerOptions}
           lastEditByProperty={lastEditByProperty}
           startupText={startupLabel(hiring, l.startupYes, l.startupNo)}
-          labels={{ ...l, ...lc }}
+          labels={pickCompanyRecordLabels(dict)}
           newContactLabels={newContactLabels}
         />
 
