@@ -3,12 +3,6 @@
  * (mockups/company-record.html). No DB import.
  */
 
-export interface MarketBreakdown {
-  latam: number;
-  us: number;
-  other: number;
-  total: number;
-}
 
 /**
  * Vacantes card footer ("N vacantes de IT abiertas · X LATAM · Y US",
@@ -17,17 +11,6 @@ export interface MarketBreakdown {
  * not an approximation from the offshore/LATAM-only fields HiringMatch
  * carries for the ranking crossover.
  */
-export function marketBreakdown(postings: readonly { market: string }[]): MarketBreakdown {
-  let latam = 0;
-  let us = 0;
-  let other = 0;
-  for (const p of postings) {
-    if (p.market === "latam") latam++;
-    else if (p.market === "us") us++;
-    else other++;
-  }
-  return { latam, us, other, total: postings.length };
-}
 
 export type CompanyActivityFilter = "all" | "note" | "stage_change" | "contact_activity";
 

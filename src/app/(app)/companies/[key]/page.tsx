@@ -14,7 +14,6 @@ import { industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/l
 import {
   isCompanyActivityFilter,
   latestEditByProperty,
-  marketBreakdown,
   startupLabel,
   type CompanyActivityFilter,
 } from "@/lib/companies/recordMappers";
@@ -95,9 +94,6 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     ]);
 
   const hiring = hiringIndex.get(key) ?? null;
-  // marketBreakdown expects a full posting array; postings.postings is now
-  // capped (see getCompanyPostingsForKey's DETAIL_ROW_LIMIT), so the "N
-  // vacantes" footer must read the precomputed, uncapped counts instead.
   const breakdown = postings
     ? { latam: postings.latamCount, us: postings.usCount, other: postings.otherCount, total: postings.totalCount }
     : { latam: 0, us: 0, other: 0, total: 0 };

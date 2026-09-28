@@ -12,25 +12,12 @@ import {
   isCompanyActivityFilter,
   isCompanyFilterSelectionComplete,
   latestEditByProperty,
-  marketBreakdown,
   resolveCompanyScopeRows,
   startupLabel,
   type CompanyTimelineFilterCounts,
 } from "@/lib/companies/recordMappers";
 
-test("marketBreakdown: tallies postings by market bucket", () => {
-  const postings = [
-    { market: "latam" },
-    { market: "latam" },
-    { market: "us" },
-    { market: "other" },
-  ];
-  assert.deepEqual(marketBreakdown(postings), { latam: 2, us: 1, other: 1, total: 4 });
-});
 
-test("marketBreakdown: zero postings", () => {
-  assert.deepEqual(marketBreakdown([]), { latam: 0, us: 0, other: 0, total: 0 });
-});
 
 test("filterTimelineRows: 'all' returns every row unchanged", () => {
   const rows = [
