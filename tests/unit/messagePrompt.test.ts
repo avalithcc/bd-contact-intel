@@ -77,6 +77,39 @@ test("english language stays professional for both channels", () => {
   assert.match(system, /English/i);
 });
 
+// Company.postings is now a bounded sample (see getCompanyPostingsForKey's
+// DETAIL_ROW_LIMIT, src/lib/hiring/queries.ts) — the true total/market
+// breakdown must come from the precomputed count fields, NOT from
+// `postings.length`/re-deriving from the (possibly truncated) sample, or a
+// large company's reported total would silently shrink to the cap.
+test("hiring signal reports the precomputed total, not the sampled postings array length", () => {
+  const { prompt } = buildOutreachMessagePrompt({
+    ...BASE,
+    company: {
+      displayName: "Affirm",
+      postings: [
+        {
+          id: "p1",
+          title: "Backend Engineer",
+          location: "Remote - US",
+          market: "us",
+          url: "https://example.com/p1",
+          postedAt: new Date("2024-01-01"),
+          firstSeen: new Date("2024-01-01"),
+        },
+      ],
+      totalCount: 105,
+      latamCount: 10,
+      usCount: 90,
+      otherCount: 5,
+      miamiCount: 2,
+      offshoreCount: 0,
+    },
+  });
+  assert.match(prompt, /Total open IT postings: 105/);
+  assert.match(prompt, /latam=10, us=90, other=5/);
+});
+
 test("history and notes injection-safety markers are unchanged across channels", () => {
   const withHistory = buildOutreachMessagePrompt({
     ...BASE,

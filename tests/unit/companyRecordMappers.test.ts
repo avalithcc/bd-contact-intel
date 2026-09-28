@@ -9,24 +9,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   filterTimelineRows,
+  isCompanyActivityFilter,
+  isCompanyFilterSelectionComplete,
   latestEditByProperty,
-  marketBreakdown,
+  resolveCompanyScopeRows,
   startupLabel,
+  type CompanyTimelineFilterCounts,
 } from "@/lib/companies/recordMappers";
 
-test("marketBreakdown: tallies postings by market bucket", () => {
-  const postings = [
-    { market: "latam" },
-    { market: "latam" },
-    { market: "us" },
-    { market: "other" },
-  ];
-  assert.deepEqual(marketBreakdown(postings), { latam: 2, us: 1, other: 1, total: 4 });
-});
 
-test("marketBreakdown: zero postings", () => {
-  assert.deepEqual(marketBreakdown([]), { latam: 0, us: 0, other: 0, total: 0 });
-});
 
 test("filterTimelineRows: 'all' returns every row unchanged", () => {
   const rows = [
@@ -91,4 +82,60 @@ test("latestEditByProperty: keeps the first (newest, per caller's ordering) row 
 
 test("latestEditByProperty: empty input yields an empty map", () => {
   assert.equal(latestEditByProperty([]).size, 0);
+});
+
+// fix/company-timeline-filter-no-reload: the client-side counterpart of
+// Contact record's isPillSelectionComplete/resolveScopeEntries
+// (@/lib/activity/timelinePills), applied to the company timeline's own
+// filter vocabulary (all/note/stage_change/contact_activity) instead of
+// activity-type pills.
+const FULL_COUNTS: CompanyTimelineFilterCounts = { all: 4, note: 1, stage_change: 1, contact_activity: 2 };
+
+test("isCompanyFilterSelectionComplete: true when the loaded pool already has every row for the filter", () => {
+  const rows = [
+    { type: "note", scope: "company" as const },
+    { type: "status_change", scope: "company" as const },
+    { type: "email_sent", scope: "contact" as const },
+    { type: "meeting_logged", scope: "contact" as const },
+  ];
+  assert.equal(isCompanyFilterSelectionComplete(rows, FULL_COUNTS, "all"), true);
+  assert.equal(isCompanyFilterSelectionComplete(rows, FULL_COUNTS, "contact_activity"), true);
+});
+
+test("isCompanyFilterSelectionComplete: false when the loaded (capped) pool is missing rows for the filter", () => {
+  // Only 1 of the true 2 "contact_activity" rows made it into this capped pool.
+  const rows = [
+    { type: "note", scope: "company" as const },
+    { type: "email_sent", scope: "contact" as const },
+  ];
+  assert.equal(isCompanyFilterSelectionComplete(rows, FULL_COUNTS, "contact_activity"), false);
+  // "all" is also incomplete: true total is 4, pool only has 2.
+  assert.equal(isCompanyFilterSelectionComplete(rows, FULL_COUNTS, "all"), false);
+});
+
+test("resolveCompanyScopeRows: 'ready' with the locally filtered rows when the pool is provably complete", () => {
+  const rows = [
+    { type: "note", scope: "company" as const, id: "a" },
+    { type: "status_change", scope: "company" as const, id: "b" },
+    { type: "email_sent", scope: "contact" as const, id: "c" },
+    { type: "meeting_logged", scope: "contact" as const, id: "d" },
+  ];
+  const result = resolveCompanyScopeRows(rows, FULL_COUNTS, "note");
+  assert.deepEqual(result, { kind: "ready", rows: [rows[0]] });
+});
+
+test("resolveCompanyScopeRows: 'fetch' when the pool can't be trusted for that filter", () => {
+  const rows = [{ type: "email_sent", scope: "contact" as const, id: "c" }];
+  const result = resolveCompanyScopeRows(rows, FULL_COUNTS, "contact_activity");
+  assert.deepEqual(result, { kind: "fetch" });
+});
+
+test("isCompanyActivityFilter: accepts the 4 known filter keys, rejects everything else", () => {
+  assert.equal(isCompanyActivityFilter("all"), true);
+  assert.equal(isCompanyActivityFilter("note"), true);
+  assert.equal(isCompanyActivityFilter("stage_change"), true);
+  assert.equal(isCompanyActivityFilter("contact_activity"), true);
+  assert.equal(isCompanyActivityFilter("status_backfill"), false);
+  assert.equal(isCompanyActivityFilter(undefined), false);
+  assert.equal(isCompanyActivityFilter(""), false);
 });

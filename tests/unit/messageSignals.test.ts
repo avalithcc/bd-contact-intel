@@ -8,7 +8,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extractOutreachSignals } from "@/lib/outreach/messageSignals";
-import type { BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
+import type { BuildOutreachMessagePromptInput, OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
+
+// Builds a minimal OutreachMessageCompany fixture. `totalCount` is set
+// independently of `postings.length` in these tests on purpose — the
+// signal must read the count fields, not re-derive from the (possibly
+// capped, see getCompanyPostingsForKey's DETAIL_ROW_LIMIT) postings array.
+function companyFixture(
+  overrides: Partial<OutreachMessageCompany> & { displayName: string },
+): OutreachMessageCompany {
+  return {
+    postings: [],
+    totalCount: 0,
+    latamCount: 0,
+    usCount: 0,
+    otherCount: 0,
+    miamiCount: 0,
+    offshoreCount: 0,
+    ...overrides,
+  };
+}
 
 const BASE: BuildOutreachMessagePromptInput = {
   contact: {
@@ -31,19 +50,23 @@ test("no signals when nothing is present", () => {
   assert.deepEqual(extractOutreachSignals(BASE), []);
 });
 
-test("hiring signal carries the open-postings count", () => {
+test("hiring signal carries the true total count, not the sampled postings array length", () => {
   const input: BuildOutreachMessagePromptInput = {
     ...BASE,
-    company: { displayName: "Acme", postings: [{ title: "Backend" }, { title: "Frontend" }] as never },
+    company: companyFixture({
+      displayName: "Acme",
+      postings: [{ title: "Backend" }, { title: "Frontend" }] as never,
+      totalCount: 105,
+    }),
   };
   const signals = extractOutreachSignals(input);
-  assert.deepEqual(signals, [{ kind: "hiring", count: 2 }]);
+  assert.deepEqual(signals, [{ kind: "hiring", count: 105 }]);
 });
 
-test("a company with zero postings does not produce a hiring signal", () => {
+test("a company with zero total open postings does not produce a hiring signal", () => {
   const input: BuildOutreachMessagePromptInput = {
     ...BASE,
-    company: { displayName: "Acme", postings: [] },
+    company: companyFixture({ displayName: "Acme", postings: [] }),
   };
   assert.deepEqual(extractOutreachSignals(input), []);
 });
@@ -106,7 +129,7 @@ test("signals are returned in a fixed, stable order", () => {
   const input: BuildOutreachMessagePromptInput = {
     ...BASE,
     contact: { ...BASE.contact, isLeadership: true },
-    company: { displayName: "Acme", postings: [{ title: "Backend" }] as never },
+    company: companyFixture({ displayName: "Acme", postings: [{ title: "Backend" }] as never, totalCount: 1 }),
     history: [
       { sentAt: new Date("2026-01-01"), direction: "sent", content: "hola" },
       { sentAt: new Date("2026-01-03"), direction: "received", content: "hola, si" },

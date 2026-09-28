@@ -9,13 +9,18 @@
  * company_key). `count(*)::int` casts the aggregate — Postgres returns
  * bigint aggregates as strings over the wire otherwise.
  */
-import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 import { BOARD_COLUMNS } from "@/lib/contacts/board";
+import { SYSTEM_VIEWS, type SystemViewKey } from "@/lib/contacts/views";
 import type { PersonStatus } from "@/lib/status/deriveStatus";
+import {
+  CONTACT_LIST_ROW_COLUMNS,
+  projectContactListRowColumns,
+} from "@/lib/contacts/contactListRowColumns";
 import {
   buildBdConnectionSummaries,
   groupBdConnectionsByPerson,
@@ -188,28 +193,6 @@ export interface ContactListRow {
   // person has zero `activity` rows (mockup renders "—").
   lastActivity: LastActivityEntry | null;
 }
-
-const CONTACT_LIST_ROW_COLUMNS = {
-  id: person.id,
-  firstName: person.firstName,
-  lastName: person.lastName,
-  jobTitle: person.jobTitle,
-  company: person.company,
-  companyKey: person.companyKey,
-  ownerBdId: person.ownerBdId,
-  ownerName: bd.name,
-  status: person.status,
-  email: person.email,
-  emailStatus: person.emailStatus,
-  roleGroup: person.roleGroup,
-  industry: person.industry,
-  country: person.country,
-  sourceKey: person.sourceKey,
-  createdAt: person.createdAt,
-  seniority: person.seniority,
-  phone: person.phone,
-  mobilePhone: person.mobilePhone,
-} as const;
 
 type ContactListRowBase = Omit<ContactListRow, "bdConnections" | "lastActivity">;
 
@@ -389,11 +372,17 @@ const BOARD_COLUMN_LIMIT = 20;
  * Board view (task 14.1; mockups/contacts-board.html): groups the SAME base
  * filter set as `getContactListPage` (owner/email-verified/hiring/search —
  * `filters.status` is intentionally ignored, since the board replaces
- * status filtering with grouping) into the five `BOARD_COLUMNS`, one
- * capped+counted query pair per column so no column ever loads more than
- * `BOARD_COLUMN_LIMIT` of a (potentially thousands-deep) status bucket.
- * Covers every Contact, including LinkedIn-only rows with no lead source —
- * there is no `bdId`/source scoping here, same as the table view.
+ * status filtering with grouping) into the five `BOARD_COLUMNS`.
+ *
+ * Perf fix (owner report: moving one card took 3-5.5s): the previous version
+ * looped over the 5 statuses and ran a count + a capped rows query per
+ * column — up to 10 round trips before `attachDerivedColumns` even ran, on
+ * a pool with `max: 3`. This now runs exactly ONE grouped count (`GROUP BY
+ * status`) and ONE capped-per-partition rows query (`row_number() OVER
+ * (PARTITION BY status ...)` in a CTE, filtered to <= BOARD_COLUMN_LIMIT),
+ * then a single batched `attachDerivedColumns` call across every column's
+ * rows at once — 4 round trips total regardless of how many columns have
+ * rows, not 4 * BOARD_COLUMNS.length.
  */
 export async function getContactBoardColumns(
   filters: ContactFilters,
@@ -407,31 +396,64 @@ export async function getContactBoardColumns(
     const condition = searchCondition(q);
     if (condition) base.push(condition);
   }
+  const where = and(...base, inArray(person.status, [...BOARD_COLUMNS]));
 
-  return Promise.all(
-    BOARD_COLUMNS.map(async (status): Promise<ContactBoardColumn> => {
-      const where = and(...base, eq(person.status, status));
-      const [{ total }] = await db
-        .select({ total: sql<number>`count(*)::int` })
-        .from(person)
-        .where(where);
-
-      const baseRows =
-        total === 0
-          ? []
-          : await db
-              .select(CONTACT_LIST_ROW_COLUMNS)
-              .from(person)
-              .leftJoin(bd, eq(bd.id, person.ownerBdId))
-              .where(where)
-              .orderBy(desc(person.createdAt))
-              .limit(BOARD_COLUMN_LIMIT);
-
-      const rows = await attachDerivedColumns(baseRows, dict);
-
-      return { status: status as PersonStatus, rows, total };
-    }),
+  // brc_ (board-ranked-columns) prefix on the window-function alias so it
+  // never collides with a joined table's own column when this CTE's
+  // projection is re-selected below. `id asc` is a deliberate secondary
+  // tiebreaker (bug found while verifying this rewrite against prod: a bulk
+  // import gives thousands of rows the exact same `created_at`, and
+  // `ORDER BY created_at DESC` alone leaves Postgres free to pick ANY of
+  // them for the top `BOARD_COLUMN_LIMIT` depending on the query plan — the
+  // pre-existing per-column query had the same defect, just never surfaced
+  // because nothing compared it against another query shape) — every
+  // ORDER BY that feeds a LIMIT must be fully deterministic.
+  const rankedBoardRows = db.$with("brc_ranked").as(
+    db
+      .select({
+        ...CONTACT_LIST_ROW_COLUMNS,
+        brcRowNum: sql<number>`row_number() over (partition by ${person.status} order by ${person.createdAt} desc, ${person.id} asc)`.as(
+          "brc_row_num",
+        ),
+      })
+      .from(person)
+      .leftJoin(bd, eq(bd.id, person.ownerBdId))
+      .where(where),
   );
+
+  const [countRows, baseRows] = await Promise.all([
+    db
+      .select({ status: person.status, brcTotal: sql<number>`count(*)::int` })
+      .from(person)
+      .where(where)
+      .groupBy(person.status),
+    db
+      .with(rankedBoardRows)
+      .select(projectContactListRowColumns(rankedBoardRows))
+      .from(rankedBoardRows)
+      .where(sql`${rankedBoardRows.brcRowNum} <= ${BOARD_COLUMN_LIMIT}`)
+      .orderBy(asc(rankedBoardRows.status), desc(rankedBoardRows.createdAt), asc(rankedBoardRows.id)),
+  ]);
+
+  const totalByStatus = new Map(countRows.map((r) => [r.status, Number(r.brcTotal)]));
+  const rowsByStatus = new Map<string, ContactListRowBase[]>();
+  for (const row of baseRows) {
+    const list = rowsByStatus.get(row.status) ?? [];
+    list.push(row);
+    rowsByStatus.set(row.status, list);
+  }
+
+  // ONE batched call across every column's rows (never per-column) — see
+  // attachDerivedColumns' own doc comment for why this stays index-friendly
+  // no matter how large the full tables get.
+  const derivedRows = await attachDerivedColumns(baseRows, dict);
+  const derivedByPersonId = new Map(derivedRows.map((r) => [r.id, r]));
+
+  return BOARD_COLUMNS.map((status): ContactBoardColumn => {
+    const idsForStatus = rowsByStatus.get(status) ?? [];
+    const rows = idsForStatus.map((r) => derivedByPersonId.get(r.id)!);
+    return { status: status as PersonStatus, rows, total: totalByStatus.get(status) ?? 0 };
+  });
 }
 
 /**
@@ -453,9 +475,9 @@ export async function getContactListRowsByIds(ids: string[], dict: Dict): Promis
 }
 
 /**
- * Per-view result counts for the tab badges (mockup: "Todos los
- * contactos<span class='count'>16,642</span>"). One count query per system
- * view — small, fixed number of views, each hitting an indexed column.
+ * One arbitrary-filter count (e.g. a saved view's own count, or an ad-hoc
+ * preview) — a single round trip for that one filter set. NOT used for the
+ * `SYSTEM_VIEWS` tab badges anymore; see `getSystemViewCounts` below for why.
  */
 export async function getContactCountForFilters(
   filters: ContactFilters,
@@ -469,6 +491,46 @@ export async function getContactCountForFilters(
     .from(person)
     .where(and(...where));
   return total;
+}
+
+/**
+ * Per-view result counts for the tab badges (mockup: "Todos los
+ * contactos<span class='count'>16,642</span>"), positionally aligned with
+ * `SYSTEM_VIEWS` (same convention page.tsx already relies on:
+ * `count={systemViewCounts[i]}`).
+ *
+ * Perf fix (owner report: ~3.0s for this block alone): the previous version
+ * ran `getContactCountForFilters` once per system view — SIX full-table
+ * `count(*)` round trips on EVERY `/contacts` render, including a plain
+ * pagination click or sort that changes none of these filters. This now
+ * runs ONE query with a `count(*) filter (where ...)` per view, computed in
+ * a single pass over `person` — one round trip regardless of how many
+ * system views exist.
+ *
+ * Freshness tradeoff: none — this is not a cache, it recomputes from the
+ * live table on every call, so a status/owner/hiring change is reflected
+ * immediately (same freshness as the old per-view queries, just cheaper).
+ * The lever here was round trips, not staleness.
+ */
+export async function getSystemViewCounts(
+  meBdId: string,
+  hiringKeys?: Set<string>,
+): Promise<number[]> {
+  const conditionsByView = await Promise.all(
+    SYSTEM_VIEWS.map(async (view) => {
+      const where = await baseContactFilterConditions(view.filters, meBdId, hiringKeys);
+      if (view.filters.status?.length) where.push(inArray(person.status, view.filters.status));
+      return where;
+    }),
+  );
+
+  const selection: Record<string, SQL<number>> = {};
+  SYSTEM_VIEWS.forEach((view, i) => {
+    selection[view.key] = sql<number>`count(*) filter (where ${and(...conditionsByView[i])})::int`;
+  });
+
+  const [row] = (await db.select(selection).from(person)) as [Record<SystemViewKey, number>];
+  return SYSTEM_VIEWS.map((view) => row[view.key]);
 }
 
 /**

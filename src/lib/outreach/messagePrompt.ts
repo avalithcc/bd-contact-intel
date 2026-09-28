@@ -1,5 +1,4 @@
 import type { RoleGroupKey } from "@/lib/roleGroups";
-import { isMiamiArea, isOffshoreHub, type MarketKey } from "@/lib/hiring/markets";
 import type { OpenPosting } from "@/lib/hiring/queries";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import type { OutreachChannel } from "@/lib/outreach/channel";
@@ -68,7 +67,21 @@ export interface OutreachMessageContact {
 
 export interface OutreachMessageCompany {
   displayName: string;
+  // Bounded sample of the company's most recent open IT postings (see
+  // getCompanyPostingsForKey's DETAIL_ROW_LIMIT, src/lib/hiring/queries.ts —
+  // not the full set for companies with many open roles). Used here only for
+  // the title sample (already capped at MAX_TITLES below) and the
+  // best-effort "do they hire in Spain" location check — never for counting,
+  // since it may not include every open posting. All counts below are
+  // precomputed over the FULL open-posting set, independent of this array's
+  // length.
   postings: OpenPosting[];
+  totalCount: number;
+  latamCount: number;
+  usCount: number;
+  otherCount: number;
+  miamiCount: number;
+  offshoreCount: number;
 }
 
 // One prior LinkedIn message with this contact, oldest-to-newest order
@@ -181,7 +194,7 @@ export interface OutreachMessagePrompt {
 }
 
 function summarizeHiring(company: OutreachMessageCompany | null): string {
-  if (!company || company.postings.length === 0) {
+  if (!company || company.totalCount === 0) {
     return [
       `Company: ${company?.displayName ?? "unknown"}`,
       "No open IT job posting data is available for this company right now.",
@@ -189,32 +202,31 @@ function summarizeHiring(company: OutreachMessageCompany | null): string {
     ].join("\n");
   }
 
+  // Titles, the Spain check, and the location sample below only ever look at
+  // `company.postings` — the bounded sample, see the interface doc comment
+  // above — never at a re-derived count. Every number in this function comes
+  // from the precomputed fields instead, so it stays correct for a company
+  // with more open postings than the sample holds.
   const sample = company.postings.slice(0, MAX_TITLES);
   const titles = sample.map((p) => p.title);
-  const marketCounts = new Map<MarketKey, number>();
   const locations = new Set<string>();
-  let miamiCount = 0;
-  let offshoreCount = 0;
   let spain = false;
   for (const p of company.postings) {
-    marketCounts.set(p.market, (marketCounts.get(p.market) ?? 0) + 1);
     if (p.location) locations.add(p.location);
-    if (isMiamiArea(p.location)) miamiCount++;
-    if (isOffshoreHub(p.location)) offshoreCount++;
     if (mentionsSpain(p.location)) spain = true;
   }
 
   const lines = [
     `Company: ${company.displayName}`,
-    `Total open IT postings: ${company.postings.length}`,
-    `Postings by market bucket: ${[...marketCounts.entries()]
-      .map(([market, count]) => `${market}=${count}`)
-      .join(", ")}`,
+    `Total open IT postings: ${company.totalCount}`,
+    `Postings by market bucket: latam=${company.latamCount}, us=${company.usCount}, other=${company.otherCount}`,
     `Sample locations (not exhaustive): ${[...locations].slice(0, 25).join("; ") || "not specified"}`,
-    miamiCount > 0 ? `Of these, ${miamiCount} are in Florida/Miami.` : null,
-    offshoreCount > 0 ? `Of these, ${offshoreCount} are in an offshore delivery hub (e.g. India, Philippines, Vietnam).` : null,
+    company.miamiCount > 0 ? `Of these, ${company.miamiCount} are in Florida/Miami.` : null,
+    company.offshoreCount > 0
+      ? `Of these, ${company.offshoreCount} are in an offshore delivery hub (e.g. India, Philippines, Vietnam).`
+      : null,
     spain ? "This company has open postings in Spain." : "This company has NO open postings in Spain — do not mention the Madrid office.",
-    `Sample open role titles, up to ${MAX_TITLES} of ${company.postings.length} total: ${titles.join(" | ")}`,
+    `Sample open role titles, up to ${MAX_TITLES} of ${company.totalCount} total: ${titles.join(" | ")}`,
   ].filter((l): l is string => l !== null);
 
   return lines.join("\n");

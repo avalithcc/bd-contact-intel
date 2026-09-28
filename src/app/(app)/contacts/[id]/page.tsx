@@ -163,7 +163,10 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const [companyRow, companyPostings, companyContactCount] = companyKey
     ? await Promise.all([getCompanyByKey(companyKey), getCompanyPostingsForKey(companyKey), getCompanyContactCount(companyKey)])
     : [null, null, 0];
-  const companyOpenItCount = companyPostings?.postings.length ?? 0;
+  // postings.postings is now capped (see getCompanyPostingsForKey's
+  // DETAIL_ROW_LIMIT) — the true count for a company with more open
+  // postings than the cap lives in totalCount, not postings.length.
+  const companyOpenItCount = companyPostings?.totalCount ?? 0;
   // `company.domain` (hubspot-import migration, drizzle/0015_company_domain.sql)
   // is the real, owner-maintained domain — prefer it. Fall back to deriving
   // one from this Contact's own verified email domain only when the
@@ -205,7 +208,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
       ? {
           companyName: record.person.company ?? l.noCompany,
           openItCount: companyOpenItCount,
-          newLast7Days: companyPostings?.postings.filter((p) => p.postedAt && p.postedAt > sevenDaysAgo).length ?? 0,
+          newLast7Days: companyPostings?.newLast7DaysCount ?? 0,
         }
       : null;
 

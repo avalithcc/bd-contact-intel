@@ -2,7 +2,11 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
-import type { CompanyPropertyHistoryRow } from "@/lib/companies/recordMappers";
+import type {
+  CompanyActivityFilter,
+  CompanyPropertyHistoryRow,
+  CompanyTimelineFilterCounts,
+} from "@/lib/companies/recordMappers";
 
 const PEOPLE_LIMIT = 200; // bounded crossover set for the timeline/tasks joins below
 const TIMELINE_LIMIT = 50;
@@ -66,15 +70,48 @@ export interface CompanyTimelineRow {
 }
 
 /**
+ * Narrows the Activity tab's base WHERE (company row OR a row from any
+ * person at this company) down to one filter's own rows, entirely in SQL —
+ * the scoped-fetch counterpart of `filterTimelineRows` (recordMappers.ts).
+ * `undefined` ("all") adds no extra condition.
+ */
+function companyFilterCondition(filter: CompanyActivityFilter | undefined) {
+  switch (filter) {
+    case "note":
+      return and(eq(activity.type, "note"), isNull(activity.personId));
+    case "stage_change":
+      return and(eq(activity.type, "status_change"), isNull(activity.personId));
+    case "contact_activity":
+      return sql`${activity.personId} is not null`;
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Activity tab (company-record.html:78-83): company-scoped `activity` rows
  * (logged directly against this company) UNIONed with activity rows logged
  * against any person at this company ("Actividad de contactos" filter),
  * ordered by effective time (effectiveActivityAtSql, same rule as the list's
  * Última actividad column), bounded to TIMELINE_LIMIT — never an unbounded
  * per-company history dump.
+ *
+ * `opts.filter` (fix/company-timeline-filter-no-reload) narrows the SQL
+ * query itself to one filter's own rows — the scoped fetch a filter click
+ * falls back to when the already-loaded "all" pool can't be trusted for it
+ * (see CompanyTimeline.tsx's `selectFilter` / `resolveCompanyScopeRows`).
+ * `undefined` (the default) is the unfiltered "Todas" page.
  */
-export async function getCompanyTimeline(companyKey: string): Promise<CompanyTimelineRow[]> {
+export async function getCompanyTimeline(
+  companyKey: string,
+  opts: { filter?: CompanyActivityFilter } = {},
+): Promise<CompanyTimelineRow[]> {
   const personIds = await getCompanyPersonIds(companyKey);
+
+  const baseWhere = personIds.length
+    ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds))
+    : eq(activity.companyKey, companyKey);
+  const filterCondition = companyFilterCondition(opts.filter);
 
   const rows = await db
     .select({
@@ -89,11 +126,7 @@ export async function getCompanyTimeline(companyKey: string): Promise<CompanyTim
       personId: activity.personId,
     })
     .from(activity)
-    .where(
-      personIds.length
-        ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds))
-        : eq(activity.companyKey, companyKey),
-    )
+    .where(filterCondition ? and(baseWhere, filterCondition) : baseWhere)
     .orderBy(desc(sql`${effectiveActivityAtSql()}`))
     .limit(TIMELINE_LIMIT);
 
@@ -120,6 +153,44 @@ export async function getCompanyTimeline(companyKey: string): Promise<CompanyTim
     personName: r.personId ? (personNameById.get(r.personId) ?? null) : null,
     scope: r.personId ? "contact" : "company",
   }));
+}
+
+/**
+ * True per-filter row counts for the Activity tab (fix/company-timeline-
+ * filter-no-reload) — computed over EVERY matching row, never capped by
+ * `getCompanyTimeline`'s `TIMELINE_LIMIT`. Mirrors `getPersonTimeline`'s
+ * `countsByType` second query: the ground truth `isCompanyFilterSelectionComplete`
+ * (recordMappers.ts) compares the client's already-loaded pool against
+ * before trusting a purely local filter over a pill click.
+ *
+ * One query, four `count(*) filter (where ...)` aggregates over the same
+ * base WHERE `getCompanyTimeline` uses — cheaper than four separate COUNT
+ * queries, and guarantees all four numbers are consistent with each other
+ * (no risk of a row landing in two counts, or none, from a race between
+ * separate queries).
+ */
+export async function getCompanyTimelineFilterCounts(companyKey: string): Promise<CompanyTimelineFilterCounts> {
+  const personIds = await getCompanyPersonIds(companyKey);
+  const baseWhere = personIds.length
+    ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds))
+    : eq(activity.companyKey, companyKey);
+
+  const [row] = await db
+    .select({
+      all: sql<number>`count(*)`,
+      note: sql<number>`count(*) filter (where ${activity.type} = 'note' and ${activity.personId} is null)`,
+      stageChange: sql<number>`count(*) filter (where ${activity.type} = 'status_change' and ${activity.personId} is null)`,
+      contactActivity: sql<number>`count(*) filter (where ${activity.personId} is not null)`,
+    })
+    .from(activity)
+    .where(baseWhere);
+
+  return {
+    all: Number(row?.all ?? 0),
+    note: Number(row?.note ?? 0),
+    stage_change: Number(row?.stageChange ?? 0),
+    contact_activity: Number(row?.contactActivity ?? 0),
+  };
 }
 
 export interface CompanyOpenTaskRow {

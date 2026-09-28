@@ -12,8 +12,29 @@ import {
   locationLabel,
   ownerLabel,
   stageBadgeClass,
+  stageLabelOf,
   vacantesLabel,
 } from "@/lib/companies/listMappers";
+
+const STAGE_LABELS = {
+  stageProspect: "Prospecto",
+  stageQualified: "Calificada",
+  stageProposalSent: "Propuesta enviada",
+  stageWon: "Ganada",
+  stageLost: "Perdida",
+};
+
+test("stageLabelOf: maps each known relationship stage to its localized label", () => {
+  assert.equal(stageLabelOf("prospect", STAGE_LABELS), "Prospecto");
+  assert.equal(stageLabelOf("qualified", STAGE_LABELS), "Calificada");
+  assert.equal(stageLabelOf("proposal_sent", STAGE_LABELS), "Propuesta enviada");
+  assert.equal(stageLabelOf("won", STAGE_LABELS), "Ganada");
+  assert.equal(stageLabelOf("lost", STAGE_LABELS), "Perdida");
+});
+
+test("stageLabelOf: falls back to the raw stage value when unrecognized", () => {
+  assert.equal(stageLabelOf("unknown_stage", STAGE_LABELS), "unknown_stage");
+});
 
 test("stageBadgeClass: maps each known relationship stage to its mockup badge tone", () => {
   assert.equal(stageBadgeClass("qualified"), "badge badge-info");
