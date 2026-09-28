@@ -21,6 +21,7 @@ import {
   pickBulkActionsLabels,
   pickContactsImportLabels,
 } from "@/lib/contacts/labels";
+import { pickCompanyRecordLabels } from "@/lib/companies/labels";
 
 test("assertClientStrings accepts a plain string", () => {
   assert.doesNotThrow(() => assertClientStrings("hola"));
@@ -67,6 +68,14 @@ test("pickBulkActionsLabels(es) is safe to pass to a client component", () => {
 
 test("pickContactsImportLabels(es) is safe to pass to a client component (task 14.2)", () => {
   assert.doesNotThrow(() => assertClientStrings(pickContactsImportLabels(es)));
+});
+
+test("pickCompanyRecordLabels(es) is safe to pass to a client component", () => {
+  assert.doesNotThrow(() => assertClientStrings(pickCompanyRecordLabels(es)));
+});
+
+test("regression guard: dict.companyList is NOT client-safe (contains showingRange/pageOf formatters)", () => {
+  assert.throws(() => assertClientStrings(es.companyList), TypeError);
 });
 
 test("regression guard: the full dictionary is NOT client-safe (contains formatters)", () => {

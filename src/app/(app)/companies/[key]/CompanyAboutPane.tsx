@@ -6,6 +6,8 @@ import { updateCompanyAction, updateCompanyPropertyAction, updateCompanyStageAct
 import { EditPencilIcon } from "@/components/icons";
 import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import { CompanyQuickActions, type CompanyQuickActionsLabels } from "./CompanyQuickActions";
+import type { ClientStrings } from "@/lib/i18n/clientStrings";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 type Stage = (typeof STAGES)[number];
@@ -20,25 +22,32 @@ export interface LastEdit {
   at: Date;
 }
 
-export interface CompanyAboutPaneLabels extends CompanyQuickActionsLabels {
-  aboutSectionTitle: string;
-  propStage: string;
-  propOwner: string;
-  propRevenuePotential: string;
-  propIndustry: string;
-  propCity: string;
-  propCountry: string;
-  propStartup: string;
-  emptyValue: string;
-  edit: string;
-  ownerUnassignedOption: string;
-  lastUpdatedByPrefix: string;
-  stageProspect: string;
-  stageQualified: string;
-  stageProposalSent: string;
-  stageWon: string;
-  stageLost: string;
-}
+// ClientStrings-wrapped, same reasoning as CompanyQuickActionsLabels
+// (src/lib/companies/labels.ts's doc comment) — the fix for the production
+// crash caused by page.tsx spreading `dict.companyList`'s formatter
+// functions into this component's `labels` prop. Stage labels
+// (stageProspect..stageLost) live on `dict.companyList` (shared with the
+// `/companies` list's stage filter), not `dict.companyRecord` — see
+// src/lib/companies/labels.ts's `pickCompanyRecordLabels`.
+export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
+  ClientStrings<
+    Pick<
+      Dictionary["companyRecord"],
+      | "aboutSectionTitle"
+      | "propStage"
+      | "propOwner"
+      | "propRevenuePotential"
+      | "propIndustry"
+      | "propCity"
+      | "propCountry"
+      | "propStartup"
+      | "emptyValue"
+      | "edit"
+      | "ownerUnassignedOption"
+      | "lastUpdatedByPrefix"
+    > &
+      Pick<Dictionary["companyList"], "stageProspect" | "stageQualified" | "stageProposalSent" | "stageWon" | "stageLost">
+  >;
 
 export interface CompanyAboutPaneProps {
   companyKey: string;
