@@ -4,7 +4,8 @@ import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
-import { getPersonTimeline, isTimelineActivityType } from "@/lib/activity/queries";
+import { getPersonTimeline } from "@/lib/activity/queries";
+import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getOpenTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
@@ -62,11 +63,11 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const l = pickContactRecordLabels(dict);
   const messageLabels = pickGenerateMessageLabels(dict);
   const locale = await getLocale();
-  const activityType = rawActivityType && isTimelineActivityType(rawActivityType) ? rawActivityType : undefined;
+  const activePill = resolveTimelinePillKey(rawActivityType);
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
   const [timeline, ownerOptions, openTasks] = await Promise.all([
-    getPersonTimeline(record.person.id, me.id, { type: activityType }),
+    getPersonTimeline(record.person.id, me.id, { pill: activePill }),
     listOwnerOptions(),
     getOpenTasksForPerson(record.person.id),
   ]);
@@ -235,7 +236,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     serverStrings={dict.contactRecordServer}
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
-                    activeType={activityType}
+                    activePill={activePill}
                     openTasks={openTasks.map((t) => ({
                       id: t.id,
                       title: t.title,

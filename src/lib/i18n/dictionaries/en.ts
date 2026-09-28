@@ -705,6 +705,13 @@ export const en = {
     timelineFilterCall: "Calls",
     timelineFilterDiscarded: "Discard",
     timelineFilterStatusBackfill: "Backfilled status",
+    // Filter PILLS (contact-record.html:97-106), grouped per
+    // @/lib/activity/timelinePills — distinct from the singular
+    // `timelineFilter*` keys above, which label individual timeline entries.
+    timelinePillNotes: "Notes",
+    timelinePillEmails: "Emails",
+    timelinePillMeetings: "Meetings",
+    timelinePillSystem: "System",
     timelineEmpty: "No activity recorded for this contact yet.",
     timelineLockedContent: "Private to the BD who logged it (and admins).",
     timelineSystemActor: "System",

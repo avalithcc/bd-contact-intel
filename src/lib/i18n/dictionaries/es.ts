@@ -603,6 +603,13 @@ export const es: typeof en = {
     timelineFilterCall: "Llamadas",
     timelineFilterDiscarded: "Descarte",
     timelineFilterStatusBackfill: "Estado respaldado",
+    // Filter PILLS (contact-record.html:97-106), grouped per
+    // @/lib/activity/timelinePills — distinct from the singular
+    // `timelineFilter*` keys above, which label individual timeline entries.
+    timelinePillNotes: "Notas",
+    timelinePillEmails: "Correos",
+    timelinePillMeetings: "Reuniones",
+    timelinePillSystem: "Sistema",
     timelineEmpty: "Todavía no hay actividad registrada para este contacto.",
     timelineLockedContent: "Contenido privado para el BD que lo registró (y los administradores).",
     timelineSystemActor: "Sistema",
