@@ -1368,4 +1368,19 @@ export const es: typeof en = {
     outcomeUnavailable:
       "El resumen de deduplicación no está disponible para esta importación.",
   },
+
+  // Error boundaries (fix/robustness). See en.ts's matching section for why
+  // these are consumed directly via `t(DEFAULT_LOCALE)` rather than
+  // `getDictionary()`.
+  errorBoundary: {
+    title: "Algo salió mal",
+    body: "No pudimos cargar esta página. Podés intentar de nuevo o volver a un lugar conocido.",
+    retry: "Reintentar",
+    backHome: "Volver al inicio",
+  },
+  notFoundPage: {
+    title: "Página no encontrada",
+    body: "La página que buscás no existe o fue movida.",
+    backHome: "Volver al inicio",
+  },
 };
