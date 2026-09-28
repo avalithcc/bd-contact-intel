@@ -105,3 +105,27 @@ export function isPillSelectionComplete(
   }
   return filterEntriesForPill(loadedEntries, pill).length >= sumPillCount(countsByType, pill);
 }
+
+export type ScopeResolution<T> = { kind: "ready"; entries: T[] } | { kind: "fetch" };
+
+/**
+ * The one decision both a pill click (Timeline.tsx's `selectPill`) and a
+ * background data refresh (its reset effect, after e.g. adding a note calls
+ * `router.refresh()`) make from a freshly-available entry pool: can `pill`'s
+ * view be safely derived from it right now, or does it require a scoped
+ * server fetch? Pulled out as its own pure function (fresh-review CRITICAL
+ * fix: `router.refresh()` used to force the active pill back to "Todo"
+ * because the reset effect trusted the server's `activePill` prop instead of
+ * re-deriving the CLIENT's own still-active pill from the new data) so both
+ * call sites can never answer this question differently.
+ */
+export function resolveScopeEntries<T extends { type: string }>(
+  pool: readonly T[],
+  countsByType: Record<string, number>,
+  pill: TimelinePillKey | undefined,
+): ScopeResolution<T> {
+  if (isPillSelectionComplete(pool, countsByType, pill)) {
+    return { kind: "ready", entries: filterEntriesForPill(pool, pill) };
+  }
+  return { kind: "fetch" };
+}

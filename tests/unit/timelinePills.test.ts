@@ -15,6 +15,7 @@ import {
   sumPillCount,
   filterEntriesForPill,
   isPillSelectionComplete,
+  resolveScopeEntries,
 } from "@/lib/activity/timelinePills";
 
 test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the 4 internal types under system", () => {
@@ -102,4 +103,49 @@ test("isPillSelectionComplete: busy-contact case — a top-N 'Todo' page can und
   ];
   assert.equal(isPillSelectionComplete(loadedTodoPage, countsByType, "note"), false);
   assert.equal(isPillSelectionComplete(loadedTodoPage, countsByType, "system"), false);
+});
+
+// Regression coverage for the CRITICAL fix (fresh review): a `router.refresh()`
+// after a mutation (e.g. adding a note) delivers a brand new entry pool while
+// the user still has a pill selected. `resolveScopeEntries` is the pure
+// decision Timeline.tsx's reset effect (and `selectPill`) both reuse to
+// re-derive that pill's view from the fresh pool WITHOUT losing the
+// selection: filter locally when the fresh pool already proves complete for
+// it, otherwise signal that a scoped fetch is required.
+test("resolveScopeEntries: complete pool -> ready with the pill's own entries, filtered from the fresh pool", () => {
+  const countsByType = { note: 2, call: 1 };
+  const freshPool = [{ id: "n1", type: "note" }, { id: "n2", type: "note" }, { id: "c1", type: "call" }];
+  assert.deepEqual(resolveScopeEntries(freshPool, countsByType, "note"), {
+    kind: "ready",
+    entries: [{ id: "n1", type: "note" }, { id: "n2", type: "note" }],
+  });
+});
+
+test("resolveScopeEntries: incomplete pool -> fetch (never silently drops back to 'Todo')", () => {
+  const countsByType = { note: 40, status_backfill: 295 };
+  const freshTodoPage = [
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, type: "note" })),
+    ...Array.from({ length: 92 }, (_, i) => ({ id: `b${i}`, type: "status_backfill" })),
+  ];
+  assert.deepEqual(resolveScopeEntries(freshTodoPage, countsByType, "note"), { kind: "fetch" });
+});
+
+test("resolveScopeEntries: a newly added note that belongs to the active pill shows up locally", () => {
+  // Mirrors the exact regression scenario: BD is on the "Notas" pill (true
+  // count 1), adds a note (now 2), router.refresh() delivers a fresh
+  // (small, complete) 'Todo' pool including the new note.
+  const countsByType = { note: 2, call: 3 };
+  const freshPool = [
+    { id: "new-note", type: "note" },
+    { id: "old-note", type: "note" },
+    { id: "c1", type: "call" },
+    { id: "c2", type: "call" },
+    { id: "c3", type: "call" },
+  ];
+  const resolved = resolveScopeEntries(freshPool, countsByType, "note");
+  assert.equal(resolved.kind, "ready");
+  assert.deepEqual(
+    resolved.kind === "ready" ? resolved.entries.map((e) => e.id) : [],
+    ["new-note", "old-note"],
+  );
 });
