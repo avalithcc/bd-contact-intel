@@ -11,7 +11,7 @@
  */
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, bd, person, personBdConnection } from "@/db/schema";
+import { activity, bd, company, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 import { BOARD_COLUMNS } from "@/lib/contacts/board";
@@ -30,6 +30,7 @@ import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -320,17 +321,21 @@ export async function getContactListPage(
       ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`]
       : [asc(person.lastName), asc(person.firstName)];
 
-  const baseRows = await db
+  // leftJoin on `company.company_key`, the PK — an index lookup, not a
+  // fan-out risk (bug fix: Empresa column recovery, see
+  // companyDisplayName.ts's doc comment for the rule).
+  const rawBaseRows = await db
     .select(CONTACT_LIST_ROW_COLUMNS)
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))
     .leftJoin(lastActivityAgg, eq(lastActivityAgg.personId, person.id))
+    .leftJoin(company, eq(company.companyKey, person.companyKey))
     .where(and(...where))
     .orderBy(...orderBy)
     .limit(pageSize)
     .offset((safePage - 1) * pageSize);
 
-  const rows = await attachDerivedColumns(baseRows, dict);
+  const rows = await attachDerivedColumns(withResolvedCompanyName(rawBaseRows), dict);
 
   return { rows, total, page: safePage, pageSize, totalPages };
 }
@@ -418,10 +423,11 @@ export async function getContactBoardColumns(
       })
       .from(person)
       .leftJoin(bd, eq(bd.id, person.ownerBdId))
+      .leftJoin(company, eq(company.companyKey, person.companyKey))
       .where(where),
   );
 
-  const [countRows, baseRows] = await Promise.all([
+  const [countRows, rawBaseRows] = await Promise.all([
     db
       .select({ status: person.status, brcTotal: sql<number>`count(*)::int` })
       .from(person)
@@ -435,6 +441,7 @@ export async function getContactBoardColumns(
       .orderBy(asc(rankedBoardRows.status), desc(rankedBoardRows.createdAt), asc(rankedBoardRows.id)),
   ]);
 
+  const baseRows = withResolvedCompanyName(rawBaseRows);
   const totalByStatus = new Map(countRows.map((r) => [r.status, Number(r.brcTotal)]));
   const rowsByStatus = new Map<string, ContactListRowBase[]>();
   for (const row of baseRows) {
@@ -466,12 +473,13 @@ export async function getContactBoardColumns(
  */
 export async function getContactListRowsByIds(ids: string[], dict: Dict): Promise<ContactListRow[]> {
   if (!ids.length) return [];
-  const baseRows = await db
+  const rawBaseRows = await db
     .select(CONTACT_LIST_ROW_COLUMNS)
     .from(person)
     .leftJoin(bd, eq(bd.id, person.ownerBdId))
+    .leftJoin(company, eq(company.companyKey, person.companyKey))
     .where(and(sql`${person.mergedIntoId} is null`, inArray(person.id, ids)));
-  return attachDerivedColumns(baseRows, dict);
+  return attachDerivedColumns(withResolvedCompanyName(rawBaseRows), dict);
 }
 
 /**

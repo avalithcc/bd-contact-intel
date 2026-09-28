@@ -6,7 +6,7 @@
  * which needs `DATABASE_URL`). This file only imports `@/db/schema`
  * (table/column definitions, no connection).
  */
-import { bd, person } from "@/db/schema";
+import { bd, company, person } from "@/db/schema";
 
 export const CONTACT_LIST_ROW_COLUMNS = {
   id: person.id,
@@ -15,6 +15,12 @@ export const CONTACT_LIST_ROW_COLUMNS = {
   jobTitle: person.jobTitle,
   company: person.company,
   companyKey: person.companyKey,
+  // Join-only field (bug fix: Empresa column recovery) — the caller must
+  // leftJoin `company` on `company.companyKey = person.companyKey` for this
+  // to resolve to anything. Never rendered directly: `withResolvedCompanyName`
+  // (@/lib/contacts/companyDisplayName) consumes it and overwrites `company`
+  // with the resolved display name, then drops this field.
+  companyCanonicalName: company.displayName,
   ownerBdId: person.ownerBdId,
   ownerName: bd.name,
   status: person.status,

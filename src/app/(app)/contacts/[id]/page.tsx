@@ -15,6 +15,7 @@ import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { getCompanyByKey, getCompanyContactCount } from "@/lib/companies/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
+import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
@@ -173,6 +174,12 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // one from this Contact's own verified email domain only when the
   // company has none on file (see resolveCompanyDomain).
   const companyDomain = resolveCompanyDomain(companyRow?.domain, record.person.email);
+  // Bug fix (Empresa recovery, same rule as /contacts' list/board/export/
+  // outreach reads — companyDisplayName.ts): `companyRow` is already fetched
+  // above for this one person, so this is a free fallback, not a new query.
+  // Free text wins when present; canonical `company.display_name` only
+  // fills in the null case.
+  const companyDisplayName = resolveCompanyDisplayName(record.person.company, companyRow?.displayName);
   const stageLabels: Record<string, string> = {
     prospect: dict.companiesPage.stageProspect,
     qualified: dict.companiesPage.stageQualified,
@@ -207,7 +214,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const signal =
     companyKey && companyOpenItCount > 0
       ? {
-          companyName: record.person.company ?? l.noCompany,
+          companyName: companyDisplayName ?? l.noCompany,
           openItCount: companyOpenItCount,
           newLast7Days: companyPostings?.newLast7DaysCount ?? 0,
         }
@@ -221,7 +228,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           labels={l}
           name={name}
           jobTitle={record.person.jobTitle}
-          company={record.person.company}
+          company={companyDisplayName}
           companyKey={record.person.companyKey}
           statusLabel={statusLabel}
           statusValue={record.person.status}
@@ -344,11 +351,11 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                 <>
                   <div className="assoc-row">
                     <span className="company-logo lg" aria-hidden="true">
-                      {initialsFromName(record.person.company ?? l.noCompany)}
+                      {initialsFromName(companyDisplayName ?? l.noCompany)}
                     </span>
                     <div className="grow">
                       <Link className="n" href={`/companies/${record.person.companyKey}`}>
-                        {record.person.company ?? l.noCompany}
+                        {companyDisplayName ?? l.noCompany}
                       </Link>
                       <div className="s">
                         {[companyDomain, record.person.industry].filter(Boolean).join(" · ")}

@@ -14,6 +14,7 @@ const FIXTURE_SOURCE = {
   jobTitle: "Engineer",
   company: "Acme",
   companyKey: "acme",
+  companyCanonicalName: "Acme Inc.",
   ownerBdId: "bd-1",
   ownerName: "Grace",
   status: "new",
@@ -40,6 +41,7 @@ test("projectContactListRowColumns picks exactly the CONTACT_LIST_ROW_COLUMNS ke
     keys,
     [
       "companyKey",
+      "companyCanonicalName",
       "company",
       "country",
       "createdAt",
