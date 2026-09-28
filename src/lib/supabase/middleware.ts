@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isPublicAuthRoute } from "@/lib/auth/publicAuthRoutes";
 
 /**
  * Refreshes the auth session on every request and gates access:
@@ -34,10 +35,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute =
-    path.startsWith("/login") ||
-    path.startsWith("/auth") ||
-    path.startsWith("/forgot-password");
+  const isAuthRoute = isPublicAuthRoute(path);
   // Authenticated via a bearer token instead of a Supabase session — see
   // src/app/api/hiring/sync/route.ts, src/app/api/hiring/discover/route.ts
   // (CRON_SECRET) and src/app/api/leads/ingest/route.ts

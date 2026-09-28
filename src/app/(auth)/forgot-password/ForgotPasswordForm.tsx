@@ -17,14 +17,22 @@ export function ForgotPasswordForm({ locale }: { locale: Locale }) {
     e.preventDefault();
     if (!email.trim()) return;
     setBusy(true);
-    // Deliberately ignore the result: whether the email belongs to an
-    // account or not, the response to the user is identical, so no
-    // account-enumeration signal ever reaches the client.
-    await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/confirm?next=/account/password`,
-    });
-    setBusy(false);
-    setSent(true);
+    try {
+      // Deliberately ignore the result: whether the email belongs to an
+      // account or not, the response to the user is identical, so no
+      // account-enumeration signal ever reaches the client. A rejected
+      // promise (e.g. a network error) gets the same treatment — surfacing
+      // it would be a signal too, so it still ends in the generic
+      // confirmation rather than an error state.
+      await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth/confirm?next=/account/password`,
+      });
+    } catch {
+      // ignored — see comment above
+    } finally {
+      setBusy(false);
+      setSent(true);
+    }
   }
 
   return (
