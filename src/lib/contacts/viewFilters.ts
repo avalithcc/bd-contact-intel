@@ -67,7 +67,11 @@ export interface ContactFilters {
   emailStatus?: EmailStatusFilter;
   // Closes the remaining 6 of 10 "Agregar filtro" options (contacts.html
   // toolbar menu) this batch adds ad-hoc-filter parity for.
-  /** Raw `person.company` substring match — "Empresa" filter. */
+  /** "Empresa" filter. Substring match against the name the row DISPLAYS —
+   * free-text `person.company` when set, otherwise the canonical name via
+   * `company_key` — NOT the raw `person.company` column alone. The rule is
+   * `companyDisplayName.ts#companyNameMatchesTerm`; the SQL that implements
+   * it is `listQueries.ts#companyNameMatchCondition`. */
   company?: string;
   /** Hiring-market crossover — reuses getHiringMatchIndex the same way the
    * Outreach view does (src/lib/outreach/queries.ts listOutreachCandidates). */

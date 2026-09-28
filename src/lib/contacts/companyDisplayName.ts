@@ -74,6 +74,11 @@ export function companyNameMatchesTerm(
   // matching, exactly as the SQL's `(company is null or company = '')` guard
   // treats it, so a blank import value still falls through to the canonical
   // name instead of matching nothing.
+  //
+  // Whitespace-only free text ("   ") is deliberately NOT trimmed here: the
+  // SQL guard is `company = ''`, so trimming on this side only would make
+  // the two disagree. Zero production rows are in that shape today (checked);
+  // if that changes, BOTH sides move together or neither does.
   const displayed = resolveCompanyDisplayName(freeText || null, canonicalDisplayName);
   if (displayed === null) return false;
   return displayed.toLowerCase().includes(term.toLowerCase());
