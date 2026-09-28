@@ -13,6 +13,7 @@ export interface NewTaskButtonLabels {
   newTask: string;
   taskCreate: string;
   taskTitleLabel: string;
+  taskDescriptionLabel: string;
   taskSubjectLabel: string;
   taskSubjectPlaceholder: string;
   taskSubjectContactOption: string;
@@ -21,8 +22,15 @@ export interface NewTaskButtonLabels {
   taskSubjectNoResults: string;
   taskSubjectRequired: string;
   taskDueLabel: string;
+  taskAssigneeLabel: string;
+  taskAssigneeSelf: string;
   taskCreateError: string;
   cancel: string;
+}
+
+export interface TaskAssigneeOption {
+  id: string;
+  name: string;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -36,13 +44,21 @@ const SEARCH_DEBOUNCE_MS = 250;
  * the record page's "Tarea" quick action and bulk "Crear tarea" — no new
  * write path is introduced here.
  */
-export function NewTaskButton({ labels: l }: { labels: NewTaskButtonLabels }) {
+export function NewTaskButton({
+  labels: l,
+  assigneeOptions,
+}: {
+  labels: NewTaskButtonLabels;
+  assigneeOptions: TaskAssigneeOption[];
+}) {
   const router = useRouter();
   const { showToast } = useToast();
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [assignedToBdId, setAssignedToBdId] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TaskSubjectSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -73,7 +89,9 @@ export function NewTaskButton({ labels: l }: { labels: NewTaskButtonLabels }) {
   function close() {
     setOpen(false);
     setTitle("");
+    setDescription("");
     setDueDate("");
+    setAssignedToBdId("");
     setQuery("");
     setResults([]);
     setSubject(null);
@@ -87,9 +105,11 @@ export function NewTaskButton({ labels: l }: { labels: NewTaskButtonLabels }) {
     try {
       await createTaskAction({
         title: title.trim(),
+        description: description.trim() || undefined,
         dueAt: dueDate ? new Date(dueDate) : undefined,
         personId: subject.type === "person" ? subject.id : undefined,
         companyKey: subject.type === "company" ? subject.id : undefined,
+        assignedToBdId,
       });
       close();
       showToast(l.taskCreate);
@@ -119,6 +139,16 @@ export function NewTaskButton({ labels: l }: { labels: NewTaskButtonLabels }) {
             <label className="field">
               {l.taskTitleLabel}
               <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
+            </label>
+
+            <label className="field">
+              {l.taskDescriptionLabel}
+              <textarea
+                className="textarea"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={busy}
+              />
             </label>
 
             <label className="field">
@@ -178,6 +208,23 @@ export function NewTaskButton({ labels: l }: { labels: NewTaskButtonLabels }) {
                 onChange={(e) => setDueDate(e.target.value)}
                 disabled={busy}
               />
+            </label>
+
+            <label className="field">
+              {l.taskAssigneeLabel}
+              <select
+                className="select"
+                value={assignedToBdId}
+                onChange={(e) => setAssignedToBdId(e.target.value)}
+                disabled={busy}
+              >
+                <option value="">{l.taskAssigneeSelf}</option>
+                {assigneeOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             {!subject && title.trim() && <p className="hint">{l.taskSubjectRequired}</p>}

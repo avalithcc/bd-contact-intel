@@ -35,6 +35,11 @@ import {
   TasksIcon,
 } from "@/components/icons";
 
+export interface TaskAssigneeOption {
+  id: string;
+  name: string;
+}
+
 export interface QuickActionsProps {
   personId: string;
   name: string;
@@ -48,6 +53,9 @@ export interface QuickActionsProps {
   // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
   // composer on mount, e.g. arriving from `/contacts/[id]?openAction=meeting`.
   initialAction?: "email" | "meeting" | "discard" | null;
+  // "Tarea" quick action's assignee `<select>` (task-essentials backlog item
+  // 2) — the same `bd` list `PropertyList`'s owner `<select>` already uses.
+  assigneeOptions: TaskAssigneeOption[];
 }
 
 type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
@@ -115,6 +123,7 @@ export function QuickActions({
   messageLabels,
   locale,
   initialAction,
+  assigneeOptions,
 }: QuickActionsProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -240,11 +249,12 @@ export function QuickActions({
           labels={l}
           busy={busy}
           error={error}
+          assigneeOptions={assigneeOptions}
           onCancel={closeQuickAction}
-          onSubmit={async (title, dueAt) => {
+          onSubmit={async (title, dueAt, description, assignedToBdId) => {
             setBusy(true);
             setError(null);
-            const result = await addContactTaskAction(personId, title, dueAt);
+            const result = await addContactTaskAction(personId, title, dueAt, description, assignedToBdId);
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -371,11 +381,17 @@ function TaskForm({
   labels: l,
   busy,
   error,
+  assigneeOptions,
   onCancel,
   onSubmit,
-}: ComposerProps & { onSubmit: (title: string, dueAt?: Date) => void }) {
+}: ComposerProps & {
+  assigneeOptions: TaskAssigneeOption[];
+  onSubmit: (title: string, dueAt: Date | undefined, description: string | undefined, assignedToBdId: string) => void;
+}) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [assignedToBdId, setAssignedToBdId] = useState("");
   return (
     <Dialog open onClose={onCancel} title={l.taskCreate}>
       <div className="composer">
@@ -383,6 +399,15 @@ function TaskForm({
         <label className="field">
           {l.taskTitleLabel}
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.taskDescriptionLabel}
+          <textarea
+            className="textarea"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={busy}
+          />
         </label>
         <label className="field">
           {l.taskDueLabel}
@@ -394,11 +419,34 @@ function TaskForm({
             disabled={busy}
           />
         </label>
+        <label className="field">
+          {l.taskAssigneeLabel}
+          <select
+            className="select"
+            value={assignedToBdId}
+            onChange={(e) => setAssignedToBdId(e.target.value)}
+            disabled={busy}
+          >
+            <option value="">{l.taskAssigneeSelf}</option>
+            {assigneeOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="bar">
           <button type="button" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
-          <button type="button" disabled={busy || !title.trim()} onClick={() => title.trim() && onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined)}>
+          <button
+            type="button"
+            disabled={busy || !title.trim()}
+            onClick={() =>
+              title.trim() &&
+              onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined, description.trim() || undefined, assignedToBdId)
+            }
+          >
             {l.taskCreate}
           </button>
         </div>

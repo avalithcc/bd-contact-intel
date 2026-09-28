@@ -5,6 +5,10 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import type { TaskSubjectInput } from "@/lib/tasks/subject";
+// The error class itself lives in assignee.ts (a DB-free module), not here —
+// see that file's doc comment for why (src/app/(app)/contacts/actionErrors.ts
+// is unit-tested without a database and must not transitively import `db`).
+import { InvalidAssigneeError } from "@/lib/tasks/assignee";
 
 export interface TaskFilters {
   leadId?: string;
@@ -200,6 +204,39 @@ export async function getOverdueTasks(bdId: string): Promise<TaskRow[]> {
       ),
     )
     .orderBy(asc(task.dueAt));
+}
+
+/**
+ * "Todas abiertas" counterpart of `getOverdueTasks` (bug fix, task-essentials
+ * backlog item 3) — same overdue definition, no `assignedToBdId` filter,
+ * mirroring how `getAllOpenTasks` mirrors `getOpenTasks`. Before this
+ * existed, the "all" view passed a hardcoded `overdueTasks = []` to
+ * `buildTaskBuckets`, so a teammate's overdue task was never shown as
+ * overdue anywhere on that tab.
+ */
+export async function getAllOverdueTasks(): Promise<TaskRow[]> {
+  return baseTaskSubjectQuery()
+    .where(and(eq(task.status, "open"), gt(sql`now()`, task.dueAt)))
+    .orderBy(asc(task.dueAt));
+}
+
+export async function isAssignableBd(bdId: string): Promise<boolean> {
+  const [row] = await db.select({ id: bd.id }).from(bd).where(eq(bd.id, bdId));
+  return !!row;
+}
+
+/**
+ * Validates a resolved assignee before a task write reaches the `assigned_to_bd_id`
+ * FK (same "pre-check instead of an opaque 500 on the FK" pattern as
+ * `bulkAssignOwner`, src/lib/contacts/bulkOwnerDb.ts). Skips the query when
+ * `assignedToBdId` is the caller's own id — `getCurrentBd()` already
+ * guarantees that row exists, so every unmodified "assign to me" task
+ * creation (the common case, unchanged from before this feature) costs zero
+ * extra round trips.
+ */
+export async function assertAssigneeExists(assignedToBdId: string, creatorBdId: string): Promise<void> {
+  if (assignedToBdId === creatorBdId) return;
+  if (!(await isAssignableBd(assignedToBdId))) throw new InvalidAssigneeError();
 }
 
 /**

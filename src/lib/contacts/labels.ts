@@ -37,7 +37,10 @@ export type BulkActionsLabels = ClientStrings<
     | "bulkConfirm"
     | "bulkCancel"
     | "bulkTaskTitleLabel"
+    | "bulkTaskDescriptionLabel"
     | "bulkTaskDueLabel"
+    | "bulkTaskAssigneeLabel"
+    | "bulkTaskAssigneeSelf"
     | "bulkExport"
     | "bulkGenerateMessages"
     | "bulkMessagesCapNotice"
@@ -59,7 +62,10 @@ export function pickBulkActionsLabels(dict: Dictionary): BulkActionsLabels {
     bulkConfirm: l.bulkConfirm,
     bulkCancel: l.bulkCancel,
     bulkTaskTitleLabel: l.bulkTaskTitleLabel,
+    bulkTaskDescriptionLabel: l.bulkTaskDescriptionLabel,
     bulkTaskDueLabel: l.bulkTaskDueLabel,
+    bulkTaskAssigneeLabel: l.bulkTaskAssigneeLabel,
+    bulkTaskAssigneeSelf: l.bulkTaskAssigneeSelf,
     bulkExport: l.bulkExport,
     bulkGenerateMessages: l.bulkGenerateMessages,
     bulkMessagesCapNotice: l.bulkMessagesCapNotice,

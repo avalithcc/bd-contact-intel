@@ -288,10 +288,29 @@ export function BulkActionsBar({
           <input id="bulk-task-title" className="input" type="text" name="title" required />
         </div>
         <div className="field">
+          <label className="label" htmlFor="bulk-task-description">
+            {l.bulkTaskDescriptionLabel}
+          </label>
+          <textarea id="bulk-task-description" className="textarea" name="description" />
+        </div>
+        <div className="field">
           <label className="label" htmlFor="bulk-task-due">
             {l.bulkTaskDueLabel}
           </label>
           <input id="bulk-task-due" className="input" type="date" name="dueAt" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bulk-task-assignee">
+            {l.bulkTaskAssigneeLabel}
+          </label>
+          <select id="bulk-task-assignee" className="select" name="assignedToBdId" defaultValue="">
+            <option value="">{l.bulkTaskAssigneeSelf}</option>
+            {ownerOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
         </div>
       </Dialog>
 

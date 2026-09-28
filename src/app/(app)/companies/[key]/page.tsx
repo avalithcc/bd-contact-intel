@@ -153,6 +153,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           city={company.city}
           country={company.country}
           ownerOptions={ownerOptions}
+          assigneeOptions={ownerOptions}
           lastEditByProperty={lastEditByProperty}
           startupText={startupLabel(hiring, l.startupYes, l.startupNo)}
           accountTypeText={accountTypeLabel(company.accountType, l)}

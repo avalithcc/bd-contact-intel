@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateCompanyAction, updateCompanyPropertyAction, updateCompanyStageAction } from "../actions";
 import { EditPencilIcon } from "@/components/icons";
 import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
-import { CompanyQuickActions, type CompanyQuickActionsLabels } from "./CompanyQuickActions";
+import { CompanyQuickActions, type CompanyQuickActionsLabels, type TaskAssigneeOption } from "./CompanyQuickActions";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
@@ -65,6 +65,11 @@ export interface CompanyAboutPaneProps {
   city: string | null;
   country: string | null;
   ownerOptions: OwnerOption[];
+  /** Same `bd` list as `ownerOptions`, handed to the "Tarea" quick action's
+   * assignee `<select>` (task-essentials backlog item 2) — a separate prop
+   * because it's conceptually a different picker (task assignee, not
+   * company owner), even though today it's the same underlying list. */
+  assigneeOptions: TaskAssigneeOption[];
   /** Last edit per editable property (industry/ownerBdId/city/country),
    * keyed by the same `EditableCompanyProperty` name — see
    * recordMappers.ts#latestEditByProperty. A plain object (not a Map): a
@@ -131,6 +136,7 @@ export function CompanyAboutPane({
   city,
   country,
   ownerOptions,
+  assigneeOptions,
   lastEditByProperty,
   startupText,
   accountTypeText,
@@ -205,7 +211,13 @@ export function CompanyAboutPane({
         </div>
       </div>
 
-      <CompanyQuickActions companyKey={companyKey} companyName={companyName} labels={l} newContactLabels={newContactLabels} />
+      <CompanyQuickActions
+        companyKey={companyKey}
+        companyName={companyName}
+        labels={l}
+        newContactLabels={newContactLabels}
+        assigneeOptions={assigneeOptions}
+      />
 
       <div className="section-title">{l.aboutSectionTitle}</div>
 

@@ -3,12 +3,15 @@ import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import {
   getAllOpenTasks,
+  getAllOverdueTasks,
   getCompletedTasks,
   getOpenTasks,
   getOverdueTasks,
   getTaskViewCounts,
 } from "@/lib/tasks/queries";
+import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { resolveTaskSubject } from "@/lib/tasks/subject";
+import { buildTaskBuckets, dueBucketOf } from "@/lib/tasks/taskBuckets";
 import { isTaskView, taskViewTabs, type TaskView } from "@/lib/tasks/viewTabs";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
@@ -25,23 +28,6 @@ interface TasksPageProps {
   searchParams: Promise<{ view?: string }>;
 }
 
-// Presentation-only grouping (mockup-parity 6.2): the mockup groups tasks
-// into vencidas/hoy/próximas within a single table pattern. The queries
-// still only fetch "overdue" and "open" (design D-unchanged) — we just
-// split the "open" set into today/upcoming client-side using the same
-// due-date math the old card view already used, so query/filter behavior
-// is unchanged.
-function dueStatus(task: Task): "overdue" | "today" | "tomorrow" | "week" | null {
-  if (!task.dueAt) return null;
-  const daysUntilDue = Math.ceil(
-    (new Date(task.dueAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-  );
-  if (daysUntilDue < 0) return "overdue";
-  if (daysUntilDue === 0) return "today";
-  if (daysUntilDue === 1) return "tomorrow";
-  return "week";
-}
-
 export default async function TasksPage({ searchParams }: TasksPageProps) {
   const sp = await searchParams;
   const view: TaskView = isTaskView(sp.view) ? sp.view : "mine";
@@ -49,7 +35,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const me = await getCurrentBd();
   const dict = await getDictionary();
   const l = dict.tasksPage;
-  const counts = await getTaskViewCounts(me.id);
+  const [counts, ownerOptions] = await Promise.all([getTaskViewCounts(me.id), listOwnerOptions()]);
   const tabs = taskViewTabs(counts, view, {
     mine: l.viewTabMine,
     all: l.viewTabAll,
@@ -70,6 +56,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
               newTask: l.newTask,
               taskCreate: l.taskCreate,
               taskTitleLabel: l.taskTitleLabel,
+              taskDescriptionLabel: l.taskDescriptionLabel,
               taskSubjectLabel: l.taskSubjectLabel,
               taskSubjectPlaceholder: l.taskSubjectPlaceholder,
               taskSubjectContactOption: l.taskSubjectContactOption,
@@ -78,9 +65,12 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
               taskSubjectNoResults: l.taskSubjectNoResults,
               taskSubjectRequired: l.taskSubjectRequired,
               taskDueLabel: l.taskDueLabel,
+              taskAssigneeLabel: l.taskAssigneeLabel,
+              taskAssigneeSelf: l.taskAssigneeSelf,
               taskCreateError: l.taskCreateError,
               cancel: l.cancel,
             }}
+            assigneeOptions={ownerOptions}
           />
         </div>
       </div>
@@ -113,16 +103,17 @@ async function OpenTasksView({
   me: Awaited<ReturnType<typeof getCurrentBd>>;
 }) {
   const l = dict.tasksPage;
+  // Bug fix (task-essentials backlog item 3): "Todas abiertas" used to pass
+  // a hardcoded `[]` here, so a teammate's overdue task never showed as
+  // overdue on that tab — it simply disappeared (dueBucketOf classifies it
+  // as "overdue", which neither the today nor upcoming bucket accepts).
+  // Both views now fetch a real, unbounded overdue set the same way.
   const [openTasks, overdueTasks] = await Promise.all([
     view === "mine" ? getOpenTasks(me.id, 100) : getAllOpenTasks(100),
-    view === "mine" ? getOverdueTasks(me.id) : [],
+    view === "mine" ? getOverdueTasks(me.id) : getAllOverdueTasks(),
   ]);
 
-  const todayTasks = openTasks.filter((t) => dueStatus(t) === "today");
-  const upcomingTasks = openTasks.filter((t) => {
-    const status = dueStatus(t);
-    return status === "tomorrow" || status === "week" || status === null;
-  });
+  const { todayTasks, upcomingTasks } = buildTaskBuckets(openTasks, overdueTasks);
 
   const hasAnyTasks =
     overdueTasks.length > 0 || todayTasks.length > 0 || upcomingTasks.length > 0;
@@ -256,7 +247,7 @@ function TaskRow({
   badgeClass: string;
 }) {
   const l = dict.tasksPage;
-  const status = dueStatus(task);
+  const status = dueBucketOf(task.dueAt);
   const ownerName = task.assignedToName ?? me.name;
   const subject = resolveTaskSubject(task);
 

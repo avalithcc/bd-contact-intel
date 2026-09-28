@@ -239,6 +239,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           ownerBdId={record.person.ownerBdId}
           ownerLocked={ownerLocked}
           ownerOptions={ownerOptions}
+          assigneeOptions={ownerOptions}
           ownerHint={ownerHint}
           email={record.person.email}
           hunterHint={hunterHint}

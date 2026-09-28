@@ -34,7 +34,10 @@ export type CompanyQuickActionsLabels = ClientStrings<
     | "noteSave"
     | "taskDialogTitle"
     | "taskTitleLabel"
+    | "taskDescriptionLabel"
     | "taskDueLabel"
+    | "taskAssigneeLabel"
+    | "taskAssigneeSelf"
     | "taskCreate"
     | "meetingDialogTitle"
     | "meetingDateLabel"
@@ -61,16 +64,23 @@ type OpenAction = "note" | "task" | "contact" | "meeting" | null;
  * icon has no specified menu) — kept inert, flagged in the checklist as an
  * open item rather than invented.
  */
+export interface TaskAssigneeOption {
+  id: string;
+  name: string;
+}
+
 export function CompanyQuickActions({
   companyKey,
   companyName,
   labels: l,
   newContactLabels,
+  assigneeOptions,
 }: {
   companyKey: string;
   companyName: string;
   labels: CompanyQuickActionsLabels;
   newContactLabels: NewContactDialogLabels;
+  assigneeOptions: TaskAssigneeOption[];
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -155,11 +165,12 @@ export function CompanyQuickActions({
           l={l}
           busy={busy}
           error={error}
+          assigneeOptions={assigneeOptions}
           onCancel={close}
-          onSubmit={async (title, dueAt) => {
+          onSubmit={async (title, dueAt, description, assignedToBdId) => {
             setBusy(true);
             setError(null);
-            const result = await addCompanyTaskAction(companyKey, title, dueAt);
+            const result = await addCompanyTaskAction(companyKey, title, dueAt, description, assignedToBdId);
             setBusy(false);
             if (result.ok) {
               close();
@@ -235,11 +246,17 @@ function TaskForm({
   l,
   busy,
   error,
+  assigneeOptions,
   onCancel,
   onSubmit,
-}: FormShellProps & { onSubmit: (title: string, dueAt?: Date) => void }) {
+}: FormShellProps & {
+  assigneeOptions: TaskAssigneeOption[];
+  onSubmit: (title: string, dueAt: Date | undefined, description: string | undefined, assignedToBdId: string) => void;
+}) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [assignedToBdId, setAssignedToBdId] = useState("");
   return (
     <Dialog open onClose={onCancel} title={l.taskDialogTitle}>
       <div className="composer">
@@ -253,8 +270,23 @@ function TaskForm({
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} autoFocus />
         </label>
         <label className="field">
+          {l.taskDescriptionLabel}
+          <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
           {l.taskDueLabel}
           <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={busy} />
+        </label>
+        <label className="field">
+          {l.taskAssigneeLabel}
+          <select className="select" value={assignedToBdId} onChange={(e) => setAssignedToBdId(e.target.value)} disabled={busy}>
+            <option value="">{l.taskAssigneeSelf}</option>
+            {assigneeOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
         </label>
         <div className="bar">
           <button type="button" onClick={onCancel} disabled={busy}>
@@ -263,7 +295,10 @@ function TaskForm({
           <button
             type="button"
             disabled={busy || !title.trim()}
-            onClick={() => title.trim() && onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined)}
+            onClick={() =>
+              title.trim() &&
+              onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined, description.trim() || undefined, assignedToBdId)
+            }
           >
             {l.taskCreate}
           </button>
