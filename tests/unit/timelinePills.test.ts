@@ -13,6 +13,9 @@ import {
   isTimelinePillKey,
   resolveTimelinePillKey,
   sumPillCount,
+  filterEntriesForPill,
+  isPillSelectionComplete,
+  resolveScopeEntries,
 } from "@/lib/activity/timelinePills";
 
 test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the 4 internal types under system", () => {
@@ -51,4 +54,98 @@ test("sumPillCount sums the counts of every type a pill groups", () => {
   assert.equal(sumPillCount(countsByType, "system"), 7);
   assert.equal(sumPillCount(countsByType, "note"), 3);
   assert.equal(sumPillCount(countsByType, "call"), 0);
+});
+
+test("filterEntriesForPill keeps only entries matching the pill's grouped types", () => {
+  const entries = [
+    { id: "1", type: "note" },
+    { id: "2", type: "status_backfill" },
+    { id: "3", type: "call" },
+    { id: "4", type: "hunter_lookup" },
+  ];
+  assert.deepEqual(
+    filterEntriesForPill(entries, "system").map((e) => e.id),
+    ["2", "4"],
+  );
+  assert.deepEqual(
+    filterEntriesForPill(entries, "note").map((e) => e.id),
+    ["1"],
+  );
+});
+
+test("filterEntriesForPill returns every entry unchanged when pill is undefined (the 'Todo' scope)", () => {
+  const entries = [{ id: "1", type: "note" }, { id: "2", type: "call" }];
+  assert.deepEqual(filterEntriesForPill(entries, undefined), entries);
+});
+
+test("isPillSelectionComplete: a single-pill fetch that already covers the true count is complete", () => {
+  const countsByType = { note: 3 };
+  const loaded = [{ type: "note" }, { type: "note" }, { type: "note" }];
+  assert.equal(isPillSelectionComplete(loaded, countsByType, "note"), true);
+});
+
+test("isPillSelectionComplete: 'Todo' scope is complete only when every loaded row across all types equals the grand total", () => {
+  const countsByType = { note: 2, call: 1 };
+  assert.equal(isPillSelectionComplete([{ type: "note" }, { type: "note" }, { type: "call" }], countsByType, undefined), true);
+  assert.equal(isPillSelectionComplete([{ type: "note" }, { type: "call" }], countsByType, undefined), false);
+});
+
+test("isPillSelectionComplete: busy-contact case — a top-N 'Todo' page can under-represent one pill", () => {
+  // Mirrors the production shape called out in the fix: the busiest contact
+  // has 335 activities but the server-side 'Todo' page is capped well below
+  // that, so its top rows can be dominated by other, more recent types.
+  const countsByType = { note: 40, status_backfill: 295 };
+  // Only 8 of the 100 most-recent rows happen to be notes — the rest are
+  // status_backfill entries pushed to the front by recency.
+  const loadedTodoPage = [
+    ...Array.from({ length: 8 }, () => ({ type: "note" })),
+    ...Array.from({ length: 92 }, () => ({ type: "status_backfill" })),
+  ];
+  assert.equal(isPillSelectionComplete(loadedTodoPage, countsByType, "note"), false);
+  assert.equal(isPillSelectionComplete(loadedTodoPage, countsByType, "system"), false);
+});
+
+// Regression coverage for the CRITICAL fix (fresh review): a `router.refresh()`
+// after a mutation (e.g. adding a note) delivers a brand new entry pool while
+// the user still has a pill selected. `resolveScopeEntries` is the pure
+// decision Timeline.tsx's reset effect (and `selectPill`) both reuse to
+// re-derive that pill's view from the fresh pool WITHOUT losing the
+// selection: filter locally when the fresh pool already proves complete for
+// it, otherwise signal that a scoped fetch is required.
+test("resolveScopeEntries: complete pool -> ready with the pill's own entries, filtered from the fresh pool", () => {
+  const countsByType = { note: 2, call: 1 };
+  const freshPool = [{ id: "n1", type: "note" }, { id: "n2", type: "note" }, { id: "c1", type: "call" }];
+  assert.deepEqual(resolveScopeEntries(freshPool, countsByType, "note"), {
+    kind: "ready",
+    entries: [{ id: "n1", type: "note" }, { id: "n2", type: "note" }],
+  });
+});
+
+test("resolveScopeEntries: incomplete pool -> fetch (never silently drops back to 'Todo')", () => {
+  const countsByType = { note: 40, status_backfill: 295 };
+  const freshTodoPage = [
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, type: "note" })),
+    ...Array.from({ length: 92 }, (_, i) => ({ id: `b${i}`, type: "status_backfill" })),
+  ];
+  assert.deepEqual(resolveScopeEntries(freshTodoPage, countsByType, "note"), { kind: "fetch" });
+});
+
+test("resolveScopeEntries: a newly added note that belongs to the active pill shows up locally", () => {
+  // Mirrors the exact regression scenario: BD is on the "Notas" pill (true
+  // count 1), adds a note (now 2), router.refresh() delivers a fresh
+  // (small, complete) 'Todo' pool including the new note.
+  const countsByType = { note: 2, call: 3 };
+  const freshPool = [
+    { id: "new-note", type: "note" },
+    { id: "old-note", type: "note" },
+    { id: "c1", type: "call" },
+    { id: "c2", type: "call" },
+    { id: "c3", type: "call" },
+  ];
+  const resolved = resolveScopeEntries(freshPool, countsByType, "note");
+  assert.equal(resolved.kind, "ready");
+  assert.deepEqual(
+    resolved.kind === "ready" ? resolved.entries.map((e) => e.id) : [],
+    ["new-note", "old-note"],
+  );
 });

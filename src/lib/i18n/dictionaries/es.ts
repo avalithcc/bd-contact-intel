@@ -641,6 +641,7 @@ export const es: typeof en = {
     timelineGroupUpcoming: "Próximas",
     timelineGroupPreMigration: "Antes de la migración",
     timelineSortNewestFirst: "Más recientes primero",
+    timelineFilterLoading: "Cargando…",
     timelineAssignedToPrefix: "Asignada a",
     taskDueBadgePrefix: "Vence",
     taskMarkDone: "Marcar como hecha",

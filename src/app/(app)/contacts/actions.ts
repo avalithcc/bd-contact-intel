@@ -17,6 +17,8 @@ import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { getConversationForAdmin, type AdminConversationData } from "@/lib/activity/getConversationForAdmin";
+import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
+import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
 import {
   contactActionErrorReason,
@@ -294,5 +296,38 @@ export async function sendContactEmailAction(
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
+  }
+}
+
+export type TimelinePillFetchResult = { ok: true; entries: TimelineEntry[] } | { ok: false };
+
+/**
+ * Read side of the record page's instant pill filter (fix/timeline-filter-
+ * no-reload). Called from the client only when the entry pool Timeline.tsx
+ * already holds is proven NOT to cover a pill's true count (see
+ * isPillSelectionComplete, timelinePills.ts) — the same `getPersonTimeline`
+ * query a `?activityType=` navigation used to trigger, minus the full-page
+ * server render (no dictionary/session/company lookups, no other tab's
+ * data — just this one query).
+ *
+ * `personId`/`pillKey` arrive from the client as plain strings (a Server
+ * Action is a public endpoint, not a type-checked function call) —
+ * `personId` is re-validated via `isUuid` (same convention as
+ * `getConversationForAdminAction` above) and `pillKey` via
+ * `isTimelinePillKey`, rather than either being trusted.
+ */
+export async function getTimelinePillEntriesAction(
+  personId: string,
+  pillKey: string | undefined,
+): Promise<TimelinePillFetchResult> {
+  try {
+    if (!isUuid(personId)) return { ok: false };
+    const me = await getCurrentBd();
+    const pill = pillKey && isTimelinePillKey(pillKey) ? pillKey : undefined;
+    const { entries } = await getPersonTimeline(personId, me.id, { pill });
+    return { ok: true, entries };
+  } catch (err) {
+    console.error("[contacts] getTimelinePillEntriesAction failed", err);
+    return { ok: false };
   }
 }

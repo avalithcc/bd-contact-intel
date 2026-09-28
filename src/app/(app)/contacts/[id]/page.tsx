@@ -250,7 +250,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   <Timeline
                     personId={record.person.id}
                     labels={l}
-                    serverStrings={dict.contactRecordServer}
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
                     activePill={activePill}
@@ -263,7 +262,18 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     isAdmin={isAdmin}
                     mergeInfo={
                       record.merge.unifiedFromCount > 1
-                        ? { ...record.merge, at: record.person.createdAt }
+                        ? {
+                            ...record.merge,
+                            at: record.person.createdAt,
+                            // Timeline is a Client Component (fix/timeline-
+                            // filter-no-reload) — `dict.contactRecordServer`'s
+                            // function templates can't cross the server ->
+                            // client boundary (same rule as
+                            // ContactRecordLabels/ClientStrings elsewhere in
+                            // this file), so the merge card's body text is
+                            // rendered to a plain string here instead.
+                            bodyText: dict.contactRecordServer.mergeCardBody(record.merge.unifiedFromCount),
+                          }
                         : null
                     }
                   />
