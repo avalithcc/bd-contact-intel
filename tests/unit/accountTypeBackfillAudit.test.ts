@@ -21,6 +21,30 @@ test("buildAccountTypeBackfillAuditMetadata reports counts and full key lists un
   assert.equal(metadata.accountTypeUpdated, 3);
   assert.equal(metadata.notesFilled, 1);
   assert.equal(metadata.notesSkippedNonEmpty, 2);
+  assert.deepEqual(metadata.accountTypeOverridesApplied, []);
+});
+
+test("buildAccountTypeBackfillAuditMetadata records applied owner overrides so the audit says a human decided", () => {
+  const metadata = buildAccountTypeBackfillAuditMetadata({
+    createdCompanyKeys: [],
+    accountTypeUpdatedCompanyKeys: ["dynamic-tours"],
+    notesFilledCompanyKeys: [],
+    notesSkippedNonEmpty: 0,
+    overridesApplied: [
+      {
+        displayName: "Dynamic Tours",
+        companyKey: "dynamic-tours",
+        previousAccountType: "strategic_org",
+        accountType: "partner",
+        reason: "Owner adjudicated on 2026-09-28: both source exports disagreed and were wrong.",
+      },
+    ],
+  });
+  assert.equal(metadata.accountTypeOverridesApplied.length, 1);
+  assert.equal(metadata.accountTypeOverridesApplied[0]!.displayName, "Dynamic Tours");
+  assert.equal(metadata.accountTypeOverridesApplied[0]!.previousAccountType, "strategic_org");
+  assert.equal(metadata.accountTypeOverridesApplied[0]!.accountType, "partner");
+  assert.match(metadata.accountTypeOverridesApplied[0]!.reason, /owner adjudicated/i);
 });
 
 test("buildAccountTypeBackfillAuditMetadata truncates key lists past the cap but keeps true counts", () => {

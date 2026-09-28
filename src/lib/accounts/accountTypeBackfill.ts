@@ -53,6 +53,48 @@ export const ACCOUNT_NAME_ALIASES: Readonly<Record<string, string>> = {
   Winclamp: "Winclap",
 };
 
+/**
+ * An owner-adjudicated `account_type` override. This is NOT a tie-break
+ * rule — it exists for the cases where a rule (like latest-Created-date
+ * conflict resolution) produced the wrong answer because the SOURCE DATA
+ * itself was wrong on both sides, and a human looked at the account and
+ * decided. Keyed by the canonical (post-`ACCOUNT_NAME_ALIASES`) display
+ * name. Applied AFTER normal `Categoría` resolution in `mergeAccountRows`
+ * — see `applyAccountTypeOverrides`.
+ */
+export interface AccountTypeOverride {
+  accountType: AccountType;
+  /** Why this override exists — must explain that a HUMAN decided, not
+   * that a rule fired, so someone reading this in six months can tell the
+   * difference. */
+  reason: string;
+}
+
+/**
+ * Declared owner overrides. Every entry here MUST correspond to an account
+ * that actually shows up in the CSV input — `applyAccountTypeOverrides`
+ * throws if one doesn't, so a typo in this map surfaces immediately instead
+ * of silently doing nothing.
+ *
+ * "Dynamic Tours": both source exports disagreed on `Categoría` (grid view:
+ * "Org. estratégica"; Pablo's view: "Cliente") — see the conflict this
+ * module's `mergeAccountRows` still reports for it. The normal
+ * latest-Created-date tie-break picked "Org. estratégica" (grid view is
+ * dated 23/5/2024, later than Pablo's 16/11/2023), but the owner reviewed
+ * the account directly and adjudicated on 2026-09-28 that BOTH source
+ * values were wrong: Dynamic Tours is a `partner`. This override reflects
+ * that human decision, not the disagreeing source rows.
+ */
+export const ACCOUNT_TYPE_OVERRIDES: Readonly<Record<string, AccountTypeOverride>> = {
+  "Dynamic Tours": {
+    accountType: "partner",
+    reason:
+      "Owner adjudicated on 2026-09-28: both source exports disagreed on Categoría " +
+      '(grid: "Org. estratégica", Pablo: "Cliente") and neither was correct — Dynamic ' +
+      "Tours is a partner. This is a human correction of the source data, not a tie-break.",
+  },
+};
+
 export interface RawAccountRow {
   /** Which CSV this row came from (a file name or short label) — used only
    * for conflict reporting, never written. */
@@ -107,22 +149,82 @@ export interface MergedAccount {
   notes: string | null;
 }
 
+/** One owner override actually applied to a resolved account — what the
+ * normal resolution had produced, what it was replaced with, and why. This
+ * is what gets printed on every run (dry run and execute alike) and what
+ * gets written into the `audit_log` row on execute — an override must
+ * never pass silently. */
+export interface AppliedAccountTypeOverride {
+  displayName: string;
+  companyKey: string;
+  previousAccountType: AccountType;
+  accountType: AccountType;
+  reason: string;
+}
+
 export interface AccountMergeResult {
-  /** One entry per real account, sorted by `companyKey` for determinism. */
+  /** One entry per real account, sorted by `companyKey` for determinism.
+   * Reflects any `overrides` already applied. */
   accounts: MergedAccount[];
   /** Any account name whose rows disagreed on `Categoría` (resolved by
    * the row with the latest parseable `Created` date; first-seen wins on
-   * a tie or when neither date parses). */
+   * a tie or when neither date parses). Reported even when an override
+   * later replaces the resolved value — both facts matter. */
   conflicts: AccountCategoryConflict[];
+  /** Every owner override from `overrides` that matched an account in this
+   * run, in `overrides` iteration order. */
+  appliedOverrides: AppliedAccountTypeOverride[];
+}
+
+/**
+ * Applies `overrides` (default: `ACCOUNT_TYPE_OVERRIDES`) to already-merged
+ * accounts. Runs AFTER normal `Categoría` resolution — an override always
+ * wins over whatever the CSVs (or their conflict tie-break) produced.
+ *
+ * Throws if an override names a display name that doesn't match any
+ * account in `accounts` — a typo in the override map (or an account that
+ * was renamed/removed from the source CSVs) must surface loudly, never
+ * silently do nothing. Pure — returns new objects, never mutates `accounts`.
+ */
+export function applyAccountTypeOverrides(
+  accounts: readonly MergedAccount[],
+  overrides: Readonly<Record<string, AccountTypeOverride>> = ACCOUNT_TYPE_OVERRIDES,
+): { accounts: MergedAccount[]; appliedOverrides: AppliedAccountTypeOverride[] } {
+  const byName = new Map(accounts.map((a) => [a.displayName, a] as const));
+  const appliedOverrides: AppliedAccountTypeOverride[] = [];
+
+  for (const [displayName, override] of Object.entries(overrides)) {
+    const account = byName.get(displayName);
+    if (!account) {
+      throw new Error(
+        `Account type override names "${displayName}", which does not match any account in this run's ` +
+          "input — check ACCOUNT_TYPE_OVERRIDES for a typo or a renamed/removed account before proceeding.",
+      );
+    }
+    appliedOverrides.push({
+      displayName,
+      companyKey: account.companyKey,
+      previousAccountType: account.accountType,
+      accountType: override.accountType,
+      reason: override.reason,
+    });
+    byName.set(displayName, { ...account, accountType: override.accountType });
+  }
+
+  return { accounts: accounts.map((a) => byName.get(a.displayName)!), appliedOverrides };
 }
 
 /**
  * Folds `ACCOUNT_NAME_ALIASES`, groups by the resulting display name,
- * resolves each group's `Categoría` (flagging disagreement), and merges
- * `Notes` text. Pure — never mutates `rawRows`; safe to call twice with the
- * same input for the same result (write-rule R1).
+ * resolves each group's `Categoría` (flagging disagreement), merges
+ * `Notes` text, then applies `overrides` (default: `ACCOUNT_TYPE_OVERRIDES`)
+ * on top. Pure — never mutates `rawRows`; safe to call twice with the same
+ * input for the same result (write-rule R1).
  */
-export function mergeAccountRows(rawRows: readonly RawAccountRow[]): AccountMergeResult {
+export function mergeAccountRows(
+  rawRows: readonly RawAccountRow[],
+  overrides: Readonly<Record<string, AccountTypeOverride>> = ACCOUNT_TYPE_OVERRIDES,
+): AccountMergeResult {
   const groups = new Map<string, RawAccountRow[]>();
   for (const row of rawRows) {
     if (!row.account) continue;
@@ -175,7 +277,8 @@ export function mergeAccountRows(rawRows: readonly RawAccountRow[]): AccountMerg
   }
 
   accounts.sort((a, b) => a.companyKey.localeCompare(b.companyKey));
-  return { accounts, conflicts };
+  const { accounts: overriddenAccounts, appliedOverrides } = applyAccountTypeOverrides(accounts, overrides);
+  return { accounts: overriddenAccounts, conflicts, appliedOverrides };
 }
 
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;

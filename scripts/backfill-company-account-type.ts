@@ -51,7 +51,21 @@
  * estratégica" in the Grid view, dated 23/5/2024, vs "Cliente" in the
  * Pablo view, dated 16/11/2023) — resolved by the row with the LATEST
  * `Created` date (dry run prints every such conflict so the owner can
- * override before approving `--execute`).
+ * decide before approving `--execute`).
+ *
+ * Sometimes the tie-break above still gets it wrong, because BOTH source
+ * rows were wrong (not disagreeing-but-one-right — actually wrong). For
+ * that, `src/lib/accounts/accountTypeBackfill.ts#ACCOUNT_TYPE_OVERRIDES`
+ * holds a small, explicit, human-adjudicated override map, applied AFTER
+ * normal `Categoría` resolution. Its one entry today: "Dynamic Tours" is a
+ * `partner` (owner adjudicated 2026-09-28), overriding whatever the
+ * conflict tie-break above computed. Every override is printed on BOTH the
+ * dry run and `--execute` (never silent) and recorded in the `audit_log`
+ * row on execute, so the stored history says the value came from a human
+ * decision, not from the disagreeing CSVs. If `ACCOUNT_TYPE_OVERRIDES`
+ * names an account that isn't in this run's input at all (a typo, or an
+ * account that no longer appears in the CSVs), this script throws instead
+ * of silently doing nothing.
  *
  * `--execute` hardening, matching scripts/backfill-company-domains.ts:
  *   1. All or nothing — every INSERT/UPDATE and the audit_log INSERT run
@@ -143,7 +157,7 @@ async function main() {
     ...pabloRecords.map((r) => mapAccountCsvRow(r, "pablo")),
   ];
 
-  const { accounts, conflicts } = mergeAccountRows(rawRows);
+  const { accounts, conflicts, appliedOverrides } = mergeAccountRows(rawRows);
 
   console.log(`CSV rows read: ${rawRows.length} (grid: ${gridRecords.length}, pablo: ${pabloRecords.length})`);
   console.log(`Distinct real accounts after alias fold: ${accounts.length}`);
@@ -152,6 +166,19 @@ async function main() {
     console.log(`Categoría conflicts resolved by latest Created date (${conflicts.length}):`);
     for (const c of conflicts) {
       console.log(`  - ${c.displayName}: ${JSON.stringify(c.candidates)} -> resolved "${c.resolvedCategory}"`);
+    }
+  }
+
+  // Owner overrides are never silent — printed on EVERY run (dry run and
+  // execute alike), even when a conflict above already explains why the
+  // normal resolution disagreed with itself. Both facts matter.
+  if (appliedOverrides.length) {
+    console.log(`Owner override(s) applied (${appliedOverrides.length}):`);
+    for (const o of appliedOverrides) {
+      console.log(
+        `  - "${o.displayName}" (${o.companyKey}): resolved "${o.previousAccountType}" -> overridden to ` +
+          `"${o.accountType}". Reason: ${o.reason}`,
+      );
     }
   }
 
@@ -235,6 +262,7 @@ async function main() {
       accountTypeUpdatedCompanyKeys,
       notesFilledCompanyKeys,
       notesSkippedNonEmpty: plan.existingNotesSkipped.length,
+      overridesApplied: appliedOverrides,
     });
     await tx.insert(auditLog).values({
       actorBdId: args.actor!,

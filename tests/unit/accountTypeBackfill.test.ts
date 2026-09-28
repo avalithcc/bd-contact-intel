@@ -7,12 +7,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ACCOUNT_TYPE_OVERRIDES,
+  applyAccountTypeOverrides,
   extractEmails,
   findCrossNameEmailDomainOverlaps,
   mapAccountCsvRow,
   mergeAccountRows,
   parseAirtableCreatedDate,
   planAccountTypeWrites,
+  type AccountTypeOverride,
   type ExistingAccountCompanyRef,
   type MergedAccount,
   type RawAccountRow,
@@ -59,24 +62,76 @@ test("mergeAccountRows folds a known alias into the canonical name and merges no
     row({ source: "grid", account: "Winclamp", category: "Partner", notes: "Heredado. contact@winclap.com" }),
     row({ source: "pablo", account: "Winclap", category: "Partner", notes: "Heredado. contact@winclap.com" }),
   ];
-  const { accounts, conflicts } = mergeAccountRows(rows);
+  // No owner overrides here — this test is isolating alias-fold behavior,
+  // not the real ACCOUNT_TYPE_OVERRIDES map (which requires "Dynamic
+  // Tours" to be present in the input, tested separately below).
+  const { accounts, conflicts } = mergeAccountRows(rows, {});
   assert.equal(accounts.length, 1);
   assert.equal(accounts[0]!.displayName, "Winclap");
   assert.equal(accounts[0]!.notes, "Heredado. contact@winclap.com");
   assert.equal(conflicts.length, 0);
 });
 
-test("mergeAccountRows resolves a Categoría conflict using the latest Created date and reports it", () => {
+test("mergeAccountRows resolves a Categoría conflict using the latest Created date and reports it (no override in play)", () => {
+  const rows: RawAccountRow[] = [
+    row({ source: "grid", account: "Some Other Account", category: "Org. estratégica", created: "23/5/2024" }),
+    row({ source: "pablo", account: "Some Other Account", category: "Cliente", created: "16/11/2023" }),
+  ];
+  const { accounts, conflicts } = mergeAccountRows(rows, {});
+  assert.equal(accounts.length, 1);
+  assert.equal(accounts[0]!.accountType, "strategic_org");
+  assert.equal(conflicts.length, 1);
+  assert.equal(conflicts[0]!.displayName, "Some Other Account");
+  assert.equal(conflicts[0]!.resolvedCategory, "Org. estratégica");
+});
+
+test("mergeAccountRows applies the real ACCOUNT_TYPE_OVERRIDES entry for Dynamic Tours, winning over latest-date-wins, while still reporting the conflict", () => {
   const rows: RawAccountRow[] = [
     row({ source: "grid", account: "Dynamic Tours", category: "Org. estratégica", created: "23/5/2024" }),
     row({ source: "pablo", account: "Dynamic Tours", category: "Cliente", created: "16/11/2023" }),
   ];
-  const { accounts, conflicts } = mergeAccountRows(rows);
+  const { accounts, conflicts, appliedOverrides } = mergeAccountRows(rows);
   assert.equal(accounts.length, 1);
-  assert.equal(accounts[0]!.accountType, "strategic_org");
+  // Latest-date-wins alone would have picked "Org. estratégica" — the
+  // owner override replaces it with "partner".
+  assert.equal(accounts[0]!.accountType, "partner");
   assert.equal(conflicts.length, 1);
   assert.equal(conflicts[0]!.displayName, "Dynamic Tours");
   assert.equal(conflicts[0]!.resolvedCategory, "Org. estratégica");
+  assert.equal(appliedOverrides.length, 1);
+  assert.equal(appliedOverrides[0]!.displayName, "Dynamic Tours");
+  assert.equal(appliedOverrides[0]!.previousAccountType, "strategic_org");
+  assert.equal(appliedOverrides[0]!.accountType, "partner");
+  assert.match(appliedOverrides[0]!.reason, /owner adjudicated/i);
+});
+
+test("applyAccountTypeOverrides throws when an override names an account absent from the input", () => {
+  const accounts: MergedAccount[] = [merged({ companyKey: "acme", displayName: "Acme" })];
+  const overrides: Readonly<Record<string, AccountTypeOverride>> = {
+    "Some Typo Name": { accountType: "partner", reason: "owner adjudicated on 2026-09-28" },
+  };
+  assert.throws(() => applyAccountTypeOverrides(accounts, overrides), /Some Typo Name/);
+});
+
+test("applyAccountTypeOverrides does not mutate its input and is safe to call twice with the same result", () => {
+  const accounts: MergedAccount[] = [merged({ companyKey: "acme", displayName: "Acme", accountType: "client" })];
+  const overrides: Readonly<Record<string, AccountTypeOverride>> = {
+    Acme: { accountType: "partner", reason: "owner adjudicated on 2026-09-28" },
+  };
+  const snapshot = JSON.parse(JSON.stringify(accounts));
+  const first = applyAccountTypeOverrides(accounts, overrides);
+  const second = applyAccountTypeOverrides(accounts, overrides);
+  assert.deepEqual(accounts, snapshot);
+  assert.deepEqual(first, second);
+  assert.equal(first.accounts[0]!.accountType, "partner");
+});
+
+test("ACCOUNT_TYPE_OVERRIDES declares Dynamic Tours as a human-adjudicated partner, not a rule result", () => {
+  const override = ACCOUNT_TYPE_OVERRIDES["Dynamic Tours"];
+  assert.ok(override);
+  assert.equal(override!.accountType, "partner");
+  assert.match(override!.reason, /owner adjudicated/i);
+  assert.match(override!.reason, /2026-09-28/);
 });
 
 test("mergeAccountRows maps every Categoría to its account type and dedupes identical notes across rows", () => {
@@ -86,7 +141,7 @@ test("mergeAccountRows maps every Categoría to its account type and dedupes ide
     row({ account: "B", category: "Cliente", notes: "" }),
     row({ account: "C", category: "Org. estratégica", notes: "" }),
   ];
-  const { accounts } = mergeAccountRows(rows);
+  const { accounts } = mergeAccountRows(rows, {});
   const byName = new Map(accounts.map((a) => [a.displayName, a]));
   assert.equal(byName.get("A")!.notes, "same text");
   assert.equal(byName.get("B")!.accountType, "client");
@@ -96,8 +151,8 @@ test("mergeAccountRows maps every Categoría to its account type and dedupes ide
 test("mergeAccountRows does not mutate its input and is safe to call twice with the same result", () => {
   const rows: RawAccountRow[] = [row({ account: "A" }), row({ account: "B", category: "Cliente" })];
   const snapshot = JSON.parse(JSON.stringify(rows));
-  const first = mergeAccountRows(rows);
-  const second = mergeAccountRows(rows);
+  const first = mergeAccountRows(rows, {});
+  const second = mergeAccountRows(rows, {});
   assert.deepEqual(rows, snapshot);
   assert.deepEqual(first, second);
 });
