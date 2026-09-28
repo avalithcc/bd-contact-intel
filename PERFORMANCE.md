@@ -8,14 +8,18 @@ Read the first section before optimizing anything here. It inverts the instinct 
 
 **`Promise.all` does not parallelize database work in this app.**
 
-Production runs a connection pool of `max: 3` (`src/db/index.ts`), because instances talk to Supavisor and the pooler multiplexes onto a 60-connection Postgres. A handful of connections process a handful of queries at a time; the promises interleave, the queries largely do not. Development runs `max: 5`, so **dev is faster than prod and hides this**.
+Production runs a connection pool of `max: 3` (`src/db/index.ts`). Three connections process three queries at a time; past that, the promises interleave and the queries queue. Development runs `max: 5`, so **dev is faster than prod and hides this**.
 
-Measured, three concurrent `pg_sleep(1)`:
+Measured against production with the real `/contacts` query set:
 
 | Pool | Wall time |
 | --- | --- |
-| `max: 1` (what production ran until 2026-09-28) | 5132ms |
-| `max: 5` (what development runs) | 2501ms |
+| `max: 1` (production until 2026-09-28) | 2482ms |
+| `max: 3` (production now) | 1642ms |
+
+**Do not raise `max` by reasoning from Postgres.** The budget is Supavisor's session-mode `pool_size`, not Postgres's 60 `max_connections`: every warm instance — production, previews, crons — holds up to `max` pooler slots. Reasoning from the 60 is exactly what caused the 2026-09-28 `EMAXCONNSESSION` incident. And **do not move to the transaction-mode pooler (port 6543)** to get around it: with postgres.js it hangs the app. Both are documented, with measurements, in `src/db/index.ts`.
+
+Each round trip is latency, not work. Postgres executes most of this app's queries in 0.1–10ms; the rest of the wall time is the network. A query with bound parameters costs **two** round trips through the pooler, not one — `select 1` measured 222ms from a laptop, the same `select 1` with a 25-id `IN` list 445ms, while executing in 0.093ms.
 
 So the lever is **the number of round trips**, not how you arrange them. Combining five small reads into one statement shortens the work. Wrapping five awaits in `Promise.all` reorders the same round trips and spends connections doing it.
 
