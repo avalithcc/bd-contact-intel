@@ -10,7 +10,7 @@ import {
 } from "@/lib/companies/recordQueries";
 import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { industryLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
-import { latestEditByProperty, marketBreakdown, startupLabel, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
+import { latestEditByProperty, startupLabel, type CompanyActivityFilter } from "@/lib/companies/recordMappers";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { pickCompanyRecordLabels } from "@/lib/companies/labels";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
@@ -82,7 +82,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   ]);
 
   const hiring = hiringIndex.get(key) ?? null;
-  const breakdown = marketBreakdown(postings?.postings ?? []);
+  // marketBreakdown expects a full posting array; postings.postings is now
+  // capped (see getCompanyPostingsForKey's DETAIL_ROW_LIMIT), so the "N
+  // vacantes" footer must read the precomputed, uncapped counts instead.
+  const breakdown = postings
+    ? { latam: postings.latamCount, us: postings.usCount, other: postings.otherCount, total: postings.totalCount }
+    : { latam: 0, us: 0, other: 0, total: 0 };
   // Plain object (not the Map recordMappers.ts returns) — see
   // CompanyAboutPane.tsx's `lastEditByProperty` prop doc comment on why.
   const lastEditByProperty = Object.fromEntries(latestEditByProperty(propertyHistoryRows));
