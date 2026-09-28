@@ -54,3 +54,12 @@ A known undercount found while porting the companies pages (2026-09-26), recorde
 - A person's `company_key` sometimes normalizes to an alias rather than the canonical key, so both reads undercount that company's contacts.
 - It is a bug, not a product decision: the owner does not need to choose anything, the count is simply wrong.
 - Fixing it means resolving through `company_alias` on both paths, and checking whether any other read matches `company_key` directly.
+
+## admin-email-conversation-access
+
+A side effect of turning the LinkedIn surface off (2026-09-28), recorded so it is a decision rather than a silent loss.
+
+- `getConversationForAdmin` returns BOTH the unredacted `email_sent` content a BD wrote AND that BD's LinkedIn threads, in one audited bypass gated on the contact having a `person_bd_connection` row.
+- Both of its UI entry points were LinkedIn surfaces — the timeline's conversation reveal and the "Historial de conversaciones" panel card — so hiding LinkedIn left admins with no UI path to another BD's email content either. The route and the audit trail still work for anyone who knows the URL; nothing was deleted.
+- Impact today is near zero: production holds a single `email_sent` activity row. But email is now the primary channel, so this will matter as outreach moves there.
+- Fixing it means a LinkedIn-independent admin entry point, gated on the contact rather than on a LinkedIn connection, keeping the same audit record. It is an access-control surface and deserves its own design rather than being bolted onto a "hide LinkedIn" change.
