@@ -266,6 +266,35 @@ export function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+// Bulk actions bar (mockup-parity contacts.html `.bulk-bar`; PR
+// fix/bulk-bar-icons). Path data copied 1:1 from the mockup's inline SVGs,
+// same convention as the other icons above.
+export function PersonIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </Svg>
+  );
+}
+
+export function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5M12 15V3" />
+    </Svg>
+  );
+}
+
+export function CloseIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </Svg>
+  );
+}
+
 // "Pegar señal" quick action (mockup-port r02) — not in either approved
 // mockup's 5-action row (intentional superset, kept per owner decision);
 // a clipboard glyph distinguishes it from the note icon it previously
