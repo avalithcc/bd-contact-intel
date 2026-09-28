@@ -68,6 +68,14 @@ export const PARTNER_ACCOUNT_CONTACT_ROWS: PartnerAccountContactRow[] = [
     email: "cdevita@aconcaguasoftware.com",
     companyDisplay: "Aconcagua Software",
     jobTitle: "Country Manager",
+    // "De Vita" is a surname, not "De" as a separate given name — the
+    // generic last-token rule would glue the particle onto firstName
+    // ("Claudio De" / "Vita"). Human-verified exception, same mechanism as
+    // Eliseo Cohen Imach above; deliberately NOT teaching the generic rule
+    // about particles (de/del/van/von/da/di/…) — that list is a rabbit
+    // hole and not always correct, so a verified override per row is the
+    // honest answer for this hand-curated list.
+    nameSplit: { firstName: "Claudio", lastName: "De Vita" },
   },
   {
     displayName: "Mafalda Ricca",

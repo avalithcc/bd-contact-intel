@@ -76,6 +76,32 @@ test("Eliseo Cohen Imach's curated row overrides the generic split with the huma
   assert.deepEqual(eliseo?.nameSplit, { firstName: "Eliseo", lastName: "Cohen Imach" });
 });
 
+test("Claudio De Vita's curated row overrides the generic split — the generic last-token rule would glue the surname particle 'De' onto firstName ('Claudio De' / 'Vita')", () => {
+  const claudio = PARTNER_ACCOUNT_CONTACT_ROWS.find((r) => r.displayName === "Claudio De Vita");
+  assert.deepEqual(claudio?.nameSplit, { firstName: "Claudio", lastName: "De Vita" });
+});
+
+test("every curated row's EFFECTIVE split (override ?? generic) is executed here, not just asserted in prose — this is the check that would have caught Claudio's particle bug", () => {
+  const effectiveSplits = PARTNER_ACCOUNT_CONTACT_ROWS.map((r) => ({
+    displayName: r.displayName,
+    split: r.nameSplit ?? splitDisplayName(r.displayName),
+  }));
+  assert.deepEqual(
+    effectiveSplits.find((e) => e.displayName === "Claudio De Vita")?.split,
+    { firstName: "Claudio", lastName: "De Vita" },
+  );
+  // No row's firstName should end with a bare surname-particle token that
+  // was actually meant to open the lastName (the exact defect this test
+  // guards against) — every override in the list must fully neutralize it.
+  for (const { displayName, split } of effectiveSplits) {
+    assert.ok(split.firstName.trim().length > 0, `empty firstName for ${displayName}`);
+    assert.ok(
+      !/\b(de|del|van|von|da|di|la|los)$/i.test(split.firstName.trim()),
+      `firstName "${split.firstName}" for ${displayName} ends in a likely surname particle — check for a missing nameSplit override`,
+    );
+  }
+});
+
 test("planPartnerAccountContactRows: resolves companyKey via normalizeCompanyKey, not a trusted column", () => {
   // "ACK Storm" only matches an existing-company set keyed by
   // normalizeCompanyKey's output ("ack storm"), never the raw display text
