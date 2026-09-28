@@ -310,15 +310,18 @@ export type TimelinePillFetchResult = { ok: true; entries: TimelineEntry[] } | {
  * server render (no dictionary/session/company lookups, no other tab's
  * data — just this one query).
  *
- * `pillKey` arrives from the client as a plain string (a Server Action is a
- * public endpoint, not a type-checked function call) — re-validated here via
- * `isTimelinePillKey` rather than trusted, same as any other action input.
+ * `personId`/`pillKey` arrive from the client as plain strings (a Server
+ * Action is a public endpoint, not a type-checked function call) —
+ * `personId` is re-validated via `isUuid` (same convention as
+ * `getConversationForAdminAction` above) and `pillKey` via
+ * `isTimelinePillKey`, rather than either being trusted.
  */
 export async function getTimelinePillEntriesAction(
   personId: string,
   pillKey: string | undefined,
 ): Promise<TimelinePillFetchResult> {
   try {
+    if (!isUuid(personId)) return { ok: false };
     const me = await getCurrentBd();
     const pill = pillKey && isTimelinePillKey(pillKey) ? pillKey : undefined;
     const { entries } = await getPersonTimeline(personId, me.id, { pill });

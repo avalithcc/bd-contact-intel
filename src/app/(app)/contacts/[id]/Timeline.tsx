@@ -8,8 +8,7 @@ import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries
 import {
   TIMELINE_PILL_KEYS,
   sumPillCount,
-  filterEntriesForPill,
-  isPillSelectionComplete,
+  resolveScopeEntries,
   type TimelinePillKey,
 } from "@/lib/activity/timelinePills";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
@@ -208,45 +207,47 @@ export function Timeline({
   const [pendingScope, setPendingScope] = useState<TimelineScope | null>(null);
   // Guards the reset effect below against firing redundantly on mount (the
   // `useState` initializers above already seed the right state for the
-  // first render) — it should only re-seed when the SERVER sends new props.
+  // first render) — it should only re-derive when the SERVER sends new props.
   const mountedProps = useRef({ entries, activePill });
-
-  useEffect(() => {
-    if (mountedProps.current.entries === entries && mountedProps.current.activePill === activePill) return;
-    mountedProps.current = { entries, activePill };
-    setCache({ [scopeOf(activePill)]: entries });
-    setActiveScope(scopeOf(activePill));
-    setPendingScope(null);
-  }, [entries, activePill]);
+  // "Latest value" ref (fresh-review CRITICAL fix): the reset effect below
+  // must read whatever pill the CLIENT currently has selected, not the one
+  // it was seeded with — reading `activeScope` state directly from the
+  // effect would make the effect depend on it and re-run on every pill
+  // click, which is not what "reset only when the server sends new props"
+  // means. Assigning during render is the standard React pattern for this.
+  const activeScopeRef = useRef(activeScope);
+  activeScopeRef.current = activeScope;
 
   function syncScopeUrl(pill: TimelinePillKey | undefined) {
     if (typeof window === "undefined") return;
-    // Raw History API, not `router.push`/`replace` — the App Router shallow-
-    // routing pattern for updating the URL bar without triggering a server
-    // render. Passing the router's own `history.state` back (instead of
-    // `null`) keeps whatever Next.js already attached there (scroll
-    // restoration, segment cache keys) intact.
+    // Raw History API, not `router.push`/`router.replace` — deliberate:
+    // 1) `replaceState`, not `pushState` — a filter pill is not a new place
+    //    in the page's history; it must not spam Back with one entry per
+    //    click, and Back from the record page should leave the record, not
+    //    walk through every pill the BD tried.
+    // 2) Raw `history`, not the Next.js router — this is the App Router
+    //    shallow-routing workaround (Next has no first-class shallow
+    //    routing yet): it updates the visible URL without the server render
+    //    a `router.replace` would trigger, which is the whole point of this
+    //    fix. Passing the router's own `history.state` back (instead of
+    //    `null`) keeps whatever Next.js already attached there (scroll
+    //    restoration, segment cache keys) intact.
+    //
+    // Trade-off this buys: Next's OWN internal `canonicalUrl` (written only
+    // by a real `router.push`/`replace`) is untouched by this call and can
+    // still diverge from the address bar — see the reset effect below for
+    // why that no longer matters for correctness.
     window.history.replaceState(window.history.state, "", filterHref(personId, pill));
   }
 
-  function selectPill(pill: TimelinePillKey | undefined) {
-    const scope = scopeOf(pill);
-    if (scope === activeScope) return;
-    syncScopeUrl(pill);
-
-    const cached = cache[scope];
-    if (cached) {
-      setActiveScope(scope);
-      return;
-    }
-
-    const referencePool = cache[activeScope] ?? entries;
-    if (isPillSelectionComplete(referencePool, countsByType, pill)) {
-      setCache((prev) => ({ ...prev, [scope]: filterEntriesForPill(referencePool, pill) }));
-      setActiveScope(scope);
-      return;
-    }
-
+  /**
+   * Fetches one pill's own page (getTimelinePillEntriesAction) and, on
+   * success, both caches it and makes it the active scope. Shared by
+   * `selectPill` (a fresh click) and the reset effect (re-deriving the
+   * still-active pill after a background data refresh) so a fetch's
+   * success/error handling can't drift between the two call sites.
+   */
+  function fetchScope(pill: TimelinePillKey | undefined, scope: TimelineScope) {
     setPendingScope(scope);
     getTimelinePillEntriesAction(personId, pill)
       .then((result) => {
@@ -262,6 +263,91 @@ export function Timeline({
         setPendingScope(null);
         showToast(l.genericError, "error");
       });
+  }
+
+  /**
+   * Fresh-review CRITICAL fix: `router.refresh()` (NoteComposer/
+   * CompleteTaskButton, after a mutation) re-fetches Next's own
+   * `canonicalUrl` — the pill active at the LAST REAL navigation — not
+   * `window.location`, so it's blind to any `syncScopeUrl` calls a pill
+   * click made since. The server therefore recomputes `activePill` (this
+   * `activePill` prop) for whatever pill THAT was, not what the BD is
+   * currently looking at, and can even revert the visible URL back to it.
+   *
+   * The underlying data DID change (that's the whole reason the refresh
+   * fired) and every previously cached scope may now be stale, so this
+   * drops the cache — but it must NOT let the server's `activePill` decide
+   * what's on screen: `activeScopeRef` (the CLIENT's own last selection)
+   * is the one source of truth for the active pill after first paint, and
+   * this only ever re-derives THAT pill's view from the fresh pool —
+   * locally when possible (`resolveScopeEntries`), via one scoped fetch
+   * otherwise — then re-asserts the URL, since the refresh may have
+   * reverted it.
+   */
+  useEffect(() => {
+    if (mountedProps.current.entries === entries && mountedProps.current.activePill === activePill) return;
+    mountedProps.current = { entries, activePill };
+    setPendingScope(null);
+
+    const serverScope = scopeOf(activePill);
+    const targetScope = activeScopeRef.current;
+    const targetPill = targetScope === ALL_SCOPE ? undefined : targetScope;
+
+    // Always refresh the scope the server just delivered. Every OTHER
+    // previously cached scope is dropped — the data changed, so a stale
+    // cache entry can't be trusted blindly the next time that pill is
+    // clicked (`selectPill`'s cache-hit fast path) — EXCEPT the currently
+    // active one, if different: its OLD (pre-mutation, but still correctly-
+    // scoped) entries stay in place until its replacement below is ready,
+    // so the visible list never flashes to a DIFFERENT scope's data while
+    // re-deriving it.
+    setCache((prev) => {
+      const next: Partial<Record<TimelineScope, TimelineEntry[]>> = { [serverScope]: entries };
+      if (targetScope !== serverScope && prev[targetScope]) next[targetScope] = prev[targetScope];
+      return next;
+    });
+
+    if (targetScope === serverScope) {
+      syncScopeUrl(targetPill);
+      return;
+    }
+
+    const resolved = resolveScopeEntries(entries, countsByType, targetPill);
+    if (resolved.kind === "ready") {
+      setCache((prev) => ({ ...prev, [targetScope]: resolved.entries }));
+      syncScopeUrl(targetPill);
+      return;
+    }
+
+    syncScopeUrl(targetPill);
+    fetchScope(targetPill, targetScope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `entries`/
+    // `activePill` (the server round-trip signal) intentionally gate this
+    // effect alone; `countsByType` always arrives from the same
+    // getPersonTimeline call as `entries`, and `personId`/`l`/`showToast`
+    // are stable for the life of this record page.
+  }, [entries, activePill]);
+
+  function selectPill(pill: TimelinePillKey | undefined) {
+    const scope = scopeOf(pill);
+    if (scope === activeScope) return;
+    syncScopeUrl(pill);
+
+    const cached = cache[scope];
+    if (cached) {
+      setActiveScope(scope);
+      return;
+    }
+
+    const referencePool = cache[activeScope] ?? entries;
+    const resolved = resolveScopeEntries(referencePool, countsByType, pill);
+    if (resolved.kind === "ready") {
+      setCache((prev) => ({ ...prev, [scope]: resolved.entries }));
+      setActiveScope(scope);
+      return;
+    }
+
+    fetchScope(pill, scope);
   }
 
   function handlePillClick(e: React.MouseEvent<HTMLAnchorElement>, pill: TimelinePillKey | undefined) {
