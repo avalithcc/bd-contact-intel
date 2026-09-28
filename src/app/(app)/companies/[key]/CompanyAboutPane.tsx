@@ -41,6 +41,7 @@ export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
       | "propCity"
       | "propCountry"
       | "propStartup"
+      | "propAccountType"
       | "emptyValue"
       | "edit"
       | "ownerUnassignedOption"
@@ -71,6 +72,9 @@ export interface CompanyAboutPaneProps {
    * RSC-serializable values. */
   lastEditByProperty: Record<string, LastEdit | undefined>;
   startupText: string;
+  /** Already localized ("Partner"/"Cliente"/"Organización estratégica"/"—")
+   * — see `accountTypeLabel` (listMappers.ts) for the mapping. */
+  accountTypeText: string;
   labels: CompanyAboutPaneLabels;
   newContactLabels: NewContactDialogLabels;
 }
@@ -129,6 +133,7 @@ export function CompanyAboutPane({
   ownerOptions,
   lastEditByProperty,
   startupText,
+  accountTypeText,
   labels: l,
   newContactLabels,
 }: CompanyAboutPaneProps) {
@@ -358,6 +363,19 @@ export function CompanyAboutPane({
         <div className="prop">
           <dt>{l.propStartup}</dt>
           <dd>{startupText}</dd>
+        </div>
+
+        {/* Display-only, no edit affordance — unlike every row above.
+            `account_type` comes from a curated import (partner/client/
+            strategic_org), and there's no product decision yet on who is
+            allowed to change an account's type, so exposing an inline edit
+            here would invite someone to flip "Partner" to "Cliente" with no
+            process behind it. This becomes an editable row with history
+            (same as Industria/Ciudad/País above) once that decision exists
+            — don't "fix" the inconsistency with the rows above it. */}
+        <div className="prop">
+          <dt>{l.propAccountType}</dt>
+          <dd>{accountTypeText}</dd>
         </div>
 
         {error && !editingProperty && (

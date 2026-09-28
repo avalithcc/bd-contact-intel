@@ -120,8 +120,6 @@ export const es: typeof en = {
     account: "Cuenta",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
-    create: "Crear",
-    importContacts: "Importar contactos",
     accountMenuLabel: "Menú de cuenta",
     signedInLabel: "Sesión iniciada",
     roleAdmin: "Administrador",
@@ -924,6 +922,12 @@ export const es: typeof en = {
     propStartup: "Startup",
     startupYes: "Sí",
     startupNo: "No",
+    // Display-only — see CompanyAboutPane.tsx's `propAccountType` row comment
+    // for why this isn't wired to `updateCompanyPropertyAction` yet.
+    propAccountType: "Tipo de cuenta",
+    accountTypePartner: "Partner",
+    accountTypeClient: "Cliente",
+    accountTypeStrategicOrg: "Organización estratégica",
     revenueHigh: "Alto",
     revenueMedium: "Medio",
     revenueLow: "Bajo",

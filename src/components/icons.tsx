@@ -42,16 +42,6 @@ export function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
-export function ImportIcon({ className }: { className?: string }) {
-  return (
-    <Svg className={className}>
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="m17 8-5-5-5 5" />
-      <path d="M12 3v12" />
-    </Svg>
-  );
-}
-
 // Sidebar nav icons (mockup-parity 3.3).
 export function ContactsIcon({ className }: { className?: string }) {
   return (
@@ -272,6 +262,35 @@ export function CheckIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>
       <path d="M20 6 9 17l-5-5" />
+    </Svg>
+  );
+}
+
+// Bulk actions bar (mockup-parity contacts.html `.bulk-bar`; PR
+// fix/bulk-bar-icons). Path data copied 1:1 from the mockup's inline SVGs,
+// same convention as the other icons above.
+export function PersonIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </Svg>
+  );
+}
+
+export function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5M12 15V3" />
+    </Svg>
+  );
+}
+
+export function CloseIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M18 6 6 18M6 6l12 12" />
     </Svg>
   );
 }

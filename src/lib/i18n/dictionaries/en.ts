@@ -153,12 +153,6 @@ export const en = {
     account: "Account",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
-    // TopBar "Create" menu (tasks.md mockup-parity 3.1). Only items backed
-    // by a real existing flow are shown — see TopBar.tsx's comment on the
-    // mockup items intentionally omitted (no standalone new-contact/
-    // new-task/log-note flow exists yet).
-    create: "Create",
-    importContacts: "Import contacts",
     // TopBar account menu (tasks.md mockup-parity 3.2).
     accountMenuLabel: "Account menu",
     signedInLabel: "Signed in",
@@ -1029,6 +1023,12 @@ export const en = {
     propStartup: "Startup",
     startupYes: "Yes",
     startupNo: "No",
+    // Display-only — see CompanyAboutPane.tsx's `propAccountType` row comment
+    // for why this isn't wired to `updateCompanyPropertyAction` yet.
+    propAccountType: "Account type",
+    accountTypePartner: "Partner",
+    accountTypeClient: "Client",
+    accountTypeStrategicOrg: "Strategic organization",
     revenueHigh: "High",
     revenueMedium: "Medium",
     revenueLow: "Low",

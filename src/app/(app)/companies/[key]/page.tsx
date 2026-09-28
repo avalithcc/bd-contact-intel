@@ -10,7 +10,7 @@ import {
   getCompanyTimelineFilterCounts,
 } from "@/lib/companies/recordQueries";
 import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/lib/companies/listMappers";
+import { accountTypeLabel, industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/lib/companies/listMappers";
 import {
   isCompanyActivityFilter,
   latestEditByProperty,
@@ -155,6 +155,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           ownerOptions={ownerOptions}
           lastEditByProperty={lastEditByProperty}
           startupText={startupLabel(hiring, l.startupYes, l.startupNo)}
+          accountTypeText={accountTypeLabel(company.accountType, l)}
           labels={pickCompanyRecordLabels(dict)}
           newContactLabels={newContactLabels}
         />

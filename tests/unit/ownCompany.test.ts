@@ -34,6 +34,19 @@ test("isOwnCompany does not match unrelated companies", () => {
   assert.equal(isOwnCompany("Acme Corp"), false);
 });
 
+test("isOwnCompany matches the production 'Avalith.net' / 'avalith.es' spelling variants", () => {
+  assert.equal(isOwnCompany("Avalith.net"), true);
+  assert.equal(isOwnCompany("avalith.es"), true);
+  assert.equal(isOwnCompany("AVALITH.NET"), true);
+  assert.equal(isOwnCompany("Avalith.ES"), true);
+});
+
+test("isOwnCompany does not match a prospect whose name merely contains 'avalith'", () => {
+  assert.equal(isOwnCompany("Avalithnet Consulting"), false);
+  assert.equal(isOwnCompany("Grupo Avalith.es Holdings"), false);
+  assert.equal(isOwnCompany("avalith.esteban"), false);
+});
+
 test("isOwnCompany handles blank/null/undefined input", () => {
   assert.equal(isOwnCompany(null), false);
   assert.equal(isOwnCompany(undefined), false);

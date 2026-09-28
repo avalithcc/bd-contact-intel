@@ -20,6 +20,7 @@
  */
 import { useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
+import { CloseIcon, DownloadIcon, PersonIcon, TasksIcon } from "@/components/icons";
 import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
 import { resolveSelectAllChecked } from "@/lib/contacts/bulkSelection";
 import { BulkGenerateMessagesButton } from "./BulkGenerateMessagesButton";
@@ -175,9 +176,11 @@ export function BulkActionsBar({
           <span className="sep" />
 
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("owner")}>
+            <PersonIcon className="icon" />
             {l.bulkAssignOwner}
           </button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("task")}>
+            <TasksIcon className="icon" />
             {l.bulkCreateTask}
           </button>
           <BulkGenerateMessagesButton
@@ -203,8 +206,10 @@ export function BulkActionsBar({
               window.location.href = buildExportHref(form, columns);
             }}
           >
+            <DownloadIcon className="icon" />
             {l.bulkExport}
           </button>
+          <span className="grow" />
           {total > selectedCount && !filterWideMode && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={selectAllMatching}>
               {l.bulkSelectAllMatching.replace("{n}", String(total))}
@@ -213,11 +218,11 @@ export function BulkActionsBar({
           {filterWideMode && <span className="meta">{l.bulkSelectAllMatchingNotice}</span>}
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-sm btn-icon"
             onClick={clearSelection}
             aria-label={l.bulkClearSelection}
           >
-            {l.bulkClearSelection}
+            <CloseIcon className="icon" />
           </button>
         </div>
       )}
