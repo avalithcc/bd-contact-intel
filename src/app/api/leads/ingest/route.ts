@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import { isValidBearer } from "@/lib/cronAuth";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
 import { importLeads } from "@/lib/leads/queries";
@@ -116,7 +117,8 @@ export async function POST(request: Request) {
   let body: IngestBody;
   try {
     body = JSON.parse(rawBody);
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err);
     return NextResponse.json({ error: "Body is not valid JSON" }, { status: 400 });
   }
 

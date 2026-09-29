@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { db } from "@/db";
@@ -34,7 +34,8 @@ export async function mergeDuplicateCandidateAction(formData: FormData): Promise
 
   try {
     await mergeContacts(db, survivorId, mergedId, detail.reason, admin.id);
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err);
     redirectWithError("unexpected");
   }
   revalidatePath("/admin/duplicates");
@@ -48,7 +49,8 @@ export async function markNotDuplicateAction(formData: FormData): Promise<void> 
 
   try {
     await markNotDuplicate(db, candidateId, admin.id);
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err);
     redirectWithError("not_found");
   }
   revalidatePath("/admin/duplicates");
@@ -62,7 +64,8 @@ export async function unmergeDuplicateAction(formData: FormData): Promise<void> 
 
   try {
     await unmergeContact(db, mergeEventId, admin.id);
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err);
     redirectWithError("unexpected");
   }
   revalidatePath("/admin/duplicates");

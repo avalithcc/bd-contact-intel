@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { buildLeadDrafts, type LeadCsvBundle } from "@/lib/leads/csv";
 import { importLeads } from "@/lib/leads/queries";
 import { getCurrentBd } from "@/lib/queries";
@@ -70,6 +71,7 @@ export async function importLeadsCsv(
       identityReport: result.identityReport,
     };
   } catch (err) {
+    unstable_rethrow(err);
     return {
       ok: false,
       errorKey: "genericFailed",
