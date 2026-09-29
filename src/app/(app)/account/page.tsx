@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { MailIcon, LockIcon, ChevronRightIcon } from "@/components/icons";
+import { getGmailOAuthConfig } from "@/lib/gmail/config";
+import { gmailConnectionState } from "@/lib/gmail/connectionState";
 import { SignOutButton } from "../../SignOutButton";
 import styles from "./page.module.css";
 
@@ -33,7 +35,8 @@ export default async function AccountPage() {
     .select()
     .from(emailAccount)
     .where(eq(emailAccount.bdId, me.id));
-  const gmailConnected = account?.status === "connected";
+  // Same state function as /account/email, so the two pages always agree.
+  const gmailState = gmailConnectionState(getGmailOAuthConfig().ok, account?.status);
 
   return (
     <main className={styles.page}>
@@ -75,10 +78,14 @@ export default async function AccountPage() {
           <span className={styles.listLinkGrow}>
             <span className={styles.listLinkTitle}>{l.gmailRowTitle}</span>
             <span className={styles.listLinkMeta}>
-              {gmailConnected ? l.gmailConnectedMeta(account.emailAddress) : l.gmailNotConnectedMeta}
+              {gmailState === "connected" && account
+                ? l.gmailConnectedMeta(account.emailAddress)
+                : gmailState === "unavailable"
+                  ? l.gmailUnavailableMeta
+                  : l.gmailNotConnectedMeta}
             </span>
           </span>
-          {gmailConnected && <span className="legacy-badge green">{l.badgeConnected}</span>}
+          {gmailState === "connected" && <span className="legacy-badge green">{l.badgeConnected}</span>}
           <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
         </a>
         <a className={styles.listLink} href="/account/password">

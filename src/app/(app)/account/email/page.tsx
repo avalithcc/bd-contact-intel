@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
+import { gmailConnectionState } from "@/lib/gmail/connectionState";
 import { formatDate } from "@/lib/i18n/format";
 import { MailIcon, InfoIcon, WarningIcon } from "@/components/icons";
 import { ConnectSuccessToast } from "./ConnectSuccessToast";
@@ -41,7 +42,8 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
     .from(emailAccount)
     .where(eq(emailAccount.bdId, me.id));
 
-  const configResult = getGmailOAuthConfig();
+  // Same state function as /account, so the two pages always agree.
+  const gmailState = gmailConnectionState(getGmailOAuthConfig().ok, account?.status);
   const errorMessage = error
     ? error === "not_configured"
       ? l.errorNotConfigured
@@ -70,7 +72,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
         </div>
       )}
 
-      {!configResult.ok ? (
+      {gmailState === "unavailable" ? (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <MailIcon className={`icon ${styles.cardHeaderIcon}`} />
@@ -91,7 +93,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
             </button>
           </div>
         </div>
-      ) : account && account.status === "connected" ? (
+      ) : gmailState === "connected" && account ? (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <MailIcon className={`icon ${styles.cardHeaderIcon}`} />

@@ -799,6 +799,7 @@ export const es: typeof en = {
     gmailRowTitle: "Conexión con Gmail",
     gmailConnectedMeta: (email: string) => `Conectado como ${email}`,
     gmailNotConnectedMeta: "No conectado",
+    gmailUnavailableMeta: "No disponible en este entorno",
     badgeConnected: "Conectado",
     passwordRowTitle: "Contraseña",
     passwordRowMeta: "Actualizá tu contraseña de acceso",
@@ -810,7 +811,7 @@ export const es: typeof en = {
     subtitle:
       "Permite enviar correos desde las fichas de contacto usando la cuenta de Gmail conectada.",
     connectedTitle: "Estado: conectado",
-    notConfiguredTitle: "Estado: sin configurar",
+    notConfiguredTitle: "Estado: no disponible en este entorno",
     disconnectedTitle: "Estado: sin conectar",
     badgeConnected: "Conectado",
     badgeNotAvailable: "No disponible",
