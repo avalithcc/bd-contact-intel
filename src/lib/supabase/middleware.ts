@@ -47,12 +47,13 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = isPublicAuthRoute(path);
   // Authenticated via a bearer token instead of a Supabase session — see
   // src/app/api/hiring/sync/route.ts, src/app/api/hiring/discover/route.ts
-  // (CRON_SECRET) and src/app/api/leads/ingest/route.ts
-  // (LEADS_INGEST_TOKEN). Exact allowlist (not a bare prefix) so future
-  // routes like /api/hiring-admin don't silently bypass the session gate.
-  // Each route still verifies its own token — this only stops the session
-  // redirect from swallowing the request before it gets there.
-  const CRON_ROUTES = ["/api/hiring/sync", "/api/hiring/discover", "/api/leads/ingest"];
+  // (CRON_SECRET), src/app/api/leads/ingest/route.ts (LEADS_INGEST_TOKEN),
+  // and src/app/api/tasks/digest/route.ts (CRON_SECRET). Exact allowlist
+  // (not a bare prefix) so future routes like /api/hiring-admin don't
+  // silently bypass the session gate. Each route still verifies its own
+  // token — this only stops the session redirect from swallowing the
+  // request before it gets there.
+  const CRON_ROUTES = ["/api/hiring/sync", "/api/hiring/discover", "/api/leads/ingest", "/api/tasks/digest"];
   const isCronRoute = CRON_ROUTES.some(
     (route) => path === route || path.startsWith(`${route}/`),
   );
