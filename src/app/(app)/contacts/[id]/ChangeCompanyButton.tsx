@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
@@ -50,6 +50,7 @@ export function ChangeCompanyButton({
   const router = useRouter();
   const { showToast } = useToast();
 
+  const ids = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TaskSubjectSearchResult[]>([]);
@@ -82,6 +83,12 @@ export function ChangeCompanyButton({
     setQuery("");
     setResults([]);
     setError(null);
+    // Reset too: same bug class as NewTaskButton.tsx's busy-reset fix — the
+    // button and the dialog share this component (it stays mounted across
+    // opens), and `save`'s success path calls close() without resetting
+    // busy. Without this, the first company change would leave every
+    // control in the next "Cambiar empresa" dialog disabled.
+    setBusy(false);
   }
 
   async function save(companyKey: string | null) {
@@ -116,61 +123,67 @@ export function ChangeCompanyButton({
 
       {open && (
         <Dialog open onClose={close} title={l.changeCompanyAction}>
-          <div className="composer">
-            {error && (
-              <div className="error-text" role="alert">
-                {error}
-              </div>
-            )}
-
-            <div className="field">
-              <span>{l.changeCompanyCurrentLabel}</span>
-              <div className={styles.subjectChip}>
-                <span>{currentCompany?.displayName ?? l.noCompany}</span>
-                {currentCompany && (
-                  <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => save(null)}>
-                    {l.changeCompanyDetach}
-                  </button>
-                )}
-              </div>
+          {/* No `.composer` wrapper (its `:focus-within` lights the whole
+              form on any field focus) and no `<label>` wrapping the search
+              results — same two bugs the "Nueva tarea" dialog had: wrapping
+              a list of result buttons in a `<label>` makes the browser
+              forward each click to the label's own associated control. */}
+          {error && (
+            <div className="error-text" role="alert">
+              {error}
             </div>
+          )}
 
-            <label className="field">
+          <div className="field">
+            <span className="label">{l.changeCompanyCurrentLabel}</span>
+            <div className={styles.subjectChip}>
+              <span>{currentCompany?.displayName ?? l.noCompany}</span>
+              {currentCompany && (
+                <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => save(null)}>
+                  {l.changeCompanyDetach}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor={`${ids}-search`}>
               {l.changeCompanySearchLabel}
-              <div className={styles.searchWrap}>
-                <input
-                  className="input"
-                  value={query}
-                  placeholder={l.changeCompanySearchPlaceholder}
-                  onChange={(e) => setQuery(e.target.value)}
-                  disabled={busy}
-                  autoFocus
-                />
-                {searching && <p className="hint">{l.changeCompanySearching}</p>}
-                {!searching && query.trim().length >= 2 && results.length === 0 && (
-                  <p className="hint">
-                    {l.changeCompanyNoResults}{" "}
-                    <Link href="/companies/new">{l.changeCompanyCreateLink}</Link>
-                  </p>
-                )}
-                {results.length > 0 && (
-                  <ul className={styles.results} role="listbox">
-                    {results.map((result) => (
-                      <li key={result.id}>
-                        <button
-                          type="button"
-                          className={styles.resultItem}
-                          disabled={busy}
-                          onClick={() => save(result.id)}
-                        >
-                          {result.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
             </label>
+            <div className={styles.searchWrap}>
+              <input
+                id={`${ids}-search`}
+                className="input"
+                value={query}
+                placeholder={l.changeCompanySearchPlaceholder}
+                onChange={(e) => setQuery(e.target.value)}
+                disabled={busy}
+                autoFocus
+              />
+              {searching && <p className="hint">{l.changeCompanySearching}</p>}
+              {!searching && query.trim().length >= 2 && results.length === 0 && (
+                <p className="hint">
+                  {l.changeCompanyNoResults}{" "}
+                  <Link href="/companies/new">{l.changeCompanyCreateLink}</Link>
+                </p>
+              )}
+              {results.length > 0 && (
+                <ul className={styles.results} role="listbox">
+                  {results.map((result) => (
+                    <li key={result.id}>
+                      <button
+                        type="button"
+                        className={styles.resultItem}
+                        disabled={busy}
+                        onClick={() => save(result.id)}
+                      >
+                        {result.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </Dialog>
       )}
