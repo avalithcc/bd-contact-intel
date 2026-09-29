@@ -8,7 +8,7 @@ Prepared 2026-09-30. Analysis only — no application code, no production writes
 | --- | --- | --- |
 | 1 | Follow-up cadence | **Decided 2026-09-29** — see below |
 | 2 | Default pipeline stage | **Decided 2026-09-29** — see below |
-| 3 | Email enrichment | Pending |
+| 3 | Email enrichment | **Stage 1 decided 2026-09-29** — see below |
 
 ### 2. Default pipeline stage — decided
 
@@ -25,6 +25,24 @@ The 12-month window replaces the brief's "replied anywhere" rule. A reply from y
 | --- | ---: | ---: | ---: |
 | Reply at any time (brief) | 2 | 2,209 | 12,044 |
 | **Reply within 12 months (decided)** | 2 | **831** | 13,422 |
+
+### 3. Email enrichment — stage 1 decided, Hunter deferred
+
+**Stage 1 (approved).** Infer emails for free from a company's own email pattern:
+- A domain qualifies when it has at least 2 known emails with first and last names, and at least 80% of them follow one pattern (`first.last`, `flast`, `first`, …).
+- Personal-mail domains are excluded (gmail, hotmail, outlook, yahoo, icloud, live, …).
+- Inferred emails are stored as **inferred / unverified**, shown as "Inferido" on the record, and never treated as verified.
+
+**Stage 2 (deferred).** Decide on Hunter Domain Search for the remaining domains only after seeing how inferred emails bounce once BDs use them.
+
+Re-measured 2026-09-29 in a read-only transaction with `TZ=UTC`, with personal domains excluded more strictly than in the analysis below:
+
+| | Contacts |
+| --- | ---: |
+| Without an email | 20,708 |
+| With an identifiable company domain | 5,052 (1,322 domains) |
+| **Inferable for free (stage 1)** | **699** (645 owned), across 365 domains |
+| Would need Hunter (stage 2) | ~4,300 (1,181 domains) |
 
 ### 1. Follow-up cadence — decided
 
