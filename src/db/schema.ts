@@ -910,7 +910,7 @@ export const auditLog = pgTable(
       .notNull()
       .references(() => bd.id, { onDelete: "cascade" }),
     // 'view_conversation' | 'merge' | 'unmerge' | 'not_duplicate' |
-    // 'migration_approve' | 'migration_execute'
+    // 'migration_approve' | 'migration_execute' | 'bd_password_reset'
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
