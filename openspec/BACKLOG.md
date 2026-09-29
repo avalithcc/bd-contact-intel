@@ -236,11 +236,11 @@ revertible with `--revert`, audit row `6e9affdc`). Still open:
 - **233 contacts with no name** whose email cannot be split reliably
   (`gusoliva@`, `maria.laura.fantoni@`, digits, initials). Needs another
   source (LinkedIn, enrichment) or a BD.
-- **191 contacts with the full name stuffed in `first_name`** and an empty
-  `last_name` ("Colette Harington"). They look fine in the list, but sorting
-  by last name, dedupe by name, and any email merge field for the last name
-  are wrong for them. Splitting needs care — an earlier automatic split
-  turned "Claudio De Vita" into `Claudio De` / `Vita`.
+- **48 contacts still have the full name in `first_name`.** 143 of 191 were
+  split on 2026-09-29 (`scripts/backfill-split-stuffed-names.ts`, PR #186,
+  audit row `df7a98fe`, revertible). The rest are genuinely ambiguous
+  ("Gonzalo Castro Peña": one given name and two surnames, or the reverse),
+  start with a particle, or are junk; they need a person to decide.
 - **11 duplicate pairs open in `/admin/duplicates`** (10 queued by the
   backfill, 1 older): the same person recorded twice — one row with the
   email and history, the other with name, title and LinkedIn connections.
