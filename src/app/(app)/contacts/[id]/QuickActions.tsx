@@ -949,10 +949,19 @@ function SignalForm({
         disabled={busy}
       />
       <div className="bar">
-        <button type="button" onClick={onCancel} disabled={busy}>
+        {/* Unclassed buttons here fell back to the legacy `:where(button)`
+            style (same bug class as the Dialog markup sweep — PRs 189-193 —
+            just outside a Dialog; this composer is the pinned-style pattern
+            NoteComposer.tsx also uses, not a bug on its own). */}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
           {l.cancel}
         </button>
-        <button type="button" onClick={() => text.trim() && onSubmit(text.trim())} disabled={busy || !text.trim()}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => text.trim() && onSubmit(text.trim())}
+          disabled={busy || !text.trim()}
+        >
           {l.signalSave}
         </button>
       </div>
