@@ -1171,6 +1171,17 @@ export const task = pgTable(
     byAssignee: index("task_assignee_idx").on(t.assignedToBdId),
     byStatus: index("task_status_idx").on(t.status),
     byDue: index("task_due_idx").on(t.dueAt),
+    // Composite covering the (assignee, status, due date) shape shared by
+    // getTaskBadgeCount, getOpenTasks, getOverdueTasks (src/lib/tasks/queries.ts)
+    // and the digest cron's per-BD read — those already filter on
+    // `assigned_to_bd_id` and `status` equality plus a `due_at` range, so a
+    // single composite index serves all of them instead of Postgres bitmap-
+    // ANDing the three single-column indexes above (digest-hardening backlog).
+    byAssigneeStatusDue: index("task_assignee_status_due_idx").on(
+      t.assignedToBdId,
+      t.status,
+      t.dueAt,
+    ),
   }),
 );
 

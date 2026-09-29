@@ -11,6 +11,7 @@ import {
   markDigestFailed,
   markDigestSent,
 } from "@/lib/tasks/digestQueries";
+import { digestRunHasFailure } from "@/lib/tasks/digestOutcome";
 import { sanitizeSendError } from "@/lib/tasks/sendErrorSanitizer";
 import { sendDigestEmail } from "@/lib/mailer/smtpMailer";
 
@@ -25,6 +26,20 @@ import { sendDigestEmail } from "@/lib/mailer/smtpMailer";
  * `?dryRun=1` (still gated by CRON_SECRET) renders every BD's digest
  * without claiming a task_digest_send row or sending anything — the preview
  * mode required before this cron is trusted with a real send.
+ *
+ * A `pending` claim whose run died before sending (crash, timeout) is
+ * reclaimed by a later run once it is older than
+ * `ABANDONED_CLAIM_THRESHOLD_MS` (src/lib/tasks/digestClaim.ts) — otherwise
+ * that BD would silently never get a digest for that day again. A `sent`
+ * row is never resent; a `failed` row is never auto-retried (deliberate
+ * operator retry, see `taskDigestSend`'s schema comment).
+ *
+ * Response status signals the scheduler (digest-hardening backlog): 200 for
+ * "all sent" / "nothing to send" / a dry run, non-2xx (500) when at least
+ * one BD's send failed this run — including a failure after reclaiming an
+ * abandoned row — so Vercel's cron monitoring can see the failed run
+ * instead of a silent 200. See `digestRunHasFailure`
+ * (src/lib/tasks/digestOutcome.ts).
  *
  * To trigger a real run manually:
  *   curl -H "Authorization: Bearer $CRON_SECRET" \
@@ -94,7 +109,9 @@ export async function GET(request: Request) {
 
     // Claim BEFORE sending — a retried or duplicated cron invocation for
     // the same (bd, Argentina date) never sends twice (idempotency rule).
-    const claimedId = await claimDigestSend(bdId, boundaries.today);
+    // Also reclaims an abandoned `pending` row from a run that died before
+    // sending — see claimDigestSend's doc comment.
+    const claimedId = await claimDigestSend(bdId, boundaries.today, now);
     if (!claimedId) {
       results.push({ bdId, bdEmail: first.bdEmail, sent: false, skippedReason: "already_claimed" });
       continue;
@@ -117,5 +134,6 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ date: boundaries.today, dryRun, results });
+  const status = digestRunHasFailure(results) ? 500 : 200;
+  return NextResponse.json({ date: boundaries.today, dryRun, results }, { status });
 }
