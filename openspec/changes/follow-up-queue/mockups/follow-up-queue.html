@@ -49,7 +49,7 @@
 </div>
 </header>
 <main class="page">
-<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Propuesta de cola de seguimiento diaria por BD (cambio <span class="mono">follow-up-queue</span>). No existe hoy en la app. Entrada nueva en la barra lateral, debajo de "Tareas". Reutiliza las mismas acciones rápidas y diálogos ya aprobados en <span class="mono">contact-record.html</span> — hacer clic en cualquier acción de una tarjeta navega a esa ficha con el diálogo abierto. Ver <code>README.md</code> junto a este archivo para las decisiones a aprobar. <a href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas del sistema aprobado</a></div><span class="tag tag-scope">En alcance: follow-up-queue</span></div>
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Propuesta de cola de seguimiento diaria por BD (cambio <span class="mono">follow-up-queue</span>). No existe hoy en la app. Entrada nueva en la barra lateral, debajo de "Tareas". Reutiliza las mismas acciones rápidas y diálogos ya aprobados en <span class="mono">contact-record.html</span>, en su variante compacta de solo ícono (la misma que usan los botones de acción de <span class="mono">card-header</span>) — hacer clic en cualquier acción de una tarjeta navega a esa ficha con el diálogo abierto. Vista de escritorio únicamente. Ver <code>README.md</code> junto a este archivo para las decisiones a aprobar. <a href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas del sistema aprobado</a></div><span class="tag tag-scope">En alcance: follow-up-queue</span></div>
 
 <div class="page-header"><div class="titles"><div class="eyebrow">Seguimientos</div><h1>seguimientos de hoy<span class="dot">.</span></h1>
 <p class="meta">Contactos propios, tocados por última vez hace menos de 12 meses, que están vencidos para un seguimiento: <strong>Respondió</strong> con 3 o más días desde el último toque, o <strong>Contactado</strong> con 7 o más días. Hasta 10 por día, respondidos primero y, dentro de cada estado, el toque más reciente primero (los más "calientes").</p></div></div>
@@ -61,195 +61,185 @@
 
 <div class="stack">
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a1">VR</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Valentina Rojas</a><span class="badge badge-replied">Respondió</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">VR</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Valentina Rojas</a><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p>
 <div class="meta">Respuesta de LinkedIn recibida · hace 3 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Valentina Rojas">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Valentina Rojas" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a1">MQ</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Martina Quiroga</a><span class="badge badge-replied">Respondió</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">MQ</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Martina Quiroga</a><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">Product Director en <a href="../../crm-hubspot-ux/mockups/company-record.html">Ualá</a></p>
 <div class="meta">Respuesta recibida por correo · hace 4 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Martina Quiroga">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Martina Quiroga" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a3">CD</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Camila Duarte</a><span class="badge badge-replied">Respondió</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a3">CD</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Camila Duarte</a><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">Head of Platform en <a href="../../crm-hubspot-ux/mockups/company-record.html">Nubank</a></p>
 <div class="meta">Respondió en LinkedIn · hace 5 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Camila Duarte">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Camila Duarte" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a4">IC</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Isabella Castro</a><span class="badge badge-replied">Respondió</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a4">IC</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Isabella Castro</a><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">VP of Product en <a href="../../crm-hubspot-ux/mockups/company-record.html">Clip</a></p>
 <div class="meta">Respuesta recibida por correo · hace 6 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Isabella Castro">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Isabella Castro" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a2">MF</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Mateo Fernández</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a2">MF</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Mateo Fernández</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Engineering Manager en <a href="../../crm-hubspot-ux/mockups/company-record.html">Globant</a></p>
 <div class="meta">Mensaje de LinkedIn enviado · hace 7 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Mateo Fernández">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Mateo Fernández" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a4">SH</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Santiago Herrera</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a4">SH</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Santiago Herrera</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">CTO en <a href="../../crm-hubspot-ux/mockups/company-record.html">Rappi</a></p>
 <div class="meta">Correo enviado · hace 8 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Santiago Herrera">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Santiago Herrera" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a6">DS</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Diego Salazar</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a6">DS</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Diego Salazar</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Director of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Despegar</a></p>
 <div class="meta">Llamada saliente · Conectado · hace 9 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Diego Salazar">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Diego Salazar" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a5">TM</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Tomás Medina</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a5">TM</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Tomás Medina</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Head of Data en <a href="../../crm-hubspot-ux/mockups/company-record.html">Falabella</a></p>
 <div class="meta">Mensaje de LinkedIn enviado · hace 10 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Tomás Medina">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Tomás Medina" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a1">RS</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Renata Silva</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">RS</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Renata Silva</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Engineering Manager en <a href="../../crm-hubspot-ux/mockups/company-record.html">TOTVS</a></p>
 <div class="meta">Correo enviado · hace 12 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Renata Silva">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Renata Silva" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a3">NV</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Nicolás Vargas</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a3">NV</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Nicolás Vargas</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">CTO en <a href="../../crm-hubspot-ux/mockups/company-record.html">Betterfly</a></p>
 <div class="meta">Mensaje de LinkedIn enviado · hace 14 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Nicolás Vargas">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Nicolás Vargas" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
 </div>
 
@@ -267,157 +257,151 @@
 
 <h3 class="mb-lg">Completados hoy <span class="badge badge-success no-dot">3</span></h3>
 <div class="stack mb-lg">
-<div class="card" style="opacity:0.6"><div class="card-body"><div class="row"><span class="avatar a1">VR</span><div class="grow">
-<div class="row wrap"><span class="strong">Valentina Rojas</span><span class="badge badge-replied">Respondió</span><span class="badge badge-success no-dot"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Hecho</span></div>
+<div class="card" style="opacity:0.6"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">VR</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><span class="strong">Valentina Rojas</span><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">VP de Ingeniería en Mercado Libre</p>
 <div class="meta">Reunión registrada hoy</div>
-</div></div></div></div>
-<div class="card" style="opacity:0.6"><div class="card-body"><div class="row"><span class="avatar a1">MQ</span><div class="grow">
-<div class="row wrap"><span class="strong">Martina Quiroga</span><span class="badge badge-replied">Respondió</span><span class="badge badge-success no-dot"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Hecho</span></div>
+</div><span class="badge badge-success no-dot"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Hecho</span></div></div>
+<div class="card" style="opacity:0.6"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">MQ</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><span class="strong">Martina Quiroga</span><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">Product Director en Ualá</p>
 <div class="meta">Nota agregada hoy</div>
-</div></div></div></div>
-<div class="card" style="opacity:0.6"><div class="card-body"><div class="row"><span class="avatar a3">CD</span><div class="grow">
-<div class="row wrap"><span class="strong">Camila Duarte</span><span class="badge badge-replied">Respondió</span><span class="badge badge-success no-dot"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Hecho</span></div>
+</div><span class="badge badge-success no-dot"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Hecho</span></div></div>
+<div class="card" style="opacity:0.6"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a3">CD</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><span class="strong">Camila Duarte</span><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">Head of Platform en Nubank</p>
 <div class="meta">Llamada registrada hoy</div>
-</div></div></div></div>
+</div><span class="badge badge-success no-dot"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Hecho</span></div></div>
 </div>
 
 <h3 class="mb-lg">Pendientes <span class="badge badge-warn no-dot">7</span></h3>
 <div class="stack">
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a4">IC</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Isabella Castro</a><span class="badge badge-replied">Respondió</span></div>
+
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a4">IC</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Isabella Castro</a><span class="badge badge-replied">Respondió</span></div>
 <p class="headline">VP of Product en <a href="../../crm-hubspot-ux/mockups/company-record.html">Clip</a></p>
 <div class="meta">Respuesta recibida por correo · hace 6 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Isabella Castro">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Isabella Castro" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a2">MF</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Mateo Fernández</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a2">MF</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Mateo Fernández</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Engineering Manager en <a href="../../crm-hubspot-ux/mockups/company-record.html">Globant</a></p>
 <div class="meta">Mensaje de LinkedIn enviado · hace 7 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Mateo Fernández">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Mateo Fernández" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a4">SH</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Santiago Herrera</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a4">SH</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Santiago Herrera</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">CTO en <a href="../../crm-hubspot-ux/mockups/company-record.html">Rappi</a></p>
 <div class="meta">Correo enviado · hace 8 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Santiago Herrera">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Santiago Herrera" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a6">DS</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Diego Salazar</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a6">DS</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Diego Salazar</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Director of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Despegar</a></p>
 <div class="meta">Llamada saliente · Conectado · hace 9 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Diego Salazar">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Diego Salazar" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a5">TM</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Tomás Medina</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a5">TM</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Tomás Medina</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Head of Data en <a href="../../crm-hubspot-ux/mockups/company-record.html">Falabella</a></p>
 <div class="meta">Mensaje de LinkedIn enviado · hace 10 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Tomás Medina">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Tomás Medina" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a1">RS</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Renata Silva</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">RS</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Renata Silva</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">Engineering Manager en <a href="../../crm-hubspot-ux/mockups/company-record.html">TOTVS</a></p>
 <div class="meta">Correo enviado · hace 12 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Renata Silva">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Renata Silva" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
-<div class="card"><div class="card-body"><div class="row" style="align-items:flex-start"><span class="avatar a3">NV</span><div class="grow stack-sm">
-<div class="row wrap"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Nicolás Vargas</a><span class="badge badge-contacted">Contactado</span></div>
+<div class="card"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a3">NV</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Nicolás Vargas</a><span class="badge badge-contacted">Contactado</span></div>
 <p class="headline">CTO en <a href="../../crm-hubspot-ux/mockups/company-record.html">Betterfly</a></p>
 <div class="meta">Mensaje de LinkedIn enviado · hace 14 d</div>
-</div></div>
-<div class="quick-actions" role="toolbar" aria-label="Acciones rápidas para Nicolás Vargas">
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>Nota</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#call"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Llamada</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#email"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>Correo</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#task"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>Tarea</a>
-<a class="qa" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reunión</a>
-<a class="qa danger" href="../../crm-hubspot-ux/mockups/contact-record.html#discard"><span class="qa-icon"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>Descartar</a>
-</div></div>
-<div class="card-footer row between">
+</div>
+<div class="row wrap" role="toolbar" aria-label="Acciones rápidas para Nicolás Vargas" style="justify-content:flex-end">
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note" aria-label="Nota" title="Nota"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#call" aria-label="Llamada" title="Llamada"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#email" aria-label="Correo" title="Correo"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#task" aria-label="Tarea" title="Tarea"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></a>
+<a class="btn btn-ghost btn-sm btn-icon" href="../../crm-hubspot-ux/mockups/contact-record.html#meeting" aria-label="Reunión" title="Reunión"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></a>
+<a class="btn btn-danger btn-icon btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html#discard" aria-label="Descartar" title="Descartar"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></a>
+<div class="row" style="gap:var(--space-sm)">
 <a class="btn btn-secondary btn-sm" href="../../crm-hubspot-ux/mockups/contact-record.html">Abrir ficha</a>
 <details class="dropdown"><summary class="btn btn-ghost btn-sm">Posponer<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
 <div class="menu left"><a class="menu-item" href="#">Posponer a mañana</a><a class="menu-item" href="#">Omitir hoy</a></div></details>
-</div></div>
+</div></div></div></div>
 
 </div>
 

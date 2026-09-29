@@ -26,10 +26,14 @@ Open `follow-up-queue.html` in a browser. The top section is the live,
 default queue (10 cards, nothing worked yet). Below it, two states that
 can't be reached by clicking a static mockup are shown as a reference
 gallery, same components, different data: the empty queue, and a
-partially-worked queue (3 done, 7 pending). The 390px-wide screenshot is
-the same default section, resized — no separate markup, the layout is
-already responsive (see `styles.css`'s existing `@media (max-width: 860px)`
-rule, same one `contact-record.html` relies on).
+partially-worked queue (3 done, 7 pending).
+
+**Desktop only, by owner direction.** This screen targets the 1280px+
+desktop layout a BD works from all day; no mobile state was built or
+screenshotted, and none of the sizing choices below were tuned for narrow
+widths. The shared `.row.wrap` utility still lets the action row wrap
+instead of clipping if the window gets narrow, so nothing breaks
+catastrophically, but that's a safety net, not a designed state.
 
 ## Placement (why a new sidebar entry, not Outreach or Tasks)
 
@@ -94,6 +98,15 @@ buried inside a page already slated for something else.
    to close out, from the queue, a contact who plainly isn't going to
    reply, and the previous review round was rejected specifically for
    silently dropping existing functionality.
+   **Rendered as the compact icon-only `.btn-ghost.btn-icon.btn-sm` /
+   `.btn-danger.btn-icon.btn-sm` variant**, not `contact-record.html`'s
+   labeled `.quick-actions` grid — that variant is already used elsewhere
+   for the same kind of repeated, single-purpose row action (the edit
+   pencil on the "Empresa" card, the "+" on the "Tareas" card in
+   `contact-record.html`). Each icon keeps its label as `aria-label` and a
+   `title` tooltip, same as those. Labeling all six inline (as the record
+   page does) is what made the first version of this card ~320px tall; a
+   10-card daily list can't afford that per row.
 5. **Two new controls were added, as asked: "Abrir ficha" and a
    "Posponer" menu** ("Posponer a mañana" / "Omitir hoy"). Neither logs an
    activity or requires a reason, unlike Descartar, because neither
@@ -125,6 +138,15 @@ buried inside a page already slated for something else.
     card. Flag: should each card also show which threshold it crossed
     (e.g., "3+ días" as a small caption), for BDs who don't remember the
     rule from the intro?
+11. **One row per contact, ~110px tall at 1280px**, not the two-block
+    (info + separate action footer) layout from the first draft. The
+    avatar, name, badge, role/company and last-touch line sit in one flex
+    row on the left; the six icon actions plus "Abrir ficha" and
+    "Posponer" sit in one flex row on the right, in the same `.card-body`
+    — no `.card-footer` anymore. This was a direct fix for a 10-card
+    daily list needing very little scrolling; the previous ~320px cards
+    (labeled actions in a 5-column grid, plus a separate footer strip)
+    made 10 cards a multi-screen scroll.
 
 ## What building it would touch
 
