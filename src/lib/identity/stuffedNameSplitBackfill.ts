@@ -37,6 +37,10 @@ import { normalizeCompanyKey } from "@/lib/companyCategories";
 export type StuffedNameSplitRule = "particle" | "two_tokens" | "email_resolved" | "heuristic_4";
 
 export type StuffedNameSplitSkipReason =
+  // An owner-reviewed exclusion (OWNER_EXCLUDED_PERSON_IDS) — passes every
+  // structural rule but the owner confirmed by reading the actual row that
+  // it is not a person. Matched by person id only.
+  | "owner_excluded"
   // Collapses to 0 or 1 tokens once whitespace is normalized (rare — the
   // read candidate is pre-filtered to contain whitespace, but non-space
   // Unicode whitespace can still collapse to nothing after trim).
@@ -86,6 +90,26 @@ export const COMPANY_SUFFIX_WORDS: ReadonlySet<string> = new Set([
   "agency",
   "studio",
   "consulting",
+]);
+
+/**
+ * Owner-reviewed exclusions (owner ask, 2026-09-29), mirroring
+ * OWNER_EXCLUDED_EMAILS in nameFromEmailBackfill.ts: matched by EXACT
+ * person id, NEVER by the name text itself — a real person could
+ * legitimately be named anything a structural rule would also accept, so
+ * only an id match is safe here. Extend this list only after another owner
+ * review of the actual row — never by guessing at a broader rule (e.g. a
+ * dictionary of "company-sounding" words), which would false-positive on
+ * real two-word names that are also ordinary words.
+ *
+ * add5bf2d-6671-4a87-8254-bb3953699afb: first_name "Smart Gen", company
+ * and companyKey both null, no matching row in the `company` table either —
+ * no structural signal distinguishes it from a real two-token person name,
+ * but the owner confirmed by reading the actual account that it is not a
+ * person.
+ */
+export const OWNER_EXCLUDED_PERSON_IDS: ReadonlySet<string> = new Set([
+  "add5bf2d-6671-4a87-8254-bb3953699afb",
 ]);
 
 // Two-word particles are matched before single-word ones at the same
@@ -233,6 +257,7 @@ function titleCaseToken(token: string): string {
 }
 
 export interface StuffedNameSplitInput {
+  personId: string;
   firstName: string;
   email: string | null;
   company: string | null;
@@ -246,6 +271,8 @@ export interface StuffedNameSplitInput {
  * `duplicate_candidate` queueing is needed.
  */
 export function deriveStuffedNameSplit(input: StuffedNameSplitInput): StuffedNameSplitResult {
+  if (OWNER_EXCLUDED_PERSON_IDS.has(input.personId)) return { kind: "skip", reason: "owner_excluded" };
+
   const collapsed = collapseWhitespaceNfc(input.firstName);
   if (/\d/.test(collapsed)) return { kind: "skip", reason: "junk_digit" };
   if (collapsed.includes("@")) return { kind: "skip", reason: "junk_at" };

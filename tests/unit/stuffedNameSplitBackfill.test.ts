@@ -9,6 +9,7 @@ import {
   buildStuffedNameSplitPlan,
   COMPANY_SUFFIX_WORDS,
   deriveStuffedNameSplit,
+  OWNER_EXCLUDED_PERSON_IDS,
   type StuffedNameSplitCandidate,
 } from "@/lib/identity/stuffedNameSplitBackfill";
 
@@ -183,6 +184,25 @@ test("a company suffix word (e.g. 'Inc') anywhere marks the value as a company, 
 test("a value matching the person's own company (company field) is looks_like_company even with no suffix word", () => {
   const result = deriveStuffedNameSplit(candidate({ firstName: "Smart Gen", company: "Smart Gen" }));
   assert.deepEqual(result, { kind: "skip", reason: "looks_like_company" });
+});
+
+test("an owner-excluded person id is skipped as owner_excluded even though the value passes every structural rule", () => {
+  const excludedId = [...OWNER_EXCLUDED_PERSON_IDS][0]!;
+  const result = deriveStuffedNameSplit(
+    candidate({ personId: excludedId, firstName: "Smart Gen", company: null, companyKey: null }),
+  );
+  assert.deepEqual(result, { kind: "skip", reason: "owner_excluded" });
+});
+
+test("OWNER_EXCLUDED_PERSON_IDS contains the 'Smart Gen' person, matched by id — never by name", () => {
+  assert.ok(OWNER_EXCLUDED_PERSON_IDS.has("add5bf2d-6671-4a87-8254-bb3953699afb"));
+});
+
+test("a different person with the exact same 'Smart Gen' text is NOT excluded — the match is by id, not by name", () => {
+  const result = deriveStuffedNameSplit(
+    candidate({ personId: "some-other-person-id", firstName: "Smart Gen", company: null, companyKey: null }),
+  );
+  assert.deepEqual(result, { kind: "fill", fill: { firstName: "Smart", lastName: "Gen", rule: "two_tokens" } });
 });
 
 test("a value matching the person's own companyKey is looks_like_company", () => {

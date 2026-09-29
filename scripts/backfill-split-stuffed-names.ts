@@ -102,6 +102,7 @@ function parseArgs(argv: readonly string[]): Args {
 
 const RULE_ORDER: StuffedNameSplitRule[] = ["two_tokens", "particle", "email_resolved", "heuristic_4"];
 const SKIP_REASON_ORDER: StuffedNameSplitSkipReason[] = [
+  "owner_excluded",
   "single_token",
   "junk_digit",
   "junk_at",
