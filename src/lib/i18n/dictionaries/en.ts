@@ -878,14 +878,29 @@ export const en = {
   },
 
   account: {
-    eyebrow: "// welcome",
-    title: "Set your password",
-    subtitle: "Choose a password to finish setting up your account.",
-    newPassword: "New password",
-    confirmPassword: "Confirm password",
-    saveAndContinue: "Save and continue",
-    passwordTooShort: "Use at least 8 characters.",
+    // Normal flow: an already-authenticated user changing their password
+    // from /account (matches mockups/account-password.html: eyebrow "Cuenta",
+    // h1 "cambiar contraseña.").
+    eyebrow: "Account",
+    title: "change password",
+    subtitle: "Update your sign-in password.",
+    // Recovery flow: landing here straight from a password-recovery/invite
+    // email link (src/app/auth/confirm/route.ts), with no current password
+    // to give — see isRecovery in PasswordForm.tsx.
+    recoveryEyebrow: "Welcome",
+    recoveryTitle: "set your password",
+    recoverySubtitle: "Choose a password to finish setting up your account.",
+    currentPasswordLabel: "Current password",
+    newPasswordLabel: "New password",
+    confirmPasswordLabel: "Confirm new password",
+    newPasswordHelp: (min: number) => `At least ${min} characters.`,
+    submit: "Update password",
+    cancel: "Cancel",
+    currentPasswordRequired: "Enter your current password.",
+    currentPasswordIncorrect: "The current password is incorrect.",
+    newPasswordSameAsCurrent: "The new password must be different from the current one.",
     passwordsDontMatch: "Passwords don't match.",
+    genericError: "Something went wrong. Please try again.",
   },
 
   accountSettings: {

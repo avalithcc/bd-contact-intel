@@ -8,7 +8,12 @@
  * mistypes it. Every generated password is guaranteed to contain at least
  * one uppercase letter, one lowercase letter, one digit and one symbol, and
  * is always at least TEMP_PASSWORD_MIN_LENGTH characters — comfortably above
- * the app's own minimum (see PasswordForm.tsx, `password.length < 8`).
+ * the app's own new-password minimum (see src/lib/auth/passwordPolicy.ts,
+ * MIN_NEW_PASSWORD_LENGTH). Note this generator is only used for the
+ * TEMPORARY password an owner sets via scripts/reset-bd-password.ts; the BD
+ * signs in with it as their *current* password and immediately picks a new
+ * one at /account/password, so this length only needs to satisfy Supabase's
+ * own minimum, not MIN_NEW_PASSWORD_LENGTH.
  */
 import { randomInt as nodeRandomInt } from "node:crypto";
 

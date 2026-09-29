@@ -779,14 +779,29 @@ export const es: typeof en = {
   },
 
   account: {
-    eyebrow: "// bienvenida",
-    title: "Configura tu contraseña",
-    subtitle: "Elige una contraseña para terminar de configurar tu cuenta.",
-    newPassword: "Nueva contraseña",
-    confirmPassword: "Confirmar contraseña",
-    saveAndContinue: "Guardar y continuar",
-    passwordTooShort: "Usa al menos 8 caracteres.",
+    // Normal flow: an already-authenticated user changing their password
+    // from /account (matches mockups/account-password.html: eyebrow "Cuenta",
+    // h1 "cambiar contraseña.").
+    eyebrow: "Cuenta",
+    title: "cambiar contraseña",
+    subtitle: "Actualizá tu contraseña de acceso.",
+    // Recovery flow: landing here straight from a password-recovery/invite
+    // email link (src/app/auth/confirm/route.ts), with no current password
+    // to give — see isRecovery in PasswordForm.tsx.
+    recoveryEyebrow: "Bienvenida",
+    recoveryTitle: "configura tu contraseña",
+    recoverySubtitle: "Elige una contraseña para terminar de configurar tu cuenta.",
+    currentPasswordLabel: "Contraseña actual",
+    newPasswordLabel: "Contraseña nueva",
+    confirmPasswordLabel: "Confirmar contraseña nueva",
+    newPasswordHelp: (min: number) => `Al menos ${min} caracteres.`,
+    submit: "Actualizar contraseña",
+    cancel: "Cancelar",
+    currentPasswordRequired: "Ingresá tu contraseña actual.",
+    currentPasswordIncorrect: "La contraseña actual no es correcta.",
+    newPasswordSameAsCurrent: "La nueva contraseña debe ser diferente a la actual.",
     passwordsDontMatch: "Las contraseñas no coinciden.",
+    genericError: "Ocurrió un error. Intentá de nuevo.",
   },
 
   accountSettings: {
