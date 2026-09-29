@@ -232,11 +232,16 @@
 
 /* Metric-adjusted local fallback, standing in for Inter/JetBrains Mono
    during the brief window before the self-hosted webfont finishes
-   loading (font-display: swap). The override percentages match what
-   next/font/google previously computed for these exact families from
-   their own font metrics — copied from a captured build, not guessed —
-   so the fallback-to-webfont swap doesn't shift layout any more than it
-   did before this migration. */
+   loading (font-display: swap). The override percentages are what
+   next/font/google computed for these exact families before this
+   migration, so the fallback-to-webfont swap shifts layout no more than
+   it did then. Regenerate them, never hand-copy them, with Next's own
+   function (the one next/font/google uses):
+     node -e 'const f=require("next/dist/server/font-utils.js");
+       for (const n of ["Inter","JetBrains Mono"])
+         console.log(n, f.calculateSizeAdjustValues(n))'
+   A first version of this block carried JetBrains Mono values that did
+   not come from that function (77.57/22.82/131.49); review caught it. */
 @font-face {
   font-family: "Inter Fallback";
   src: local("Arial");
@@ -248,10 +253,10 @@
 @font-face {
   font-family: "JetBrains Mono Fallback";
   src: local("Arial");
-  ascent-override: 77.57%;
-  descent-override: 22.82%;
+  ascent-override: 75.79%;
+  descent-override: 22.29%;
   line-gap-override: 0%;
-  size-adjust: 131.49%;
+  size-adjust: 134.59%;
 }
 
 * {

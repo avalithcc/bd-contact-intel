@@ -990,7 +990,7 @@ export const es: typeof en = {
     taskDialogTitle: "Nueva tarea",
     taskTitleLabel: "Título de la tarea",
     taskDescriptionLabel: "Descripción",
-    taskDueLabel: "Fecha límite",
+    taskDueLabel: "Vencimiento",
     taskAssigneeLabel: "Asignado a",
     taskCreate: "Crear tarea",
     meetingDialogTitle: "Registrar reunión",
