@@ -761,6 +761,19 @@ export const es: typeof en = {
     domainRestricted: (domain) => `Las cuentas están limitadas a correos ${domain}.`,
     passwordTooShort: "Usa al menos 8 caracteres para tu contraseña.",
     accountCreated: "Cuenta creada. Revisa tu bandeja de entrada para confirmar y luego inicia sesión.",
+    forgotPasswordLink: "¿Olvidaste tu contraseña?",
+    expiredLinkError: "El enlace venció o no es válido. Solicitá uno nuevo.",
+  },
+
+  forgotPassword: {
+    eyebrow: "// recuperar acceso",
+    title: "Recuperar contraseña",
+    subtitle: "Ingresá tu correo de trabajo y te enviamos un enlace para elegir una contraseña nueva.",
+    workEmail: "Correo de trabajo",
+    submit: "Enviar enlace",
+    genericConfirmation:
+      "Si ese correo tiene una cuenta, vas a recibir un enlace para restablecer tu contraseña.",
+    backToLogin: "Volver a iniciar sesión",
   },
 
   account: {
