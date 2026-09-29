@@ -342,9 +342,14 @@ export function deriveStuffedNameSplit(input: StuffedNameSplitInput): StuffedNam
     }
   }
 
-  const casedTokens = tokens.map((token, idx) =>
-    particleIndices.has(idx) ? token : isAllLower(token) || isAllUpper(token) ? titleCaseToken(token) : token,
-  );
+  const casedTokens = tokens.map((token, idx) => {
+    const isUniformCase = isAllLower(token) || isAllUpper(token);
+    if (!isUniformCase) return token; // mixed-case original (e.g. "De") kept verbatim
+    // A particle whose original was all-caps/all-lowercase becomes lowercase
+    // ("JUAN DE LA CRUZ" -> "de la Cruz"), never title-cased like a normal
+    // surname token ("De La Cruz" would look like two given names).
+    return particleIndices.has(idx) ? token.toLowerCase() : titleCaseToken(token);
+  });
   const firstName = casedTokens.slice(0, boundary).join(" ");
   const lastName = casedTokens.slice(boundary).join(" ");
   return { kind: "fill", fill: { firstName, lastName, rule } };

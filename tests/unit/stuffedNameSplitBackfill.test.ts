@@ -72,6 +72,30 @@ test("surname particle keeps its original (lowercase) casing even though the gen
   });
 });
 
+test("an all-caps particle is lowercased (not kept verbatim, not title-cased) even though the surname after it is still title-cased", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "JUAN DE LA CRUZ" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Juan", lastName: "de la Cruz", rule: "particle" },
+  });
+});
+
+test("an all-lowercase whole-name particle stays lowercase (same output as the mixed-case original)", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "juan de la cruz" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Juan", lastName: "de la Cruz", rule: "particle" },
+  });
+});
+
+test("a particle with genuine mixed-case original ('De') keeps it, even though it starts with a capital letter", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Claudio De Vita" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Claudio", lastName: "De Vita", rule: "particle" },
+  });
+});
+
 test("two-word particle 'van der' is recognised", () => {
   const result = deriveStuffedNameSplit(candidate({ firstName: "Johan van der Berg" }));
   assert.deepEqual(result, {
