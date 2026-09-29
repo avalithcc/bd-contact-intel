@@ -12,6 +12,7 @@ import {
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { resolveTaskSubject } from "@/lib/tasks/subject";
 import { buildTaskBuckets, dueBucketOf } from "@/lib/tasks/taskBuckets";
+import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { isTaskView, taskViewTabs, type TaskView } from "@/lib/tasks/viewTabs";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
@@ -276,10 +277,7 @@ function TaskRow({
               ? l.dueToday
               : status === "tomorrow"
                 ? l.dueTomorrow
-                : new Date(task.dueAt).toLocaleDateString("es-AR", {
-                    day: "numeric",
-                    month: "short",
-                  })}
+                : formatTaskDueDate(new Date(task.dueAt))}
           </span>
         ) : (
           "—"

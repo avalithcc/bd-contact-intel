@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
 import {
   TIMELINE_PILL_KEYS,
@@ -490,7 +491,7 @@ export function Timeline({
                     <span className="what">{t.title}</span>
                     {t.dueAt && (
                       <span className="badge badge-warn no-dot">
-                        {l.taskDueBadgePrefix} {format(t.dueAt, "d MMM", { locale: es })}
+                        {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
                       </span>
                     )}
                     {t.assignedToName && (
