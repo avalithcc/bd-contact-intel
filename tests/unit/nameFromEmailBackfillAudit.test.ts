@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildNameFromEmailBackfillAuditMetadata,
+  isNameFromEmailBackfillAuditWorthRecording,
   NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP,
 } from "@/lib/identity/nameFromEmailBackfillAudit";
 
@@ -83,4 +84,32 @@ test("buildNameFromEmailBackfillAuditMetadata truncates the duplicate_candidate 
   });
   assert.equal(metadata.duplicateCandidatesQueued.length, NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP);
   assert.equal(metadata.duplicateCandidatesQueuedTruncated, true);
+});
+
+// --- isNameFromEmailBackfillAuditWorthRecording ------------------------------
+// CRITICAL fix: an empty --execute re-run must never write an audit_log row
+// (it would become the "latest" and hide the real backfill from --revert).
+
+test("isNameFromEmailBackfillAuditWorthRecording is false when nothing was applied and nothing was queued", () => {
+  assert.equal(
+    isNameFromEmailBackfillAuditWorthRecording({ appliedFills: [], queuedDuplicateCandidates: [] }),
+    false,
+  );
+});
+
+test("isNameFromEmailBackfillAuditWorthRecording is true when at least one fill was applied", () => {
+  assert.equal(
+    isNameFromEmailBackfillAuditWorthRecording({ appliedFills: [fill("p1")], queuedDuplicateCandidates: [] }),
+    true,
+  );
+});
+
+test("isNameFromEmailBackfillAuditWorthRecording is true when at least one duplicate_candidate was queued, even with zero fills", () => {
+  assert.equal(
+    isNameFromEmailBackfillAuditWorthRecording({
+      appliedFills: [],
+      queuedDuplicateCandidates: [{ id: "dc1", personAId: "a", personBId: "b" }],
+    }),
+    true,
+  );
 });

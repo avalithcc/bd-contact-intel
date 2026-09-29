@@ -68,6 +68,22 @@ export interface NameFromEmailBackfillAuditMetadata {
   duplicateCandidatesAlreadyQueued: number;
 }
 
+/**
+ * CRITICAL fix: an `--execute` run that applies ZERO fills and queues ZERO
+ * duplicate_candidate rows (e.g. someone re-running `--execute` "to check"
+ * after the real backfill already ran) must NOT write an audit_log row —
+ * it would become the newest row and hide the real backfill from
+ * `--revert`'s row-selection (see nameFromEmailBackfillRevert.ts). Callers
+ * must check this BEFORE inserting into audit_log; skip the insert (and
+ * print "nothing to do") when it returns false.
+ */
+export function isNameFromEmailBackfillAuditWorthRecording(input: {
+  appliedFills: readonly unknown[];
+  queuedDuplicateCandidates: readonly unknown[];
+}): boolean {
+  return input.appliedFills.length > 0 || input.queuedDuplicateCandidates.length > 0;
+}
+
 export function buildNameFromEmailBackfillAuditMetadata(input: {
   fillsPlanned: number;
   appliedFills: readonly AppliedNameFromEmailFill[];

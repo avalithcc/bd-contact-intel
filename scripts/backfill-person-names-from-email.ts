@@ -36,11 +36,16 @@
  *      batching, see scripts/backfill-role-groups.ts), never one round trip
  *      per row.
  *   2. Audit trail — one `audit_log` row (action
- *      `person_name_from_email_backfill`) in the same transaction. Metadata
- *      (src/lib/identity/nameFromEmailBackfillAudit.ts) carries each
- *      applied fill's personId + the exact firstName/lastName written (the
- *      revert path needs the written value, not just the id — see below),
- *      plus the id of every `duplicate_candidate` row this run inserted.
+ *      `person_name_from_email_backfill`) in the same transaction, ONLY
+ *      when at least one fill was applied or one duplicate_candidate was
+ *      queued (isNameFromEmailBackfillAuditWorthRecording — CRITICAL fix: a
+ *      no-op re-run must never write an empty audit row, since it would
+ *      become the newest row and hide the real backfill from `--revert`).
+ *      Metadata (src/lib/identity/nameFromEmailBackfillAudit.ts) carries
+ *      each applied fill's personId + the exact firstName/lastName written
+ *      (the revert path needs the written value, not just the id — see
+ *      below), plus the id of every `duplicate_candidate` row this run
+ *      inserted.
  *   3. Re-check before writing — the UPDATE's WHERE clause re-checks BOTH
  *      first_name and last_name are still empty at write time, on top of the
  *      in-memory snapshot check the read already did. A row that changed
@@ -80,7 +85,10 @@ import {
   planDuplicateCandidateQueue,
   type NameFromEmailSkipReason,
 } from "../src/lib/identity/nameFromEmailBackfill";
-import { buildNameFromEmailBackfillAuditMetadata } from "../src/lib/identity/nameFromEmailBackfillAudit";
+import {
+  buildNameFromEmailBackfillAuditMetadata,
+  isNameFromEmailBackfillAuditWorthRecording,
+} from "../src/lib/identity/nameFromEmailBackfillAudit";
 import {
   readCollisionCandidates,
   readExistingDuplicateCandidatePairs,
@@ -246,6 +254,15 @@ async function runForwardBackfill(args: Args) {
       queuedDuplicateCandidates.push(...inserted);
     }
 
+    // CRITICAL: an empty run (0 applied, 0 queued — e.g. re-running
+    // --execute "to check" after the real backfill already ran) must NOT
+    // write an audit_log row. It would become the newest row and hide the
+    // real backfill from --revert's row selection (see
+    // nameFromEmailBackfillRevertDb.ts#readAllNameFromEmailBackfillAuditRows).
+    if (!isNameFromEmailBackfillAuditWorthRecording({ appliedFills, queuedDuplicateCandidates })) {
+      return;
+    }
+
     const metadata = buildNameFromEmailBackfillAuditMetadata({
       fillsPlanned: plan.fills.length,
       appliedFills,
@@ -259,6 +276,12 @@ async function runForwardBackfill(args: Args) {
       metadata,
     });
   });
+
+  if (!isNameFromEmailBackfillAuditWorthRecording({ appliedFills, queuedDuplicateCandidates })) {
+    console.log("");
+    console.log("Nothing to do — no fills applied and no duplicate_candidate rows queued. No audit_log row written.");
+    return;
+  }
 
   console.log("");
   console.log(`Applied ${appliedFills.length} name fill(s).`);
