@@ -823,11 +823,15 @@ export const en = {
   },
 
   // Server-only formatter templates for /companies/[key] (mockup-port c03).
-  // Kept separate from `companyRecord` — EditCompanyButton.tsx types its
-  // labels prop as `ClientStrings<Dictionary["companyRecord"]>`, which
-  // requires every value to be a plain string (or nested string record);
-  // function-valued templates live here instead, same split as
-  // contactRecordServer above.
+  // Kept separate from `companyRecord` — CompanyAboutPane.tsx and
+  // CompanyQuickActions.tsx (client components) get their labels via
+  // `pickCompanyRecordLabels` (src/lib/companies/labels.ts), typed
+  // `ClientStrings<Dictionary["companyRecord"] & ...>`, which requires
+  // every value to be a plain string (or nested string record); RSC
+  // serialization rejects a function prop reaching a Client Component.
+  // These function-valued formatters are only ever read server-side
+  // (page.tsx / actions.ts via buildCompanyTimelineViewRows), same split
+  // as contactRecordServer above.
   companyRecordServer: {
     noteBy: (actor: string) => `Note · ${actor}`,
     emailSentTo: (to: string) => `Email sent to ${to}`,
@@ -1016,23 +1020,14 @@ export const en = {
     revenuePotential: "Revenue potential",
     notesTitle: "Notes",
     activityTitle: "Activity",
-    editCompany: "Edit company",
-    addActivity: "Add activity",
-    editDialogTitle: "Edit company",
     companyNameLabel: "Company name",
     stageLabel: "Stage",
-    stageNone: "None",
     revenueLabel: "Revenue potential",
     notesLabel: "Notes",
     save: "Save",
     saving: "Saving…",
     cancel: "Cancel",
-    editError: "Couldn't update the company",
-    editSuccess: "Company updated.",
-    addActivityDialogTitle: "Add activity",
     notePlaceholder: "What happened?",
-    addActivityError: "Couldn't add the activity",
-    addActivitySuccess: "Activity added.",
 
     // --- mockup-port c03 additions (company-record.html three-panel shell) ---
     breadcrumb: "Companies",
@@ -1068,9 +1063,6 @@ export const en = {
     accountTypePartner: "Partner",
     accountTypeClient: "Client",
     accountTypeStrategicOrg: "Strategic organization",
-    revenueHigh: "High",
-    revenueMedium: "Medium",
-    revenueLow: "Low",
     tabActivity: "Activity",
     tabHiring: "Hiring signals",
     timelineFilterAll: "All",
