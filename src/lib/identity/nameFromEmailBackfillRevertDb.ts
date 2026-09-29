@@ -6,40 +6,43 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, duplicateCandidate, person } from "@/db/schema";
-import type { AppliedNameFromEmailFill, QueuedDuplicateCandidateRef } from "@/lib/identity/nameFromEmailBackfillAudit";
+import type { NameFromEmailBackfillAuditRowForSelection } from "@/lib/identity/nameFromEmailBackfillRevert";
 import type { CurrentDuplicateCandidateState, CurrentPersonNameState } from "@/lib/identity/nameFromEmailBackfillRevert";
 
 const BACKFILL_ACTION = "person_name_from_email_backfill";
 
-export interface NameFromEmailBackfillAuditRow {
-  id: string;
-  fills: AppliedNameFromEmailFill[];
-  duplicateCandidatesQueued: QueuedDuplicateCandidateRef[];
-}
-
 /**
- * The most recent `audit_log` row for this backfill's `--execute` action —
- * one indexed query (audit_log has no dedicated index on `action`, but this
- * table is small and admin-only; bounded by `LIMIT 1`). Returns null when
- * this backfill has never been executed.
+ * EVERY `audit_log` row for this backfill's `--execute` action, oldest to
+ * newest metadata shape aside — CRITICAL: revert must never just read the
+ * MOST RECENT row (a no-op re-run used to still write an empty one, which
+ * would then hide the real backfill run from revert — see
+ * nameFromEmailBackfillAudit.ts#isNameFromEmailBackfillAuditWorthRecording
+ * for the write-side fix, and
+ * nameFromEmailBackfillRevert.ts#selectNameFromEmailBackfillAuditRow for the
+ * read-side selection rule this feeds). This table is small and admin-only
+ * (one row per backfill run, never per-person), so reading every matching
+ * row is bounded and cheap — no LIMIT needed.
  */
-export async function readLatestNameFromEmailBackfillAudit(): Promise<NameFromEmailBackfillAuditRow | null> {
-  const [row] = await db
-    .select({ id: auditLog.id, metadata: auditLog.metadata })
+export async function readAllNameFromEmailBackfillAuditRows(): Promise<NameFromEmailBackfillAuditRowForSelection[]> {
+  const rows = await db
+    .select({ id: auditLog.id, at: auditLog.at, actorBdId: auditLog.actorBdId, metadata: auditLog.metadata })
     .from(auditLog)
     .where(eq(auditLog.action, BACKFILL_ACTION))
-    .orderBy(desc(auditLog.at))
-    .limit(1);
-  if (!row) return null;
-  const metadata = row.metadata as {
-    fills?: AppliedNameFromEmailFill[];
-    duplicateCandidatesQueued?: QueuedDuplicateCandidateRef[];
-  };
-  return {
-    id: row.id,
-    fills: metadata.fills ?? [],
-    duplicateCandidatesQueued: metadata.duplicateCandidatesQueued ?? [],
-  };
+    .orderBy(desc(auditLog.at));
+
+  return rows.map((row) => {
+    const metadata = row.metadata as {
+      fills?: NameFromEmailBackfillAuditRowForSelection["fills"];
+      duplicateCandidatesQueued?: NameFromEmailBackfillAuditRowForSelection["duplicateCandidatesQueued"];
+    };
+    return {
+      id: row.id,
+      at: row.at,
+      actorBdId: row.actorBdId,
+      fills: metadata.fills ?? [],
+      duplicateCandidatesQueued: metadata.duplicateCandidatesQueued ?? [],
+    };
+  });
 }
 
 /** Current first_name/last_name for exactly the audited person ids — never

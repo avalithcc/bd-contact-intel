@@ -100,3 +100,74 @@ export function buildNameFromEmailRevertPlan(input: {
 
   return { personIdsToRevert, personsSkipped, duplicateCandidateIdsToDelete, duplicateCandidatesSkipped };
 }
+
+// --- Audit row selection (CRITICAL fix) -------------------------------------
+// Revert must NEVER just take the "latest" audit_log row: an empty re-run
+// used to still insert a row (fixed separately in
+// nameFromEmailBackfillAudit.ts#isNameFromEmailBackfillAuditWorthRecording),
+// and defensively, this selector also ignores any row it's given that
+// records no fills and no queued candidates — belt and suspenders. When
+// more than one real (non-empty) row exists, revert refuses by default and
+// lists every candidate so the operator can pick one explicitly via
+// --audit-id=<uuid>.
+
+export interface NameFromEmailBackfillAuditSummary {
+  id: string;
+  at: Date;
+  actorBdId: string;
+  fillCount: number;
+  queuedCount: number;
+}
+
+export interface NameFromEmailBackfillAuditRowForSelection {
+  id: string;
+  at: Date;
+  actorBdId: string;
+  fills: AuditedFill[];
+  duplicateCandidatesQueued: AuditedDuplicateCandidateRef[];
+}
+
+export type NameFromEmailBackfillAuditSelection =
+  | { kind: "none" }
+  | { kind: "selected"; row: NameFromEmailBackfillAuditRowForSelection }
+  | { kind: "ambiguous"; candidates: NameFromEmailBackfillAuditSummary[] }
+  | { kind: "not_found"; requestedAuditId: string; candidates: NameFromEmailBackfillAuditSummary[] };
+
+function isNonEmptyAuditRow(row: NameFromEmailBackfillAuditRowForSelection): boolean {
+  return row.fills.length > 0 || row.duplicateCandidatesQueued.length > 0;
+}
+
+function toAuditSummary(row: NameFromEmailBackfillAuditRowForSelection): NameFromEmailBackfillAuditSummary {
+  return {
+    id: row.id,
+    at: row.at,
+    actorBdId: row.actorBdId,
+    fillCount: row.fills.length,
+    queuedCount: row.duplicateCandidatesQueued.length,
+  };
+}
+
+/**
+ * Pure — never mutates `rows`. Filters out any row recording no fills and no
+ * queued candidates (legacy/defensive — see
+ * isNameFromEmailBackfillAuditWorthRecording, which should prevent these
+ * from ever being written, but this selector never trusts that alone).
+ * `auditId`, when given, must match a NON-EMPTY row — an id that only
+ * matches an empty row is reported as not_found, never silently accepted.
+ */
+export function selectNameFromEmailBackfillAuditRow(
+  rows: readonly NameFromEmailBackfillAuditRowForSelection[],
+  auditId: string | null,
+): NameFromEmailBackfillAuditSelection {
+  const nonEmpty = rows.filter(isNonEmptyAuditRow);
+
+  if (auditId) {
+    const match = nonEmpty.find((r) => r.id === auditId);
+    if (match) return { kind: "selected", row: match };
+    return { kind: "not_found", requestedAuditId: auditId, candidates: nonEmpty.map(toAuditSummary) };
+  }
+
+  if (nonEmpty.length === 0) return { kind: "none" };
+  if (nonEmpty.length === 1) return { kind: "selected", row: nonEmpty[0]! };
+  return { kind: "ambiguous", candidates: nonEmpty.map(toAuditSummary) };
+}

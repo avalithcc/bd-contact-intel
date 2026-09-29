@@ -55,15 +55,27 @@
  *      pair-unique constraint as a second line of defense.
  *
  * Revert: `--revert` (dry run) or `--revert --execute --actor=<bd id>`
- * (applies). Reads the most recent matching audit_log row and only reverts
- * a person whose CURRENT name still equals exactly what this run wrote (a
- * BD's later correction is never silently wiped), and only deletes a
- * queued `duplicate_candidate` row that is still `open` (an already-
- * reviewed pair is left alone and reported) — see
- * src/lib/identity/nameFromEmailBackfillRevert.ts for the exact selection
- * rule. The revert's own writes re-check both conditions again at write
- * time (same "re-check before writing" rule as the forward path), in one
- * transaction, with a new `audit_log` row (action
+ * (applies). CRITICAL: revert never just reads the "most recent" audit_log
+ * row — it reads EVERY `person_name_from_email_backfill` row, ignores any
+ * that record zero fills and zero queued candidates (legacy/defensive —
+ * should never happen after the fix in point 2 above, but never trusted
+ * alone), and:
+ *   - if exactly one non-empty row exists, uses it automatically;
+ *   - if none exist, reports "nothing to revert";
+ *   - if MORE THAN ONE exists, REFUSES by default and lists every candidate
+ *     (id, `at`, actor, fill count, queued count) — pass
+ *     `--audit-id=<uuid>` to choose one explicitly.
+ * See src/lib/identity/nameFromEmailBackfillRevert.ts#selectNameFromEmailBackfillAuditRow
+ * for the exact selection rule (unit-tested for 0/1/several/only-empty rows).
+ * Only ever reverts a person whose CURRENT name still equals exactly what
+ * the SELECTED run wrote (a BD's later correction is never silently
+ * wiped), and only deletes a queued `duplicate_candidate` row that is still
+ * `open` (an already-reviewed pair is left alone and reported) — see
+ * buildNameFromEmailRevertPlan, which by construction can never touch a
+ * person or duplicate_candidate id that isn't listed in the selected row's
+ * own metadata. The revert's own writes re-check both conditions again at
+ * write time (same "re-check before writing" rule as the forward path), in
+ * one transaction, with a new `audit_log` row (action
  * `person_name_from_email_backfill_revert`).
  *
  * Defaults to `--dry-run` (no writes) and REQUIRES `--execute --actor=<bd
@@ -74,6 +86,7 @@
  *   npx tsx --env-file=.env.local scripts/backfill-person-names-from-email.ts --execute --actor=<bd id> # writes
  *   npx tsx --env-file=.env.local scripts/backfill-person-names-from-email.ts --revert                  # revert dry run
  *   npx tsx --env-file=.env.local scripts/backfill-person-names-from-email.ts --revert --execute --actor=<bd id>
+ *   npx tsx --env-file=.env.local scripts/backfill-person-names-from-email.ts --revert --audit-id=<uuid> [--execute --actor=<bd id>]
  */
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
@@ -94,11 +107,11 @@ import {
   readExistingDuplicateCandidatePairs,
   readNameFromEmailBackfillCandidates,
 } from "../src/lib/identity/nameFromEmailBackfillDb";
-import { buildNameFromEmailRevertPlan } from "../src/lib/identity/nameFromEmailBackfillRevert";
+import { buildNameFromEmailRevertPlan, selectNameFromEmailBackfillAuditRow } from "../src/lib/identity/nameFromEmailBackfillRevert";
 import {
+  readAllNameFromEmailBackfillAuditRows,
   readCurrentDuplicateCandidatesByIds,
   readCurrentPersonsByIds,
-  readLatestNameFromEmailBackfillAudit,
   REVERT_ACTION,
 } from "../src/lib/identity/nameFromEmailBackfillRevertDb";
 
@@ -106,20 +119,27 @@ interface Args {
   execute: boolean;
   actor: string | null;
   revert: boolean;
+  auditId: string | null;
 }
 
 function parseArgs(argv: readonly string[]): Args {
   let execute = false;
   let actor: string | null = null;
   let revert = false;
+  let auditId: string | null = null;
   for (const arg of argv) {
     if (arg === "--execute") execute = true;
     else if (arg === "--dry-run") execute = false; // explicit no-op, dry-run is already the default
     else if (arg === "--revert") revert = true;
     else if (arg.startsWith("--actor=")) actor = arg.slice("--actor=".length);
-    else throw new Error(`Unknown argument: ${arg}. Valid: --execute, --dry-run, --revert, --actor=<bd id>`);
+    else if (arg.startsWith("--audit-id=")) auditId = arg.slice("--audit-id=".length);
+    else {
+      throw new Error(
+        `Unknown argument: ${arg}. Valid: --execute, --dry-run, --revert, --actor=<bd id>, --audit-id=<uuid>`,
+      );
+    }
   }
-  return { execute, actor, revert };
+  return { execute, actor, revert, auditId };
 }
 
 const SKIP_REASON_ORDER: NameFromEmailSkipReason[] = [
@@ -300,12 +320,37 @@ async function runForwardBackfill(args: Args) {
   }
 }
 
+function formatAuditCandidate(c: { id: string; at: Date; actorBdId: string; fillCount: number; queuedCount: number }): string {
+  return `  ${c.id} — at=${c.at.toISOString()} actor=${c.actorBdId} fills=${c.fillCount} queued=${c.queuedCount}`;
+}
+
 async function runRevert(args: Args) {
-  const audit = await readLatestNameFromEmailBackfillAudit();
-  if (!audit) {
-    console.log("No person_name_from_email_backfill audit_log row found — nothing to revert.");
+  const rows = await readAllNameFromEmailBackfillAuditRows();
+  const selection = selectNameFromEmailBackfillAuditRow(rows, args.auditId);
+
+  if (selection.kind === "none") {
+    console.log("No non-empty person_name_from_email_backfill audit_log row found — nothing to revert.");
     return;
   }
+  if (selection.kind === "not_found") {
+    const lines = [
+      `--audit-id=${selection.requestedAuditId} does not match any non-empty person_name_from_email_backfill audit_log row.`,
+      selection.candidates.length
+        ? `Available non-empty rows:\n${selection.candidates.map(formatAuditCandidate).join("\n")}`
+        : "There are no non-empty rows to revert at all.",
+    ];
+    throw new Error(lines.join("\n"));
+  }
+  if (selection.kind === "ambiguous") {
+    const lines = [
+      `More than one non-empty person_name_from_email_backfill audit_log row exists — refusing to guess which one to revert.`,
+      `Re-run with --audit-id=<uuid> to choose one explicitly:`,
+      selection.candidates.map(formatAuditCandidate).join("\n"),
+    ];
+    throw new Error(lines.join("\n"));
+  }
+
+  const audit = selection.row;
   console.log(`Reverting audit_log row ${audit.id}: ${audit.fills.length} fill(s), ${audit.duplicateCandidatesQueued.length} queued duplicate_candidate(s).`);
 
   const [currentPersons, currentDuplicateCandidates] = await Promise.all([
