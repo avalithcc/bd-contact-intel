@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   MIN_NEW_PASSWORD_LENGTH,
+  mapUpdateUserError,
   validatePasswordChange,
 } from "@/lib/auth/passwordPolicy";
 
@@ -111,4 +112,64 @@ test("does not mutate the input object", () => {
   const frozen = { ...input };
   validatePasswordChange(input);
   assert.deepEqual(input, frozen);
+});
+
+// --- mapUpdateUserError: maps supabase.auth.updateUser()'s error.code to a
+// field-level outcome, for the server-side enforcement layer (the
+// GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD project setting —
+// see PasswordForm.tsx's doc comment). Codes are read from
+// node_modules/@supabase/auth-js/dist/module/lib/error-codes.d.ts, never
+// invented.
+
+test("mapUpdateUserError: same_password maps to the new-password field, current not required", () => {
+  assert.deepEqual(mapUpdateUserError("same_password", false), {
+    field: "new",
+    code: "sameAsCurrent",
+  });
+});
+
+test("mapUpdateUserError: same_password maps to the new-password field, current required", () => {
+  assert.deepEqual(mapUpdateUserError("same_password", true), {
+    field: "new",
+    code: "sameAsCurrent",
+  });
+});
+
+test("mapUpdateUserError: invalid_credentials maps to the current-password field only when requireCurrent is true", () => {
+  assert.deepEqual(mapUpdateUserError("invalid_credentials", true), {
+    field: "current",
+    code: "incorrect",
+  });
+});
+
+test("mapUpdateUserError: invalid_credentials is generic when requireCurrent is false (recovery sends no current_password, so there is no such field to blame)", () => {
+  assert.deepEqual(mapUpdateUserError("invalid_credentials", false), {
+    field: null,
+    code: "generic",
+  });
+});
+
+test("mapUpdateUserError: an unrelated known error code (weak_password) is generic", () => {
+  assert.deepEqual(mapUpdateUserError("weak_password", true), {
+    field: null,
+    code: "generic",
+  });
+});
+
+test("mapUpdateUserError: a code this app does not special-case (reauthentication_needed) is generic", () => {
+  assert.deepEqual(mapUpdateUserError("reauthentication_needed", true), {
+    field: null,
+    code: "generic",
+  });
+});
+
+test("mapUpdateUserError: missing/null code is generic", () => {
+  assert.deepEqual(mapUpdateUserError(undefined, true), {
+    field: null,
+    code: "generic",
+  });
+  assert.deepEqual(mapUpdateUserError(null, true), {
+    field: null,
+    code: "generic",
+  });
 });

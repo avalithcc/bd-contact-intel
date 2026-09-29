@@ -8,6 +8,7 @@ import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
 import {
   MIN_NEW_PASSWORD_LENGTH,
+  mapUpdateUserError,
   validatePasswordChange,
   type PasswordChangeError,
   type PasswordChangeErrorField,
@@ -81,9 +82,14 @@ export function PasswordForm({
     setBusy(true);
     try {
       if (requireCurrent) {
-        // Supabase has no direct "check this password" call — verifying the
-        // current password IS a real sign-in attempt with it. A wrong
-        // password fails here and nothing about the account changes.
+        // UX layer only — this is NOT the enforcement. Supabase has no
+        // dedicated "check this password" call, so this re-authenticates
+        // with the given current password purely to show a fast, clear
+        // per-field error before touching anything. A hijacked session
+        // could skip this entirely and call updateUser() directly (browser
+        // console, REST API) — the `current_password` field passed to
+        // updateUser below is what actually closes that gap, and only if
+        // the owner has enabled it (see the comment there).
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -105,13 +111,34 @@ export function PasswordForm({
 
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
+        // Real, server-side enforcement of "you must know the current
+        // password to change it" — but ONLY if the OWNER has enabled it.
+        // The underlying server config is
+        // GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD (the
+        // name confirmed in this SDK's own types —
+        // node_modules/@supabase/auth-js/dist/module/lib/types.d.ts,
+        // UserAttributes.current_password's doc comment: "This is only ever
+        // present when the user is resetting their password and
+        // GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD is
+        // true"). The owner must find and enable the matching toggle in the
+        // Supabase dashboard (see
+        // https://supabase.com/docs/guides/auth/password-security) and
+        // confirm it is actually on — this comment does not assert the
+        // dashboard's exact label/location, only the verified server
+        // config name. Until the owner verifies that setting is enabled,
+        // GoTrue silently ignores this field and the signInWithPassword
+        // check above is the only gate — which a stolen session can
+        // bypass entirely (browser console, REST API, skipping this form).
+        // Omitted entirely on the recovery path: there is no current
+        // password to send, and whether GoTrue exempts recovery sessions
+        // from this setting is not documented (see passwordReset.ts's
+        // "verify end to end" note).
+        ...(requireCurrent ? { current_password: currentPassword } : {}),
       });
       if (updateError) {
-        if (updateError.code === "same_password") {
-          // Recovery flow has no client-side "new == current" check (there
-          // is no current password to compare against) — this is Supabase's
-          // own server-side same-password guard catching it instead.
-          setFieldError({ field: "new", code: "sameAsCurrent" });
+        const outcome = mapUpdateUserError(updateError.code, requireCurrent);
+        if (outcome.field === "current" || outcome.field === "new") {
+          setFieldError(outcome);
         } else {
           setFormError(dict.account.genericError);
         }
