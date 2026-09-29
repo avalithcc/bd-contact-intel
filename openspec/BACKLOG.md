@@ -91,19 +91,21 @@ Still open:
   when empty) from notificaciones@avalith.net, plus a sidebar "Tareas" count.
   Cron `30 11 * * *` UTC; on this Vercel plan crons fire within the hour, so
   it arrives 08:30–09:29 Argentina. First real send verified; a second run the
-  same day is skipped (`already_claimed`). Follow-ups:
-  - a claim left `pending` by a crash is neither retried nor flagged;
-  - the route returns 200 even when every send fails (same as the other crons);
-  - composite index `task(assigned_to_bd_id, status, due_at)` once tasks grow.
+  same day is skipped (`already_claimed`). Hardened in #195: a claim left
+  `pending` for over 10 minutes is reclaimed, the route returns 500 when a
+  send fails, and `task(assigned_to_bd_id, status, due_at)` is indexed.
+  Branded email design in #194.
 - **All timestamp columns are `timestamp without time zone`.** Vercel reads
   them as UTC, a laptop in Argentina as local time (+3h). Task due dates are
   now treated as calendar dates everywhere (#192), but the durable fix is
   migrating the columns to `timestamptz`. Until then, run local checks with
   `TZ=UTC`.
-- **No automated guard for the dialog bugs** fixed in #189–#191 and #193
-  (`.composer` inside a Dialog, unclassed footer buttons, `<label>` wrapping
-  controls). A static scan test, like `tests/unit/iconSizing.test.ts`, would
-  keep them from coming back.
+- Dialog markup bugs are now guarded by `tests/unit/dialogMarkup.test.ts`
+  (#197).
+- `/contacts` list: 4 → 2 round trips (#196). The JSON-to-row mapping it
+  added (`mapInlineDerivedColumns` in `listQueries.ts`) has no unit test;
+  extract it into a DB-free module and assert it matches
+  `attachDerivedColumns`.
 - **No task edit UI** anywhere, not even for the title. `updateTaskAction` is
   validated and ready but has no caller.
 - `bulkCreateTaskAction` inserts one task per selected contact in a loop.
