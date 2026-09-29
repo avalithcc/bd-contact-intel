@@ -563,7 +563,12 @@ export const es: typeof en = {
     callDirectionLabel: "Dirección",
     callDirectionOutbound: "Saliente",
     callDirectionInbound: "Entrante",
-    callDateLabel: "Fecha y hora",
+    // Fecha/Hora as two separate fields (approved mockup contact-record.html
+    // #call's second `.form-grid` row) — previously one field held both
+    // inputs under a single label, which the fix for the dialog markup
+    // sweep split apart.
+    callDateLabel: "Fecha",
+    callTimeLabel: "Hora",
     callDurationLabel: "Duración (minutos)",
     callNotesLabel: "Notas",
     callSubmit: "Registrar llamada",

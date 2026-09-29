@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useId, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { signalLabelsFromDict } from "@/lib/outreach/messageLabels";
@@ -11,21 +12,33 @@ import { DEFAULT_OUTREACH_CHANNEL } from "@/lib/outreach/channel";
 import { DEFAULT_MESSAGE_LANGUAGE, type MessageLanguage } from "@/lib/outreach/messageLanguage";
 
 /**
- * "Generar mensaje" dialog body (mockups/contact-record.html #generate):
- * Canal + Idioma selects, "Señales utilizadas" chips (from the actually-fed
- * prompt input — see messageSignals.ts, never the model's output),
- * editable "Borrador" textarea, and Regenerar/Copiar/Usar en correo
- * footer. Replaces the plain-text GenerateMessageButton on this page only
- * — /outreach's LinkedIn-triage list keeps that simpler component
- * unchanged (no channel choice there: BDs only use LinkedIn for the first
- * touch, owner direction 2026-09-26).
+ * "Generar mensaje" dialog (mockups/contact-record.html #generate): Canal +
+ * Idioma selects, "Señales utilizadas" chips (from the actually-fed prompt
+ * input — see messageSignals.ts, never the model's output), editable
+ * "Borrador" textarea, and Regenerar/Copiar/Usar en correo footer. Replaces
+ * the plain-text GenerateMessageButton on this page only — /outreach's
+ * LinkedIn-triage list keeps that simpler component unchanged (no channel
+ * choice there: BDs only use LinkedIn for the first touch, owner direction
+ * 2026-09-26).
+ *
+ * Owns its own Dialog (rather than being rendered as an external Dialog's
+ * children, as it was originally) so its footer buttons can live in the
+ * Dialog's `footer` prop — same dialog-markup sweep as QuickActions.tsx: a
+ * `.composer` wrapper here lit the whole form red on focus, and the footer
+ * was a plain child div instead of `.dialog-footer`, which loses the
+ * approved mockup's flush bottom bar (it renders inset, inside
+ * `.dialog-body`'s padding) once nested that way.
  */
 export function GenerateMessageDialog({
+  title,
+  onClose,
   boundAction,
   labels: l,
   useInEmailLabel,
   onUseInEmail,
 }: {
+  title: string;
+  onClose: () => void;
   boundAction: (
     prevState: GenerateOutreachMessageResult | null,
     formData: FormData,
@@ -37,6 +50,8 @@ export function GenerateMessageDialog({
   useInEmailLabel: string;
   onUseInEmail: (subject: string, body: string) => void;
 }) {
+  const ids = useId();
+  const formId = `${ids}-form`;
   const [state, formAction, pending] = useActionState<GenerateOutreachMessageResult | null, FormData>(
     boundAction,
     null,
@@ -66,69 +81,14 @@ export function GenerateMessageDialog({
   };
 
   return (
-    <div className="composer">
-      <form action={formAction} aria-busy={pending}>
-        <div className="form-grid">
-          <label className="field">
-            {l.generateMessageChannelLabel}
-            <select
-              className="select"
-              name="channel"
-              value={channel}
-              onChange={(e) => setChannel(e.target.value as OutreachChannel)}
-              disabled={pending}
-            >
-              <option value="email">{l.generateMessageChannelEmail}</option>
-              <option value="linkedin">{l.generateMessageChannelLinkedin}</option>
-            </select>
-          </label>
-          <label className="field">
-            {l.generateMessageLanguageLabel}
-            <select
-              className="select"
-              name="messageLanguage"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as MessageLanguage)}
-              disabled={pending}
-            >
-              <option value="es">{l.messageLanguageEs}</option>
-              <option value="en">{l.messageLanguageEn}</option>
-              <option value="pt">{l.messageLanguagePt}</option>
-            </select>
-          </label>
-        </div>
-
-        {state?.ok && state.signals.length > 0 && (
-          <div className="field">
-            <span className="label">{l.generateMessageSignalsLabel}</span>
-            <div className="row wrap">
-              {state.signals.map((signal, i) => (
-                <span key={i} className="chip">
-                  {formatOutreachSignalLabel(signal, signalLabels)}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <label className="field">
-          {l.generateMessageDraftLabel}
-          <textarea
-            className="textarea"
-            rows={7}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={pending}
-          />
-          <span className="help">{l.generateMessageDraftHelp}</span>
-        </label>
-
-        {state && !state.ok && (
-          <p className="text-danger generate-message-error">{l.generateMessageErrors[state.errorKey]}</p>
-        )}
-
-        <div className="dialog-footer">
-          <button type="submit" className="btn btn-ghost left" disabled={pending}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={title}
+      wide
+      footer={
+        <>
+          <button type="submit" form={formId} className="btn btn-ghost left" disabled={pending}>
             {pending ? l.generatingMessage : state?.ok ? l.regenerateMessage : l.generateMessageGenerateAction}
           </button>
           <button type="button" className="btn btn-secondary" onClick={handleCopy} disabled={pending || !draft.trim()}>
@@ -145,8 +105,78 @@ export function GenerateMessageDialog({
           >
             {useInEmailLabel}
           </button>
+        </>
+      }
+    >
+      <form id={formId} action={formAction} aria-busy={pending}>
+        <div className="form-grid">
+          <div className="field">
+            <label className="label" htmlFor={`${ids}-channel`}>
+              {l.generateMessageChannelLabel}
+            </label>
+            <select
+              id={`${ids}-channel`}
+              className="select"
+              name="channel"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value as OutreachChannel)}
+              disabled={pending}
+            >
+              <option value="email">{l.generateMessageChannelEmail}</option>
+              <option value="linkedin">{l.generateMessageChannelLinkedin}</option>
+            </select>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor={`${ids}-language`}>
+              {l.generateMessageLanguageLabel}
+            </label>
+            <select
+              id={`${ids}-language`}
+              className="select"
+              name="messageLanguage"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as MessageLanguage)}
+              disabled={pending}
+            >
+              <option value="es">{l.messageLanguageEs}</option>
+              <option value="en">{l.messageLanguageEn}</option>
+              <option value="pt">{l.messageLanguagePt}</option>
+            </select>
+          </div>
         </div>
+
+        {state?.ok && state.signals.length > 0 && (
+          <div className="field">
+            <span className="label">{l.generateMessageSignalsLabel}</span>
+            <div className="row wrap">
+              {state.signals.map((signal, i) => (
+                <span key={i} className="chip">
+                  {formatOutreachSignalLabel(signal, signalLabels)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="field">
+          <label className="label" htmlFor={`${ids}-draft`}>
+            {l.generateMessageDraftLabel}
+          </label>
+          <textarea
+            id={`${ids}-draft`}
+            className="textarea"
+            rows={7}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={pending}
+          />
+          <span className="help">{l.generateMessageDraftHelp}</span>
+        </div>
+
+        {state && !state.ok && (
+          <p className="text-danger generate-message-error">{l.generateMessageErrors[state.errorKey]}</p>
+        )}
       </form>
-    </div>
+    </Dialog>
   );
 }
