@@ -995,8 +995,17 @@ export const company = pgTable(
   {
     companyKey: text("company_key").primaryKey(),
     displayName: text("display_name").notNull(),
-    // Free text, app-validated pipeline: 'prospect' | 'qualified' | 'proposal_sent' | 'won' | 'lost'
-    relationshipStage: text("relationship_stage"),
+    // Free text, app-validated pipeline: 'prospect' | 'qualified' | 'proposal_sent' | 'won' | 'lost'.
+    // Migration 0022 (default-pipeline-stage): defaults new rows to
+    // 'prospect' — the HubSpot company importer (src/lib/hubspot/importQueries.ts)
+    // inserts a company with only companyKey/displayName/domain set, so
+    // without this column default every newly-imported company arrived
+    // with a null stage (the same gap scripts/backfill-default-pipeline-stage.ts
+    // backfills for existing rows). "Nueva empresa" already defaults to
+    // 'prospect' explicitly (src/app/(app)/companies/new/page.tsx), so this
+    // column default only changes behavior for insert paths that omit the
+    // column, like the HubSpot importer.
+    relationshipStage: text("relationship_stage").default("prospect"),
     // Revenue potential in undefined unit; nullable until estimated. Never
     // used for calculations in MVP — display-only for now.
     revenuePotential: integer("revenue_potential"),
