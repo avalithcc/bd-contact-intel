@@ -31,6 +31,15 @@ export function Dialog({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // Latest onClose, read by the focus/keyboard effect below without being
+  // one of its dependencies. Callers pass a function declared in their render
+  // (`function close() {…}`), which is a NEW function on every render; with
+  // onClose in the effect's dependency list, every keystroke in a field that
+  // updates the caller's state re-ran the effect, whose cleanup restores focus
+  // and whose setup focuses the first focusable element — the close "×". The
+  // owner could not type in "Nueva tarea": each key sent the caret to the ×.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const titleId = `dialog-title-${useId()}`;
 
   // Body scroll lock: while the dialog is open, the page behind it
@@ -57,7 +66,7 @@ export function Dialog({
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -83,7 +92,9 @@ export function Dialog({
       document.removeEventListener("keydown", onKeyDown);
       previouslyFocused.current?.focus();
     };
-  }, [open, onClose]);
+    // Deliberately only `open`: initial focus and the focus trap are set up
+    // once when the dialog opens, not on every parent render.
+  }, [open]);
 
   if (!open) return null;
 
