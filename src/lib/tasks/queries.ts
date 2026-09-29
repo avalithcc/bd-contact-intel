@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
@@ -218,6 +218,32 @@ export async function getAllOverdueTasks(): Promise<TaskRow[]> {
   return baseTaskSubjectQuery()
     .where(and(eq(task.status, "open"), gt(sql`now()`, task.dueAt)))
     .orderBy(asc(task.dueAt));
+}
+
+/**
+ * Sidebar "Tareas" badge count (task-reminders backlog): today + overdue
+ * open tasks for the signed-in BD, one bounded `count(*)` covered by
+ * `task_assignee_idx`/`task_status_idx`/`task_due_idx` — the same shape as
+ * `getTaskViewCounts` above, not a fetch-and-`.length`. `before` is the ART
+ * "tomorrow starts" instant from `argentinaDayBoundaries` — a task is
+ * counted once it's due today or earlier, never for a future due date.
+ * Costs exactly one round trip; the caller (AppLayout) already has
+ * `bdId` for free from the cached `getCurrentBd()` call every page under it
+ * makes.
+ */
+export async function getTaskBadgeCount(bdId: string, before: Date): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(task)
+    .where(
+      and(
+        eq(task.assignedToBdId, bdId),
+        eq(task.status, "open"),
+        isNotNull(task.dueAt),
+        lt(task.dueAt, before),
+      ),
+    );
+  return row?.count ?? 0;
 }
 
 export async function isAssignableBd(bdId: string): Promise<boolean> {

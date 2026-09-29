@@ -16,6 +16,10 @@
     {
       "path": "/api/hiring/discover",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/tasks/digest",
+      "schedule": "30 11 * * *"
     }
   ]
 }

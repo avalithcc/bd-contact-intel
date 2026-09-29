@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   timestamp,
+  date,
   index,
   uniqueIndex,
   unique,
@@ -1203,6 +1204,49 @@ export const emailAccount = pgTable(
 
 export type EmailAccount = typeof emailAccount.$inferSelect;
 export type NewEmailAccount = typeof emailAccount.$inferInsert;
+
+// One row per (bd, Argentina calendar date) — the idempotency claim for the
+// 08:30 ART daily task-reminder digest (task-reminders backlog). The cron
+// inserts a 'pending' row with `on conflict (bd_id, send_date) do nothing`
+// BEFORE sending; it only sends when its own insert actually returned a row
+// (see src/app/api/tasks/digest/route.ts), so a retried or duplicated cron
+// invocation for the same BD/day never sends twice. `send_date` is a plain
+// `date` (Argentina's calendar day, not a timestamp) because
+// America/Argentina/Buenos_Aires has no DST — see
+// src/lib/tasks/argentinaDate.ts for how it's computed from `now()`.
+//
+// A 'failed' row is left as-is by later cron runs (the conflict still
+// fires), so a failed send stays visible in this table for a human to
+// retry deliberately — e.g. `delete from task_digest_send where id = ...`
+// then re-invoke the cron — rather than being silently retried or dropped.
+export const taskDigestSend = pgTable(
+  "task_digest_send",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    sendDate: date("send_date").notNull(),
+    // 'pending' (claimed, send in progress) | 'sent' | 'failed'
+    status: text("status").notNull().default("pending"),
+    subject: text("subject"),
+    todayCount: integer("today_count").notNull().default(0),
+    overdueCount: integer("overdue_count").notNull().default(0),
+    yesterdayCount: integer("yesterday_count").notNull().default(0),
+    // Send-failure text, deliberately never the raw SMTP error object (which
+    // can echo back connection details) — see markDigestFailed's doc comment.
+    error: text("error"),
+    sentAt: timestamp("sent_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    bdDateUnique: unique("task_digest_send_bd_date_unique").on(t.bdId, t.sendDate),
+    byBd: index("task_digest_send_bd_idx").on(t.bdId),
+  }),
+);
+
+export type TaskDigestSend = typeof taskDigestSend.$inferSelect;
+export type NewTaskDigestSend = typeof taskDigestSend.$inferInsert;
 
 // Generic signal/research data for leads/companies/contacts. Discriminated by
 // source ('linkedin_apify' | 'manual_paste' | 'web_research' | etc.) and a
