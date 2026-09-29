@@ -1,0 +1,1 @@
+ALTER TABLE "company" ALTER COLUMN "relationship_stage" SET DEFAULT 'prospect';

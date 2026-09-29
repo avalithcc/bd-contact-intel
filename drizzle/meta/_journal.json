@@ -155,6 +155,13 @@
       "when": 1791318271556,
       "tag": "0021_task_assignee_status_due_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791404671556,
+      "tag": "0022_default_pipeline_stage",
+      "breakpoints": true
     }
   ]
 }
