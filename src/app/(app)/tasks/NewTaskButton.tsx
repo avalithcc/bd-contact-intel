@@ -103,6 +103,11 @@ export function NewTaskButton({
     setResults([]);
     setSubject(null);
     setError(null);
+    // Reset too: after a successful create, handleSubmit leaves busy=true and
+    // calls close(). This component stays mounted (the button and the dialog
+    // share it), so without this the next "Nueva tarea" opened with every
+    // field disabled — the owner could create one task and not a second.
+    setBusy(false);
   }
 
   async function handleSubmit() {
