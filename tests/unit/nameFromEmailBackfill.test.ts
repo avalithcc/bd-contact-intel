@@ -7,9 +7,13 @@ import { test } from "node:test";
 import {
   buildNameFromEmailPlan,
   deriveNameFromEmail,
+  duplicateCandidatePairKey,
+  filterAlreadyQueuedDuplicateCandidates,
   findNameCompanyCollisions,
   GENERIC_LOCAL_PARTS,
   OWNER_EXCLUDED_EMAILS,
+  planDuplicateCandidateQueue,
+  type NameCompanyCollision,
   type NameFromEmailCandidate,
 } from "@/lib/identity/nameFromEmailBackfill";
 
@@ -212,4 +216,69 @@ test("findNameCompanyCollisions skips fills with no companyKey (no key to collid
   ];
   const existing = [{ id: "other-1", firstName: "Efrain", lastName: "Romero", companyKey: null }];
   assert.deepEqual(findNameCompanyCollisions(fills, existing), []);
+});
+
+// --- duplicateCandidatePairKey / planDuplicateCandidateQueue -----------------
+
+test("duplicateCandidatePairKey orders a pair the same regardless of argument order", () => {
+  assert.equal(duplicateCandidatePairKey("aaa", "bbb"), duplicateCandidatePairKey("bbb", "aaa"));
+});
+
+function collision(overrides: Partial<NameCompanyCollision> = {}): NameCompanyCollision {
+  return {
+    personId: "p1",
+    email: "jorge.blanco@nubiral.com",
+    firstName: "Jorge",
+    lastName: "Blanco",
+    companyKey: "nubiral",
+    collidesWithPersonIds: ["existing-1"],
+    ...overrides,
+  };
+}
+
+test("planDuplicateCandidateQueue builds one ordered, reason=name_company pair per collision", () => {
+  const candidates = planDuplicateCandidateQueue([collision()]);
+  assert.equal(candidates.length, 1);
+  const [pair] = candidates;
+  assert.equal(pair!.reason, "name_company");
+  assert.equal(pair!.matchKey, "jorge blanco::nubiral");
+  const [a, b] = "p1" < "existing-1" ? ["p1", "existing-1"] : ["existing-1", "p1"];
+  assert.equal(pair!.personAId, a);
+  assert.equal(pair!.personBId, b);
+});
+
+test("planDuplicateCandidateQueue produces one pair per colliding existing person (a fill colliding with 2 existing persons -> 2 pairs)", () => {
+  const candidates = planDuplicateCandidateQueue([
+    collision({ collidesWithPersonIds: ["existing-1", "existing-2"] }),
+  ]);
+  assert.equal(candidates.length, 2);
+});
+
+test("planDuplicateCandidateQueue never duplicates the same pair twice", () => {
+  const candidates = planDuplicateCandidateQueue([collision(), collision()]);
+  assert.equal(candidates.length, 1);
+});
+
+test("filterAlreadyQueuedDuplicateCandidates separates pairs that already exist (any status) from new ones", () => {
+  const candidates = planDuplicateCandidateQueue([
+    collision({ personId: "p1", collidesWithPersonIds: ["existing-1"] }),
+    collision({ personId: "p2", email: "javier.astort@wolox.com.ar", firstName: "Javier", lastName: "Astort", companyKey: "wolox", collidesWithPersonIds: ["existing-2"] }),
+  ]);
+  const [firstPair] = candidates;
+  const plan = filterAlreadyQueuedDuplicateCandidates(candidates, [
+    { personAId: firstPair!.personAId, personBId: firstPair!.personBId, status: "not_duplicate" },
+  ]);
+  assert.equal(plan.toQueue.length, 1);
+  assert.equal(plan.alreadyQueued.length, 1);
+  assert.equal(plan.alreadyQueued[0]!.existingStatus, "not_duplicate");
+});
+
+test("filterAlreadyQueuedDuplicateCandidates never mutates its inputs", () => {
+  const candidates = planDuplicateCandidateQueue([collision()]);
+  const existing = [{ personAId: candidates[0]!.personAId, personBId: candidates[0]!.personBId, status: "open" }];
+  const candidatesBefore = JSON.parse(JSON.stringify(candidates));
+  const existingBefore = JSON.parse(JSON.stringify(existing));
+  filterAlreadyQueuedDuplicateCandidates(candidates, existing);
+  assert.deepEqual(candidates, candidatesBefore);
+  assert.deepEqual(existing, existingBefore);
 });

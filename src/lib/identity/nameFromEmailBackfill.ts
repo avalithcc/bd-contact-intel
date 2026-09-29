@@ -12,7 +12,7 @@
  * findNameCompanyCollisions, per the "one key builder per map" rule — this
  * module must never re-derive that key a different way.
  */
-import { buildNameCompanyKey } from "@/lib/identity/matcher";
+import { buildNameCompanyKey, type ReviewReason } from "@/lib/identity/matcher";
 
 /**
  * Owner-reviewed exclusions (owner ask, 2026-09-29): these 6 local parts
@@ -281,4 +281,98 @@ export function findNameCompanyCollisions(
     });
   }
   return collisions;
+}
+
+// --- Queueing name+company collisions into the EXISTING duplicate-review ---
+// --- mechanism (duplicate_candidate) ----------------------------------------
+
+/**
+ * The ONE key builder for a `duplicate_candidate` pair — same canonical
+ * ordering (`a < b` by JS string comparison) src/lib/identity/resolve.ts
+ * already uses when it writes `reviewPairs` into `duplicateCandidates`, and
+ * the same ordering the DB's `duplicate_candidate_pair_unique` constraint
+ * expects (personAId < personBId). Both planDuplicateCandidateQueue and
+ * nameFromEmailBackfillDb.ts#readExistingDuplicateCandidatePairs must build
+ * this key the same way — see the "one key builder per map" rule.
+ */
+export function duplicateCandidatePairKey(personAId: string, personBId: string): string {
+  const [a, b] = personAId < personBId ? [personAId, personBId] : [personBId, personAId];
+  return `${a}:${b}`;
+}
+
+export interface DuplicateCandidateQueueCandidate {
+  personAId: string;
+  personBId: string;
+  reason: ReviewReason;
+  matchKey: string;
+}
+
+/**
+ * Turns `findNameCompanyCollisions`'s output into ordered, deduped
+ * `duplicate_candidate` rows to insert — one per (fill, colliding existing
+ * person) pair, `reason: "name_company"` (the exact reason
+ * src/lib/identity/matcher.ts's `{ kind: "review" }` case uses for this
+ * match), `matchKey` = the SAME `buildNameCompanyKey` both sides now share.
+ * Read-only/pure: never itself decides whether a pair already exists — see
+ * filterAlreadyQueuedDuplicateCandidates for that (a DB read is required).
+ */
+export function planDuplicateCandidateQueue(
+  collisions: readonly NameCompanyCollision[],
+): DuplicateCandidateQueueCandidate[] {
+  const seen = new Set<string>();
+  const candidates: DuplicateCandidateQueueCandidate[] = [];
+  for (const collision of collisions) {
+    const matchKey = buildNameCompanyKey({
+      firstName: collision.firstName,
+      lastName: collision.lastName,
+      companyKey: collision.companyKey,
+    });
+    if (!matchKey) continue; // defensive: a real collision always has one
+    for (const otherId of collision.collidesWithPersonIds) {
+      const [personAId, personBId] =
+        collision.personId < otherId ? [collision.personId, otherId] : [otherId, collision.personId];
+      const key = duplicateCandidatePairKey(personAId, personBId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push({ personAId, personBId, reason: "name_company", matchKey });
+    }
+  }
+  return candidates;
+}
+
+export interface ExistingDuplicateCandidatePair {
+  personAId: string;
+  personBId: string;
+  status: string;
+}
+
+export interface DuplicateCandidateQueuePlan {
+  toQueue: DuplicateCandidateQueueCandidate[];
+  alreadyQueued: (DuplicateCandidateQueueCandidate & { existingStatus: string })[];
+}
+
+/**
+ * Splits planned candidates into ones that must actually be inserted vs.
+ * ones a `duplicate_candidate` row (in ANY status — open, merged, or
+ * not_duplicate) already exists for — never re-queue a pair that was
+ * already resolved, and never rely solely on the DB's unique-constraint
+ * conflict handling to decide that silently: this is reported in the dry
+ * run so the owner sees exactly which pairs are new. Pure — never mutates
+ * `candidates` or `existingPairs`.
+ */
+export function filterAlreadyQueuedDuplicateCandidates(
+  candidates: readonly DuplicateCandidateQueueCandidate[],
+  existingPairs: readonly ExistingDuplicateCandidatePair[],
+): DuplicateCandidateQueuePlan {
+  const existingByKey = new Map(
+    existingPairs.map((p) => [duplicateCandidatePairKey(p.personAId, p.personBId), p.status] as const),
+  );
+  const toQueue: DuplicateCandidateQueueCandidate[] = [];
+  const alreadyQueued: (DuplicateCandidateQueueCandidate & { existingStatus: string })[] = [];
+  for (const candidate of candidates) {
+    const status = existingByKey.get(duplicateCandidatePairKey(candidate.personAId, candidate.personBId));
+    if (status) alreadyQueued.push({ ...candidate, existingStatus: status });
+    else toQueue.push(candidate);
+  }
+  return { toQueue, alreadyQueued };
 }

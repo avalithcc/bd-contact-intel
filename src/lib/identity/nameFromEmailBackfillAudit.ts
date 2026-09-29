@@ -1,58 +1,96 @@
 /**
  * Pure audit_log metadata builder for
- * scripts/backfill-person-names-from-email.ts's `--execute` path. Mirrors
- * src/lib/hubspot/companyDomainBackfillAudit.ts's shape (fillsPlanned/
- * fillsApplied/fillsSkippedRace + a capped key list for the revert path),
- * with `personIds` (uuids) instead of `companyKeys` — uuids are not PII by
- * themselves (unlike the email/name they resolve to), so they're the right
- * thing to persist here, never the email or the derived name.
+ * scripts/backfill-person-names-from-email.ts's `--execute` path.
+ *
+ * `fills` stores each applied fill's personId AND the exact firstName/
+ * lastName this run wrote — needed by the revert planner
+ * (nameFromEmailBackfillRevert.ts) to only revert a row whose CURRENT name
+ * still equals what THIS run wrote (a BD's later correction must never be
+ * silently wiped). The derived name is not new PII beyond what the row
+ * itself already carries (it's the very value already sitting in
+ * `person.first_name`/`last_name`) — unlike an email, it's fine to persist
+ * here for the revert path.
+ *
+ * `duplicateCandidatesQueued` stores the `duplicate_candidate.id` (plus its
+ * personA/personB) of every row THIS run inserted — the revert path only
+ * ever deletes a row from this exact list, and only if it's still `open`
+ * (never a reviewed one) — see nameFromEmailBackfillRevert.ts.
  *
  * Revert path: given an audit_log row's metadata (action =
- * 'person_name_from_email_backfill'),
- *   update person set first_name = null, last_name = null where id in (<personIds>);
- * (both fields are set back to NULL together, since this backfill only ever
- * fills a row whose first_name AND last_name were BOTH empty — see the
- * script's own precondition. If `personIdsTruncated` is true, re-derive the
- * full set by re-running this script's dry run against the SAME DB state
- * instead of relying on the capped list.)
+ * 'person_name_from_email_backfill'), run
+ *   npx tsx --env-file=.env.local scripts/backfill-person-names-from-email.ts --revert
+ * (dry run) then `--revert --execute --actor=<bd id>` — see
+ * nameFromEmailBackfillRevert.ts for the exact selection rule.
  */
 
-/** Above this many ids, the audit row keeps the count accurate but caps the
- * persisted id list — same convention as
- * COMPANY_DOMAIN_BACKFILL_AUDIT_KEY_CAP. */
-export const NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP = 5000;
+/** Above this many entries, the audit row keeps the count accurate but caps
+ * the persisted list — same convention as
+ * COMPANY_DOMAIN_BACKFILL_AUDIT_KEY_CAP. Applies to both `fills` and
+ * `duplicateCandidatesQueued` independently. */
+export const NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP = 5000;
+
+export interface AppliedNameFromEmailFill {
+  personId: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface QueuedDuplicateCandidateRef {
+  id: string;
+  personAId: string;
+  personBId: string;
+}
 
 export interface NameFromEmailBackfillAuditMetadata {
   /** How many fills the planner found (before this run started writing). */
   fillsPlanned: number;
   /** How many fills were ACTUALLY applied (rows changed) — the write-time
-   * source of truth, may be less than `fillsPlanned` if a row's name/last
-   * name was no longer empty by write time (`fillsSkippedRace`). */
+   * source of truth, may be less than `fillsPlanned` if a row's name was no
+   * longer empty by write time (`fillsSkippedRace`). */
   fillsApplied: number;
   /** Fills skipped at write time because the person's name was no longer
    * empty (changed by something else between the read and this execute) —
    * reported, never silently dropped. */
   fillsSkippedRace: number;
-  /** The person id of every fill actually applied, capped at
-   * NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP — the revert list. */
-  personIds: string[];
-  /** True when `personIds` was capped (fillsApplied is still accurate). */
-  personIdsTruncated: boolean;
+  /** Every fill actually applied (personId + the exact firstName/lastName
+   * written), capped at NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP — the revert list. */
+  fills: AppliedNameFromEmailFill[];
+  /** True when `fills` was capped (fillsApplied is still accurate). */
+  fillsTruncated: boolean;
+  /** Every `duplicate_candidate` row THIS run inserted, capped — the
+   * revert-delete list. */
+  duplicateCandidatesQueued: QueuedDuplicateCandidateRef[];
+  /** True when `duplicateCandidatesQueued` was capped. */
+  duplicateCandidatesQueuedTruncated: boolean;
+  /** How many planned pairs were NOT inserted because a `duplicate_candidate`
+   * row already existed for that pair (any status) — informational only,
+   * never part of the revert (this run didn't create them). */
+  duplicateCandidatesAlreadyQueued: number;
 }
 
 export function buildNameFromEmailBackfillAuditMetadata(input: {
   fillsPlanned: number;
-  appliedPersonIds: readonly string[];
+  appliedFills: readonly AppliedNameFromEmailFill[];
   skippedRacePersonIds: readonly string[];
+  queuedDuplicateCandidates: readonly QueuedDuplicateCandidateRef[];
+  alreadyQueuedDuplicateCandidatesCount: number;
 }): NameFromEmailBackfillAuditMetadata {
-  const truncated = input.appliedPersonIds.length > NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP;
+  const fillsTruncated = input.appliedFills.length > NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP;
+  const duplicateCandidatesQueuedTruncated =
+    input.queuedDuplicateCandidates.length > NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP;
+
   return {
     fillsPlanned: input.fillsPlanned,
-    fillsApplied: input.appliedPersonIds.length,
+    fillsApplied: input.appliedFills.length,
     fillsSkippedRace: input.skippedRacePersonIds.length,
-    personIds: truncated
-      ? input.appliedPersonIds.slice(0, NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP)
-      : [...input.appliedPersonIds],
-    personIdsTruncated: truncated,
+    fills: fillsTruncated
+      ? input.appliedFills.slice(0, NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP)
+      : [...input.appliedFills],
+    fillsTruncated,
+    duplicateCandidatesQueued: duplicateCandidatesQueuedTruncated
+      ? input.queuedDuplicateCandidates.slice(0, NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP)
+      : [...input.queuedDuplicateCandidates],
+    duplicateCandidatesQueuedTruncated,
+    duplicateCandidatesAlreadyQueued: input.alreadyQueuedDuplicateCandidatesCount,
   };
 }

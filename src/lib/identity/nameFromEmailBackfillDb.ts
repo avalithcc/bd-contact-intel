@@ -9,6 +9,12 @@ import { db } from "@/db";
 import { person } from "@/db/schema";
 import type { NameFromEmailCandidate } from "@/lib/identity/nameFromEmailBackfill";
 
+export interface ExistingDuplicateCandidatePairRow {
+  personAId: string;
+  personBId: string;
+  status: string;
+}
+
 // 346 non-merged, both-empty-name persons existed at the time this backfill
 // was designed (contact-identity owner ask). Capped well above that so a
 // future run (after new nameless contacts appear) still can't turn into an
@@ -63,4 +69,27 @@ export async function readCollisionCandidates(
     .where(and(isNull(person.mergedIntoId), inArray(person.companyKey, [...companyKeys])))
     .limit(CANDIDATE_READ_CAP);
   return rows;
+}
+
+/**
+ * Every `duplicate_candidate` row, in ANY status, whose (person_a_id,
+ * person_b_id) matches one of `pairs` (canonical order, same as
+ * nameFromEmailBackfill.ts#duplicateCandidatePairKey and the DB's
+ * `duplicate_candidate_pair_unique` constraint) — one round trip via a
+ * tuple IN list, bounded by `pairs.length` (this run's own collision count,
+ * never the whole table). Feeds
+ * nameFromEmailBackfill.ts#filterAlreadyQueuedDuplicateCandidates so an
+ * already-resolved pair is never re-queued.
+ */
+export async function readExistingDuplicateCandidatePairs(
+  pairs: readonly { personAId: string; personBId: string }[],
+): Promise<ExistingDuplicateCandidatePairRow[]> {
+  if (pairs.length === 0) return [];
+  const tuples = pairs.map((p) => sql`(${p.personAId}::uuid, ${p.personBId}::uuid)`);
+  const rows = (await db.execute(sql`
+    select person_a_id, person_b_id, status
+    from duplicate_candidate
+    where (person_a_id, person_b_id) in (${sql.join(tuples, sql`, `)})
+  `)) as unknown as { person_a_id: string; person_b_id: string; status: string }[];
+  return rows.map((r) => ({ personAId: r.person_a_id, personBId: r.person_b_id, status: r.status }));
 }

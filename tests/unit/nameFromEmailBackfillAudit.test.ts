@@ -5,27 +5,35 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildNameFromEmailBackfillAuditMetadata,
-  NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP,
+  NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP,
 } from "@/lib/identity/nameFromEmailBackfillAudit";
 
-test("buildNameFromEmailBackfillAuditMetadata reports fillsApplied/fillsSkippedRace and the full id list when under the cap", () => {
+function fill(personId: string, firstName = "Efrain", lastName = "Romero") {
+  return { personId, firstName, lastName };
+}
+
+test("buildNameFromEmailBackfillAuditMetadata reports fillsApplied/fillsSkippedRace and the full fill list (with written names) when under the cap", () => {
   const metadata = buildNameFromEmailBackfillAuditMetadata({
     fillsPlanned: 3,
-    appliedPersonIds: ["p1", "p2", "p3"],
+    appliedFills: [fill("p1"), fill("p2", "Javier", "Astort"), fill("p3")],
     skippedRacePersonIds: [],
+    queuedDuplicateCandidates: [],
+    alreadyQueuedDuplicateCandidatesCount: 0,
   });
   assert.equal(metadata.fillsPlanned, 3);
   assert.equal(metadata.fillsApplied, 3);
   assert.equal(metadata.fillsSkippedRace, 0);
-  assert.deepEqual(metadata.personIds, ["p1", "p2", "p3"]);
-  assert.equal(metadata.personIdsTruncated, false);
+  assert.deepEqual(metadata.fills, [fill("p1"), fill("p2", "Javier", "Astort"), fill("p3")]);
+  assert.equal(metadata.fillsTruncated, false);
 });
 
 test("buildNameFromEmailBackfillAuditMetadata reports a race-skipped fill without dropping it (applied < planned)", () => {
   const metadata = buildNameFromEmailBackfillAuditMetadata({
     fillsPlanned: 3,
-    appliedPersonIds: ["p1", "p2"],
+    appliedFills: [fill("p1"), fill("p2")],
     skippedRacePersonIds: ["p3"],
+    queuedDuplicateCandidates: [],
+    alreadyQueuedDuplicateCandidatesCount: 0,
   });
   assert.equal(metadata.fillsPlanned, 3);
   assert.equal(metadata.fillsApplied, 2);
@@ -33,14 +41,46 @@ test("buildNameFromEmailBackfillAuditMetadata reports a race-skipped fill withou
   assert.notEqual(metadata.fillsApplied, metadata.fillsPlanned);
 });
 
-test("buildNameFromEmailBackfillAuditMetadata truncates the person id list past the cap, but keeps the true applied count", () => {
-  const many = Array.from({ length: NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP + 50 }, (_, i) => `person-${i}`);
+test("buildNameFromEmailBackfillAuditMetadata truncates the fill list past the cap, but keeps the true applied count", () => {
+  const many = Array.from({ length: NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP + 50 }, (_, i) => fill(`person-${i}`));
   const metadata = buildNameFromEmailBackfillAuditMetadata({
     fillsPlanned: many.length,
-    appliedPersonIds: many,
+    appliedFills: many,
     skippedRacePersonIds: [],
+    queuedDuplicateCandidates: [],
+    alreadyQueuedDuplicateCandidatesCount: 0,
   });
   assert.equal(metadata.fillsApplied, many.length);
-  assert.equal(metadata.personIds.length, NAME_FROM_EMAIL_BACKFILL_AUDIT_ID_CAP);
-  assert.equal(metadata.personIdsTruncated, true);
+  assert.equal(metadata.fills.length, NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP);
+  assert.equal(metadata.fillsTruncated, true);
+});
+
+test("buildNameFromEmailBackfillAuditMetadata records queued duplicate_candidate ids for the revert path", () => {
+  const metadata = buildNameFromEmailBackfillAuditMetadata({
+    fillsPlanned: 1,
+    appliedFills: [fill("p1")],
+    skippedRacePersonIds: [],
+    queuedDuplicateCandidates: [{ id: "dc1", personAId: "p1", personBId: "existing-1" }],
+    alreadyQueuedDuplicateCandidatesCount: 2,
+  });
+  assert.deepEqual(metadata.duplicateCandidatesQueued, [{ id: "dc1", personAId: "p1", personBId: "existing-1" }]);
+  assert.equal(metadata.duplicateCandidatesQueuedTruncated, false);
+  assert.equal(metadata.duplicateCandidatesAlreadyQueued, 2);
+});
+
+test("buildNameFromEmailBackfillAuditMetadata truncates the duplicate_candidate id list past the cap", () => {
+  const many = Array.from({ length: NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP + 10 }, (_, i) => ({
+    id: `dc-${i}`,
+    personAId: `a-${i}`,
+    personBId: `b-${i}`,
+  }));
+  const metadata = buildNameFromEmailBackfillAuditMetadata({
+    fillsPlanned: 0,
+    appliedFills: [],
+    skippedRacePersonIds: [],
+    queuedDuplicateCandidates: many,
+    alreadyQueuedDuplicateCandidatesCount: 0,
+  });
+  assert.equal(metadata.duplicateCandidatesQueued.length, NAME_FROM_EMAIL_BACKFILL_AUDIT_CAP);
+  assert.equal(metadata.duplicateCandidatesQueuedTruncated, true);
 });
