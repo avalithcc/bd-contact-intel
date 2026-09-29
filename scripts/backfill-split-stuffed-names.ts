@@ -107,6 +107,7 @@ const SKIP_REASON_ORDER: StuffedNameSplitSkipReason[] = [
   "junk_digit",
   "junk_at",
   "junk_scrape_artifact",
+  "particle_first",
   "junk_punctuation",
   "looks_like_company",
   "ambiguous_3",

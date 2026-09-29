@@ -80,6 +80,40 @@ test("two-word particle 'van der' is recognised", () => {
   });
 });
 
+test("a name that already reads 'Oscar De La Hoya' (given name first) is a valid particle split", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Oscar De La Hoya" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Oscar", lastName: "De La Hoya", rule: "particle" },
+  });
+});
+
+// --- CRITICAL: a particle at the very FIRST token is ambiguous, never split ---
+// The boundary loop only ever considers i >= 1 as a possible surname start,
+// so a value like "De La Hoya" (no given name before the particle at all —
+// reversed/garbled data) must never be silently treated as firstName "De" /
+// lastName "La Hoya". It must be refused, same spirit as ambiguous_3.
+
+test("a single-word particle as the very first token is ambiguous, never split (surname-first / no given name)", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Del Toro Guillermo" }));
+  assert.deepEqual(result, { kind: "skip", reason: "particle_first" });
+});
+
+test("a two-word particle as the very first tokens is ambiguous, never split", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "De La Hoya" }));
+  assert.deepEqual(result, { kind: "skip", reason: "particle_first" });
+});
+
+test("a two-word particle as the very first tokens is ambiguous even in a longer, reversed, all-caps value", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "DE LA HOYA OSCAR" }));
+  assert.deepEqual(result, { kind: "skip", reason: "particle_first" });
+});
+
+test("'Van der Berg Johan' (surname-first order) is ambiguous, never split, even though 'Van der Berg Johan' given-name-first would be valid", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Van der Berg Johan" }));
+  assert.deepEqual(result, { kind: "skip", reason: "particle_first" });
+});
+
 test("'mc'/'mac' are explicitly NOT particles — a 3-token name with 'Mc' is ambiguous like any other 3-token name, never specially split", () => {
   const result = deriveStuffedNameSplit(candidate({ firstName: "Ronald Mc Donald" }));
   assert.deepEqual(result, { kind: "skip", reason: "ambiguous_3" });

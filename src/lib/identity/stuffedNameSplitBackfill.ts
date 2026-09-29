@@ -57,6 +57,11 @@ export type StuffedNameSplitSkipReason =
   // space — never a real surname particle, even though it may contain
   // "de"/"la".
   | "junk_scrape_artifact"
+  // A surname particle (one- or two-word) is the very FIRST token(s) —
+  // there's no given name before it at all. Never guessed at: this is
+  // exactly the shape of reversed/garbled data (e.g. a surname-first
+  // export), not a valid particle split.
+  | "particle_first"
   // Matches a known company-name suffix word, or matches this person's own
   // `company`/`companyKey` — a company name, not a person.
   | "looks_like_company"
@@ -168,20 +173,43 @@ function looksLikeCompany(
   return false;
 }
 
-/** Leftmost surname-particle boundary, or null when none applies. The
- * particle must leave at least one token before it (the given name) and at
- * least one token after it (the actual surname word) — "Pedro De" (2
- * tokens) is never split as a particle, it falls through to `two_tokens`. */
-function findParticleBoundary(tokens: readonly string[]): { start: number; length: number } | null {
+export type ParticleFinding =
+  | { kind: "boundary"; start: number; length: number }
+  // The very first token(s) form a particle — there's no given name before
+  // it. Ambiguous by construction: never a valid boundary.
+  | { kind: "particle_first" }
+  | null;
+
+/**
+ * Leftmost surname-particle boundary, or a special `particle_first` finding
+ * when the particle is the very FIRST token(s) (no given name before it at
+ * all — e.g. reversed/garbled data). CRITICAL: this must be checked BEFORE
+ * scanning from i=1, not just by starting the scan at i=1 — "De La Hoya"
+ * has "La" (a one-word particle on its own) sitting at index 1, which the
+ * i=1 scan would otherwise happily match as a normal boundary, treating
+ * "De" (itself half of the "De La" particle) as if it were a given name.
+ *
+ * Once position 0 is cleared, the particle must leave at least one token
+ * before it (the given name) and at least one token after it (the actual
+ * surname word) — "Pedro De" (2 tokens) is never split as a particle, it
+ * falls through to `two_tokens`.
+ */
+function findParticleBoundary(tokens: readonly string[]): ParticleFinding {
+  if (tokens.length >= 2) {
+    const twoWordAtStart = `${tokens[0]!.toLowerCase()} ${tokens[1]!.toLowerCase()}`;
+    if (TWO_WORD_PARTICLES.has(twoWordAtStart)) return { kind: "particle_first" };
+  }
+  if (ONE_WORD_PARTICLES.has(tokens[0]!.toLowerCase())) return { kind: "particle_first" };
+
   for (let i = 1; i < tokens.length; i++) {
     if (i + 1 < tokens.length) {
       const twoWord = `${tokens[i]!.toLowerCase()} ${tokens[i + 1]!.toLowerCase()}`;
       if (TWO_WORD_PARTICLES.has(twoWord) && i + 2 <= tokens.length - 1) {
-        return { start: i, length: 2 };
+        return { kind: "boundary", start: i, length: 2 };
       }
     }
     if (ONE_WORD_PARTICLES.has(tokens[i]!.toLowerCase()) && i + 1 <= tokens.length - 1) {
-      return { start: i, length: 1 };
+      return { kind: "boundary", start: i, length: 1 };
     }
   }
   return null;
@@ -286,11 +314,13 @@ export function deriveStuffedNameSplit(input: StuffedNameSplitInput): StuffedNam
   if (tokens.length <= 1) return { kind: "skip", reason: "single_token" };
 
   const particle = findParticleBoundary(tokens);
+  if (particle?.kind === "particle_first") return { kind: "skip", reason: "particle_first" };
+
   const particleIndices = new Set<number>();
   let boundary: number;
   let rule: StuffedNameSplitRule;
 
-  if (particle) {
+  if (particle?.kind === "boundary") {
     boundary = particle.start;
     rule = "particle";
     for (let k = particle.start; k < particle.start + particle.length; k++) particleIndices.add(k);
