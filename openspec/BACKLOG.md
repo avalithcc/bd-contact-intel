@@ -208,12 +208,6 @@ server-side `@avalith.net` + confirmed-email gate in the middleware and
 - **Check the Supabase API logs for past `/rest/v1/` traffic** (owner). The
   app never uses that path, so any request there before 2026-09-29 was
   someone else reading the base. Exposure started when the project did.
-- `redirect()` thrown by `getCurrentBd()` is swallowed by generic
-  `try/catch` in several server actions and route handlers (e.g.
-  `src/app/actions.ts`, `contacts/actions.ts`, `api/gmail/oauth/callback`).
-  Fails closed — the session is cleared and no data is returned — but the
-  user sees a generic error instead of the login page. Rethrow with
-  `isRedirectError`.
 - When creating a BD in the Supabase dashboard, tick **Auto Confirm User**:
   without SMTP an unconfirmed user can never confirm and the new gate blocks
   them.
