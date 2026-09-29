@@ -10,7 +10,7 @@ import { changeContactCompany } from "@/lib/contacts/companyChangeDb";
 import { searchContactCompanies } from "@/lib/contacts/companySearchDb";
 import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
 import { createActivityAction } from "@/app/activity/actions";
-import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
+import { completeTaskAction, createTaskAction, updateTaskAction } from "@/app/(app)/tasks/actions";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
@@ -209,6 +209,24 @@ export async function addContactTaskAction(
 export async function completeContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
   try {
     await completeTaskAction(taskId);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * "Reabrir" on the record page's "Tareas" filter pill (mockup-port
+ * timeline-tasks-pill) — the reopen counterpart of
+ * `completeContactTaskAction` above, for a `done` task shown there. Thin
+ * wrapper over the existing `updateTaskAction` (src/app/(app)/tasks/actions.ts,
+ * already accepts an arbitrary `status`) rather than a new task-write
+ * primitive — same revalidation rationale as `completeContactTaskAction`.
+ */
+export async function reopenContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
+  try {
+    await updateTaskAction(taskId, { status: "open" });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

@@ -7,7 +7,7 @@ import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
-import { getOpenTasksForPerson } from "@/lib/tasks/queries";
+import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
@@ -67,13 +67,25 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const messageLabels = pickGenerateMessageLabels(dict);
   const locale = await getLocale();
   const activePill = resolveTimelinePillKey(rawActivityType);
+  // "Tareas" (contact-record.html:104) isn't a real `TimelinePillKey` — see
+  // the doc comment on @/lib/activity/timelinePills — so a `?activityType=task`
+  // deep link must bypass `resolveTimelinePillKey` (which would silently fall
+  // back to "Todo") to still land the Timeline client component on the
+  // Tareas pill. `activePill` above stays the one used for the actual
+  // `getPersonTimeline` filter, unaffected.
+  const timelineTab = rawActivityType === "task" ? ("task" as const) : activePill;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const [timeline, ownerOptions, openTasks] = await Promise.all([
+  const [timeline, ownerOptions, personTasks] = await Promise.all([
     getPersonTimeline(record.person.id, me.id, { pill: activePill }),
     listOwnerOptions(),
-    getOpenTasksForPerson(record.person.id),
+    getTasksForPerson(record.person.id),
   ]);
+  // "Próximas" bucket + right-panel "Tareas" card (contact-record.html's
+  // r03/r05 cards) only ever show OPEN tasks — unchanged by this pill; the
+  // Timeline component itself gets the full `personTasks` (open + done) for
+  // its own "Tareas" pill.
+  const openTasks = personTasks.filter((t) => t.status === "open");
   // R3 (design.md): reassignment is only allowed while the person has no
   // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
   // enforces server-side for updateContactOwnerAction (task 13.3).
@@ -266,11 +278,14 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     labels={l}
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
-                    activePill={activePill}
-                    openTasks={openTasks.map((t) => ({
+                    activePill={timelineTab}
+                    tasks={personTasks.map((t) => ({
                       id: t.id,
                       title: t.title,
+                      status: t.status as "open" | "done",
                       dueAt: t.dueAt,
+                      createdAt: t.createdAt,
+                      updatedAt: t.updatedAt,
                       assignedToName: t.assignedToName ?? null,
                     }))}
                     isAdmin={isAdmin}
