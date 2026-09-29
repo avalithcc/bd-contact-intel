@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
@@ -60,6 +60,7 @@ export function NewTaskButton({
   const router = useRouter();
   const { showToast } = useToast();
 
+  const ids = useId();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -135,121 +136,159 @@ export function NewTaskButton({
       </button>
 
       {open && (
-        <Dialog open onClose={close} title={l.taskCreate}>
-          <div className="composer">
-            {error && (
-              <div className="error-text" role="alert">
-                {error}
-              </div>
-            )}
-            <label className="field">
-              {l.taskTitleLabel}
-              <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
-            </label>
-
-            <label className="field">
-              {l.taskSubjectLabel}
-              {subject ? (
-                <div className={styles.subjectChip}>
-                  <span>
-                    {subject.type === "person" ? l.taskSubjectContactOption : l.taskSubjectCompanyOption}: {subject.label}
-                  </span>
-                  <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setSubject(null)} disabled={busy}>
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <div className={styles.searchWrap}>
-                  <input
-                    className="input"
-                    value={query}
-                    placeholder={l.taskSubjectPlaceholder}
-                    onChange={(e) => setQuery(e.target.value)}
-                    disabled={busy}
-                  />
-                  {searching && <p className="hint">{l.taskSubjectSearching}</p>}
-                  {!searching && query.trim().length >= 2 && results.length === 0 && (
-                    <p className="hint">{l.taskSubjectNoResults}</p>
-                  )}
-                  {results.length > 0 && (
-                    <ul className={styles.results} role="listbox">
-                      {results.map((result) => (
-                        <li key={`${result.type}:${result.id}`}>
-                          <button
-                            type="button"
-                            className={styles.resultItem}
-                            onClick={() => {
-                              setSubject(result);
-                              setQuery("");
-                              setResults([]);
-                            }}
-                          >
-                            {result.type === "person" ? l.taskSubjectContactOption : l.taskSubjectCompanyOption}:{" "}
-                            {result.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </label>
-
-            {/* Vencimiento + Asignado a side by side (approved mockup
-                contact-record.html #task's `.form-grid`) — mirrored here
-                since this dialog has no mockup of its own. */}
-            <div className="form-grid">
-              <label className="field">
-                {l.taskDueLabel}
-                <input
-                  className="input"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  disabled={busy}
-                />
-              </label>
-
-              <label className="field">
-                {l.taskAssigneeLabel}
-                <select
-                  className="select"
-                  value={assignedToBdId}
-                  onChange={(e) => setAssignedToBdId(e.target.value)}
-                  disabled={busy}
-                >
-                  {buildTaskAssigneeOptions(assigneeOptions, meId).map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            {/* Descripción: not in the approved mockup — a deliberate
-                deviation, kept because the backlog explicitly asked for a
-                write path. */}
-            <label className="field">
-              {l.taskDescriptionLabel}
-              <textarea
-                className="textarea"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={busy}
-              />
-            </label>
-
-            {!subject && title.trim() && <p className="hint">{l.taskSubjectRequired}</p>}
-
-            <div className="bar">
-              <button type="button" onClick={close} disabled={busy}>
+        <Dialog
+          open
+          onClose={close}
+          title={l.taskCreate}
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={close} disabled={busy}>
                 {l.cancel}
               </button>
-              <button type="button" disabled={busy || !title.trim() || !subject} onClick={handleSubmit}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy || !title.trim() || !subject}
+                onClick={handleSubmit}
+              >
                 {l.taskCreate}
               </button>
+            </>
+          }
+        >
+          {/* Markup follows the approved mockup's task dialog
+              (contact-record.html #task): `.field` > `label.label[for]` +
+              control inside Dialog's `.dialog-body`, actions in its
+              `.dialog-footer`. Two bugs came from departing from it: a
+              `.composer` wrapper lit the whole form red on focus
+              (`.composer:focus-within`), and wrapping the subject picker in a
+              <label> made the browser forward the click on a search result to
+              the chip's "×" rendered in its place, clearing the selection. */}
+          {error && (
+            <div className="error-text" role="alert">
+              {error}
             </div>
+          )}
+
+          <div className="field">
+            <label className="label" htmlFor={`${ids}-title`}>
+              {l.taskTitleLabel}
+            </label>
+            <input
+              id={`${ids}-title`}
+              className="input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={busy}
+            />
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor={`${ids}-subject`}>
+              {l.taskSubjectLabel}
+            </label>
+            {subject ? (
+              <div className={styles.subjectChip}>
+                <span>
+                  {subject.type === "person" ? l.taskSubjectContactOption : l.taskSubjectCompanyOption}: {subject.label}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon btn-sm"
+                  aria-label={l.cancel}
+                  onClick={() => setSubject(null)}
+                  disabled={busy}
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <div className={styles.searchWrap}>
+                <input
+                  id={`${ids}-subject`}
+                  className="input"
+                  value={query}
+                  placeholder={l.taskSubjectPlaceholder}
+                  onChange={(e) => setQuery(e.target.value)}
+                  disabled={busy}
+                />
+                {searching && <p className="hint">{l.taskSubjectSearching}</p>}
+                {!searching && query.trim().length >= 2 && results.length === 0 && (
+                  <p className="hint">{l.taskSubjectNoResults}</p>
+                )}
+                {results.length > 0 && (
+                  <ul className={styles.results} role="listbox">
+                    {results.map((result) => (
+                      <li key={`${result.type}:${result.id}`}>
+                        <button
+                          type="button"
+                          className={styles.resultItem}
+                          onClick={() => {
+                            setSubject(result);
+                            setQuery("");
+                            setResults([]);
+                          }}
+                        >
+                          {result.type === "person" ? l.taskSubjectContactOption : l.taskSubjectCompanyOption}:{" "}
+                          {result.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {!subject && title.trim() && <p className="hint">{l.taskSubjectRequired}</p>}
+          </div>
+
+          <div className="form-grid">
+            <div className="field">
+              <label className="label" htmlFor={`${ids}-due`}>
+                {l.taskDueLabel}
+              </label>
+              <input
+                id={`${ids}-due`}
+                className="input"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                disabled={busy}
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor={`${ids}-assignee`}>
+                {l.taskAssigneeLabel}
+              </label>
+              <select
+                id={`${ids}-assignee`}
+                className="select"
+                value={assignedToBdId}
+                onChange={(e) => setAssignedToBdId(e.target.value)}
+                disabled={busy}
+              >
+                {buildTaskAssigneeOptions(assigneeOptions, meId).map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Descripción: not in the approved mockup — a deliberate
+              deviation, kept because the backlog explicitly asked for a
+              write path. */}
+          <div className="field">
+            <label className="label" htmlFor={`${ids}-description`}>
+              {l.taskDescriptionLabel}
+            </label>
+            <textarea
+              id={`${ids}-description`}
+              className="textarea"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={busy}
+            />
           </div>
         </Dialog>
       )}
