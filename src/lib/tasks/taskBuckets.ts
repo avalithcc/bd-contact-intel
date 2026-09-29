@@ -10,14 +10,29 @@
  * for every view, not just "mine"); this module makes the bucketing itself
  * one tested, view-agnostic function instead of two copies of inline logic.
  */
+import { addDaysToDateString, argentinaCalendarDate, taskDueDate } from "@/lib/tasks/argentinaDate";
+
 export type DueBucket = "overdue" | "today" | "tomorrow" | "week" | null;
 
+/**
+ * Classifies `dueAt` by comparing calendar dates, not raw instants (bug fix,
+ * production 2026-09-29): `dueAt` is a stored calendar date at 00:00 UTC,
+ * never a real instant, so the old `Math.ceil((dueAt - now) / day)` ms diff
+ * flipped a due-today task to "overdue" every evening once UTC rolled over,
+ * hours before the ART calendar day actually ended (21:00 ART = 00:00 UTC
+ * next day). `now`, by contrast, IS a real instant, so it's read through
+ * `argentinaCalendarDate` (the ART shift) to get today's Argentina date.
+ */
 export function dueBucketOf(dueAt: Date | string | null, now: Date = new Date()): DueBucket {
   if (!dueAt) return null;
-  const daysUntilDue = Math.ceil((new Date(dueAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysUntilDue < 0) return "overdue";
-  if (daysUntilDue === 0) return "today";
-  if (daysUntilDue === 1) return "tomorrow";
+  const due = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
+  if (Number.isNaN(due.getTime())) return null;
+
+  const dueDate = taskDueDate(due);
+  const today = argentinaCalendarDate(now);
+  if (dueDate < today) return "overdue";
+  if (dueDate === today) return "today";
+  if (dueDate === addDaysToDateString(today, 1)) return "tomorrow";
   return "week";
 }
 

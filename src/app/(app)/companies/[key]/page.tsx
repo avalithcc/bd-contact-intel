@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { getCompanyByKey } from "@/lib/companies/queries";
 import {
   getCompanyOpenTasks,
@@ -279,7 +280,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                   >
                     <button type="submit" className="btn btn-ghost btn-sm" title={l.taskMarkDone}>
                       {t.title}
-                      {t.dueAt && <> · {format(t.dueAt, "d MMM", { locale: es })}</>}
+                      {t.dueAt && <> · {formatTaskDueDate(t.dueAt)}</>}
                     </button>
                   </form>
                 ))

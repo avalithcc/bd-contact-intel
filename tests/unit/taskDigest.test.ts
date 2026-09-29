@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildDigestEmail, groupDigestTasks, type DigestTask } from "@/lib/tasks/digest";
+import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
 
 const BOUNDARIES = { today: "2026-09-29", yesterday: "2026-09-28" };
 
@@ -25,12 +26,15 @@ function task(id: string, dueAt: string, overrides: Partial<DigestTask> = {}): D
   };
 }
 
-test("groupDigestTasks splits into yesterday/overdue/today by ART calendar date", () => {
+test("groupDigestTasks splits into yesterday/overdue/today by due_at's stored calendar date (00:00 UTC)", () => {
+  // `dueAt` always holds a calendar date at 00:00 UTC (never a real ART
+  // instant — every task-creation path stores it that way), so these
+  // fixtures use the same shape production due_at rows do.
   const tasks: DigestTask[] = [
-    task("today1", "2026-09-29T11:00:00Z"), // 2026-09-29 ART -> today
-    task("yesterday1", "2026-09-29T02:30:00Z"), // 2026-09-28 ART -> yesterday
-    task("overdue1", "2026-09-25T12:00:00Z"), // 2026-09-25 ART -> overdue (before yesterday)
-    task("overdue2", "2026-09-27T23:59:00Z"), // 2026-09-27 ART -> overdue
+    task("today1", "2026-09-29T00:00:00Z"), // due today
+    task("yesterday1", "2026-09-28T00:00:00Z"), // due yesterday
+    task("overdue1", "2026-09-25T00:00:00Z"), // before yesterday -> overdue
+    task("overdue2", "2026-09-27T00:00:00Z"), // before yesterday -> overdue
   ];
 
   const groups = groupDigestTasks(tasks, BOUNDARIES);
@@ -104,6 +108,63 @@ test("buildDigestEmail's html includes each task's title, subject link and due d
   assert.doesNotMatch(email!.html, /Atrasadas/);
   assert.doesNotMatch(email!.html, /Pendientes de ayer/);
   assert.match(email!.text, /Llamar a Juan/);
+});
+
+/**
+ * Reproduces the exact production bug (2026-09-29 digest dry run): a task
+ * due today (`due_at = 2026-09-29T00:00:00Z`, stored as a calendar date at
+ * 00:00 UTC — never a real ART instant) was grouped as "de ayer", and a task
+ * due yesterday (`2026-09-28T00:00:00Z`) as "atrasada". The old code read
+ * `due_at` through `argentinaCalendarDate` (an ART-instant shift), which
+ * pushes a UTC-midnight calendar date back one day.
+ */
+test("groupDigestTasks classifies production due_at values (00:00 UTC calendar dates) correctly across the ART day boundary", () => {
+  const dueToday = task("due-today", "2026-09-29T00:00:00Z");
+  const dueYesterday = task("due-yesterday", "2026-09-28T00:00:00Z");
+  const dueTomorrow = task("due-tomorrow", "2026-09-30T00:00:00Z");
+
+  for (const now of [
+    new Date("2026-09-29T11:30:00Z"), // 08:30 ART
+    new Date("2026-09-30T02:30:00Z"), // 23:30 ART, still the 29th
+  ]) {
+    const boundaries = argentinaDayBoundaries(now);
+    const groups = groupDigestTasks([dueToday, dueYesterday, dueTomorrow], boundaries);
+
+    assert.deepEqual(
+      groups.today.map((t) => t.id),
+      ["due-today"],
+      `today group at now=${now.toISOString()}`,
+    );
+    assert.deepEqual(
+      groups.yesterday.map((t) => t.id),
+      ["due-yesterday"],
+      `yesterday group at now=${now.toISOString()}`,
+    );
+    assert.deepEqual(groups.overdue, [], `overdue group at now=${now.toISOString()}`);
+  }
+});
+
+test("buildDigestEmail's subject uses singular 'atrasada' for exactly one overdue task", () => {
+  const tasks = {
+    today: [],
+    overdue: [task("o1", "2026-09-20T00:00:00Z")],
+    yesterday: [],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.equal(email!.subject, "Tus tareas de hoy — 1 atrasada");
+});
+
+test("formatDueDate (via the html output) shows the stored UTC calendar date, not an ART-shifted one", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T00:00:00Z", { title: "Due today" })],
+    overdue: [],
+    yesterday: [task("y1", "2026-09-28T00:00:00Z", { title: "Due yesterday" })],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /Due today.*vence 29\/09/s);
+  assert.match(email!.html, /Due yesterday.*vence 28\/09/s);
 });
 
 test("buildDigestEmail never leaks images or tracking pixels", () => {

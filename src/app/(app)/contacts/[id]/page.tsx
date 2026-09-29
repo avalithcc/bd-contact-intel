@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
@@ -450,7 +451,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     <div className="grow">
                       <div className="n">{t.title}</div>
                       <div className="s">
-                        {t.dueAt ? `${l.taskDueBadgePrefix} ${format(t.dueAt, "d MMM", { locale: es })}` : l.emptyValue}
+                        {t.dueAt ? `${l.taskDueBadgePrefix} ${formatTaskDueDate(t.dueAt)}` : l.emptyValue}
                         {t.assignedToName ? ` · ${t.assignedToName}` : ""}
                       </div>
                     </div>

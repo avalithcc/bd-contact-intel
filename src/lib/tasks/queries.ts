@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, company, person, task, type Task, type NewTask } from "@/db/schema";
+import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
@@ -194,13 +195,25 @@ export async function getOpenTasksForPerson(personId: string, limit: number = 50
     .limit(limit);
 }
 
+/**
+ * Overdue = due calendar date strictly before today's Argentina date, i.e.
+ * `due_at < todayStartUtc` (today's calendar date at 00:00 UTC — `due_at`
+ * is a stored calendar date, never a real instant, see argentinaDate.ts).
+ * Bug fixed here: this used to compare `now() > due_at` as real instants,
+ * which flagged a task due today as overdue almost immediately (Postgres
+ * `now()`, naive-compared against a UTC-session `timestamp without time
+ * zone` column, crosses midnight UTC hours before the ART calendar day
+ * ends).
+ */
 export async function getOverdueTasks(bdId: string): Promise<TaskRow[]> {
+  const { todayStartUtc } = argentinaDayBoundaries(new Date());
   return baseTaskSubjectQuery()
     .where(
       and(
         eq(task.assignedToBdId, bdId),
         eq(task.status, "open"),
-        gt(sql`now()`, task.dueAt),
+        isNotNull(task.dueAt),
+        lt(task.dueAt, todayStartUtc),
       ),
     )
     .orderBy(asc(task.dueAt));
@@ -215,8 +228,9 @@ export async function getOverdueTasks(bdId: string): Promise<TaskRow[]> {
  * overdue anywhere on that tab.
  */
 export async function getAllOverdueTasks(): Promise<TaskRow[]> {
+  const { todayStartUtc } = argentinaDayBoundaries(new Date());
   return baseTaskSubjectQuery()
-    .where(and(eq(task.status, "open"), gt(sql`now()`, task.dueAt)))
+    .where(and(eq(task.status, "open"), isNotNull(task.dueAt), lt(task.dueAt, todayStartUtc)))
     .orderBy(asc(task.dueAt));
 }
 
@@ -224,9 +238,11 @@ export async function getAllOverdueTasks(): Promise<TaskRow[]> {
  * Sidebar "Tareas" badge count (task-reminders backlog): today + overdue
  * open tasks for the signed-in BD, one bounded `count(*)` covered by
  * `task_assignee_idx`/`task_status_idx`/`task_due_idx` — the same shape as
- * `getTaskViewCounts` above, not a fetch-and-`.length`. `before` is the ART
- * "tomorrow starts" instant from `argentinaDayBoundaries` — a task is
- * counted once it's due today or earlier, never for a future due date.
+ * `getTaskViewCounts` above, not a fetch-and-`.length`. `before` is
+ * `tomorrowStartUtc` from `argentinaDayBoundaries` — tomorrow's calendar
+ * date at 00:00 UTC (NOT ART midnight, 03:00 UTC — that would be >= a
+ * due-tomorrow task's own `due_at` and wrongly count it). A task is counted
+ * once it's due today or earlier, never for a future due date.
  * Costs exactly one round trip; the caller (AppLayout) already has
  * `bdId` for free from the cached `getCurrentBd()` call every page under it
  * makes.

@@ -1,5 +1,4 @@
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
@@ -76,7 +75,7 @@ export function Overview({ labels: l, serverStrings: s, lastActivity, touchpoint
               <div key={t.id}>
                 {s.openTaskLine(
                   t.title,
-                  t.dueAt ? format(t.dueAt, "d MMM", { locale: es }) : l.emptyValue,
+                  t.dueAt ? formatTaskDueDate(t.dueAt) : l.emptyValue,
                   t.assignedToName ?? l.emptyValue,
                 )}
               </div>

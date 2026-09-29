@@ -32,10 +32,22 @@ export interface ArgentinaDayBoundaries {
   /** Yesterday's ART calendar date. */
   yesterday: string;
   /**
-   * The UTC instant of ART midnight tomorrow — every task due strictly
-   * before this instant is due today or earlier in ART. Used to bound the
-   * digest's SQL read (`due_at < tomorrowStartUtc`) without needing a
-   * per-row date computation in Postgres.
+   * `due_at` value a task due TODAY would hold. Every task-creation path
+   * stores `due_at` as a plain calendar date at 00:00 UTC (a date-only
+   * `<input type="date">` parsed with `new Date("YYYY-MM-DD")`) — it is
+   * never a real ART instant, so this boundary must NOT be ART midnight
+   * (which would be 03:00 UTC). `due_at < todayStartUtc` means the task's
+   * due calendar date is strictly before today, i.e. overdue.
+   */
+  todayStartUtc: Date;
+  /**
+   * `due_at` value a task due TOMORROW would hold, i.e. tomorrow's calendar
+   * date at 00:00 UTC. Every open task due today or earlier satisfies
+   * `due_at < tomorrowStartUtc`. Bug fixed here: this used to be ART
+   * midnight tomorrow (03:00 UTC), which is >= a due-tomorrow task's actual
+   * `due_at` (00:00 UTC) and so wrongly counted it as due today (production
+   * 2026-09-29 digest dry run / sidebar badge). Used to bound the digest's
+   * SQL read and the sidebar badge count.
    */
   tomorrowStartUtc: Date;
 }
@@ -44,8 +56,53 @@ export function argentinaDayBoundaries(now: Date): ArgentinaDayBoundaries {
   const today = argentinaCalendarDate(now);
   const yesterday = addDaysToDateString(today, -1);
   const tomorrow = addDaysToDateString(today, 1);
-  // ART midnight on `tomorrow` = that same calendar day at 03:00 UTC
-  // (UTC-3 offset, no DST).
-  const tomorrowStartUtc = new Date(`${tomorrow}T${String(3).padStart(2, "0")}:00:00.000Z`);
-  return { today, yesterday, tomorrowStartUtc };
+  const todayStartUtc = new Date(`${today}T00:00:00.000Z`);
+  const tomorrowStartUtc = new Date(`${tomorrow}T00:00:00.000Z`);
+  return { today, yesterday, todayStartUtc, tomorrowStartUtc };
+}
+
+/**
+ * The calendar date `due_at` represents, read directly off its UTC date
+ * fields — NOT shifted by the ART offset the way `argentinaCalendarDate`
+ * shifts a real instant like "now". `due_at` is never a real instant: every
+ * task-creation path stores it as a bare calendar date at 00:00 UTC. Reading
+ * it back through the ART-instant shift (subtract 3h) pushes it one day
+ * back — the exact bug found in production 2026-09-29 (a task due today
+ * showed as "de ayer", a task due yesterday as "atrasada"). Uses UTC getters
+ * (not `getDate()`/`getMonth()`) so the result never depends on the calling
+ * process's local timezone.
+ */
+export function taskDueDate(dueAt: Date): string {
+  const y = dueAt.getUTCFullYear();
+  const m = String(dueAt.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(dueAt.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+const ES_MONTH_ABBR = [
+  "ene",
+  "feb",
+  "mar",
+  "abr",
+  "may",
+  "jun",
+  "jul",
+  "ago",
+  "sep",
+  "oct",
+  "nov",
+  "dic",
+];
+
+/**
+ * Displays a task's due date as "29 sep" — the stored UTC calendar date,
+ * independent of the viewer's or server's timezone (rule: a due date is a
+ * calendar date, not an instant). Do not reuse this for real-instant
+ * timestamps (createdAt, activity times, etc.) — those should keep using
+ * `date-fns`'s `format` with the ART display convention already in place.
+ */
+export function formatTaskDueDate(dueAt: Date): string {
+  const day = dueAt.getUTCDate();
+  const month = ES_MONTH_ABBR[dueAt.getUTCMonth()];
+  return `${day} ${month}`;
 }
