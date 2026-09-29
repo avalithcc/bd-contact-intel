@@ -93,21 +93,23 @@ Still open:
   validated and ready but has no caller.
 - `bulkCreateTaskAction` inserts one task per selected contact in a loop.
 
-### custom-smtp
-The Supabase project has no SMTP of its own. Its built-in email service only
-delivers to members of the project's team, heavily rate-limited, and without
-custom SMTP the auth email templates cannot be edited. Consequences today:
-- **Self-service password reset is built but switched off**
-  (`src/lib/auth/passwordReset.ts`, `PASSWORD_RESET_ENABLED = false`) — it
-  would show "check your inbox" and nothing would arrive. The module lists the
-  steps to turn it on, including making `/auth/confirm` accept a PKCE `code`.
-- Invites have never been used (0 invited users in `auth.users`), so the
-  invite email path is untested for the same reason.
-- The Supabase dashboard's own recovery and magic-link actions are email-based
-  too, so they are not a manual workaround.
+### custom-smtp — done 2026-09-29
+Supabase sends through the HostGator mailbox `notificaciones@avalith.net`
+(`amanti.websitewelcome.com:465`, sender "Avalith BD"; details and the traps
+in `src/lib/auth/passwordReset.ts`). Self-service password reset is ON and
+was verified end to end: inbox delivery, the token_hash link, and saving a
+new password with "require current password" enabled. Auth email rate limit
+raised from 2 to 30 per hour.
 
-Likely the avalith.net Google Workspace SMTP; decide together with the email
-strategy for BD outreach.
+Still open:
+- The **invite** template still uses the default `{{ .ConfirmationURL }}`.
+  Invites are not used (the owner creates users with a password and Auto
+  Confirm); if they ever are, switch it to the token_hash shape first.
+- avalith.net's DMARC record reports to the placeholder
+  `email@yourdomain.com`, so no report ever arrives. Point `rua` at a real
+  mailbox (DNS at HostGator).
+- The same SMTP credentials are what the app would use for task reminders by
+  email.
 
 ### bd-password-reset (manual) — shipped, not yet run
 `scripts/reset-bd-password.ts` (PR #179) sets a random temporary password
