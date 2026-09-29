@@ -9,6 +9,7 @@ import {
   deriveNameFromEmail,
   findNameCompanyCollisions,
   GENERIC_LOCAL_PARTS,
+  OWNER_EXCLUDED_EMAILS,
   type NameFromEmailCandidate,
 } from "@/lib/identity/nameFromEmailBackfill";
 
@@ -116,6 +117,32 @@ test("GENERIC_LOCAL_PARTS covers the minimum required list", () => {
 test("malformed email (no local part) is skipped as malformed", () => {
   const result = deriveNameFromEmail("@example.com");
   assert.deepEqual(result, { kind: "skip", reason: "malformed" });
+});
+
+// --- owner-reviewed exclusions -----------------------------------------------
+
+test("OWNER_EXCLUDED_EMAILS contains exactly the 6 owner-reviewed functional mailboxes", () => {
+  assert.deepEqual(
+    [...OWNER_EXCLUDED_EMAILS].sort(),
+    [
+      "andrescamp_ac@hotmail.com",
+      "capacity.america@intive.com",
+      "dnais.rofertas@policia.gob.ec",
+      "julionunez.rv@gmail.com",
+      "metodyfabricas.arg@bbva.com",
+      "pmo.tech@uala.com.ar",
+    ].sort(),
+  );
+});
+
+test("an owner-excluded email is skipped as owner_excluded, even though it would otherwise structurally qualify as a fill", () => {
+  const result = deriveNameFromEmail("capacity.america@intive.com");
+  assert.deepEqual(result, { kind: "skip", reason: "owner_excluded" });
+});
+
+test("owner exclusion matches case-insensitively", () => {
+  const result = deriveNameFromEmail("Capacity.America@Intive.com");
+  assert.deepEqual(result, { kind: "skip", reason: "owner_excluded" });
 });
 
 // --- buildNameFromEmailPlan --------------------------------------------------

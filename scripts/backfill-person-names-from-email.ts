@@ -87,6 +87,7 @@ const SKIP_REASON_ORDER: NameFromEmailSkipReason[] = [
   "short_token",
   "non_letter_token",
   "generic_word",
+  "owner_excluded",
   "malformed",
 ];
 

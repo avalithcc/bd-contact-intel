@@ -14,6 +14,24 @@
  */
 import { buildNameCompanyKey } from "@/lib/identity/matcher";
 
+/**
+ * Owner-reviewed exclusions (owner ask, 2026-09-29): these 6 local parts
+ * pass every structural rule below (exactly 2 letter-only tokens, no
+ * digits, neither token nor the whole local part in GENERIC_LOCAL_PARTS)
+ * but are functional/team mailboxes, not a person — the owner confirmed
+ * this by reading the actual accounts before any `--execute`. Matched by
+ * EXACT lowercased email. Extend this list only after another owner review
+ * — never by guessing at a broader rule.
+ */
+export const OWNER_EXCLUDED_EMAILS: ReadonlySet<string> = new Set([
+  "capacity.america@intive.com",
+  "pmo.tech@uala.com.ar",
+  "metodyfabricas.arg@bbva.com",
+  "dnais.rofertas@policia.gob.ec",
+  "andrescamp_ac@hotmail.com",
+  "julionunez.rv@gmail.com",
+]);
+
 // Minimum required generic/role local parts (contact-identity owner ask):
 // any of these — as a WHOLE token, or as the WHOLE local part once
 // separators are stripped — refuses the fill rather than guessing a
@@ -68,7 +86,10 @@ export type NameFromEmailSkipReason =
   | "non_letter_token"
   // A token (or the whole local part with separators stripped) is a
   // generic/role mailbox, never a person's name.
-  | "generic_word";
+  | "generic_word"
+  // An owner-reviewed functional mailbox (OWNER_EXCLUDED_EMAILS) — passes
+  // every structural rule but is confirmed NOT a person.
+  | "owner_excluded";
 
 export interface NameFromEmailFill {
   firstName: string;
@@ -105,6 +126,10 @@ function localPartBeforeTag(email: string): string | null {
  * the email — never adding one that isn't there.
  */
 export function deriveNameFromEmail(email: string): NameFromEmailResult {
+  if (OWNER_EXCLUDED_EMAILS.has(email.trim().toLowerCase())) {
+    return { kind: "skip", reason: "owner_excluded" };
+  }
+
   const localPart = localPartBeforeTag(email);
   if (!localPart) return { kind: "skip", reason: "malformed" };
 
