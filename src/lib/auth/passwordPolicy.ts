@@ -69,7 +69,12 @@ export function mapUpdateUserError(
   if (errorCode === "same_password") {
     return { field: "new", code: "sameAsCurrent" };
   }
-  if (requireCurrent && errorCode === "invalid_credentials") {
+  // `current_password_required` is the code GoTrue actually returns when the
+  // project requires the current password and the request omits it —
+  // observed in production on 2026-09-29 (scripts/check-password-change-guard.ts);
+  // it is newer than the installed SDK's error-code list. `invalid_credentials`
+  // remains an inference for a wrong current password.
+  if (requireCurrent && (errorCode === "invalid_credentials" || errorCode === "current_password_required")) {
     return { field: "current", code: "incorrect" };
   }
   return { field: null, code: "generic" };

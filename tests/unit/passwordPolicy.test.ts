@@ -173,3 +173,10 @@ test("mapUpdateUserError: missing/null code is generic", () => {
     code: "generic",
   });
 });
+
+test("mapUpdateUserError maps GoTrue's current_password_required to the current-password field", () => {
+  // Observed in production on 2026-09-29 by scripts/check-password-change-guard.ts
+  // once "require current password" was enabled on the Supabase project: the
+  // server answers a change that omits current_password with this code.
+  assert.deepEqual(mapUpdateUserError("current_password_required", true), { field: "current", code: "incorrect" });
+});
