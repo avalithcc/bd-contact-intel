@@ -9,6 +9,7 @@ import {
   statesMatch,
 } from "@/lib/gmail/oauthState";
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 
 function back(req: NextRequest, params: Record<string, string>) {
   const url = new URL("/account/email", req.url);
@@ -99,6 +100,7 @@ export async function GET(req: NextRequest) {
 
     return back(req, { success: "true" });
   } catch (err) {
+    unstable_rethrow(err);
     console.error("OAuth callback error:", err);
     return back(req, { error: "server_error" });
   }

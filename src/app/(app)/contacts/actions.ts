@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contacts/propertyEdit";
@@ -36,6 +37,11 @@ import {
 // Unclassified errors reach the client only as "unexpected"; log them here so
 // a real failure (DB, schema drift) still leaves a server-side trace.
 function actionFailure(err: unknown): { ok: false; reason: ReturnType<typeof contactActionErrorReason> } {
+  // A redirect()/notFound() thrown inside the try (e.g. getCurrentBd()'s
+  // defense-in-depth auth redirect) must reach Next's router, not be
+  // swallowed into a generic `{ ok: false }` result — see
+  // tests/unit/rethrowNavigationErrors.test.ts.
+  unstable_rethrow(err);
   const reason = contactActionErrorReason(err);
   if (reason === "unexpected") console.error("[contacts] unexpected action error", err);
   return { ok: false, reason };
@@ -368,6 +374,7 @@ export async function getTimelinePillEntriesAction(
     const { entries } = await getPersonTimeline(personId, me.id, { pill });
     return { ok: true, entries };
   } catch (err) {
+    unstable_rethrow(err);
     console.error("[contacts] getTimelinePillEntriesAction failed", err);
     return { ok: false };
   }

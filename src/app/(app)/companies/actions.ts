@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { createCompany, getCompanyByKey, updateCompany } from "@/lib/companies/queries";
 import { getCurrentBd } from "@/lib/queries";
 import type { NewCompany } from "@/db/schema";
@@ -122,6 +123,16 @@ export interface CompanyActionResult {
   message?: string;
 }
 
+// A redirect()/notFound() thrown inside the try (e.g. getCurrentBd()'s
+// defense-in-depth auth redirect, reached transitively via
+// createActivityAction/createTaskAction) must reach Next's router, not be
+// swallowed into a generic `{ ok: false }` result — see
+// tests/unit/rethrowNavigationErrors.test.ts.
+function actionFailure(err: unknown): CompanyActionResult {
+  unstable_rethrow(err);
+  return { ok: false, message: err instanceof Error ? err.message : String(err) };
+}
+
 /**
  * Company-scoped quick actions (mockup-port c03; company-record.html:66).
  * `createActivityAction`/`createTaskAction` (src/app/activity/actions.ts,
@@ -136,7 +147,7 @@ export async function addCompanyNoteAction(companyKey: string, note: string): Pr
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    return actionFailure(err);
   }
 }
 
@@ -155,7 +166,7 @@ export async function addCompanyTaskAction(
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    return actionFailure(err);
   }
 }
 
@@ -180,7 +191,7 @@ export async function logCompanyMeetingAction(
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    return actionFailure(err);
   }
 }
 
@@ -190,7 +201,7 @@ export async function completeCompanyTaskAction(taskId: string, companyKey: stri
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    return actionFailure(err);
   }
 }
 
@@ -226,6 +237,7 @@ export async function getCompanyTimelineFilterEntriesAction(
     const viewRows = buildCompanyTimelineViewRows(rows, dict.companyRecordServer, l, (stage) => stageLabelOf(stage, lc));
     return { ok: true, rows: viewRows };
   } catch (err) {
+    unstable_rethrow(err);
     console.error("[companies] getCompanyTimelineFilterEntriesAction failed", err);
     return { ok: false };
   }

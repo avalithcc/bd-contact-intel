@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import { syncAllCompanies } from "@/lib/hiring/sync";
 import { classifyPendingStartups } from "@/lib/hiring/startupClassification";
 import { isValidBearer } from "@/lib/cronAuth";
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
   try {
     startupClassification = await classifyPendingStartups();
   } catch (error) {
+    unstable_rethrow(error);
     console.error("classifyPendingStartups failed", error);
     startupClassification = { attempted: 0, classified: 0, failed: 0, error: String(error) };
   }

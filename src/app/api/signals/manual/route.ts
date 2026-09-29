@@ -5,6 +5,7 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
+    unstable_rethrow(err);
     console.error("Signal save error:", err);
     return NextResponse.json(
       { error: "Failed to save signal" },

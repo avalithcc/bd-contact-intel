@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { parseConnectionsCsv } from "@/lib/csv";
 import { parseMessagesCsv } from "@/lib/messagesCsv";
 import {
@@ -82,6 +83,7 @@ export async function uploadCsv(
     revalidatePath("/contacts");
     return { ok: true, imported, skippedOwnCompany, identityReport };
   } catch (err) {
+    unstable_rethrow(err);
     return {
       ok: false,
       errorKey: "genericFailed",
@@ -153,6 +155,7 @@ export async function uploadMessagesCsv(
       cleanupFailed: Boolean(removeError),
     };
   } catch (err) {
+    unstable_rethrow(err);
     return {
       ok: false,
       errorKey: "genericFailed",
