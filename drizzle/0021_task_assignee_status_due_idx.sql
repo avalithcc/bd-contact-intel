@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "task_assignee_status_due_idx" ON "task" USING btree ("assigned_to_bd_id","status","due_at");
