@@ -20,7 +20,7 @@ What follows instead:
   and `src/lib/contacts/effectiveActivityTime.ts` (column definitions,
   existing bugs/fixes, the effective-activity-time rule) are cited from code.
 - Every number this brief could **not** get without a new query is marked
-  **[NEEDS QUERY]** and its exact SQL is in the Appendix, ready for the
+  **measured — see "Measured results"** and its exact SQL is in the Appendix, ready for the
   orchestrator to run read-only against prod (`TZ=UTC`, `SELECT` only) and
   drop back into this document.
 - Company context is from `avalith/contexto/empresa.md` and
@@ -30,10 +30,31 @@ What follows instead:
 ## Summary
 
 | Decision | Recommendation | The number that drives it |
-| --- | --- | --- |
-| 1. Follow-up cadence | Status-specific thresholds (`contacted`: 7d, `replied`: 3d) **plus** a bounded per-BD daily queue, not a raw day-count trigger | **8,737** `contacted`+`replied` contacts (5,835 + 2,902) whose effective last-touch is a historical backfill date, not a real BD action — a raw threshold floods the queue on day one regardless of N. Exact days-since distribution: **[NEEDS QUERY Q1]** |
-| 2. Default pipeline stage | Derive from `account_type` first (client→`won`, partner→`qualified`), then from contact status (`replied`/`meeting` anywhere → `qualified`), else `prospect` | 32 companies already classified as partner/client (30 + 2) would otherwise default to the same bucket as a company with zero contacts; company counts per resulting stage: **[NEEDS QUERY Q2]** |
-| 3. Email enrichment | Free pattern-guess from same-domain emails first; Hunter Domain Search (1 credit/domain) before Email Finder (1 credit/person) for the residual | 21,391 no-email contacts vs. an unknown-but-likely-small number of distinct domains — pattern-guess and domain coverage: **[NEEDS QUERY Q3]** |
+| ## Measured results (orchestrator, 2026-09-29, read-only transaction, `TZ=UTC`)
+
+The first draft could not reach the database; these numbers come from running
+the appendix queries unchanged, inside `BEGIN READ ONLY`.
+
+**Q1.1 — contacts overdue for follow-up, by owner** (`contacted` + `replied`, as of 2026-09-29 22:58 UTC)
+
+| Owner | Total | Overdue at 3d | 7d | 14d | 30d |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Cristian Civita | 2,969 | 2,969 | 2,969 | 2,969 | 2,945 |
+| Macarena Dávila | 2,678 | 2,678 | 2,678 | 2,678 | 2,582 |
+| Mariel Meza | 9 | 9 | 9 | 9 | 9 |
+| (no owner) | 3,081 | 3,081 | 3,079 | 3,079 | 3,079 |
+| **Total** | **8,737** | **8,737** | **8,735** | **8,735** | **8,615** |
+
+Last-touch months are spread out (top: 2023-03 553, 2023-09 547, 2023-01 441, 2023-02 436, 2022-10 236, 2023-06 234, 2025-07 231, 2024-02 226). The threshold barely matters; what matters is how many a BD can work per day. BD headcount: 3 (Q1.4).
+
+**Q2 — companies by the recommended default rule:** 12,044 prospect, 2,209 qualified (a contact that replied or met, or a partner account), 2 won (client accounts). Q2.1 detail: 9,447 companies have only `new` contacts, 2,559 only `contacted`, 2,179 at least one `replied`; 38 have no contacts; 66 have an open IT job posting.
+
+**Q3 — email enrichment:** 4,678 no-email contacts resolve a domain through `company.domain` and 1,809 more only through a colleague's email — **6,487 of 21,391 (30%)**, across **3,097 distinct domains**. Caveats from Q3.4: personal-mail domains (`gmail.com`, `hotmail.com`, `outlook.com`) appear among them and cannot be pattern-guessed or domain-searched — exclude them; where a company pattern was detected it is overwhelmingly `first.last@` (e.g. 85 of 86 known addresses at one domain, 48 of 49, 27 of 27), but many domains match none of the three patterns measured and need a broader pattern check before any guess. The Hunter credit cost remains an estimate (≤ 3,097 domain searches before excluding personal domains; per-call model unverified).
+
+--- | --- | --- |
+| 1. Follow-up cadence | Status-specific thresholds (`contacted`: 7d, `replied`: 3d) **plus** a bounded per-BD daily queue, not a raw day-count trigger | **8,737** `contacted`+`replied` contacts (5,835 + 2,902) whose last touch is months or years old — **8,735 are already overdue at 7 days and 8,615 at 30 days**, so a raw threshold floods the queue on day one regardless of N (Q1.1, measured) |
+| 2. Default pipeline stage | Derive from `account_type` first (client→`won`, partner→`qualified`), then from contact status (`replied`/`meeting` anywhere → `qualified`), else `prospect` | 32 companies already classified as partner/client (30 + 2) would otherwise default to the same bucket as a company with zero contacts; under the rule: **12,044 prospect · 2,209 qualified · 2 won** (Q2.2, measured) |
+| 3. Email enrichment | Free pattern-guess from same-domain emails first; Hunter Domain Search (1 credit/domain) before Email Finder (1 credit/person) for the residual | of 21,391 no-email contacts, **6,487 (30%) have a resolvable company domain** (4,678 via `company.domain`, 1,809 via a colleague's email), across **3,097 distinct domains** (Q3.1–Q3.3, measured); the other 70% has no domain to enrich from |
 
 ---
 
@@ -64,8 +85,9 @@ What follows instead:
 
 ### The critical finding (no query needed for this part)
 Combine those two facts: **8,737 contacts (`contacted` + `replied`) have an
-effective last-touch that is a historical import artifact, not a real BD
-action**, and the app has produced a grand total of one real touch (the
+effective last touch that predates the app** — measured, it is spread over
+real historical dates from 2022-10 to 2025-07 (not one backfill date, as a
+first draft of this brief assumed), but all of it is old, and the app has produced a grand total of one real touch (the
 self-test email) since inception. That means, on the day a cadence ships,
 **a plain "days since effective last activity ≥ N" rule puts nearly the
 entire 8,737 at N days overdue simultaneously — at N = 3, 7, 14 AND 30**,
@@ -108,8 +130,8 @@ contact a BD has actually worked.
 ### What the data says
 - Status counts: measured, see above (BACKLOG.md 2026-09-28).
 - Days-since-effective-activity distribution per status, and volume at 3 /
-  7 / 14 / 30 days **per BD**: **[NEEDS QUERY]** — Appendix Q1.1.
-- BD headcount (needed to size the daily cap): **[NEEDS QUERY]** — Appendix
+  7 / 14 / 30 days **per BD**: **measured — see "Measured results"** — Appendix Q1.1.
+- BD headcount (needed to size the daily cap): **measured — see "Measured results"** — Appendix
   Q1.4.
 
 ---
@@ -172,9 +194,9 @@ proposes for role-based BD guidance (`bd-playbook`).
 
 ### What the data says
 - Companies × account_type × contact-status bucket (the exact segmentation
-  behind option 3): **[NEEDS QUERY]** — Appendix Q2.1.
+  behind option 3): **measured — see "Measured results"** — Appendix Q2.1.
 - Resulting company count per stage under the recommended rule:
-  **[NEEDS QUERY]** — Appendix Q2.2.
+  **measured — see "Measured results"** — Appendix Q2.2.
 - Already known without a query: 14,255 companies total, all null
   `relationship_stage`; 32 already have a non-null `account_type` (30
   partner, 2 client), 14,223 do not; 88 `target_company` rows exist at all,
@@ -261,8 +283,8 @@ budgeting)
 
 ### What the data says
 - No-email contacts with a resolvable domain (via `company.domain` or a
-  sibling's email): **[NEEDS QUERY]** — Appendix Q3.1, Q3.2.
-- Distinct domain count behind that: **[NEEDS QUERY]** — Appendix Q3.3.
+  sibling's email): **measured — see "Measured results"** — Appendix Q3.1, Q3.2.
+- Distinct domain count behind that: **measured — see "Measured results"** — Appendix Q3.3.
 - Observed pattern per domain, and how many domains have a single dominant
   pattern (≥80% of that domain's known emails share one shape): **[NEEDS
   QUERY]** — Appendix Q3.4.
