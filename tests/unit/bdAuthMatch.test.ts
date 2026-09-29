@@ -31,9 +31,13 @@ function authRow(overrides: Partial<AuthUserRowForMatch> = {}): AuthUserRowForMa
     email: "cristian@avalith.net",
     lastSignInAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    bannedUntil: null,
+    deletedAt: null,
     ...overrides,
   };
 }
+
+const NOW = new Date("2026-09-29T00:00:00.000Z");
 
 test("matches exactly one bd row to exactly one auth user row with the same email", () => {
   const match = matchBdToAuthUser([bdRow()], [authRow()]);
@@ -77,5 +81,56 @@ test("fails with email_mismatch when the bd row and the auth user row disagree o
         [authRow({ email: "cristian@avalith.net" })],
       ),
     (err: unknown) => err instanceof BdAuthMatchError && err.reason === "email_mismatch",
+  );
+});
+
+test("fails with auth_user_deleted when the auth user row has deleted_at set", () => {
+  assert.throws(
+    () =>
+      matchBdToAuthUser([bdRow()], [authRow({ deletedAt: new Date("2026-06-01T00:00:00.000Z") })], {
+        now: NOW,
+      }),
+    (err: unknown) => err instanceof BdAuthMatchError && err.reason === "auth_user_deleted",
+  );
+});
+
+test("fails with auth_user_banned when banned_until is in the future relative to now", () => {
+  assert.throws(
+    () =>
+      matchBdToAuthUser([bdRow()], [authRow({ bannedUntil: new Date("2026-12-31T00:00:00.000Z") })], {
+        now: NOW,
+      }),
+    (err: unknown) => err instanceof BdAuthMatchError && err.reason === "auth_user_banned",
+  );
+});
+
+test("does not refuse when banned_until is in the past (ban already expired)", () => {
+  const match = matchBdToAuthUser(
+    [bdRow()],
+    [authRow({ bannedUntil: new Date("2020-01-01T00:00:00.000Z") })],
+    { now: NOW },
+  );
+  assert.equal(match.authUser.id, "auth-1");
+});
+
+test("does not refuse when banned_until and deleted_at are both null", () => {
+  const match = matchBdToAuthUser([bdRow()], [authRow()], { now: NOW });
+  assert.equal(match.authUser.id, "auth-1");
+});
+
+test("checks auth_user_deleted before auth_user_banned when both apply", () => {
+  assert.throws(
+    () =>
+      matchBdToAuthUser(
+        [bdRow()],
+        [
+          authRow({
+            deletedAt: new Date("2026-06-01T00:00:00.000Z"),
+            bannedUntil: new Date("2026-12-31T00:00:00.000Z"),
+          }),
+        ],
+        { now: NOW },
+      ),
+    (err: unknown) => err instanceof BdAuthMatchError && err.reason === "auth_user_deleted",
   );
 });

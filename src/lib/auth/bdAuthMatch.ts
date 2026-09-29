@@ -18,6 +18,8 @@ export type BdAuthMatchFailureReason =
   | "bd_multiple_matches"
   | "auth_user_not_found"
   | "auth_user_multiple_matches"
+  | "auth_user_deleted"
+  | "auth_user_banned"
   | "email_mismatch";
 
 export class BdAuthMatchError extends Error {
@@ -42,6 +44,10 @@ export interface AuthUserRowForMatch {
   email: string;
   lastSignInAt: Date | null;
   createdAt: Date;
+  /** GoTrue's temporary/permanent ban marker — set to a far-future date for a permanent ban. */
+  bannedUntil: Date | null;
+  /** GoTrue's soft-delete marker. Non-null means the account is deleted. */
+  deletedAt: Date | null;
 }
 
 export interface BdAuthMatch {
@@ -49,9 +55,15 @@ export interface BdAuthMatch {
   authUser: AuthUserRowForMatch;
 }
 
+export interface MatchBdToAuthUserOptions {
+  /** Reference time for the banned_until check. Defaults to `new Date()`. */
+  now?: Date;
+}
+
 export function matchBdToAuthUser(
   bdRows: readonly BdRowForMatch[],
   authRows: readonly AuthUserRowForMatch[],
+  options: MatchBdToAuthUserOptions = {},
 ): BdAuthMatch {
   if (bdRows.length === 0) {
     throw new BdAuthMatchError("bd_not_found", "No bd row found for that email.");
@@ -78,6 +90,25 @@ export function matchBdToAuthUser(
 
   const [bdRow] = bdRows;
   const [authRow] = authRows;
+
+  // Refuse before anything else touches this account's own disabled state —
+  // "refusing is always safer than resetting an account the operator may
+  // not know is disabled." Checked before email_mismatch deliberately: a
+  // deleted or banned account is disqualified on its own terms, regardless
+  // of whether its email also happens to agree with the bd row.
+  if (authRow!.deletedAt !== null) {
+    throw new BdAuthMatchError(
+      "auth_user_deleted",
+      `auth.users row ${authRow!.id} has deleted_at set (${authRow!.deletedAt!.toISOString()}) — refusing to reset a deleted account.`,
+    );
+  }
+  const now = options.now ?? new Date();
+  if (authRow!.bannedUntil !== null && authRow!.bannedUntil.getTime() > now.getTime()) {
+    throw new BdAuthMatchError(
+      "auth_user_banned",
+      `auth.users row ${authRow!.id} is banned until ${authRow!.bannedUntil.toISOString()} — refusing to reset a banned account.`,
+    );
+  }
 
   if (bdRow!.email !== authRow!.email) {
     throw new BdAuthMatchError(

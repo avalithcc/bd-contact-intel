@@ -44,6 +44,16 @@
  * mistaken reset is corrected by resetting again for the intended target,
  * not by any kind of undo. The `audit_log` row records this explicitly.
  *
+ * Exit codes (see src/lib/auth/passwordResetExitCode.ts for the 0/2 split):
+ *   0 = password reset AND the audit_log row was written
+ *   1 = nothing changed — bad arguments, target/actor could not be
+ *       resolved, the admin API call itself failed, etc.
+ *   2 = the password WAS changed via the Supabase admin API, but the
+ *       audit_log insert failed afterward. Never 0 here — the operator must
+ *       notice the write is out of sync with the audit trail. The printed
+ *       temporary password is still valid; act on it, then fix the audit
+ *       trail by hand if needed.
+ *
  * Usage:
  *   npx tsx scripts/reset-bd-password.ts --email=<bd email>                          # dry run
  *   npx tsx scripts/reset-bd-password.ts --email=<bd email> --execute --actor=<bd id> # writes
@@ -58,6 +68,7 @@ import { db } from "../src/db";
 import { auditLog, bd } from "../src/db/schema";
 import { BdAuthMatchError, type BdAuthMatch } from "../src/lib/auth/bdAuthMatch";
 import { resolveBdAuthUser } from "../src/lib/auth/bdAuthResolveDb";
+import { passwordResetExitCode } from "../src/lib/auth/passwordResetExitCode";
 import { generateTempPassword } from "../src/lib/auth/tempPassword";
 
 interface Args {
@@ -204,6 +215,9 @@ async function main() {
   } else {
     console.log("\nPassword reset. One audit_log row written (action: bd_password_reset).");
   }
+  // 0 when audited, 2 (never 0, never the generic 1) when the password
+  // changed but the audit_log row failed to write — see the header comment.
+  process.exitCode = passwordResetExitCode(result.auditWritten);
 
   console.log("\n=== TEMPORARY PASSWORD (shown once, not stored anywhere) ===");
   console.log(result.temporaryPassword);

@@ -9,6 +9,11 @@
  * template — the same connection already has access to it. Timestamps come
  * back as strings from raw `sql` and are normalized to `Date` here (see
  * PERFORMANCE.md / src/lib/whatsnew/queries.ts for the same pattern).
+ *
+ * Also reads `banned_until`/`deleted_at` (confirmed present on production's
+ * `auth.users` via a read-only `SELECT banned_until, deleted_at FROM
+ * auth.users LIMIT 0`) so bdAuthMatch.ts can refuse a banned or deleted
+ * account instead of silently resetting a password nobody can use.
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -20,6 +25,8 @@ type RawAuthUserRow = {
   email: string;
   last_sign_in_at: Date | string | null;
   created_at: Date | string;
+  banned_until: Date | string | null;
+  deleted_at: Date | string | null;
 };
 
 /**
@@ -37,7 +44,7 @@ export async function resolveBdAuthUser(email: string): Promise<BdAuthMatch> {
     .where(sql`lower(${bd.email}) = lower(${trimmed})`);
 
   const authRowsRaw = await db.execute<RawAuthUserRow>(
-    sql`select id::text as id, email, last_sign_in_at, created_at
+    sql`select id::text as id, email, last_sign_in_at, created_at, banned_until, deleted_at
         from auth.users
         where lower(email) = lower(${trimmed})
         limit 10`,
@@ -47,6 +54,8 @@ export async function resolveBdAuthUser(email: string): Promise<BdAuthMatch> {
     email: r.email,
     lastSignInAt: r.last_sign_in_at ? new Date(r.last_sign_in_at) : null,
     createdAt: new Date(r.created_at),
+    bannedUntil: r.banned_until ? new Date(r.banned_until) : null,
+    deletedAt: r.deleted_at ? new Date(r.deleted_at) : null,
   }));
 
   return matchBdToAuthUser(bdRows, authRows);
