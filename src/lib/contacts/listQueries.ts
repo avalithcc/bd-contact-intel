@@ -24,9 +24,14 @@ import {
 import {
   buildBdConnectionSummaries,
   groupBdConnectionsByPerson,
+  type BdConnectionRow,
   type BdConnectionSummary,
 } from "@/lib/contacts/bdConnections";
-import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
+import {
+  buildLastActivityEntries,
+  formatLastActivityLabel,
+  type LastActivityEntry,
+} from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
@@ -332,6 +337,55 @@ const lastActivityAgg = db
   .groupBy(activity.personId)
   .as("last_activity_agg");
 
+/**
+ * Row shape for `getContactListPage`'s single rows query below —
+ * `CONTACT_LIST_ROW_COLUMNS` plus the two correlated-subquery JSON columns
+ * that replace `attachDerivedColumns`'s two extra round trips for this call
+ * site only (`getContactBoardColumns`/`getContactListRowsByIds` still batch
+ * through `attachDerivedColumns`, unchanged).
+ */
+interface InlineDerivedRawRow extends ContactListRowBase {
+  companyCanonicalName: string | null;
+  bdConnectionsRaw: BdConnectionRow[] | null;
+  lastActivityRaw: { type: string; metadata: unknown; createdAt: string } | null;
+}
+
+/**
+ * Maps the inline JSON columns onto the render-ready shape
+ * `attachDerivedColumns` used to produce. `bdConnectionsRaw` is already
+ * scoped to exactly this row's person (the SQL `json_agg` correlated on
+ * `pcl_page.id`), so no grouping step is needed here — unlike
+ * `attachDerivedColumns`, which groups one shared batched result set by id.
+ */
+function mapInlineDerivedColumns<
+  T extends ContactListRowBase & {
+    bdConnectionsRaw: BdConnectionRow[] | null;
+    lastActivityRaw: { type: string; metadata: unknown; createdAt: string } | null;
+  },
+>(rows: T[], dict: Dict): ContactListRow[] {
+  return rows.map((row) => {
+    const { bdConnectionsRaw, lastActivityRaw, ...base } = row;
+    return {
+      ...base,
+      bdConnections: bdConnectionsRaw?.length
+        ? buildBdConnectionSummaries(bdConnectionsRaw)
+        : EMPTY_BD_CONNECTION_SUMMARY,
+      lastActivity: lastActivityRaw
+        ? {
+            type: lastActivityRaw.type,
+            label: formatLastActivityLabel(lastActivityRaw, dict),
+            // `createdAt` arrives as a JSON string (json_build_object's
+            // `to_json` rendering of the `effectiveActivityAtSql()`
+            // timestamptz expression) — same "computed expression comes back
+            // as a string" class this module already documents for the
+            // DISTINCT ON path, just a different (ISO-with-`T`) string shape.
+            createdAt: new Date(lastActivityRaw.createdAt),
+          }
+        : null,
+    };
+  });
+}
+
 export async function getContactListPage(
   filters: ContactFilters,
   meBdId: string,
@@ -357,26 +411,101 @@ export async function getContactListPage(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
+  // UNCHANGED from before this perf fix — same WHERE, same ORDER BY (no new
+  // tiebreak added here: the owner report this fixes is round trips, not
+  // pagination-tie stability, and this exact query shape/order already
+  // shipped, so changing tie resolution would risk changing which rows page
+  // 2..N shows for ties even though the total row SET stays identical).
   const orderBy =
     sort === "lastActivity"
       ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`]
       : [asc(person.lastName), asc(person.firstName)];
 
-  // leftJoin on `company.company_key`, the PK — an index lookup, not a
-  // fan-out risk (bug fix: Empresa column recovery, see
-  // companyDisplayName.ts's doc comment for the rule).
-  const rawBaseRows = await db
-    .select(CONTACT_LIST_ROW_COLUMNS)
-    .from(person)
-    .leftJoin(bd, eq(bd.id, person.ownerBdId))
-    .leftJoin(lastActivityAgg, eq(lastActivityAgg.personId, person.id))
-    .leftJoin(company, eq(company.companyKey, person.companyKey))
-    .where(and(...where))
-    .orderBy(...orderBy)
-    .limit(pageSize)
-    .offset((safePage - 1) * pageSize);
+  // Perf fix (round trips; orchestrator measured ~1,395ms across 4 serialized
+  // queries: count, rows, bd-connections-by-page-ids, last-activity-by-page-
+  // ids). `pcl_page` filters/sorts/paginates EXACTLY like the old rows query
+  // (same WHERE, same ORDER BY, same LIMIT/OFFSET) — Postgres can never
+  // flatten a subquery/CTE that has its own LIMIT into the outer query (pull-
+  // up is disabled whenever LIMIT/OFFSET is present), so the two correlated
+  // JSON subqueries added in the outer SELECT below are guaranteed to run
+  // exactly `pageSize` times each (once per already-paginated row), never
+  // once per row matching the whole filtered set. The outer query has no
+  // ORDER BY of its own (deliberately: it has no join/group/distinct either,
+  // so the CTE's already-sorted+limited row order passes straight through —
+  // re-sorting here would risk Postgres's Sort resolving a tie differently
+  // than `pcl_page`'s own Sort just did, undoing the "same order as before"
+  // guarantee this rewrite depends on). leftJoin on `company.company_key`,
+  // the PK — an index lookup, not a fan-out risk (bug fix: Empresa column
+  // recovery, see companyDisplayName.ts's doc comment).
+  const pclPageRows = db.$with("pcl_page").as(
+    db
+      .select(CONTACT_LIST_ROW_COLUMNS)
+      .from(person)
+      .leftJoin(bd, eq(bd.id, person.ownerBdId))
+      .leftJoin(lastActivityAgg, eq(lastActivityAgg.personId, person.id))
+      .leftJoin(company, eq(company.companyKey, person.companyKey))
+      .where(and(...where))
+      .orderBy(...orderBy)
+      .limit(pageSize)
+      .offset((safePage - 1) * pageSize),
+  );
 
-  const rows = await attachDerivedColumns(withResolvedCompanyName(rawBaseRows), dict);
+  // The two correlated subqueries below deliberately do NOT interpolate a
+  // reused Drizzle `Column`/`WithSubquery` reference for the correlation
+  // predicate (`${pclPageRows.id}`, `${activity.personId}`, `${activity.id}`)
+  // — bug found while verifying this rewrite against prod: Drizzle silently
+  // re-emits an EARLIER bare (unqualified) rendering of the same column
+  // reference (e.g. `activity.personId`, already used bare as a SELECT
+  // target inside `lastActivityAgg` above) wherever that same reference
+  // appears again, even nested inside an unrelated correlated subquery. That
+  // turned `where activity.person_id = pcl_page.id` into the always-false
+  // `where "person_id" = "id"` (both resolving inside `activity`'s own
+  // scope, since `activity.id` is a real column) — `lastActivity` came back
+  // `null` for every row. Every identifier below is therefore written as
+  // literal, table-qualified SQL text instead, matching the real table/CTE
+  // names (`activity`, `person_bd_connection`, `pcl_page`, `pcl_conn_bd`) —
+  // the ONLY drizzle interpolations left are `effectiveActivityAtSql()`
+  // (builds a fresh expression tree per call, confirmed NOT affected) and
+  // the plain `${activity}`/`${personBdConnection}`/`${bd}` FROM/JOIN table
+  // references (confirmed rendering correctly).
+  const rawRows = (await db
+    .with(pclPageRows)
+    .select({
+      ...projectContactListRowColumns(pclPageRows),
+      // "BDs conectados" — one JSON array per row, correlated on this page's
+      // own id (never a batched IN-list follow-up query). Joined `bd` table
+      // aliased `pcl_conn_bd` so it can never be confused with the outer
+      // owner-`bd` join in `pcl_page` above. Ordered by `bd_id` for a
+      // deterministic array (old join order was otherwise incidental).
+      bdConnectionsRaw: sql<BdConnectionRow[] | null>`(
+        select json_agg(json_build_object(
+          'personId', person_bd_connection.person_id,
+          'bdId', person_bd_connection.bd_id,
+          'bdName', pcl_conn_bd.name
+        ) order by person_bd_connection.bd_id)
+        from ${personBdConnection}
+        inner join ${bd} pcl_conn_bd on pcl_conn_bd.id = person_bd_connection.bd_id
+        where person_bd_connection.person_id = pcl_page.id
+      )`,
+      // "Última actividad" — the single most recent row (by
+      // `effectiveActivityAtSql()`, NOT `created_at` — see that helper's doc
+      // comment), `activity.id desc` as a tiebreak for two rows sharing the
+      // exact same effective timestamp.
+      lastActivityRaw: sql<{ type: string; metadata: unknown; createdAt: string } | null>`(
+        select json_build_object(
+          'type', activity.type,
+          'metadata', activity.metadata,
+          'createdAt', ${effectiveActivityAtSql()}
+        )
+        from ${activity}
+        where activity.person_id = pcl_page.id
+        order by ${effectiveActivityAtSql()} desc, activity.id desc
+        limit 1
+      )`,
+    })
+    .from(pclPageRows)) as InlineDerivedRawRow[];
+
+  const rows = mapInlineDerivedColumns(withResolvedCompanyName(rawRows), dict);
 
   return { rows, total, page: safePage, pageSize, totalPages };
 }
