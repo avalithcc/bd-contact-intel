@@ -45,23 +45,27 @@ exercised by a real user.** The first BD through the door is the test.
 Nothing about email outreach can work until this is fixed, and everything below
 assumes it is.
 
-### email-coverage
+### email-coverage — unblocked, partly
+
+Measured 2026-09-29:
 
 | | |
 | --- | --- |
-| verified | **11** |
-| probable | 5,218 |
+| verified | **5,087** |
+| probable | 142 |
 | none | 21,391 |
 
-Email is the declared primary channel. Four out of five contacts have no address
-at all, and eleven have a verified one. Open tracking, sequences, templates and
-reporting are all theatre on top of this.
+Was 11 verified on 2026-09-28. The HubSpot-imported addresses were relabelled
+verified on the owner's word (they were already validated in HubSpot), and
+the owner decided `probable` is good enough to send to. So email outreach
+is no longer blocked: ~5,200 contacts are reachable today.
 
-Decide, before anything else: which slice of the base is actually reachable by
-email, how the rest gets enriched (Hunter is already wired — `hunter_lookup`
-activity type exists and has never fired in production), and whether `probable`
-is good enough to send to. That last one is a deliverability decision, not a
-technical one — bouncing 5,000 addresses costs the sending domain.
+Emails are sent **individually by each BD**, never in bulk — deliberately,
+so each BD builds the dynamic with their own contacts.
+
+Still open: 21,391 contacts (four in five) have no address. Enriching them
+(Hunter is wired; `hunter_lookup` has never fired in production) is a cost
+and deliverability decision for the owner, not a technical one.
 
 ## Layer 1 — before the team comes in
 
