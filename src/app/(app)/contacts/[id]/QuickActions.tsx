@@ -136,15 +136,36 @@ export function QuickActions({
   const [openAction, setOpenAction] = useState<QuickAction>(initialAction ?? null);
   const [error, setError] = useState<ActionError | null>(null);
   const [busy, setBusy] = useState(false);
-  // Filled by "Generar mensaje" (see the EmailForm render below) — kept
-  // here (not inside EmailForm's own state) so a fresh generation before
-  // the email panel is opened still has somewhere to land.
-  const [generatedBody, setGeneratedBody] = useState<string | null>(null);
-  const [generatedSubject, setGeneratedSubject] = useState<string | null>(null);
+  // The email composer's draft, lifted OUT of EmailForm (fresh-review fix):
+  // "Redactar con IA" switches `openAction` to "generate", which unmounts
+  // EmailForm — a subject/body kept in EmailForm's own useState would be
+  // lost on that round trip. Living here, they survive it; `closeQuickAction`
+  // clears them once the email composer itself is closed or sent, so a
+  // stale draft never pre-fills the NEXT "Correo".
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  // Where the "generate" panel's own close button (Esc/×) should go:
+  // back to the email composer (opened via "Redactar con IA", draft above
+  // kept intact) or fully closed (opened via the top-level "Generar
+  // mensaje" CTA, nothing else was open). Cleared on every route out of
+  // "generate" so it never leaks into an unrelated later open.
+  const [generateReturnTo, setGenerateReturnTo] = useState<"email" | null>(null);
 
   function closeQuickAction() {
     setOpenAction(null);
     setError(null);
+    setEmailSubject("");
+    setEmailBody("");
+    setGenerateReturnTo(null);
+  }
+
+  function closeGenerate() {
+    if (generateReturnTo === "email") {
+      setGenerateReturnTo(null);
+      setOpenAction("email");
+    } else {
+      closeQuickAction();
+    }
   }
 
   function toggle(action: QuickAction) {
@@ -214,13 +235,18 @@ export function QuickActions({
       {openAction === "generate" && (
         <GenerateMessageDialog
           title={`${l.generateMessageCta} · ${name}`}
-          onClose={closeQuickAction}
+          onClose={closeGenerate}
           boundAction={generatePersonOutreachMessageAction.bind(null, personId, locale)}
           labels={messageLabels}
           useInEmailLabel={l.useInEmailAction}
           onUseInEmail={(subject, body) => {
-            setGeneratedSubject(subject);
-            setGeneratedBody(body);
+            // Explicit "Usar en correo" click — replaces whatever was
+            // already typed (same as this generator always did before it
+            // moved into a dialog of its own). Closing WITHOUT this click
+            // (Esc/×) leaves the draft above untouched — see closeGenerate.
+            setEmailSubject(subject);
+            setEmailBody(body);
+            setGenerateReturnTo(null);
             setOpenAction("email");
           }}
         />
@@ -283,9 +309,14 @@ export function QuickActions({
           to={email}
           busy={busy}
           error={error}
-          initialSubject={generatedSubject}
-          initialBody={generatedBody}
-          onOpenGenerate={() => setOpenAction("generate")}
+          subject={emailSubject}
+          body={emailBody}
+          onSubjectChange={setEmailSubject}
+          onBodyChange={setEmailBody}
+          onOpenGenerate={() => {
+            setGenerateReturnTo("email");
+            setOpenAction("generate");
+          }}
           onCancel={closeQuickAction}
           onSubmit={async (subject, body) => {
             if (!email) return;
@@ -502,15 +533,23 @@ function EmailForm({
   to,
   busy,
   error,
-  initialSubject,
-  initialBody,
+  subject,
+  body,
+  onSubjectChange,
+  onBodyChange,
   onOpenGenerate,
   onCancel,
   onSubmit,
 }: ComposerProps & {
   to: string | null;
-  initialSubject?: string | null;
-  initialBody?: string | null;
+  // Controlled by the caller (QuickActions), not local state (fresh-review
+  // fix): "Redactar con IA" below unmounts this form while the "Generar
+  // mensaje" dialog is open, which would silently drop a locally-held draft.
+  // Living in the parent, it survives that round trip.
+  subject: string;
+  body: string;
+  onSubjectChange: (value: string) => void;
+  onBodyChange: (value: string) => void;
   // "Redactar con IA" (approved mockup contact-record.html #email's
   // `.dialog-footer`: `btn btn-ghost left`, before Cancelar/Enviar) opens
   // the SAME "Generar mensaje" dialog the top-level quick action uses
@@ -523,8 +562,6 @@ function EmailForm({
   onSubmit: (subject: string, body: string) => void;
 }) {
   const ids = useId();
-  const [subject, setSubject] = useState(initialSubject ?? "");
-  const [body, setBody] = useState(initialBody ?? "");
 
   if (!to) {
     return (
@@ -582,7 +619,7 @@ function EmailForm({
           id={`${ids}-subject`}
           className="input"
           value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={(e) => onSubjectChange(e.target.value)}
           disabled={busy}
         />
       </div>
@@ -594,7 +631,7 @@ function EmailForm({
           id={`${ids}-body`}
           className="textarea"
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => onBodyChange(e.target.value)}
           disabled={busy}
         />
       </div>
