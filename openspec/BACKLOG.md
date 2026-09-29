@@ -209,6 +209,23 @@ point of its own design.
 
 ## Known defects
 
+### contact-names
+On 2026-09-29, 113 of the 346 contacts with no name at all got one from a
+`first.last@` email (`scripts/backfill-person-names-from-email.ts`, PR #182;
+revertible with `--revert`, audit row `6e9affdc`). Still open:
+- **233 contacts with no name** whose email cannot be split reliably
+  (`gusoliva@`, `maria.laura.fantoni@`, digits, initials). Needs another
+  source (LinkedIn, enrichment) or a BD.
+- **191 contacts with the full name stuffed in `first_name`** and an empty
+  `last_name` ("Colette Harington"). They look fine in the list, but sorting
+  by last name, dedupe by name, and any email merge field for the last name
+  are wrong for them. Splitting needs care — an earlier automatic split
+  turned "Claudio De Vita" into `Claudio De` / `Vita`.
+- **11 duplicate pairs open in `/admin/duplicates`** (10 queued by the
+  backfill, 1 older): the same person recorded twice — one row with the
+  email and history, the other with name, title and LinkedIn connections.
+  Merging each gives one complete contact.
+
 ### bd-test-row
 A `bd` row named `test` is not a dangling record: it has a working Supabase
 auth user that last signed in on 2026-09-23 — a live login with access to the
