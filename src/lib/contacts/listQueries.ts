@@ -27,15 +27,12 @@ import {
   type BdConnectionRow,
   type BdConnectionSummary,
 } from "@/lib/contacts/bdConnections";
-import {
-  buildLastActivityEntries,
-  formatLastActivityLabel,
-  type LastActivityEntry,
-} from "@/lib/contacts/lastActivity";
+import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
+import { mapInlineDerivedColumns, type InlineDerivedRawRow } from "@/lib/contacts/inlineDerivedColumns";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -241,7 +238,7 @@ export interface ContactListRow {
   lastActivity: LastActivityEntry | null;
 }
 
-type ContactListRowBase = Omit<ContactListRow, "bdConnections" | "lastActivity">;
+export type ContactListRowBase = Omit<ContactListRow, "bdConnections" | "lastActivity">;
 
 const EMPTY_BD_CONNECTION_SUMMARY: BdConnectionSummary = { avatars: [], title: "" };
 
@@ -336,55 +333,6 @@ const lastActivityAgg = db
   .where(sql`${activity.personId} is not null`)
   .groupBy(activity.personId)
   .as("last_activity_agg");
-
-/**
- * Row shape for `getContactListPage`'s single rows query below —
- * `CONTACT_LIST_ROW_COLUMNS` plus the two correlated-subquery JSON columns
- * that replace `attachDerivedColumns`'s two extra round trips for this call
- * site only (`getContactBoardColumns`/`getContactListRowsByIds` still batch
- * through `attachDerivedColumns`, unchanged).
- */
-interface InlineDerivedRawRow extends ContactListRowBase {
-  companyCanonicalName: string | null;
-  bdConnectionsRaw: BdConnectionRow[] | null;
-  lastActivityRaw: { type: string; metadata: unknown; createdAt: string } | null;
-}
-
-/**
- * Maps the inline JSON columns onto the render-ready shape
- * `attachDerivedColumns` used to produce. `bdConnectionsRaw` is already
- * scoped to exactly this row's person (the SQL `json_agg` correlated on
- * `pcl_page.id`), so no grouping step is needed here — unlike
- * `attachDerivedColumns`, which groups one shared batched result set by id.
- */
-function mapInlineDerivedColumns<
-  T extends ContactListRowBase & {
-    bdConnectionsRaw: BdConnectionRow[] | null;
-    lastActivityRaw: { type: string; metadata: unknown; createdAt: string } | null;
-  },
->(rows: T[], dict: Dict): ContactListRow[] {
-  return rows.map((row) => {
-    const { bdConnectionsRaw, lastActivityRaw, ...base } = row;
-    return {
-      ...base,
-      bdConnections: bdConnectionsRaw?.length
-        ? buildBdConnectionSummaries(bdConnectionsRaw)
-        : EMPTY_BD_CONNECTION_SUMMARY,
-      lastActivity: lastActivityRaw
-        ? {
-            type: lastActivityRaw.type,
-            label: formatLastActivityLabel(lastActivityRaw, dict),
-            // `createdAt` arrives as a JSON string (json_build_object's
-            // `to_json` rendering of the `effectiveActivityAtSql()`
-            // timestamptz expression) — same "computed expression comes back
-            // as a string" class this module already documents for the
-            // DISTINCT ON path, just a different (ISO-with-`T`) string shape.
-            createdAt: new Date(lastActivityRaw.createdAt),
-          }
-        : null,
-    };
-  });
-}
 
 export async function getContactListPage(
   filters: ContactFilters,
