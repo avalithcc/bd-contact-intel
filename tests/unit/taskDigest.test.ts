@@ -177,3 +177,168 @@ test("buildDigestEmail never leaks images or tracking pixels", () => {
   assert.ok(email);
   assert.doesNotMatch(email!.html, /<img/i);
 });
+
+test("buildDigestEmail's summary line is a natural Spanish sentence built from non-empty group counts", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T11:00:00Z")],
+    overdue: [],
+    yesterday: [task("y1", "2026-09-28T00:00:00Z")],
+  };
+  const email = buildDigestEmail({ name: "Cristian Civita", email: "cristian@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /Tenés 1 tarea para hoy y 1 pendiente de ayer\./);
+  assert.match(email!.text, /Tenés 1 tarea para hoy y 1 pendiente de ayer\./);
+  assert.match(email!.html, /Buen día, Cristian\./);
+});
+
+test("buildDigestEmail's summary line joins three non-empty groups with a final 'y' (Oxford-comma-less Spanish list)", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T11:00:00Z"), task("t2", "2026-09-29T12:00:00Z")],
+    overdue: [task("o1", "2026-09-20T00:00:00Z")],
+    yesterday: [task("y1", "2026-09-28T00:00:00Z")],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /Tenés 2 tareas para hoy, 1 pendiente de ayer y 1 tarea atrasada\./);
+});
+
+test("buildDigestEmail orders sections 'Para hoy', 'Pendientes de ayer', 'Atrasadas' regardless of input order", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T11:00:00Z", { title: "TODAY_TASK" })],
+    overdue: [task("o1", "2026-09-20T00:00:00Z", { title: "OVERDUE_TASK" })],
+    yesterday: [task("y1", "2026-09-28T00:00:00Z", { title: "YESTERDAY_TASK" })],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  const todayIdx = email!.html.indexOf("Para hoy");
+  const yesterdayIdx = email!.html.indexOf("Pendientes de ayer");
+  const overdueIdx = email!.html.indexOf("Atrasadas");
+  assert.ok(todayIdx < yesterdayIdx, "Para hoy must render before Pendientes de ayer");
+  assert.ok(yesterdayIdx < overdueIdx, "Pendientes de ayer must render before Atrasadas");
+});
+
+test("buildDigestEmail renders a task with no resolvable subject as title + due pill only, no dangling link", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T11:00:00Z", { title: "Tarea sin registro asociado" })],
+    overdue: [],
+    yesterday: [],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /Tarea sin registro asociado/);
+  assert.doesNotMatch(email!.html, /<a href="https:\/\/bd-contact-intel\.vercel\.app\/contacts\/undefined/);
+});
+
+test("buildDigestEmail escapes HTML-significant characters in the task title, the subject label and the recipient's first name", () => {
+  const tasks = {
+    today: [
+      task("t1", "2026-09-29T11:00:00Z", {
+        title: `<script>alert('x')</script> & "quoted"`,
+        personId: "p1",
+        subjectPersonFirstName: `<b>Juan</b>`,
+        subjectPersonLastName: "Pérez",
+      }),
+    ],
+    overdue: [],
+    yesterday: [],
+  };
+  const email = buildDigestEmail(
+    { name: `<i>Ana</i> & co`, email: "ana@avalith.net" },
+    tasks,
+    "https://bd-contact-intel.vercel.app",
+  );
+  assert.ok(email);
+  assert.doesNotMatch(email!.html, /<script>/);
+  assert.match(email!.html, /&lt;script&gt;/);
+  assert.match(email!.html, /&amp;/);
+  assert.doesNotMatch(email!.html, /<b>Juan<\/b>/);
+  assert.match(email!.html, /&lt;b&gt;Juan&lt;\/b&gt;/);
+  assert.doesNotMatch(email!.html, /Buen día, <i>/);
+});
+
+test("buildDigestEmail's font-family declarations never contain a double quote (every declaration sits inside a double-quoted style=\"...\" attribute — a literal \"Segoe UI\" would truncate it early in every HTML parser, verified with a real render)", () => {
+  const tasks = { today: [task("t1", "2026-09-29T11:00:00Z")], overdue: [], yesterday: [] };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.doesNotMatch(email!.html, /font-family:[^;]*"/);
+});
+
+test("buildDigestEmail's HTML carries the avalith wordmark, workspace eyebrow and a 'Ver mis tareas' CTA linking to /tasks", () => {
+  const tasks = { today: [task("t1", "2026-09-29T11:00:00Z")], overdue: [], yesterday: [] };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, />avalith<span/);
+  assert.match(email!.html, /ESPACIO DE TRABAJO/);
+  assert.match(email!.html, /Ver mis tareas/);
+  assert.match(email!.html, /href="https:\/\/bd-contact-intel\.vercel\.app\/tasks"/);
+  assert.match(email!.html, /<meta name="color-scheme" content="light">/);
+});
+
+test("header: wordmark renders before the 'ESPACIO DE TRABAJO' eyebrow (sidebar order), no '//' prefix, muted ink-subtle color instead of accent red", () => {
+  const tasks = { today: [task("t1", "2026-09-29T11:00:00Z")], overdue: [], yesterday: [] };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  const wordmarkIdx = email!.html.indexOf(">avalith<span");
+  const eyebrowIdx = email!.html.indexOf("ESPACIO DE TRABAJO");
+  assert.ok(wordmarkIdx > -1 && eyebrowIdx > -1 && wordmarkIdx < eyebrowIdx, "wordmark must render before the eyebrow");
+  assert.doesNotMatch(email!.html, /\/\/ ESPACIO DE TRABAJO/);
+  const eyebrowDivStart = email!.html.lastIndexOf("<div", eyebrowIdx);
+  const eyebrowDivEnd = email!.html.indexOf("</div>", eyebrowIdx);
+  const eyebrowDiv = email!.html.slice(eyebrowDivStart, eyebrowDivEnd);
+  assert.match(eyebrowDiv, /color:#6e6b78/);
+  assert.doesNotMatch(eyebrowDiv, /color:#d5252f/);
+  assert.doesNotMatch(eyebrowDiv, /color:#b81f27/);
+});
+
+test("the related contact/company link sits flush with the task title's left edge (no extra left padding beyond the row's own inset)", () => {
+  const tasks = {
+    today: [
+      task("t1", "2026-09-29T11:00:00Z", {
+        title: "Llamar a Juan",
+        personId: "p1",
+        subjectPersonFirstName: "Juan",
+        subjectPersonLastName: "Perez",
+      }),
+    ],
+    overdue: [],
+    yesterday: [],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /<td colspan="2" style="padding:4px 0 0;/);
+  assert.doesNotMatch(email!.html, /padding:4px 16px 0/);
+});
+
+test("every top-level block (header, greeting, each section, CTA, footer) shares the 'digest-pad' class so mobile left edges align", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T11:00:00Z")],
+    overdue: [task("o1", "2026-09-20T00:00:00Z")],
+    yesterday: [task("y1", "2026-09-28T00:00:00Z")],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  const padCount = (email!.html.match(/class="digest-pad"/g) ?? []).length;
+  // header + greeting + 3 sections (today/yesterday/overdue all non-empty) + CTA + footer
+  assert.equal(padCount, 7);
+});
+
+test("the due-date pill has a narrow-screen fallback row below the related link, hidden unless the <style> media query activates it — the desktop 2-column row is untouched when <style> is stripped", () => {
+  const tasks = {
+    today: [
+      task("t1", "2026-09-29T11:00:00Z", {
+        title: "Llamar a Juan",
+        personId: "p1",
+        subjectPersonFirstName: "Juan",
+        subjectPersonLastName: "Perez",
+      }),
+    ],
+    overdue: [],
+    yesterday: [],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /<td class="due-desktop-cell" align="right"/);
+  assert.match(email!.html, /<tr class="due-mobile-row" style="display:none;">/);
+  assert.match(email!.html, /\.due-desktop-cell \{ display: none !important; \}/);
+  assert.match(email!.html, /\.due-mobile-row \{ display: table-row !important; \}/);
+});
