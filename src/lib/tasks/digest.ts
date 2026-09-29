@@ -11,7 +11,7 @@
  * with no link instead of a broken one, exactly like the board.
  */
 import { resolveTaskSubject, type TaskSubjectInput } from "@/lib/tasks/subject";
-import { argentinaCalendarDate, type ArgentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
+import { taskDueDate, type ArgentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
 
 export interface DigestTask extends TaskSubjectInput {
   id: string;
@@ -42,7 +42,10 @@ export function groupDigestTasks<T extends { dueAt: Date }>(
   const yesterday: T[] = [];
   const overdue: T[] = [];
   for (const t of tasks) {
-    const day = argentinaCalendarDate(t.dueAt);
+    // `dueAt` is a stored calendar date (00:00 UTC), never a real ART
+    // instant — read it directly with `taskDueDate`, not the ART-instant
+    // shift `argentinaCalendarDate` applies to things like "now".
+    const day = taskDueDate(t.dueAt);
     if (day === boundaries.today) today.push(t);
     else if (day === boundaries.yesterday) yesterday.push(t);
     else if (day < boundaries.yesterday) overdue.push(t);
@@ -64,11 +67,9 @@ export interface DigestEmail {
 }
 
 function formatDueDate(dueAt: Date): string {
-  // dd/mm in ART — same shift trick as argentinaCalendarDate, formatted for
-  // display rather than comparison.
-  const shifted = new Date(dueAt.getTime() - 3 * 60 * 60 * 1000);
-  const day = String(shifted.getUTCDate()).padStart(2, "0");
-  const month = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  // dd/mm of the stored calendar date — `dueAt` is never a real ART instant
+  // (see `taskDueDate`'s doc comment), so no ART shift here.
+  const [, month, day] = taskDueDate(dueAt).split("-");
   return `${day}/${month}`;
 }
 
@@ -84,7 +85,10 @@ function escapeHtml(value: string): string {
 function buildSubject(groups: DigestGroups<DigestTask>): string {
   const parts: string[] = [];
   if (groups.today.length > 0) parts.push(`${groups.today.length} para hoy`);
-  if (groups.overdue.length > 0) parts.push(`${groups.overdue.length} atrasadas`);
+  if (groups.overdue.length > 0) {
+    const word = groups.overdue.length === 1 ? "atrasada" : "atrasadas";
+    parts.push(`${groups.overdue.length} ${word}`);
+  }
   if (groups.yesterday.length > 0) parts.push(`${groups.yesterday.length} de ayer`);
   return `Tus tareas de hoy — ${parts.join(", ")}`;
 }
