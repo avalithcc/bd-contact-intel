@@ -235,6 +235,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           statusValue={record.person.status}
           statusReasonText={statusReasonText}
           emailVerified={record.person.emailStatus === "verified"}
+          emailInferred={record.person.emailSource === "pattern_inferred"}
           linkedinHref={linkedinProfileHref(record.person.profileKey)}
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}

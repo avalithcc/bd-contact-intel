@@ -728,6 +728,7 @@ export const en = {
     timelineCallDefault: "Call logged.",
     timelineDiscardedDefault: "Contact discarded.",
     verifiedBadge: "Verified",
+    inferredBadge: "Inferred",
     linkedInBadge: "LinkedIn",
     historyAction: "History",
     generateMessageCta: "Generate message with AI",

@@ -634,6 +634,10 @@ export const es: typeof en = {
     timelineCallDefault: "Llamada registrada.",
     timelineDiscardedDefault: "Contacto descartado.",
     verifiedBadge: "Verificado",
+    // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — never
+    // shown alongside verifiedBadge, since email_status can only be one of
+    // 'verified'/'probable'/'none' at a time.
+    inferredBadge: "Inferido",
     linkedInBadge: "LinkedIn",
     historyAction: "Historial",
     generateMessageCta: "Generar mensaje con IA",

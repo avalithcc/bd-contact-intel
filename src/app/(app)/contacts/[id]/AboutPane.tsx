@@ -27,6 +27,10 @@ export interface AboutPaneProps {
   // `null` when there's no evidence yet (status "new").
   statusReasonText: string | null;
   emailVerified: boolean;
+  // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — only ever
+  // passed through to PropertyList (see its own doc comment); not used in
+  // this component's own identity-header badge row.
+  emailInferred: boolean;
   linkedinHref: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
@@ -74,6 +78,7 @@ export function AboutPane({
   statusValue,
   statusReasonText,
   emailVerified,
+  emailInferred,
   linkedinHref,
   ownerLabel,
   ownerBdId,
@@ -162,6 +167,7 @@ export function AboutPane({
         ownerOptions={ownerOptions}
         ownerHint={ownerHint}
         emailVerified={emailVerified}
+        emailInferred={emailInferred}
         hunterHint={hunterHint}
         sourceText={sourceText}
         createdText={createdText}

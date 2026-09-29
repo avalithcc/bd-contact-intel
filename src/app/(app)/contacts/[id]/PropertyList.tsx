@@ -44,6 +44,10 @@ export interface PropertyListProps {
   ownerOptions: OwnerOption[];
   ownerHint: string | null;
   emailVerified: boolean;
+  // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — renders
+  // "Inferido" next to the value, same spot as the verified badge (mutually
+  // exclusive: email_status is one of 'verified'/'probable'/'none').
+  emailInferred: boolean;
   hunterHint: string | null;
   sourceText: string | null;
   createdText: string;
@@ -76,6 +80,7 @@ export function PropertyList({
   ownerOptions,
   ownerHint,
   emailVerified,
+  emailInferred,
   hunterHint,
   sourceText,
   createdText,
@@ -214,6 +219,7 @@ export function PropertyList({
             labels={l}
             prop={prop}
             emailVerified={prop.key === "email" && emailVerified}
+            emailInferred={prop.key === "email" && emailInferred}
             hunterHint={prop.key === "email" ? hunterHint : null}
             editing={editingKey === prop.key}
             busy={busy}
@@ -267,6 +273,7 @@ function PropertyRow({
   labels: l,
   prop,
   emailVerified,
+  emailInferred,
   hunterHint,
   editing,
   busy,
@@ -278,6 +285,7 @@ function PropertyRow({
   labels: ContactRecordLabels;
   prop: AboutPaneProperty;
   emailVerified: boolean;
+  emailInferred: boolean;
   hunterHint: string | null;
   editing: boolean;
   busy: boolean;
@@ -333,6 +341,7 @@ function PropertyRow({
       <dd>
         {telHref ? <a href={telHref}>{prop.value}</a> : (prop.value ?? l.emptyValue)}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
+        {emailInferred && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
         <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
