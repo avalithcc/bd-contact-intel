@@ -194,14 +194,30 @@ unconfirmed as an assumption. Surface it where BDs choose who to contact — a
 "por qué este rol" hint on the record, the outreach view, the role filter — not
 only as a standalone page.
 
-### account-password-current
-`/account/password` sets a new password without asking for the current one,
-so anyone holding an active session can lock the real user out. It also
-diverges from its approved mockup (`account-password.html`: three fields and a
-12-character minimum; the page has two fields and 8). Pre-existing.
-
-(auth-ux shipped in PR #178: the post-login `next` return, with a validator
-that also closed a live open redirect in `/auth/confirm`.)
+### auth-security — follow-ups
+Shipped 2026-09-29: RLS on every table (#183, it had been off — the public
+anon key could read and delete the whole CRM through PostgREST), sign-ups
+disabled in Supabase, current password required to change it (#184), and a
+server-side `@avalith.net` + confirmed-email gate in the middleware and
+`getCurrentBd()` (#185). Still open:
+- **Enable the Supabase setting that makes GoTrue require `current_password`**
+  (owner, dashboard). Until then the current-password check on
+  `/account/password` is UX only; a stolen session can call the API directly.
+  Then run a test that changes the password without going through the form
+  and expect a rejection.
+- **Check the Supabase API logs for past `/rest/v1/` traffic** (owner). The
+  app never uses that path, so any request there before 2026-09-29 was
+  someone else reading the base. Exposure started when the project did.
+- `redirect()` thrown by `getCurrentBd()` is swallowed by generic
+  `try/catch` in several server actions and route handlers (e.g.
+  `src/app/actions.ts`, `contacts/actions.ts`, `api/gmail/oauth/callback`).
+  Fails closed — the session is cleared and no data is returned — but the
+  user sees a generic error instead of the login page. Rethrow with
+  `isRedirectError`.
+- When creating a BD in the Supabase dashboard, tick **Auto Confirm User**:
+  without SMTP an unconfirmed user can never confirm and the new gate blocks
+  them.
+- `mailer_autoconfirm` is still on; harmless while sign-ups are off.
 
 ### admin-email-conversation-access
 `getConversationForAdmin` serves unredacted `email_sent` content as well as
