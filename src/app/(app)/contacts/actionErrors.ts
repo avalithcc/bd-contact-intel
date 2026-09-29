@@ -24,6 +24,7 @@ import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
 import { CallOccurredAtInFutureError, CallOutcomeRequiredError } from "@/lib/contacts/call";
 import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
+import { TaskNotFoundError } from "@/lib/tasks/errors";
 
 export type ContactActionErrorReason =
   | "not_found"
@@ -90,6 +91,10 @@ export class PropertyNotEditableError extends Error {
 export function contactActionErrorReason(err: unknown): ContactActionErrorReason {
   if (err instanceof ContactMergedError) return "merged";
   if (err instanceof ContactNotFoundError) return "not_found";
+  // A task that doesn't exist, or exists but isn't this Contact's, collapses
+  // to the same "not_found" reason as a missing Contact itself (never leak
+  // which case it was — see TaskNotFoundError's doc comment).
+  if (err instanceof TaskNotFoundError) return "not_found";
   if (err instanceof InvalidEmailError) return "invalid_email";
   if (err instanceof InvalidPhoneError) return "invalid_phone";
   if (err instanceof PropertyNotEditableError) return "not_editable";

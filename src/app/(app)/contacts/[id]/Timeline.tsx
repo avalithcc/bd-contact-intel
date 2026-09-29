@@ -74,11 +74,18 @@ export interface TimelineProps {
   // it only ever comes from page.tsx's own `?activityType=task` deep-link
   // check, never from `getPersonTimeline`'s filter.
   activePill?: TimelinePillKey | "task";
-  // Every open-or-done task for this Contact (getTasksForPerson,
-  // src/lib/tasks/queries.ts) — the "Próximas" bucket below filters this down
-  // to `status === "open"` itself (unchanged behavior); the "Tareas" pill
-  // uses the full array via sortTasksForTimelinePill.
+  // Every open-or-done task for this Contact that FIT the bounded reads
+  // behind getTasksForPerson (src/lib/tasks/queries.ts — open capped at 50,
+  // done at 20) — the "Próximas" bucket below filters this down to
+  // `status === "open"` itself (unchanged behavior); the "Tareas" pill uses
+  // the full array via sortTasksForTimelinePill.
   tasks: TimelineTask[];
+  // TRUE count of open+done tasks (cancelled excluded), never capped by
+  // `tasks`' own bounded reads — same "never capped" contract as
+  // `countsByType` above. Drives the Tareas pill's own badge AND the part of
+  // "Todo"'s total that accounts for tasks (getTasksForPerson's
+  // openCount+doneCount).
+  taskTotalCount: number;
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
@@ -211,6 +218,7 @@ export function Timeline({
   countsByType,
   activePill,
   tasks,
+  taskTotalCount,
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
@@ -471,7 +479,10 @@ export function Timeline({
   // mockup's own arithmetic pins this: contact-record.html:98's "Todo 15"
   // equals the sum of every OTHER pill's own count on that same screen
   // (3+1+2+4+0+2+3, including "Tareas 2"), not just the activity types.
-  const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0) + tasks.length;
+  // `taskTotalCount`, not `tasks.length` — `tasks` is the bounded rows array
+  // (getTasksForPerson caps open at 50, done at 20); `taskTotalCount` is the
+  // true, never-capped total, same invariant `countsByType` already holds.
+  const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0) + taskTotalCount;
   const showMergeCard = !isTasksActive && !activePillNow && mergeInfo && mergeInfo.unifiedFromCount > 1;
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
@@ -512,6 +523,51 @@ export function Timeline({
   // it: after Reuniones, before Sistema.
   const activityPillsBeforeTasks = TIMELINE_PILL_KEYS.filter((pill) => pill !== "system");
 
+  /**
+   * One open-task card — identical markup for the "Próximas" bucket
+   * (visible regardless of the active pill) and the Tareas pill's own open
+   * group (review fix: these two used to be hand-duplicated JSX blocks that
+   * had to be kept in sync by hand).
+   */
+  function renderOpenTaskCard(t: TimelineTask) {
+    return (
+      <div key={t.id} className="tl-item">
+        <div className="tl-icon">
+          <TasksIcon className="icon" />
+        </div>
+        <div className="tl-card">
+          <div className="tl-head">
+            <span className="what">{t.title}</span>
+            {t.dueAt && (
+              <span className="badge badge-warn no-dot">
+                {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
+              </span>
+            )}
+            {t.assignedToName && (
+              <span className="when">
+                {l.timelineAssignedToPrefix} {t.assignedToName}
+              </span>
+            )}
+          </div>
+          <div className="row mt-lg">
+            <CompleteTaskButton
+              taskId={t.id}
+              personId={personId}
+              label={l.taskMarkDone}
+              errorLabel={l.genericError}
+            />
+            {/* Mockup itself has no wired destination for "Reprogramar"
+                (contact-record.html:111) — kept inert rather than inventing
+                an unspec'd reschedule flow. */}
+            <button type="button" className="btn btn-ghost btn-sm" disabled>
+              {l.taskReschedule}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderActivityPill(pill: TimelinePillKey) {
     const Icon = PILL_ICON[pill];
     return (
@@ -549,7 +605,7 @@ export function Timeline({
           aria-current={isTasksActive ? "true" : undefined}
         >
           <TasksIcon className="icon" />
-          {l.timelinePillTasks} <span className="n">{tasks.length}</span>
+          {l.timelinePillTasks} <span className="n">{taskTotalCount}</span>
         </Link>
         {renderActivityPill("system")}
         <span className="grow" />
@@ -572,45 +628,7 @@ export function Timeline({
               {openTasksForPill.length > 0 && (
                 <>
                   <div className="tl-group">{l.timelineGroupUpcoming}</div>
-                  <div className="tl">
-                    {openTasksForPill.map((t) => (
-                      <div key={t.id} className="tl-item">
-                        <div className="tl-icon">
-                          <TasksIcon className="icon" />
-                        </div>
-                        <div className="tl-card">
-                          <div className="tl-head">
-                            <span className="what">{t.title}</span>
-                            {t.dueAt && (
-                              <span className="badge badge-warn no-dot">
-                                {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
-                              </span>
-                            )}
-                            {t.assignedToName && (
-                              <span className="when">
-                                {l.timelineAssignedToPrefix} {t.assignedToName}
-                              </span>
-                            )}
-                          </div>
-                          <div className="row mt-lg">
-                            <CompleteTaskButton
-                              taskId={t.id}
-                              personId={personId}
-                              label={l.taskMarkDone}
-                              errorLabel={l.genericError}
-                            />
-                            {/* Mockup itself has no wired destination for
-                                "Reprogramar" (contact-record.html:111) —
-                                kept inert rather than inventing an unspec'd
-                                reschedule flow. */}
-                            <button type="button" className="btn btn-ghost btn-sm" disabled>
-                              {l.taskReschedule}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="tl">{openTasksForPill.map(renderOpenTaskCard)}</div>
                 </>
               )}
               {doneTasksForPill.length > 0 && (
@@ -654,45 +672,7 @@ export function Timeline({
           {upcoming.length > 0 && (
             <>
               <div className="tl-group">{l.timelineGroupUpcoming}</div>
-              <div className="tl">
-                {upcoming.map((t) => (
-                  <div key={t.id} className="tl-item">
-                    <div className="tl-icon">
-                      <TasksIcon className="icon" />
-                    </div>
-                    <div className="tl-card">
-                      <div className="tl-head">
-                        <span className="what">{t.title}</span>
-                        {t.dueAt && (
-                          <span className="badge badge-warn no-dot">
-                            {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
-                          </span>
-                        )}
-                        {t.assignedToName && (
-                          <span className="when">
-                            {l.timelineAssignedToPrefix} {t.assignedToName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="row mt-lg">
-                        <CompleteTaskButton
-                          taskId={t.id}
-                          personId={personId}
-                          label={l.taskMarkDone}
-                          errorLabel={l.genericError}
-                        />
-                        {/* Mockup itself has no wired destination for
-                            "Reprogramar" (contact-record.html:111) — kept
-                            inert rather than inventing an unspec'd
-                            reschedule flow. */}
-                        <button type="button" className="btn btn-ghost btn-sm" disabled>
-                          {l.taskReschedule}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <div className="tl">{upcoming.map(renderOpenTaskCard)}</div>
             </>
           )}
 

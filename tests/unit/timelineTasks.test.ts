@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { sortTasksForTimelinePill, type TimelineTaskItem } from "@/lib/contacts/timelineTasks";
+import { combineOpenAndDoneTasks, sortTasksForTimelinePill, type TimelineTaskItem } from "@/lib/contacts/timelineTasks";
 
 function task(
   overrides: Partial<TimelineTaskItem> & Pick<TimelineTaskItem, "id" | "status">,
@@ -43,5 +43,22 @@ test("done tasks sort by most recently completed first, and always come after ev
   assert.deepEqual(
     result.map((t) => t.id),
     ["open", "done-new", "done-old"],
+  );
+});
+
+test("combineOpenAndDoneTasks never lets done tasks displace open ones, no matter how many done tasks there are (bug fix: getTasksForPerson used to share one LIMIT across both statuses)", () => {
+  const open = [
+    task({ id: "open-1", status: "open" }),
+    task({ id: "open-2", status: "open" }),
+    task({ id: "open-3", status: "open" }),
+  ];
+  const done = Array.from({ length: 100 }, (_, i) => task({ id: `done-${i}`, status: "done" }));
+
+  const result = combineOpenAndDoneTasks(open, done);
+
+  assert.equal(result.length, 103);
+  assert.deepEqual(
+    result.slice(0, 3).map((t) => t.id),
+    ["open-1", "open-2", "open-3"],
   );
 });

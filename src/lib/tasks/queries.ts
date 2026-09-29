@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
@@ -10,6 +10,8 @@ import type { TaskSubjectInput } from "@/lib/tasks/subject";
 // see that file's doc comment for why (src/app/(app)/contacts/actionErrors.ts
 // is unit-tested without a database and must not transitively import `db`).
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
+import { TaskNotFoundError } from "@/lib/tasks/errors";
+import { combineOpenAndDoneTasks } from "@/lib/contacts/timelineTasks";
 
 export interface TaskFilters {
   leadId?: string;
@@ -182,24 +184,86 @@ export async function getTaskViewCounts(bdId: string): Promise<TaskViewCounts> {
   };
 }
 
+const OPEN_TASKS_FOR_PERSON_LIMIT = 50;
+const DONE_TASKS_FOR_PERSON_LIMIT = 20;
+
+export interface TasksForPerson {
+  /** Open tasks first (their existing order), then done tasks — see
+   * `combineOpenAndDoneTasks` (@/lib/contacts/timelineTasks). */
+  rows: TaskRow[];
+  /** TRUE count of this Contact's open tasks, never capped by
+   * `OPEN_TASKS_FOR_PERSON_LIMIT` — see the `count(*) over ()` doc comment
+   * below. */
+  openCount: number;
+  /** Same guarantee as `openCount`, for done tasks. */
+  doneCount: number;
+}
+
 /**
  * Every open-or-done task for one Contact (mockup-port r03/r05 +
  * timeline-tasks-pill; contact-record.html's "Próximas" timeline bucket,
  * right-panel "Tareas" card, and the Actividad tab's "Tareas" filter pill —
- * contact-record.html:104). One bounded read covers all three: `page.tsx`
- * filters this same array down to `status === "open"` for the first two
- * (unchanged behavior), and Timeline.tsx uses the full array (open + done)
- * for the pill. `cancelled` tasks are excluded — neither the "Próximas"
- * bucket nor the Tareas pill has ever shown them. Bounded to a single
- * `personId`, no pagination — a Contact realistically has a handful of tasks
- * at most (same assumption `getPersonTimeline`'s own `limit` makes for
- * activity).
+ * contact-record.html:104). `page.tsx` filters `rows` down to
+ * `status === "open"` for the first two (unchanged behavior); Timeline.tsx
+ * uses the full `rows` array (open + done) for the pill, and `openCount`/
+ * `doneCount` for its "never capped" pill/Todo totals (see the doc comment
+ * on `TimelineProps.countsByType`, Timeline.tsx). `cancelled` tasks are
+ * excluded from all three — neither the "Próximas" bucket, the right-panel
+ * card, nor the Tareas pill has ever shown them.
+ *
+ * Bug fix (review): this used to be ONE query with ONE shared `LIMIT` across
+ * both statuses. Done tasks only ever accumulate — nothing ever un-completes
+ * one — so once they outnumbered the limit they could silently push an open
+ * task out of the result entirely, and an open task missing here disappears
+ * from "Próximas", the right-panel card, AND the pill all at once. Now two
+ * independently bounded reads (open: `OPEN_TASKS_FOR_PERSON_LIMIT`, done:
+ * `DONE_TASKS_FOR_PERSON_LIMIT`), so neither can ever displace the other —
+ * `combineOpenAndDoneTasks`'s own unit test (tests/unit/timelineTasks.test.ts)
+ * pins that guarantee directly. Costs one extra round trip over the old
+ * single-query shape (both queries run concurrently via `Promise.all`, so
+ * the extra cost is one queueing slot on the pool, not one full extra
+ * latency hop — see page.tsx's own `Promise.all` this is already called
+ * inside of) in exchange for correctness a capped shared query can't give.
+ *
+ * `count(*) over ()` in each query's SELECT list is Postgres's own "give me
+ * the true total alongside a LIMITed page" idiom: window functions evaluate
+ * over the full WHERE-matched set BEFORE `ORDER BY`/`LIMIT` apply, so
+ * `openCount`/`doneCount` are exact regardless of the two limits above —
+ * this is the SAME round trip as the row fetch, not a third query (same
+ * pattern `getPersonTimeline`, @/lib/activity/queries, uses two queries for
+ * — rows and counts — but this piggybacks the count onto the rows query
+ * instead, since the "many done, few open" shape here makes a `GROUP BY`
+ * over the unbounded full set proportionally more wasteful than there).
  */
-export async function getTasksForPerson(personId: string, limit: number = 50): Promise<TaskRow[]> {
-  return baseTaskSubjectQuery()
-    .where(and(eq(task.personId, personId), or(eq(task.status, "open"), eq(task.status, "done"))))
-    .orderBy(asc(task.dueAt), desc(task.createdAt))
-    .limit(limit);
+export async function getTasksForPerson(personId: string): Promise<TasksForPerson> {
+  const withTotal = { ...taskSubjectSelect(), totalCount: sql<number>`count(*) over ()::int` };
+
+  const [openRows, doneRows] = await Promise.all([
+    db
+      .select(withTotal)
+      .from(task)
+      .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+      .leftJoin(person, eq(task.personId, person.id))
+      .leftJoin(company, eq(task.companyKey, company.companyKey))
+      .where(and(eq(task.personId, personId), eq(task.status, "open")))
+      .orderBy(asc(task.dueAt), desc(task.createdAt))
+      .limit(OPEN_TASKS_FOR_PERSON_LIMIT),
+    db
+      .select(withTotal)
+      .from(task)
+      .leftJoin(bd, eq(task.assignedToBdId, bd.id))
+      .leftJoin(person, eq(task.personId, person.id))
+      .leftJoin(company, eq(task.companyKey, company.companyKey))
+      .where(and(eq(task.personId, personId), eq(task.status, "done")))
+      .orderBy(desc(task.updatedAt))
+      .limit(DONE_TASKS_FOR_PERSON_LIMIT),
+  ]);
+
+  return {
+    rows: combineOpenAndDoneTasks(openRows, doneRows),
+    openCount: openRows[0]?.totalCount ?? 0,
+    doneCount: doneRows[0]?.totalCount ?? 0,
+  };
 }
 
 /**
@@ -305,6 +369,15 @@ export async function createTask(input: NewTask): Promise<Task> {
  * Re-resolves `person_id` when the update itself changes the task's subject
  * (design "Reference writes": "`updateTask` re-resolves on subject change").
  * Untouched otherwise, so a plain status/title update never re-queries.
+ *
+ * Bug fix (review): `.returning()` on a `WHERE id = taskId` that matches
+ * nothing (task already deleted, or a bad id) used to return an empty array,
+ * and the old `row!` non-null assertion turned that into `undefined` silently
+ * reported as a successful `Task` to every caller. Now throws
+ * `TaskNotFoundError` instead — callers that don't already handle it (see
+ * `completeTask`/`setTaskStatusForPerson` below, and every server action that
+ * wraps them) surface it as a thrown rejection, same as any other typed task
+ * error in this file.
  */
 export async function updateTask(taskId: string, updates: Partial<NewTask>): Promise<Task> {
   const lookup =
@@ -316,11 +389,38 @@ export async function updateTask(taskId: string, updates: Partial<NewTask>): Pro
       ? { ...updates, personId: personIdLookupSql(lookup), updatedAt: new Date() }
       : { ...updates, updatedAt: new Date() };
   const [row] = await db.update(task).set(set).where(eq(task.id, taskId)).returning();
-  return row!;
+  if (!row) throw new TaskNotFoundError();
+  return row;
 }
 
 export async function completeTask(taskId: string): Promise<Task> {
   return updateTask(taskId, { status: "done" });
+}
+
+/**
+ * Ownership-scoped task status write (review fix, timeline-tasks-pill):
+ * `completeContactTaskAction`/`reopenContactTaskAction` (contacts/actions.ts)
+ * used to update a task by `id` alone — no check that it actually belonged
+ * to the `personId` the caller claimed, so any signed-in BD could complete
+ * or reopen ANY task by guessing/copying its id into the wrong Contact's
+ * page. The ownership check is part of the write itself
+ * (`WHERE id = taskId AND person_id = personId`), not a separate read-then-
+ * write — a row that exists but belongs to a different person never matches
+ * and throws the same `TaskNotFoundError` as a genuinely missing task
+ * (never let a caller distinguish the two — see that error's doc comment).
+ */
+export async function setTaskStatusForPerson(
+  taskId: string,
+  personId: string,
+  status: "open" | "done",
+): Promise<Task> {
+  const [row] = await db
+    .update(task)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(task.id, taskId), eq(task.personId, personId)))
+    .returning();
+  if (!row) throw new TaskNotFoundError();
+  return row;
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

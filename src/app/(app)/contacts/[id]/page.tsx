@@ -76,15 +76,17 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const timelineTab = rawActivityType === "task" ? ("task" as const) : activePill;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const [timeline, ownerOptions, personTasks] = await Promise.all([
+  const [timeline, ownerOptions, tasksForPerson] = await Promise.all([
     getPersonTimeline(record.person.id, me.id, { pill: activePill }),
     listOwnerOptions(),
     getTasksForPerson(record.person.id),
   ]);
+  const personTasks = tasksForPerson.rows;
   // "Próximas" bucket + right-panel "Tareas" card (contact-record.html's
   // r03/r05 cards) only ever show OPEN tasks — unchanged by this pill; the
   // Timeline component itself gets the full `personTasks` (open + done) for
-  // its own "Tareas" pill.
+  // its own "Tareas" pill, plus the TRUE (never-capped) counts for its pill/
+  // Todo totals.
   const openTasks = personTasks.filter((t) => t.status === "open");
   // R3 (design.md): reassignment is only allowed while the person has no
   // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
@@ -288,6 +290,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       updatedAt: t.updatedAt,
                       assignedToName: t.assignedToName ?? null,
                     }))}
+                    taskTotalCount={tasksForPerson.openCount + tasksForPerson.doneCount}
                     isAdmin={isAdmin}
                     mergeInfo={
                       record.merge.unifiedFromCount > 1

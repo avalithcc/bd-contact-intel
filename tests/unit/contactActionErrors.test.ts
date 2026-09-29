@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
+import { TaskNotFoundError } from "@/lib/tasks/errors";
 import { InvalidEmailError } from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
 import {
@@ -22,6 +23,10 @@ test("maps ContactMergedError to 'merged'", () => {
 
 test("maps ContactNotFoundError to 'not_found'", () => {
   assert.equal(contactActionErrorReason(new ContactNotFoundError("p1")), "not_found");
+});
+
+test("maps TaskNotFoundError to 'not_found' — a task write scoped to the wrong personId must never be distinguishable from a missing task", () => {
+  assert.equal(contactActionErrorReason(new TaskNotFoundError()), "not_found");
 });
 
 test("maps InvalidEmailError to 'invalid_email'", () => {

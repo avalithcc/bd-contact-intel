@@ -41,3 +41,17 @@ export function sortTasksForTimelinePill<T extends TimelineTaskItem>(tasks: read
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   return [...open, ...done];
 }
+
+/**
+ * Pure combine step behind `getTasksForPerson`'s two independently-bounded
+ * reads (src/lib/tasks/queries.ts — review fix, timeline-tasks-pill): open
+ * tasks first, done tasks after. Kept here (DB-free) so it's unit-testable
+ * on its own. A plain concatenation, not a shared slice, so a `doneRows`
+ * array of any size can never push an `openRows` entry out — the bug this
+ * replaces was one query with one shared SQL `LIMIT` across both statuses,
+ * which could silently drop an open task once enough done ones (which only
+ * ever accumulate) piled up ahead of it in that single ordering.
+ */
+export function combineOpenAndDoneTasks<T>(openRows: readonly T[], doneRows: readonly T[]): T[] {
+  return [...openRows, ...doneRows];
+}
