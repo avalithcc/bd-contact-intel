@@ -75,18 +75,43 @@ edge. This is not QA theatre — `task.description` and `task.leadId` have full
 schema, indexes, joins and rendering with **no write path anywhere**, which is
 exactly the class of gap that only surfaces when a human tries to use the thing.
 
-### task-essentials
-Every task creation path captures only **title and due date**.
-- `description` is stored, read and rendered — and no form writes it.
-- `leadId` is joined and selected — and no UI sets it.
-- `assignedToBdId` is hard-set to the creator; there is no way to assign a task
-  to a teammate.
-- Overdue tasks surface only in "Mis tareas"; a teammate's overdue task never
-  appears as overdue in "Todas abiertas".
-- There are **no reminders of any kind** — no cron, no notification. A BD learns
-  a task is due by opening `/tasks`.
+### task-essentials — remaining
+Shipped in PR #178 (2026-09-29): every creation path writes `description` and an
+assignee (validated server-side), and a teammate's overdue task — which used to
+vanish from "Todas abiertas" entirely — now shows as overdue. `leadId` was left
+alone on purpose: leads redirect to contacts, so there is no entry point for it.
 
-A task system nobody is reminded about is a list nobody reads.
+Still open:
+- **No reminders of any kind** — no cron, no notification. A BD learns a task is
+  due by opening `/tasks`. A task system nobody is reminded about is a list
+  nobody reads. Needs an owner decision on channel (in-app, email, both).
+- **No task edit UI** anywhere, not even for the title. `updateTaskAction` is
+  validated and ready but has no caller.
+- `bulkCreateTaskAction` inserts one task per selected contact in a loop.
+
+### custom-smtp
+The Supabase project has no SMTP of its own. Its built-in email service only
+delivers to members of the project's team, heavily rate-limited, and without
+custom SMTP the auth email templates cannot be edited. Consequences today:
+- **Self-service password reset is built but switched off**
+  (`src/lib/auth/passwordReset.ts`, `PASSWORD_RESET_ENABLED = false`) — it
+  would show "check your inbox" and nothing would arrive. The module lists the
+  steps to turn it on, including making `/auth/confirm` accept a PKCE `code`.
+- Invites have never been used (0 invited users in `auth.users`), so the
+  invite email path is untested for the same reason.
+- The Supabase dashboard's own recovery and magic-link actions are email-based
+  too, so they are not a manual workaround.
+
+Likely the avalith.net Google Workspace SMTP; decide together with the email
+strategy for BD outreach.
+
+### bd-password-reset (manual)
+Until custom SMTP exists, a BD who forgets their password has no way back in
+that works: every Supabase path is email-based. Setting a password directly
+needs the admin API and the service-role key, which is not in `.env.local`.
+Proposal: a dry-run-by-default script (`--execute --actor=<bd id>`) that sets
+a random temporary password through the admin API and writes `audit_log`;
+the BD then changes it at `/account/password`.
 
 ### gmail-connection
 One Gmail account is connected (the owner's). Every BD needs to connect theirs
@@ -165,13 +190,14 @@ unconfirmed as an assumption. Surface it where BDs choose who to contact — a
 "por qué este rol" hint on the record, the outreach view, the role filter — not
 only as a standalone page.
 
-### auth-ux
-- No "forgot password" flow: a BD without a session is locked out and needs a
-  manual reset in Supabase.
-- After login the app always lands on `/`, ignoring the requested page. Return
-  to a validated, same-origin `next` parameter.
+### account-password-current
+`/account/password` sets a new password without asking for the current one,
+so anyone holding an active session can lock the real user out. It also
+diverges from its approved mockup (`account-password.html`: three fields and a
+12-character minimum; the page has two fields and 8). Pre-existing.
 
-Both bite on day one of a real launch.
+(auth-ux shipped in PR #178: the post-login `next` return, with a validator
+that also closed a live open redirect in `/auth/confirm`.)
 
 ### admin-email-conversation-access
 `getConversationForAdmin` serves unredacted `email_sent` content as well as
@@ -182,6 +208,10 @@ but it matters as email becomes the channel. Needs a LinkedIn-independent entry
 point of its own design.
 
 ## Known defects
+
+### bd-test-row
+A `bd` row named `test` exists and now appears in every task "Asignado a"
+list. Removing it is a production write — check it owns nothing first.
 
 ### company-contact-counts
 The `/companies` list's "Contactos" column and the company record's contacts
