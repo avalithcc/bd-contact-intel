@@ -200,14 +200,15 @@ anon key could read and delete the whole CRM through PostgREST), sign-ups
 disabled in Supabase, current password required to change it (#184), and a
 server-side `@avalith.net` + confirmed-email gate in the middleware and
 `getCurrentBd()` (#185). Still open:
-- **Enable the Supabase setting that makes GoTrue require `current_password`**
-  (owner, dashboard). Until then the current-password check on
-  `/account/password` is UX only; a stolen session can call the API directly.
-  Then run a test that changes the password without going through the form
-  and expect a rejection.
-- **Check the Supabase API logs for past `/rest/v1/` traffic** (owner). The
-  app never uses that path, so any request there before 2026-09-29 was
-  someone else reading the base. Exposure started when the project did.
+- Done 2026-09-29: `security_update_password_require_current_password`
+  enabled via the Management API and verified with
+  `scripts/check-password-change-guard.ts` (a change without the current
+  password is refused: `current_password_required`).
+- Done 2026-09-29: API logs checked for `/rest/v1/`. In the retained window
+  (earliest row 2026-09-29 08:25 local) the only requests were Supabase's own
+  schema reads and the orchestrator's exposure tests. Anything earlier is no
+  longer in the logs.
+- Server-side `password_min_length` is 6 while the app requires 12.
 - When creating a BD in the Supabase dashboard, tick **Auto Confirm User**:
   without SMTP an unconfirmed user can never confirm and the new gate blocks
   them.
