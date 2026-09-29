@@ -2,6 +2,33 @@
 
 Prepared 2026-09-30. Analysis only — no application code, no production writes.
 
+## Owner decisions
+
+| # | Decision | Status |
+| --- | --- | --- |
+| 1 | Follow-up cadence | **Decided 2026-09-29** — see below |
+| 2 | Default pipeline stage | Pending |
+| 3 | Email enrichment | Pending |
+
+### 1. Follow-up cadence — decided
+
+- Due thresholds: `replied` after 3 days, `contacted` after 7 days, measured from `effectiveActivityAtSql()`.
+- Each BD gets a follow-up queue capped at **10 contacts per day**.
+- Only contacts **owned by a BD** whose effective last touch is **within the last 12 months** enter the queue. Older contacts stay in Outreach's `dormant` tier (`DORMANT_MONTHS = 12`). They are re-engagement, not follow-up.
+- Order: `replied` first, then the **most recent** last touch first (warmest first). This replaces the "oldest first" wording in Options below.
+- Contacts with no owner never enter a queue.
+
+**Correction to the analysis below.** Last touches are not all from 2022–2025: the newest are from September 2026. The following was measured 2026-09-29 in a read-only transaction with `TZ=UTC`:
+
+| Owner | < 6 months | 6–12 months | > 12 months |
+| --- | ---: | ---: | ---: |
+| Cristian Civita | 144 | 131 | 2,694 |
+| Macarena Dávila | 620 | 668 | 1,390 |
+| Mariel Meza | 1 | 2 | 6 |
+| (no owner) | 35 | 26 | 3,020 |
+
+At 10 per day, the within-12-months backlog clears in about 28 working days for Cristian and about 129 for Macarena, before counting contacts that fall due later.
+
 ## Methodology note — read before the numbers below
 
 This worktree could not obtain production database credentials: `.env.local`
