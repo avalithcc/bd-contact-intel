@@ -71,7 +71,7 @@ export default async function AccountPage() {
       <div className={styles.card}>
         <h3 className={styles.cardHeader}>{l.connectionsTitle}</h3>
         <a className={styles.listLink} href="/account/email">
-          <MailIcon className={styles.listLinkIcon} />
+          <MailIcon className={`icon ${styles.listLinkIcon}`} />
           <span className={styles.listLinkGrow}>
             <span className={styles.listLinkTitle}>{l.gmailRowTitle}</span>
             <span className={styles.listLinkMeta}>
@@ -79,15 +79,15 @@ export default async function AccountPage() {
             </span>
           </span>
           {gmailConnected && <span className="legacy-badge green">{l.badgeConnected}</span>}
-          <ChevronRightIcon className={styles.listLinkChevron} />
+          <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
         </a>
         <a className={styles.listLink} href="/account/password">
-          <LockIcon className={styles.listLinkIcon} />
+          <LockIcon className={`icon ${styles.listLinkIcon}`} />
           <span className={styles.listLinkGrow}>
             <span className={styles.listLinkTitle}>{l.passwordRowTitle}</span>
             <span className={styles.listLinkMeta}>{l.passwordRowMeta}</span>
           </span>
-          <ChevronRightIcon className={styles.listLinkChevron} />
+          <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
         </a>
       </div>
 
