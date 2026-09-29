@@ -234,8 +234,14 @@ type TaskWindowRow = {
   statusCount: number;
 };
 
+/** Every task timestamp column is `timestamp without time zone` holding UTC,
+ * and raw `db.execute` returns it as an offset-less string. `new Date()`
+ * would read that in the process's local timezone, so an offset-less value is
+ * pinned to UTC explicitly, matching drizzle's own column mapper. */
 function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return value;
+  const hasOffset = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/.test(value);
+  return new Date(hasOffset ? value : `${value.replace(" ", "T")}Z`);
 }
 
 function toTaskRow(row: TaskWindowRow): TaskRow {
