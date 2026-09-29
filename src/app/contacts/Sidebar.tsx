@@ -40,11 +40,13 @@ export interface SidebarSection {
 // mockup).
 //
 // Item counts (mockup's `.nav-count`/`.pill-count`) are intentionally left
-// out here — the apply instructions require counts to come from cheap
-// existing queries, and no cheap count-only query exists yet for
-// contacts/tasks/discovery (getContactListPage, getOpenTasks etc. all
-// return full rows, not a lightweight count). Adding one is out of scope
-// for this batch; revisit once such a query exists.
+// out here for contacts/discovery — no cheap count-only query exists yet for
+// those (getContactListPage etc. return full rows, not a lightweight count).
+// "Tareas" is the one exception (task-reminders backlog): getTaskBadgeCount
+// is a single bounded `count(*)`, so AppLayout fetches it (one extra round
+// trip, riding the same `getCurrentBd()` call every page already pays for)
+// and passes it in as `taskCount` below, rendered with the mockup's own
+// `.pill-count` class (tasks.html's `Tareas<span class="pill-count">4</span>`).
 export const NAVIGATION: SidebarSection[] = [
   {
     titleKey: "workspaceSection",
@@ -79,7 +81,7 @@ export const NAVIGATION: SidebarSection[] = [
  * simplification to stay faithful to the approved mockup, which has no JS
  * toggle of its own.
  */
-export function Sidebar({ labels }: { labels: NavLabels }) {
+export function Sidebar({ labels, taskCount }: { labels: NavLabels; taskCount?: number }) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname.startsWith(href);
@@ -102,6 +104,7 @@ export function Sidebar({ labels }: { labels: NavLabels }) {
             >
               <item.icon className="icon" />
               {labels[item.labelKey]}
+              {item.labelKey === "tasks" && !!taskCount && <span className="pill-count">{taskCount}</span>}
             </Link>
           ))}
         </div>
