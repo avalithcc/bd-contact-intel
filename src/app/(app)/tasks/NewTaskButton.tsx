@@ -6,6 +6,7 @@ import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
 import { PlusIcon } from "@/components/icons";
 import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
+import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { createTaskAction, searchTaskSubjectsAction } from "./actions";
 import styles from "./NewTaskButton.module.css";
 
@@ -23,7 +24,6 @@ export interface NewTaskButtonLabels {
   taskSubjectRequired: string;
   taskDueLabel: string;
   taskAssigneeLabel: string;
-  taskAssigneeSelf: string;
   taskCreateError: string;
   cancel: string;
 }
@@ -47,9 +47,15 @@ const SEARCH_DEBOUNCE_MS = 250;
 export function NewTaskButton({
   labels: l,
   assigneeOptions,
+  meId,
 }: {
   labels: NewTaskButtonLabels;
   assigneeOptions: TaskAssigneeOption[];
+  // Preselects "Asignado a" and marks that option "(yo)" — no subject is
+  // known yet when this dialog opens (the subject picker below is how the
+  // user chooses one), so there is no owner to mark "(responsable)" without
+  // an extra query; skipped, per the mockup's own optional marker.
+  meId: string;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -58,7 +64,7 @@ export function NewTaskButton({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [assignedToBdId, setAssignedToBdId] = useState("");
+  const [assignedToBdId, setAssignedToBdId] = useState(meId);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TaskSubjectSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -91,7 +97,7 @@ export function NewTaskButton({
     setTitle("");
     setDescription("");
     setDueDate("");
-    setAssignedToBdId("");
+    setAssignedToBdId(meId);
     setQuery("");
     setResults([]);
     setSubject(null);
@@ -142,16 +148,6 @@ export function NewTaskButton({
             </label>
 
             <label className="field">
-              {l.taskDescriptionLabel}
-              <textarea
-                className="textarea"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={busy}
-              />
-            </label>
-
-            <label className="field">
               {l.taskSubjectLabel}
               {subject ? (
                 <div className={styles.subjectChip}>
@@ -199,32 +195,49 @@ export function NewTaskButton({
               )}
             </label>
 
+            {/* Vencimiento + Asignado a side by side (approved mockup
+                contact-record.html #task's `.form-grid`) — mirrored here
+                since this dialog has no mockup of its own. */}
+            <div className="form-grid">
+              <label className="field">
+                {l.taskDueLabel}
+                <input
+                  className="input"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  disabled={busy}
+                />
+              </label>
+
+              <label className="field">
+                {l.taskAssigneeLabel}
+                <select
+                  className="select"
+                  value={assignedToBdId}
+                  onChange={(e) => setAssignedToBdId(e.target.value)}
+                  disabled={busy}
+                >
+                  {buildTaskAssigneeOptions(assigneeOptions, meId).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {/* Descripción: not in the approved mockup — a deliberate
+                deviation, kept because the backlog explicitly asked for a
+                write path. */}
             <label className="field">
-              {l.taskDueLabel}
-              <input
-                className="input"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+              {l.taskDescriptionLabel}
+              <textarea
+                className="textarea"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 disabled={busy}
               />
-            </label>
-
-            <label className="field">
-              {l.taskAssigneeLabel}
-              <select
-                className="select"
-                value={assignedToBdId}
-                onChange={(e) => setAssignedToBdId(e.target.value)}
-                disabled={busy}
-              >
-                <option value="">{l.taskAssigneeSelf}</option>
-                {assigneeOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
             </label>
 
             {!subject && title.trim() && <p className="hint">{l.taskSubjectRequired}</p>}

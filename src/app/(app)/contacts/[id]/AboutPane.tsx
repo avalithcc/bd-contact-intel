@@ -37,6 +37,9 @@ export interface AboutPaneProps {
   // because it's conceptually a different picker (task assignee, not
   // Contact owner), even though today it's the same underlying list.
   assigneeOptions: TaskAssigneeOption[];
+  // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
+  // on the "Tarea" quick action's assignee `<select>`.
+  meId: string;
   ownerHint: string | null;
   email: string | null;
   hunterHint: string | null;
@@ -77,6 +80,7 @@ export function AboutPane({
   ownerLocked,
   ownerOptions,
   assigneeOptions,
+  meId,
   ownerHint,
   email,
   hunterHint,
@@ -128,6 +132,8 @@ export function AboutPane({
         locale={locale}
         initialAction={initialAction}
         assigneeOptions={assigneeOptions}
+        meId={meId}
+        ownerBdId={ownerBdId}
       />
 
       <div className="section-title">

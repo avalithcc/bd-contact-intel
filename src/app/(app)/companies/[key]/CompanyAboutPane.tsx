@@ -70,6 +70,9 @@ export interface CompanyAboutPaneProps {
    * because it's conceptually a different picker (task assignee, not
    * company owner), even though today it's the same underlying list. */
   assigneeOptions: TaskAssigneeOption[];
+  // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
+  // on the "Tarea" quick action's assignee `<select>`.
+  meId: string;
   /** Last edit per editable property (industry/ownerBdId/city/country),
    * keyed by the same `EditableCompanyProperty` name — see
    * recordMappers.ts#latestEditByProperty. A plain object (not a Map): a
@@ -137,6 +140,7 @@ export function CompanyAboutPane({
   country,
   ownerOptions,
   assigneeOptions,
+  meId,
   lastEditByProperty,
   startupText,
   accountTypeText,
@@ -217,6 +221,8 @@ export function CompanyAboutPane({
         labels={l}
         newContactLabels={newContactLabels}
         assigneeOptions={assigneeOptions}
+        meId={meId}
+        ownerBdId={ownerBdId}
       />
 
       <div className="section-title">{l.aboutSectionTitle}</div>

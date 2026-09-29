@@ -6,6 +6,7 @@ import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
 import { NoteIcon, TasksIcon, MeetingIcon, ContactsIcon } from "@/components/icons";
 import { NewContactDialog, type NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
+import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import {
@@ -37,7 +38,6 @@ export type CompanyQuickActionsLabels = ClientStrings<
     | "taskDescriptionLabel"
     | "taskDueLabel"
     | "taskAssigneeLabel"
-    | "taskAssigneeSelf"
     | "taskCreate"
     | "meetingDialogTitle"
     | "meetingDateLabel"
@@ -75,12 +75,19 @@ export function CompanyQuickActions({
   labels: l,
   newContactLabels,
   assigneeOptions,
+  meId,
+  ownerBdId,
 }: {
   companyKey: string;
   companyName: string;
   labels: CompanyQuickActionsLabels;
   newContactLabels: NewContactDialogLabels;
   assigneeOptions: TaskAssigneeOption[];
+  // Current BD's id (preselects "Asignado a", marks that option "(yo)") and
+  // this Company's own owner (marks their option "(responsable)" — already
+  // loaded on the record page, never fetched here — see buildTaskAssigneeOptions).
+  meId: string;
+  ownerBdId: string | null;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -166,6 +173,8 @@ export function CompanyQuickActions({
           busy={busy}
           error={error}
           assigneeOptions={assigneeOptions}
+          meId={meId}
+          ownerBdId={ownerBdId}
           onCancel={close}
           onSubmit={async (title, dueAt, description, assignedToBdId) => {
             setBusy(true);
@@ -247,16 +256,20 @@ function TaskForm({
   busy,
   error,
   assigneeOptions,
+  meId,
+  ownerBdId,
   onCancel,
   onSubmit,
 }: FormShellProps & {
   assigneeOptions: TaskAssigneeOption[];
+  meId: string;
+  ownerBdId: string | null;
   onSubmit: (title: string, dueAt: Date | undefined, description: string | undefined, assignedToBdId: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [assignedToBdId, setAssignedToBdId] = useState("");
+  const [assignedToBdId, setAssignedToBdId] = useState(meId);
   return (
     <Dialog open onClose={onCancel} title={l.taskDialogTitle}>
       <div className="composer">
@@ -269,24 +282,29 @@ function TaskForm({
           {l.taskTitleLabel}
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} autoFocus />
         </label>
+        {/* Vencimiento + Asignado a side by side (approved mockup
+            contact-record.html #task's `.form-grid`). */}
+        <div className="form-grid">
+          <label className="field">
+            {l.taskDueLabel}
+            <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={busy} />
+          </label>
+          <label className="field">
+            {l.taskAssigneeLabel}
+            <select className="select" value={assignedToBdId} onChange={(e) => setAssignedToBdId(e.target.value)} disabled={busy}>
+              {buildTaskAssigneeOptions(assigneeOptions, meId, ownerBdId).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {/* Descripción: not in the approved mockup — a deliberate deviation,
+            kept because the backlog explicitly asked for a write path. */}
         <label className="field">
           {l.taskDescriptionLabel}
           <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} disabled={busy} />
-        </label>
-        <label className="field">
-          {l.taskDueLabel}
-          <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={busy} />
-        </label>
-        <label className="field">
-          {l.taskAssigneeLabel}
-          <select className="select" value={assignedToBdId} onChange={(e) => setAssignedToBdId(e.target.value)} disabled={busy}>
-            <option value="">{l.taskAssigneeSelf}</option>
-            {assigneeOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
         </label>
         <div className="bar">
           <button type="button" onClick={onCancel} disabled={busy}>

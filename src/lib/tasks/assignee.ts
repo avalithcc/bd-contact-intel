@@ -17,6 +17,43 @@ export function resolveTaskAssignee(raw: string, creatorBdId: string): string | 
   return normalized ?? creatorBdId;
 }
 
+export interface TaskAssigneeBd {
+  id: string;
+  name: string;
+}
+
+export interface TaskAssigneeSelectOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * Builds the "Asignado a" `<select>` option list (approved mockup
+ * contact-record.html `#task`: `<option>Cristian Civita (yo)</option>
+ * <option>Ana Pereyra (responsable)</option>` — one entry per BD, no
+ * separate blank "Yo" option, current BD first and preselected by the
+ * caller via its `id`). `ownerBdId` is the record's own owner — passed in
+ * ONLY when the caller already has it loaded (e.g. the Contact/Company
+ * record's `ownerBdId` prop); never fetched here. When the owner IS the
+ * current BD, "(yo)" wins — a person is never labeled twice. Pure: never
+ * mutates `bds`, and the same input always produces the same output.
+ */
+export function buildTaskAssigneeOptions(
+  bds: readonly TaskAssigneeBd[],
+  meId: string,
+  ownerBdId?: string | null,
+): TaskAssigneeSelectOption[] {
+  const labelFor = (bd: TaskAssigneeBd): string => {
+    if (bd.id === meId) return `${bd.name} (yo)`;
+    if (ownerBdId && bd.id === ownerBdId) return `${bd.name} (responsable)`;
+    return bd.name;
+  };
+  const toOption = (bd: TaskAssigneeBd): TaskAssigneeSelectOption => ({ id: bd.id, label: labelFor(bd) });
+  const me = bds.filter((bd) => bd.id === meId).map(toOption);
+  const rest = bds.filter((bd) => bd.id !== meId).map(toOption);
+  return [...me, ...rest];
+}
+
 /** Thrown when a task write's `assignedToBdId` doesn't reference a real `bd`
  * row (task-essentials backlog item 2). Lives here (not in tasks/queries.ts,
  * which imports the live `db` connection) so DB-free callers — like

@@ -240,6 +240,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           ownerLocked={ownerLocked}
           ownerOptions={ownerOptions}
           assigneeOptions={ownerOptions}
+          meId={me.id}
           ownerHint={ownerHint}
           email={record.person.email}
           hunterHint={hunterHint}

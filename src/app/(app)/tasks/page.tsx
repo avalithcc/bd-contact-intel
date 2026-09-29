@@ -66,11 +66,11 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
               taskSubjectRequired: l.taskSubjectRequired,
               taskDueLabel: l.taskDueLabel,
               taskAssigneeLabel: l.taskAssigneeLabel,
-              taskAssigneeSelf: l.taskAssigneeSelf,
               taskCreateError: l.taskCreateError,
               cancel: l.cancel,
             }}
             assigneeOptions={ownerOptions}
+            meId={me.id}
           />
         </div>
       </div>

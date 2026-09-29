@@ -22,6 +22,7 @@ import { useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { CloseIcon, DownloadIcon, PersonIcon, TasksIcon } from "@/components/icons";
 import { bulkAssignOwnerAction, bulkCreateTaskAction } from "./bulkActions";
+import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { resolveSelectAllChecked } from "@/lib/contacts/bulkSelection";
 import { BulkGenerateMessagesButton } from "./BulkGenerateMessagesButton";
 import type { BulkActionsLabels } from "@/lib/contacts/labels";
@@ -32,6 +33,9 @@ import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 export interface BulkActionsBarProps {
   labels: BulkActionsLabels;
   ownerOptions: { id: string; name: string }[];
+  // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
+  // via buildTaskAssigneeOptions (mockup contact-record.html #task).
+  meId: string;
   view: string;
   q?: string;
   page: number;
@@ -72,6 +76,7 @@ type Panel = "owner" | "task" | null;
 export function BulkActionsBar({
   labels: l,
   ownerOptions,
+  meId,
   view,
   q,
   page,
@@ -287,30 +292,39 @@ export function BulkActionsBar({
           </label>
           <input id="bulk-task-title" className="input" type="text" name="title" required />
         </div>
+        {/* Vencimiento + Asignado a side by side (approved mockup
+            contact-record.html #task's `.form-grid`) — mirrored here since
+            this dialog has no mockup of its own. No "(responsable)" marker:
+            a bulk selection spans many contacts, each with its own (or no)
+            owner, so there is no single owner to mark without an extra
+            per-contact query. */}
+        <div className="form-grid">
+          <div className="field">
+            <label className="label" htmlFor="bulk-task-due">
+              {l.bulkTaskDueLabel}
+            </label>
+            <input id="bulk-task-due" className="input" type="date" name="dueAt" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="bulk-task-assignee">
+              {l.bulkTaskAssigneeLabel}
+            </label>
+            <select id="bulk-task-assignee" className="select" name="assignedToBdId" defaultValue={meId}>
+              {buildTaskAssigneeOptions(ownerOptions, meId).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {/* Descripción: not in the approved mockup — a deliberate deviation,
+            kept because the backlog explicitly asked for a write path. */}
         <div className="field">
           <label className="label" htmlFor="bulk-task-description">
             {l.bulkTaskDescriptionLabel}
           </label>
           <textarea id="bulk-task-description" className="textarea" name="description" />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="bulk-task-due">
-            {l.bulkTaskDueLabel}
-          </label>
-          <input id="bulk-task-due" className="input" type="date" name="dueAt" />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="bulk-task-assignee">
-            {l.bulkTaskAssigneeLabel}
-          </label>
-          <select id="bulk-task-assignee" className="select" name="assignedToBdId" defaultValue="">
-            <option value="">{l.bulkTaskAssigneeSelf}</option>
-            {ownerOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
         </div>
       </Dialog>
 
