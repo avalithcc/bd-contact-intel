@@ -48,6 +48,46 @@ test("two tokens: an all-uppercase token is title-cased", () => {
   });
 });
 
+test("an all-caps token with an apostrophe is title-cased on both sides of the apostrophe, not just the first letter of the whole token", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Pat O'BRIEN" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Pat", lastName: "O'Brien", rule: "two_tokens" },
+  });
+});
+
+test("an all-caps token with a leading apostrophe segment ('D'ANGELO') title-cases both segments", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Leo D'ANGELO" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Leo", lastName: "D'Angelo", rule: "two_tokens" },
+  });
+});
+
+test("a genuinely mixed-case original with an apostrophe ('O'Neill') is kept verbatim, never re-cased", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Conor O'Neill" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Conor", lastName: "O'Neill", rule: "two_tokens" },
+  });
+});
+
+test("a mixed-case original with an internal capital ('McDonald') is kept verbatim, never re-cased", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "John McDonald" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "John", lastName: "McDonald", rule: "two_tokens" },
+  });
+});
+
+test("a mixed-case original with an internal capital ('DiCaprio') is kept verbatim, never re-cased", () => {
+  const result = deriveStuffedNameSplit(candidate({ firstName: "Leo DiCaprio" }));
+  assert.deepEqual(result, {
+    kind: "fill",
+    fill: { firstName: "Leo", lastName: "DiCaprio", rule: "two_tokens" },
+  });
+});
+
 test("two tokens: a single-letter initial with a period is kept, not treated as junk", () => {
   const result = deriveStuffedNameSplit(candidate({ firstName: "j. Smith" }));
   assert.deepEqual(result, {

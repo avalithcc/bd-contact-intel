@@ -277,11 +277,15 @@ function isAllUpper(token: string): boolean {
   return letters.length > 0 && letters === letters.toUpperCase() && letters !== letters.toLowerCase();
 }
 
+// Straight apostrophe and the typographic right single quote both act as a
+// segment boundary, same as hyphen — "O'BRIEN" -> "O'Brien", not "O'brien".
+const TITLE_CASE_SEGMENT_DELIMITER_RE = /([-'’])/;
+
 function titleCaseToken(token: string): string {
   return token
-    .split("-")
-    .map((seg) => (seg.length === 0 ? seg : seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase()))
-    .join("-");
+    .split(TITLE_CASE_SEGMENT_DELIMITER_RE)
+    .map((seg) => (/^[-'’]$/.test(seg) || seg.length === 0 ? seg : seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase()))
+    .join("");
 }
 
 export interface StuffedNameSplitInput {
