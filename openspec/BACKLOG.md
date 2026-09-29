@@ -208,7 +208,9 @@ server-side `@avalith.net` + confirmed-email gate in the middleware and
   (earliest row 2026-09-29 08:25 local) the only requests were Supabase's own
   schema reads and the orchestrator's exposure tests. Anything earlier is no
   longer in the logs.
-- Server-side `password_min_length` is 6 while the app requires 12.
+- Done 2026-09-29: server-side `password_min_length` raised from 6 to 12,
+  matching `MIN_NEW_PASSWORD_LENGTH` in `src/lib/auth/passwordPolicy.ts`
+  (the reset script generates 20 characters).
 - When creating a BD in the Supabase dashboard, tick **Auto Confirm User**:
   without SMTP an unconfirmed user can never confirm and the new gate blocks
   them.
