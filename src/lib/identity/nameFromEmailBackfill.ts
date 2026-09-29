@@ -124,13 +124,23 @@ function localPartBeforeTag(email: string): string | null {
  * letters, letters only (any digit anywhere rejects); reject a generic/role
  * word. Output is title-cased, preserving any accents already present in
  * the email — never adding one that isn't there.
+ *
+ * Normalizes to NFC first (SUGGESTION fix): an accented letter can arrive
+ * either precomposed (NFC, one codepoint, e.g. "í" U+00ED) or decomposed
+ * (NFD, base letter + a combining mark, e.g. "i" U+0069 + U+0301). A
+ * combining mark's Unicode category is "Mn" (mark), not "L" (letter), so
+ * `LETTERS_ONLY_RE` (`\p{L}+`) would wrongly reject an NFD token as
+ * `non_letter_token` even though it spells a perfectly normal name.
+ * Normalizing first means both forms are treated identically and the
+ * written name is always the single-codepoint NFC form.
  */
 export function deriveNameFromEmail(email: string): NameFromEmailResult {
-  if (OWNER_EXCLUDED_EMAILS.has(email.trim().toLowerCase())) {
+  const normalizedEmail = email.normalize("NFC");
+  if (OWNER_EXCLUDED_EMAILS.has(normalizedEmail.trim().toLowerCase())) {
     return { kind: "skip", reason: "owner_excluded" };
   }
 
-  const localPart = localPartBeforeTag(email);
+  const localPart = localPartBeforeTag(normalizedEmail);
   if (!localPart) return { kind: "skip", reason: "malformed" };
 
   const tokens = localPart.split(/[._-]+/).filter(Boolean);

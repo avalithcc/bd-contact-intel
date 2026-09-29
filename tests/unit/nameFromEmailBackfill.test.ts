@@ -35,6 +35,27 @@ test("accents already present in the email are preserved, never added", () => {
   });
 });
 
+test("an NFD-decomposed accent (combining mark) fills exactly like its NFC form, not rejected as non_letter_token", () => {
+  // "í" as base letter "i" (U+0069) + COMBINING ACUTE ACCENT (U+0301),
+  // instead of the single precomposed codepoint "í" (U+00ED) — some sources
+  // (e.g. macOS filenames, certain export tools) produce NFD.
+  const nfdLocalPart = "mart" + "ín.medina";
+  const nfcResult = deriveNameFromEmail("martín.medina@example.com");
+  const nfdResult = deriveNameFromEmail(`${nfdLocalPart}@example.com`);
+  assert.deepEqual(nfdResult, nfcResult);
+  assert.deepEqual(nfdResult, { kind: "fill", fill: { firstName: "Martín", lastName: "Medina" } });
+});
+
+test("NFD-decomposed output is itself normalized to NFC (single composed codepoint), not left decomposed", () => {
+  const nfdLocalPart = "mart" + "ín.medina";
+  const result = deriveNameFromEmail(`${nfdLocalPart}@example.com`);
+  assert.equal(result.kind, "fill");
+  if (result.kind === "fill") {
+    assert.equal(result.fill.firstName, result.fill.firstName.normalize("NFC"));
+    assert.equal(result.fill.firstName.length, "Martín".length); // 6, not 7 (composed, not decomposed)
+  }
+});
+
 test("underscore and hyphen separators are both accepted", () => {
   assert.equal(deriveNameFromEmail("ana_gomez@example.com").kind, "fill");
   assert.equal(deriveNameFromEmail("ana-gomez@example.com").kind, "fill");
