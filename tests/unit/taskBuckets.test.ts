@@ -10,6 +10,40 @@ import { buildTaskBuckets, dueBucketOf } from "@/lib/tasks/taskBuckets";
 
 const NOW = new Date("2026-09-28T12:00:00Z");
 
+/**
+ * Reproduces the production bug (2026-09-29 digest dry run root cause): the
+ * old `dueBucketOf` used `Math.ceil((dueAt - now) / day)`, a real-ms diff,
+ * so a task due today (`due_at` at 00:00 UTC) flipped from "today" to
+ * "overdue" once UTC rolled to the next day — at 21:00 ART, still the same
+ * ART calendar day. `dueAt`/`now` here use the exact production values.
+ */
+test("production values: due today/yesterday/tomorrow bucket correctly across the 08:30/23:30/00:10 ART boundary", () => {
+  const dueToday = new Date("2026-09-29T00:00:00Z");
+  const dueYesterday = new Date("2026-09-28T00:00:00Z");
+  const dueTomorrow = new Date("2026-09-30T00:00:00Z");
+
+  const nowMorning = new Date("2026-09-29T11:30:00Z"); // 08:30 ART, 29th
+  const nowLateEvening = new Date("2026-09-30T02:30:00Z"); // 23:30 ART, still 29th
+
+  for (const now of [nowMorning, nowLateEvening]) {
+    assert.equal(dueBucketOf(dueToday, now), "today", `dueToday at now=${now.toISOString()}`);
+    assert.equal(dueBucketOf(dueYesterday, now), "overdue", `dueYesterday at now=${now.toISOString()}`);
+    assert.notEqual(
+      dueBucketOf(dueTomorrow, now),
+      "overdue",
+      `dueTomorrow must never be overdue at now=${now.toISOString()}`,
+    );
+    assert.notEqual(
+      dueBucketOf(dueTomorrow, now),
+      "today",
+      `dueTomorrow must never be today at now=${now.toISOString()}`,
+    );
+  }
+
+  const nowJustAfterMidnight = new Date("2026-09-30T03:10:00Z"); // 00:10 ART, 30th
+  assert.equal(dueBucketOf(dueTomorrow, nowJustAfterMidnight), "today");
+});
+
 test("dueBucketOf classifies past/today/tomorrow/later dates relative to now", () => {
   assert.equal(dueBucketOf(null, NOW), null);
   assert.equal(dueBucketOf(new Date("2026-09-20T00:00:00Z"), NOW), "overdue");
