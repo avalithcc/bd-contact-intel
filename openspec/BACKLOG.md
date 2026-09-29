@@ -105,13 +105,13 @@ custom SMTP the auth email templates cannot be edited. Consequences today:
 Likely the avalith.net Google Workspace SMTP; decide together with the email
 strategy for BD outreach.
 
-### bd-password-reset (manual)
-Until custom SMTP exists, a BD who forgets their password has no way back in
-that works: every Supabase path is email-based. Setting a password directly
-needs the admin API and the service-role key, which is not in `.env.local`.
-Proposal: a dry-run-by-default script (`--execute --actor=<bd id>`) that sets
-a random temporary password through the admin API and writes `audit_log`;
-the BD then changes it at `/account/password`.
+### bd-password-reset (manual) — shipped, not yet run
+`scripts/reset-bd-password.ts` (PR #179) sets a random temporary password
+through the Supabase admin API, writes `audit_log`, and prints the password
+once. Dry run is the default; `--execute --actor=<bd id>` needs
+`SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, which is not there yet. The admin
+call and the audit insert have never run: the first `--execute` should be on
+the owner's own account, as the smoke test.
 
 ### gmail-connection
 One Gmail account is connected (the owner's). Every BD needs to connect theirs
@@ -210,8 +210,11 @@ point of its own design.
 ## Known defects
 
 ### bd-test-row
-A `bd` row named `test` exists and now appears in every task "Asignado a"
-list. Removing it is a production write — check it owns nothing first.
+A `bd` row named `test` is not a dangling record: it has a working Supabase
+auth user that last signed in on 2026-09-23 — a live login with access to the
+whole base. It also appears in every task "Asignado a" list. Disable the auth
+user (and then remove or retire the `bd` row) — production writes; check what
+it owns first.
 
 ### company-contact-counts
 The `/companies` list's "Contactos" column and the company record's contacts
