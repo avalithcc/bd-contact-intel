@@ -183,14 +183,21 @@ export async function getTaskViewCounts(bdId: string): Promise<TaskViewCounts> {
 }
 
 /**
- * Open tasks for one Contact (mockup-port r03/r05; contact-record.html's
- * "Próximas" timeline bucket + right-panel "Tareas" card). Bounded to a
- * single `personId` — no pagination needed, a Contact realistically has a
- * handful of open tasks at most.
+ * Every open-or-done task for one Contact (mockup-port r03/r05 +
+ * timeline-tasks-pill; contact-record.html's "Próximas" timeline bucket,
+ * right-panel "Tareas" card, and the Actividad tab's "Tareas" filter pill —
+ * contact-record.html:104). One bounded read covers all three: `page.tsx`
+ * filters this same array down to `status === "open"` for the first two
+ * (unchanged behavior), and Timeline.tsx uses the full array (open + done)
+ * for the pill. `cancelled` tasks are excluded — neither the "Próximas"
+ * bucket nor the Tareas pill has ever shown them. Bounded to a single
+ * `personId`, no pagination — a Contact realistically has a handful of tasks
+ * at most (same assumption `getPersonTimeline`'s own `limit` makes for
+ * activity).
  */
-export async function getOpenTasksForPerson(personId: string, limit: number = 50): Promise<TaskRow[]> {
+export async function getTasksForPerson(personId: string, limit: number = 50): Promise<TaskRow[]> {
   return baseTaskSubjectQuery()
-    .where(and(eq(task.personId, personId), eq(task.status, "open")))
+    .where(and(eq(task.personId, personId), or(eq(task.status, "open"), eq(task.status, "done"))))
     .orderBy(asc(task.dueAt), desc(task.createdAt))
     .limit(limit);
 }
