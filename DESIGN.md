@@ -378,6 +378,7 @@ No gradients, no glow, no multi-layer shadows — matching Linear's "surface lad
 - Don't reach for inline `style={{...}}` for spacing/layout that a utility class already covers.
 - Don't reintroduce a theme cookie, `ThemeSwitcher`, `LocaleSwitcher`, or `[data-theme]`/`prefers-color-scheme` branching — the app is light-only and Spanish-only by owner decision (see **Theming** and **Language**).
 - **Never hardcode a color outside the token layer.** Every hex/rgba value belongs in `:root` in `src/app/globals.css` — never inline in a component rule, never in a TSX `style={{}}`, never baked into an SVG's `stroke`/`fill` (use `currentColor`, or — if the icon is a data-URI that can't use `currentColor` — put the whole `background-image`/`mask-image` behind a token, as `--icon-select-chevron` does).
+- **Every icon from `@/components/icons` carries the `icon` class** (or `icon icon-lg`), even when it also takes a CSS-module class: ``className={`icon ${styles.x}`}``. The shared `Svg` wrapper has only a `viewBox`; its size comes from `.icon`, as every mockup marks its SVGs `class="icon"`. Without it the SVG stretches to fill its container — `/account` and `/account/email` shipped that way for three days. `tests/unit/iconSizing.test.ts` fails on any icon missing the class.
 
 ## Responsive
 

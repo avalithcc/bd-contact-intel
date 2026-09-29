@@ -65,7 +65,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
 
       {errorMessage && (
         <div className={`${styles.alert} ${styles.alertWarn}`}>
-          <WarningIcon className={styles.alertIcon} />
+          <WarningIcon className={`icon ${styles.alertIcon}`} />
           <div>{errorMessage}</div>
         </div>
       )}
@@ -73,13 +73,13 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
       {!configResult.ok ? (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <MailIcon className={styles.cardHeaderIcon} />
+            <MailIcon className={`icon ${styles.cardHeaderIcon}`} />
             <h3>{l.notConfiguredTitle}</h3>
             <span className={styles.badgeNeutral}>{l.badgeNotAvailable}</span>
           </div>
           <div className={styles.cardBody}>
             <div className={`${styles.alert} ${styles.alertWarn}`}>
-              <WarningIcon className={styles.alertIcon} />
+              <WarningIcon className={`icon ${styles.alertIcon}`} />
               <div>
                 <strong>{l.notConfiguredWarning}</strong>
                 <br />
@@ -94,7 +94,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
       ) : account && account.status === "connected" ? (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <MailIcon className={styles.cardHeaderIcon} />
+            <MailIcon className={`icon ${styles.cardHeaderIcon}`} />
             <h3>{l.connectedTitle}</h3>
             <span className="legacy-badge green">{l.badgeConnected}</span>
           </div>
@@ -114,7 +114,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
               </div>
             </dl>
             <div className={`${styles.alert} ${styles.alertInfo}`}>
-              <InfoIcon className={styles.alertIcon} />
+              <InfoIcon className={`icon ${styles.alertIcon}`} />
               <div>{l.syncNote}</div>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
       ) : (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <MailIcon className={styles.cardHeaderIcon} />
+            <MailIcon className={`icon ${styles.cardHeaderIcon}`} />
             <h3>{l.disconnectedTitle}</h3>
           </div>
           <div className={styles.cardBody}>
