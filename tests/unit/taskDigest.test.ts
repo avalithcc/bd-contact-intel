@@ -273,3 +273,72 @@ test("buildDigestEmail's HTML carries the avalith wordmark, workspace eyebrow an
   assert.match(email!.html, /href="https:\/\/bd-contact-intel\.vercel\.app\/tasks"/);
   assert.match(email!.html, /<meta name="color-scheme" content="light">/);
 });
+
+test("header: wordmark renders before the 'ESPACIO DE TRABAJO' eyebrow (sidebar order), no '//' prefix, muted ink-subtle color instead of accent red", () => {
+  const tasks = { today: [task("t1", "2026-09-29T11:00:00Z")], overdue: [], yesterday: [] };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  const wordmarkIdx = email!.html.indexOf(">avalith<span");
+  const eyebrowIdx = email!.html.indexOf("ESPACIO DE TRABAJO");
+  assert.ok(wordmarkIdx > -1 && eyebrowIdx > -1 && wordmarkIdx < eyebrowIdx, "wordmark must render before the eyebrow");
+  assert.doesNotMatch(email!.html, /\/\/ ESPACIO DE TRABAJO/);
+  const eyebrowDivStart = email!.html.lastIndexOf("<div", eyebrowIdx);
+  const eyebrowDivEnd = email!.html.indexOf("</div>", eyebrowIdx);
+  const eyebrowDiv = email!.html.slice(eyebrowDivStart, eyebrowDivEnd);
+  assert.match(eyebrowDiv, /color:#6e6b78/);
+  assert.doesNotMatch(eyebrowDiv, /color:#d5252f/);
+  assert.doesNotMatch(eyebrowDiv, /color:#b81f27/);
+});
+
+test("the related contact/company link sits flush with the task title's left edge (no extra left padding beyond the row's own inset)", () => {
+  const tasks = {
+    today: [
+      task("t1", "2026-09-29T11:00:00Z", {
+        title: "Llamar a Juan",
+        personId: "p1",
+        subjectPersonFirstName: "Juan",
+        subjectPersonLastName: "Perez",
+      }),
+    ],
+    overdue: [],
+    yesterday: [],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /<td colspan="2" style="padding:4px 0 0;/);
+  assert.doesNotMatch(email!.html, /padding:4px 16px 0/);
+});
+
+test("every top-level block (header, greeting, each section, CTA, footer) shares the 'digest-pad' class so mobile left edges align", () => {
+  const tasks = {
+    today: [task("t1", "2026-09-29T11:00:00Z")],
+    overdue: [task("o1", "2026-09-20T00:00:00Z")],
+    yesterday: [task("y1", "2026-09-28T00:00:00Z")],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  const padCount = (email!.html.match(/class="digest-pad"/g) ?? []).length;
+  // header + greeting + 3 sections (today/yesterday/overdue all non-empty) + CTA + footer
+  assert.equal(padCount, 7);
+});
+
+test("the due-date pill has a narrow-screen fallback row below the related link, hidden unless the <style> media query activates it — the desktop 2-column row is untouched when <style> is stripped", () => {
+  const tasks = {
+    today: [
+      task("t1", "2026-09-29T11:00:00Z", {
+        title: "Llamar a Juan",
+        personId: "p1",
+        subjectPersonFirstName: "Juan",
+        subjectPersonLastName: "Perez",
+      }),
+    ],
+    overdue: [],
+    yesterday: [],
+  };
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
+  assert.ok(email);
+  assert.match(email!.html, /<td class="due-desktop-cell" align="right"/);
+  assert.match(email!.html, /<tr class="due-mobile-row" style="display:none;">/);
+  assert.match(email!.html, /\.due-desktop-cell \{ display: none !important; \}/);
+  assert.match(email!.html, /\.due-mobile-row \{ display: table-row !important; \}/);
+});

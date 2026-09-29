@@ -93,6 +93,7 @@ const COLOR_SURFACE_2 = "#ffffff"; // --color-surface-2
 const COLOR_BORDER = "rgba(0,0,0,0.08)"; // --color-border
 const COLOR_INK = "#17151c"; // --color-ink
 const COLOR_INK_SOFT = "#5b5865"; // --color-ink-soft
+const COLOR_INK_SUBTLE = "#6e6b78"; // --color-ink-subtle (mockups/styles.css .nav-title)
 const COLOR_INK_MUTED = "#8b8894"; // --color-ink-muted
 const COLOR_ACCENT = "#d5252f"; // --color-accent
 const COLOR_ACCENT_STRONG = "#b81f27"; // --color-accent-hover / -focus / -strong
@@ -177,20 +178,34 @@ function taskRow(task: DigestTask, siteBaseUrl: string, tone: DueTone, isLast: b
   const text = `- ${task.title}${subjectText} (vence ${due})${url ? ` ${url}` : ""}`;
 
   const borderStyle = isLast ? "" : `border-bottom:1px solid ${COLOR_BORDER};`;
+  // Flush with the title's left edge: no extra left/right padding here — the
+  // outer <td> below already insets the whole row by 16px, and this cell
+  // shares that same nested table, so any horizontal padding of its own
+  // would double up and push the link further right than the title.
   const subjectRow = subject
-    ? `<tr><td colspan="2" style="padding:4px 16px 0;font-family:${FONT_STACK};font-size:13px;">${
+    ? `<tr><td colspan="2" style="padding:4px 0 0;font-family:${FONT_STACK};font-size:13px;">${
         url
           ? `<a href="${escapeHtml(url)}" style="color:${COLOR_ACCENT_STRONG};text-decoration:none;">${escapeHtml(subject.label)}</a>`
           : `<span style="color:${COLOR_INK_SOFT};">${escapeHtml(subject.label)}</span>`
       }</td></tr>`
     : "";
 
+  // Narrow-screen fallback: the pill also renders in its own row below the
+  // subject link, hidden by default (inline `display:none`, so clients that
+  // strip <style> never show it — the desktop 2-column row stays the only
+  // visible pill) and revealed only by the <style> media query at <=480px,
+  // which simultaneously hides the desktop column's pill (`due-desktop-cell`).
+  const mobilePillRow = `<tr class="due-mobile-row" style="display:none;"><td colspan="2" style="padding:6px 0 0;">${duePill(
+    task.dueAt,
+    tone,
+  )}</td></tr>`;
+
   const html =
     `<tr><td style="padding:14px 16px ${subject ? "10px" : "14px"} 16px;${borderStyle}">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
     `<td style="font-family:${FONT_STACK};font-size:14px;font-weight:700;color:${COLOR_INK};word-break:break-word;">${escapeHtml(task.title)}</td>` +
-    `<td align="right" style="padding-left:12px;white-space:nowrap;">${duePill(task.dueAt, tone)}</td>` +
-    `</tr>${subjectRow}</table></td></tr>`;
+    `<td class="due-desktop-cell" align="right" style="padding-left:12px;white-space:nowrap;">${duePill(task.dueAt, tone)}</td>` +
+    `</tr>${subjectRow}${mobilePillRow}</table></td></tr>`;
 
   return { text, html };
 }
@@ -206,7 +221,7 @@ function renderSection(
   const rows = tasks.map((t, i) => taskRow(t, siteBaseUrl, tone, i === tasks.length - 1));
   const text = `${heading} (${tasks.length})\n${rows.map((r) => r.text).join("\n")}\n`;
   const html =
-    `<tr><td style="padding:20px 32px 0;">` +
+    `<tr><td class="digest-pad" style="padding:20px 32px 0;">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-family:${FONT_STACK};font-size:15px;font-weight:800;color:${COLOR_INK};padding-bottom:12px;">` +
     `${escapeHtml(heading)}${countPill(tasks.length, tone)}` +
     `</td></tr></table>` +
@@ -262,6 +277,8 @@ export function buildDigestEmail(
      render; clients that strip <style> fall back to the inline styles above. */
   @media only screen and (max-width: 480px) {
     .digest-pad { padding-left: 20px !important; padding-right: 20px !important; }
+    .due-desktop-cell { display: none !important; }
+    .due-mobile-row { display: table-row !important; }
   }
 </style>
 </head>
@@ -272,8 +289,8 @@ export function buildDigestEmail(
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:${COLOR_SURFACE_2};border:1px solid ${COLOR_BORDER};border-radius:12px;">
 
 <tr><td class="digest-pad" style="padding:28px 32px 20px;border-bottom:1px solid ${COLOR_BORDER};">
-<div style="font-family:${FONT_MONO_STACK};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${COLOR_ACCENT_STRONG};">// ESPACIO DE TRABAJO</div>
-<div style="font-family:${FONT_STACK};font-size:20px;font-weight:800;letter-spacing:-0.02em;color:${COLOR_INK};margin-top:4px;">avalith<span style="color:${COLOR_ACCENT};">.</span></div>
+<div style="font-family:${FONT_STACK};font-size:20px;font-weight:800;letter-spacing:-0.02em;color:${COLOR_INK};">avalith<span style="color:${COLOR_ACCENT};">.</span></div>
+<div style="font-family:${FONT_MONO_STACK};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${COLOR_INK_SUBTLE};margin-top:4px;">ESPACIO DE TRABAJO</div>
 </td></tr>
 
 <tr><td class="digest-pad" style="padding:24px 32px 4px;">
