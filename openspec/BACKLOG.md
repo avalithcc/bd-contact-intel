@@ -230,13 +230,6 @@ revertible with `--revert`, audit row `6e9affdc`). Still open:
   email and history, the other with name, title and LinkedIn connections.
   Merging each gives one complete contact.
 
-### bd-test-row
-A `bd` row named `test` is not a dangling record: it has a working Supabase
-auth user that last signed in on 2026-09-23 — a live login with access to the
-whole base. It also appears in every task "Asignado a" list. Disable the auth
-user (and then remove or retire the `bd` row) — production writes; check what
-it owns first.
-
 ### company-contact-counts
 The `/companies` list's "Contactos" column and the company record's contacts
 card match `person.company_key` directly instead of resolving through
