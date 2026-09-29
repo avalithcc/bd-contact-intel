@@ -16,10 +16,7 @@ import {
 import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
-import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
-import { splitEmailDraft } from "@/lib/outreach/emailDraftFormat";
-import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { Locale } from "@/lib/i18n/locales";
 import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
@@ -46,9 +43,10 @@ export interface QuickActionsProps {
   name: string;
   labels: ContactRecordLabels;
   email: string | null;
-  // "Generar mensaje" (task 13.3) reuses /outreach's GenerateMessageButton —
-  // needs its own ClientStrings-safe labels slice and the record page's
-  // (Spanish-only) locale fallback, same as /outreach and /whats-new.
+  // "Generar mensaje" / "Redactar con IA" (both open GenerateMessageDialog,
+  // task 13.3) — needs its own ClientStrings-safe labels slice and the
+  // record page's (Spanish-only) locale fallback, same as /outreach and
+  // /whats-new.
   messageLabels: GenerateMessageLabels;
   locale: Locale;
   // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
@@ -287,11 +285,7 @@ export function QuickActions({
           error={error}
           initialSubject={generatedSubject}
           initialBody={generatedBody}
-          generate={{
-            labels: messageLabels,
-            boundAction: generatePersonOutreachMessageAction.bind(null, personId, locale),
-            onGenerated: setGeneratedBody,
-          }}
+          onOpenGenerate={() => setOpenAction("generate")}
           onCancel={closeQuickAction}
           onSubmit={async (subject, body) => {
             if (!email) return;
@@ -503,15 +497,6 @@ function TaskForm({
   );
 }
 
-interface EmailGenerateProps {
-  labels: GenerateMessageLabels;
-  boundAction: (
-    prevState: GenerateOutreachMessageResult | null,
-    formData: FormData,
-  ) => Promise<GenerateOutreachMessageResult>;
-  onGenerated: (message: string) => void;
-}
-
 function EmailForm({
   labels: l,
   to,
@@ -519,18 +504,22 @@ function EmailForm({
   error,
   initialSubject,
   initialBody,
-  generate,
+  onOpenGenerate,
   onCancel,
   onSubmit,
 }: ComposerProps & {
   to: string | null;
   initialSubject?: string | null;
   initialBody?: string | null;
-  // "Generar mensaje" (task 13.3) — omitted entirely (rather than rendered
-  // disabled) when the caller has nothing to bind, keeping this composer
-  // reusable for a context with no AI draft (none today, but no reason to
-  // hard-couple the two).
-  generate?: EmailGenerateProps;
+  // "Redactar con IA" (approved mockup contact-record.html #email's
+  // `.dialog-footer`: `btn btn-ghost left`, before Cancelar/Enviar) opens
+  // the SAME "Generar mensaje" dialog the top-level quick action uses
+  // (QuickActions' openAction "generate" — GenerateMessageDialog.tsx),
+  // which hands the draft back via onUseInEmail. Omitted entirely (rather
+  // than rendered disabled) when the caller has nothing to open, keeping
+  // this composer reusable for a context with no AI draft (none today, but
+  // no reason to hard-couple the two).
+  onOpenGenerate?: () => void;
   onSubmit: (subject: string, body: string) => void;
 }) {
   const ids = useId();
@@ -553,6 +542,17 @@ function EmailForm({
       wide
       footer={
         <>
+          {/* Approved mockup (contact-record.html #email's `.dialog-footer`):
+              "Redactar con IA" is `btn btn-ghost left`, before Cancelar/
+              Enviar — moved here from an inline body button (fresh-review
+              fix), same position/class GenerateMessageDialog's own
+              "Generar"/"Regenerar" action already uses. */}
+          {onOpenGenerate && (
+            <button type="button" className="btn btn-ghost left" onClick={onOpenGenerate} disabled={busy}>
+              <GenerateIcon className="icon" />
+              {l.emailGenerateAction}
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
@@ -598,21 +598,6 @@ function EmailForm({
           disabled={busy}
         />
       </div>
-      {generate && (
-        <GenerateMessageButton
-          boundAction={generate.boundAction}
-          labels={generate.labels}
-          onGenerated={(message) => {
-            generate.onGenerated(message);
-            // "Redactar con IA" here always uses this action's default
-            // channel (email) — split the "Asunto: ...\n\n<body>"
-            // combined draft back into the two separate fields.
-            const split = splitEmailDraft(message);
-            if (split.subject) setSubject(split.subject);
-            setBody(split.subject ? split.body : message);
-          }}
-        />
-      )}
     </Dialog>
   );
 }

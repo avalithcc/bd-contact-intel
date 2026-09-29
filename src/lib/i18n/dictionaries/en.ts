@@ -628,6 +628,7 @@ export const en = {
     emailToLabel: "To",
     emailSubjectLabel: "Subject",
     emailBodyLabel: "Message",
+    emailGenerateAction: "Draft with AI",
     emailSend: "Send",
     emailNoAddress: "This contact has no email on file.",
     genericError: "Something went wrong. Please try again.",

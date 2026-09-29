@@ -530,6 +530,7 @@ export const es: typeof en = {
     emailToLabel: "Para",
     emailSubjectLabel: "Asunto",
     emailBodyLabel: "Mensaje",
+    emailGenerateAction: "Redactar con IA",
     emailSend: "Enviar",
     emailNoAddress: "Este contacto no tiene un correo registrado.",
     genericError: "Ocurrió un error. Vuelva a intentarlo.",
