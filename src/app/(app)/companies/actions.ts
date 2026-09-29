@@ -140,13 +140,18 @@ export async function addCompanyNoteAction(companyKey: string, note: string): Pr
   }
 }
 
+/** `description`/`assignedToBdId` join in task-essentials (backlog items
+ * 1-2) — both optional, same defaulting as every other creation path
+ * (`createTaskAction` resolves a blank/omitted assignee to the caller). */
 export async function addCompanyTaskAction(
   companyKey: string,
   title: string,
   dueAt?: Date,
+  description?: string,
+  assignedToBdId?: string,
 ): Promise<CompanyActionResult> {
   try {
-    await createTaskAction({ title, companyKey, dueAt });
+    await createTaskAction({ title, companyKey, dueAt, description, assignedToBdId });
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {

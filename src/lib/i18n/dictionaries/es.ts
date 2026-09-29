@@ -523,7 +523,9 @@ export const es: typeof en = {
     signalPlaceholder: "Pegar cualquier señal encontrada: publicación de LinkedIn, aviso laboral, noticia, etc.",
     signalSave: "Guardar señal",
     taskTitleLabel: "Título",
+    taskDescriptionLabel: "Descripción",
     taskDueLabel: "Vencimiento",
+    taskAssigneeLabel: "Asignado a",
     taskCreate: "Crear tarea",
     emailToLabel: "Para",
     emailSubjectLabel: "Asunto",
@@ -761,6 +763,19 @@ export const es: typeof en = {
     domainRestricted: (domain) => `Las cuentas están limitadas a correos ${domain}.`,
     passwordTooShort: "Usa al menos 8 caracteres para tu contraseña.",
     accountCreated: "Cuenta creada. Revisa tu bandeja de entrada para confirmar y luego inicia sesión.",
+    forgotPasswordLink: "¿Olvidaste tu contraseña?",
+    expiredLinkError: "El enlace venció o no es válido. Solicitá uno nuevo.",
+  },
+
+  forgotPassword: {
+    eyebrow: "// recuperar acceso",
+    title: "Recuperar contraseña",
+    subtitle: "Ingresá tu correo de trabajo y te enviamos un enlace para elegir una contraseña nueva.",
+    workEmail: "Correo de trabajo",
+    submit: "Enviar enlace",
+    genericConfirmation:
+      "Si ese correo tiene una cuenta, vas a recibir un enlace para restablecer tu contraseña.",
+    backToLogin: "Volver a iniciar sesión",
   },
 
   account: {
@@ -846,6 +861,7 @@ export const es: typeof en = {
     // --- tasks: new task dialog (t04) ---
     taskCreate: "Crear tarea",
     taskTitleLabel: "Título",
+    taskDescriptionLabel: "Descripción",
     taskSubjectLabel: "Asociado con",
     taskSubjectPlaceholder: "Buscar un contacto por nombre...",
     taskSubjectContactOption: "Contacto",
@@ -854,6 +870,7 @@ export const es: typeof en = {
     taskSubjectNoResults: "Sin resultados.",
     taskSubjectRequired: "Elegí un contacto o una empresa.",
     taskDueLabel: "Vencimiento",
+    taskAssigneeLabel: "Asignado a",
     taskCreateError: "No se pudo crear la tarea. Probá de nuevo.",
     cancel: "Cancelar",
     // --- end tasks: new task dialog ---
@@ -972,7 +989,9 @@ export const es: typeof en = {
     noteSave: "Guardar nota",
     taskDialogTitle: "Nueva tarea",
     taskTitleLabel: "Título de la tarea",
-    taskDueLabel: "Fecha límite",
+    taskDescriptionLabel: "Descripción",
+    taskDueLabel: "Vencimiento",
+    taskAssigneeLabel: "Asignado a",
     taskCreate: "Crear tarea",
     meetingDialogTitle: "Registrar reunión",
     meetingDateLabel: "Fecha",
@@ -1272,7 +1291,9 @@ export const es: typeof en = {
     bulkConfirm: "Aplicar",
     bulkCancel: "Cancelar",
     bulkTaskTitleLabel: "Título de la tarea",
+    bulkTaskDescriptionLabel: "Descripción",
     bulkTaskDueLabel: "Vencimiento",
+    bulkTaskAssigneeLabel: "Asignado a",
     bulkExport: "Exportar",
     bulkGenerateMessages: "Generar mensajes",
     bulkMessagesCapNotice: "Se generaron mensajes solo para los primeros 25 contactos seleccionados (límite provisorio, a confirmar).",

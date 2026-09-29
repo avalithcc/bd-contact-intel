@@ -9,7 +9,7 @@ import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { HistoryIcon, LinkedInIcon } from "@/components/icons";
 import { PropertyList, type AboutPaneProperty, type OwnerOption } from "./PropertyList";
-import { QuickActions } from "./QuickActions";
+import { QuickActions, type TaskAssigneeOption } from "./QuickActions";
 
 export type { AboutPaneProperty, OwnerOption };
 
@@ -32,6 +32,14 @@ export interface AboutPaneProps {
   ownerBdId: string | null;
   ownerLocked: boolean;
   ownerOptions: OwnerOption[];
+  // Same `bd` list as `ownerOptions`, handed to the "Tarea" quick action's
+  // assignee `<select>` (task-essentials backlog item 2) — a separate prop
+  // because it's conceptually a different picker (task assignee, not
+  // Contact owner), even though today it's the same underlying list.
+  assigneeOptions: TaskAssigneeOption[];
+  // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
+  // on the "Tarea" quick action's assignee `<select>`.
+  meId: string;
   ownerHint: string | null;
   email: string | null;
   hunterHint: string | null;
@@ -71,6 +79,8 @@ export function AboutPane({
   ownerBdId,
   ownerLocked,
   ownerOptions,
+  assigneeOptions,
+  meId,
   ownerHint,
   email,
   hunterHint,
@@ -121,6 +131,9 @@ export function AboutPane({
         messageLabels={messageLabels}
         locale={locale}
         initialAction={initialAction}
+        assigneeOptions={assigneeOptions}
+        meId={meId}
+        ownerBdId={ownerBdId}
       />
 
       <div className="section-title">

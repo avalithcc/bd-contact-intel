@@ -20,7 +20,8 @@ import { getCurrentBd } from "@/lib/queries";
 import { bulkAssignOwner, filterLivePersonIds } from "@/lib/contacts/bulkOwnerDb";
 import { isUuid } from "@/lib/uuid";
 import { BULK_FILTER_TARGET_CAP, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
-import { createTask } from "@/lib/tasks/queries";
+import { createTask, assertAssigneeExists } from "@/lib/tasks/queries";
+import { resolveTaskAssignee } from "@/lib/tasks/assignee";
 import type { NewTask } from "@/db/schema";
 import { getContactIdsForFilters } from "@/lib/contacts/listQueries";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
@@ -103,24 +104,31 @@ export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
 }
 
 /** "Crear tarea" bulk action (task 13.2): one task per selected person,
- * sharing the submitted title/due date — reuses createTask (same path as
- * the record page's "Tarea" quick action), looped over the validated id
- * list, not a bespoke bulk-insert. */
+ * sharing the submitted title/due date/description/assignee — reuses
+ * createTask (same path as the record page's "Tarea" quick action), looped
+ * over the validated id list, not a bespoke bulk-insert. The assignee is
+ * resolved and validated ONCE before the loop (task-essentials backlog item
+ * 2) — never per row, since every created task shares the same assignee. */
 export async function bulkCreateTaskAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
   const { ids: personIds, wasLimited } = await resolveBulkTargetIds(formData, me.id, BULK_FILTER_TARGET_CAP);
   const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || undefined;
   const dueAtRaw = String(formData.get("dueAt") ?? "");
   const dueAt = dueAtRaw ? new Date(dueAtRaw) : undefined;
+  const rawAssignee = String(formData.get("assignedToBdId") ?? "");
+  const assignedToBdId = resolveTaskAssignee(rawAssignee, me.id);
 
   let created = 0;
-  if (title) {
+  if (title && assignedToBdId !== undefined) {
+    await assertAssigneeExists(assignedToBdId, me.id);
     for (const personId of await filterLivePersonIds(personIds)) {
       await createTask({
         title,
+        description,
         dueAt,
         personId,
-        assignedToBdId: me.id,
+        assignedToBdId,
         actorBdId: me.id,
       } as NewTask);
       created++;

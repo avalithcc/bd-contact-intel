@@ -188,11 +188,17 @@
   /* ---- motion ---- */
   --transition-fast: 0.15s ease;
 
-  /* ---- fonts (loaded via next/font in layout.tsx) ----
-     --font-jetbrains is next/font's CSS variable (see layout.tsx); naming
-     it separately from --font-mono keeps this declaration from being
-     self-referential (var(--font-mono) inside the definition of
-     --font-mono is invalid and silently drops the whole property). */
+  /* ---- fonts (self-hosted @fontsource-variable CSS imported in
+     layout.tsx; "Inter Variable"/"JetBrains Mono Variable" are the family
+     names @fontsource-variable declares — see the "Inter Fallback" /
+     "JetBrains Mono Fallback" @font-face rules below for the
+     metric-adjusted fallback) ----
+     --font-jetbrains is named separately from --font-mono so that
+     --font-mono's own definition below isn't self-referential
+     (var(--font-mono) inside the definition of --font-mono is invalid
+     and silently drops the whole property). */
+  --font-inter: "Inter Variable", "Inter Fallback";
+  --font-jetbrains: "JetBrains Mono Variable", "JetBrains Mono Fallback";
   --font-body: var(--font-inter), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
@@ -222,6 +228,35 @@
    This tells the browser not to darken form controls, scrollbars, etc. */
 :root {
   color-scheme: light;
+}
+
+/* Metric-adjusted local fallback, standing in for Inter/JetBrains Mono
+   during the brief window before the self-hosted webfont finishes
+   loading (font-display: swap). The override percentages are what
+   next/font/google computed for these exact families before this
+   migration, so the fallback-to-webfont swap shifts layout no more than
+   it did then. Regenerate them, never hand-copy them, with Next's own
+   function (the one next/font/google uses):
+     node -e 'const f=require("next/dist/server/font-utils.js");
+       for (const n of ["Inter","JetBrains Mono"])
+         console.log(n, f.calculateSizeAdjustValues(n))'
+   A first version of this block carried JetBrains Mono values that did
+   not come from that function (77.57/22.82/131.49); review caught it. */
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+  size-adjust: 107.12%;
+}
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  src: local("Arial");
+  ascent-override: 75.79%;
+  descent-override: 22.29%;
+  line-gap-override: 0%;
+  size-adjust: 134.59%;
 }
 
 * {

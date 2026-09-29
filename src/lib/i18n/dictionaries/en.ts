@@ -621,7 +621,9 @@ export const en = {
     signalPlaceholder: "Paste any signal you found — LinkedIn post, job posting, news, etc.",
     signalSave: "Save signal",
     taskTitleLabel: "Title",
+    taskDescriptionLabel: "Description",
     taskDueLabel: "Due date",
+    taskAssigneeLabel: "Assigned to",
     taskCreate: "Create task",
     emailToLabel: "To",
     emailSubjectLabel: "Subject",
@@ -860,6 +862,19 @@ export const en = {
     domainRestricted: (domain: string) => `Accounts are limited to ${domain} emails.`,
     passwordTooShort: "Use at least 8 characters for your password.",
     accountCreated: "Account created. Check your inbox to confirm, then sign in.",
+    forgotPasswordLink: "Forgot your password?",
+    expiredLinkError: "That link expired or is invalid. Request a new one.",
+  },
+
+  forgotPassword: {
+    eyebrow: "// recover access",
+    title: "Reset password",
+    subtitle: "Enter your work email and we'll send you a link to choose a new password.",
+    workEmail: "Work email",
+    submit: "Send link",
+    genericConfirmation:
+      "If that email has an account, you'll receive a link to reset your password.",
+    backToLogin: "Back to sign in",
   },
 
   account: {
@@ -944,6 +959,7 @@ export const en = {
     // --- tasks: new task dialog (t04) ---
     taskCreate: "Create task",
     taskTitleLabel: "Title",
+    taskDescriptionLabel: "Description",
     taskSubjectLabel: "Related to",
     taskSubjectPlaceholder: "Search a contact by name...",
     taskSubjectContactOption: "Contact",
@@ -952,6 +968,7 @@ export const en = {
     taskSubjectNoResults: "No matches.",
     taskSubjectRequired: "Pick a contact or a company.",
     taskDueLabel: "Due date",
+    taskAssigneeLabel: "Assigned to",
     taskCreateError: "Could not create the task. Try again.",
     cancel: "Cancel",
     // --- end tasks: new task dialog ---
@@ -1073,7 +1090,9 @@ export const en = {
     noteSave: "Save note",
     taskDialogTitle: "New task",
     taskTitleLabel: "Task title",
+    taskDescriptionLabel: "Description",
     taskDueLabel: "Due date",
+    taskAssigneeLabel: "Assigned to",
     taskCreate: "Create task",
     meetingDialogTitle: "Log meeting",
     meetingDateLabel: "Date",
@@ -1385,7 +1404,9 @@ export const en = {
     bulkConfirm: "Apply",
     bulkCancel: "Cancel",
     bulkTaskTitleLabel: "Task title",
+    bulkTaskDescriptionLabel: "Description",
     bulkTaskDueLabel: "Due date",
+    bulkTaskAssigneeLabel: "Assigned to",
     bulkExport: "Export",
     bulkGenerateMessages: "Generate messages",
     bulkMessagesCapNotice: "Messages were generated for the first 25 selected contacts only (provisional cap, needs confirmation).",

@@ -1,21 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
+import { sanitizeNextPath } from "@/lib/auth/nextPath";
+import { PASSWORD_RESET_ENABLED } from "@/lib/auth/passwordReset";
 
 const ALLOWED_DOMAIN = "@avalith.net";
 
-export function LoginForm({ locale }: { locale: Locale }) {
+export function LoginForm({
+  locale,
+  next,
+  error,
+}: {
+  locale: Locale;
+  next?: string;
+  error?: string;
+}) {
   const dict = t(locale);
   const router = useRouter();
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(
+    error === "invalid_or_expired_link" ? dict.login.expiredLinkError : null,
+  );
   const [busy, setBusy] = useState(false);
+  const safeNext = sanitizeNextPath(next);
 
   function validate(): boolean {
     if (!email.trim() || !password) {
@@ -39,7 +53,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
       setMsg(error.message);
       return;
     }
-    router.push("/");
+    router.push(safeNext);
     router.refresh();
   }
 
@@ -128,6 +142,11 @@ export function LoginForm({ locale }: { locale: Locale }) {
         {msg && (
           <p className="muted mb-0 mt-md">
             {msg}
+          </p>
+        )}
+        {PASSWORD_RESET_ENABLED && (
+          <p className="soft mb-0 mt-md">
+            <Link href="/forgot-password">{dict.login.forgotPasswordLink}</Link>
           </p>
         )}
       </form>

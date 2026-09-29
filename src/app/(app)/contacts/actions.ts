@@ -173,15 +173,19 @@ export async function addContactNoteAction(personId: string, note: string): Prom
   }
 }
 
-/** "Tarea" quick action (task 9.2). */
+/** "Tarea" quick action (task 9.2). `description`/`assignedToBdId` join in
+ * task-essentials (backlog items 1-2) — both optional, same defaulting
+ * (`createTaskAction` resolves a blank/omitted assignee to the caller). */
 export async function addContactTaskAction(
   personId: string,
   title: string,
   dueAt?: Date,
+  description?: string,
+  assignedToBdId?: string,
 ): Promise<ContactActionResult> {
   try {
     await assertContactEditableById(personId);
-    await createTaskAction({ title, personId, dueAt });
+    await createTaskAction({ title, personId, dueAt, description, assignedToBdId });
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
