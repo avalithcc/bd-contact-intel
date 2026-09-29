@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
@@ -225,27 +225,46 @@ interface FormShellProps {
 }
 
 function NoteForm({ l, busy, error, onCancel, onSubmit }: FormShellProps & { onSubmit: (note: string) => void }) {
+  const ids = useId();
   const [note, setNote] = useState("");
   return (
-    <Dialog open onClose={onCancel} title={l.noteDialogTitle}>
-      <div className="composer">
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        <label className="field">
-          {l.noteLabel}
-          <textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} autoFocus />
-        </label>
-        <div className="bar">
-          <button type="button" onClick={onCancel} disabled={busy}>
+    <Dialog
+      open
+      onClose={onCancel}
+      title={l.noteDialogTitle}
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
-          <button type="button" disabled={busy || !note.trim()} onClick={() => note.trim() && onSubmit(note.trim())}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !note.trim()}
+            onClick={() => note.trim() && onSubmit(note.trim())}
+          >
             {l.noteSave}
           </button>
-        </div>
+        </>
+      }
+    >
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="field">
+        <label className="label" htmlFor={`${ids}-note`}>
+          {l.noteLabel}
+        </label>
+        <textarea
+          id={`${ids}-note`}
+          className="textarea"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          disabled={busy}
+          autoFocus
+        />
       </div>
     </Dialog>
   );
@@ -266,52 +285,24 @@ function TaskForm({
   ownerBdId: string | null;
   onSubmit: (title: string, dueAt: Date | undefined, description: string | undefined, assignedToBdId: string) => void;
 }) {
+  const ids = useId();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assignedToBdId, setAssignedToBdId] = useState(meId);
   return (
-    <Dialog open onClose={onCancel} title={l.taskDialogTitle}>
-      <div className="composer">
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        <label className="field">
-          {l.taskTitleLabel}
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} autoFocus />
-        </label>
-        {/* Vencimiento + Asignado a side by side (approved mockup
-            contact-record.html #task's `.form-grid`). */}
-        <div className="form-grid">
-          <label className="field">
-            {l.taskDueLabel}
-            <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={busy} />
-          </label>
-          <label className="field">
-            {l.taskAssigneeLabel}
-            <select className="select" value={assignedToBdId} onChange={(e) => setAssignedToBdId(e.target.value)} disabled={busy}>
-              {buildTaskAssigneeOptions(assigneeOptions, meId, ownerBdId).map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {/* Descripción: not in the approved mockup — a deliberate deviation,
-            kept because the backlog explicitly asked for a write path. */}
-        <label className="field">
-          {l.taskDescriptionLabel}
-          <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} disabled={busy} />
-        </label>
-        <div className="bar">
-          <button type="button" onClick={onCancel} disabled={busy}>
+    <Dialog
+      open
+      onClose={onCancel}
+      title={l.taskDialogTitle}
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
           <button
             type="button"
+            className="btn btn-primary"
             disabled={busy || !title.trim()}
             onClick={() =>
               title.trim() &&
@@ -320,7 +311,75 @@ function TaskForm({
           >
             {l.taskCreate}
           </button>
+        </>
+      }
+    >
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="field">
+        <label className="label" htmlFor={`${ids}-title`}>
+          {l.taskTitleLabel}
+        </label>
+        <input
+          id={`${ids}-title`}
+          className="input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={busy}
+          autoFocus
+        />
+      </div>
+      {/* Vencimiento + Asignado a side by side (approved mockup
+          contact-record.html #task's `.form-grid`). */}
+      <div className="form-grid">
+        <div className="field">
+          <label className="label" htmlFor={`${ids}-due`}>
+            {l.taskDueLabel}
+          </label>
+          <input
+            id={`${ids}-due`}
+            className="input"
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            disabled={busy}
+          />
         </div>
+        <div className="field">
+          <label className="label" htmlFor={`${ids}-assignee`}>
+            {l.taskAssigneeLabel}
+          </label>
+          <select
+            id={`${ids}-assignee`}
+            className="select"
+            value={assignedToBdId}
+            onChange={(e) => setAssignedToBdId(e.target.value)}
+            disabled={busy}
+          >
+            {buildTaskAssigneeOptions(assigneeOptions, meId, ownerBdId).map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {/* Descripción: not in the approved mockup — a deliberate deviation,
+          kept because the backlog explicitly asked for a write path. */}
+      <div className="field">
+        <label className="label" htmlFor={`${ids}-description`}>
+          {l.taskDescriptionLabel}
+        </label>
+        <textarea
+          id={`${ids}-description`}
+          className="textarea"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={busy}
+        />
       </div>
     </Dialog>
   );
@@ -333,37 +392,79 @@ function MeetingForm({
   onCancel,
   onSubmit,
 }: FormShellProps & { onSubmit: (date: string, time: string, notes: string) => void }) {
+  const ids = useId();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
   return (
-    <Dialog open onClose={onCancel} title={l.meetingDialogTitle}>
-      <div className="composer">
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        <label className="field">
-          {l.meetingDateLabel}
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} autoFocus />
-        </label>
-        <label className="field">
-          {l.meetingTimeLabel}
-          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
-        </label>
-        <label className="field">
-          {l.meetingNotesLabel}
-          <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
-        </label>
-        <div className="bar">
-          <button type="button" onClick={onCancel} disabled={busy}>
+    <Dialog
+      open
+      onClose={onCancel}
+      title={l.meetingDialogTitle}
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
-          <button type="button" disabled={busy || !date} onClick={() => date && onSubmit(date, time, notes)}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !date}
+            onClick={() => date && onSubmit(date, time, notes)}
+          >
             {l.meetingSubmit}
           </button>
+        </>
+      }
+    >
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
+      {/* Fecha + Hora side by side (approved mockup contact-record.html
+          #meeting's `.form-grid`) — mirrored here since this dialog has no
+          mockup of its own. */}
+      <div className="form-grid">
+        <div className="field">
+          <label className="label" htmlFor={`${ids}-date`}>
+            {l.meetingDateLabel}
+          </label>
+          <input
+            id={`${ids}-date`}
+            className="input"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={busy}
+            autoFocus
+          />
         </div>
+        <div className="field">
+          <label className="label" htmlFor={`${ids}-time`}>
+            {l.meetingTimeLabel}
+          </label>
+          <input
+            id={`${ids}-time`}
+            className="input"
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            disabled={busy}
+          />
+        </div>
+      </div>
+      <div className="field">
+        <label className="label" htmlFor={`${ids}-notes`}>
+          {l.meetingNotesLabel}
+        </label>
+        <textarea
+          id={`${ids}-notes`}
+          className="textarea"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          disabled={busy}
+        />
       </div>
     </Dialog>
   );
