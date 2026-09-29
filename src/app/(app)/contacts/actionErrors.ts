@@ -23,6 +23,7 @@ import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/cont
 import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
 import { CallOccurredAtInFutureError, CallOutcomeRequiredError } from "@/lib/contacts/call";
 import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
+import { InvalidAssigneeError } from "@/lib/tasks/assignee";
 
 export type ContactActionErrorReason =
   | "not_found"
@@ -104,6 +105,9 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof CallOccurredAtInFutureError) return "call_occurred_at_in_future";
   if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
   if (err instanceof OwnerValueInvalidError) return "owner_invalid";
+  // A task's assignee `<select>` reuses the same "owner_invalid" message
+  // (l.errorOwnerInvalid) — both mean "pick a real, valid BD".
+  if (err instanceof InvalidAssigneeError) return "owner_invalid";
   if (err instanceof OwnerReassignLockedError) return "owner_locked";
   if (err instanceof CompanyNotFoundError) return "company_not_found";
   return "unexpected";

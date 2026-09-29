@@ -14,6 +14,7 @@ import {
   sendContactEmailAction,
 } from "../actions";
 import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
+import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
@@ -35,6 +36,11 @@ import {
   TasksIcon,
 } from "@/components/icons";
 
+export interface TaskAssigneeOption {
+  id: string;
+  name: string;
+}
+
 export interface QuickActionsProps {
   personId: string;
   name: string;
@@ -48,6 +54,14 @@ export interface QuickActionsProps {
   // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
   // composer on mount, e.g. arriving from `/contacts/[id]?openAction=meeting`.
   initialAction?: "email" | "meeting" | "discard" | null;
+  // "Tarea" quick action's assignee `<select>` (task-essentials backlog item
+  // 2) — the same `bd` list `PropertyList`'s owner `<select>` already uses.
+  assigneeOptions: TaskAssigneeOption[];
+  // Current BD's id (preselects "Asignado a", marks that option "(yo)") and
+  // this Contact's own owner (marks their option "(responsable)" — already
+  // loaded on the record page as `ownerBdId`, never fetched here).
+  meId: string;
+  ownerBdId: string | null;
 }
 
 type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
@@ -115,6 +129,9 @@ export function QuickActions({
   messageLabels,
   locale,
   initialAction,
+  assigneeOptions,
+  meId,
+  ownerBdId,
 }: QuickActionsProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -240,11 +257,14 @@ export function QuickActions({
           labels={l}
           busy={busy}
           error={error}
+          assigneeOptions={assigneeOptions}
+          meId={meId}
+          ownerBdId={ownerBdId}
           onCancel={closeQuickAction}
-          onSubmit={async (title, dueAt) => {
+          onSubmit={async (title, dueAt, description, assignedToBdId) => {
             setBusy(true);
             setError(null);
-            const result = await addContactTaskAction(personId, title, dueAt);
+            const result = await addContactTaskAction(personId, title, dueAt, description, assignedToBdId);
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -371,11 +391,21 @@ function TaskForm({
   labels: l,
   busy,
   error,
+  assigneeOptions,
+  meId,
+  ownerBdId,
   onCancel,
   onSubmit,
-}: ComposerProps & { onSubmit: (title: string, dueAt?: Date) => void }) {
+}: ComposerProps & {
+  assigneeOptions: TaskAssigneeOption[];
+  meId: string;
+  ownerBdId: string | null;
+  onSubmit: (title: string, dueAt: Date | undefined, description: string | undefined, assignedToBdId: string) => void;
+}) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [assignedToBdId, setAssignedToBdId] = useState(meId);
   return (
     <Dialog open onClose={onCancel} title={l.taskCreate}>
       <div className="composer">
@@ -384,13 +414,43 @@ function TaskForm({
           {l.taskTitleLabel}
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
         </label>
+        {/* Vencimiento + Asignado a side by side (approved mockup
+            contact-record.html #task's `.form-grid`). */}
+        <div className="form-grid">
+          <label className="field">
+            {l.taskDueLabel}
+            <input
+              className="input"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              disabled={busy}
+            />
+          </label>
+          <label className="field">
+            {l.taskAssigneeLabel}
+            <select
+              className="select"
+              value={assignedToBdId}
+              onChange={(e) => setAssignedToBdId(e.target.value)}
+              disabled={busy}
+            >
+              {buildTaskAssigneeOptions(assigneeOptions, meId, ownerBdId).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {/* Descripción: not in the approved mockup — a deliberate deviation,
+            kept because the backlog explicitly asked for a write path. */}
         <label className="field">
-          {l.taskDueLabel}
-          <input
-            className="input"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+          {l.taskDescriptionLabel}
+          <textarea
+            className="textarea"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             disabled={busy}
           />
         </label>
@@ -398,7 +458,14 @@ function TaskForm({
           <button type="button" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
-          <button type="button" disabled={busy || !title.trim()} onClick={() => title.trim() && onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined)}>
+          <button
+            type="button"
+            disabled={busy || !title.trim()}
+            onClick={() =>
+              title.trim() &&
+              onSubmit(title.trim(), dueDate ? new Date(dueDate) : undefined, description.trim() || undefined, assignedToBdId)
+            }
+          >
             {l.taskCreate}
           </button>
         </div>

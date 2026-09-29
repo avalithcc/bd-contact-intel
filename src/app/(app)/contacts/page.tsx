@@ -923,6 +923,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         <BulkActionsBar
           labels={bulkLabels}
           ownerOptions={ownerOptions}
+          meId={me.id}
           view={activeView.viewKey}
           q={sp.q}
           page={currentPage}

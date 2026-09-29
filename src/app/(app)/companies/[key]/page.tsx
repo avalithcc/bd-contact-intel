@@ -19,6 +19,7 @@ import {
 } from "@/lib/companies/recordMappers";
 import { buildCompanyTimelineViewRows } from "@/lib/companies/timelineView";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
+import { getCurrentBd } from "@/lib/queries";
 import { pickCompanyRecordLabels } from "@/lib/companies/labels";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
@@ -60,6 +61,10 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   const lc = dict.companyList;
 
   const company = await getCompanyByKey(key);
+  // React-`cache()`-wrapped (src/lib/queries.ts) — the app-shell layout
+  // already calls this once per request for the account menu, so this is a
+  // cache hit, not a second round trip (see PERFORMANCE.md).
+  const me = await getCurrentBd();
 
   if (!company) {
     return (
@@ -153,6 +158,8 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           city={company.city}
           country={company.country}
           ownerOptions={ownerOptions}
+          assigneeOptions={ownerOptions}
+          meId={me.id}
           lastEditByProperty={lastEditByProperty}
           startupText={startupLabel(hiring, l.startupYes, l.startupNo)}
           accountTypeText={accountTypeLabel(company.accountType, l)}
