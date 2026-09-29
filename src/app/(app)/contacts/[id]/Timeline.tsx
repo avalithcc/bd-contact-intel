@@ -15,6 +15,7 @@ import {
 import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
+import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
 import { groupEmailThreads } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
 import { useToast } from "@/components/ToastProvider";
@@ -30,6 +31,7 @@ import {
   TasksIcon,
 } from "@/components/icons";
 import { CompleteTaskButton } from "./CompleteTaskButton";
+import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
 import { getTimelinePillEntriesAction } from "../actions";
 import styles from "./page.module.css";
@@ -37,7 +39,10 @@ import styles from "./page.module.css";
 export interface TimelineTask {
   id: string;
   title: string;
+  status: "open" | "done";
   dueAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
   assignedToName: string | null;
 }
 
@@ -64,8 +69,23 @@ export interface TimelineProps {
   // by the query's `limit` — see getPersonTimeline) — the ground truth the
   // client compares its own loaded pool against (isPillSelectionComplete).
   countsByType: Record<string, number>;
-  activePill?: TimelinePillKey;
-  openTasks: TimelineTask[];
+  // `"task"` (contact-record.html:104's "Tareas" pill) is never a real
+  // `TimelinePillKey` — see the doc comment on @/lib/activity/timelinePills —
+  // it only ever comes from page.tsx's own `?activityType=task` deep-link
+  // check, never from `getPersonTimeline`'s filter.
+  activePill?: TimelinePillKey | "task";
+  // Every open-or-done task for this Contact that FIT the bounded reads
+  // behind getTasksForPerson (src/lib/tasks/queries.ts — open capped at 50,
+  // done at 20) — the "Próximas" bucket below filters this down to
+  // `status === "open"` itself (unchanged behavior); the "Tareas" pill uses
+  // the full array via sortTasksForTimelinePill.
+  tasks: TimelineTask[];
+  // TRUE count of open+done tasks (cancelled excluded), never capped by
+  // `tasks`' own bounded reads — same "never capped" contract as
+  // `countsByType` above. Drives the Tareas pill's own badge AND the part of
+  // "Todo"'s total that accounts for tasks (getTasksForPerson's
+  // openCount+doneCount).
+  taskTotalCount: number;
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
@@ -141,7 +161,7 @@ const PILL_ICON: Record<TimelinePillKey, (props: { className?: string }) => Reac
   system: HistoryIcon,
 };
 
-function filterHref(personId: string, pill?: TimelinePillKey): string {
+function filterHref(personId: string, pill?: TimelinePillKey | "task"): string {
   return pill ? `/contacts/${personId}?activityType=${pill}#activity` : `/contacts/${personId}#activity`;
 }
 
@@ -197,15 +217,26 @@ export function Timeline({
   entries,
   countsByType,
   activePill,
-  openTasks,
+  tasks,
+  taskTotalCount,
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
   const { showToast } = useToast();
+  // "task" (the Tareas pill) is never a real activity scope for the
+  // cache/fetch engine below — it's tracked entirely by `isTasksActive`
+  // instead, since its data (`tasks`) is always fully loaded already, never
+  // fetched. `activityPillOf` strips it before feeding the engine.
+  function activityPillOf(pill: TimelinePillKey | "task" | undefined): TimelinePillKey | undefined {
+    return pill === "task" ? undefined : pill;
+  }
   const [cache, setCache] = useState<Partial<Record<TimelineScope, TimelineEntry[]>>>(() => ({
-    [scopeOf(activePill)]: entries,
+    [scopeOf(activityPillOf(activePill))]: entries,
   }));
-  const [activeScope, setActiveScope] = useState<TimelineScope>(() => scopeOf(activePill));
+  const [activeScope, setActiveScope] = useState<TimelineScope>(() => scopeOf(activityPillOf(activePill)));
+  const [isTasksActive, setIsTasksActive] = useState(activePill === "task");
+  const isTasksActiveRef = useRef(isTasksActive);
+  isTasksActiveRef.current = isTasksActive;
   const [pendingScope, setPendingScope] = useState<TimelineScope | null>(null);
   // Guards the reset effect below against firing redundantly on mount (the
   // `useState` initializers above already seed the right state for the
@@ -231,7 +262,7 @@ export function Timeline({
     generationRef.current += 1;
   }
 
-  function syncScopeUrl(pill: TimelinePillKey | undefined) {
+  function syncScopeUrl(pill: TimelinePillKey | "task" | undefined) {
     if (typeof window === "undefined") return;
     // Raw History API, not `router.push`/`router.replace` — deliberate:
     // 1) `replaceState`, not `pushState` — a filter pill is not a new place
@@ -327,7 +358,20 @@ export function Timeline({
     bumpGeneration();
     setPendingScope(null);
 
-    const serverScope = scopeOf(activePill);
+    const serverScope = scopeOf(activityPillOf(activePill));
+
+    // The Tareas pill never depends on `entries`/`cache` at all — it always
+    // reads the fresh `tasks` prop directly (see the render below) — so a
+    // background refresh (e.g. completing/reopening a task while THIS pill
+    // is the one on screen) only needs to keep the activity cache warm for
+    // whenever the BD leaves it, and to re-assert the URL the server's own
+    // (activity-only) `activePill` may have reverted.
+    if (isTasksActiveRef.current) {
+      setCache((prev) => ({ ...prev, [serverScope]: entries }));
+      syncScopeUrl("task");
+      return;
+    }
+
     const targetScope = activeScopeRef.current;
     const targetPill = targetScope === ALL_SCOPE ? undefined : targetScope;
 
@@ -368,7 +412,9 @@ export function Timeline({
 
   function selectPill(pill: TimelinePillKey | undefined) {
     const scope = scopeOf(pill);
-    if (scope === activeScope) return;
+    const leavingTasksPill = isTasksActive;
+    if (scope === activeScope && !leavingTasksPill) return;
+    setIsTasksActive(false);
     // Every branch below moves the active scope away from whatever it was —
     // including the cache-hit/local-derive ones that never call
     // `fetchScope` at all — so this must supersede any fetch already in
@@ -379,6 +425,11 @@ export function Timeline({
     // path.
     bumpGeneration();
     syncScopeUrl(pill);
+
+    // Coming FROM the Tareas pill back to an activity scope that's already
+    // cached (the common case — nothing about the activity pool changed
+    // while Tareas was on screen) needs no re-derivation at all.
+    if (scope === activeScope) return;
 
     const cached = cache[scope];
     if (cached) {
@@ -397,16 +448,42 @@ export function Timeline({
     fetchScope(pill, scope);
   }
 
+  /**
+   * "Tareas" pill (mockup-port timeline-tasks-pill; contact-record.html:104)
+   * — always a pure client-side switch, never a fetch: `tasks` (open + done)
+   * is already fully loaded in `props` (see TimelineProps' doc comment), the
+   * same way the "Próximas" bucket below has always rendered straight from
+   * props with no cache/fetch machinery of its own.
+   */
+  function selectTasksPill() {
+    if (isTasksActive) return;
+    setIsTasksActive(true);
+    syncScopeUrl("task");
+  }
+
   function handlePillClick(e: React.MouseEvent<HTMLAnchorElement>, pill: TimelinePillKey | undefined) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     selectPill(pill);
   }
 
+  function handleTasksPillClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    selectTasksPill();
+  }
+
   const displayedEntries = cache[activeScope] ?? entries;
   const activePillNow = activeScope === ALL_SCOPE ? undefined : activeScope;
-  const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-  const showMergeCard = !activePillNow && mergeInfo && mergeInfo.unifiedFromCount > 1;
+  // "Todo" totals every activity type PLUS every task (open + done) — the
+  // mockup's own arithmetic pins this: contact-record.html:98's "Todo 15"
+  // equals the sum of every OTHER pill's own count on that same screen
+  // (3+1+2+4+0+2+3, including "Tareas 2"), not just the activity types.
+  // `taskTotalCount`, not `tasks.length` — `tasks` is the bounded rows array
+  // (getTasksForPerson caps open at 50, done at 20); `taskTotalCount` is the
+  // true, never-capped total, same invariant `countsByType` already holds.
+  const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0) + taskTotalCount;
+  const showMergeCard = !isTasksActive && !activePillNow && mergeInfo && mergeInfo.unifiedFromCount > 1;
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
   // `displayedEntries` BEFORE merging in the merge synthetic entry, so
@@ -436,36 +513,101 @@ export function Timeline({
       ? [{ id: "merge-unified", type: MERGE_UNIFIED_TYPE, createdAt: mergeInfo!.at, metadata: null }]
       : []),
   ]);
-  const upcoming = upcomingTasks(openTasks);
+  const openTasksForUpcoming = tasks.filter((t) => t.status === "open");
+  const upcoming = upcomingTasks(openTasksForUpcoming);
+  const sortedTasksForPill = sortTasksForTimelinePill(tasks);
+  const openTasksForPill = sortedTasksForPill.filter((t) => t.status === "open");
+  const doneTasksForPill = sortedTasksForPill.filter((t) => t.status === "done");
+  // Pills that group `activity` rows, minus "Sistema" — rendered before the
+  // Tareas pill so Tareas can sit right where contact-record.html:104 puts
+  // it: after Reuniones, before Sistema.
+  const activityPillsBeforeTasks = TIMELINE_PILL_KEYS.filter((pill) => pill !== "system");
+
+  /**
+   * One open-task card — identical markup for the "Próximas" bucket
+   * (visible regardless of the active pill) and the Tareas pill's own open
+   * group (review fix: these two used to be hand-duplicated JSX blocks that
+   * had to be kept in sync by hand).
+   */
+  function renderOpenTaskCard(t: TimelineTask) {
+    return (
+      <div key={t.id} className="tl-item">
+        <div className="tl-icon">
+          <TasksIcon className="icon" />
+        </div>
+        <div className="tl-card">
+          <div className="tl-head">
+            <span className="what">{t.title}</span>
+            {t.dueAt && (
+              <span className="badge badge-warn no-dot">
+                {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
+              </span>
+            )}
+            {t.assignedToName && (
+              <span className="when">
+                {l.timelineAssignedToPrefix} {t.assignedToName}
+              </span>
+            )}
+          </div>
+          <div className="row mt-lg">
+            <CompleteTaskButton
+              taskId={t.id}
+              personId={personId}
+              label={l.taskMarkDone}
+              errorLabel={l.genericError}
+            />
+            {/* Mockup itself has no wired destination for "Reprogramar"
+                (contact-record.html:111) — kept inert rather than inventing
+                an unspec'd reschedule flow. */}
+            <button type="button" className="btn btn-ghost btn-sm" disabled>
+              {l.taskReschedule}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderActivityPill(pill: TimelinePillKey) {
+    const Icon = PILL_ICON[pill];
+    return (
+      <Link
+        key={pill}
+        href={filterHref(personId, pill)}
+        className={!isTasksActive && activePillNow === pill ? "filter-pill on" : "filter-pill"}
+        onClick={(e) => handlePillClick(e, pill)}
+        aria-current={!isTasksActive && activePillNow === pill ? "true" : undefined}
+      >
+        <Icon className="icon" />
+        {l[PILL_LABEL_KEY[pill]] as string} <span className="n">{sumPillCount(countsByType, pill)}</span>
+        {pendingScope === pill && <span className="spinner" aria-hidden="true" />}
+      </Link>
+    );
+  }
 
   return (
     <div>
       <div className="timeline-toolbar" role="group" aria-label={l.timelineFilterGroupLabel} aria-busy={pendingScope !== null}>
         <Link
           href={filterHref(personId)}
-          className={activePillNow ? "filter-pill" : "filter-pill on"}
+          className={!isTasksActive && !activePillNow ? "filter-pill on" : "filter-pill"}
           onClick={(e) => handlePillClick(e, undefined)}
-          aria-current={activePillNow ? undefined : "true"}
+          aria-current={!isTasksActive && !activePillNow ? "true" : undefined}
         >
           {l.timelineFilterAll} <span className="n">{total}</span>
           {pendingScope === ALL_SCOPE && <span className="spinner" aria-hidden="true" />}
         </Link>
-        {TIMELINE_PILL_KEYS.map((pill) => {
-          const Icon = PILL_ICON[pill];
-          return (
-            <Link
-              key={pill}
-              href={filterHref(personId, pill)}
-              className={activePillNow === pill ? "filter-pill on" : "filter-pill"}
-              onClick={(e) => handlePillClick(e, pill)}
-              aria-current={activePillNow === pill ? "true" : undefined}
-            >
-              <Icon className="icon" />
-              {l[PILL_LABEL_KEY[pill]] as string} <span className="n">{sumPillCount(countsByType, pill)}</span>
-              {pendingScope === pill && <span className="spinner" aria-hidden="true" />}
-            </Link>
-          );
-        })}
+        {activityPillsBeforeTasks.map(renderActivityPill)}
+        <Link
+          href={filterHref(personId, "task")}
+          className={isTasksActive ? "filter-pill on" : "filter-pill"}
+          onClick={handleTasksPillClick}
+          aria-current={isTasksActive ? "true" : undefined}
+        >
+          <TasksIcon className="icon" />
+          {l.timelinePillTasks} <span className="n">{taskTotalCount}</span>
+        </Link>
+        {renderActivityPill("system")}
         <span className="grow" />
         {/* Static — the record's timeline has exactly one sort order today
             (newest-first per bucket); no toggle exists to switch it, same as
@@ -477,54 +619,67 @@ export function Timeline({
 
       <NoteComposer personId={personId} labels={l} />
 
-      {upcoming.length > 0 && (
+      {isTasksActive ? (
         <>
-          <div className="tl-group">{l.timelineGroupUpcoming}</div>
-          <div className="tl">
-            {upcoming.map((t) => (
-              <div key={t.id} className="tl-item">
-                <div className="tl-icon">
-                  <TasksIcon className="icon" />
-                </div>
-                <div className="tl-card">
-                  <div className="tl-head">
-                    <span className="what">{t.title}</span>
-                    {t.dueAt && (
-                      <span className="badge badge-warn no-dot">
-                        {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
-                      </span>
-                    )}
-                    {t.assignedToName && (
-                      <span className="when">
-                        {l.timelineAssignedToPrefix} {t.assignedToName}
-                      </span>
-                    )}
+          {openTasksForPill.length === 0 && doneTasksForPill.length === 0 ? (
+            <div className={styles.placeholder}>{l.timelineTasksEmpty}</div>
+          ) : (
+            <>
+              {openTasksForPill.length > 0 && (
+                <>
+                  <div className="tl-group">{l.timelineGroupUpcoming}</div>
+                  <div className="tl">{openTasksForPill.map(renderOpenTaskCard)}</div>
+                </>
+              )}
+              {doneTasksForPill.length > 0 && (
+                <>
+                  <div className="tl-group">{l.timelineGroupCompletedTasks}</div>
+                  <div className="tl">
+                    {doneTasksForPill.map((t) => (
+                      <div key={t.id} className="tl-item">
+                        <div className="tl-icon">
+                          <TasksIcon className="icon" />
+                        </div>
+                        <div className="tl-card">
+                          <div className="tl-head">
+                            <span className="what">{t.title}</span>
+                            <span className="badge badge-neutral no-dot">{l.taskStatusDone}</span>
+                            {t.assignedToName && (
+                              <span className="when">
+                                {l.timelineAssignedToPrefix} {t.assignedToName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="row mt-lg">
+                            <ReopenTaskButton
+                              taskId={t.id}
+                              personId={personId}
+                              label={l.taskReopen}
+                              errorLabel={l.genericError}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="row mt-lg">
-                    <CompleteTaskButton
-                      taskId={t.id}
-                      personId={personId}
-                      label={l.taskMarkDone}
-                      errorLabel={l.genericError}
-                    />
-                    {/* Mockup itself has no wired destination for
-                        "Reprogramar" (contact-record.html:111) — kept inert
-                        rather than inventing an unspec'd reschedule flow. */}
-                    <button type="button" className="btn btn-ghost btn-sm" disabled>
-                      {l.taskReschedule}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                </>
+              )}
+            </>
+          )}
         </>
-      )}
-
-      {displayedEntries.length === 0 && upcoming.length === 0 ? (
-        <div className={styles.placeholder}>{l.timelineEmpty}</div>
       ) : (
-        groups.map((group, i) => (
+        <>
+          {upcoming.length > 0 && (
+            <>
+              <div className="tl-group">{l.timelineGroupUpcoming}</div>
+              <div className="tl">{upcoming.map(renderOpenTaskCard)}</div>
+            </>
+          )}
+
+          {displayedEntries.length === 0 && upcoming.length === 0 ? (
+            <div className={styles.placeholder}>{l.timelineEmpty}</div>
+          ) : (
+            groups.map((group, i) => (
           <div key={`${group.kind}-${group.monthKey}-${i}`}>
             <div className="tl-group">
               {group.kind === "pre-migration" ? l.timelineGroupPreMigration : monthLabel(group.items[0].at)}
@@ -631,6 +786,8 @@ export function Timeline({
             </div>
           </div>
         ))
+          )}
+        </>
       )}
     </div>
   );

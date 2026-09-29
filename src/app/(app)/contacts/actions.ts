@@ -10,7 +10,8 @@ import { changeContactCompany } from "@/lib/contacts/companyChangeDb";
 import { searchContactCompanies } from "@/lib/contacts/companySearchDb";
 import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
 import { createActivityAction } from "@/app/activity/actions";
-import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
+import { createTaskAction } from "@/app/(app)/tasks/actions";
+import { setTaskStatusForPerson } from "@/lib/tasks/queries";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
@@ -200,15 +201,40 @@ export async function addContactTaskAction(
 
 /**
  * "Marcar como hecha" on a record-page timeline/right-panel task row
- * (mockup-port r03/r05; contact-record.html:111/181). Thin wrapper over the
- * existing `completeTaskAction` (src/app/(app)/tasks/actions.ts) — same
- * write, same semantics — that additionally revalidates this Contact's own
- * page, since `completeTaskAction` itself only revalidates /tasks, /leads,
- * /companies (it has no personId to revalidate with).
+ * (mockup-port r03/r05; contact-record.html:111/181).
+ *
+ * Bug fix (review, timeline-tasks-pill): this used to call the generic
+ * `completeTaskAction(taskId)` — a plain `WHERE id = taskId` update with no
+ * check that the task actually belonged to `personId`, so any signed-in BD
+ * could complete (or, via `reopenContactTaskAction` below, reopen) ANY task
+ * by putting its id in the URL of a Contact it had nothing to do with. Now:
+ * `assertContactEditableById` first, same guard every other write in this
+ * file already runs; then `setTaskStatusForPerson` (src/lib/tasks/queries.ts),
+ * which enforces the ownership check IN the write's own `WHERE` clause
+ * (`id = taskId AND person_id = personId`), not as a separate read — a task
+ * that exists but belongs to someone else throws the same
+ * `TaskNotFoundError` (-> "not_found") a genuinely missing task would.
  */
 export async function completeContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
   try {
-    await completeTaskAction(taskId);
+    await assertContactEditableById(personId);
+    await setTaskStatusForPerson(taskId, personId, "done");
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * "Reabrir" on the record page's "Tareas" filter pill (mockup-port
+ * timeline-tasks-pill) — the reopen counterpart of
+ * `completeContactTaskAction` above, same fix and same reasoning.
+ */
+export async function reopenContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    await setTaskStatusForPerson(taskId, personId, "open");
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
@@ -10,6 +10,8 @@ import type { TaskSubjectInput } from "@/lib/tasks/subject";
 // see that file's doc comment for why (src/app/(app)/contacts/actionErrors.ts
 // is unit-tested without a database and must not transitively import `db`).
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
+import { TaskNotFoundError } from "@/lib/tasks/errors";
+import { combineOpenAndDoneTasks } from "@/lib/contacts/timelineTasks";
 
 export interface TaskFilters {
   leadId?: string;
@@ -182,17 +184,190 @@ export async function getTaskViewCounts(bdId: string): Promise<TaskViewCounts> {
   };
 }
 
+const OPEN_TASKS_FOR_PERSON_LIMIT = 50;
+const DONE_TASKS_FOR_PERSON_LIMIT = 20;
+
+export interface TasksForPerson {
+  /** Open tasks first (their existing order), then done tasks — see
+   * `combineOpenAndDoneTasks` (@/lib/contacts/timelineTasks). */
+  rows: TaskRow[];
+  /** TRUE count of this Contact's open tasks, never capped by
+   * `OPEN_TASKS_FOR_PERSON_LIMIT` — see the `count(*) over ()` doc comment
+   * below. */
+  openCount: number;
+  /** Same guarantee as `openCount`, for done tasks. */
+  doneCount: number;
+}
+
+/** Raw shape of one row from `getTasksForPerson`'s window-function query —
+ * `TaskRow`'s columns plus the two window values that never reach the
+ * caller. Dates come back as `Date | string` because raw `db.execute`
+ * bypasses drizzle's column mappers (same rule `getSyncStatus`,
+ * @/lib/whatsnew/queries.ts, already documents) — `toTaskRow` below
+ * normalizes both to `Date`. */
+type TaskWindowRow = {
+  id: string;
+  leadId: string | null;
+  companyKey: string | null;
+  contactId: string | null;
+  personId: string | null;
+  actorBdId: string | null;
+  assignedToBdId: string | null;
+  title: string;
+  description: string | null;
+  status: string;
+  dueAt: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  assignedToName: string | null;
+  subjectPersonFirstName: string | null;
+  subjectPersonLastName: string | null;
+  subjectPersonCompany: string | null;
+  subjectCompanyName: string | null;
+  /** 1-based rank within this row's own `status` partition, per-status
+   * order (open: due_at asc nulls last, created_at desc; done: updated_at
+   * desc) — used only to re-sort each status group after the fetch, then
+   * discarded. */
+  rn: number;
+  /** TRUE row count of this row's `status` partition, unaffected by the
+   * `rn <=` filter below — see `openCount`/`doneCount` on `TasksForPerson`. */
+  statusCount: number;
+};
+
+/** Every task timestamp column is `timestamp without time zone` holding UTC,
+ * and raw `db.execute` returns it as an offset-less string. `new Date()`
+ * would read that in the process's local timezone, so an offset-less value is
+ * pinned to UTC explicitly, matching drizzle's own column mapper. */
+function toDate(value: Date | string): Date {
+  if (value instanceof Date) return value;
+  const hasOffset = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/.test(value);
+  return new Date(hasOffset ? value : `${value.replace(" ", "T")}Z`);
+}
+
+function toTaskRow(row: TaskWindowRow): TaskRow {
+  return {
+    id: row.id,
+    leadId: row.leadId,
+    companyKey: row.companyKey,
+    contactId: row.contactId,
+    personId: row.personId,
+    actorBdId: row.actorBdId,
+    assignedToBdId: row.assignedToBdId,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    dueAt: row.dueAt ? toDate(row.dueAt) : null,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
+    assignedToName: row.assignedToName,
+    subjectPersonFirstName: row.subjectPersonFirstName,
+    subjectPersonLastName: row.subjectPersonLastName,
+    subjectPersonCompany: row.subjectPersonCompany,
+    subjectCompanyName: row.subjectCompanyName,
+  };
+}
+
 /**
- * Open tasks for one Contact (mockup-port r03/r05; contact-record.html's
- * "Próximas" timeline bucket + right-panel "Tareas" card). Bounded to a
- * single `personId` — no pagination needed, a Contact realistically has a
- * handful of open tasks at most.
+ * Every open-or-done task for one Contact (mockup-port r03/r05 +
+ * timeline-tasks-pill; contact-record.html's "Próximas" timeline bucket,
+ * right-panel "Tareas" card, and the Actividad tab's "Tareas" filter pill —
+ * contact-record.html:104). `page.tsx` filters `rows` down to
+ * `status === "open"` for the first two (unchanged behavior); Timeline.tsx
+ * uses the full `rows` array (open + done) for the pill, and `openCount`/
+ * `doneCount` for its "never capped" pill/Todo totals (see the doc comment
+ * on `TimelineProps.countsByType`, Timeline.tsx). `cancelled` tasks are
+ * excluded from all three — neither the "Próximas" bucket, the right-panel
+ * card, nor the Tareas pill has ever shown them.
+ *
+ * ONE round trip (review fix: an earlier version of this fix used two
+ * queries via `Promise.all` — correct, but 2 round trips against a prod
+ * pool of `max: 3` on a page whose `Promise.all` already runs 3 other
+ * queries concurrently is exactly the pressure PERFORMANCE.md:26/:45 warns
+ * against: `Promise.all` reorders round trips, it does not remove them).
+ * A single raw-SQL query instead, using `row_number() over (partition by
+ * status order by ...)` to rank each status's rows in ITS OWN per-status
+ * order (open: due_at asc nulls last, created_at desc; done: updated_at
+ * desc — the exact orders the old two `ORDER BY`s used) and `count(*) over
+ * (partition by status)` for that status's TRUE total — both BEFORE any
+ * `LIMIT`/filter applies, so `openCount`/`doneCount` are exact regardless of
+ * the `rn <=` cutoffs below. An outer `WHERE rn <= N` (N per status) is
+ * `getTasksForPerson`'s SQL-level version of `combineOpenAndDoneTasks`'s
+ * guarantee: because open and done are independent PARTITIONs, a done row's
+ * rank can never affect an open row's rank or its cutoff — one shared
+ * `LIMIT` (the original bug) is exactly what a `partition by status` window
+ * makes impossible.
+ *
+ * Column names are written as literal, already-qualified SQL text
+ * (`task.due_at`, not `${task.dueAt}`) rather than interpolating drizzle's
+ * `Column` objects — `task.status`/`task.due_at`/`task.created_at`/
+ * `task.updated_at` each appear more than once in this query (SELECT,
+ * PARTITION BY, ORDER BY), and PERFORMANCE.md documents a Drizzle 0.36.4
+ * bug where reusing a `Column` reference already used as a bare `.select()`
+ * target elsewhere in the same query, by interpolating it again, silently
+ * re-emits its FIRST (here: unqualified) rendering instead of re-qualifying
+ * it for wherever it's reused — safe with plain literal SQL text instead,
+ * which is never rendered by drizzle at all. Only actual VALUES
+ * (`personId`, the two limits) are `${}`-interpolated, as bound parameters,
+ * never column identifiers.
+ *
+ * `combineOpenAndDoneTasks` (@/lib/contacts/timelineTasks) still does the
+ * final open-then-done concatenation, unchanged — this function only
+ * changed HOW the two groups are fetched (one query instead of two), not
+ * the shape it hands them off in.
  */
-export async function getOpenTasksForPerson(personId: string, limit: number = 50): Promise<TaskRow[]> {
-  return baseTaskSubjectQuery()
-    .where(and(eq(task.personId, personId), eq(task.status, "open")))
-    .orderBy(asc(task.dueAt), desc(task.createdAt))
-    .limit(limit);
+export async function getTasksForPerson(personId: string): Promise<TasksForPerson> {
+  const rawRows = await db.execute<TaskWindowRow>(sql`
+    with ranked as (
+      select
+        task.id as "id",
+        task.lead_id as "leadId",
+        task.company_key as "companyKey",
+        task.contact_id as "contactId",
+        task.person_id as "personId",
+        task.actor_bd_id as "actorBdId",
+        task.assigned_to_bd_id as "assignedToBdId",
+        task.title as "title",
+        task.description as "description",
+        task.status as "status",
+        task.due_at as "dueAt",
+        task.created_at as "createdAt",
+        task.updated_at as "updatedAt",
+        bd.name as "assignedToName",
+        person.first_name as "subjectPersonFirstName",
+        person.last_name as "subjectPersonLastName",
+        person.company as "subjectPersonCompany",
+        company.display_name as "subjectCompanyName",
+        (row_number() over (
+          partition by task.status
+          order by
+            case when task.status = 'open' then task.due_at end asc nulls last,
+            case when task.status = 'open' then task.created_at end desc,
+            case when task.status = 'done' then task.updated_at end desc
+        ))::int as "rn",
+        (count(*) over (partition by task.status))::int as "statusCount"
+      from task
+      left join bd on bd.id = task.assigned_to_bd_id
+      left join person on person.id = task.person_id
+      left join company on company.company_key = task.company_key
+      where task.person_id = ${personId} and task.status in ('open', 'done')
+    )
+    select * from ranked
+    where (status = 'open' and rn <= ${OPEN_TASKS_FOR_PERSON_LIMIT})
+       or (status = 'done' and rn <= ${DONE_TASKS_FOR_PERSON_LIMIT})
+    order by rn
+  `);
+
+  const byRn = (a: TaskWindowRow, b: TaskWindowRow) => a.rn - b.rn;
+  const openRows = rawRows.filter((r) => r.status === "open").sort(byRn).map(toTaskRow);
+  const doneRows = rawRows.filter((r) => r.status === "done").sort(byRn).map(toTaskRow);
+  const openCount = rawRows.find((r) => r.status === "open")?.statusCount ?? 0;
+  const doneCount = rawRows.find((r) => r.status === "done")?.statusCount ?? 0;
+
+  return {
+    rows: combineOpenAndDoneTasks(openRows, doneRows),
+    openCount,
+    doneCount,
+  };
 }
 
 /**
@@ -298,6 +473,15 @@ export async function createTask(input: NewTask): Promise<Task> {
  * Re-resolves `person_id` when the update itself changes the task's subject
  * (design "Reference writes": "`updateTask` re-resolves on subject change").
  * Untouched otherwise, so a plain status/title update never re-queries.
+ *
+ * Bug fix (review): `.returning()` on a `WHERE id = taskId` that matches
+ * nothing (task already deleted, or a bad id) used to return an empty array,
+ * and the old `row!` non-null assertion turned that into `undefined` silently
+ * reported as a successful `Task` to every caller. Now throws
+ * `TaskNotFoundError` instead — callers that don't already handle it (see
+ * `completeTask`/`setTaskStatusForPerson` below, and every server action that
+ * wraps them) surface it as a thrown rejection, same as any other typed task
+ * error in this file.
  */
 export async function updateTask(taskId: string, updates: Partial<NewTask>): Promise<Task> {
   const lookup =
@@ -309,11 +493,38 @@ export async function updateTask(taskId: string, updates: Partial<NewTask>): Pro
       ? { ...updates, personId: personIdLookupSql(lookup), updatedAt: new Date() }
       : { ...updates, updatedAt: new Date() };
   const [row] = await db.update(task).set(set).where(eq(task.id, taskId)).returning();
-  return row!;
+  if (!row) throw new TaskNotFoundError();
+  return row;
 }
 
 export async function completeTask(taskId: string): Promise<Task> {
   return updateTask(taskId, { status: "done" });
+}
+
+/**
+ * Ownership-scoped task status write (review fix, timeline-tasks-pill):
+ * `completeContactTaskAction`/`reopenContactTaskAction` (contacts/actions.ts)
+ * used to update a task by `id` alone — no check that it actually belonged
+ * to the `personId` the caller claimed, so any signed-in BD could complete
+ * or reopen ANY task by guessing/copying its id into the wrong Contact's
+ * page. The ownership check is part of the write itself
+ * (`WHERE id = taskId AND person_id = personId`), not a separate read-then-
+ * write — a row that exists but belongs to a different person never matches
+ * and throws the same `TaskNotFoundError` as a genuinely missing task
+ * (never let a caller distinguish the two — see that error's doc comment).
+ */
+export async function setTaskStatusForPerson(
+  taskId: string,
+  personId: string,
+  status: "open" | "done",
+): Promise<Task> {
+  const [row] = await db
+    .update(task)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(task.id, taskId), eq(task.personId, personId)))
+    .returning();
+  if (!row) throw new TaskNotFoundError();
+  return row;
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

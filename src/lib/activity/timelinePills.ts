@@ -9,9 +9,17 @@
  * outranks real BD activity in the UI.
  *
  * No LinkedIn pill: LinkedIn ingestion is off (see chore/hide-linkedin-
- * imports) and this module doesn't reintroduce it. No Tareas pill: tasks
- * aren't timeline `activity` rows today — a separate feature, out of scope
- * here.
+ * imports) and this module doesn't reintroduce it.
+ *
+ * No "task" entry here either, even though the record page's Actividad tab
+ * DOES have a "Tareas" pill (mockup-port timeline-tasks-pill;
+ * contact-record.html:104): a task is never an `activity` row, so it has no
+ * `activity.type` to group and no place in `TIMELINE_PILL_GROUPS`. Timeline.tsx
+ * handles that pill entirely on its own — it always holds the Contact's full
+ * task list already (`getTasksForPerson`, src/lib/tasks/queries.ts, fetched
+ * once in page.tsx's initial `Promise.all`, same round trip that used to
+ * fetch open-only tasks), so selecting it is a pure client-side switch, never
+ * a fetch through this module's `TimelinePillKey` machinery.
  *
  * Deliberately has ZERO imports from @/lib/activity/queries (which imports
  * @/db) so this stays a pure, DB-free module a plain `node:test` file can
