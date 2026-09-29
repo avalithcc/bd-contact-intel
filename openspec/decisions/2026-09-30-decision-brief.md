@@ -7,8 +7,24 @@ Prepared 2026-09-30. Analysis only — no application code, no production writes
 | # | Decision | Status |
 | --- | --- | --- |
 | 1 | Follow-up cadence | **Decided 2026-09-29** — see below |
-| 2 | Default pipeline stage | Pending |
+| 2 | Default pipeline stage | **Decided 2026-09-29** — see below |
 | 3 | Email enrichment | Pending |
+
+### 2. Default pipeline stage — decided
+
+This is a one-time default, written only where `relationship_stage` is null. It never overwrites a stage a BD has set.
+
+1. `account_type = 'client'` → `won`
+2. `account_type = 'partner'` → `qualified`
+3. Otherwise, if at least one contact is `replied` or `meeting` **and** has an effective last touch within the last 12 months → `qualified`
+4. Otherwise → `prospect`
+
+The 12-month window replaces the brief's "replied anywhere" rule. A reply from years ago may have been a "no", and the window matches the follow-up cadence. Measured 2026-09-29 in a read-only transaction with `TZ=UTC`:
+
+| Rule | Won | Qualified | Prospect |
+| --- | ---: | ---: | ---: |
+| Reply at any time (brief) | 2 | 2,209 | 12,044 |
+| **Reply within 12 months (decided)** | 2 | **831** | 13,422 |
 
 ### 1. Follow-up cadence — decided
 
