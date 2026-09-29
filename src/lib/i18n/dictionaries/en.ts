@@ -851,19 +851,13 @@ export const en = {
 
   login: {
     title: "sign in",
-    signUpIntro: "New here?",
-    signUpHintPrefix: "Create an account with your ",
-    signUpHintSuffix: " email.",
     workEmail: "Work email",
     password: "Password",
     signIn: "Sign in",
-    createAccount: "Create account",
     enterEmailPassword: "Enter your email and password first.",
-    domainRestricted: (domain: string) => `Accounts are limited to ${domain} emails.`,
-    passwordTooShort: "Use at least 8 characters for your password.",
-    accountCreated: "Account created. Check your inbox to confirm, then sign in.",
     forgotPasswordLink: "Forgot your password?",
     expiredLinkError: "That link expired or is invalid. Request a new one.",
+    notAuthorizedError: "This account can't sign in here. Ask an administrator for access.",
   },
 
   forgotPassword: {

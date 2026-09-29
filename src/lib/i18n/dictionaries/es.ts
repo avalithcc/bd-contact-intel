@@ -752,19 +752,13 @@ export const es: typeof en = {
 
   login: {
     title: "iniciar sesión",
-    signUpIntro: "¿Primera vez aquí?",
-    signUpHintPrefix: "Crea una cuenta con tu correo ",
-    signUpHintSuffix: ".",
     workEmail: "Correo de trabajo",
     password: "Contraseña",
     signIn: "Iniciar sesión",
-    createAccount: "Crear cuenta",
     enterEmailPassword: "Ingresa tu correo y contraseña primero.",
-    domainRestricted: (domain) => `Las cuentas están limitadas a correos ${domain}.`,
-    passwordTooShort: "Usa al menos 8 caracteres para tu contraseña.",
-    accountCreated: "Cuenta creada. Revisa tu bandeja de entrada para confirmar y luego inicia sesión.",
     forgotPasswordLink: "¿Olvidaste tu contraseña?",
     expiredLinkError: "El enlace venció o no es válido. Solicitá uno nuevo.",
+    notAuthorizedError: "Esta cuenta no puede iniciar sesión aquí. Pídele acceso a un administrador.",
   },
 
   forgotPassword: {

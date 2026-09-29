@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { and, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -29,11 +30,23 @@ import {
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
+import { isAllowedWorkEmail } from "@/lib/auth/allowedEmail";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
  * `bd` row on first sign-in. Callers run behind middleware that redirects
  * unauthenticated requests to /login, so a missing user is an error here.
+ *
+ * Defense in depth: the middleware session gate (src/lib/supabase/middleware.ts)
+ * is the primary place a disallowed or unconfirmed session gets signed out and
+ * redirected — but this function must never rely on that alone (a live
+ * incident happened because a client-only check was the ONLY check). So it
+ * re-checks the same two conditions here and — like middleware — never
+ * returns a `bd` row or leaks account state for a session that fails them:
+ * a disallowed domain or an unconfirmed email redirects to /login instead of
+ * throwing, so it doesn't fall through to the generic error boundary (which
+ * would just be a confusing dead end for someone who should never have had a
+ * session to begin with).
  *
  * Wrapped in React `cache` so the app-shell layout and the page it renders
  * share one auth lookup + query per request instead of repeating them.
@@ -44,6 +57,16 @@ export const getCurrentBd = cache(async function getCurrentBd() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) throw new Error("Not authenticated");
+
+  if (!isAllowedWorkEmail(user.email) || !user.email_confirmed_at) {
+    // Best-effort: clears cookies when called from a Server Action or Route
+    // Handler; a no-op when called from a Server Component (cookies() is
+    // read-only there — see src/lib/supabase/server.ts). Either way the
+    // redirect below still prevents a `bd` row or any account data being
+    // returned to this session.
+    await supabase.auth.signOut();
+    redirect("/login?error=not_authorized");
+  }
 
   const existing = await db.query.bd.findFirst({
     where: eq(bd.email, user.email),
