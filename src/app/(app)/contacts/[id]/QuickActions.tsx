@@ -16,10 +16,7 @@ import {
 import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
-import { GenerateMessageButton } from "@/app/(app)/outreach/GenerateMessageButton";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
-import { splitEmailDraft } from "@/lib/outreach/emailDraftFormat";
-import type { GenerateOutreachMessageResult } from "@/app/(app)/outreach/actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { Locale } from "@/lib/i18n/locales";
 import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
@@ -46,9 +43,10 @@ export interface QuickActionsProps {
   name: string;
   labels: ContactRecordLabels;
   email: string | null;
-  // "Generar mensaje" (task 13.3) reuses /outreach's GenerateMessageButton —
-  // needs its own ClientStrings-safe labels slice and the record page's
-  // (Spanish-only) locale fallback, same as /outreach and /whats-new.
+  // "Generar mensaje" / "Redactar con IA" (both open GenerateMessageDialog,
+  // task 13.3) — needs its own ClientStrings-safe labels slice and the
+  // record page's (Spanish-only) locale fallback, same as /outreach and
+  // /whats-new.
   messageLabels: GenerateMessageLabels;
   locale: Locale;
   // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
@@ -138,15 +136,36 @@ export function QuickActions({
   const [openAction, setOpenAction] = useState<QuickAction>(initialAction ?? null);
   const [error, setError] = useState<ActionError | null>(null);
   const [busy, setBusy] = useState(false);
-  // Filled by "Generar mensaje" (see the EmailForm render below) — kept
-  // here (not inside EmailForm's own state) so a fresh generation before
-  // the email panel is opened still has somewhere to land.
-  const [generatedBody, setGeneratedBody] = useState<string | null>(null);
-  const [generatedSubject, setGeneratedSubject] = useState<string | null>(null);
+  // The email composer's draft, lifted OUT of EmailForm (fresh-review fix):
+  // "Redactar con IA" switches `openAction` to "generate", which unmounts
+  // EmailForm — a subject/body kept in EmailForm's own useState would be
+  // lost on that round trip. Living here, they survive it; `closeQuickAction`
+  // clears them once the email composer itself is closed or sent, so a
+  // stale draft never pre-fills the NEXT "Correo".
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  // Where the "generate" panel's own close button (Esc/×) should go:
+  // back to the email composer (opened via "Redactar con IA", draft above
+  // kept intact) or fully closed (opened via the top-level "Generar
+  // mensaje" CTA, nothing else was open). Cleared on every route out of
+  // "generate" so it never leaks into an unrelated later open.
+  const [generateReturnTo, setGenerateReturnTo] = useState<"email" | null>(null);
 
   function closeQuickAction() {
     setOpenAction(null);
     setError(null);
+    setEmailSubject("");
+    setEmailBody("");
+    setGenerateReturnTo(null);
+  }
+
+  function closeGenerate() {
+    if (generateReturnTo === "email") {
+      setGenerateReturnTo(null);
+      setOpenAction("email");
+    } else {
+      closeQuickAction();
+    }
   }
 
   function toggle(action: QuickAction) {
@@ -216,13 +235,18 @@ export function QuickActions({
       {openAction === "generate" && (
         <GenerateMessageDialog
           title={`${l.generateMessageCta} · ${name}`}
-          onClose={closeQuickAction}
+          onClose={closeGenerate}
           boundAction={generatePersonOutreachMessageAction.bind(null, personId, locale)}
           labels={messageLabels}
           useInEmailLabel={l.useInEmailAction}
           onUseInEmail={(subject, body) => {
-            setGeneratedSubject(subject);
-            setGeneratedBody(body);
+            // Explicit "Usar en correo" click — replaces whatever was
+            // already typed (same as this generator always did before it
+            // moved into a dialog of its own). Closing WITHOUT this click
+            // (Esc/×) leaves the draft above untouched — see closeGenerate.
+            setEmailSubject(subject);
+            setEmailBody(body);
+            setGenerateReturnTo(null);
             setOpenAction("email");
           }}
         />
@@ -285,12 +309,13 @@ export function QuickActions({
           to={email}
           busy={busy}
           error={error}
-          initialSubject={generatedSubject}
-          initialBody={generatedBody}
-          generate={{
-            labels: messageLabels,
-            boundAction: generatePersonOutreachMessageAction.bind(null, personId, locale),
-            onGenerated: setGeneratedBody,
+          subject={emailSubject}
+          body={emailBody}
+          onSubjectChange={setEmailSubject}
+          onBodyChange={setEmailBody}
+          onOpenGenerate={() => {
+            setGenerateReturnTo("email");
+            setOpenAction("generate");
           }}
           onCancel={closeQuickAction}
           onSubmit={async (subject, body) => {
@@ -503,39 +528,40 @@ function TaskForm({
   );
 }
 
-interface EmailGenerateProps {
-  labels: GenerateMessageLabels;
-  boundAction: (
-    prevState: GenerateOutreachMessageResult | null,
-    formData: FormData,
-  ) => Promise<GenerateOutreachMessageResult>;
-  onGenerated: (message: string) => void;
-}
-
 function EmailForm({
   labels: l,
   to,
   busy,
   error,
-  initialSubject,
-  initialBody,
-  generate,
+  subject,
+  body,
+  onSubjectChange,
+  onBodyChange,
+  onOpenGenerate,
   onCancel,
   onSubmit,
 }: ComposerProps & {
   to: string | null;
-  initialSubject?: string | null;
-  initialBody?: string | null;
-  // "Generar mensaje" (task 13.3) — omitted entirely (rather than rendered
-  // disabled) when the caller has nothing to bind, keeping this composer
-  // reusable for a context with no AI draft (none today, but no reason to
-  // hard-couple the two).
-  generate?: EmailGenerateProps;
+  // Controlled by the caller (QuickActions), not local state (fresh-review
+  // fix): "Redactar con IA" below unmounts this form while the "Generar
+  // mensaje" dialog is open, which would silently drop a locally-held draft.
+  // Living in the parent, it survives that round trip.
+  subject: string;
+  body: string;
+  onSubjectChange: (value: string) => void;
+  onBodyChange: (value: string) => void;
+  // "Redactar con IA" (approved mockup contact-record.html #email's
+  // `.dialog-footer`: `btn btn-ghost left`, before Cancelar/Enviar) opens
+  // the SAME "Generar mensaje" dialog the top-level quick action uses
+  // (QuickActions' openAction "generate" — GenerateMessageDialog.tsx),
+  // which hands the draft back via onUseInEmail. Omitted entirely (rather
+  // than rendered disabled) when the caller has nothing to open, keeping
+  // this composer reusable for a context with no AI draft (none today, but
+  // no reason to hard-couple the two).
+  onOpenGenerate?: () => void;
   onSubmit: (subject: string, body: string) => void;
 }) {
   const ids = useId();
-  const [subject, setSubject] = useState(initialSubject ?? "");
-  const [body, setBody] = useState(initialBody ?? "");
 
   if (!to) {
     return (
@@ -553,6 +579,17 @@ function EmailForm({
       wide
       footer={
         <>
+          {/* Approved mockup (contact-record.html #email's `.dialog-footer`):
+              "Redactar con IA" is `btn btn-ghost left`, before Cancelar/
+              Enviar — moved here from an inline body button (fresh-review
+              fix), same position/class GenerateMessageDialog's own
+              "Generar"/"Regenerar" action already uses. */}
+          {onOpenGenerate && (
+            <button type="button" className="btn btn-ghost left" onClick={onOpenGenerate} disabled={busy}>
+              <GenerateIcon className="icon" />
+              {l.emailGenerateAction}
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
@@ -582,7 +619,7 @@ function EmailForm({
           id={`${ids}-subject`}
           className="input"
           value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={(e) => onSubjectChange(e.target.value)}
           disabled={busy}
         />
       </div>
@@ -594,25 +631,10 @@ function EmailForm({
           id={`${ids}-body`}
           className="textarea"
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => onBodyChange(e.target.value)}
           disabled={busy}
         />
       </div>
-      {generate && (
-        <GenerateMessageButton
-          boundAction={generate.boundAction}
-          labels={generate.labels}
-          onGenerated={(message) => {
-            generate.onGenerated(message);
-            // "Redactar con IA" here always uses this action's default
-            // channel (email) — split the "Asunto: ...\n\n<body>"
-            // combined draft back into the two separate fields.
-            const split = splitEmailDraft(message);
-            if (split.subject) setSubject(split.subject);
-            setBody(split.subject ? split.body : message);
-          }}
-        />
-      )}
     </Dialog>
   );
 }
@@ -949,10 +971,19 @@ function SignalForm({
         disabled={busy}
       />
       <div className="bar">
-        <button type="button" onClick={onCancel} disabled={busy}>
+        {/* Unclassed buttons here fell back to the legacy `:where(button)`
+            style (same bug class as the Dialog markup sweep — PRs 189-193 —
+            just outside a Dialog; this composer is the pinned-style pattern
+            NoteComposer.tsx also uses, not a bug on its own). */}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
           {l.cancel}
         </button>
-        <button type="button" onClick={() => text.trim() && onSubmit(text.trim())} disabled={busy || !text.trim()}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => text.trim() && onSubmit(text.trim())}
+          disabled={busy || !text.trim()}
+        >
           {l.signalSave}
         </button>
       </div>
