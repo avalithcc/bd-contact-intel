@@ -14,6 +14,9 @@
  */
 import nodemailer from "nodemailer";
 
+/** The digest's sending mailbox — also shown in the footer (src/lib/tasks/digest.ts) so the two never drift apart. */
+export const DIGEST_FROM_ADDRESS = "notificaciones@avalith.net";
+
 export interface DigestSendInput {
   to: string;
   subject: string;
@@ -43,7 +46,7 @@ function buildTransport() {
 export async function sendDigestEmail(input: DigestSendInput): Promise<void> {
   const transport = buildTransport();
   await transport.sendMail({
-    from: '"Avalith BD" <notificaciones@avalith.net>',
+    from: `"Avalith BD" <${DIGEST_FROM_ADDRESS}>`,
     to: input.to,
     subject: input.subject,
     html: input.html,
