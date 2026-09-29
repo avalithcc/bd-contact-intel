@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
 import { sanitizeNextPath } from "@/lib/auth/nextPath";
+import { PASSWORD_RESET_ENABLED } from "@/lib/auth/passwordReset";
 
 const ALLOWED_DOMAIN = "@avalith.net";
 
@@ -143,9 +144,11 @@ export function LoginForm({
             {msg}
           </p>
         )}
-        <p className="soft mb-0 mt-md">
-          <Link href="/forgot-password">{dict.login.forgotPasswordLink}</Link>
-        </p>
+        {PASSWORD_RESET_ENABLED && (
+          <p className="soft mb-0 mt-md">
+            <Link href="/forgot-password">{dict.login.forgotPasswordLink}</Link>
+          </p>
+        )}
       </form>
     </main>
   );
