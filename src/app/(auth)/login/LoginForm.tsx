@@ -8,8 +8,7 @@ import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
 import { sanitizeNextPath } from "@/lib/auth/nextPath";
 import { PASSWORD_RESET_ENABLED } from "@/lib/auth/passwordReset";
-
-const ALLOWED_DOMAIN = "@avalith.net";
+import { ALLOWED_WORK_EMAIL_DOMAIN } from "@/lib/auth/allowedEmail";
 
 export function LoginForm({
   locale,
@@ -26,7 +25,11 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(
-    error === "invalid_or_expired_link" ? dict.login.expiredLinkError : null,
+    error === "invalid_or_expired_link"
+      ? dict.login.expiredLinkError
+      : error === "not_authorized"
+        ? dict.login.notAuthorizedError
+        : null,
   );
   const [busy, setBusy] = useState(false);
   const safeNext = sanitizeNextPath(next);
@@ -57,36 +60,6 @@ export function LoginForm({
     router.refresh();
   }
 
-  async function signUp() {
-    if (!validate()) return;
-    if (!email.trim().toLowerCase().endsWith(ALLOWED_DOMAIN)) {
-      setMsg(dict.login.domainRestricted(ALLOWED_DOMAIN));
-      return;
-    }
-    if (password.length < 8) {
-      setMsg(dict.login.passwordTooShort);
-      return;
-    }
-    setBusy(true);
-    setMsg(null);
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-    setBusy(false);
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-    if (data.session) {
-      // email confirmation disabled → already signed in
-      router.push("/");
-      router.refresh();
-      return;
-    }
-    setMsg(dict.login.accountCreated);
-  }
-
   return (
     <main className="form-narrow">
       <div className="header">
@@ -99,11 +72,6 @@ export function LoginForm({
         {dict.login.title}
         <span className="dot">.</span>
       </h1>
-      <p className="soft">
-        {dict.login.signUpIntro} {dict.login.signUpHintPrefix}
-        <strong>{ALLOWED_DOMAIN}</strong>
-        {dict.login.signUpHintSuffix}
-      </p>
       <form className="panel mt-xl" onSubmit={signIn}>
         <div className="mb-lg">
           <label htmlFor="email">{dict.login.workEmail}</label>
@@ -112,7 +80,7 @@ export function LoginForm({
             type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder={`you${ALLOWED_DOMAIN}`}
+            placeholder={`you${ALLOWED_WORK_EMAIL_DOMAIN}`}
             required
           />
         </div>
@@ -129,14 +97,6 @@ export function LoginForm({
         <div className="legacy-row">
           <button type="submit" disabled={busy}>
             {busy ? dict.common.ellipsis : dict.login.signIn}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={signUp}
-            disabled={busy}
-          >
-            {dict.login.createAccount}
           </button>
         </div>
         {msg && (
