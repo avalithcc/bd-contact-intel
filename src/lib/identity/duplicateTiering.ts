@@ -530,18 +530,31 @@ export interface DuplicateTierPlan {
   entries: readonly DuplicatePairPlanEntry[];
 }
 
-const ALL_BUCKETS: readonly DuplicatePairBucket[] = [
-  "same_email",
-  "classic_split_no_conflict",
-  "classic_split_conflict",
-  "one_email_not_classic",
-  "two_emails_same_mailbox",
-  "two_emails_same_mailbox_ambiguous",
-  "two_emails_differ_verified",
-  "two_emails_differ_unverified",
-  "no_email_titles_agree",
-  "no_email_titles_conflict",
-];
+/**
+ * The canonical bucket enumeration, as a Record over the union rather than a
+ * hand-kept array. Adding a member to `DuplicatePairBucket` without listing it
+ * here is a COMPILE ERROR, which is the point: a bucket missing from this list
+ * would be absent from `bucketCounts`, so it would escape both the dry run's
+ * report and the test that asserts no bucket maps to a tier outside
+ * {safe, review} — the guard that keeps the retired dismiss tier from coming
+ * back unnoticed. A plain array plus `{} as DuplicateBucketCounts` compiled
+ * happily with a member missing, which made that guard only as reliable as
+ * whoever remembered to update the array.
+ */
+const BUCKET_REGISTRY: Record<DuplicatePairBucket, true> = {
+  same_email: true,
+  classic_split_no_conflict: true,
+  classic_split_conflict: true,
+  one_email_not_classic: true,
+  two_emails_same_mailbox: true,
+  two_emails_same_mailbox_ambiguous: true,
+  two_emails_differ_verified: true,
+  two_emails_differ_unverified: true,
+  no_email_titles_agree: true,
+  no_email_titles_conflict: true,
+};
+
+const ALL_BUCKETS: readonly DuplicatePairBucket[] = Object.keys(BUCKET_REGISTRY) as DuplicatePairBucket[];
 
 function emptyBucketCounts(): DuplicateBucketCounts {
   const counts = {} as DuplicateBucketCounts;
