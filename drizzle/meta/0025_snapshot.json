@@ -1,6 +1,6 @@
 {
-  "id": "4b70e0d6-55ce-49bc-a605-342a6f2ca0a0",
-  "prevId": "cad99938-51fd-4764-acc0-c0e6661a1395",
+  "id": "be6b5c3b-64c8-479a-9987-4eaae6551786",
+  "prevId": "c804a69a-90c2-4190-b5c1-8df9a0b9f251",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2199,6 +2199,148 @@
             "bd_id",
             "kind",
             "value"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.follow_up_queue_item": {
+      "name": "follow_up_queue_item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "bd_id": {
+          "name": "bd_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "queue_date": {
+          "name": "queue_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "due_status": {
+          "name": "due_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_touch_at": {
+          "name": "last_touch_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "snoozed_until": {
+          "name": "snoozed_until",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "follow_up_queue_item_bd_date_idx": {
+          "name": "follow_up_queue_item_bd_date_idx",
+          "columns": [
+            {
+              "expression": "bd_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "queue_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "follow_up_queue_item_bd_id_bd_id_fk": {
+          "name": "follow_up_queue_item_bd_id_bd_id_fk",
+          "tableFrom": "follow_up_queue_item",
+          "tableTo": "bd",
+          "columnsFrom": [
+            "bd_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "follow_up_queue_item_person_id_person_id_fk": {
+          "name": "follow_up_queue_item_person_id_person_id_fk",
+          "tableFrom": "follow_up_queue_item",
+          "tableTo": "person",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "follow_up_queue_item_bd_date_person_unique": {
+          "name": "follow_up_queue_item_bd_date_person_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "bd_id",
+            "queue_date",
+            "person_id"
           ]
         }
       },
