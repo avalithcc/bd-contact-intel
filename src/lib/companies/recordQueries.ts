@@ -197,22 +197,45 @@ export async function getCompanyTimelineFilterCounts(companyKey: string): Promis
 export interface CompanyOpenTaskRow {
   id: string;
   title: string;
+  description: string | null;
   dueAt: Date | null;
   personId: string | null;
+  companyKey: string | null;
+  assignedToBdId: string | null;
+  assignedToName: string | null;
+  /** Set only for a person-scoped row (one of this company's contacts) —
+   * the EditTaskDialog's "Asociado con" field (task-edit change) needs the
+   * PERSON's own name in that case, not the company's. */
+  personName: string | null;
 }
 
 /**
  * "Tareas abiertas" card (company-record.html:92) — `task.companyKey`/
  * `task.personId` already exist (src/db/schema.ts task_company_idx/
  * task_person_idx), so this needed no schema change. Bounded to
- * OPEN_TASKS_LIMIT, soonest due date first (nulls last).
+ * OPEN_TASKS_LIMIT, soonest due date first (nulls last). `description`/
+ * `assignedToBdId`/`assignedToName`/`personName` join in for the task-edit
+ * change's "Editar tarea" dialog — same single query, no added round trip.
  */
 export async function getCompanyOpenTasks(companyKey: string): Promise<CompanyOpenTaskRow[]> {
   const personIds = await getCompanyPersonIds(companyKey);
 
   const rows = await db
-    .select({ id: task.id, title: task.title, dueAt: task.dueAt, personId: task.personId })
+    .select({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      dueAt: task.dueAt,
+      personId: task.personId,
+      companyKey: task.companyKey,
+      assignedToBdId: task.assignedToBdId,
+      assignedToName: bd.name,
+      personFirstName: person.firstName,
+      personLastName: person.lastName,
+    })
     .from(task)
+    .leftJoin(bd, eq(bd.id, task.assignedToBdId))
+    .leftJoin(person, eq(person.id, task.personId))
     .where(
       and(
         eq(task.status, "open"),
@@ -222,7 +245,17 @@ export async function getCompanyOpenTasks(companyKey: string): Promise<CompanyOp
     .orderBy(asc(sql`${task.dueAt} is null`), asc(task.dueAt))
     .limit(OPEN_TASKS_LIMIT);
 
-  return rows;
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    description: r.description,
+    dueAt: r.dueAt,
+    personId: r.personId,
+    companyKey: r.companyKey,
+    assignedToBdId: r.assignedToBdId,
+    assignedToName: r.assignedToName,
+    personName: [r.personFirstName, r.personLastName].filter(Boolean).join(" ") || null,
+  }));
 }
 
 /**

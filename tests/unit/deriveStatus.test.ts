@@ -45,6 +45,16 @@ test("informational activity types (note, hunter_lookup) do not move the stage",
   assert.equal(result.status, "new");
 });
 
+test("task_updated/task_completed/task_reopened are never treated as contact touches (task-edit change)", () => {
+  const result = deriveStatus([
+    activityEvent({ id: "a1", type: "task_updated", at: new Date("2026-01-01") }),
+    activityEvent({ id: "a2", type: "task_completed", at: new Date("2026-01-02") }),
+    activityEvent({ id: "a3", type: "task_reopened", at: new Date("2026-01-03") }),
+  ]);
+  assert.equal(result.status, "new");
+  assert.equal(result.because, null);
+});
+
 test("email_sent activity advances stage to contacted", () => {
   const result = deriveStatus([
     activityEvent({ id: "a1", type: "email_sent", at: new Date("2026-01-01") }),

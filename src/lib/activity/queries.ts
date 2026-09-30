@@ -13,7 +13,14 @@ export type { TimelinePillKey } from "@/lib/activity/timelinePills";
 
 export type { TimelineEntry } from "@/lib/activity/timelineEntry";
 
-/** Activity types the Contact record's timeline pane renders (task 10.1). */
+/** Activity types the Contact record's timeline pane renders (task 10.1).
+ * `task_updated`/`task_completed`/`task_reopened` join in with the task-edit
+ * change — they appear in "Todo" through this same list (and its
+ * `countsByType`), but are grouped under the "Tareas" pill instead of
+ * "Sistema" (see TIMELINE_PILL_GROUPS, timelinePills.ts, and
+ * TASK_ACTIVITY_TYPES there) and are never contact-touch/discard evidence
+ * (deriveStatus.ts has no case for them — see
+ * tests/unit/deriveStatus.test.ts). */
 export const TIMELINE_ACTIVITY_TYPES = [
   "note",
   "email_sent",
@@ -23,6 +30,9 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "call",
   "discarded",
   "status_backfill",
+  "task_updated",
+  "task_completed",
+  "task_reopened",
 ] as const;
 
 export type TimelineActivityType = (typeof TIMELINE_ACTIVITY_TYPES)[number];

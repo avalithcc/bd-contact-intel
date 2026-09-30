@@ -26,6 +26,17 @@ const labels = {
   atDiscarded: "Descartado",
   atHunterLookup: "Búsqueda",
   atStatusBackfill: "Historial",
+  atTaskUpdated: "Tarea editada",
+  atTaskCompleted: "Tarea completada",
+  atTaskReopened: "Tarea reabierta",
+  taskChangeFieldTitle: "Título",
+  taskChangeFieldDue: "Vencimiento",
+  taskChangeFieldAssignee: "Asignada a",
+  taskChangeFieldDescription: "Descripción",
+  taskChangeUpdatedPrefix: "editó la tarea",
+  taskChangeCompletedPrefix: "completó la tarea",
+  taskChangeReopenedPrefix: "reabrió la tarea",
+  taskChangeUnknownActor: "Un usuario",
 };
 
 const stageLabelOf = (stage: string) => (stage === "qualified" ? "Calificada" : "Prospecto");
@@ -66,4 +77,43 @@ test("buildCompanyTimelineViewRows: contact-scoped row with no known name falls 
   const rows = [{ ...baseRow, type: "email_sent", metadata: {}, scope: "contact" as const, personId: "p1", personName: null }];
   const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
   assert.equal(view.what, "Correo");
+});
+
+// Owner decision (2026-09-29): any BD may edit/complete/reopen any task, so
+// the timeline entry itself must name WHO did it — on the Company timeline
+// (unlike Contact's, which already names the actor in its head line), the
+// body text is the ONLY place that can, since a contact-scoped row's "what"
+// here names the PERSON the task belongs to, not who acted on it.
+test("buildCompanyTimelineViewRows: a task_updated row's body names the actor, not just the person", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "task_updated",
+      metadata: {
+        taskTitle: "Enviar propuesta",
+        changes: [{ field: "dueAt", from: "12 oct", to: "20 oct" }],
+      },
+      actorName: "Macarena",
+      scope: "contact" as const,
+      personId: "p1",
+      personName: "Bruno Diaz",
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
+  assert.equal(view.what, "Tarea editada · Bruno Diaz");
+  assert.equal(view.body, "Macarena editó la tarea «Enviar propuesta»: Vencimiento 12 oct → 20 oct");
+});
+
+test("buildCompanyTimelineViewRows: a task_completed row's body falls back to the unknown-actor label when actorName is null", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "task_completed",
+      metadata: { taskTitle: "Enviar propuesta" },
+      actorName: null,
+      scope: "company" as const,
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
+  assert.equal(view.body, "Un usuario completó la tarea «Enviar propuesta»");
 });
