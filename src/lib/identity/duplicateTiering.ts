@@ -121,7 +121,8 @@
  * ever written by this script, so there's nothing to leave half-done.
  */
 import { chooseDefaultSurvivor, type SurvivorCandidate } from "@/lib/identity/duplicateReviewView";
-import { emailStatusRank, type EmailStatus } from "@/lib/identity/matcher";
+import { pickEmailWinner } from "@/lib/identity/merge";
+import { type EmailStatus } from "@/lib/identity/matcher";
 
 // --- Bucket classification --------------------------------------------------
 
@@ -341,27 +342,19 @@ export function hasNonAsciiLocalPart(email: string): boolean {
 // --- Email-winner mirror (defect 4: dry-run property-loss line) ------------
 
 /**
- * Mirrors merge.ts's private `mergeEmailFields` winner rule (rank by
- * emailStatus, survivor wins ties) WITHOUT touching merge.ts — this file
- * reimplements only the side-decision, not the full field-copy, so
- * scripts/merge-duplicates.ts's dry run can describe in advance which email
- * a merge will discard and never disagree with what `planMerge` actually
- * does. If `mergeEmailFields`'s rule ever changes, this must change with it.
- * Uses matcher.ts's shared `emailStatusRank` rather than a local copy of the
- * rank table, so this can't drift from the definition `mergeEmailFields`
- * itself is mirroring (matcher.ts and merge.ts each already have their own
- * copy; this is deliberately not a third).
+ * Which side `merge.ts`'s `mergeEmailFields` would pick as the email winner,
+ * so `scripts/merge-duplicates.ts`'s dry run can describe in advance which
+ * email a merge will discard. Resolves through the single shared
+ * `pickEmailWinner` (merge.ts) rather than carrying its own copy of the
+ * rule — see that function's doc comment for why, and
+ * tests/unit/pickEmailWinner.test.ts for the proof that this and the live
+ * merge write path can never quietly disagree.
  */
 export function pickEmailWinnerSide(
   survivor: { email: string | null; emailStatus: EmailStatus },
   merged: { email: string | null; emailStatus: EmailStatus },
 ): "survivor" | "merged" {
-  const survivorHas = !!survivor.email;
-  const mergedHas = !!merged.email;
-  if (survivorHas && !mergedHas) return "survivor";
-  if (mergedHas && !survivorHas) return "merged";
-  if (!survivorHas && !mergedHas) return "survivor";
-  return emailStatusRank(merged.emailStatus) > emailStatusRank(survivor.emailStatus) ? "merged" : "survivor";
+  return pickEmailWinner(survivor, merged) === survivor ? "survivor" : "merged";
 }
 
 export function classifyDuplicatePairBucket(
