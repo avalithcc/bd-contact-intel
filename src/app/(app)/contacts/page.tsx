@@ -352,11 +352,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   // "Grupo de rol: Desarrolladores" from the ad-hoc panel always overrides
   // the default, regardless of view/system-view/saved-view origin), then
   // threaded through every read below (page query, count query, view-tab
-  // badges) and the "Exportar"/CSV href, so none of them can disagree on
-  // which rows are hidden. Never applied to the Outreach view (a separate
-  // hiring-crossover read, outreachViewDb.ts) or to bulk "select all N
-  // filtered" actions (bulkActions.ts/bulkMessageActions.ts) — task brief
-  // scope is the list default only.
+  // badges), the "Exportar"/CSV href and bulk "select all N filtered"
+  // (bulkActions.ts/bulkMessageActions.ts re-resolve it server-side from the
+  // forwarded `roles` field), so none of them can disagree on which rows are
+  // hidden. Never applied to the Outreach view (a separate hiring-crossover
+  // read, outreachViewDb.ts) or to the follow-up queue.
   const roleVisibility = resolveRoleVisibility(sp.roles, effectiveFilters.roleGroup);
 
   // Column picker (task 13.1): a `?columns=` query override wins (used by
