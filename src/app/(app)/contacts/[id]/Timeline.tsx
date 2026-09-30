@@ -1104,10 +1104,29 @@ export function Timeline({
                         <span className="when">{formatWhen(at)}</span>
                       </div>
                       <div className={timelineEntry.visible ? "tl-body" : "locked"}>
-                        {timelineEntry.type === "note" && timelineEntry.visible ? (
-                          <blockquote>{entryBody(timelineEntry, l)}</blockquote>
+                        {timelineEntry.visible ? (
+                          timelineEntry.type === "note" ? (
+                            <blockquote>{entryBody(timelineEntry, l)}</blockquote>
+                          ) : (
+                            entryBody(timelineEntry, l)
+                          )
                         ) : (
-                          entryBody(timelineEntry, l)
+                          // Same rich "belongs to X" copy the locked-THREAD
+                          // card uses (admin-conversation-access mockup-
+                          // fidelity fix) — a lone locked email_sent/
+                          // reply_received row used to fall through to
+                          // entryBody's generic timelineLockedContent text
+                          // instead, the only locked row shape that never
+                          // named its owning BD.
+                          <>
+                            <LockIcon className="icon" />
+                            <span>
+                              {(() => {
+                                const ownerName = timelineEntry.actorName ?? l.timelineSystemActor;
+                                return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+                              })()}
+                            </span>
+                          </>
                         )}
                       </div>
                       {!timelineEntry.visible &&
