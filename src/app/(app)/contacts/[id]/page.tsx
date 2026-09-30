@@ -21,6 +21,7 @@ import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { classifyPosition } from "@/lib/roleGroups";
 import { ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
+import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { PlusIcon } from "@/components/icons";
@@ -29,7 +30,7 @@ import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
-import { AdminConversationHistoryCard } from "./AdminConversationHistoryCard";
+import { ConversationHistoryCard } from "./ConversationHistoryCard";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
 import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
@@ -294,6 +295,81 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
         }
       : null;
 
+  // Right panel — "Historial de conversaciones" (contact-record.html:172-178;
+  // admin-conversation-access mockup, admin-conversation.html:138-144) is a
+  // SEPARATE card from "BDs conectados" — restored 2026-09-30 (owner
+  // decision) as ONE merged card (ConversationHistoryCard.tsx), not two: the
+  // viewer's OWN connection (LinkedIn message history) is for everyone, an
+  // expandable full history on demand; every OTHER BD's locked content
+  // (email thread(s), LinkedIn message history, or both) is admin-only,
+  // combined into one row per BD since the destination route is
+  // (contact, BD)-scoped regardless of channel (README decision 4) — no
+  // "LinkedIn" filter pill anywhere on this page either way.
+  const ownConnection = record.connections.find((c) => c.bdId === me.id) ?? null;
+  const ownConnectionHistory = ownConnection ? describeConnectionHistory(ownConnection) : null;
+  const ownConversationRow =
+    ownConnection && ownConnectionHistory?.kind === "some"
+      ? {
+          bdName: ownConnection.bdName ?? l.emptyValue,
+          summaryText: dict.contactRecordServer.conversationHistorySummary(
+            ownConnectionHistory.count,
+            ownConnectionHistory.lastMessageAt
+              ? format(ownConnectionHistory.lastMessageAt, "d MMM", { locale: es })
+              : l.emptyValue,
+          ),
+        }
+      : null;
+  // Same summary text as the right panel card above, precomposed for the
+  // Timeline's own interleaved LinkedIn entries (Timeline.tsx is a Client
+  // Component — `dict.contactRecordServer`'s function templates can't cross
+  // that boundary, same rule as `mergeInfo.bodyText` below) — keyed by bdId
+  // since a synthesized LinkedIn timeline entry only carries `linkedinMeta.bdId`.
+  // Covers every connection with history (not just the viewer's own): a
+  // non-own locked entry never reads this map (see isLinkedinEntryLocked in
+  // Timeline.tsx), so only the "own" lookup ever resolves in practice, but
+  // keying by every bdId here costs nothing extra and keeps this map a
+  // simple, total function of `record.connections`.
+  const linkedinSummaryByBdId: Record<string, string> = {};
+  for (const c of record.connections) {
+    const history = describeConnectionHistory(c);
+    if (history.kind !== "some") continue;
+    linkedinSummaryByBdId[c.bdId] = dict.contactRecordServer.conversationHistorySummary(
+      history.count,
+      history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue,
+    );
+  }
+  // Admin-only locked summaries (ConversationHistoryCard's `summaries` prop):
+  // union of BDs with a locked EMAIL thread (getLockedConversationSummaries,
+  // above) and BDs with real LinkedIn message history (record.connections,
+  // excluding the viewer's own) — merged by bdId into ONE row per BD rather
+  // than listing the same BD twice, since either channel navigates to the
+  // SAME (contact, BD)-scoped conversation page.
+  const lockedConversationRowsByBd = new Map<string, { bdId: string; bdName: string; parts: string[] }>();
+  if (isAdmin) {
+    for (const s of lockedConversationSummaries) {
+      lockedConversationRowsByBd.set(s.bdId, {
+        bdId: s.bdId,
+        bdName: s.bdName,
+        parts: [dict.contactRecordServer.lockedConversationThreadCount(s.threadCount)],
+      });
+    }
+    for (const c of record.connections) {
+      if (c.bdId === me.id) continue;
+      const history = describeConnectionHistory(c);
+      if (history.kind !== "some") continue;
+      const summaryText = dict.contactRecordServer.conversationHistorySummary(
+        history.count,
+        history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue,
+      );
+      const existing = lockedConversationRowsByBd.get(c.bdId);
+      if (existing) existing.parts.push(summaryText);
+      else lockedConversationRowsByBd.set(c.bdId, { bdId: c.bdId, bdName: c.bdName ?? l.emptyValue, parts: [summaryText] });
+    }
+  }
+  const lockedConversationRows = [...lockedConversationRowsByBd.values()]
+    .map((r) => ({ bdId: r.bdId, bdName: r.bdName, summaryText: r.parts.join(" · ") }))
+    .sort((a, b) => a.bdName.localeCompare(b.bdName));
+
   return (
     <main>
       <div className="record">
@@ -360,6 +436,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     meId={me.id}
                     taskLabels={pickEditTaskLabels(l)}
                     isAdmin={isAdmin}
+                    connections={record.connections}
+                    linkedinSummaryByBdId={linkedinSummaryByBdId}
                     mergeInfo={
                       record.merge.unifiedFromCount > 1
                         ? {
@@ -505,33 +583,13 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
             </div>
           </div>
 
-          {/*
-            "Historial de conversaciones" card (contact-record.html:172-178)
-            is intentionally hidden — the owner turned LinkedIn off. This card
-            was entirely driven by `person_bd_connection.messageCount`
-            (LinkedIn message history) and its "Ver conversación" link was the
-            only UI entry point (besides the Timeline's now-hidden
-            AdminConversationReveal, see Timeline.tsx) into the audited admin
-            bypass (getConversationForAdmin.ts / conversationAudit.ts). Data,
-            actions and the /contacts/[id]/conversation/[bdId] route are all
-            untouched — restore by re-adding the
-            `describeConnectionHistory`/`LockIcon` imports, the
-            `connectionsWithHistory` filter above, and this block (see git
-            history of this file).
-          */}
-
-          {isAdmin && (
-            <AdminConversationHistoryCard
-              personId={record.person.id}
-              personName={name}
-              summaries={lockedConversationSummaries.map((s) => ({
-                bdId: s.bdId,
-                bdName: s.bdName,
-                summaryText: dict.contactRecordServer.lockedConversationThreadCount(s.threadCount),
-              }))}
-              labels={l}
-            />
-          )}
+          <ConversationHistoryCard
+            personId={record.person.id}
+            personName={name}
+            ownRow={ownConversationRow}
+            summaries={lockedConversationRows}
+            labels={l}
+          />
 
           <div className="card assoc">
             <div className="card-header">

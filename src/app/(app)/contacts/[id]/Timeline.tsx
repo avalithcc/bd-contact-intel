@@ -28,6 +28,13 @@ import {
 } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, emailRecipientText, entryBody } from "@/lib/contacts/timelineEntryBody";
 import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
+import {
+  buildConnectionTimelineEntries,
+  linkedinEntryAccess,
+  type ConnectionForTimeline,
+  type LinkedinTimelineEntryType,
+} from "@/lib/contacts/connectionTimelineEntries";
+import { isLinkedinEntryLocked, linkedinTimelineTotal } from "@/lib/contacts/conversationHistoryAccess";
 import { useToast } from "@/components/ToastProvider";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
@@ -38,6 +45,7 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   HistoryIcon,
+  LinkedInIcon,
   LockIcon,
   MailIcon,
   MeetingIcon,
@@ -124,6 +132,27 @@ export interface TimelineProps {
   meId: string;
   taskLabels: EditTaskLabels;
   isAdmin: boolean;
+  // Every connection this Contact has (mockup-port r04; contact-record.html:
+  // 124-131's "Mensaje de LinkedIn enviado"/"Respuesta de LinkedIn recibida"
+  // cards; owner decision 2026-09-30: restored WITHOUT a dedicated
+  // "LinkedIn" filter pill, since LinkedIn imports stay off). Always the
+  // FULL list (never paginated, see getContactRecord) — `buildConnectionTimelineEntries`
+  // (@/lib/contacts/connectionTimelineEntries) synthesizes one entry per
+  // connection with real message history; those only ever render in the
+  // unfiltered "Todo" scope (see `showLinkedinEntries` below), interleaved
+  // chronologically with real activity, but their count is always folded
+  // into "Todo"'s own total (`linkedinTimelineTotal`) regardless of which
+  // scope is active — the same "true grand total" invariant every other
+  // pill's own badge already holds.
+  connections: ConnectionForTimeline[];
+  // Same `dict.contactRecordServer.conversationHistorySummary(...)` text the
+  // right panel's "Historial de conversaciones" card shows for each
+  // connection with real history (page.tsx), keyed by bdId — composed
+  // server-side for the same reason `mergeInfo.bodyText` below is: this is a
+  // Client Component, so it can never receive the function template itself.
+  // Feeds the "own" branch of a synthesized LinkedIn entry (real content
+  // summary instead of the bare `connectionHistorySomePrefix` fragment).
+  linkedinSummaryByBdId: Record<string, string>;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
   // person was never the survivor of a migration/merge. `bodyText` is
@@ -149,6 +178,11 @@ function scopeOf(pill: TimelinePillKey | undefined): TimelineScope {
 }
 
 const MERGE_UNIFIED_TYPE = "merge_unified" as const;
+
+const LINKEDIN_PREFIX_KEY: Record<LinkedinTimelineEntryType, keyof ContactRecordLabels> = {
+  linkedin_replied: "linkedinRepliedPrefix",
+  linkedin_sent: "linkedinSentPrefix",
+};
 
 const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> = {
   note: "timelineFilterNote",
@@ -235,6 +269,20 @@ function monthLabel(at: Date): string {
 }
 
 /**
+ * The shared "belongs to X" locked-row copy (email-sync.html:186's "Este
+ * hilo pertenece a Ana Pereyra..."; admin-conversation-access mockup-fidelity
+ * fix 2225af8 extended it to the single-entry email card) — now also the
+ * LinkedIn locked entry's own copy (owner decision 2026-09-30: same
+ * locked-row pattern across every channel, since the admin conversation page
+ * shows both). One function so the three call sites (locked email thread,
+ * locked single email entry, locked LinkedIn entry) can never drift on the
+ * exact wording.
+ */
+function lockedConversationText(l: ContactRecordLabels, ownerName: string): string {
+  return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+}
+
+/**
  * Filtered activity timeline (task 10.1; contact-record spec "Filtered
  * activity timeline"; mockup-port r03 markup rework onto design-system.css's
  * `.filter-pill`/`.tl-group`/`.tl`/`.tl-item`/`.tl-icon`/`.tl-card` classes,
@@ -284,6 +332,8 @@ export function Timeline({
   meId,
   taskLabels,
   isAdmin,
+  connections,
+  linkedinSummaryByBdId,
   mergeInfo,
   statusMovedByActivityId,
 }: TimelineProps) {
@@ -596,8 +646,23 @@ export function Timeline({
   // `taskTotalCount`, not `tasks.length` — `tasks` is the bounded rows array
   // (getTasksForPerson caps open at 50, done at 20); `taskTotalCount` is the
   // true, never-capped total, same invariant `countsByType` already holds.
-  const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0) + taskTotalCount;
+  // `linkedinTimelineTotal(connections)` folds in — owner decision
+  // 2026-09-30: there is no dedicated "LinkedIn" pill anymore, so its count
+  // has nowhere else to live; "Todo" is the only badge that still needs to
+  // add up to everything a BD could expand (see conversationHistoryAccess.ts).
+  const total =
+    Object.values(countsByType).reduce((sum, n) => sum + n, 0) + taskTotalCount + linkedinTimelineTotal(connections);
   const showMergeCard = !isTasksActive && !activePillNow && mergeInfo && mergeInfo.unifiedFromCount > 1;
+  // LinkedIn connection cards (contact-record.html:124-131) only render in
+  // the unfiltered "Todo" scope — they aren't one of the real activity
+  // pills, so a filtered view (e.g. "Correos") must never include them, and
+  // there is no dedicated "LinkedIn" pill to select them into either (owner
+  // decision 2026-09-30). `connections` is always the FULL list (never
+  // paginated), so this needs no fetch of its own, unlike a real pill's
+  // scoped entries.
+  const showLinkedinEntries = !isTasksActive && !activePillNow;
+  const linkedinEntries = showLinkedinEntries ? buildConnectionTimelineEntries(connections) : [];
+  const linkedinMetaById = new Map(linkedinEntries.map((e) => [e.id, e.metadata]));
 
   // Email-thread grouping (contact-record.html:116-123) — done on the raw
   // `displayedEntries` BEFORE merging in the merge synthetic entry, so
@@ -623,6 +688,7 @@ export function Timeline({
 
   const groups = groupTimelineEntries([
     ...processedEntries,
+    ...linkedinEntries.map((e) => ({ id: e.id, type: e.type, createdAt: e.createdAt, metadata: e.metadata })),
     ...(showMergeCard
       ? [{ id: "merge-unified", type: MERGE_UNIFIED_TYPE, createdAt: mergeInfo!.at, metadata: null }]
       : []),
@@ -909,7 +975,7 @@ export function Timeline({
                   // owner (email-sync.html:186's "Este hilo pertenece a
                   // Ana Pereyra").
                   const ownerName = group.messages.find((m) => m.actorName)?.actorName ?? l.timelineSystemActor;
-                  return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+                  return lockedConversationText(l, ownerName);
                 })()}
               </span>
             </div>
@@ -1081,6 +1147,39 @@ export function Timeline({
                   return renderEmailThreadCard(threadGroup.threadId, threadGroup, threadGroup.latestAt);
                 }
 
+                const linkedinMeta = linkedinMetaById.get(entry.id);
+                if (linkedinMeta) {
+                  const type = entry.type as LinkedinTimelineEntryType;
+                  const access = linkedinEntryAccess(linkedinMeta.bdId, meId, isAdmin);
+                  const bdName = linkedinMeta.bdName ?? l.emptyValue;
+                  return (
+                    <div key={entry.id} className="tl-item">
+                      <div className={type === "linkedin_replied" ? "tl-icon reply" : "tl-icon"}>
+                        <LinkedInIcon className="icon" />
+                      </div>
+                      <div className="tl-card">
+                        <div className="tl-head">
+                          <span className="what">
+                            {l[LINKEDIN_PREFIX_KEY[type]] as string} · {l.linkedinConversationOfPrefix} {bdName}
+                          </span>
+                          <span className="when">{formatWhen(at)}</span>
+                        </div>
+                        {isLinkedinEntryLocked(access) ? (
+                          <div className="locked">
+                            <LockIcon className="icon" />
+                            <span>{lockedConversationText(l, bdName)}</span>
+                          </div>
+                        ) : (
+                          <div className="tl-body">
+                            {linkedinSummaryByBdId[linkedinMeta.bdId] ?? l.connectionHistorySomePrefix}
+                          </div>
+                        )}
+                        {isLinkedinEntryLocked(access) && renderAdminViewAction(linkedinMeta.bdId, bdName)}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const timelineEntry = entry as TimelineEntry;
                 const Icon = TYPE_ICON[timelineEntry.type as TimelineActivityType] ?? NoteIcon;
                 const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
@@ -1123,7 +1222,7 @@ export function Timeline({
                             <span>
                               {(() => {
                                 const ownerName = timelineEntry.actorName ?? l.timelineSystemActor;
-                                return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+                                return lockedConversationText(l, ownerName);
                               })()}
                             </span>
                           </>
