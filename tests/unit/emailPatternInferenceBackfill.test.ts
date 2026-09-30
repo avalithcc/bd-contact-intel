@@ -64,6 +64,21 @@ test("below 80% agreement never qualifies (no single pattern dominates)", () => 
   assert.equal(result, null);
 });
 
+test("examples with a multi-token first OR last name are excluded from both numerator and denominator (learning symmetry with the skip-on-apply rule)", () => {
+  const result = detectDominantPattern([
+    { firstName: "Efrain", lastName: "Romero", email: "efrain.romero@x.com" },
+    { firstName: "Ana", lastName: "Gomez", email: "ana.gomez@x.com" },
+    // Multi-token first name: excluded even though its local part happens
+    // to look like it agrees with the winning pattern once concatenated.
+    { firstName: "Juan Pablo", lastName: "Ruiz", email: "juanpablo.ruiz@x.com" },
+    // Multi-token (particle) last name: same exclusion.
+    { firstName: "Luis", lastName: "de la Fuente", email: "luis.delafuente@x.com" },
+  ]);
+  assert.ok(result);
+  assert.equal(result?.total, 2);
+  assert.equal(result?.matched, 2);
+});
+
 test("examples missing a first or last name are excluded from both numerator and denominator", () => {
   const result = detectDominantPattern([
     { firstName: "Efrain", lastName: "Romero", email: "efrain.romero@x.com" },
@@ -137,6 +152,33 @@ test("skips a multi-token (particle) surname rather than guessing", () => {
   const plan = buildEmailPatternInferencePlan(candidates);
   assert.equal(plan.fills.length, 0);
   assert.deepEqual(plan.skips, [{ personId: "p1", reason: "multi_token_surname" }]);
+});
+
+test("skips a multi-token compound first name rather than guessing (symmetric with surnames)", () => {
+  const candidates: InferenceCandidate[] = [
+    {
+      personId: "p1",
+      firstName: "Juan Pablo",
+      lastName: "Perez",
+      companyKey: "acme",
+      companyDomain: "acme.com",
+      colleagueEmails: colleagues("acme.com", 4),
+    },
+    {
+      personId: "p2",
+      firstName: "Ana-María",
+      lastName: "Diaz",
+      companyKey: "acme",
+      companyDomain: "acme.com",
+      colleagueEmails: colleagues("acme.com", 4),
+    },
+  ];
+  const plan = buildEmailPatternInferencePlan(candidates);
+  assert.equal(plan.fills.length, 0);
+  assert.deepEqual(plan.skips, [
+    { personId: "p1", reason: "multi_token_first_name" },
+    { personId: "p2", reason: "multi_token_first_name" },
+  ]);
 });
 
 test("skips a candidate missing a first or last name", () => {

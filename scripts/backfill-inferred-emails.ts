@@ -44,12 +44,14 @@
  *      among the ones this run just filled, so it writes 0 rows.
  *
  * Revert: documented, not automated (rule 4, "a documented revert path") —
- * every applied row started from `email IS NULL`, so
- * `update person set email = null, email_normalized = null, email_status =
- * 'none', email_source = null, updated_at = now() where id in
- * (<appliedPersonIds from the audit_log row's metadata>) and email_source =
- * 'pattern_inferred'` safely reverts without touching a row a BD has since
- * hand-edited (email_source would have moved to `'manual'`).
+ * see emailPatternInferenceBackfillAudit.ts's `revertNote` (written into the
+ * audit_log row itself). `email_source = 'pattern_inferred'` is the anchor,
+ * not the applied-ids list: once applied, a row's `email` is no longer null,
+ * so this script's OWN dry run can never re-derive a truncated id list — the
+ * revert must not depend on it. `email_source = 'pattern_inferred'` alone
+ * uniquely identifies every row this backfill (and only this backfill) ever
+ * wrote, and safely leaves alone any row a BD has since hand-edited
+ * (email_source would have moved to `'manual'`).
  *
  * Defaults to `--dry-run` (no writes) and REQUIRES `--apply --actor=<bd id>`
  * to actually write. Requires DATABASE_URL to be set (see .env).
@@ -91,6 +93,7 @@ function parseArgs(argv: readonly string[]): Args {
 
 const SKIP_REASON_ORDER: InferenceSkipReason[] = [
   "missing_name",
+  "multi_token_first_name",
   "multi_token_surname",
   "normalized_name_empty",
   "no_domain",

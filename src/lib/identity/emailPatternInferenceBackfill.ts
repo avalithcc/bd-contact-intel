@@ -138,9 +138,28 @@ export const DOMINANT_PATTERN_RATIO = 0.8;
  * an empty first or last part (rare — e.g. a name with no a-z letters at
  * all) is excluded from both numerator and denominator, same as it would
  * never have produced a matchable local part anyway.
+ *
+ * LEARNING/APPLYING SYMMETRY (fresh-review fix): a multi-token first OR last
+ * name (compound given name like "Juan Pablo", a hyphenated "Ana-María", a
+ * particle surname like "de la Fuente") is excluded from BOTH the numerator
+ * AND the denominator here, exactly mirroring buildEmailPatternInferencePlan
+ * below refusing to APPLY a fill for the same shape of name. Chosen over
+ * "count it toward the denominator but never the numerator" because that
+ * alternative would silently penalize a domain's real pattern strength
+ * (diluting the ratio) for names this backfill was never going to act on
+ * either way — excluding them entirely keeps both sides of the "how strong
+ * is this domain's convention" question scoped to the same population of
+ * names this backfill can actually apply to.
  */
 export function detectDominantPattern(examples: readonly DomainEmailExample[]): DomainPatternResult | null {
-  const usable = examples.filter((e) => !!e.firstName?.trim() && !!e.lastName?.trim() && splitEmail(e.email) !== null);
+  const usable = examples.filter(
+    (e) =>
+      !!e.firstName?.trim() &&
+      !!e.lastName?.trim() &&
+      !hasMultipleNameTokens(e.firstName!.trim()) &&
+      !hasMultipleNameTokens(e.lastName!.trim()) &&
+      splitEmail(e.email) !== null,
+  );
 
   const counts = new Map<PatternId, number>();
   let total = 0;
@@ -220,6 +239,7 @@ export function resolveCandidateDomain(
 
 export type InferenceSkipReason =
   | "missing_name"
+  | "multi_token_first_name"
   | "multi_token_surname"
   | "normalized_name_empty"
   | "no_domain"
@@ -279,6 +299,16 @@ export function buildEmailPatternInferencePlan(candidates: readonly InferenceCan
     const lastNameRaw = candidate.lastName?.trim() ?? "";
     if (!firstNameRaw || !lastNameRaw) {
       skips.push({ personId: candidate.personId, reason: "missing_name" });
+      continue;
+    }
+    // Symmetric with the surname check below (fresh-review fix): a
+    // compound/hyphenated first name ("Juan Pablo", "Ana-María") would
+    // otherwise silently normalize to a concatenation ("juanpablo") that is
+    // almost certainly not how this person's real address is built — refuse
+    // rather than guess, same "skipping is fine" rule as multi-token
+    // surnames.
+    if (hasMultipleNameTokens(firstNameRaw)) {
+      skips.push({ personId: candidate.personId, reason: "multi_token_first_name" });
       continue;
     }
     if (hasMultipleNameTokens(lastNameRaw)) {

@@ -56,6 +56,13 @@ export async function readCandidates(): Promise<CandidatePersonRow[]> {
     .orderBy(person.id)
     .limit(CANDIDATE_READ_CAP);
 
+  if (rows.length === CANDIDATE_READ_CAP) {
+    console.warn(
+      `readCandidates hit its CANDIDATE_READ_CAP (${CANDIDATE_READ_CAP}) — there may be more candidates than ` +
+        "this run saw. Re-run after this batch is applied (or raise the cap) to reach the rest.",
+    );
+  }
+
   return rows.map((r) => ({ personId: r.id, firstName: r.firstName, lastName: r.lastName, companyKey: r.companyKey! }));
 }
 
