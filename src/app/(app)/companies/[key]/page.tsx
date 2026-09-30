@@ -31,7 +31,37 @@ import { RecordTabs } from "@/app/(app)/contacts/[id]/RecordTabs";
 import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import { CompanyAboutPane } from "./CompanyAboutPane";
 import { CompanyTimeline } from "./CompanyTimeline";
-import { completeCompanyTaskAction } from "../actions";
+import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
+import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
+import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
+
+/** Maps this page's companyRecord dict section into EditTaskDialog's shape
+ * — see that component's doc comment for why each page builds its own. */
+function pickEditTaskLabels(l: Dictionary["companyRecord"]): EditTaskLabels {
+  return {
+    dialogTitle: l.taskEditDialogTitle,
+    fieldTitle: l.taskTitleLabel,
+    fieldDue: l.taskDueLabel,
+    fieldAssignee: l.taskAssigneeLabel,
+    fieldDescription: l.taskDescriptionLabel,
+    fieldAssociation: l.taskAssociationLabel,
+    associationHelp: l.taskAssociationHelp,
+    titleRequiredError: l.taskTitleRequiredError,
+    markComplete: l.taskMarkComplete,
+    reopenTask: l.taskReopenDialogAction,
+    cancel: l.cancel,
+    saveChanges: l.taskSaveChanges,
+    saving: l.taskSaving,
+    saveError: l.taskSaveError,
+    genericError: l.genericError,
+    completedBadge: l.taskCompletedBadge,
+    completedCaptionPrefix: l.taskCompletedCaptionPrefix,
+    toastUpdated: l.toastTaskUpdated,
+    toastCompleted: l.toastTaskCompleted,
+    toastReopened: l.toastTaskReopened,
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -266,23 +296,48 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             <div className="card-header">
               <h3>{l.assocTasksTitle}</h3>
             </div>
-            <div className="card-body soft small">
+            <div className="card-body">
               {openTasks.length === 0 ? (
                 <span>{l.tasksEmpty}</span>
               ) : (
                 openTasks.map((t) => (
-                  <form
-                    key={t.id}
-                    action={async () => {
-                      "use server";
-                      await completeCompanyTaskAction(t.id, key);
-                    }}
-                  >
-                    <button type="submit" className="btn btn-ghost btn-sm" title={l.taskMarkDone}>
-                      {t.title}
-                      {t.dueAt && <> · {formatTaskDueDate(t.dueAt)}</>}
-                    </button>
-                  </form>
+                  <div key={t.id} className="assoc-row">
+                    <CompleteTaskCheckbox
+                      taskId={t.id}
+                      companyKey={key}
+                      ariaLabel={l.taskMarkDone}
+                      errorLabel={l.genericError}
+                    />
+                    <div className="grow">
+                      <TaskTitleLink
+                        task={{
+                          id: t.id,
+                          title: t.title,
+                          description: t.description,
+                          dueAt: t.dueAt,
+                          assignedToBdId: t.assignedToBdId,
+                          status: "open",
+                          personId: t.personId,
+                          companyKey: t.companyKey,
+                          // Person-scoped row (one of this company's
+                          // contacts): associate with THAT person, not the
+                          // company itself — see getCompanyOpenTasks's doc
+                          // comment.
+                          associationLabel: t.personId
+                            ? (t.personName ?? company.displayName)
+                            : company.displayName,
+                        }}
+                        className="n"
+                        assigneeOptions={ownerOptions}
+                        meId={me.id}
+                        labels={pickEditTaskLabels(l)}
+                      />
+                      <div className="s">
+                        {t.dueAt ? formatTaskDueDate(t.dueAt) : l.emptyValue}
+                        {t.assignedToName ? ` · ${t.assignedToName}` : ""}
+                      </div>
+                    </div>
+                  </div>
                 ))
               )}
             </div>

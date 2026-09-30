@@ -18,12 +18,42 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { NewTaskButton } from "./NewTaskButton";
+import { TaskTitleLink } from "./TaskTitleLink";
+import type { EditTaskLabels } from "./EditTaskDialog";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
 type Task = Awaited<ReturnType<typeof getOpenTasks>>[number];
 type Dict = Awaited<ReturnType<typeof getDictionary>>["tasksPage"];
+
+/** Maps this page's own dictionary section into the shared EditTaskDialog
+ * shape — see that component's doc comment for why every page that mounts
+ * it builds its own copy of this object instead of sharing one bundle. */
+function pickEditTaskLabels(l: Dict): EditTaskLabels {
+  return {
+    dialogTitle: l.taskEditDialogTitle,
+    fieldTitle: l.taskTitleLabel,
+    fieldDue: l.taskDueLabel,
+    fieldAssignee: l.taskAssigneeLabel,
+    fieldDescription: l.taskDescriptionLabel,
+    fieldAssociation: l.taskAssociationLabel,
+    associationHelp: l.taskAssociationHelp,
+    titleRequiredError: l.taskTitleRequiredError,
+    markComplete: l.taskMarkComplete,
+    reopenTask: l.taskReopenDialogAction,
+    cancel: l.cancel,
+    saveChanges: l.taskSaveChanges,
+    saving: l.taskSaving,
+    saveError: l.taskSaveError,
+    genericError: l.genericError,
+    completedBadge: l.taskCompletedBadge,
+    completedCaptionPrefix: l.taskCompletedCaptionPrefix,
+    toastUpdated: l.toastTaskUpdated,
+    toastCompleted: l.toastTaskCompleted,
+    toastReopened: l.toastTaskReopened,
+  };
+}
 
 interface TasksPageProps {
   searchParams: Promise<{ view?: string }>;
@@ -86,9 +116,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       </nav>
 
       {view === "done" ? (
-        <CompletedTasksView dict={dict} me={me} />
+        <CompletedTasksView dict={dict} me={me} ownerOptions={ownerOptions} />
       ) : (
-        <OpenTasksView view={view} dict={dict} me={me} />
+        <OpenTasksView view={view} dict={dict} me={me} ownerOptions={ownerOptions} />
       )}
     </main>
   );
@@ -98,10 +128,12 @@ async function OpenTasksView({
   view,
   dict,
   me,
+  ownerOptions,
 }: {
   view: Extract<TaskView, "mine" | "all">;
   dict: Awaited<ReturnType<typeof getDictionary>>;
   me: Awaited<ReturnType<typeof getCurrentBd>>;
+  ownerOptions: { id: string; name: string }[];
 }) {
   const l = dict.tasksPage;
   // Bug fix (task-essentials backlog item 3): "Todas abiertas" used to pass
@@ -137,6 +169,7 @@ async function OpenTasksView({
           tasks={overdueTasks}
           dict={dict}
           me={me}
+          ownerOptions={ownerOptions}
         />
       )}
       {todayTasks.length > 0 && (
@@ -147,6 +180,7 @@ async function OpenTasksView({
           tasks={todayTasks}
           dict={dict}
           me={me}
+          ownerOptions={ownerOptions}
         />
       )}
       {upcomingTasks.length > 0 && (
@@ -157,6 +191,7 @@ async function OpenTasksView({
           tasks={upcomingTasks}
           dict={dict}
           me={me}
+          ownerOptions={ownerOptions}
         />
       )}
     </>
@@ -166,9 +201,11 @@ async function OpenTasksView({
 async function CompletedTasksView({
   dict,
   me,
+  ownerOptions,
 }: {
   dict: Awaited<ReturnType<typeof getDictionary>>;
   me: Awaited<ReturnType<typeof getCurrentBd>>;
+  ownerOptions: { id: string; name: string }[];
 }) {
   const l = dict.tasksPage;
   const completedTasks = await getCompletedTasks(100);
@@ -189,6 +226,7 @@ async function CompletedTasksView({
       tasks={completedTasks}
       dict={dict}
       me={me}
+      ownerOptions={ownerOptions}
     />
   );
 }
@@ -200,6 +238,7 @@ function TaskGroup({
   tasks,
   dict,
   me,
+  ownerOptions,
 }: {
   title: string;
   count: number | null;
@@ -207,6 +246,7 @@ function TaskGroup({
   tasks: Task[];
   dict: Awaited<ReturnType<typeof getDictionary>>;
   me: Awaited<ReturnType<typeof getCurrentBd>>;
+  ownerOptions: { id: string; name: string }[];
 }) {
   return (
     <section className={styles.section}>
@@ -227,7 +267,7 @@ function TaskGroup({
           </thead>
           <tbody>
             {tasks.map((task) => (
-              <TaskRow key={task.id} task={task} dict={dict} me={me} badgeClass={badgeClass} />
+              <TaskRow key={task.id} task={task} dict={dict} me={me} badgeClass={badgeClass} ownerOptions={ownerOptions} />
             ))}
           </tbody>
         </table>
@@ -241,11 +281,13 @@ function TaskRow({
   dict,
   me,
   badgeClass,
+  ownerOptions,
 }: {
   task: Task;
   dict: Awaited<ReturnType<typeof getDictionary>>;
   me: Awaited<ReturnType<typeof getCurrentBd>>;
   badgeClass: string;
+  ownerOptions: { id: string; name: string }[];
 }) {
   const l = dict.tasksPage;
   const status = dueBucketOf(task.dueAt);
@@ -258,7 +300,23 @@ function TaskRow({
         <CompleteTaskButton taskId={task.id} ariaLabel={l.completeAria} errorLabel={l.completeError} />
       </td>
       <td>
-        <span className={styles.taskTitle}>{task.title}</span>
+        <TaskTitleLink
+          task={{
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            dueAt: task.dueAt,
+            assignedToBdId: task.assignedToBdId,
+            status: task.status as "open" | "done" | "cancelled",
+            personId: task.personId,
+            companyKey: task.companyKey,
+            associationLabel: subject?.label ?? "—",
+          }}
+          className={styles.taskTitle}
+          assigneeOptions={ownerOptions}
+          meId={me.id}
+          labels={pickEditTaskLabels(l)}
+        />
         {task.description && <p className={styles.taskDescription}>{task.description}</p>}
       </td>
       <td>

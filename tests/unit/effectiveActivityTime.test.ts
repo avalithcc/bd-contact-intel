@@ -185,3 +185,81 @@ test("timeline ordering: a task_updated row newer than 60 other activities appea
     "the task edit must survive the LIMIT, not be cut as if it were the oldest row",
   );
 });
+
+/**
+ * "Last touch" scenario (task-edit change, owner review): a contact's
+ * `lastActivityDays` staleness filter (listQueries.ts's EXISTS, built from
+ * `effectiveActivityAtSql() >= since` — the SQL twin of
+ * `isEffectiveActivityWithinDays` below) and its DISTINCT ON "last touch"
+ * pick (`ORDER BY effectiveActivityAtSql() DESC NULLS LAST`, the SQL twin
+ * of picking the max non-null `resolveEffectiveActivityAt` here) must both
+ * be driven by the contact's REAL last touch, never by a newer
+ * task_updated/task_completed/task_reopened row — those are NON_TOUCH_
+ * ACTIVITY_TYPES (see effectiveActivityAtSql's NULL branch), so `NULLS
+ * LAST` can never let one win the "most recent touch" pick over an older
+ * real touch, and `NULL >= since` is never true in the EXISTS filter
+ * either. This pins the JS-side equivalent of BOTH: simulating the
+ * DISTINCT-ON pick (max non-null effective time) across a person's rows,
+ * then checking a 30-day staleness window against THAT pick, not against
+ * whichever row is newest by wall-clock.
+ */
+test("a contact whose newest activity is task_updated keeps its real last touch and still matches a 30-day staleness filter", () => {
+  const now = new Date("2026-09-30T12:00:00.000Z");
+  const realTouch = {
+    id: "touch-1",
+    type: "email_sent",
+    createdAt: new Date("2026-09-15T12:00:00.000Z"), // 15 days ago — within 30
+    metadata: {},
+  };
+  const newerTaskEdit = {
+    id: "task-edit-1",
+    type: "task_updated",
+    createdAt: new Date("2026-09-29T12:00:00.000Z"), // 1 day ago — newer by wall-clock
+    metadata: {},
+  };
+  const rows = [realTouch, newerTaskEdit];
+
+  // Simulates the DISTINCT ON pick: max non-null effective time wins,
+  // exactly what `ORDER BY effectiveActivityAtSql() DESC NULLS LAST` picks.
+  const lastTouch = rows.reduce<{ id: string; at: Date } | null>((best, row) => {
+    const at = resolveEffectiveActivityAt(row);
+    if (!at) return best;
+    if (!best || at.getTime() > best.at.getTime()) return { id: row.id, at };
+    return best;
+  }, null);
+
+  assert.equal(lastTouch?.id, "touch-1", "the real touch must win the pick, not the newer non-touch row");
+  assert.equal(
+    isEffectiveActivityWithinDays(realTouch, 30, now),
+    true,
+    "the contact's real last touch (15 days ago) is within a 30-day staleness filter",
+  );
+  assert.equal(
+    isEffectiveActivityWithinDays(newerTaskEdit, 30, now),
+    false,
+    "the newer task_updated row must never count toward the staleness filter, even though it is more recent by wall-clock",
+  );
+});
+
+test("a contact whose only recent activity is task_updated, with its real touch OLDER than the window, correctly reads as stale", () => {
+  const now = new Date("2026-09-30T12:00:00.000Z");
+  const oldRealTouch = {
+    id: "touch-1",
+    type: "email_sent",
+    createdAt: new Date("2026-08-01T12:00:00.000Z"), // 60 days ago — outside 30
+    metadata: {},
+  };
+  const todaysTaskEdit = {
+    id: "task-edit-1",
+    type: "task_updated",
+    createdAt: now, // edited today
+    metadata: {},
+  };
+
+  // Neither row satisfies a 30-day staleness filter: the real touch is too
+  // old, and the task edit — however recent — is never a touch at all. A
+  // naive "most recent row wins" filter would wrongly read this contact as
+  // fresh because of today's task edit.
+  assert.equal(isEffectiveActivityWithinDays(oldRealTouch, 30, now), false);
+  assert.equal(isEffectiveActivityWithinDays(todaysTaskEdit, 30, now), false);
+});

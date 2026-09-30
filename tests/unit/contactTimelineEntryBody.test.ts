@@ -37,6 +37,7 @@ function entry(overrides: Partial<TimelineEntryForBody> = {}): TimelineEntryForB
     type: "status_backfill",
     metadata: {},
     visible: true,
+    actorName: null,
     ...overrides,
   };
 }

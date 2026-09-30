@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, company, person, task, type Task, type NewTask } from "@/db/schema";
+import { activity, bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
@@ -471,64 +471,81 @@ export async function createTask(input: NewTask): Promise<Task> {
   return row!;
 }
 
-/**
- * Re-resolves `person_id` when the update itself changes the task's subject
- * (design "Reference writes": "`updateTask` re-resolves on subject change").
- * Untouched otherwise, so a plain status/title update never re-queries.
- *
- * Bug fix (review): `.returning()` on a `WHERE id = taskId` that matches
- * nothing (task already deleted, or a bad id) used to return an empty array,
- * and the old `row!` non-null assertion turned that into `undefined` silently
- * reported as a successful `Task` to every caller. Now throws
- * `TaskNotFoundError` instead — callers that don't already handle it (see
- * `completeTask`/`setTaskStatusForPerson` below, and every server action that
- * wraps them) surface it as a thrown rejection, same as any other typed task
- * error in this file.
- */
-export async function updateTask(taskId: string, updates: Partial<NewTask>): Promise<Task> {
-  const lookup =
-    updates.personId == null && (updates.leadId !== undefined || updates.contactId !== undefined)
-      ? resolvePersonIdLookup(updates)
-      : null;
-  const set =
-    lookup && isIdentityDualWriteEnabled()
-      ? { ...updates, personId: personIdLookupSql(lookup), updatedAt: new Date() }
-      : { ...updates, updatedAt: new Date() };
-  const [row] = await db.update(task).set(set).where(eq(task.id, taskId)).returning();
-  if (!row) throw new TaskNotFoundError();
-  return row;
-}
-
-export async function completeTask(taskId: string): Promise<Task> {
-  return updateTask(taskId, { status: "done" });
-}
+// The general-purpose `updateTask`/`completeTask`/`setTaskStatusForPerson`
+// helpers that used to live here were replaced by `updateTaskWithActivity`/
+// `setTaskStatusChecked` (src/lib/tasks/updateWithActivity.ts) — see the doc
+// comment above `deleteTask` below. Neither the "Editar tarea" dialog nor
+// any completion/reopen entry point ever reassigns a task's subject (mockup
+// decision: "Asociado con" is read-only), so the identity dual-write
+// re-resolution `updateTask` used to do on a subject change has no caller
+// left; `createTask` above still does its own (initial-subject) resolution.
 
 /**
- * Ownership-scoped task status write (review fix, timeline-tasks-pill):
- * `completeContactTaskAction`/`reopenContactTaskAction` (contacts/actions.ts)
- * used to update a task by `id` alone — no check that it actually belonged
- * to the `personId` the caller claimed, so any signed-in BD could complete
- * or reopen ANY task by guessing/copying its id into the wrong Contact's
- * page. The ownership check is part of the write itself
- * (`WHERE id = taskId AND person_id = personId`), not a separate read-then-
- * write — a row that exists but belongs to a different person never matches
- * and throws the same `TaskNotFoundError` as a genuinely missing task
- * (never let a caller distinguish the two — see that error's doc comment).
+ * Task completion/reopening (and its authorization + activity logging) now
+ * lives in ONE place, `setTaskStatusChecked` (src/lib/tasks/
+ * updateWithActivity.ts) — replacing this file's old `completeTask` (a
+ * plain, unscoped `WHERE id = taskId` update) and `setTaskStatusForPerson`
+ * (scoped by a caller-supplied `personId`, which couldn't handle a task
+ * shown on a Company's page that's actually person-scoped — see
+ * updateWithActivity.ts's doc comment). Every former caller
+ * (contacts/actions.ts, companies/actions.ts, tasks/CompleteTaskButton.tsx)
+ * now goes through `setTaskStatusAction` (tasks/actions.ts) instead.
  */
-export async function setTaskStatusForPerson(
-  taskId: string,
-  personId: string,
-  status: "open" | "done",
-): Promise<Task> {
-  const [row] = await db
-    .update(task)
-    .set({ status, updatedAt: new Date() })
-    .where(and(eq(task.id, taskId), eq(task.personId, personId)))
-    .returning();
-  if (!row) throw new TaskNotFoundError();
-  return row;
-}
 
 export async function deleteTask(taskId: string): Promise<void> {
   await db.delete(task).where(eq(task.id, taskId));
+}
+
+/**
+ * Plain read by id — used by `getTaskCompletionInfoAction` (tasks/actions.ts,
+ * review fix WARNING #3) to derive the task's OWN subject/authorization
+ * inputs itself, instead of trusting a client-supplied `subject`. Read-only,
+ * so no `FOR UPDATE` lock (contrast `loadTaskForUpdate`,
+ * src/lib/tasks/updateWithActivity.ts, used by the write paths).
+ */
+export async function getTaskById(taskId: string): Promise<Task | null> {
+  const [row] = await db.select().from(task).where(eq(task.id, taskId));
+  return row ?? null;
+}
+
+/**
+ * "Completada el … · <nombre>" caption (task-edit change, mockup decision
+ * 5) — the most recent `task_completed` activity row for this task, if any.
+ * `null` for a task completed before this feature shipped (no such activity
+ * row exists yet) — the dialog falls back to a date-only caption using the
+ * task's own `updatedAt` in that case (see EditTaskDialog.tsx), never a
+ * crash or a fabricated actor.
+ *
+ * Scoped by the task's own subject (`personId`/`companyKey`) before the
+ * `metadata->>'taskId'` match, so this hits `activity_person_idx`/
+ * `activity_company_idx` first — the JSONB match only narrows an already
+ * small, indexed result set, never a full-table scan. Called on-demand when
+ * the edit dialog opens for an already-completed task (never from a record
+ * page's own render — see PERFORMANCE.md "round trips are the budget").
+ */
+export async function getTaskCompletionInfo(
+  taskId: string,
+  subject: { personId?: string | null; companyKey?: string | null },
+): Promise<{ at: Date; byName: string | null } | null> {
+  const subjectCondition = subject.personId
+    ? eq(activity.personId, subject.personId)
+    : subject.companyKey
+      ? eq(activity.companyKey, subject.companyKey)
+      : undefined;
+  if (!subjectCondition) return null;
+
+  const [row] = await db
+    .select({ at: activity.createdAt, byName: bd.name })
+    .from(activity)
+    .leftJoin(bd, eq(bd.id, activity.actorBdId))
+    .where(
+      and(
+        subjectCondition,
+        eq(activity.type, "task_completed"),
+        sql`${activity.metadata}->>'taskId' = ${taskId}`,
+      ),
+    )
+    .orderBy(desc(activity.createdAt))
+    .limit(1);
+  return row ?? null;
 }

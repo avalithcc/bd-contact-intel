@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ToastProvider";
-import { completeTaskAction } from "./actions";
+import { setTaskStatusAction } from "./actions";
 import styles from "./page.module.css";
 
 /**
@@ -26,7 +26,7 @@ export function CompleteTaskButton({
   const handleChange = async () => {
     setState("saving");
     try {
-      await completeTaskAction(taskId);
+      await setTaskStatusAction(taskId, "done");
       setState("done");
     } catch {
       setState("idle");

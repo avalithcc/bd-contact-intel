@@ -11,15 +11,25 @@
  * No LinkedIn pill: LinkedIn ingestion is off (see chore/hide-linkedin-
  * imports) and this module doesn't reintroduce it.
  *
- * No "task" entry here either, even though the record page's Actividad tab
- * DOES have a "Tareas" pill (mockup-port timeline-tasks-pill;
- * contact-record.html:104): a task is never an `activity` row, so it has no
- * `activity.type` to group and no place in `TIMELINE_PILL_GROUPS`. Timeline.tsx
- * handles that pill entirely on its own — it always holds the Contact's full
- * task list already (`getTasksForPerson`, src/lib/tasks/queries.ts, fetched
- * once in page.tsx's initial `Promise.all`, same round trip that used to
- * fetch open-only tasks), so selecting it is a pure client-side switch, never
- * a fetch through this module's `TimelinePillKey` machinery.
+ * No "task" entry in `TIMELINE_PILL_GROUPS`/`TimelinePillKey` itself, even
+ * though the record page's Actividad tab DOES have a "Tareas" pill
+ * (mockup-port timeline-tasks-pill; contact-record.html:104): a task ROW
+ * (open/done) is still never an `activity` row, so `getTasksForPerson`'s
+ * task list has no `activity.type` to group here. Timeline.tsx handles that
+ * pill's task-row part entirely on its own — `getTasksForPerson` is fetched
+ * once in page.tsx's initial `Promise.all`, so selecting it is a pure
+ * client-side switch, never a fetch through this module's `TimelinePillKey`
+ * machinery.
+ *
+ * `task_updated`/`task_completed`/`task_reopened` (task-edit change) ARE
+ * real `activity` rows, though — see `TASK_ACTIVITY_TYPES` below. They ride
+ * along in "Todo" through `TIMELINE_ACTIVITY_TYPES` (queries.ts) like any
+ * other type, but are deliberately left OUT of every `TIMELINE_PILL_GROUPS`
+ * entry (in particular "system") — the Tareas pill counts and displays them
+ * itself (Timeline.tsx adds `sumTaskActivityCount` to its own badge and
+ * filters its own loaded pool by `TASK_ACTIVITY_TYPES` when that pill is
+ * active), so they must never ALSO be attributed to an activity-type pill or
+ * they'd be counted twice on the same screen.
  *
  * Deliberately has ZERO imports from @/lib/activity/queries (which imports
  * @/db) so this stays a pure, DB-free module a plain `node:test` file can
@@ -68,6 +78,21 @@ export function resolveTimelinePillKey(value: string | undefined): TimelinePillK
 /** A pill's badge count is the SUM over every type it groups. */
 export function sumPillCount(countsByType: Record<string, number>, pill: TimelinePillKey): number {
   return TIMELINE_PILL_GROUPS[pill].reduce((sum, type) => sum + (countsByType[type] ?? 0), 0);
+}
+
+/**
+ * The three real `activity` types the "Editar tarea" dialog writes
+ * (task-edit change) — grouped under the Tareas pill, never a
+ * `TimelinePillKey`/`TIMELINE_PILL_GROUPS` entry (see this module's doc
+ * comment above for why). Timeline.tsx uses this both to add their true
+ * count to the Tareas pill's badge (`sumTaskActivityCount`) and to filter
+ * its own loaded entry pool down to just these three when that pill is
+ * active.
+ */
+export const TASK_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened"] as const;
+
+export function sumTaskActivityCount(countsByType: Record<string, number>): number {
+  return TASK_ACTIVITY_TYPES.reduce((sum, type) => sum + (countsByType[type] ?? 0), 0);
 }
 
 /**

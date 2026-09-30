@@ -1,5 +1,6 @@
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { CompanyTimelineRow } from "@/lib/companies/recordQueries";
+import { taskActivityBody, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
 
 /**
  * Plain-string labels this module needs to build a row's "what" headline —
@@ -16,6 +17,17 @@ export interface CompanyTimelineViewLabels {
   atDiscarded: string;
   atHunterLookup: string;
   atStatusBackfill: string;
+  atTaskUpdated: string;
+  atTaskCompleted: string;
+  atTaskReopened: string;
+  taskChangeFieldTitle: string;
+  taskChangeFieldDue: string;
+  taskChangeFieldAssignee: string;
+  taskChangeFieldDescription: string;
+  taskChangeUpdatedPrefix: string;
+  taskChangeCompletedPrefix: string;
+  taskChangeReopenedPrefix: string;
+  taskChangeUnknownActor: string;
 }
 
 export interface CompanyTimelineViewRow extends CompanyTimelineRow {
@@ -43,9 +55,35 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atDiscarded;
     case "hunter_lookup":
       return l.atHunterLookup;
+    case "task_updated":
+      return l.atTaskUpdated;
+    case "task_completed":
+      return l.atTaskCompleted;
+    case "task_reopened":
+      return l.atTaskReopened;
     default:
       return type;
   }
+}
+
+const TASK_ACTIVITY_TYPES_SET = new Set(["task_updated", "task_completed", "task_reopened"]);
+
+function taskActivityViewBody(
+  type: string,
+  metadata: Record<string, unknown>,
+  actorName: string | null,
+  l: CompanyTimelineViewLabels,
+): string {
+  return taskActivityBody(type, metadata as TaskActivityMetadata, actorName, {
+    fieldTitle: l.taskChangeFieldTitle,
+    fieldDue: l.taskChangeFieldDue,
+    fieldAssignee: l.taskChangeFieldAssignee,
+    fieldDescription: l.taskChangeFieldDescription,
+    updatedPrefix: l.taskChangeUpdatedPrefix,
+    completedPrefix: l.taskChangeCompletedPrefix,
+    reopenedPrefix: l.taskChangeReopenedPrefix,
+    unknownActor: l.taskChangeUnknownActor,
+  });
 }
 
 /**
@@ -84,7 +122,12 @@ export function buildCompanyTimelineViewRows(
     } else {
       what = row.personName ? `${typeLabel(labels, row.type)} · ${row.personName}` : typeLabel(labels, row.type);
     }
-    const body = row.type === "note" && typeof metadata.note === "string" ? metadata.note : null;
+    const body =
+      row.type === "note" && typeof metadata.note === "string"
+        ? metadata.note
+        : TASK_ACTIVITY_TYPES_SET.has(row.type)
+          ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
+          : null;
     return { ...row, what, body };
   });
 }

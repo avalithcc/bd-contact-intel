@@ -11,7 +11,7 @@ import { searchContactCompanies } from "@/lib/contacts/companySearchDb";
 import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
-import { setTaskStatusForPerson } from "@/lib/tasks/queries";
+import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
@@ -203,22 +203,19 @@ export async function addContactTaskAction(
  * "Marcar como hecha" on a record-page timeline/right-panel task row
  * (mockup-port r03/r05; contact-record.html:111/181).
  *
- * Bug fix (review, timeline-tasks-pill): this used to call the generic
- * `completeTaskAction(taskId)` — a plain `WHERE id = taskId` update with no
- * check that the task actually belonged to `personId`, so any signed-in BD
- * could complete (or, via `reopenContactTaskAction` below, reopen) ANY task
- * by putting its id in the URL of a Contact it had nothing to do with. Now:
- * `assertContactEditableById` first, same guard every other write in this
- * file already runs; then `setTaskStatusForPerson` (src/lib/tasks/queries.ts),
- * which enforces the ownership check IN the write's own `WHERE` clause
- * (`id = taskId AND person_id = personId`), not as a separate read — a task
- * that exists but belongs to someone else throws the same
- * `TaskNotFoundError` (-> "not_found") a genuinely missing task would.
+ * Authorization, id+subject-scoped write and `task_completed` activity
+ * logging all live in ONE place now — `setTaskStatusChecked`
+ * (src/lib/tasks/updateWithActivity.ts), shared by every completion/reopen
+ * entry point in the app (task-edit change). It reads the task's OWN real
+ * subject fresh (not this `personId` argument, kept only for
+ * `revalidatePath` below), so a task that exists but belongs to someone
+ * else still throws `TaskNotFoundError` (-> "not_found") — same guarantee
+ * the original IDOR fix (review, timeline-tasks-pill) established.
  */
 export async function completeContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
   try {
-    await assertContactEditableById(personId);
-    await setTaskStatusForPerson(taskId, personId, "done");
+    const me = await getCurrentBd();
+    await setTaskStatusChecked(taskId, "done", me);
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
@@ -229,12 +226,12 @@ export async function completeContactTaskAction(taskId: string, personId: string
 /**
  * "Reabrir" on the record page's "Tareas" filter pill (mockup-port
  * timeline-tasks-pill) — the reopen counterpart of
- * `completeContactTaskAction` above, same fix and same reasoning.
+ * `completeContactTaskAction` above, same shared write path.
  */
 export async function reopenContactTaskAction(taskId: string, personId: string): Promise<ContactActionResult> {
   try {
-    await assertContactEditableById(personId);
-    await setTaskStatusForPerson(taskId, personId, "open");
+    const me = await getCurrentBd();
+    await setTaskStatusChecked(taskId, "open", me);
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
