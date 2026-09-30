@@ -171,7 +171,11 @@ function relationshipFilterCondition(key: RelationshipFilterKey) {
       cutoff.setMonth(cutoff.getMonth() - DORMANT_MONTHS);
       // Composed as one SQL fragment: `and()` is typed as possibly
       // undefined, which does not fit the non-optional filter list.
-      return sql`${contact.reciprocal} = true and ${contact.lastMessageAt} < ${cutoff}`;
+      // `last_message_at` is naive UTC (query rule 2/6): interpolating the
+      // raw `cutoff` Date here (query rule 1) left it an implicitly-typed
+      // naive literal; pass an explicit `::timestamptz` ISO string and
+      // convert the naive column with `at time zone 'UTC'` instead.
+      return sql`${contact.reciprocal} = true and ${contact.lastMessageAt} at time zone 'UTC' < ${cutoff.toISOString()}::timestamptz`;
     }
   }
 }

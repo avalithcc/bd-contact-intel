@@ -145,7 +145,11 @@ export async function getCandidateCompanies(
       and not exists (
         select 1 from company_probe cp
         where cp.company_key = c.company_key
-          and cp.last_probed_at >= ${cooldownDate.toISOString()}::timestamp
+          -- last_probed_at is naive UTC: convert it explicitly with
+          -- "at time zone 'UTC'" and compare to a real ::timestamptz
+          -- instant, instead of a naive ::timestamp cast or an implicit
+          -- cast that would depend on the session TimeZone GUC.
+          and cp.last_probed_at at time zone 'UTC' >= ${cooldownDate.toISOString()}::timestamptz
       )
     group by c.company_key
     having min(coalesce(c.company_category, 'unclassified')) not in (${excluded})
