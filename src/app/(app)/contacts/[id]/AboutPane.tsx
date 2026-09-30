@@ -8,10 +8,10 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { HistoryIcon, LinkedInIcon } from "@/components/icons";
-import { PropertyList, type AboutPaneProperty, type OwnerOption } from "./PropertyList";
+import { PropertyList, type AboutPaneProperty, type JobTitleRoleGroupHint, type OwnerOption } from "./PropertyList";
 import { QuickActions, type TaskAssigneeOption } from "./QuickActions";
 
-export type { AboutPaneProperty, OwnerOption };
+export type { AboutPaneProperty, JobTitleRoleGroupHint, OwnerOption };
 
 export interface AboutPaneProps {
   personId: string;
@@ -52,6 +52,7 @@ export interface AboutPaneProps {
   properties: AboutPaneProperty[];
   // "Ubicación" composite row (contact-record.html:86) — see PropertyList.
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
+  jobTitleRoleGroupHint: JobTitleRoleGroupHint;
   messageLabels: GenerateMessageLabels;
   locale: Locale;
   // Board drag/keyboard-menu handoff (task 10.5, 14.1), plus the follow-up
@@ -94,6 +95,7 @@ export function AboutPane({
   createdText,
   properties,
   locationProperties,
+  jobTitleRoleGroupHint,
   messageLabels,
   locale,
   initialAction,
@@ -174,6 +176,7 @@ export function AboutPane({
         createdText={createdText}
         properties={properties}
         locationProperties={locationProperties}
+        jobTitleRoleGroupHint={jobTitleRoleGroupHint}
       />
     </aside>
   );

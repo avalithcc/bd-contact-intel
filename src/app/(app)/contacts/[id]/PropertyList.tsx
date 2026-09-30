@@ -28,6 +28,21 @@ export interface OwnerOption {
   name: string;
 }
 
+/**
+ * "Por qué este rol" disclosure on the Cargo row (openspec/changes/
+ * bd-playbook, surface 1) — computed server-side in page.tsx from
+ * `classifyPosition(record.person.jobTitle)` (src/lib/roleGroups.ts) plus
+ * the matching entry in src/lib/roleGroupPlaybook.ts. No new query: the
+ * jobTitle is already fetched for the Cargo row itself.
+ */
+export interface JobTitleRoleGroupHint {
+  roleGroupLabel: string;
+  decides: string | null;
+  painSolved: string | null;
+  note: string | null;
+  guideHref: string;
+}
+
 export interface PropertyListProps {
   personId: string;
   labels: ContactRecordLabels;
@@ -57,6 +72,7 @@ export interface PropertyListProps {
   // history; this only composes how the collapsed row displays and expands
   // its own inline edit form (see LocationPropertyRow below).
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
+  jobTitleRoleGroupHint: JobTitleRoleGroupHint;
 }
 
 /**
@@ -86,6 +102,7 @@ export function PropertyList({
   createdText,
   properties,
   locationProperties,
+  jobTitleRoleGroupHint,
 }: PropertyListProps) {
   const router = useRouter();
   const [editingKey, setEditingKey] = useState<EditablePersonProperty | null>(null);
@@ -221,6 +238,7 @@ export function PropertyList({
             emailVerified={prop.key === "email" && emailVerified}
             emailInferred={prop.key === "email" && emailInferred}
             hunterHint={prop.key === "email" ? hunterHint : null}
+            roleGroupHint={prop.key === "jobTitle" ? jobTitleRoleGroupHint : null}
             editing={editingKey === prop.key}
             busy={busy}
             error={editingKey === prop.key ? error : null}
@@ -275,6 +293,7 @@ function PropertyRow({
   emailVerified,
   emailInferred,
   hunterHint,
+  roleGroupHint,
   editing,
   busy,
   error,
@@ -287,6 +306,7 @@ function PropertyRow({
   emailVerified: boolean;
   emailInferred: boolean;
   hunterHint: string | null;
+  roleGroupHint?: JobTitleRoleGroupHint | null;
   editing: boolean;
   busy: boolean;
   error: string | null;
@@ -342,6 +362,39 @@ function PropertyRow({
         {telHref ? <a href={telHref}>{prop.value}</a> : (prop.value ?? l.emptyValue)}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
         {emailInferred && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
+        {roleGroupHint && (
+          <details className="dropdown">
+            <summary className="btn btn-ghost btn-sm btn-icon" aria-label={l.jobTitleHintLabel} title={l.jobTitleHintLabel}>
+              <InfoIcon className="icon" />
+            </summary>
+            <div className="menu left" style={{ width: 300 }}>
+              <div className="menu-label">{l.jobTitleHintMenuLabel}</div>
+              {roleGroupHint.decides ? (
+                <>
+                  <p className="meta" style={{ padding: "0.4rem var(--space-sm)" }}>
+                    <strong>{roleGroupHint.roleGroupLabel}.</strong> {roleGroupHint.decides}
+                  </p>
+                  {roleGroupHint.painSolved && (
+                    <>
+                      <div className="menu-sep" />
+                      <p className="meta" style={{ padding: "0 var(--space-sm) 0.4rem" }}>
+                        {l.jobTitlePainPrefix} {roleGroupHint.painSolved}
+                      </p>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="meta" style={{ padding: "0.4rem var(--space-sm)" }}>
+                  <strong>{roleGroupHint.roleGroupLabel}.</strong> {roleGroupHint.note}
+                </p>
+              )}
+              <div className="menu-sep" />
+              <a className="menu-item" href={roleGroupHint.guideHref}>
+                {l.jobTitleGuideLinkText}
+              </a>
+            </div>
+          </details>
+        )}
         <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>

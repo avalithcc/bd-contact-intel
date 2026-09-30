@@ -18,6 +18,8 @@ import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
+import { classifyPosition } from "@/lib/roleGroups";
+import { ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { PlusIcon } from "@/components/icons";
@@ -151,6 +153,22 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     city: toAboutPaneProperty(record.properties.find((p) => p.key === "city")!),
     region: toAboutPaneProperty(record.properties.find((p) => p.key === "region")!),
     country: toAboutPaneProperty(record.properties.find((p) => p.key === "country")!),
+  };
+
+  // "Por qué este rol" hint on the Cargo row (openspec/changes/bd-playbook,
+  // surface 1) — classifyPosition is a pure function over the jobTitle
+  // already fetched above for the Cargo row itself, so this adds no query.
+  // Deliberately reclassifies from the raw jobTitle text rather than trusting
+  // the separately editable `roleGroup` property (a BD can override that one
+  // by hand), so the hint always explains the CURRENT Cargo value.
+  const jobTitleRoleGroupKey = classifyPosition(record.person.jobTitle);
+  const jobTitleRoleGroupEntry = ROLE_GROUP_PLAYBOOK[jobTitleRoleGroupKey];
+  const jobTitleRoleGroupHint = {
+    roleGroupLabel: dict.roleGroups[jobTitleRoleGroupKey],
+    decides: jobTitleRoleGroupEntry.decides ?? null,
+    painSolved: jobTitleRoleGroupEntry.painSolved ?? null,
+    note: jobTitleRoleGroupEntry.note ?? null,
+    guideHref: `/playbook#${jobTitleRoleGroupKey}`,
   };
 
   // "Estado" derivation "why" hint (contact-record.html:77) — composed
@@ -296,6 +314,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           createdText={createdText}
           properties={properties}
           locationProperties={locationProperties}
+          jobTitleRoleGroupHint={jobTitleRoleGroupHint}
           messageLabels={messageLabels}
           locale={locale}
           initialAction={openAction}
