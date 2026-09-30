@@ -12,6 +12,33 @@ import {
   syncedActivityIdempotencyKey,
   type BuildSyncedActivityRowsInput,
 } from "@/lib/gmail/buildSyncedActivities";
+import { classifyGmailMessage, type KnownPersonEmail } from "@/lib/gmail/classify";
+import { parseGmailMessage, type GmailApiMessage } from "@/lib/gmail/parseMessage";
+
+const BD_EMAIL = "cristian@avalith.net";
+
+function b64url(text: string): string {
+  return Buffer.from(text, "utf8").toString("base64url");
+}
+
+function fixtureMessage(overrides: Partial<GmailApiMessage> = {}): GmailApiMessage {
+  return {
+    id: "msg-automated-1",
+    threadId: "thread-automated-1",
+    internalDate: "1700000000000",
+    payload: {
+      headers: [
+        { name: "From", value: "sistemas@decreditos.com" },
+        { name: "To", value: "operaciones@decreditos.com" },
+        { name: "Cc", value: "rcrescentini@decreditos.com" },
+        { name: "Subject", value: "Transferencia exitosa" },
+      ],
+      mimeType: "text/plain",
+      body: { data: b64url("Comprobante adjunto.") },
+    },
+    ...overrides,
+  };
+}
 
 function baseInput(overrides: Partial<BuildSyncedActivityRowsInput> = {}): BuildSyncedActivityRowsInput {
   return {
@@ -84,6 +111,65 @@ test("idempotency keys are unique per (person, gmailMessageId) even for the same
   const keys = rows.map(syncedActivityIdempotencyKey);
   assert.deepEqual(keys, ["person-1:msg-1", "person-2:msg-1"]);
   assert.equal(new Set(keys).size, keys.length);
+});
+
+test("regression (2026-09-30 misattributed inbound sender match): a CRM contact only in To/Cc of an automated inbound message gets no reply_received activity", () => {
+  const knownPersons: KnownPersonEmail[] = [
+    { personId: "person-rc", emailNormalized: "rcrescentini@decreditos.com", confidence: "exact" },
+  ];
+  const classified = classifyGmailMessage({
+    message: parseGmailMessage(fixtureMessage()),
+    bdEmail: BD_EMAIL,
+    knownPersons,
+    neverLogRules: [],
+  });
+  assert.equal(classified.direction, "inbound");
+  assert.deepEqual(classified.matches, []);
+
+  const rows = buildSyncedActivityRows({
+    gmailMessageId: classified.gmailMessageId,
+    gmailThreadId: classified.gmailThreadId,
+    direction: classified.direction,
+    fromAddress: classified.fromAddress,
+    toAddresses: classified.toAddresses,
+    subject: classified.subject,
+    sentAt: classified.sentAt,
+    isPlatformSent: classified.isPlatformSent,
+    matches: classified.matches,
+  });
+  assert.deepEqual(rows, []);
+});
+
+test("inbound from a CRM contact with another CRM contact in cc: only the sender gets a reply_received row", () => {
+  const knownPersons: KnownPersonEmail[] = [
+    { personId: "person-sender", emailNormalized: "sistemas@decreditos.com", confidence: "exact" },
+    { personId: "person-rc", emailNormalized: "rcrescentini@decreditos.com", confidence: "exact" },
+  ];
+  const classified = classifyGmailMessage({
+    message: parseGmailMessage(fixtureMessage()),
+    bdEmail: BD_EMAIL,
+    knownPersons,
+    neverLogRules: [],
+  });
+  assert.equal(classified.direction, "inbound");
+  assert.deepEqual(classified.matches, [
+    { personId: "person-sender", matchedEmail: "sistemas@decreditos.com", matchConfidence: "exact" },
+  ]);
+
+  const rows = buildSyncedActivityRows({
+    gmailMessageId: classified.gmailMessageId,
+    gmailThreadId: classified.gmailThreadId,
+    direction: classified.direction,
+    fromAddress: classified.fromAddress,
+    toAddresses: classified.toAddresses,
+    subject: classified.subject,
+    sentAt: classified.sentAt,
+    isPlatformSent: classified.isPlatformSent,
+    matches: classified.matches,
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.type, "reply_received");
+  assert.equal(rows[0]?.personId, "person-sender");
 });
 
 test("is a pure planner: calling it twice with the same input yields deepEqual results and never mutates the input", () => {
