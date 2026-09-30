@@ -28,17 +28,23 @@
  * single-valued and NOT migrated by a merge, so a merged contact either
  * showed zero LinkedIn conversations, or (if the survivor already had its
  * own key) showed a count from the migrated `person_bd_connection` row that
- * disagreed with an empty message list. `mergedProfileKeysSql` resolves
- * every profile key merges have folded onto `personId` (see
+ * disagreed with an empty message list. `mergedProfileKeysAnyCondition`
+ * resolves every profile key merges have folded onto `personId` (see
  * src/lib/identity/mergedProfileKeys.ts) directly in the `conversation`
  * query, which also drops the separate `person` lookup — one fewer round
- * trip than before, not one more.
+ * trip than before, not one more. `ANY (ARRAY(...))`, not `IN (...)`: see
+ * mergedProfileKeys.ts's doc comment for the prod EXPLAIN numbers that ruled
+ * out `IN (...)` (it forced a seq scan on `conversation`).
+ *
+ * The `targetBdId` existence check below (a separate lookup, on `bd`, not
+ * `person`) still runs BEFORE the audit insert — that part of this function
+ * is untouched by this bugfix.
  */
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, auditLog, bd, conversation, emailMessage, emailMessagePerson, message } from "@/db/schema";
 import { shouldAuditConversationView } from "@/lib/activity/conversationAudit";
-import { mergedProfileKeysSql } from "@/lib/identity/mergedProfileKeys";
+import { mergedProfileKeysAnyCondition } from "@/lib/identity/mergedProfileKeys";
 
 export interface AdminConversationEmailEntry {
   id: string;
@@ -140,7 +146,7 @@ export async function getConversationForAdmin(
     const conversationRows = await tx
       .select({ id: conversation.id, title: conversation.title })
       .from(conversation)
-      .where(and(eq(conversation.bdId, targetBdId), inArray(conversation.peerProfileKey, mergedProfileKeysSql(personId))));
+      .where(and(eq(conversation.bdId, targetBdId), mergedProfileKeysAnyCondition(personId)));
 
     let linkedin: AdminConversationThread[] = [];
     if (conversationRows.length) {

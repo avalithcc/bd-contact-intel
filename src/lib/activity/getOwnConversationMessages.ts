@@ -18,19 +18,23 @@
  * so a merged contact's summary card showed a real message count (from the
  * migrated `person_bd_connection` row) while expanding it returned an empty
  * message list. Resolves every profile key that belongs to `personId` once
- * merges are taken into account (`mergedProfileKeysSql` — the survivor's own
- * key plus every merged-away person's, walking `merged_into_id`) instead of
- * joining `person` directly — still one query, no intermediate round trip. A
- * `null` peer_profile_key (group threads/InMail with no resolvable profile,
- * see src/lib/messagesCsv.ts) can never match the resolved key set, so those
- * are excluded here the same way `recomputeMessageSignals`
- * (src/lib/queries.ts) already excludes them from per-contact aggregation.
+ * merges are taken into account (`mergedProfileKeysAnyCondition` — the
+ * survivor's own key plus every merged-away person's, walking
+ * `merged_into_id`) instead of joining `person` directly — still one query,
+ * no intermediate round trip. `ANY (ARRAY(...))`, not `IN (...)`: see
+ * mergedProfileKeys.ts's doc comment for the prod EXPLAIN numbers (`IN`
+ * forced a seq scan on `conversation`; `ANY (ARRAY(...))` keeps the
+ * `conversation_bd_peer_idx` index scan). A `null` peer_profile_key (group
+ * threads/InMail with no resolvable profile, see src/lib/messagesCsv.ts) can
+ * never match the resolved key set, so those are excluded here the same way
+ * `recomputeMessageSignals` (src/lib/queries.ts) already excludes them from
+ * per-contact aggregation.
  */
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { conversation, message } from "@/db/schema";
 import { resolveMessageDirection, type MessageDirection } from "@/lib/activity/messageDirection";
-import { mergedProfileKeysSql } from "@/lib/identity/mergedProfileKeys";
+import { mergedProfileKeysAnyCondition } from "@/lib/identity/mergedProfileKeys";
 
 export interface OwnConversationMessage {
   id: string;
@@ -55,7 +59,7 @@ export async function getOwnConversationMessages(bdId: string, personId: string)
     .where(
       and(
         eq(message.bdId, bdId),
-        inArray(conversation.peerProfileKey, mergedProfileKeysSql(personId)),
+        mergedProfileKeysAnyCondition(personId),
         eq(message.isDraft, false),
       ),
     )

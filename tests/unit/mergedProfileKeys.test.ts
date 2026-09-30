@@ -2,14 +2,27 @@
  * Unit tests for src/lib/identity/mergedProfileKeys.ts (bugfix: merged
  * person's LinkedIn conversation content, PR #235 review). `resolveMergedProfileKeys`
  * is the pure reference implementation pinning the merge-chain closure
- * semantics; `mergedProfileKeysSql` is the production SQL twin, pinned with a
- * PgDialect render test (schema-only import, no live DATABASE_URL needed,
- * same convention as tests/unit/appShellBadgeCountsQuery.test.ts).
+ * semantics; `mergedProfileKeysAnyCondition` is the production entry point,
+ * pinned with a PgDialect render test (schema-only import, no live
+ * DATABASE_URL needed, same convention as
+ * tests/unit/appShellBadgeCountsQuery.test.ts).
+ *
+ * Coordinator-measured fix: the predicate must render as
+ * `peer_profile_key = any(array(<recursive CTE>))`, NOT
+ * `peer_profile_key in (<recursive CTE>)` — read-only EXPLAIN ANALYZE
+ * against prod showed `IN (...)` forces a `Seq Scan on conversation` over
+ * all 6,081 rows (124ms cold / 1.86ms warm), while `= ANY (ARRAY(...))`
+ * keeps the `conversation_bd_peer_idx` index scan (1.28–1.33ms).
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { mergedProfileKeysSql, resolveMergedProfileKeys, type MergeChainPersonRow } from "@/lib/identity/mergedProfileKeys";
+import {
+  mergedProfileKeysAnyCondition,
+  mergedProfileKeysSql,
+  resolveMergedProfileKeys,
+  type MergeChainPersonRow,
+} from "@/lib/identity/mergedProfileKeys";
 
 const SURVIVOR = "00000000-0000-0000-0000-000000000001";
 const MERGED_DIRECT = "00000000-0000-0000-0000-000000000002";
@@ -82,8 +95,11 @@ test("mergedProfileKeysSql: renders a recursive CTE walking merged_into_id, filt
   assert.deepEqual(params, [SURVIVOR]);
 });
 
-test("mergedProfileKeysSql: is a single self-contained parenthesized expression (safe to embed in an IN (...) clause)", () => {
-  const { sql: rendered } = dialect.sqlToQuery(mergedProfileKeysSql(SURVIVOR));
-  assert.ok(rendered.trim().startsWith("("));
-  assert.ok(rendered.trim().endsWith(")"));
+test("mergedProfileKeysAnyCondition: renders 'peer_profile_key = any(array(<recursive CTE>))', never 'in (...)'", () => {
+  const { sql: rendered, params } = dialect.sqlToQuery(mergedProfileKeysAnyCondition(SURVIVOR));
+  assert.match(rendered, /"peer_profile_key" = any\(array\(with recursive mpk_chain/i);
+  assert.match(rendered, /merged_into_id = mpk_chain\.mpk_id/i);
+  assert.match(rendered, /profile_key is not null/i);
+  assert.doesNotMatch(rendered, /peer_profile_key["\s]*in\s*\(/i, "must never regress to IN (...) — prod EXPLAIN showed it forces a seq scan on conversation");
+  assert.deepEqual(params, [SURVIVOR]);
 });

@@ -27,15 +27,28 @@
  * since `merged_into_id` and the merged-away row's own `profile_key` were
  * never touched or deleted by the merge.
  *
- * `mergedProfileKeysSql` is the ONE production entry point — both read paths
- * (getOwnConversationMessages.ts's own-history query, getConversationForAdmin.ts's
- * admin-bypass query) and this module's own pure twin
- * (`resolveMergedProfileKeys`, used only by this file's unit tests to pin the
- * exact closure semantics before the SQL was written) must stay in sync;
- * change one, change the other's test fixture.
+ * `mergedProfileKeysAnyCondition` is the ONE production entry point — both
+ * read paths (getOwnConversationMessages.ts's own-history query,
+ * getConversationForAdmin.ts's admin-bypass query) and this module's own pure
+ * twin (`resolveMergedProfileKeys`, used only by this file's unit tests to
+ * pin the exact closure semantics before the SQL was written) must stay in
+ * sync; change one, change the other's test fixture.
+ *
+ * Coordinator-measured fix (read-only EXPLAIN ANALYZE against prod,
+ * 6,081-row `conversation` table): the first version of this predicate used
+ * `inArray(conversation.peerProfileKey, mergedProfileKeysSql(personId))`,
+ * i.e. `peer_profile_key IN (<recursive CTE>)`. The planner could not turn
+ * that into an index lookup on `conversation_bd_peer_idx` — 124ms cold /
+ * 1.86ms warm, 239 buffers, `Seq Scan on conversation` over all 6,081 rows —
+ * versus 0.43ms/95 buffers/index scan for the old direct
+ * `person.profile_key` join it replaced. Rewriting the SAME subquery as
+ * `peer_profile_key = ANY (ARRAY(<recursive CTE>))` measured 1.28–1.33ms, no
+ * seq scan: `ARRAY(...)` forces Postgres to materialize the (tiny) key set
+ * first, then the outer query can still use the index for `= ANY`. Keep this
+ * shape; do not go back to `inArray`/`IN (...)` for this predicate.
  */
 import { sql, type SQL } from "drizzle-orm";
-import { person } from "@/db/schema";
+import { conversation, person } from "@/db/schema";
 
 export interface MergeChainPersonRow {
   id: string;
@@ -74,14 +87,12 @@ export function resolveMergedProfileKeys(personId: string, persons: readonly Mer
 }
 
 /**
- * SQL subquery expression yielding every `profile_key` that currently
- * belongs to `personId` once merges are taken into account — embed this
- * directly into a `WHERE ... IN (...)` clause (e.g. via drizzle's
- * `inArray(conversation.peerProfileKey, mergedProfileKeysSql(personId))`) so
- * merge resolution costs zero extra round trips. `personId` is a fixed
- * value, not correlated to an outer row, so Postgres evaluates this once per
- * statement (an `InitPlan`/hashed subplan), not per row — never call this in
- * a loop.
+ * Bare (unparenthesized) `SELECT` yielding every `profile_key` that
+ * currently belongs to `personId` once merges are taken into account — NOT
+ * meant to be embedded directly in a `WHERE ... IN (...)` clause (see
+ * `mergedProfileKeysAnyCondition` below for the production entry point).
+ * Exported only so this file's own PgDialect render test can pin the
+ * recursive CTE's shape independent of the `ANY (ARRAY(...))` wrapper.
  *
  * Bounded and index-friendly: each recursive step is a lookup on
  * `person_merged_into_idx` (`merged_into_id`), and in production this chain
@@ -94,12 +105,23 @@ export function resolveMergedProfileKeys(personId: string, persons: readonly Mer
  * applied here to the table reference out of caution.
  */
 export function mergedProfileKeysSql(personId: string): SQL {
-  return sql`(
-    with recursive mpk_chain(mpk_id) as (
+  return sql`with recursive mpk_chain(mpk_id) as (
       select id from ${person} where id = ${personId}::uuid
       union all
       select person.id from person join mpk_chain on person.merged_into_id = mpk_chain.mpk_id
     )
-    select profile_key from person where id in (select mpk_id from mpk_chain) and profile_key is not null
-  )`;
+    select profile_key from person where id in (select mpk_id from mpk_chain) and profile_key is not null`;
+}
+
+/**
+ * Production entry point: a ready-to-`and()` condition testing
+ * `conversation.peer_profile_key = ANY (ARRAY(<mergedProfileKeysSql>))` —
+ * embed this directly in a `WHERE` clause (see this file's doc comment for
+ * why `ANY (ARRAY(...))` and not `IN (...)`) so merge resolution costs zero
+ * extra round trips. `personId` is a fixed value, not correlated to an
+ * outer row, so Postgres evaluates the inner subquery once per statement,
+ * not per row — never call this in a loop.
+ */
+export function mergedProfileKeysAnyCondition(personId: string): SQL {
+  return sql`${conversation.peerProfileKey} = any(array(${mergedProfileKeysSql(personId)}))`;
 }
