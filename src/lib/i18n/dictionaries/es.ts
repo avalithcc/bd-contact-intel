@@ -22,6 +22,11 @@ export const es: typeof en = {
     filter: "Filtrar",
     roleGroupLabel: "Grupo de rol",
     allGroups: "Todos los grupos",
+    // "Por qué estos grupos de rol" disclosure on the Contactos role-group
+    // filter chip (openspec/changes/bd-playbook, surface 2).
+    roleGroupFilterHintLabel: "Por qué estos grupos de rol",
+    roleGroupFilterHintMenuLabel: "Prioridad por grupo de rol",
+    roleGroupFilterGuideLink: "Ver guía completa →",
     marketLabel: "Mercado",
     allMarkets: "Todos los mercados",
     miamiOnlyLabel: "Solo Florida",
@@ -56,6 +61,32 @@ export const es: typeof en = {
     operations: "Operaciones",
     other: "Otro",
     no_position: "Sin cargo",
+  },
+
+  // "Guía de roles" — BD playbook page chrome (openspec/changes/bd-playbook).
+  // Per-role-group body copy is NOT here — it's static content in
+  // src/lib/roleGroupPlaybook.ts (keyed by RoleGroupKey), reused by both the
+  // standalone page and the in-context "por qué este rol"/"por qué estos
+  // grupos" hints.
+  bdPlaybook: {
+    eyebrow: "Guía",
+    title: "guía de roles",
+    subtitle:
+      'A quién conviene contactar en cada empresa, qué decide ese rol y qué dolor resuelve Avalith — organizado por grupo de rol. Lo marcado "(supuesto)" no está confirmado por una fuente interna; queda para que el owner lo confirme o corrija.',
+    priorityReferenceAriaLabel: "Referencia de prioridad",
+    priorityLabel: "Prioridad:",
+    priorityAlta: "Alta",
+    priorityMedia: "Media",
+    priorityBaja: "Baja",
+    priorityNoPriorizar: "No priorizar",
+    priorityRevisar: "Revisar / no evaluable",
+    notWorthTitle: "Grupos que no vale la pena priorizar.",
+    notWorthNoPriorizarLabel: "No priorizar:",
+    notWorthLowLabel: "Prioridad baja:",
+    notWorthReviewLabel: "No evaluable sin más datos:",
+    fieldDecides: "Qué decide",
+    fieldPain: "Qué dolor resuelve Avalith",
+    fieldWrongPerson: "Cuándo es la persona equivocada",
   },
 
   companyCategories: {
@@ -119,6 +150,7 @@ export const es: typeof en = {
     whatsNew: "Novedades",
     discovery: "Descubrimiento",
     account: "Cuenta",
+    playbook: "Guía de roles",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
     accountMenuLabel: "Menú de cuenta",
@@ -490,6 +522,12 @@ export const es: typeof en = {
     propPhone: "Teléfono",
     propMobilePhone: "Móvil",
     propJobTitle: "Cargo",
+    // "Por qué este rol" disclosure on the Cargo row (openspec/changes/
+    // bd-playbook, surface 1) — reuses classifyPosition, no new query.
+    jobTitleHintLabel: "Por qué este rol",
+    jobTitleHintMenuLabel: "Por qué contactar a este rol",
+    jobTitlePainPrefix: "Dolor que resuelve Avalith:",
+    jobTitleGuideLinkText: "Ver guía completa de este grupo →",
     propRoleGroup: "Grupo de rol",
     propSeniority: "Nivel",
     propCity: "Ciudad",
