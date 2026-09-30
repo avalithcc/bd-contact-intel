@@ -16,6 +16,7 @@ import {
   PlaybookIcon,
   AccountIcon,
   EyeIcon,
+  ReportsIcon,
 } from "@/components/icons";
 
 export interface SidebarItem {
@@ -95,9 +96,10 @@ export function Sidebar({
   taskCount?: number;
   followUpCount?: number;
   // Admin-only "Administración" section (admin-conversation-access mockup,
-  // screen 1: admin-conversation.html:57-61) — only "Registro de auditoría"
-  // is wired here; see NAVIGATION's own comment for why Duplicados/Migración
-  // stay out of this real Sidebar for now.
+  // screen 1: admin-conversation.html:57-61) — "Registro de auditoría" and
+  // "Reportes" (owner-reporting decision 1/5) are wired here; see
+  // NAVIGATION's own comment for why Duplicados/Migración stay out of this
+  // real Sidebar for now. Hidden entirely (not just visually gated) for a BD.
   isAdmin?: boolean;
 }) {
   const pathname = usePathname();
@@ -140,6 +142,14 @@ export function Sidebar({
       {isAdmin && (
         <div className="nav-section">
           <div className="nav-title">{labels.administrationSection}</div>
+          <Link
+            href="/admin/reports"
+            className={`nav-item${isActive("/admin/reports") ? " active" : ""}`}
+            aria-current={isActive("/admin/reports") ? "page" : undefined}
+          >
+            <ReportsIcon className="icon" />
+            {labels.reports}
+          </Link>
           <Link
             href="/admin/audit-log"
             className={`nav-item${isActive("/admin/audit-log") ? " active" : ""}`}

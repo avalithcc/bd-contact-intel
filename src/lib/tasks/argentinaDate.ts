@@ -52,6 +52,21 @@ export interface ArgentinaDayBoundaries {
   tomorrowStartUtc: Date;
 }
 
+/**
+ * The real UTC instant ART midnight falls on for a given `YYYY-MM-DD`
+ * calendar date — the inverse of `argentinaCalendarDate`. Unlike
+ * `ArgentinaDayBoundaries.todayStartUtc`/`tomorrowStartUtc` (deliberately
+ * naive 00:00 UTC, matching `due_at`'s calendar-date-only encoding), this is
+ * for bounding REAL timestamp columns (`activity.created_at`,
+ * `person.created_at`, ...) by an Argentina calendar-day or period boundary
+ * (owner-reporting: report period ranges). Do not swap this in for
+ * `argentinaDayBoundaries`'s own boundaries — that would reintroduce the bug
+ * that function's own doc comment describes.
+ */
+export function argentinaInstantBoundary(dateStr: string): Date {
+  return new Date(Date.parse(`${dateStr}T00:00:00.000Z`) + ART_OFFSET_MS);
+}
+
 export function argentinaDayBoundaries(now: Date): ArgentinaDayBoundaries {
   const today = argentinaCalendarDate(now);
   const yesterday = addDaysToDateString(today, -1);
