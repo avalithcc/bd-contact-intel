@@ -4,8 +4,9 @@ Ordered by what unblocks what, not by how much anyone wants it. The question thi
 list answers is **what has to be true before the BD team is let in**, because the
 app is finished enough to look ready and has never been used by anyone.
 
-Inventoried against production on 2026-09-28. Every number below was measured,
-not estimated.
+Inventoried against production on 2026-09-28. Refreshed 2026-09-30 against PRs
+#198–#223 (Seguimientos queue, email sync, task edit/bulk create, pipeline
+backfill, account-type filter, playbook, DMARC fix).
 
 ## Where we actually are
 
@@ -37,35 +38,44 @@ Contact statuses (`new` 17,882 · `contacted` 5,835 · `replied` 2,902 ·
 connection counters. No status in production came from an action taken in this
 app.
 
-**So the risk is not that features are missing. It is that nothing has been
-exercised by a real user.** The first BD through the door is the test.
+That was true on 2026-09-28. By 2026-09-30, most of what stood between the team
+and a usable app has shipped — see **Shipped** below. What's left is a short
+list of in-progress items (email sync's last mailbox, two mockups, one UI bug)
+and manual owner actions (11 duplicate merges, the password-reset smoke test,
+the remaining name splits). None of that changes the core fact: the database
+still holds zero BD-produced activity. **The first BD through the door is
+still the test.**
 
-## Layer 0 — the blocker
+## Shipped
 
-Nothing about email outreach can work until this is fixed, and everything below
-assumes it is.
-
-### email-coverage — unblocked, partly
-
-Measured 2026-09-29:
-
-| | |
-| --- | --- |
-| verified | **5,087** |
-| probable | 142 |
-| none | 21,391 |
-
-Was 11 verified on 2026-09-28. The HubSpot-imported addresses were relabelled
-verified on the owner's word (they were already validated in HubSpot), and
-the owner decided `probable` is good enough to send to. So email outreach
-is no longer blocked: ~5,200 contacts are reachable today.
-
-Emails are sent **individually by each BD**, never in bulk — deliberately,
-so each BD builds the dynamic with their own contacts.
-
-Still open: 21,391 contacts (four in five) have no address. Enriching them
-(Hunter is wired; `hunter_lookup` has never fired in production) is a cost
-and deliverability decision for the owner, not a technical one.
+- Follow-up cadence: the Seguimientos queue, capped at 10 contacts/day per BD
+  (#215). Decisions in `openspec/decisions/2026-09-30-decision-brief.md`.
+- Email coverage stage 1: 480 emails deduced from each domain's dominant
+  pattern, labelled "Deducido" (#207). Hunter stage 2 (paid lookup) stays
+  deferred — a cost/deliverability call for the owner.
+- Default pipeline stage: 14,255 companies backfilled — 2 `won` / 831
+  `qualified` / 13,422 `prospect` (#205); new companies now default to
+  `prospect`.
+- Account-type filter on the companies list, display-only until reclassification
+  rules are decided (#211).
+- Task essentials: every creation path writes `description` and a validated
+  assignee (#178); task edit with an audited activity log (#216); bulk task
+  create as one set-based insert instead of a per-contact loop (#220); the
+  Tareas filter pill on the contact timeline (#203); dialog markup regressions
+  guarded by `tests/unit/dialogMarkup.test.ts` (#197).
+- Task reminders: daily digest email + sidebar "Tareas" count (#188), branded
+  (#194), hardened against abandoned claims (#195).
+- `parseDbTimestamp` UTC helper (#212) — see **timestamptz migration** below
+  for the rest of the column conversion.
+- Guía de roles (bd-playbook): in-app manual on which roles to contact and why,
+  with in-context "por qué este rol" hints (#223).
+- Auth/security hardening: RLS on every table, sign-ups disabled, current
+  password required to change it, server-side `@avalith.net` + confirmed-email
+  gate (#183–#185); `password_min_length` raised to 12; reset script audited
+  and verified.
+- Custom SMTP via HostGator `notificaciones@avalith.net`; password reset
+  verified end to end. DMARC `rua` fixed 2026-09-30 — now points to
+  `notificaciones@avalith.net` (was the placeholder `email@yourdomain.com`).
 
 ## Layer 1 — before the team comes in
 
@@ -79,55 +89,6 @@ edge. This is not QA theatre — `task.description` and `task.leadId` have full
 schema, indexes, joins and rendering with **no write path anywhere**, which is
 exactly the class of gap that only surfaces when a human tries to use the thing.
 
-### task-essentials — remaining
-Shipped in PR #178 (2026-09-29): every creation path writes `description` and an
-assignee (validated server-side), and a teammate's overdue task — which used to
-vanish from "Todas abiertas" entirely — now shows as overdue. `leadId` was left
-alone on purpose: leads redirect to contacts, so there is no entry point for it.
-
-Still open:
-- **Reminders — shipped 2026-09-29** (PR #188, fixes #192): a daily email
-  digest per BD ("Pendientes de ayer", "Atrasadas", "Para hoy"; nothing sent
-  when empty) from notificaciones@avalith.net, plus a sidebar "Tareas" count.
-  Cron `30 11 * * *` UTC; on this Vercel plan crons fire within the hour, so
-  it arrives 08:30–09:29 Argentina. First real send verified; a second run the
-  same day is skipped (`already_claimed`). Hardened in #195: a claim left
-  `pending` for over 10 minutes is reclaimed, the route returns 500 when a
-  send fails, and `task(assigned_to_bd_id, status, due_at)` is indexed.
-  Branded email design in #194.
-- **All timestamp columns are `timestamp without time zone`.** Vercel reads
-  them as UTC, a laptop in Argentina as local time (+3h). Task due dates are
-  now treated as calendar dates everywhere (#192), but the durable fix is
-  migrating the columns to `timestamptz`. Until then, run local checks with
-  `TZ=UTC`.
-- Dialog markup bugs are now guarded by `tests/unit/dialogMarkup.test.ts`
-  (#197).
-- `/contacts` list: 4 → 2 round trips (#196). The JSON-to-row mapping it
-  added (`mapInlineDerivedColumns` in `listQueries.ts`) has no unit test;
-  extract it into a DB-free module and assert it matches
-  `attachDerivedColumns`.
-- **No task edit UI** anywhere, not even for the title. `updateTaskAction` is
-  validated and ready but has no caller.
-- `bulkCreateTaskAction` inserts one task per selected contact in a loop.
-
-### custom-smtp — done 2026-09-29
-Supabase sends through the HostGator mailbox `notificaciones@avalith.net`
-(`amanti.websitewelcome.com:465`, sender "Avalith BD"; details and the traps
-in `src/lib/auth/passwordReset.ts`). Self-service password reset is ON and
-was verified end to end: inbox delivery, the token_hash link, and saving a
-new password with "require current password" enabled. Auth email rate limit
-raised from 2 to 30 per hour.
-
-Still open:
-- The **invite** template still uses the default `{{ .ConfirmationURL }}`.
-  Invites are not used (the owner creates users with a password and Auto
-  Confirm); if they ever are, switch it to the token_hash shape first.
-- avalith.net's DMARC record reports to the placeholder
-  `email@yourdomain.com`, so no report ever arrives. Point `rua` at a real
-  mailbox (DNS at HostGator).
-- The same SMTP credentials are what the app would use for task reminders by
-  email.
-
 ### bd-password-reset (manual) — shipped, not yet run
 `scripts/reset-bd-password.ts` (PR #179) sets a random temporary password
 through the Supabase admin API, writes `audit_log`, and prints the password
@@ -137,60 +98,34 @@ call and the audit insert have never run: the first `--execute` should be on
 the owner's own account, as the smoke test.
 
 ### gmail-connection
-One Gmail account is connected (the owner's). Every BD needs to connect theirs
-before they can send anything, and the flow has only ever been walked by one
-person.
+Every BD needs to connect their own Gmail account before they can send
+anything. Cristian and Macarena have reconnected with the new readonly scope
+(needed for email sync, below); the rest of the team still needs to walk the
+flow at all.
 
 ## Layer 2 — closing the loop
 
 ### email-sync
-Two-way email logging on the Contact timeline, HubSpot-style.
+Two-way email logging on the Contact timeline, HubSpot-style. Shipped: backend
+— readonly scope, message store, sync route, 90-day first-sync backfill
+(#217); UI — threads, connection states, never-log, reconnect banner (#222);
+never-log now suppresses the whole message rather than per-address (#218).
+Runs via Supabase `pg_cron` every 15 minutes (`net.http_get`,
+`scripts/gmail-sync-cron.sql`). This is what lets `person.status` reach
+`replied` from an inbound signal — previously nothing captured inbound mail.
 
-**Why it is Layer 2 and not a nice-to-have:** `person.status` can only reach
-`replied` from an inbound signal, and nothing captures inbound mail. Without
-this, the pipeline physically cannot advance past `contacted` from anything a BD
-does in the app. The board's `replied` column is a documented no-op for the same
-reason.
-
-- Log emails sent from the platform and from the BD's own client, plus replies,
-  as threads. Only threads with contacts that exist in the CRM; never the whole
-  mailbox.
-- Requires `gmail.readonly`. The OAuth app is Internal, so no Google
-  verification is needed, but every BD must reconnect.
-- Sync via Gmail push (Pub/Sub `users.watch`) or a cron over the history API.
-- Deduplicate messages already sent from the platform.
-- Admins can always view every conversation; each admin view of another BD's
-  conversation is audit-logged.
-
-### follow-up-cadence
-Nothing sequences follow-up. Nothing says "nobody has touched this contact in N
-days". The closest thing is the Outreach view's `dormant` tier, which keys off
-message history with a **12-month** threshold — useless for working a pipeline
-week to week.
-
-Decide what the cadence is before building it: a BD needs to know what to do
-today, not a ranked list of everyone.
+Still open:
+- Mariel's mailbox is not Gmail, so it is not synced — needs its own path or
+  stays manual.
+- Admins have no UI path to another BD's email conversation yet — see
+  `admin-email-conversation-access` below.
 
 ## Layer 3 — the pipeline nobody is using yet
 
-### company-pipeline-adoption
-`company.relationship_stage` (`prospect → qualified → proposal_sent → won →
-lost`) **has a working write path** — an inline edit control on the company
-record, and "Nueva empresa" defaults to `prospect`. It is null on all 14,255
-companies because nothing backfilled the bulk-imported ones and nobody has used
-the control.
-
-This is not "build the pipeline". It is: pick a sensible default for imported
-companies, and give a BD a reason to move a company along.
-
-### account-type-filter
-`company.account_type` (30 partner, 2 client) renders on the company record but
-has no list filter, so the 32 accounts cannot be seen as a group. Deliberately
-display-only until there is a decision on who may reclassify an account.
-
 ### owner-reporting
-Reports for the owner to act on pipeline data: discard-reason breakdown, funnel
-conversion by stage and by source, activity per BD over time.
+Mockup in progress (2026-09-30). Reports for the owner to act on pipeline
+data: discard-reason breakdown, funnel conversion by stage and by source,
+activity per BD over time.
 
 **Correction to this item's original premise:** it claimed discard reasons must
 first become a fixed code rather than free text. **They already are** —
@@ -202,65 +137,40 @@ on.
 
 ## Layer 4 — product depth
 
-### bd-playbook
-An in-app manual: which roles to contact and **why** each is worth reaching —
-what they decide, what pain Avalith solves for them, when they are the wrong
-person. Organised by the role groups the system already classifies
-(`src/lib/roleGroups.ts`), including which groups are not worth prioritising.
-
-Ground every rationale in facts from `avalith/contexto/`; mark anything
-unconfirmed as an assumption. Surface it where BDs choose who to contact — a
-"por qué este rol" hint on the record, the outreach view, the role filter — not
-only as a standalone page.
-
-### auth-security — follow-ups
-Shipped 2026-09-29: RLS on every table (#183, it had been off — the public
-anon key could read and delete the whole CRM through PostgREST), sign-ups
-disabled in Supabase, current password required to change it (#184), and a
-server-side `@avalith.net` + confirmed-email gate in the middleware and
-`getCurrentBd()` (#185). Still open:
-- Done 2026-09-29: `security_update_password_require_current_password`
-  enabled via the Management API and verified with
-  `scripts/check-password-change-guard.ts` (a change without the current
-  password is refused: `current_password_required`).
-- Done 2026-09-29: API logs checked for `/rest/v1/`. In the retained window
-  (earliest row 2026-09-29 08:25 local) the only requests were Supabase's own
-  schema reads and the orchestrator's exposure tests. Anything earlier is no
-  longer in the logs.
-- Done 2026-09-29: server-side `password_min_length` raised from 6 to 12,
-  matching `MIN_NEW_PASSWORD_LENGTH` in `src/lib/auth/passwordPolicy.ts`
-  (the reset script generates 20 characters).
-- When creating a BD in the Supabase dashboard, tick **Auto Confirm User**:
-  without SMTP an unconfirmed user can never confirm and the new gate blocks
-  them.
-- `mailer_autoconfirm` is still on; harmless while sign-ups are off.
-
 ### admin-email-conversation-access
-`getConversationForAdmin` serves unredacted `email_sent` content as well as
-LinkedIn threads, and both its UI entry points were LinkedIn surfaces that are
-now hidden — so admins have no UI path to another BD's email content. The route
-and its audit trail still work. Near-zero impact today (one `email_sent` row),
-but it matters as email becomes the channel. Needs a LinkedIn-independent entry
-point of its own design.
+Mockup in progress (2026-09-30). `getConversationForAdmin` serves unredacted
+`email_sent` content as well as LinkedIn threads, and both its UI entry points
+were LinkedIn surfaces that are now hidden — so admins have no UI path to
+another BD's email content. The route and its audit trail still work.
+Near-zero impact today (one `email_sent` row), but it matters as email becomes
+the channel.
+
+### auth-security — remaining
+- The invite email template still uses the default `{{ .ConfirmationURL }}`.
+  Invites are not used today (the owner creates users with a password and Auto
+  Confirm); if they ever are, switch it to the token_hash shape first.
+- `mailer_autoconfirm` is still on; harmless while sign-ups are disabled.
+
+### timestamptz migration
+All timestamp columns are `timestamp without time zone`. Plan:
+`openspec/decisions/2026-09-30-timestamptz-migration-plan.md`. Slice 0 (prep,
+no schema change) is done (#221). Slices 1–6 — small tables, imported tables,
+lead/person, company, activity/task, email/follow-up tables — are pending.
+Until they land, run local checks with `TZ=UTC`.
 
 ## Known defects
 
 ### contact-names
-On 2026-09-29, 113 of the 346 contacts with no name at all got one from a
-`first.last@` email (`scripts/backfill-person-names-from-email.ts`, PR #182;
-revertible with `--revert`, audit row `6e9affdc`). Still open:
-- **233 contacts with no name** whose email cannot be split reliably
+- 143 of 191 stuffed full-names were split 2026-09-29
+  (`scripts/backfill-split-stuffed-names.ts`, PR #186, audit row `df7a98fe`,
+  revertible). The rest are genuinely ambiguous ("Gonzalo Castro Peña": one
+  given name and two surnames, or the reverse), start with a particle, or are
+  junk. **A first-token split for this remainder is in progress** — count
+  pending.
+- 233 contacts with no name at all whose email cannot be split reliably
   (`gusoliva@`, `maria.laura.fantoni@`, digits, initials). Needs another
   source (LinkedIn, enrichment) or a BD.
-- **48 contacts still have the full name in `first_name`.** 143 of 191 were
-  split on 2026-09-29 (`scripts/backfill-split-stuffed-names.ts`, PR #186,
-  audit row `df7a98fe`, revertible). The rest are genuinely ambiguous
-  ("Gonzalo Castro Peña": one given name and two surnames, or the reverse),
-  start with a particle, or are junk; they need a person to decide.
-- **11 duplicate pairs open in `/admin/duplicates`** (10 queued by the
-  backfill, 1 older): the same person recorded twice — one row with the
-  email and history, the other with name, title and LinkedIn connections.
-  Merging each gives one complete contact.
+- 11 duplicate pairs open in `/admin/duplicates` — still owner action.
 
 ### company-contact-counts
 The `/companies` list's "Contactos" column and the company record's contacts
@@ -269,11 +179,14 @@ card match `person.company_key` directly instead of resolving through
 empty. The fix is written and waiting on the branch
 `fix/company-contact-count-alias`; ship it the day an alias is created.
 
-### tasks-timeline-pill
-The contact record's timeline has no `Tareas` filter pill, which the mockup
-specifies (`contact-record.html:97-106`). Tasks are not timeline entries today,
-so this is a feature rather than a markup port. Deliberately left unbuilt rather
-than faked.
+### edit-pencil-hover
+The inline edit-pencil icon turns red on hover instead of the intended hover
+state. Fix in progress.
+
+### contacts-list-mapping
+`/contacts` list round trips went from 4 to 2 (#196). The JSON-to-row mapping
+it added (`mapInlineDerivedColumns` in `listQueries.ts`) has no unit test;
+extract it into a DB-free module and assert it matches `attachDerivedColumns`.
 
 ## Deferred from crm-hubspot-ux
 
