@@ -17,12 +17,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
-import { bulkAssignOwner, filterLivePersonIds } from "@/lib/contacts/bulkOwnerDb";
+import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
 import { isUuid } from "@/lib/uuid";
 import { BULK_FILTER_TARGET_CAP, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
-import { createTask, assertAssigneeExists } from "@/lib/tasks/queries";
+import { assertAssigneeExists } from "@/lib/tasks/queries";
+import { bulkCreateTasks } from "@/lib/tasks/bulkCreateDb";
 import { resolveTaskAssignee } from "@/lib/tasks/assignee";
-import type { NewTask } from "@/db/schema";
 import { getContactIdsForFilters } from "@/lib/contacts/listQueries";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
 import { parseContactSort } from "@/lib/contacts/sort";
@@ -104,11 +104,13 @@ export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
 }
 
 /** "Crear tarea" bulk action (task 13.2): one task per selected person,
- * sharing the submitted title/due date/description/assignee — reuses
- * createTask (same path as the record page's "Tarea" quick action), looped
- * over the validated id list, not a bespoke bulk-insert. The assignee is
- * resolved and validated ONCE before the loop (task-essentials backlog item
- * 2) — never per row, since every created task shares the same assignee. */
+ * sharing the submitted title/due date/description/assignee — a single
+ * set-based insert (bulkCreateTasks, src/lib/tasks/bulkCreateDb.ts) inside
+ * one transaction, not a per-person `createTask` loop (perf fix,
+ * task-essentials backlog: N INSERT round trips collapsed to one). The
+ * assignee is resolved and validated ONCE before the write (task-essentials
+ * backlog item 2) — never per row, since every created task shares the same
+ * assignee. */
 export async function bulkCreateTaskAction(formData: FormData): Promise<void> {
   const me = await getCurrentBd();
   const { ids: personIds, wasLimited } = await resolveBulkTargetIds(formData, me.id, BULK_FILTER_TARGET_CAP);
@@ -122,17 +124,13 @@ export async function bulkCreateTaskAction(formData: FormData): Promise<void> {
   let created = 0;
   if (title && assignedToBdId !== undefined) {
     await assertAssigneeExists(assignedToBdId, me.id);
-    for (const personId of await filterLivePersonIds(personIds)) {
-      await createTask({
-        title,
-        description,
-        dueAt,
-        personId,
-        assignedToBdId,
-        actorBdId: me.id,
-      } as NewTask);
-      created++;
-    }
+    created = await bulkCreateTasks(personIds, {
+      title,
+      description,
+      dueAt,
+      assignedToBdId,
+      actorBdId: me.id,
+    });
   }
 
   revalidatePath("/contacts");
