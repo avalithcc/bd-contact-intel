@@ -24,6 +24,16 @@
  * (`reply_received`/`email_sent`) and one status recompute for EVERY
  * matched person, not just the first — see
  * src/lib/gmail/buildSyncedActivities.ts.
+ *
+ * Direction-scoped matching (HubSpot-like, owner decision 2026-09-30, fixing
+ * a bug where a CRM person only in To/Cc of an automated inbound email — an
+ * accounting system CC'ing them on a transfer receipt — was recorded as
+ * having replied): for an INBOUND message only the sender (From) can match,
+ * so `matches` has at most one entry and a `reply_received` activity is only
+ * ever written for the person who actually sent the message. The multi-match
+ * scenario above (several `matches[]` entries, several join rows) only
+ * happens for OUTBOUND messages, where every To/Cc recipient is still a
+ * candidate.
  */
 import type { ParsedGmailMessage } from "./parseMessage";
 
@@ -132,13 +142,23 @@ export function classifyGmailMessage(input: ClassifyGmailMessageInput): Classifi
 
   const personByEmail = new Map(knownPersons.map((p) => [p.emailNormalized, p] as const));
 
-  // Every header address is a match candidate for either direction — a CRM
-  // contact can be CC'd without ever appearing in From/To (CC-only match).
+  // Match candidates depend on direction (HubSpot-like semantics, owner
+  // decision 2026-09-30, fixing the misattributed-inbound-sender bug where a
+  // CRM person only in To/Cc of an automated inbound email — e.g. an
+  // accounting system CC'ing a contact on a transfer receipt — was recorded
+  // as having replied):
+  //  - INBOUND: only the sender (From address) can match a CRM person. A
+  //    person who merely appears in To/Cc of an inbound message did not
+  //    reply, so they are never matched here, and the message is stored (see
+  //    shouldStoreClassifiedMessage) only when the sender itself matches.
+  //  - OUTBOUND: every To/Cc recipient is still a match candidate, same
+  //    multi-person join semantics as before (a BD can legitimately email
+  //    several CRM contacts on one thread).
   // The BD's own address is excluded so a self-sent message never matches
   // itself as a "contact" even if it happens to share a person row's email.
-  const candidateAddresses = [...new Set([fromAddress, ...toAddresses, ...ccAddresses])].filter(
-    (address) => address !== "" && address !== bdEmail,
-  );
+  const candidateAddresses = (
+    direction === "inbound" ? [fromAddress] : [...new Set([...toAddresses, ...ccAddresses])]
+  ).filter((address) => address !== "" && address !== bdEmail);
 
   // Whole-message never-log: checked over every raw participant address
   // (including the BD's own, unfiltered), not the deduped match candidates —

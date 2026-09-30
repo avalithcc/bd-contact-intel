@@ -167,7 +167,7 @@ test("a deduced (pattern_inferred) person email is flagged match_confidence 'inf
   assert.equal(classified.matches[0]?.matchConfidence, "inferred");
 });
 
-test("CC-only match: a CRM person only in Cc still matches even though From/To are unknown", () => {
+test("inbound from a non-CRM address with a CRM contact in cc: no match (only the sender can match on inbound)", () => {
   const classified = classifyGmailMessage({
     message: parseGmailMessage(
       fixtureMessage({
@@ -184,8 +184,9 @@ test("CC-only match: a CRM person only in Cc still matches even though From/To a
     knownPersons: [knownPerson()],
     neverLogRules: [],
   });
-  assert.equal(classified.matches.length, 1);
-  assert.equal(classified.matches[0]?.personId, "person-1");
+  assert.equal(classified.direction, "inbound");
+  assert.deepEqual(classified.matches, []);
+  assert.equal(shouldStoreClassifiedMessage(classified), false);
 });
 
 test("never-log by exact address suppresses that match", () => {
@@ -255,7 +256,7 @@ test("never-log applies to the whole message: a never-logged domain on a Cc-only
   assert.equal(shouldStoreClassifiedMessage(classified), false);
 });
 
-test("no never-log rules: behavior is unchanged (both CRM contacts still match)", () => {
+test("inbound from a CRM contact with another CRM contact in cc: only the sender matches", () => {
   const classified = classifyGmailMessage({
     message: parseGmailMessage(
       fixtureMessage({
@@ -272,7 +273,10 @@ test("no never-log rules: behavior is unchanged (both CRM contacts still match)"
     knownPersons: [knownPerson(), knownPerson({ personId: "person-2", emailNormalized: "bob@prospect.com" })],
     neverLogRules: [],
   });
-  assert.equal(classified.matches.length, 2);
+  assert.equal(classified.direction, "inbound");
+  assert.deepEqual(classified.matches, [
+    { personId: "person-1", matchedEmail: "jane@prospect.com", matchConfidence: "exact" },
+  ]);
 });
 
 test("never-log is scoped to the BD who set it (caller passes only that BD's rules)", () => {
@@ -353,14 +357,14 @@ test("a message not in the platform-sent set is isPlatformSent: false", () => {
   assert.equal(classified.isPlatformSent, false);
 });
 
-test("a message matching two different CRM persons produces one match per person, deduped", () => {
+test("outbound message matching two different CRM recipients (To + Cc) produces one match per person, deduped (multi-person join kept for outbound)", () => {
   const classified = classifyGmailMessage({
     message: parseGmailMessage(
       fixtureMessage({
         payload: {
           headers: [
-            { name: "From", value: "jane@prospect.com" },
-            { name: "To", value: BD_EMAIL },
+            { name: "From", value: BD_EMAIL },
+            { name: "To", value: "jane@prospect.com" },
             { name: "Cc", value: "bob@prospect.com" },
           ],
         },
@@ -370,6 +374,7 @@ test("a message matching two different CRM persons produces one match per person
     knownPersons: [knownPerson(), knownPerson({ personId: "person-2", emailNormalized: "bob@prospect.com" })],
     neverLogRules: [],
   });
+  assert.equal(classified.direction, "outbound");
   assert.equal(classified.matches.length, 2);
   assert.deepEqual(
     classified.matches.map((m) => m.personId).sort(),
