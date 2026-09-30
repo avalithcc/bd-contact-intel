@@ -6,7 +6,8 @@ import { createCompany, getCompanyByKey, updateCompany } from "@/lib/companies/q
 import { getCurrentBd } from "@/lib/queries";
 import type { NewCompany } from "@/db/schema";
 import { createActivityAction } from "@/app/activity/actions";
-import { completeTaskAction, createTaskAction } from "@/app/(app)/tasks/actions";
+import { createTaskAction } from "@/app/(app)/tasks/actions";
+import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { updateCompanyProperty } from "@/lib/companies/propertyEditDb";
 import {
@@ -195,9 +196,22 @@ export async function logCompanyMeetingAction(
   }
 }
 
+/**
+ * Known-IDOR fix (task-edit change): this used to call the generic,
+ * UNSCOPED `completeTaskAction(taskId)` (a plain `WHERE id = taskId`
+ * update) — any signed-in BD could complete ANY task by guessing/copying
+ * its id, regardless of which company (or contact) it actually belonged
+ * to. Now routes through the same shared `setTaskStatusChecked`
+ * (src/lib/tasks/updateWithActivity.ts) every other completion/reopen entry
+ * point uses: it reads the task's OWN real subject and scopes the write to
+ * it — correct even for a task `getCompanyOpenTasks` (recordQueries.ts)
+ * shows here because it belongs to one of the company's PEOPLE, not the
+ * company itself (`company_key` would be null on that row).
+ */
 export async function completeCompanyTaskAction(taskId: string, companyKey: string): Promise<CompanyActionResult> {
   try {
-    await completeTaskAction(taskId);
+    const me = await getCurrentBd();
+    await setTaskStatusChecked(taskId, "done", me);
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {
