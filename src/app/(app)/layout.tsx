@@ -3,6 +3,7 @@ import { t } from "@/lib/i18n/dictionaries";
 import { pickNavLabels } from "@/lib/i18n/navLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { getTaskBadgeCount } from "@/lib/tasks/queries";
+import { getFollowUpQueueBadgeCount } from "@/lib/followUp/queueQueries";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
 import { ToastProvider } from "@/components/ToastProvider";
 import { Sidebar } from "../contacts/Sidebar";
@@ -39,13 +40,19 @@ export default async function AppLayout({
   const locale = await getLocale();
   const labels = pickNavLabels(t(locale));
   const me = await getCurrentBd();
-  const { tomorrowStartUtc } = argentinaDayBoundaries(new Date());
+  const now = new Date();
+  const { tomorrowStartUtc } = argentinaDayBoundaries(now);
   const taskCount = await getTaskBadgeCount(me.id, tomorrowStartUtc);
+  // One more round trip, same budget as taskCount above — see
+  // getFollowUpQueueBadgeCount's doc comment (deliberately does not
+  // materialize an un-materialized day, so this never costs more than the
+  // one bounded count).
+  const followUpCount = await getFollowUpQueueBadgeCount(me.id, now);
 
   return (
     <ToastProvider>
       <div className="app">
-        <Sidebar labels={labels} taskCount={taskCount} />
+        <Sidebar labels={labels} taskCount={taskCount} followUpCount={followUpCount} />
         <div className="main">
           <TopBar
             labels={labels}
