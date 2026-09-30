@@ -104,8 +104,9 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
     // the history reported was actually fetched — otherwise the next run
     // must resume from the SAME startHistoryId so a message that ran out of
     // budget is never silently skipped. Reprocessing already-fetched ids is
-    // safe: `ON CONFLICT DO NOTHING` on email_message and the
-    // already-has-a-reply_received check make it idempotent.
+    // safe: `email_message`'s own `unique(bd_id, gmail_message_id)`
+    // (`ON CONFLICT DO NOTHING`) makes the whole write, including its
+    // activity rows, idempotent (see buildSyncedActivities.ts).
     newHistoryId: exhausted && rawMessages.length === ids.length ? latestHistoryId : null,
     messagesFetched: rawMessages.length,
     messagesStored: writeResult.inserted,
