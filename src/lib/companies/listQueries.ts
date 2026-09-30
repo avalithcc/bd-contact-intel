@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, bd, company, person } from "@/db/schema";
+import { accountTypeCondition, type AccountType } from "@/lib/companies/accountTypeFilter";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import type { HiringMatch } from "@/lib/hiring/queries";
 
@@ -62,6 +63,16 @@ export interface CompanyListPage {
  * (`company_industry_idx`/`company_owner_idx`, migration 0017) — the only
  * two D1 fields the list filters on, per the owner's instruction to only
  * add filters the new indexes actually support.
+ *
+ * `accountTypeFilter` (BACKLOG.md Layer 3 "account-type-filter") is a plain
+ * equality WHERE condition on `company.account_type`, same shape as the
+ * others above — zero extra round trips, since it's folded into this same
+ * count query and this same page query rather than adding a new one. No
+ * index backs it (unlike industry/owner): with only 30 partner / 2 client
+ * rows out of ~14,240 companies, a sequential scan over this single column
+ * is negligible next to the pagination query's own cost, so one wasn't
+ * added speculatively (PERFORMANCE.md: round trips are the budget, not
+ * every column needing its own index).
  */
 export async function getCompanyListPage(
   view: CompanyListView,
@@ -72,12 +83,15 @@ export async function getCompanyListPage(
   pageSize: number,
   industryFilter?: string,
   ownerFilter?: string,
+  accountTypeFilter?: AccountType,
 ): Promise<CompanyListPage> {
   const conditions: SQL[] = [];
   if (stage) conditions.push(eq(company.relationshipStage, stage));
   if (view === "mine") conditions.push(eq(company.ownerBdId, meBdId));
   if (industryFilter) conditions.push(eq(company.industry, industryFilter));
   if (ownerFilter) conditions.push(eq(company.ownerBdId, ownerFilter));
+  const accountTypeWhere = accountTypeCondition(accountTypeFilter);
+  if (accountTypeWhere) conditions.push(accountTypeWhere);
 
   let hiringKeys: string[] | null = null;
   if (view === "hiring") {

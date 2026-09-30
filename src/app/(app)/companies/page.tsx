@@ -11,7 +11,8 @@ import {
 } from "@/lib/companies/listQueries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
-import { industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
+import { accountTypeLabel, industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
+import { ACCOUNT_TYPES, isAccountType, type AccountType } from "@/lib/companies/accountTypeFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,14 @@ function isView(value: string | undefined): value is CompanyListView {
 }
 
 interface CompaniesPageProps {
-  searchParams: Promise<{ view?: string; stage?: string; page?: string; industry?: string; owner?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    stage?: string;
+    page?: string;
+    industry?: string;
+    owner?: string;
+    accountType?: string;
+  }>;
 }
 
 /**
@@ -50,6 +58,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const page = Math.max(1, Number(sp.page) || 1);
   const industry = sp.industry || undefined;
   const owner = sp.owner || undefined;
+  const accountType: AccountType | undefined = isAccountType(sp.accountType) ? sp.accountType : undefined;
 
   // Fetched once per request (React `cache()`, see getHiringMatchIndex's
   // doc comment) and threaded through both the view-tab count and the list
@@ -57,7 +66,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const hiringIndex = await getHiringMatchIndex();
 
   const [{ rows, total, totalPages }, viewCounts, filterOptions, ownerOptions] = await Promise.all([
-    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner),
+    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType),
     getCompanyViewCounts(me.id, hiringIndex),
     getCompanyFilterOptions(),
     listOwnerOptions(),
@@ -71,6 +80,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     if (stage) params.set("stage", stage);
     if (industry) params.set("industry", industry);
     if (owner) params.set("owner", owner);
+    if (accountType) params.set("accountType", accountType);
     return params;
   }
 
@@ -102,7 +112,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     }
   }
 
-  function clearFilterHref(key: "stage" | "industry" | "owner"): string {
+  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType"): string {
     const params = baseParams();
     params.delete(key);
     params.set("view", view);
@@ -111,6 +121,10 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
 
   function ownerNameFor(id: string): string {
     return ownerOptions.find((o) => o.id === id)?.name ?? l.emptyValue;
+  }
+
+  function accountTypeLabelFor(value: AccountType): string {
+    return accountTypeLabel(value, dict.companyRecord);
   }
 
   return (
@@ -177,6 +191,21 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
             </Link>
           </span>
         )}
+        {/* Tipo de cuenta chip (BACKLOG.md Layer 3 "account-type-filter") —
+            same conditional-chip pattern as Industria/Responsable above:
+            only shown once a filter is applied, not always-on like Etapa's
+            "Cualquiera" default (companies.html doesn't show this chip at
+            all; it's a beyond-mockup addition, same precedent). Filter
+            only — no way to edit/reclassify `account_type` here or on the
+            record page (deliberately undecided). */}
+        {accountType && (
+          <span className="chip">
+            <span className="k">{l.filterAccountTypeLabel}</span> {accountTypeLabelFor(accountType)}
+            <Link href={clearFilterHref("accountType")} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          </span>
+        )}
         <details className="dropdown">
           <summary className="chip chip-add">{l.addFilter}</summary>
           <form method="get" action="/companies" className="menu">
@@ -210,6 +239,17 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                 {ownerOptions.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="menu-item">
+              {l.filterAccountTypeLabel}
+              <select name="accountType" defaultValue={accountType ?? ""}>
+                <option value="">{l.filterAccountTypeAny}</option>
+                {ACCOUNT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {accountTypeLabelFor(t)}
                   </option>
                 ))}
               </select>
