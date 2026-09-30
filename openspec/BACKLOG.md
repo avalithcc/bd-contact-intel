@@ -276,28 +276,118 @@ with real pricing, the recording/consent constraint, what changes in the data
 model (if anything), and an explicit recommendation — including the honest
 option of "the `tel:` link is enough; spend the effort on logging instead".
 
-### linkedin-chrome-extension — not started
-Owner request (2026-09-30): a Chrome extension so that, when a BD connects
-with someone on LinkedIn, that person can be pushed into this CRM from the
-LinkedIn page itself.
+### linkedin-chrome-extension — ON HOLD (owner decision 2026-09-30)
 
-- Why it matters: LinkedIn is where the BDs actually prospect, and CSV
-  imports are off (`9f428dd`). Today a new LinkedIn contact only reaches the
-  CRM by hand. This is the missing capture path, and it is the one place a BD
-  would naturally create a Contact.
-- Shape to investigate: a content script on `linkedin.com/in/*` adding an
-  "Agregar al CRM" control that posts name, headline, company and profile URL
-  to an authenticated endpoint here; the server resolves or creates the
-  Company, runs the existing identity matcher (`src/lib/identity/matcher.ts`)
-  to avoid duplicates, and sets `profile_key` so the imported conversation
-  history (`conversation.peer_profile_key`) links up.
-- Open questions for the brief: how the extension authenticates (a Supabase
-  session cookie only works on our own domain, so this likely needs a
-  per-BD token), what LinkedIn's terms allow (reading the page a user is
-  already viewing vs. scraping), Chrome Web Store publication vs. an internal
-  unpacked extension for 3 people, and how it behaves for a person who is
-  already in the CRM.
-- Output: a decision brief in `openspec/decisions/` before any code.
+**Held, not rejected.** The workflow is worth having; there is no way to build
+it that satisfies all three of the owner's constraints at once. Recorded in
+full so it is not re-litigated from scratch.
+
+What was asked: when a BD connects with someone new on LinkedIn, a modal
+offers to push that person into this CRM with name, company and role already
+filled — the Apollo-style flow.
+
+What the terms actually say (fetched from linkedin.com/legal/user-agreement,
+2026-09-30):
+
+- **§8.2.13** — "Use **bots or other unauthorized automated methods** to
+  access the Services, add or download contacts…" — does NOT apply. A human
+  clicking a button is not a bot.
+- **§8.2.4** — copying information "without the consent of the content owner"
+  — turns on the *person's* consent, not LinkedIn's. Arguable either way.
+- **§8.2.2** — "Develop, support or use software… (such as crawlers,
+  **browser plugins and add-ons**…) **to scrape or copy the Services**" — this
+  is the one that binds. The prohibited act is "scrape **or copy**", browser
+  plugins are named explicitly, and there is no exception for a single
+  user-initiated read. Reading the rendered page is inside it.
+
+How Apollo and its peers actually avoid that: **they do not read the LinkedIn
+page.** The extension reads only the URL the user is already on, sends that to
+their own backend, and the name/company/title in the modal come from **their
+database**, assembled from public sources, user contributions and licensed
+providers. That is why they rate as low account risk. It is not a clever
+reading of the terms — it is a different data source. (Apollo's own LinkedIn
+company page was still removed in early 2025 over data-use policy.)
+
+Which leaves three paths, and only three:
+
+| Path | Cost | Blocker |
+| --- | --- | --- |
+| BD types the 3 fields | free, ~5s | owner: too much friction at daily volume |
+| Extension reads the page DOM | free | §8.2.2; the restricted account is the BD's, and the 3 BDs' accounts *are* the pipeline |
+| Enrichment API keyed on the URL | ~USD 0–49/mo at this volume | owner: no external data platforms |
+
+The third is the Apollo model and was costed: Apollo starts at 10k free
+credits then USD 49/mo; People Data Labs runs USD 0.20–0.28 per lookup. At
+10–30 new contacts a day it fits the free or cheapest tier. **The owner
+declined it — no external platforms.** With that constraint, and with the
+contacts being people not already in the CRM (so the CRM cannot enrich from
+itself), no path remains.
+
+Worth knowing before this is reopened:
+
+- **Proxycurl — the "LinkedIn URL in, profile JSON out" service — shut down
+  2025-07-04 after LinkedIn filed a federal suit in January 2025.** The
+  page-reading path is not an unwatched grey area; LinkedIn litigates it.
+- The surviving real-time scrapers (ScrapIn, Bright Data, Apify) carry the
+  same exposure Proxycurl did.
+- Enrichment databases are strong in the US and thin in Latin America. Before
+  ever paying for one, run 20 real prospects through a free tier and count the
+  hits — a modal that says "not found" is worse than no modal, because the
+  BD still types everything and has lost the click.
+
+What is still true and cheap, if the workflow is revisited: the CRM already
+keys people by normalized `profile_key` (`src/lib/csv.ts`,
+`src/lib/identity/matcher.ts`), `createContact` already accepts a
+`linkedinUrl` and normalizes it (`src/lib/contacts/createContact.ts:57`), and
+`NewContactDialog` already knows how to open prefilled. So the "does this
+person already exist?" half needs almost no new code. It is only the "fill in
+someone new" half that has no legal, free, self-hosted answer.
+
+**Recommendation, in order — held is not the same as nothing to do.**
+
+1. **Build the free half now, before deciding anything about the paid half.**
+   The "does this person already exist?" path costs almost nothing: an
+   extension or bookmarklet that carries only the URL, the matcher on
+   `profile_key`, and `NewContactDialog` opening prefilled. Zero ToS surface,
+   about a day of work. It is also the half that protects the thing that
+   actually costs money — 98 duplicate pairs were merged by hand on
+   2026-09-30 and 244 remain, and an uncontrolled capture path is exactly how
+   that queue refills. Ship this whatever happens to the rest.
+
+2. **Fix the export lag instead of routing around it.** The objection to the
+   connections export was that a weekly cadence leaves the CRM stale when BDs
+   connect and write the same day. That is an objection to the *cadence*, not
+   to the source. LinkedIn's connections archive is requested on demand and
+   arrives in minutes, not the days the full archive takes. A BD running it at
+   the end of the day closes the gap to hours, and the CRM can prompt it:
+   "you added 6 contacts by URL today — run your export to fill them in."
+   That is free, sanctioned, self-hosted, and it was dismissed too quickly.
+
+3. **Measure the friction before paying to remove it.** Nobody has counted how
+   many new LinkedIn contacts a BD actually adds in a week. At 5–10 a day
+   across three BDs, typing name and company is roughly 25–50 minutes a month
+   for the whole team — and the BD is looking at the profile they just chose,
+   so it is not blind data entry. Run step 1 for a month and count. If typing
+   turns out to be the real bottleneck, that is a decision with numbers behind
+   it instead of an impression.
+
+4. **The constraint is worth stating precisely, because the current wording
+   rules out more than it probably means.** This CRM already depends on
+   external platforms — Vercel, Supabase, the Gmail API, the Vercel AI
+   Gateway. The line the owner is drawing is almost certainly narrower:
+   *our contacts' data must not be handed to a third-party data broker.* That
+   is a legitimate and defensible line, and it is not the same as "no external
+   platforms". Worth noting that an enrichment lookup sends a **public
+   LinkedIn URL** and receives **public professional data** — it does not
+   upload the CRM. Whether that crosses the line is the owner's call, but it
+   should be decided on the narrow question rather than the broad one, because
+   the broad phrasing also rules out things nobody intends to rule out.
+
+None of the above needs a decision today. Step 1 stands on its own.
+
+Superseded: `openspec/decisions/2026-09-30-linkedin-extension-research.md`
+(no-go) and `2026-09-30-linkedin-extension-brief.md` (conditional go). Both
+kept; this entry records where the decision actually landed and why.
 
 ### free-ai-for-simple-tasks — research first
 Owner request (2026-09-30): use other AI models for simple, low-stakes
