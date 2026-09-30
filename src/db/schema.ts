@@ -911,7 +911,9 @@ export const auditLog = pgTable(
       .notNull()
       .references(() => bd.id, { onDelete: "cascade" }),
     // 'view_conversation' | 'merge' | 'unmerge' | 'not_duplicate' |
-    // 'migration_approve' | 'migration_execute' | 'bd_password_reset'
+    // 'migration_approve' | 'migration_execute' | 'bd_password_reset' |
+    // 'bulk_merge_duplicates_run' | 'bulk_merge_duplicates_revert'
+    // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
