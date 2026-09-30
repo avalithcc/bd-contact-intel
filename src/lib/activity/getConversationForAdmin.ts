@@ -22,11 +22,29 @@
  * `targetBdId` as well-formed UUIDs first (src/lib/uuid.ts) — a malformed
  * id hits the same FK-violation/driver-error problem even before this
  * function's own existence check runs.
+ *
+ * Bugfix (PR #235 review): used to look up `person.profile_key` first and
+ * only query `conversation` when it was non-null. That column is
+ * single-valued and NOT migrated by a merge, so a merged contact either
+ * showed zero LinkedIn conversations, or (if the survivor already had its
+ * own key) showed a count from the migrated `person_bd_connection` row that
+ * disagreed with an empty message list. `mergedProfileKeysAnyCondition`
+ * resolves every profile key merges have folded onto `personId` (see
+ * src/lib/identity/mergedProfileKeys.ts) directly in the `conversation`
+ * query, which also drops the separate `person` lookup — one fewer round
+ * trip than before, not one more. `ANY (ARRAY(...))`, not `IN (...)`: see
+ * mergedProfileKeys.ts's doc comment for the prod EXPLAIN numbers that ruled
+ * out `IN (...)` (it forced a seq scan on `conversation`).
+ *
+ * The `targetBdId` existence check below (a separate lookup, on `bd`, not
+ * `person`) still runs BEFORE the audit insert — that part of this function
+ * is untouched by this bugfix.
  */
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, auditLog, bd, conversation, emailMessage, emailMessagePerson, message, person } from "@/db/schema";
+import { activity, auditLog, bd, conversation, emailMessage, emailMessagePerson, message } from "@/db/schema";
 import { shouldAuditConversationView } from "@/lib/activity/conversationAudit";
+import { mergedProfileKeysAnyCondition } from "@/lib/identity/mergedProfileKeys";
 
 export interface AdminConversationEmailEntry {
   id: string;
@@ -99,11 +117,6 @@ export async function getConversationForAdmin(
       });
     }
 
-    const [personRow] = await tx
-      .select({ profileKey: person.profileKey })
-      .from(person)
-      .where(eq(person.id, personId));
-
     const emailRows = await tx
       .select({ id: activity.id, createdAt: activity.createdAt, metadata: activity.metadata })
       .from(activity)
@@ -130,13 +143,13 @@ export async function getConversationForAdmin(
       .where(and(eq(emailMessage.bdId, targetBdId), eq(emailMessagePerson.personId, personId)))
       .orderBy(asc(emailMessage.sentAt));
 
-    let linkedin: AdminConversationThread[] = [];
-    if (personRow?.profileKey) {
-      const conversationRows = await tx
-        .select({ id: conversation.id, title: conversation.title })
-        .from(conversation)
-        .where(and(eq(conversation.bdId, targetBdId), eq(conversation.peerProfileKey, personRow.profileKey)));
+    const conversationRows = await tx
+      .select({ id: conversation.id, title: conversation.title })
+      .from(conversation)
+      .where(and(eq(conversation.bdId, targetBdId), mergedProfileKeysAnyCondition(personId)));
 
+    let linkedin: AdminConversationThread[] = [];
+    if (conversationRows.length) {
       linkedin = await Promise.all(
         conversationRows.map(async (c) => {
           const messageRows = await tx
