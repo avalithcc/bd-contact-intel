@@ -76,6 +76,25 @@ export function BoardDnD({
       if (status && isBoardStatus(status) && boardDropAction(status)) {
         e.preventDefault();
       }
+      autoScrollBoard(e);
+    }
+
+    // Small progressive enhancement: a board wider than the viewport
+    // (fix/board-horizontal-scroll) can start a column entirely
+    // scrolled off-screen — nudge `.board`'s own scroll position while
+    // dragging near its left/right edge so a column doesn't have to
+    // already be visible to be a drop target.
+    const EDGE_PX = 56;
+    const SCROLL_STEP_PX = 24;
+    function autoScrollBoard(e: DragEvent) {
+      const board = root!.querySelector<HTMLElement>(".board");
+      if (!board) return;
+      const rect = board.getBoundingClientRect();
+      if (e.clientX < rect.left + EDGE_PX) {
+        board.scrollLeft -= SCROLL_STEP_PX;
+      } else if (e.clientX > rect.right - EDGE_PX) {
+        board.scrollLeft += SCROLL_STEP_PX;
+      }
     }
 
     function onDrop(e: DragEvent) {
