@@ -175,6 +175,8 @@ kbd, .kbd {
 .btn-sm.btn-icon { width: var(--control-height-sm); }
 .btn .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ds-spin 0.8s linear infinite; }
 @keyframes ds-spin { to { transform: rotate(360deg); } }
+/* Standalone spinner outside a `.btn` (email-sync.html's first-sync `.alert-info` — Account decision 6/7 sibling: same keyframes, no button chrome). */
+.spinner-standalone { display: inline-block; width: 16px; height: 16px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ds-spin 0.8s linear infinite; }
 .btn-group { display: inline-flex; }
 .btn-group .btn { border-radius: 0; }
 .btn-group .btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
@@ -521,7 +523,7 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .empty p { max-width: 360px; margin: 0 auto var(--space-lg); font-size: var(--text-base); }
 .skeleton { background: linear-gradient(90deg, var(--color-surface-sunken) 0%, var(--color-surface-1) 50%, var(--color-surface-sunken) 100%); background-size: 200% 100%; animation: ds-shimmer 1.4s ease infinite; border-radius: 4px; height: 12px; }
 @keyframes ds-shimmer { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .skeleton, .btn .spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .skeleton, .btn .spinner, .spinner-standalone { animation: none; } }
 
 /* --------------------------------------------------------------- dialog */
 .overlay.open { display: flex; }

@@ -48,6 +48,41 @@ test("entries with no gmailThreadId, or a non-email_sent type, pass through as '
   ]);
 });
 
+test("a reply_received row shares a thread with an email_sent row on the same gmailThreadId", () => {
+  const sent = {
+    id: "s1",
+    type: "email_sent",
+    createdAt: new Date("2026-10-13T16:02:00Z"),
+    metadata: { gmailThreadId: "t1" },
+    visible: true,
+  };
+  const reply = {
+    id: "r1",
+    type: "reply_received",
+    createdAt: new Date("2026-10-14T09:15:00Z"),
+    metadata: { gmailThreadId: "t1" },
+    visible: true,
+  };
+  const result = groupEmailThreads([sent, reply]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind === "thread") {
+    assert.deepEqual(result[0].group.messages.map((m) => m.id), ["s1", "r1"]);
+    assert.deepEqual(result[0].group.latestAt, reply.createdAt);
+  }
+});
+
+test("a lone reply_received row with a threadId stays a 'single' (no badge for 1 message)", () => {
+  const entry = {
+    id: "r1",
+    type: "reply_received",
+    createdAt: new Date("2026-10-14T09:15:00Z"),
+    metadata: { gmailThreadId: "t2" },
+    visible: true,
+  };
+  assert.deepEqual(groupEmailThreads([entry]), [{ kind: "single", entry }]);
+});
+
 test("a thread is 'visible' if at least one of its messages is", () => {
   const a = {
     id: "a1",

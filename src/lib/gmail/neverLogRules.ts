@@ -19,3 +19,34 @@ export function normalizeNeverLogValue(kind: NeverLogKind, rawValue: string): st
   const trimmed = rawValue.trim().toLowerCase();
   return kind === "domain" ? trimmed.replace(/^@/, "") : trimmed;
 }
+
+// Deliberately simple — this only needs to reject obvious typos before a row
+// reaches classify.ts's exact-match check (isNeverLogged), not validate
+// against the full RFC 5322/5890 grammar.
+const ADDRESS_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DOMAIN_SHAPE = /^[^\s@]+\.[^\s@]+$/;
+
+export type NeverLogValidationResult =
+  | { ok: true; value: string }
+  | { ok: false; error: "empty" | "invalid_address" | "invalid_domain" };
+
+/**
+ * Validates + normalizes one "Nunca registrar" form submission
+ * (email-sync.html:315-319's Tipo/Valor fields) before it reaches
+ * `addNeverLogEntry` (neverLog.ts). A `kind: "domain"` value is matched
+ * EXACTLY against `email_message`'s sender/recipient domain — never as a
+ * suffix/wildcard — so this only accepts a bare domain shape (no `@`), not
+ * an address; see this file's own doc comment above for why the settings
+ * screen's copy must say so explicitly.
+ */
+export function validateNeverLogInput(kind: NeverLogKind, rawValue: string): NeverLogValidationResult {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return { ok: false, error: "empty" };
+  const value = normalizeNeverLogValue(kind, trimmed);
+  if (kind === "address") {
+    return ADDRESS_SHAPE.test(value) ? { ok: true, value } : { ok: false, error: "invalid_address" };
+  }
+  return DOMAIN_SHAPE.test(value) && !value.includes("@")
+    ? { ok: true, value }
+    : { ok: false, error: "invalid_domain" };
+}

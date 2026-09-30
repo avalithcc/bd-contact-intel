@@ -869,16 +869,22 @@ export const es: typeof en = {
     eyebrow: "Cuenta",
     title: "conexión con gmail",
     subtitle:
-      "Permite enviar correos desde las fichas de contacto usando la cuenta de Gmail conectada.",
+      "Envía correos y sincroniza hilos con contactos conocidos desde la cuenta de Gmail conectada.",
     connectedTitle: "Estado: conectado",
     notConfiguredTitle: "Estado: no disponible en este entorno",
     disconnectedTitle: "Estado: sin conectar",
     badgeConnected: "Conectado",
     badgeNotAvailable: "No disponible",
+    // "Necesita reconectar" (email-sync.html:240) — pre-readonly connection.
+    badgeNeedsReconnect: "Necesita reconectar",
     addressLabel: "Dirección",
     connectedLabel: "Conectado",
     permissionsLabel: "Permisos",
+    // `permissionsValue` kept for backward compatibility; the two states now
+    // rendered pick one of the explicit variants below.
     permissionsValue: "Solo envío de correo",
+    permissionsValueSendOnly: "Solo envío de correo",
+    permissionsValueFull: "Envío y lectura de correo",
     syncNote:
       "La sincronización de correo (registrar respuestas en la cronología) llegará más adelante y va a requerir reconectar con permiso de lectura.",
     notConfiguredWarning: "Gmail no está configurado en el servidor.",
@@ -890,6 +896,57 @@ export const es: typeof en = {
     reconnectButton: "Reconectar Gmail",
     connectedSuccessToast: "Gmail conectado correctamente.",
     errorNotConfigured: "Gmail no está configurado en el servidor. Contactá a un administrador.",
+    // --- needs-reconnect state (email-sync.html screen 2a) ---
+    reconnectAlertTitle: "Tu conexión solo permite enviar correo.",
+    reconnectAlertBody:
+      "Para sincronizar respuestas en la cronología de los contactos, reconectá Gmail y aceptá el nuevo permiso de lectura. No se lee nada de tu bandeja hasta que reconectes.",
+    // --- connected + syncing / error / backfilling (screen 2b, 2b·error, 2c) ---
+    lastSyncedLabel: "Última sincronización",
+    lastSyncedNever: "Todavía no sincronizó",
+    errorAlertTitle: "No se pudo sincronizar Gmail.",
+    errorAlertBodySuffix: "Reconectá para reanudar la sincronización; el resto de la cuenta sigue funcionando con normalidad.",
+    // No percentage/ETA (owner brief override of README decision 4): the
+    // history/messages-list APIs never expose a total up front, so a real
+    // progress bar can't be computed — see the checklist for the full note.
+    backfillTitle: "Sincronizando los últimos 90 días…",
+    backfillBody:
+      "Puede tardar varios minutos la primera vez. Los contactos que respondieron en esta ventana van a pasar a Respondió apenas termine. Podés cerrar esta página; el proceso sigue en segundo plano.",
+    backfillButtonLabel: "Sincronizando…",
+    disconnectButton: "Desconectar",
+    disconnectError: "No se pudo desconectar Gmail. Probá de nuevo.",
+    syncNowButton: "Sincronizar ahora",
+    syncNowSyncing: "Sincronizando…",
+    syncNowError: "No se pudo sincronizar. Probá de nuevo.",
+    breadcrumbAccount: "Cuenta",
+    breadcrumbGmail: "Gmail",
+    neverLogLink: "Nunca registrar",
+  },
+
+  accountEmailNeverLog: {
+    breadcrumbNeverLog: "Nunca registrar",
+    eyebrow: "Cuenta · Gmail",
+    title: "nunca registrar",
+    subtitle: "Los correos con estas direcciones o dominios no se guardan ni aparecen en ninguna cronología.",
+    sectionTitle: "Direcciones y dominios excluidos",
+    typeLabel: "Tipo",
+    typeAddressOption: "Dirección de correo",
+    typeDomainOption: "Dominio",
+    valueLabel: "Valor",
+    valuePlaceholder: "nombre@empresa.com o empresa.com",
+    addButton: "Agregar a la lista",
+    removeAria: "Quitar de la lista",
+    chipAddressPrefix: "Dirección:",
+    chipDomainPrefix: "Dominio:",
+    // Exact-match copy (neverLogRules.ts's own TODO note): a domain rule
+    // never matches its subdomains.
+    domainExactHelp: "Un dominio excluido coincide exactamente — no incluye sus subdominios.",
+    emptyTitle: "No excluiste ninguna dirección todavía",
+    emptyBody:
+      "Todo correo con un contacto conocido en el CRM se sincroniza. Agregá una dirección o un dominio para dejarlo afuera.",
+    errorEmpty: "Ingresá una dirección o un dominio.",
+    errorInvalidAddress: "Esa dirección no parece válida (ejemplo: nombre@empresa.com).",
+    errorInvalidDomain: "Ese dominio no parece válido (ejemplo: empresa.com), o incluye un @.",
+    errorUnexpected: "Ocurrió un error. Probá de nuevo.",
   },
 
   tasksPage: {
