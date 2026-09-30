@@ -14,6 +14,7 @@ import {
   WhatsNewIcon,
   DiscoveryIcon,
   PlaybookIcon,
+  StatusGuideIcon,
   AccountIcon,
   EyeIcon,
   PersonIcon,
@@ -140,6 +141,33 @@ export function Sidebar({
         </div>
       ))}
 
+      {/* "Guías" section (openspec/changes/contact-status-guide, owner
+          decision 2026-09-30): reference/manual pages for every BD, no live
+          counts, NOT admin-gated (unlike "Administración" right below it).
+          "Guía de roles" moved here from sidenav-footer now that a second
+          reference item ("Estados de contacto") exists — same markup shape
+          as the "Administración" nav-section, just without the isAdmin
+          gate. */}
+      <div className="nav-section">
+        <div className="nav-title">{labels.guidesSection}</div>
+        <Link
+          href="/playbook"
+          className={`nav-item${isActive("/playbook") ? " active" : ""}`}
+          aria-current={isActive("/playbook") ? "page" : undefined}
+        >
+          <PlaybookIcon className="icon" />
+          {labels.playbook}
+        </Link>
+        <Link
+          href="/contact-status"
+          className={`nav-item${isActive("/contact-status") ? " active" : ""}`}
+          aria-current={isActive("/contact-status") ? "page" : undefined}
+        >
+          <StatusGuideIcon className="icon" />
+          {labels.contactStatusGuide}
+        </Link>
+      </div>
+
       {isAdmin && (
         <div className="nav-section">
           <div className="nav-title">{labels.administrationSection}</div>
@@ -171,22 +199,11 @@ export function Sidebar({
       )}
 
       <div className="sidenav-footer">
-        {/* "Guía de roles" (openspec/changes/bd-playbook, owner decision
-            2026-09-30): grouped with "Cuenta" as a reference/setup item with
-            no live count, not under "Espacio de trabajo" (reserved for
-            objects a BD works through with counts/pills). This group is
-            expected to grow with more reference items later; if it doesn't,
-            this entry moves into "Mi perfil" (/account) instead — the route
-            below (src/app/(app)/playbook) is self-contained for exactly
-            that move. */}
-        <Link
-          href="/playbook"
-          className={`nav-item${isActive("/playbook") ? " active" : ""}`}
-          aria-current={isActive("/playbook") ? "page" : undefined}
-        >
-          <PlaybookIcon className="icon" />
-          {labels.playbook}
-        </Link>
+        {/* "Cuenta" is the only entry left here (openspec/changes/
+            contact-status-guide): "Guía de roles" moved into its own
+            "Guías" nav-section above once a second reference page
+            ("Estados de contacto") existed to group it with — see that
+            section's comment. */}
         <Link href="/account" className="nav-item">
           <AccountIcon className="icon" />
           {labels.account}

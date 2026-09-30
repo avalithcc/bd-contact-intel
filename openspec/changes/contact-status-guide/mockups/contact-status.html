@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estados de contacto · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<!-- "Guías" nav-section (openspec/changes/contact-status-guide): holds
+     every reference/manual page for the BD, not gated on admin. "Guía de
+     roles" moves in here from sidenav-footer (bd-playbook, owner decision
+     2026-09-30) now that a second reference item exists. -->
+<div class="nav-section"><div class="nav-title">Guías</div>
+<a class="nav-item" href="bd-playbook.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Guía de roles</a>
+<a class="nav-item active" aria-current="page" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Estados de contacto</a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><span>Estados de contacto</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a5">MR</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Martín Rivas</strong><br><span class="meta">BD</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Manual interno (cambio <span class="mono">contact-status-guide</span>): explica el algoritmo de <span class="mono">src/lib/status/deriveStatus.ts</span> y la etapa comercial de la empresa (<span class="mono">src/lib/reports/pipeline.ts</span>) sin exponer código — cada afirmación de esta página está verificada contra esos dos archivos. Reutiliza el sistema de diseño de <span class="mono">crm-hubspot-ux</span> sin componentes nuevos: tarjetas <span class="mono">.card</span> (ya usadas en <a href="../../crm-hubspot-ux/mockups/tasks.html">tasks.html</a> y en <a href="bd-playbook.html">bd-playbook.html</a>), tabla <span class="mono">.data</span> (ya usada en <a href="../../crm-hubspot-ux/mockups/contacts.html">contacts.html</a>), insignias de estado (mismas que en <a href="../../crm-hubspot-ux/mockups/contact-record.html">contact-record.html</a>). Vista de escritorio únicamente. Ver <code>README.md</code> junto a este archivo. <a href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas del sistema aprobado</a></div><span class="tag tag-scope">En alcance: contact-status-guide</span></div>
+
+<div class="page-header"><div class="titles"><div class="eyebrow">Guía</div><h1>Cómo funcionan los estados de un contacto<span class="dot">.</span></h1>
+<p class="meta">El estado de un contacto no se elige: lo calcula el sistema a partir de la actividad que registrás. No hay ningún lugar donde cambiarlo a mano, y eso es a propósito.</p></div></div>
+
+<div class="row wrap mb-lg" style="gap:var(--space-sm)" aria-label="Las cuatro etapas, en orden">
+<span class="meta">Hay cuatro etapas, en orden:</span>
+<span class="badge badge-new">Nuevo</span>
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<span class="badge badge-contacted">Contactado</span>
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<span class="badge badge-replied">Respondió</span>
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<span class="badge badge-meeting">Reunión</span>
+<span class="meta">El contacto queda siempre en la más alta que alcanzó.</span>
+</div>
+
+<div class="stack">
+
+<div class="card">
+<div class="card-header"><h3>Qué mueve cada etapa</h3></div>
+<div class="card-body">
+<p class="meta mb-lg">Solo estas acciones cambian el estado. Cualquier otra cosa lo deja como está.</p>
+<div class="table-wrap"><table class="data"><thead><tr><th>Lo que registrás</th><th>El contacto pasa a</th></tr></thead><tbody>
+<tr><td>Correo enviado</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
+<tr><td>Respuesta recibida</td><td><span class="badge badge-replied">Respondió</span></td></tr>
+<tr><td>Reunión registrada</td><td><span class="badge badge-meeting">Reunión</span></td></tr>
+<tr><td>Llamada saliente, con cualquier resultado</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
+<tr><td>Llamada con resultado "conectado", entrante o saliente</td><td><span class="badge badge-replied">Respondió</span></td></tr>
+<tr><td>Conexión de LinkedIn con mensajes que enviaste</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
+<tr><td>Conexión de LinkedIn con mensajes que recibiste</td><td><span class="badge badge-replied">Respondió</span></td></tr>
+</tbody></table></div>
+<p class="meta mt-lg"><strong>Una nota no mueve el estado.</strong> Sirve para dejar contexto, no para registrar que pasó algo con la persona. Si llamaste, registrá la llamada; la nota es aparte.</p>
+</div></div>
+
+<div class="card">
+<div class="card-header"><h3>Dos reglas que conviene saber</h3></div>
+<div class="card-body">
+<p class="meta mb-md"><strong>El estado no baja solo.</strong> Se queda con la etapa más alta que el contacto alcanzó alguna vez, no con lo último que pasó. Si ya tuviste una reunión y después le mandás un correo, sigue en Reunión. No baja a Contactado.</p>
+<p class="meta mb-md"><strong>Descartar no es para siempre.</strong> El descarte gana solo mientras sea lo más reciente. Cualquier actividad posterior lo revive automáticamente y el contacto vuelve a la etapa que le corresponde. Así que si descartaste a alguien y después te responde, no tenés que deshacer nada: la respuesta sola lo saca del descarte.</p>
+<p class="meta">También cuenta la actividad de <strong>todo el equipo</strong>, no solo la tuya. Si Macarena ya lo contactó, el contacto figura como Contactado aunque vos no le hayas escrito nunca.</p>
+</div></div>
+
+<div class="card">
+<div class="card-header"><h3>Qué pasa después de la reunión</h3></div>
+<div class="card-body">
+<p class="meta mb-md"><strong>Reunión es el techo del contacto.</strong> No hay una etapa más alta: por más reuniones, propuestas o llamadas que sigan, la persona se queda ahí. Eso no es un límite del sistema, es que a partir de ese punto lo que avanza ya no es la persona.</p>
+<p class="meta mb-lg"><strong>El negocio sigue en la empresa, no en el contacto.</strong> Abrí la ficha de la empresa y ahí está la etapa comercial:</p>
+<div class="table-wrap"><table class="data"><thead><tr><th>Etapa de la empresa</th><th>Cuándo moverla</th></tr></thead><tbody>
+<tr><td><span class="badge badge-neutral">Prospecto</span></td><td>Todavía no sabemos si hay oportunidad</td></tr>
+<tr><td><span class="badge badge-info">Calificada</span></td><td>Confirmamos que hay necesidad, presupuesto y con quién hablar</td></tr>
+<tr><td><span class="badge badge-warn">Propuesta enviada</span></td><td>Ya mandamos números</td></tr>
+<tr><td><span class="badge badge-success">Ganada</span></td><td>Cerró</td></tr>
+<tr><td><span class="badge badge-outline">Perdida</span></td><td>Se cayó, o no va a avanzar</td></tr>
+</tbody></table></div>
+<p class="meta mt-lg mb-md"><strong>Esta sí la movés vos, a mano.</strong> Es la diferencia importante con el estado del contacto: el estado se calcula solo a partir de lo que registrás, la etapa de la empresa la elegís. Nadie la va a mover por vos, y ninguna actividad la cambia sola.</p>
+<p class="meta mb-lg">Cada cambio de etapa queda registrado en la cronología de la empresa, con tu nombre y la fecha.</p>
+<p class="meta"><strong>Por qué están separados.</strong> Una empresa suele tener varios contactos: el que te atendió primero, el técnico que validó, el que firma. Cada uno avanza por su cuenta en su propio estado, pero la oportunidad es una sola y es de la empresa. Por eso el embudo comercial vive ahí.</p>
+</div></div>
+
+<div class="card">
+<div class="card-header"><h3>Qué significa en la práctica</h3></div>
+<div class="card-body">
+<p class="meta mb-md"><strong>Si no registrás, el contacto no avanza.</strong> No es que el tablero esté desactualizado: para el sistema, una llamada que no registraste no existe. Un contacto con el que hablaste tres veces sigue figurando en Nuevo hasta que quede alguna actividad cargada.</p>
+<p class="meta">Esto es a propósito. Un estado que se elige a mano miente: alguien marca "Contactado" sin haber escrito, o escribe y se olvida de mover la etiqueta. Acá el estado no puede separarse de los hechos, porque <strong>es</strong> los hechos. No hay forma de tener a alguien en Respondió sin una respuesta registrada.</p>
+</div></div>
+
+<div class="alert alert-neutral">
+<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+<div>El trato es ese: el tablero refleja la realidad exactamente en la medida en que la carguen.</div>
+</div>
+
+</div>
+
+</main>
+</div>
+</div>
+</body>
+</html>

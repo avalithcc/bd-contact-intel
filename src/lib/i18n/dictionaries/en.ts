@@ -163,6 +163,60 @@ export const en = {
     fieldWrongPerson: "When they're the wrong person",
   },
 
+  // "Contact status" guide page chrome (openspec/changes/contact-status-guide).
+  // English mirror kept only for type parity with `es` (Dictionary = typeof
+  // en) — the product ships Spanish-only (D10), this copy never renders.
+  contactStatusGuide: {
+    eyebrow: "Guide",
+    title: "How a contact's status works",
+    lead: "A contact's status isn't chosen: the system computes it from the activity you record. There's no place to change it by hand, and that's on purpose.",
+    stagesAriaLabel: "The four stages, in order",
+    stagesIntroLabel: "There are four stages, in order:",
+    stagesIntroSuffix: "The contact always stays at the highest one it reached.",
+    sectionTriggersTitle: "What moves each stage",
+    sectionTriggersIntro: "Only these actions change the status. Anything else leaves it as is.",
+    tableActivityHeader: "What you record",
+    tableResultHeader: "The contact moves to",
+    noteRuleLabel: "A note does not move the status.",
+    noteRuleBody:
+      "It's for leaving context, not for recording that something happened with the person. If you called, log the call; the note is separate.",
+    sectionRulesTitle: "Two rules worth knowing",
+    ruleNoDowngradeLabel: "The status never goes down on its own.",
+    ruleNoDowngradeBody:
+      "It stays at the highest stage the contact ever reached, not the last thing that happened. If you already had a meeting and then send a follow-up email, it stays at Meeting. It doesn't drop back to Contacted.",
+    ruleDiscardNotForeverLabel: "Discarding isn't forever.",
+    ruleDiscardNotForeverBody:
+      "A discard only wins while it's the most recent event. Any later activity revives the contact automatically, back to whatever stage it belongs in. So if you discarded someone and they reply afterward, you don't have to undo anything: the reply alone pulls it out of the discard.",
+    teamActivityPrefix: "Activity from",
+    teamActivityStrong: "the whole team",
+    teamActivitySuffix:
+      " counts too, not just yours. If a teammate already contacted this person, the contact shows as Contacted even if you never wrote to them.",
+    sectionAfterMeetingTitle: "What happens after the meeting",
+    ceilingLabel: "Meeting is the contact's ceiling.",
+    ceilingBody:
+      "There's no higher stage: no matter how many more meetings, proposals or calls follow, the person stays there. That's not a system limit — past that point, what's moving forward isn't the person anymore.",
+    companyStageLabel: "The deal lives on the company, not the contact.",
+    companyStageBody: "Open the company record and the commercial stage is there:",
+    tableCompanyStageHeader: "Company stage",
+    tableWhenToMoveHeader: "When to move it",
+    manualLabel: "This one you do move by hand.",
+    manualBody:
+      "That's the key difference from a contact's status: the status is computed only from what you record, while the company stage is something you choose. No one will move it for you, and no activity changes it on its own.",
+    stageChangeLoggedNote: "Every stage change is logged in the company's timeline, with your name and the date.",
+    whySeparateLabel: "Why they're separate.",
+    whySeparateBody:
+      "A company usually has several contacts: whoever answered first, the engineer who validated the fit, whoever signs. Each one moves through their own status independently, but the opportunity is one and it belongs to the company. That's why the sales funnel lives there.",
+    sectionPracticeTitle: "What this means in practice",
+    noRecordLabel: "If you don't record it, the contact doesn't move.",
+    noRecordBody:
+      "It's not that the board is out of date: as far as the system is concerned, a call you didn't log doesn't exist. A contact you've spoken to three times still shows as New until some activity is recorded.",
+    practicalWhyPrefix:
+      'This is on purpose. A status you pick by hand lies: someone marks "Contacted" without having written, or writes and forgets to move the label. Here the status can\'t be separated from the facts, because it',
+    practicalWhyStrong: "is",
+    practicalWhySuffix: "the facts. There's no way to have someone at Replied without a recorded reply.",
+    closingStatement: "That's the deal: the board reflects reality exactly to the extent that it gets logged.",
+  },
+
   companyCategories,
   relationshipFilters,
   markets,
@@ -184,6 +238,10 @@ export const en = {
     discovery: "Discovery",
     account: "Account",
     playbook: "Role guide",
+    // "Guides" sidenav section (openspec/changes/contact-status-guide) —
+    // reference pages for every BD, not admin-gated.
+    guidesSection: "Guides",
+    contactStatusGuide: "Contact status",
     administrationSection: "Administration",
     auditLog: "Audit log",
     duplicates: "Duplicates",

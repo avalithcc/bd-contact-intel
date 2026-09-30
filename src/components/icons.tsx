@@ -135,6 +135,18 @@ export function PlaybookIcon({ className }: { className?: string }) {
   );
 }
 
+// "Estados de contacto" sidebar entry (openspec/changes/contact-status-guide)
+// — an activity/pulse glyph, path copied 1:1 from that change's mockup
+// (contact-status.html's nav item), same family as PlaybookIcon in the new
+// "Guías" nav-section.
+export function StatusGuideIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </Svg>
+  );
+}
+
 // "Reportes" sidebar entry (owner-reporting decision 5) — a bar-chart glyph,
 // path copied 1:1 from that change's mockup (reports.html:30). The one new
 // visual asset owner-reporting needs; no equivalent existed in this file.
