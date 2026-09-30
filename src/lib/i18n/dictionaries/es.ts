@@ -880,11 +880,16 @@ export const es: typeof en = {
   adminConversation: {
     backLink: "Volver a la ficha",
     title: "Conversación con",
-    auditNotice: "Esta visualización queda registrada en el registro de auditoría.",
-    emailSectionTitle: "Correos",
+    syncedEmailSectionTitle: "Correos sincronizados",
+    noSyncedEmailContent: "No hay correo sincronizado con este BD.",
+    legacyEmailSectionTitle: "Correos (registro manual)",
     linkedinSectionTitle: "Conversación de LinkedIn",
     noEmailContent: "Este BD no envió correos.",
     noLinkedinContent: "No hay conversación de LinkedIn con este BD.",
+    auditBannerTitle: (bdName: string) =>
+      `Estás viendo la conversación de ${bdName} como administrador — este acceso quedó registrado`,
+    auditBannerBody: (actorName: string, bdName: string, personName: string, dateLabel: string) =>
+      `Registro de auditoría: ${actorName} · conversación de ${bdName} con ${personName} · ${dateLabel}.`,
   },
 
   login: {

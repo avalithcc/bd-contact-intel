@@ -964,11 +964,21 @@ export const en = {
   adminConversation: {
     backLink: "Back to the record",
     title: "Conversation with",
-    auditNotice: "This view is recorded in the audit log.",
-    emailSectionTitle: "Emails",
+    syncedEmailSectionTitle: "Synced email",
+    noSyncedEmailContent: "No synced email with this BD.",
+    legacyEmailSectionTitle: "Email (manual record)",
     linkedinSectionTitle: "LinkedIn conversation",
     noEmailContent: "No emails sent by this BD.",
     noLinkedinContent: "No LinkedIn conversation with this BD.",
+    // Audit banner (admin-conversation-access mockup, admin-conversation.html:208)
+    // — a server-only function template (this dict section is never passed to
+    // a client component, see contactRecordServer's own doc comment for why
+    // that split exists elsewhere). Owner decision (2026-09-30): no promise
+    // that the BD can see this, unlike the mockup's earlier draft copy.
+    auditBannerTitle: (bdName: string) =>
+      `You're viewing ${bdName}'s conversation as an administrator — this access was recorded`,
+    auditBannerBody: (actorName: string, bdName: string, personName: string, dateLabel: string) =>
+      `Audit log: ${actorName} · ${bdName}'s conversation with ${personName} · ${dateLabel}.`,
   },
 
   login: {

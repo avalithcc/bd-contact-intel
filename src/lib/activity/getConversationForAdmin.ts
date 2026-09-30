@@ -50,6 +50,11 @@ export interface AdminConversationThread {
 export interface AdminSyncedEmailMessage {
   id: string;
   direction: string;
+  // Groups messages into one "hilo de correo" card (admin-conversation-access
+  // mockup, "Correos sincronizados" section) — same grouping key
+  // groupEmailThreads uses for the BD's own timeline (src/lib/contacts/
+  // emailThreads.ts), via groupSyncedEmailThreads (src/lib/gmail/).
+  gmailThreadId: string;
   fromAddress: string;
   toAddresses: unknown;
   ccAddresses: unknown;
@@ -111,6 +116,7 @@ export async function getConversationForAdmin(
       .select({
         id: emailMessage.id,
         direction: emailMessage.direction,
+        gmailThreadId: emailMessage.gmailThreadId,
         fromAddress: emailMessage.fromAddress,
         toAddresses: emailMessage.toAddresses,
         ccAddresses: emailMessage.ccAddresses,
