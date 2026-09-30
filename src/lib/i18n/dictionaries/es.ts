@@ -647,7 +647,25 @@ export const es: typeof en = {
     // shown alongside verifiedBadge, since email_status can only be one of
     // 'verified'/'probable'/'none' at a time.
     inferredBadge: "Deducido",
+    // Tooltip on the "Deducido" badge over a synced thread (email-sync.html:180).
+    inferredMatchHint:
+      "El correo se emparejó por patrón de dominio (nombre.apellido@empresa), no fue verificado a mano.",
     linkedInBadge: "LinkedIn",
+    // --- synced email thread (email-sync.html screen 1) ---
+    timelineThreadWhatPrefix: "Hilo de correo",
+    timelineThreadNoSubject: "(sin asunto)",
+    timelineThreadIntro: "Sincronizado automáticamente desde Gmail.",
+    timelineViewInGmail: "Ver en Gmail",
+    timelineShowMessages: "Ver mensajes",
+    timelineHideMessages: "Ocultar mensajes",
+    timelineStatusMovedMarker: "Marcó el estado como Respondió",
+    timelineBodyTruncatedNote: "El mensaje se truncó por tamaño.",
+    timelineQuotedShow: "Mostrar texto citado",
+    timelineQuotedHide: "Ocultar texto citado",
+    timelineSentBadge: "Enviado",
+    timelineReceivedBadge: "Recibido",
+    timelineRecipientPrefix: "para",
+    timelineThreadLoadError: "No se pudo cargar el hilo. Probá de nuevo.",
     historyAction: "Historial",
     generateMessageCta: "Generar mensaje con IA",
     changeCompanyAction: "Cambiar empresa",

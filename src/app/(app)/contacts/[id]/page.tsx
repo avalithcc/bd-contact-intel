@@ -310,6 +310,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                 content: (
                   <Timeline
                     personId={record.person.id}
+                    personName={name}
                     labels={l}
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
@@ -345,6 +346,11 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                             // rendered to a plain string here instead.
                             bodyText: dict.contactRecordServer.mergeCardBody(record.merge.unifiedFromCount),
                           }
+                        : null
+                    }
+                    statusMovedByActivityId={
+                      record.statusReason?.status === "replied" && record.statusReason.because.source === "activity"
+                        ? record.statusReason.because.activityId
                         : null
                     }
                   />

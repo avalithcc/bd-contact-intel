@@ -75,3 +75,15 @@ export function groupEmailThreads<T extends EmailThreadableEntry>(entries: reado
 
   return result;
 }
+
+/**
+ * "Deducido" badge (email-sync.html:180; README decision 1 — reuses
+ * `.badge-probable`, the same class/color the contacts table already uses
+ * for a `pattern_inferred` email match). A thread is "Deducido" if ANY of
+ * its messages matched through an inferred address — the badge is a
+ * caution about the MATCH, not about every individual message, so one
+ * inferred-matched message is enough to flag the whole thread.
+ */
+export function isInferredThread<T extends EmailThreadableEntry>(group: EmailThreadGroup<T>): boolean {
+  return group.messages.some((m) => m.metadata?.matchConfidence === "inferred");
+}

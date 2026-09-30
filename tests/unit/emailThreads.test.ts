@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { groupEmailThreads } from "@/lib/contacts/emailThreads";
+import { groupEmailThreads, isInferredThread } from "@/lib/contacts/emailThreads";
 
 test("a lone email_sent row with a threadId stays a 'single' (no badge for 1 message)", () => {
   const entry = {
@@ -101,4 +101,44 @@ test("a thread is 'visible' if at least one of its messages is", () => {
   const result = groupEmailThreads([a, b]);
   assert.equal(result[0].kind, "thread");
   if (result[0].kind === "thread") assert.equal(result[0].group.visible, true);
+});
+
+test("isInferredThread is true when any message matched through an inferred address", () => {
+  const a = {
+    id: "a1",
+    type: "email_sent",
+    createdAt: new Date("2026-10-13T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchConfidence: "exact" },
+    visible: true,
+  };
+  const b = {
+    id: "a2",
+    type: "reply_received",
+    createdAt: new Date("2026-10-14T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchConfidence: "inferred" },
+    visible: true,
+  };
+  const result = groupEmailThreads([a, b]);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind === "thread") assert.equal(isInferredThread(result[0].group), true);
+});
+
+test("isInferredThread is false when every message matched exactly", () => {
+  const a = {
+    id: "a1",
+    type: "email_sent",
+    createdAt: new Date("2026-10-13T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchConfidence: "exact" },
+    visible: true,
+  };
+  const b = {
+    id: "a2",
+    type: "reply_received",
+    createdAt: new Date("2026-10-14T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchConfidence: "exact" },
+    visible: true,
+  };
+  const result = groupEmailThreads([a, b]);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind === "thread") assert.equal(isInferredThread(result[0].group), false);
 });
