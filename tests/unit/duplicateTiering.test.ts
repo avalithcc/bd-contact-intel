@@ -17,10 +17,24 @@ import {
   hasNonAsciiLocalPart,
   pickEmailWinnerSide,
   planDuplicateTierRun,
+  type DuplicatePairBucket,
   type DuplicateTierPersonFields,
   type DuplicatePairPlanInput,
   type DuplicatePairPlanPerson,
 } from "@/lib/identity/duplicateTiering";
+
+const ALL_BUCKETS: readonly DuplicatePairBucket[] = [
+  "same_email",
+  "classic_split_no_conflict",
+  "classic_split_conflict",
+  "one_email_not_classic",
+  "two_emails_same_mailbox",
+  "two_emails_same_mailbox_ambiguous",
+  "two_emails_differ_verified",
+  "two_emails_differ_unverified",
+  "no_email_titles_agree",
+  "no_email_titles_conflict",
+];
 
 function pf(overrides: Partial<DuplicateTierPersonFields> = {}): DuplicateTierPersonFields {
   return {
@@ -190,7 +204,7 @@ test("classifyMailboxMatch: every rule reaching the auto-merge tier requires ide
   }
 });
 
-test("classifyDuplicatePairBucket: a ccTLD-related same-mailbox pair goes to review, not safe and not dismiss", () => {
+test("classifyDuplicatePairBucket: a ccTLD-related same-mailbox pair goes to review, not safe", () => {
   const bucket = classifyDuplicatePairBucket(
     pf({ email: "abresciani@rappachiani.com", emailStatus: "verified" }),
     pf({ email: "abresciani@rappachiani.com.ar", emailStatus: "verified" }),
@@ -216,7 +230,7 @@ test("isSameMailbox: production true-cases still hold after the boundary-sensiti
   assert.equal(isSameMailbox("javier.astort@wolox.com.ar", "javier.s.astort@wolox.com.ar"), true); // rule B, middle initial
 });
 
-test("isSameMailbox: production must-stay-dismiss pairs still hold after the boundary-sensitive rewrite", () => {
+test("isSameMailbox: production genuinely-different-people pairs still hold after the boundary-sensitive rewrite", () => {
   assert.equal(isSameMailbox("jose.tanaka@tecpetrol.com", "jose.somale@tecpetrol.com"), false);
   assert.equal(isSameMailbox("juan.barrere@pampaenergia.com", "juan.vespa@pampaenergia.com"), false);
 });
@@ -260,10 +274,12 @@ test("hasNonAsciiLocalPart: detects an accented local part, not a plain ASCII on
   assert.equal(hasNonAsciiLocalPart("martin.medina@ladonware.com"), false);
 });
 
-test("classifyDuplicatePairBucket: two verified emails that are the same mailbox (identical token sequences, same domain) is safe, not dismiss", () => {
+test("classifyDuplicatePairBucket: two verified emails that are the same mailbox (identical token sequences, same domain) is tier safe", () => {
   // The fixture has moved twice, both times because the pair it used stopped
   // qualifying for the auto-merge tier, never because the intent changed: the
-  // point is still that a same-mailbox pair must not be dismissed.
+  // point is still that a genuine same-mailbox pair must land in "safe",
+  // never in "review" (the dismiss tier that used to be the other risk here
+  // was retired entirely — see duplicateTiering.ts's module doc comment).
   //   - juanmontanaro/juan.montanaro matches only via the sole-token rule.
   //   - abresciani@rappachiani.com/.com.ar matches only across a ccTLD suffix.
   // Both relations are non-transitive, so both now route to
@@ -276,7 +292,7 @@ test("classifyDuplicatePairBucket: two verified emails that are the same mailbox
   assert.equal(tierForBucket(bucket), "safe");
 });
 
-test("classifyDuplicatePairBucket: a middle-initial same-mailbox pair is safe, not dismiss", () => {
+test("classifyDuplicatePairBucket: a middle-initial same-mailbox pair is tier safe", () => {
   const a = pf({ email: "javier.astort@wolox.com.ar", emailStatus: "verified" });
   const b = pf({ email: "javier.s.astort@wolox.com.ar", emailStatus: "verified" });
   const bucket = classifyDuplicatePairBucket(a, b);
@@ -292,33 +308,57 @@ test("classifyDuplicatePairBucket: a sole-token-only same-mailbox match is 'two_
   assert.equal(tierForBucket(bucket), "review");
 });
 
-test("regression (Issue 1 trap): a sole-token same-mailbox pair must never land in tier dismiss", () => {
+test("regression (Issue 1 trap): a sole-token same-mailbox pair must never land in tier safe", () => {
   // This is the exact trap the module header warns about: deleting the
   // sole-token rule outright would make isSameMailbox return false here,
-  // which would fall through to "two_emails_differ_verified" -> tier
-  // "dismiss" (a permanent not_duplicate that --revert cannot undo). The fix
-  // must route this pair to "review" instead, never to "dismiss" or "safe".
+  // which would fall through to "two_emails_differ_verified". That bucket
+  // used to be tier "dismiss" (a permanent not_duplicate that --revert could
+  // not undo); the dismiss tier has since been retired entirely, so the only
+  // remaining risk this regression guards against is the pair being
+  // auto-merged as "safe" on the strength of a single ambiguous rule. The fix
+  // must route this pair to "review" instead, never to "safe".
   const a = pf({ email: "juanmontanaro@jpmorgan.com", emailStatus: "verified" });
   const b = pf({ email: "juan.montanaro@jpmorgan.com", emailStatus: "verified" });
   const bucket = classifyDuplicatePairBucket(a, b);
-  assert.notEqual(tierForBucket(bucket), "dismiss");
+  assert.notEqual(tierForBucket(bucket), "safe");
   assert.equal(tierForBucket(bucket), "review");
 });
 
-test("classifyDuplicatePairBucket: two verified emails on the same domain but genuinely different people stays dismiss", () => {
+test("classifyDuplicatePairBucket: two verified emails on the same domain but genuinely different people is tier review (no longer auto-dismissed)", () => {
   const a = pf({ email: "jose.tanaka@tecpetrol.com", emailStatus: "verified" });
   const b = pf({ email: "jose.somale@tecpetrol.com", emailStatus: "verified" });
   const bucket = classifyDuplicatePairBucket(a, b);
   assert.equal(bucket, "two_emails_differ_verified");
-  assert.equal(tierForBucket(bucket), "dismiss");
+  assert.equal(tierForBucket(bucket), "review");
 });
 
-test("classifyDuplicatePairBucket: two different VERIFIED emails is dismiss (likely two people)", () => {
+test("classifyDuplicatePairBucket: two different VERIFIED emails is tier review (auto-dismiss was retired — see duplicateTiering.ts header)", () => {
   const a = pf({ email: "jane@corp.com", emailStatus: "verified" });
   const b = pf({ email: "jane.doe@corp.com", emailStatus: "verified" });
   const bucket = classifyDuplicatePairBucket(a, b);
   assert.equal(bucket, "two_emails_differ_verified");
-  assert.equal(tierForBucket(bucket), "dismiss");
+  assert.equal(tierForBucket(bucket), "review");
+});
+
+test("tierForBucket: two_emails_differ_verified is review, not a tier of its own", () => {
+  assert.equal(tierForBucket("two_emails_differ_verified"), "review");
+});
+
+test("tierForBucket: no bucket maps to a tier outside {safe, review} (guards against the dismiss tier being quietly resurrected)", () => {
+  // The bucket list comes from the planner's own bucketCounts, not from the
+  // local ALL_BUCKETS fixture above: a hand-copied list would silently stop
+  // covering an 11th bucket added to duplicateTiering.ts, which is exactly the
+  // case this guard exists to catch.
+  const canonicalBuckets = Object.keys(planDuplicateTierRun([], "safe").bucketCounts) as DuplicatePairBucket[];
+  assert.deepEqual(
+    [...canonicalBuckets].sort(),
+    [...ALL_BUCKETS].sort(),
+    "the local ALL_BUCKETS fixture drifted from duplicateTiering.ts's own enumeration",
+  );
+  for (const bucket of canonicalBuckets) {
+    const tier = tierForBucket(bucket);
+    assert.ok(tier === "safe" || tier === "review", `bucket ${bucket} produced unexpected tier ${tier}`);
+  }
 });
 
 test("classifyDuplicatePairBucket: two different emails, not both verified, is review (not dismissed)", () => {
@@ -437,19 +477,22 @@ test("planDuplicateTierRun: tier=safe merges the clean pair, skips the chained p
   assert.equal((c4 as { loss: { losesGmailMessages: boolean } }).loss.losesGmailMessages, true);
 });
 
-test("planDuplicateTierRun: tier=dismiss selects the two-different-verified-emails pairs", () => {
+test("planDuplicateTierRun: a two_emails_differ_verified pair produces no plan entry (tier review, untouched by --tier=safe)", () => {
+  // The dismiss tier that used to act on this bucket was retired (see
+  // duplicateTiering.ts's module doc comment): it was right 2 times out of 9
+  // in production and had no revert path. This bucket is tier "review" now,
+  // like everything else this script doesn't touch.
   const a = planPerson({ id: "a", email: "jane@corp.com", emailStatus: "verified" });
   const b = planPerson({ id: "b", email: "jane.doe@corp.com", emailStatus: "verified" });
-  const plan = planDuplicateTierRun([pairInput("c1", a, b, "name_company")], "dismiss");
+  const plan = planDuplicateTierRun([pairInput("c1", a, b, "name_company")], "safe");
 
-  assert.equal(plan.tier, "dismiss");
-  assert.equal(plan.tierCounts.dismiss, 1);
-  assert.equal(plan.entries.length, 1);
-  assert.equal(plan.entries[0].kind, "dismiss");
-  assert.equal(plan.entries[0].candidateId, "c1");
+  assert.equal(plan.bucketCounts.two_emails_differ_verified, 1);
+  assert.equal(plan.tierCounts.safe, 0);
+  assert.equal(plan.tierCounts.review, 1);
+  assert.equal(plan.entries.length, 0);
 });
 
-test("planDuplicateTierRun: a same-mailbox verified pair (identical token sequences) lands in the safe plan, not the dismiss plan", () => {
+test("planDuplicateTierRun: a same-mailbox verified pair (identical token sequences) lands in the safe plan", () => {
   // The fixture has moved twice for the same reason as the
   // classifyDuplicatePairBucket test above: juanmontanaro/juan.montanaro
   // matches only via the sole-token rule, and abresciani@….com/.com.ar only
@@ -464,16 +507,11 @@ test("planDuplicateTierRun: a same-mailbox verified pair (identical token sequen
   const safePlan = planDuplicateTierRun(pairs, "safe");
   assert.equal(safePlan.bucketCounts.two_emails_same_mailbox, 1);
   assert.equal(safePlan.tierCounts.safe, 1);
-  assert.equal(safePlan.tierCounts.dismiss, 0);
   assert.equal(safePlan.entries.length, 1);
   assert.equal(safePlan.entries[0].kind, "merge");
-
-  const dismissPlan = planDuplicateTierRun(pairs, "dismiss");
-  assert.equal(dismissPlan.tierCounts.dismiss, 0);
-  assert.equal(dismissPlan.entries.length, 0);
 });
 
-test("planDuplicateTierRun: a sole-token-only same-mailbox pair appears in neither the safe plan nor the dismiss plan", () => {
+test("planDuplicateTierRun: a sole-token-only same-mailbox pair produces no plan entry under tier=safe", () => {
   const a = planPerson({ id: "a", email: "juanmontanaro@jpmorgan.com", emailStatus: "verified" });
   const b = planPerson({ id: "b", email: "juan.montanaro@jpmorgan.com", emailStatus: "verified" });
   const pairs: DuplicatePairPlanInput[] = [pairInput("c1", a, b, "name_company")];
@@ -483,10 +521,6 @@ test("planDuplicateTierRun: a sole-token-only same-mailbox pair appears in neith
   assert.equal(safePlan.tierCounts.safe, 0);
   assert.equal(safePlan.tierCounts.review, 1);
   assert.equal(safePlan.entries.length, 0);
-
-  const dismissPlan = planDuplicateTierRun(pairs, "dismiss");
-  assert.equal(dismissPlan.tierCounts.dismiss, 0);
-  assert.equal(dismissPlan.entries.length, 0);
 });
 
 // --- Defect 3: accent-survivor override for two_emails_same_mailbox --------

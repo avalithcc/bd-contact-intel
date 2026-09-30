@@ -27,32 +27,37 @@
  * has no synced messages while the losing side does, or lacks a
  * profile_key the losing side has (checkSurvivorLoss).
  *
- * Writes: one `mergeContacts`/`markNotDuplicate` transaction PER PAIR
- * (never a parallel merge implementation — both are the exact functions the
- * /admin/duplicates UI uses), run strictly SEQUENTIALLY (the prod pool is
- * `max: 3` and every round trip already costs ~222ms — fanning out
- * concurrently would only interleave queries on the same pool, not speed
- * anything up; see PERFORMANCE.md). One extra `audit_log` row summarizes
- * the whole run (action `bulk_merge_duplicates_run`), listing every merged
- * and dismissed pair, for full traceability and revert.
+ * Writes: one `mergeContacts` transaction PER PAIR (never a parallel merge
+ * implementation — it's the exact function the /admin/duplicates UI uses),
+ * run strictly SEQUENTIALLY (the prod pool is `max: 3` and every round trip
+ * already costs ~222ms — fanning out concurrently would only interleave
+ * queries on the same pool, not speed anything up; see PERFORMANCE.md). One
+ * extra `audit_log` row summarizes the whole run (action
+ * `bulk_merge_duplicates_run`), listing every merged pair, for full
+ * traceability and revert.
  *
- * Idempotent: a merged/dismissed duplicate_candidate leaves `status='open'`
- * (mergeContacts marks it `'merged'`; markNotDuplicate marks it
- * `'not_duplicate'`), so a second `--execute` simply finds nothing left to
- * do for that pair — the open-pairs read naturally excludes it.
+ * Idempotent: a merged duplicate_candidate leaves `status='open'`
+ * (mergeContacts marks it `'merged'`), so a second `--execute` simply finds
+ * nothing left to do for that pair — the open-pairs read naturally excludes
+ * it.
+ *
+ * Retired: `--tier=dismiss` (2026-09). It used to mark a
+ * `two_emails_differ_verified` pair `not_duplicate` permanently, with no
+ * revert path. Of the 9 production pairs that ever went through it, only 2
+ * were genuinely two different people; the other 7 were one person with a
+ * ccTLD domain, a dot separator, a middle initial, an accented local part, a
+ * two-letter typo, a short vs. full name, or a personal address next to a
+ * work one. See duplicateTiering.ts's module doc comment for the full
+ * account. Dismissal is now exclusively a human call in /admin/duplicates;
+ * passing `--tier=dismiss` here fails fast with a pointer to that page.
  *
  * Usage (dry run by default — never writes):
  *   npx tsx scripts/merge-duplicates.ts --tier=safe
- *   npx tsx scripts/merge-duplicates.ts --tier=dismiss
  *
  * Execute (writes; requires an explicit tier and actor):
  *   npx tsx scripts/merge-duplicates.ts --tier=safe --execute --actor=<bd id>
- *   npx tsx scripts/merge-duplicates.ts --tier=dismiss --execute --actor=<bd id>
  *
- * Revert everything a run merged (newest merge first; does not reopen
- * dismissed pairs — dismissing was never destructive, there is nothing to
- * undo there beyond re-opening the pair, which an owner can still do
- * directly if truly needed):
+ * Revert everything a run merged (newest merge first):
  *   npx tsx scripts/merge-duplicates.ts --revert=<runId> --actor=<bd id>
  *
  * Requires DATABASE_URL to be set (see .env). Do NOT run automatically —
@@ -62,7 +67,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog, bd } from "../src/db/schema";
-import { mergeContacts, markNotDuplicate, unmergeContact } from "../src/lib/identity/mergeDb";
+import { mergeContacts, unmergeContact } from "../src/lib/identity/mergeDb";
 import { mergeProperty } from "../src/lib/identity/matcher";
 import { loadOpenDuplicatePairsForTiering } from "../src/lib/identity/duplicateBulkQueries";
 import {
@@ -76,7 +81,7 @@ const RUN_ACTION = "bulk_merge_duplicates_run";
 const REVERT_ACTION = "bulk_merge_duplicates_revert";
 
 interface CliArgs {
-  tier?: "safe" | "dismiss";
+  tier?: "safe";
   execute: boolean;
   actor?: string;
   revert?: string;
@@ -88,8 +93,14 @@ function parseCliArgs(argv: readonly string[]): CliArgs {
     if (raw === "--execute") args.execute = true;
     else if (raw.startsWith("--tier=")) {
       const value = raw.slice("--tier=".length);
-      if (value !== "safe" && value !== "dismiss") {
-        throw new Error(`Invalid --tier: ${value} (must be "safe" or "dismiss")`);
+      if (value === "dismiss") {
+        throw new Error(
+          "--tier=dismiss was retired: automatic dismissal was wrong 7 times out of 9 in production and has no revert path. " +
+            "Dismiss duplicate_candidate pairs by hand in /admin/duplicates instead.",
+        );
+      }
+      if (value !== "safe") {
+        throw new Error(`Invalid --tier: ${value} (must be "safe")`);
       }
       args.tier = value;
     } else if (raw.startsWith("--actor=")) args.actor = raw.slice("--actor=".length);
@@ -125,7 +136,6 @@ function printReport(plan: DuplicateTierPlan, pairs: readonly DuplicatePairPlanI
   }
   console.log("Tier counts (all open pairs):");
   console.log(`  safe: ${plan.tierCounts.safe}`);
-  console.log(`  dismiss: ${plan.tierCounts.dismiss}`);
   console.log(`  review (untouched by this script): ${plan.tierCounts.review}`);
 
   const pairByCandidateId = new Map(pairs.map((p) => [p.candidateId, p]));
@@ -150,11 +160,6 @@ function printReport(plan: DuplicateTierPlan, pairs: readonly DuplicatePairPlanI
       console.log(`    SKIP (survivor guard): ${reasons.join("; ")} — not guessing, needs a human.`);
       continue;
     }
-    if (entry.kind === "dismiss") {
-      console.log(`    WOULD DISMISS as not-a-duplicate (${entry.bucket}: two different verified emails).`);
-      continue;
-    }
-
     // kind === "merge"
     const survivor = entry.survivorId === pair.personA.id ? pair.personA : pair.personB;
     const merged = entry.mergedId === pair.personA.id ? pair.personA : pair.personB;
@@ -212,7 +217,6 @@ interface MergedRecord {
 async function runExecute(plan: DuplicateTierPlan, actorBdId: string): Promise<void> {
   const runId = randomUUID();
   const merged: MergedRecord[] = [];
-  const dismissed: string[] = [];
   const errors: { candidateId: string; kind: string; message: string }[] = [];
 
   // Sequential on purpose (PERFORMANCE.md, query rule 7): the prod pool is
@@ -229,16 +233,6 @@ async function runExecute(plan: DuplicateTierPlan, actorBdId: string): Promise<v
         errors.push({ candidateId: entry.candidateId, kind: "merge", message });
         console.error(`FAILED to merge ${entry.candidateId}: ${message}`);
       }
-    } else if (entry.kind === "dismiss") {
-      try {
-        await markNotDuplicate(db, entry.candidateId, actorBdId);
-        dismissed.push(entry.candidateId);
-        console.log(`dismissed ${entry.candidateId}`);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errors.push({ candidateId: entry.candidateId, kind: "dismiss", message });
-        console.error(`FAILED to dismiss ${entry.candidateId}: ${message}`);
-      }
     }
     // skip_chain / skip_survivor_loss entries are never executed.
   }
@@ -252,14 +246,13 @@ async function runExecute(plan: DuplicateTierPlan, actorBdId: string): Promise<v
       runId,
       tier: plan.tier,
       merged,
-      dismissed,
       skippedChainCandidateIds: plan.chainedCandidateIds,
       skippedSurvivorLossCandidateIds,
       errors,
     },
   });
 
-  console.log(`\nRun ${runId}: merged ${merged.length}, dismissed ${dismissed.length}, ${errors.length} error(s).`);
+  console.log(`\nRun ${runId}: merged ${merged.length}, ${errors.length} error(s).`);
   console.log(`Skipped (chain): ${plan.chainedCandidateIds.length}. Skipped (survivor guard): ${skippedSurvivorLossCandidateIds.length}.`);
   if (merged.length > 0) {
     console.log(`To revert this run: npx tsx scripts/merge-duplicates.ts --revert=${runId} --actor=<bd id>`);
@@ -319,7 +312,7 @@ async function main(): Promise<void> {
   }
 
   if (!args.tier) {
-    throw new Error("Refusing to run: pass an explicit --tier=safe or --tier=dismiss (or --revert=<runId> --actor=<bd id>).");
+    throw new Error("Refusing to run: pass an explicit --tier=safe (or --revert=<runId> --actor=<bd id>).");
   }
 
   const [pairs, ownerNameById] = await Promise.all([loadOpenDuplicatePairsForTiering(), loadOwnerNameById()]);

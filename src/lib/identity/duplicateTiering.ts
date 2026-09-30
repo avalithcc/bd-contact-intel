@@ -67,12 +67,13 @@
  *   into it across separate runs (the chain guard below only covers pairs
  *   open in the SAME run). An equality relation that isn't transitive means
  *   the evidence is real but not conclusive on its own, so a human confirms
- *   it instead of either side of the binary: NOT "safe" (an auto-merge could
- *   combine two different people on the strength of a single ambiguous rule)
- *   and NOT "dismiss" either (dropping the rule entirely and falling through
- *   to "two_emails_differ_verified" would permanently mark a genuine match as
- *   not-a-duplicate, which is the original bug this whole module exists to
- *   fix, and `--revert` cannot undo a dismissal). What is left in
+ *   it instead: NOT "safe" (an auto-merge could combine two different people
+ *   on the strength of a single ambiguous rule). Historically this also had
+ *   to avoid a "dismiss" tier that no longer exists (see "Retired: the
+ *   dismiss tier" below) — dropping the rule entirely and falling through to
+ *   "two_emails_differ_verified" used to permanently mark a genuine match as
+ *   not-a-duplicate with no revert path, which was the original bug this
+ *   module exists to fix. What is left in
  *   "two_emails_same_mailbox" — identical token sequences or the
  *   middle-initial rule, both on one identical domain — reduces to equality
  *   of a derived token sequence, which IS transitive. That is the property
@@ -81,22 +82,35 @@
  *   calls different.
  * - "two_emails_differ_verified" / "two_emails_differ_unverified": both
  *   sides have an email, they differ, and they are NOT the same mailbox
- *   (isSameMailbox is false) — this is left as "dismiss" only when both
- *   sides are verified, since a genuine mismatch between two verified,
- *   distinct mailboxes is real evidence of two different people (see the
- *   Tanaka/Somale and Barrere/Vespa production pairs, which collided only on
- *   a truncated first name); anything less certain is left for manual
- *   review.
+ *   (isSameMailbox is false). The BUCKET split (both sides verified vs. not)
+ *   is kept because it is still useful information in the dry run's report,
+ *   but as of the removal below BOTH buckets route to tier "review" — see
+ *   "Retired: the dismiss tier" for why "two_emails_differ_verified" no
+ *   longer gets special treatment.
  * - "no_email_titles_agree" / "no_email_titles_conflict": neither side has
  *   an email; split by whether the job titles agree (or one/both are
  *   blank) or actively conflict.
  *
  * Tiers: "safe" (same_email, classic_split_no_conflict,
- * two_emails_same_mailbox) is what `--tier=safe` merges; "dismiss"
- * (two_emails_differ_verified) is what `--tier=dismiss` marks
- * not-a-duplicate; everything else — including
- * "two_emails_same_mailbox_ambiguous" — is "review" and this script never
- * touches it.
+ * two_emails_same_mailbox) is what `--tier=safe` merges; everything else is
+ * "review" and this script never touches it.
+ *
+ * Retired: the dismiss tier (2026-09). "two_emails_differ_verified" used to
+ * route to a "dismiss" tier that permanently marked a duplicate_candidate
+ * pair `not_duplicate` via scripts/merge-duplicates.ts --tier=dismiss, on the
+ * premise that two different verified emails mean two different people. It
+ * doesn't, reliably: of the 9 production pairs that ever landed in this
+ * bucket, the premise held 2 times. The 7 misses were one real person with a
+ * ccTLD domain, a dot separator, a middle initial, an accented local part, a
+ * two-letter typo, a short form vs. a full form, or a personal address
+ * alongside a work one. The 2 hits that were genuinely two different people
+ * (Tanaka/Somale, Barrere/Vespa) had one thing in common that the misses
+ * didn't: a different SURNAME TOKEN in the local part, not merely a
+ * different address string. That is the actual distinguishing signal this
+ * module never captured — "the addresses differ" is not it, which is why a
+ * 22%-accurate heuristic was driving a write with no revert path
+ * (`--revert` only ever undid merges, never dismissals). Dismissal is now
+ * exclusively a human judgement call made in /admin/duplicates.
  *
  * Transitive chains (A-B, B-C sharing person B) are never merged by this
  * planner, in either tier: `findChainedPersonIds` flags every person who
@@ -123,7 +137,7 @@ export type DuplicatePairBucket =
   | "no_email_titles_agree"
   | "no_email_titles_conflict";
 
-export type DuplicatePairTier = "safe" | "dismiss" | "review";
+export type DuplicatePairTier = "safe" | "review";
 
 export interface DuplicateTierPersonFields {
   email: string | null;
@@ -399,11 +413,9 @@ const SAFE_BUCKETS: ReadonlySet<DuplicatePairBucket> = new Set([
   "classic_split_no_conflict",
   "two_emails_same_mailbox",
 ]);
-const DISMISS_BUCKETS: ReadonlySet<DuplicatePairBucket> = new Set(["two_emails_differ_verified"]);
 
 export function tierForBucket(bucket: DuplicatePairBucket): DuplicatePairTier {
   if (SAFE_BUCKETS.has(bucket)) return "safe";
-  if (DISMISS_BUCKETS.has(bucket)) return "dismiss";
   return "review";
 }
 
@@ -497,7 +509,6 @@ export interface DuplicatePairPlanInput {
 
 export type DuplicatePairPlanEntry =
   | { kind: "merge"; candidateId: string; reason: string; bucket: DuplicatePairBucket; survivorId: string; mergedId: string }
-  | { kind: "dismiss"; candidateId: string; reason: string; bucket: DuplicatePairBucket }
   | { kind: "skip_chain"; candidateId: string; reason: string; bucket: DuplicatePairBucket; tier: DuplicatePairTier }
   | {
       kind: "skip_survivor_loss";
@@ -512,9 +523,9 @@ export type DuplicatePairPlanEntry =
 export type DuplicateBucketCounts = Record<DuplicatePairBucket, number>;
 
 export interface DuplicateTierPlan {
-  tier: "safe" | "dismiss";
+  tier: "safe";
   bucketCounts: DuplicateBucketCounts;
-  tierCounts: { safe: number; dismiss: number; review: number };
+  tierCounts: { safe: number; review: number };
   chainedCandidateIds: readonly string[];
   entries: readonly DuplicatePairPlanEntry[];
 }
@@ -554,9 +565,9 @@ function pairIdentity(pair: DuplicatePairPlanInput): DuplicatePairIdentity {
  * `pairs` array produces two structurally identical plans and leaves
  * `pairs` byte-for-byte unchanged (see tests/unit/duplicateTiering.test.ts).
  */
-export function planDuplicateTierRun(pairs: readonly DuplicatePairPlanInput[], tier: "safe" | "dismiss"): DuplicateTierPlan {
+export function planDuplicateTierRun(pairs: readonly DuplicatePairPlanInput[], tier: "safe"): DuplicateTierPlan {
   const bucketCounts = emptyBucketCounts();
-  const tierCounts = { safe: 0, dismiss: 0, review: 0 };
+  const tierCounts = { safe: 0, review: 0 };
   const chainedPersonIds = findChainedPersonIds(pairs.map(pairIdentity));
   const chainedCandidateIds: string[] = [];
   const entries: DuplicatePairPlanEntry[] = [];
@@ -577,11 +588,6 @@ export function planDuplicateTierRun(pairs: readonly DuplicatePairPlanInput[], t
     if (isPairChained(identity, chainedPersonIds)) {
       chainedCandidateIds.push(pair.candidateId);
       entries.push({ kind: "skip_chain", candidateId: pair.candidateId, reason: pair.reason, bucket, tier: pairTier });
-      continue;
-    }
-
-    if (tier === "dismiss") {
-      entries.push({ kind: "dismiss", candidateId: pair.candidateId, reason: pair.reason, bucket });
       continue;
     }
 
