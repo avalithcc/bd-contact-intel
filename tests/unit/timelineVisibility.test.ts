@@ -28,3 +28,11 @@ test("meeting_logged, discarded, status_change, status_backfill, hunter_lookup a
     assert.equal(isTimelineEntryVisible({ type, actorBdId: "bd-a" }, "bd-b"), true, type);
   }
 });
+
+test("a reply_received by the syncing BD is visible to that BD (email-sync brief)", () => {
+  assert.equal(isTimelineEntryVisible({ type: "reply_received", actorBdId: "bd-a" }, "bd-a"), true);
+});
+
+test("a reply_received synced into another BD's mailbox is hidden from a different viewer", () => {
+  assert.equal(isTimelineEntryVisible({ type: "reply_received", actorBdId: "bd-a" }, "bd-b"), false);
+});

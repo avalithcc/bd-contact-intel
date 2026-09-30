@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS "email_message" (
 	"cc_addresses" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"subject" text,
 	"body_text" text,
-	"body_html" text,
+	"body_truncated" boolean DEFAULT false NOT NULL,
 	"sent_at" timestamp NOT NULL,
 	"matched_email" text NOT NULL,
 	"match_confidence" text NOT NULL,

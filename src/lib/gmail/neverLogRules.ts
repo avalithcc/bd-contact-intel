@@ -3,6 +3,14 @@
  * src/lib/gmail/neverLog.ts (which imports `@/db`) so this stays importable
  * from a unit test with no DATABASE_URL, same pattern as
  * src/lib/status/deriveStatus.ts vs. recompute.ts.
+ *
+ * UI copy TODO (fresh-review note, 2026-09-30 — no code change needed, this
+ * is a documentation-only reminder for whoever builds the never-log
+ * settings screen, slice 5): a `kind: "domain"` rule matches EXACTLY that
+ * domain (src/lib/gmail/classify.ts's `isNeverLogged`), not its subdomains —
+ * `"prospect.com"` does NOT suppress `mail.prospect.com`. The settings UI
+ * copy must say "exact domain" (or similar) so a BD doesn't assume it's a
+ * wildcard/suffix match.
  */
 export type NeverLogKind = "address" | "domain";
 

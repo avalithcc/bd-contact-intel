@@ -5,6 +5,8 @@
  * instead of ever hitting Google (HARD RULE: never call the Gmail API
  * against real mailboxes from a test).
  */
+import { htmlToPlainText } from "./htmlToText";
+import { truncateBodyText } from "./truncateBodyText";
 
 export interface GmailApiHeader {
   name: string;
@@ -32,8 +34,12 @@ export interface ParsedGmailMessage {
   to: string;
   cc: string;
   subject: string | null;
+  // text/plain preferred; an HTML-only message is converted to plain text
+  // (htmlToText.ts) — we never store HTML at all (fresh-review fix: an
+  // allow-list HTML sanitizer is bypassable). Capped at
+  // truncateBodyText.MAX_BODY_TEXT_BYTES; see `bodyTruncated`.
   bodyText: string | null;
-  bodyHtml: string | null;
+  bodyTruncated: boolean;
   sentAt: Date;
 }
 
@@ -60,27 +66,15 @@ function collectBodies(part: GmailApiMessagePart | undefined, out: { text?: stri
   for (const child of part.parts ?? []) collectBodies(child, out);
 }
 
-/**
- * Minimal sanitizer applied to the HTML body before it is ever persisted
- * (owner decision: store the full body, text/plain preferred, sanitized
- * HTML if kept). Strips `<script>`/`<style>` blocks and inline `on*` event
- * handlers. This branch never renders the stored HTML (no timeline UI
- * ships here) — sanitizing at write time means whatever renders it later
- * inherits the same floor rather than relying on every future render path
- * to re-sanitize.
- */
-export function sanitizeHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
-    .replace(/\son\w+\s*=\s*'[^']*'/gi, "");
-}
-
 export function parseGmailMessage(message: GmailApiMessage): ParsedGmailMessage {
   const headers = message.payload?.headers;
   const bodies: { text?: string; html?: string } = {};
   if (message.payload) collectBodies(message.payload, bodies);
+
+  // text/plain as-is; an HTML-only body is converted to text (never stored
+  // as HTML — see htmlToText.ts's doc comment for why).
+  const rawBody = bodies.text ?? (bodies.html !== undefined ? htmlToPlainText(bodies.html) : null);
+  const { text: bodyText, truncated: bodyTruncated } = rawBody !== null ? truncateBodyText(rawBody) : { text: null, truncated: false };
 
   return {
     gmailMessageId: message.id,
@@ -89,8 +83,8 @@ export function parseGmailMessage(message: GmailApiMessage): ParsedGmailMessage 
     to: findHeader(headers, "To"),
     cc: findHeader(headers, "Cc"),
     subject: findHeader(headers, "Subject") || null,
-    bodyText: bodies.text ?? null,
-    bodyHtml: bodies.html !== undefined ? sanitizeHtml(bodies.html) : null,
+    bodyText,
+    bodyTruncated,
     sentAt: new Date(Number(message.internalDate)),
   };
 }

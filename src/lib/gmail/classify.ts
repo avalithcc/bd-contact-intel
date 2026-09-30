@@ -12,9 +12,10 @@
  * `email_message_person` join row per match (see src/db/schema.ts), and the
  * first entry in `matches` becomes `email_message.person_id` as a
  * convenience column for the common single-match case. This keeps the
- * message-level uniqueness intact while still writing a `reply_received`
- * activity (and a future status recompute) for EVERY matched person, not
- * just the first.
+ * message-level uniqueness intact while still writing one activity
+ * (`reply_received`/`email_sent`) and one status recompute for EVERY
+ * matched person, not just the first — see
+ * src/lib/gmail/buildSyncedActivities.ts.
  */
 import type { ParsedGmailMessage } from "./parseMessage";
 
@@ -49,8 +50,9 @@ export interface ClassifiedMessage {
   toAddresses: string[];
   ccAddresses: string[];
   subject: string | null;
+  // Never HTML — see src/lib/gmail/htmlToText.ts's doc comment.
   bodyText: string | null;
-  bodyHtml: string | null;
+  bodyTruncated: boolean;
   sentAt: Date;
   /** Every CRM person this message matches, never-log already applied. Empty means "do not store". */
   matches: ClassifiedMatch[];
@@ -138,7 +140,7 @@ export function classifyGmailMessage(input: ClassifyGmailMessageInput): Classifi
     ccAddresses,
     subject: message.subject,
     bodyText: message.bodyText,
-    bodyHtml: message.bodyHtml,
+    bodyTruncated: message.bodyTruncated,
     sentAt: message.sentAt,
     matches,
     isPlatformSent: input.platformSentGmailMessageIds?.has(message.gmailMessageId) ?? false,

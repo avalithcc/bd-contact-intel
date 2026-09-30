@@ -1258,12 +1258,15 @@ export type NewEmailAccount = typeof emailAccount.$inferInsert;
 // only table the write path (status recompute, admin view) should treat as
 // authoritative for "which persons does this message belong to".
 //
-// Content: stores the full body (text/plain preferred; sanitized HTML if
-// present — src/lib/gmail/parseMessage.ts#sanitizeHtml), per the owner
-// decision to match HubSpot. Visible only to the owning BD
-// (src/lib/activity/timelineVisibility.ts's CONVERSATION_CONTENT_TYPES) or
-// an admin through the audited getConversationForAdmin path — no timeline
-// UI reads this table yet (that ships after the mockup, slice 5).
+// Content: stores the full body as PLAIN TEXT ONLY, capped at
+// truncateBodyText.MAX_BODY_TEXT_BYTES (fresh-review fix, 2026-09-30: never
+// store HTML — an allow-list sanitizer is bypassable via unquoted event
+// handlers, `javascript:` URIs, or `<svg onload>`; an HTML-only message is
+// converted to text instead, src/lib/gmail/htmlToText.ts). Visible only to
+// the owning BD (src/lib/activity/timelineVisibility.ts's
+// CONVERSATION_CONTENT_TYPES) or an admin through the audited
+// getConversationForAdmin path — no timeline UI reads this table yet (that
+// ships after the mockup, slice 5).
 export const emailMessage = pgTable(
   "email_message",
   {
@@ -1282,7 +1285,7 @@ export const emailMessage = pgTable(
     ccAddresses: jsonb("cc_addresses").notNull().default([]),
     subject: text("subject"),
     bodyText: text("body_text"),
-    bodyHtml: text("body_html"),
+    bodyTruncated: boolean("body_truncated").notNull().default(false),
     sentAt: timestamp("sent_at").notNull(),
     // The single address that produced `personId`'s match (mirrors that
     // person's row in email_message_person).

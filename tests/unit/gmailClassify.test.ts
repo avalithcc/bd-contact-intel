@@ -9,7 +9,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseGmailMessage, sanitizeHtml, type GmailApiMessage } from "@/lib/gmail/parseMessage";
+import { parseGmailMessage, type GmailApiMessage } from "@/lib/gmail/parseMessage";
 import {
   classifyGmailMessage,
   extractEmailAddresses,
@@ -56,7 +56,7 @@ test("parseGmailMessage reads headers and decodes a plain-text body", () => {
   assert.equal(parsed.sentAt.getTime(), 1700000000000);
 });
 
-test("parseGmailMessage prefers text/plain but also decodes text/html from multipart", () => {
+test("parseGmailMessage prefers text/plain when both parts are present, and never returns HTML", () => {
   const parsed = parseGmailMessage(
     fixtureMessage({
       payload: {
@@ -64,24 +64,38 @@ test("parseGmailMessage prefers text/plain but also decodes text/html from multi
         mimeType: "multipart/alternative",
         parts: [
           { mimeType: "text/plain", body: { data: b64url("plain body") } },
-          { mimeType: "text/html", body: { data: b64url("<p onclick=\"x()\">html body</p><script>evil()</script>") } },
+          { mimeType: "text/html", body: { data: b64url('<p onclick="x()">html body</p><script>evil()</script>') } },
         ],
       },
     }),
   );
   assert.equal(parsed.bodyText, "plain body");
-  assert.match(parsed.bodyHtml ?? "", /html body/);
-  assert.doesNotMatch(parsed.bodyHtml ?? "", /script/i);
-  assert.doesNotMatch(parsed.bodyHtml ?? "", /onclick/i);
+  assert.equal("bodyHtml" in parsed, false);
 });
 
-test("sanitizeHtml strips script/style blocks and inline event handlers", () => {
-  const dirty = '<div onmouseover="steal()">hi</div><script>bad()</script><style>body{}</style>';
-  const clean = sanitizeHtml(dirty);
-  assert.doesNotMatch(clean, /script/i);
-  assert.doesNotMatch(clean, /style/i);
-  assert.doesNotMatch(clean, /onmouseover/i);
-  assert.match(clean, />hi</);
+test("parseGmailMessage converts an HTML-only body to plain text (never stores HTML)", () => {
+  const parsed = parseGmailMessage(
+    fixtureMessage({
+      payload: {
+        headers: [{ name: "From", value: "jane@prospect.com" }],
+        mimeType: "text/html",
+        body: { data: b64url('<p onclick="x()">html body</p><script>evil()</script>') },
+      },
+    }),
+  );
+  assert.equal(parsed.bodyText, "html body");
+  assert.doesNotMatch(parsed.bodyText ?? "", /script|onclick/i);
+});
+
+test("parseGmailMessage flags bodyTruncated for an oversized body", () => {
+  const big = "a".repeat(300_000);
+  const parsed = parseGmailMessage(
+    fixtureMessage({
+      payload: { headers: [{ name: "From", value: "jane@prospect.com" }], mimeType: "text/plain", body: { data: b64url(big) } },
+    }),
+  );
+  assert.equal(parsed.bodyTruncated, true);
+  assert.ok(Buffer.byteLength(parsed.bodyText ?? "", "utf8") <= 256 * 1024);
 });
 
 // --- extractEmailAddresses / normalizeEmailAddress ----------------------

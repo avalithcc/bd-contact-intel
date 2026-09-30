@@ -1,5 +1,5 @@
 {
-  "id": "c7d601dc-3ab0-4482-9b8d-a8ba3a031e03",
+  "id": "4b70e0d6-55ce-49bc-a605-342a6f2ca0a0",
   "prevId": "cad99938-51fd-4764-acc0-c0e6661a1395",
   "version": "7",
   "dialect": "postgresql",
@@ -1905,11 +1905,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "body_html": {
-          "name": "body_html",
-          "type": "text",
+        "body_truncated": {
+          "name": "body_truncated",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": false
         },
         "sent_at": {
           "name": "sent_at",
