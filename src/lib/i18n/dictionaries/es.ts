@@ -151,6 +151,12 @@ export const es: typeof en = {
     discovery: "Descubrimiento",
     account: "Cuenta",
     playbook: "Guía de roles",
+    // Admin-only sidenav section (admin-conversation-access mockup, screen 1:
+    // admin-conversation.html:57-61). Only "Registro de auditoría" is wired
+    // here — Duplicados/Migración exist as routes but were never in this
+    // real Sidebar to begin with (a pre-existing gap, not introduced here).
+    administrationSection: "Administración",
+    auditLog: "Registro de auditoría",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
     accountMenuLabel: "Menú de cuenta",
@@ -1475,6 +1481,30 @@ export const es: typeof en = {
       already_resolved: "Este par ya fue resuelto por otra persona.",
       unexpected: "La acción no se pudo completar. Intenta de nuevo.",
     },
+  },
+
+  // Registro de auditoría (admin-conversation-access mockup, screen 3:
+  // admin-conversation.html:310-355). Spanish-only regardless of `locale`,
+  // same rationale as duplicates/migration above (design D10, R11) — the
+  // page reads `es.auditLog` directly, never through `getDictionary()`.
+  auditLog: {
+    eyebrow: "Administración",
+    title: "registro de auditoría",
+    subtitle: "Quién vio la conversación de otro BD, con quién y cuándo.",
+    noteBodyPrefix: "Solo visualizaciones de conversación.",
+    noteBodyBeforeLink: "Otras acciones auditadas (fusiones, deshacer fusión) ya tienen su propia vista en",
+    noteLinkText: "Duplicados → historial de fusiones",
+    cardTitle: "Visualizaciones de conversación",
+    colWhen: "Cuándo",
+    colAdmin: "Administrador",
+    colContact: "Contacto",
+    colConversationOf: "Conversación de",
+    openAction: "Abrir",
+    emptyState: "Todavía no hay visualizaciones registradas.",
+    prevPage: "Anterior",
+    nextPage: "Siguiente",
+    pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,
+    showingRange: (from: number, to: number, total: number) => `Mostrando ${from}–${to} de ${total}`,
   },
 
   contactList: {

@@ -184,6 +184,8 @@ export const en = {
     discovery: "Discovery",
     account: "Account",
     playbook: "Role guide",
+    administrationSection: "Administration",
+    auditLog: "Audit log",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
     // TopBar account menu (tasks.md mockup-parity 3.2).
@@ -1559,6 +1561,26 @@ export const en = {
       already_resolved: "This pair was already resolved by someone else.",
       unexpected: "The action could not be completed. Please try again.",
     },
+  },
+
+  auditLog: {
+    eyebrow: "Admin",
+    title: "audit log",
+    subtitle: "Who viewed another BD's conversation, with whom, and when.",
+    noteBodyPrefix: "Conversation views only.",
+    noteBodyBeforeLink: "Other audited actions (merges, undo merge) already have their own view in",
+    noteLinkText: "Duplicates → merge history",
+    cardTitle: "Conversation views",
+    colWhen: "When",
+    colAdmin: "Admin",
+    colContact: "Contact",
+    colConversationOf: "Conversation of",
+    openAction: "Open",
+    emptyState: "No conversation views recorded yet.",
+    prevPage: "Previous",
+    nextPage: "Next",
+    pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
+    showingRange: (from: number, to: number, total: number) => `Showing ${from}-${to} of ${total}`,
   },
 
   // `/contacts` list (task 12.2-12.4; contact-list spec). System view labels

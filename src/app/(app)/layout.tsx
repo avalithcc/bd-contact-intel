@@ -48,7 +48,12 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <div className="app">
-        <Sidebar labels={labels} taskCount={taskCount} followUpCount={followUpCount} />
+        <Sidebar
+          labels={labels}
+          taskCount={taskCount}
+          followUpCount={followUpCount}
+          isAdmin={me.role === "admin"}
+        />
         <div className="main">
           <TopBar
             labels={labels}
