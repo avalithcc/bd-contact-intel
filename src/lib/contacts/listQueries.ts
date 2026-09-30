@@ -505,8 +505,9 @@ export async function getContactIdsForFilters(
   dict: Dict,
   cap: number,
   hiringKeys?: Set<string>,
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ): Promise<ContactIdsForFiltersResult> {
-  const page = await getContactListPage(filters, meBdId, q, 1, cap, dict, sort, hiringKeys);
+  const page = await getContactListPage(filters, meBdId, q, 1, cap, dict, sort, hiringKeys, hiddenRoleGroups);
   return idsFromContactListPage(page);
 }
 

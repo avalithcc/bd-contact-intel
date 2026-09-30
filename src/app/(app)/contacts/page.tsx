@@ -1028,6 +1028,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           total={total}
           filtersQuery={currentFiltersQuery}
           sort={sort}
+          roles={sp.roles}
           wholeViewExportHref={toolbarExportHref()}
         >
           <div className="table-wrap">

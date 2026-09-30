@@ -33,6 +33,10 @@ export interface BulkGenerateMessagesButtonProps {
   filtersQuery: string;
   sort: string;
   q?: string;
+  // "Ocultar grupos No priorizar por defecto" (roleVisibility.ts) — same
+  // `?roles=` the toolbar/table currently show, so "Generar mensajes" on
+  // "Seleccionar los N" can never disagree with what's on screen.
+  roles?: string;
 }
 
 export function BulkGenerateMessagesButton({
@@ -44,6 +48,7 @@ export function BulkGenerateMessagesButton({
   filtersQuery,
   sort,
   q,
+  roles,
 }: BulkGenerateMessagesButtonProps) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -61,6 +66,7 @@ export function BulkGenerateMessagesButton({
           filters: parseContactFilters(new URLSearchParams(filtersQuery)),
           q,
           sort: parseContactSort(sort),
+          roles,
         })
       : await bulkGenerateMessagesAction(
           locale,

@@ -54,6 +54,12 @@ export interface BulkActionsBarProps {
   total: number;
   filtersQuery: string;
   sort: string;
+  // "Ocultar grupos No priorizar por defecto" (roleVisibility.ts) — the one
+  // filter `filtersQuery` doesn't carry (deliberately kept out of the
+  // saved-view-persisted ContactFilters shape). "Seleccionar los N" MUST
+  // act on exactly what the list shows, so this rides along the same way
+  // `sort` already does.
+  roles?: string;
   wholeViewExportHref: string;
   children: React.ReactNode;
 }
@@ -86,6 +92,7 @@ export function BulkActionsBar({
   total,
   filtersQuery,
   sort,
+  roles,
   wholeViewExportHref,
   children,
 }: BulkActionsBarProps) {
@@ -164,6 +171,7 @@ export function BulkActionsBar({
           <input type="hidden" name="mode" value="filter" />
           <input type="hidden" name="filtersQuery" value={filtersQuery} />
           <input type="hidden" name="sort" value={sort} />
+          {roles !== undefined && <input type="hidden" name="roles" value={roles} />}
         </>
       )}
 
@@ -197,6 +205,7 @@ export function BulkActionsBar({
             filtersQuery={filtersQuery}
             sort={sort}
             q={q}
+            roles={roles}
           />
           <button
             type="button"

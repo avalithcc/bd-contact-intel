@@ -23,6 +23,7 @@ import { getCurrentBd } from "@/lib/queries";
 import { sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { capBulkGenerateMessageIds, MAX_BULK_GENERATE_MESSAGES } from "@/lib/contacts/bulkMessages";
 import { getContactIdsForFilters, getContactListRowsByIds } from "@/lib/contacts/listQueries";
+import { resolveBulkRoleVisibility } from "@/lib/contacts/bulkTargetIds";
 import { getDictionary } from "@/lib/i18n/server";
 import { generatePersonOutreachMessageAction } from "./messageActions";
 import type { Locale } from "@/lib/i18n/locales";
@@ -50,7 +51,7 @@ export interface BulkGenerateMessagesResponse {
 export async function bulkGenerateMessagesAction(
   locale: Locale,
   rawPersonIds: string[],
-  filterTarget?: { filters: ContactFilters; q?: string; sort: ContactSortKey } | null,
+  filterTarget?: { filters: ContactFilters; q?: string; sort: ContactSortKey; roles?: string } | null,
 ): Promise<BulkGenerateMessagesResponse> {
   const me = await getCurrentBd();
   const dict = await getDictionary();
@@ -58,6 +59,10 @@ export async function bulkGenerateMessagesAction(
   let ids: string[];
   let wasCapped: boolean;
   if (filterTarget) {
+    // "Seleccionar los N" MUST act on exactly what the list shows — same
+    // roleVisibility.ts resolution as the table (BulkGenerateMessagesButton
+    // forwards `roles` alongside filters/q/sort).
+    const roleVisibility = resolveBulkRoleVisibility(filterTarget.roles, filterTarget.filters);
     const derived = await getContactIdsForFilters(
       filterTarget.filters,
       me.id,
@@ -65,6 +70,8 @@ export async function bulkGenerateMessagesAction(
       filterTarget.sort,
       dict,
       MAX_BULK_GENERATE_MESSAGES,
+      undefined,
+      roleVisibility.hiddenRoleGroups,
     );
     ids = derived.ids;
     wasCapped = derived.total > derived.ids.length;
