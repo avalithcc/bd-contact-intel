@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { groupEmailThreads, isInferredThread } from "@/lib/contacts/emailThreads";
+import { groupEmailThreads, isInferredThread, threadContextSummary } from "@/lib/contacts/emailThreads";
 
 test("a lone email_sent row with a threadId stays a 'single' (no badge for 1 message)", () => {
   const entry = {
@@ -141,4 +141,76 @@ test("isInferredThread is false when every message matched exactly", () => {
   const result = groupEmailThreads([a, b]);
   assert.equal(result[0].kind, "thread");
   if (result[0].kind === "thread") assert.equal(isInferredThread(result[0].group), false);
+});
+
+// --- threadContextSummary (email-sync.html:180's "Con <address> · <name> ·
+// saliente/entrante" line — mockup-fidelity fix, 2026-10-01) -------------
+
+test("threadContextSummary reads matchedEmail/direction off the LATEST message (outbound -> 'outbound')", () => {
+  const older = {
+    id: "a1",
+    type: "reply_received",
+    createdAt: new Date("2026-10-09T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchedEmail: "old@prospect.com" },
+    visible: true,
+  };
+  const latest = {
+    id: "a2",
+    type: "email_sent",
+    createdAt: new Date("2026-10-14T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchedEmail: "d.salazar@despegar.com" },
+    visible: true,
+  };
+  const result = groupEmailThreads([older, latest]);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind !== "thread") return;
+  assert.deepEqual(threadContextSummary(result[0].group), {
+    matchedEmail: "d.salazar@despegar.com",
+    direction: "outbound",
+  });
+});
+
+test("threadContextSummary reports 'inbound' for a thread whose latest message was received", () => {
+  const sent = {
+    id: "a1",
+    type: "email_sent",
+    createdAt: new Date("2026-10-13T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchedEmail: "v.rojas@mercadolibre.com" },
+    visible: true,
+  };
+  const reply = {
+    id: "a2",
+    type: "reply_received",
+    createdAt: new Date("2026-10-14T00:00:00Z"),
+    metadata: { gmailThreadId: "t1", matchedEmail: "v.rojas@mercadolibre.com" },
+    visible: true,
+  };
+  const result = groupEmailThreads([sent, reply]);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind !== "thread") return;
+  assert.deepEqual(threadContextSummary(result[0].group), {
+    matchedEmail: "v.rojas@mercadolibre.com",
+    direction: "inbound",
+  });
+});
+
+test("threadContextSummary falls back to null matchedEmail when no message carries one", () => {
+  const a = {
+    id: "a1",
+    type: "email_sent",
+    createdAt: new Date("2026-10-13T00:00:00Z"),
+    metadata: { gmailThreadId: "t1" },
+    visible: true,
+  };
+  const b = {
+    id: "a2",
+    type: "email_sent",
+    createdAt: new Date("2026-10-14T00:00:00Z"),
+    metadata: { gmailThreadId: "t1" },
+    visible: true,
+  };
+  const result = groupEmailThreads([a, b]);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind !== "thread") return;
+  assert.deepEqual(threadContextSummary(result[0].group), { matchedEmail: null, direction: "outbound" });
 });

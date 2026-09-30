@@ -654,7 +654,13 @@ export const es: typeof en = {
     // --- synced email thread (email-sync.html screen 1) ---
     timelineThreadWhatPrefix: "Hilo de correo",
     timelineThreadNoSubject: "(sin asunto)",
-    timelineThreadIntro: "Sincronizado automáticamente desde Gmail.",
+    // "Con {address} [Deducido] · {name} · saliente/entrante"
+    // (email-sync.html:180) — mockup-fidelity fix, 2026-10-01: replaces the
+    // old generic sync-explanation line for every thread, not just a
+    // Deducido match.
+    timelineThreadContextPrefix: "Con",
+    timelineThreadOutbound: "saliente",
+    timelineThreadInbound: "entrante",
     timelineViewInGmail: "Ver en Gmail",
     timelineShowMessages: "Ver mensajes",
     timelineHideMessages: "Ocultar mensajes",
@@ -943,6 +949,9 @@ export const es: typeof en = {
     syncNowButton: "Sincronizar ahora",
     syncNowSyncing: "Sincronizando…",
     syncNowError: "No se pudo sincronizar. Probá de nuevo.",
+    // Server-side cooldown refusal (syncCooldown.ts) — friendly, not an error.
+    syncNowCooldown: "Ya se sincronizó hace instantes.",
+    syncNowInProgress: "Ya se está sincronizando — esperá a que termine.",
     breadcrumbAccount: "Cuenta",
     breadcrumbGmail: "Gmail",
     neverLogLink: "Nunca registrar",

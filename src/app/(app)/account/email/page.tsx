@@ -14,6 +14,12 @@ import { ConnectSuccessToast } from "./ConnectSuccessToast";
 import { DisconnectButton, SyncNowButton } from "./AccountEmailActions";
 
 export const dynamic = "force-dynamic";
+// The "Sincronizar ahora" server action (connectionActions.ts) runs a full
+// sync turn (syncOneAccountNow) inline — same per-account work the cron
+// route budgets 60s for (src/app/api/gmail/sync/route.ts's own
+// `maxDuration`). Match it here so a slow mailbox's manual trigger isn't
+// cut off by Vercel's shorter serverless default.
+export const maxDuration = 60;
 
 interface EmailPageProps {
   searchParams: Promise<{ error?: string; success?: string }>;
@@ -241,7 +247,13 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
                 {l.backfillButtonLabel}
               </button>
             ) : (
-              <SyncNowButton label={l.syncNowButton} syncingLabel={l.syncNowSyncing} errorLabel={l.syncNowError} />
+              <SyncNowButton
+                label={l.syncNowButton}
+                syncingLabel={l.syncNowSyncing}
+                errorLabel={l.syncNowError}
+                cooldownLabel={l.syncNowCooldown}
+                inProgressLabel={l.syncNowInProgress}
+              />
             )}
             <DisconnectButton label={l.disconnectButton} errorLabel={l.disconnectError} />
           </div>

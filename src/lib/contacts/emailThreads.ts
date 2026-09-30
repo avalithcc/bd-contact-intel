@@ -87,3 +87,26 @@ export function groupEmailThreads<T extends EmailThreadableEntry>(entries: reado
 export function isInferredThread<T extends EmailThreadableEntry>(group: EmailThreadGroup<T>): boolean {
   return group.messages.some((m) => m.metadata?.matchConfidence === "inferred");
 }
+
+export interface ThreadContextSummary {
+  /** The counterpart address this thread matched on, or `null` if no message carries one (should be rare — every synced message has `matchedEmail`). */
+  matchedEmail: string | null;
+  /** The LATEST message's direction — "outbound" for `email_sent`, "inbound" for `reply_received`. */
+  direction: "outbound" | "inbound";
+}
+
+/**
+ * Contextual summary line (email-sync.html:180: "Con d.salazar@despegar.com
+ * Deducido · Diego Salazar · saliente" — mockup-fidelity fix, 2026-10-01,
+ * replacing the generic "Sincronizado automáticamente desde Gmail." intro).
+ * Reads off the thread's LATEST (most recent) message — `messages` is
+ * sorted oldest-first, so that's simply the last element — matching the
+ * mockup's own single-message thread example, which describes only that
+ * one message's address/direction, not every message in the thread.
+ */
+export function threadContextSummary<T extends EmailThreadableEntry>(group: EmailThreadGroup<T>): ThreadContextSummary {
+  const latest = group.messages[group.messages.length - 1];
+  const matchedEmail = typeof latest?.metadata?.matchedEmail === "string" ? latest.metadata.matchedEmail : null;
+  const direction: ThreadContextSummary["direction"] = latest?.type === "reply_received" ? "inbound" : "outbound";
+  return { matchedEmail, direction };
+}

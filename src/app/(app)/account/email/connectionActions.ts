@@ -14,8 +14,11 @@ import { emailAccount } from "@/db/schema";
 import { getCurrentBd } from "@/lib/queries";
 import { getSyncableAccountForBd } from "@/lib/gmail/syncQueries";
 import { syncOneAccountNow } from "@/lib/gmail/syncOneAccountNow";
+import { checkSyncCooldown } from "@/lib/gmail/syncCooldown";
 
-export type ConnectionActionResult = { ok: true } | { ok: false; reason: "unexpected" | "not_syncable" };
+export type ConnectionActionResult =
+  | { ok: true }
+  | { ok: false; reason: "unexpected" | "not_syncable" | "cooldown" | "in_progress" };
 
 function actionFailure(err: unknown): { ok: false; reason: "unexpected" } {
   unstable_rethrow(err);
@@ -39,12 +42,30 @@ export async function disconnectEmailAccountAction(): Promise<ConnectionActionRe
   }
 }
 
-/** "Sincronizar ahora" (email-sync.html:249) — runs the exact per-account sync turn the 15-minute cron runs, once, for this BD alone. */
+/**
+ * "Sincronizar ahora" (email-sync.html:249) — runs the exact per-account
+ * sync turn the 15-minute cron runs, once, for this BD alone.
+ *
+ * Fresh-review fix (2026-10-01): the button's own client-side `busy` flag
+ * is not a real guard — it only prevents a double-click on the SAME mounted
+ * button, not a second tab, a reload mid-request, or a fast double submit
+ * before React re-renders. `checkSyncCooldown` (syncCooldown.ts) is the
+ * actual guard, enforced here server-side: refuses within 60s of the
+ * account's own `lastSyncedAt`, or at all while a first-sync backfill is
+ * still in progress (`backfillPageToken` set) — both read off the SAME row
+ * `getSyncableAccountForBd` already fetched, no extra round trip.
+ */
 export async function syncEmailAccountNowAction(): Promise<ConnectionActionResult> {
   try {
     const me = await getCurrentBd();
     const account = await getSyncableAccountForBd(me.id);
     if (!account) return { ok: false, reason: "not_syncable" };
+    const cooldown = checkSyncCooldown({
+      lastSyncedAt: account.lastSyncedAt,
+      backfillPageToken: account.backfillPageToken,
+      now: new Date(),
+    });
+    if (!cooldown.ok) return { ok: false, reason: cooldown.reason };
     await syncOneAccountNow(account);
     revalidatePath("/account/email");
     return { ok: true };

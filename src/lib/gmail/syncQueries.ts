@@ -22,6 +22,10 @@ export interface SyncableAccount {
   refreshTokenEncrypted: string;
   historyId: string | null;
   backfillPageToken: string | null;
+  // Only populated (and only needed) by getSyncableAccountForBd — the
+  // manual "Sincronizar ahora" cooldown check (syncCooldown.ts). The cron
+  // path (getSyncableAccounts) never reads this field.
+  lastSyncedAt: Date | null;
 }
 
 function toSyncableAccount(r: {
@@ -30,6 +34,7 @@ function toSyncableAccount(r: {
   refreshTokenEncrypted: string;
   historyId: string | null;
   backfillPageToken: string | null;
+  lastSyncedAt?: Date | null;
 }): SyncableAccount {
   return {
     bdId: r.bdId,
@@ -37,6 +42,7 @@ function toSyncableAccount(r: {
     refreshTokenEncrypted: r.refreshTokenEncrypted,
     historyId: r.historyId,
     backfillPageToken: r.backfillPageToken,
+    lastSyncedAt: r.lastSyncedAt ?? null,
   };
 }
 
@@ -67,7 +73,9 @@ export async function getSyncableAccounts(): Promise<SyncableAccount[]> {
  * trigger their OWN account's sync, and only when it's actually eligible
  * (connected, readonly-scoped, has a refresh token) — the same guard the
  * cron already enforces, checked again here since a manual trigger is a
- * second, BD-initiated entry point into the same write path.
+ * second, BD-initiated entry point into the same write path. Also returns
+ * `lastSyncedAt` (fresh-review fix, 2026-10-01) so the caller can run the
+ * server-side cooldown check (syncCooldown.ts) without a second round trip.
  */
 export async function getSyncableAccountForBd(bdId: string): Promise<SyncableAccount | null> {
   const [row] = await db
@@ -78,6 +86,7 @@ export async function getSyncableAccountForBd(bdId: string): Promise<SyncableAcc
       historyId: emailAccount.historyId,
       backfillPageToken: emailAccount.backfillPageToken,
       grantedScopes: emailAccount.grantedScopes,
+      lastSyncedAt: emailAccount.lastSyncedAt,
     })
     .from(emailAccount)
     .where(and(eq(emailAccount.bdId, bdId), eq(emailAccount.status, "connected")));

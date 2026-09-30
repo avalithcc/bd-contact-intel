@@ -20,7 +20,12 @@ import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
-import { groupEmailThreads, isInferredThread, type EmailThreadGroup } from "@/lib/contacts/emailThreads";
+import {
+  groupEmailThreads,
+  isInferredThread,
+  threadContextSummary,
+  type EmailThreadGroup,
+} from "@/lib/contacts/emailThreads";
 import { callWhatLabel, emailRecipientText, entryBody } from "@/lib/contacts/timelineEntryBody";
 import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
 import { useToast } from "@/components/ToastProvider";
@@ -784,6 +789,7 @@ export function Timeline({
    */
   function renderEmailThreadCard(threadId: string, group: EmailThreadGroup<TimelineEntry>, when: Date) {
     const inferred = isInferredThread(group);
+    const { matchedEmail, direction } = threadContextSummary(group);
     const subject = group.messages[0]?.metadata?.subject;
     const subjectText = typeof subject === "string" && subject ? subject : l.timelineThreadNoSubject;
     const isExpanded = expandedThreadId === threadId;
@@ -803,17 +809,30 @@ export function Timeline({
             <span className="badge badge-info no-dot">
               {group.messages.length} {l.timelineFilterEmail.toLowerCase()}
             </span>
-            {inferred && (
-              <span className="badge badge-probable" title={l.inferredMatchHint}>
-                {l.inferredBadge}
-              </span>
-            )}
             <span className="when">{formatWhen(when)}</span>
           </div>
           {group.visible ? (
             <>
               <div className="tl-body">
-                <p>{l.timelineThreadIntro}</p>
+                {/* Contextual summary (email-sync.html:180: "Con
+                    d.salazar@despegar.com Deducido · Diego Salazar ·
+                    saliente") replaces the generic sync-explanation intro —
+                    mockup-fidelity fix, 2026-10-01. `personName` is always
+                    the counterpart here: a thread only ever shows on the ONE
+                    contact record it's grouped under. */}
+                <p>
+                  {l.timelineThreadContextPrefix}{" "}
+                  {matchedEmail && <span className="mono">{matchedEmail}</span>}
+                  {inferred && (
+                    <>
+                      {" "}
+                      <span className="badge badge-probable" title={l.inferredMatchHint}>
+                        {l.inferredBadge}
+                      </span>
+                    </>
+                  )}{" "}
+                  · {personName} · {direction === "inbound" ? l.timelineThreadInbound : l.timelineThreadOutbound}
+                </p>
                 <a
                   className="btn btn-ghost btn-sm mt-md"
                   href={`https://mail.google.com/mail/u/0/#all/${threadId}`}
