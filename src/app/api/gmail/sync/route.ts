@@ -5,6 +5,7 @@ import { decryptToken } from "@/lib/gmail/crypto";
 import { refreshGmailAccessToken } from "@/lib/gmail/accessToken";
 import { createGmailClient } from "@/lib/gmail/client";
 import { syncAccountIncremental } from "@/lib/gmail/syncAccount";
+import { backfillAccountFirstSync } from "@/lib/gmail/backfillAccount";
 import {
   getKnownPersonsForAddresses,
   getNeverLogRules,
@@ -28,9 +29,12 @@ import {
  * budget (`PER_BD_BUDGET_MS`) so one broken/slow mailbox can never starve or
  * crash every other BD's sync in the same run.
  *
- * An account with no stored `historyId` yet needs the first-sync backfill
- * (email-sync brief slice 4) — this route flags it (`needs_baseline`) but
- * does not perform that pull itself yet.
+ * An account with no stored `historyId` yet (a fresh connection, or one
+ * reset after a stale/404 `history.list`) runs the first-sync 90-day
+ * backfill instead of incremental polling (src/lib/gmail/backfillAccount.ts)
+ * — one bounded `messages.list` page per run, resumable via
+ * `backfill_page_token`, until it seeds a fresh `historyId` and switches
+ * that account over to incremental sync.
  *
  * To trigger a real run manually:
  *   curl -H "Authorization: Bearer $CRON_SECRET" \
@@ -40,10 +44,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const PER_BD_BUDGET_MS = 20_000;
+const BACKFILL_WINDOW_DAYS = 90;
 
 interface AccountSyncResult {
   bdId: string;
-  status: "ok" | "needs_baseline" | "reauth_required" | "error";
+  status: "ok" | "backfilling" | "reauth_required" | "error";
   messagesFetched?: number;
   messagesStored?: number;
   error?: string;
@@ -60,11 +65,6 @@ export async function GET(request: Request) {
 
   for (const account of accounts) {
     try {
-      if (!account.historyId) {
-        results.push({ bdId: account.bdId, status: "needs_baseline" });
-        continue;
-      }
-
       const refreshToken = decryptToken(account.refreshTokenEncrypted);
       const tokenResult = await refreshGmailAccessToken(refreshToken);
       if (!tokenResult.ok) {
@@ -78,21 +78,46 @@ export async function GET(request: Request) {
       }
 
       const client = createGmailClient(tokenResult.accessToken);
-      const outcome = await syncAccountIncremental({
+      const deps = {
         client,
         bdId: account.bdId,
         bdEmail: account.bdEmail,
-        historyId: account.historyId,
         deadlineAt: Date.now() + PER_BD_BUDGET_MS,
         getKnownPersons: getKnownPersonsForAddresses,
         getNeverLogRules: () => getNeverLogRules(account.bdId),
-        getPlatformSentIds: (ids) => getPlatformSentGmailMessageIds(account.bdId, ids),
-        writeMessages: (classified) => writeSyncedMessages(account.bdId, classified),
-      });
+        getPlatformSentIds: (ids: string[]) => getPlatformSentGmailMessageIds(account.bdId, ids),
+        writeMessages: (classified: Parameters<typeof writeSyncedMessages>[1]) =>
+          writeSyncedMessages(account.bdId, classified),
+      };
+
+      if (!account.historyId) {
+        const outcome = await backfillAccountFirstSync({
+          ...deps,
+          pageToken: account.backfillPageToken,
+          windowDays: BACKFILL_WINDOW_DAYS,
+          now: new Date(),
+        });
+        await updateAccountAfterSync(account.bdId, {
+          backfillPageToken: outcome.nextPageToken,
+          ...(outcome.finalHistoryId ? { historyId: outcome.finalHistoryId } : {}),
+          syncError: null,
+        });
+        results.push({
+          bdId: account.bdId,
+          status: "backfilling",
+          messagesFetched: outcome.messagesFetched,
+          messagesStored: outcome.messagesStored,
+        });
+        continue;
+      }
+
+      const outcome = await syncAccountIncremental({ ...deps, historyId: account.historyId });
 
       if (outcome.status === "needs_baseline") {
-        await updateAccountAfterSync(account.bdId, { historyId: null, syncError: null });
-        results.push({ bdId: account.bdId, status: "needs_baseline" });
+        // Stale/404 history.list — reset to the backfill path (bounded
+        // messages.list re-baseline) rather than retrying the same expired cursor.
+        await updateAccountAfterSync(account.bdId, { historyId: null, backfillPageToken: null, syncError: null });
+        results.push({ bdId: account.bdId, status: "backfilling" });
         continue;
       }
 

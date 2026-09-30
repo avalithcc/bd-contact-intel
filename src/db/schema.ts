@@ -1231,6 +1231,12 @@ export const emailAccount = pgTable(
     // debugging purpose as lastErrorMessage but scoped to sync rather than
     // send (a send failure and a sync failure are unrelated conditions).
     syncError: text("sync_error"),
+    // `users.messages.list` nextPageToken for the first-sync 90-day backfill
+    // (email-sync brief slice 4) — resumable across runs since one cron
+    // tick's time budget rarely covers a whole mailbox. Null once the
+    // backfill completes (historyId then takes over for incremental sync)
+    // or before it has started.
+    backfillPageToken: text("backfill_page_token"),
     connectedAt: timestamp("connected_at").notNull().defaultNow(),
     disconnectedAt: timestamp("disconnected_at"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -21,6 +21,7 @@ export interface SyncableAccount {
   bdEmail: string;
   refreshTokenEncrypted: string;
   historyId: string | null;
+  backfillPageToken: string | null;
 }
 
 /** Connected accounts that hold the readonly scope this feature needs — a pre-readonly connection is skipped, not retried, until the BD reconnects. */
@@ -31,6 +32,7 @@ export async function getSyncableAccounts(): Promise<SyncableAccount[]> {
       emailAddress: emailAccount.emailAddress,
       refreshTokenEncrypted: emailAccount.refreshTokenEncrypted,
       historyId: emailAccount.historyId,
+      backfillPageToken: emailAccount.backfillPageToken,
       grantedScopes: emailAccount.grantedScopes,
     })
     .from(emailAccount)
@@ -45,6 +47,7 @@ export async function getSyncableAccounts(): Promise<SyncableAccount[]> {
       bdEmail: r.emailAddress,
       refreshTokenEncrypted: r.refreshTokenEncrypted,
       historyId: r.historyId,
+      backfillPageToken: r.backfillPageToken,
     }));
 }
 
@@ -83,7 +86,7 @@ export async function getPlatformSentGmailMessageIds(bdId: string, gmailMessageI
 
 export async function updateAccountAfterSync(
   bdId: string,
-  patch: { historyId?: string | null; syncError?: string | null },
+  patch: { historyId?: string | null; syncError?: string | null; backfillPageToken?: string | null },
 ): Promise<void> {
   await db
     .update(emailAccount)
