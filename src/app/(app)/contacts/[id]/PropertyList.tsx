@@ -201,7 +201,7 @@ export function PropertyList({
               l.emptyValue
             )}
             {!ownerLocked && (
-              <button type="button" className="edit" onClick={() => setOwnerEditing(true)} aria-label={l.edit}>
+              <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={() => setOwnerEditing(true)} aria-label={l.edit}>
                 <EditPencilIcon className="icon" />
               </button>
             )}
@@ -395,7 +395,7 @@ function PropertyRow({
             </div>
           </details>
         )}
-        <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
       </dd>
@@ -546,7 +546,7 @@ function LocationPropertyRow({
       <dt>{l.propLocation}</dt>
       <dd>
         {composeLocation(city.value, country.value) ?? l.emptyValue}
-        <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
       </dd>
