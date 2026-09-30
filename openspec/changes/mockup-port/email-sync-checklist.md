@@ -54,7 +54,7 @@ Columns: element | mockup ref | status | evidence | notes
 | Add form (Tipo select + Valor input) | email-sync.html:315-319 | done | page.tsx | |
 | Help text re: exact-domain matching | README.md (neverLogRules.ts TODO) | done | page.tsx copy + src/lib/gmail/neverLogRules.ts validation | Copy states domains match exactly, no subdomains. |
 | Subtitle states the whole-message exclusion rule | owner feedback 2026-10-01 | done | src/lib/i18n/dictionaries/es.ts/en.ts `accountEmailNeverLog.subtitle` | "Si un correo incluye alguna de estas direcciones o dominios, no se registra en el CRM." The matching backend change (any participant match suppresses the WHOLE message, not just its own side) ships on a separate branch (`classify.ts`) — not touched here. |
-| Help text re: own-domain default | email-sync.html:320 | deviation | page.tsx (omitted) | The app has no code path that auto-excludes `avalith.net` by default (verified: `classify.ts` has no such rule) — this looks like flavor copy for the mockup's own example data, not a real default. Flagged for the owner: either (a) approve seeding each BD's list with their own email domain at account-connect time, or (b) drop this line. Not built either way to avoid inventing an unapproved business rule. |
+| Help text re: own-domain default | email-sync.html:320 | deviation (resolved) | page.tsx (omitted) | Owner decision (2026-10-01): leave it out — mail between BDs never matches a CRM person anyway, so there is nothing for this line to protect against. Not built. |
 | Empty state (icon + copy + inline form) | email-sync.html:323-332 | done | page.tsx | |
 | Input validation (empty / malformed address / malformed domain) | brief | done | src/lib/gmail/neverLogRules.ts (`validateNeverLogInput`) | Unit tested. |
 
@@ -78,8 +78,7 @@ Columns: element | mockup ref | status | evidence | notes
    with a "Ver mensajes"/"Ocultar mensajes" toggle not drawn in the static
    mockup — required by the brief's own performance rule, not a silent
    omission.
-2. **"Nunca registrar" own-domain default help line** — see the row above.
-3. **First-sync progress bar** — see the "c) First-sync-in-progress" row
+2. **First-sync progress bar** — see the "c) First-sync-in-progress" row
    above; the brief's own text explicitly authorizes falling back to
    indeterminate copy when a real percentage isn't knowable.
 

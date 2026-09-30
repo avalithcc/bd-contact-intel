@@ -21,7 +21,7 @@ import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
 import { groupEmailThreads, isInferredThread, type EmailThreadGroup } from "@/lib/contacts/emailThreads";
-import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
+import { callWhatLabel, emailRecipientText, entryBody } from "@/lib/contacts/timelineEntryBody";
 import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
 import { useToast } from "@/components/ToastProvider";
 import { Avatar } from "@/components/Avatar";
@@ -707,17 +707,6 @@ export function Timeline({
     );
   }
 
-  /** `metadata.to` is a single string for a manually composed send (src/app/(app)/contacts/actions.ts#sendContactEmailAction) but a string[] for a synced thread message (buildSyncedActivities.ts) — normalize both. */
-  function recipientText(metadata: Record<string, unknown> | null): string | null {
-    const to = metadata?.to;
-    if (typeof to === "string") return to || null;
-    if (Array.isArray(to)) {
-      const addresses = to.filter((v): v is string => typeof v === "string");
-      return addresses.length > 0 ? addresses.join(", ") : null;
-    }
-    return null;
-  }
-
   /**
    * One message inside an expanded synced thread (email-sync.html:158-174).
    * `body` is `undefined` while the thread's bodies are still loading —
@@ -727,7 +716,7 @@ export function Timeline({
     const isSent = m.type === "email_sent";
     const avatarId = isSent ? (m.actorBdId ?? meId) : personId;
     const senderName = isSent ? (m.actorName ?? l.timelineSystemActor) : personName;
-    const to = recipientText(m.metadata);
+    const to = emailRecipientText(m.metadata);
     const movedStatus = m.id === statusMovedByActivityId;
     const quotedOpen = expandedQuotedIds.has(m.id);
     const split = body?.bodyText ? splitQuotedText(body.bodyText) : null;
