@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { WarningIcon } from "@/components/icons";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import { ConversationDialog } from "@/components/ConversationDialog";
 import { EmailThreadMessage } from "@/components/EmailThreadMessage";
 import { groupSyncedEmailThreads } from "@/lib/gmail/groupSyncedEmailThreads";
@@ -15,6 +17,16 @@ import { AdminViewConversationDialog } from "./AdminViewConversationDialog";
 
 function when(at: Date): string {
   return format(at, "d MMM, HH:mm", { locale: es });
+}
+
+// Ported from the deleted standalone page's own `addressListText` — the
+// synced-mail recipient line ("Para: a@x.com, b@x.com") for an OUTBOUND
+// message. `toAddresses` is `jsonb` (AdminSyncedEmailMessage.toAddresses:
+// unknown) — never trust its shape without checking.
+function addressListText(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const addresses = value.filter((v): v is string => typeof v === "string");
+  return addresses.length ? addresses.join(", ") : null;
 }
 
 export interface AdminConversationTrigger {
@@ -34,11 +46,20 @@ export interface AdminConversationTrigger {
  * `audit_log(view_conversation)` row BEFORE reading content, in the same
  * transaction — exactly the audit guarantee the old standalone page relied
  * on, now triggered by "Ver conversación" instead of a page navigation.
- * Exactly one audit row lands per confirmed view: this effect only ever
- * fires once per mounted instance (`phase` only enters "loading" once, from
- * either the confirm click or `skipConfirm`), and callers key a fresh
- * instance per trigger (`key={bdId}`) so a different row's click can never
- * reuse an in-flight fetch.
+ *
+ * Exactly one audit row lands per confirmed view: callers key a fresh
+ * instance per trigger (`key={bdId}`), so a different row's click can never
+ * reuse an in-flight fetch, AND `hasFetchedRef` below guards the action call
+ * itself against firing twice for the SAME instance — the audited read now
+ * runs from a client `useEffect` (it used to run inline in a Server
+ * Component's own render), and React 18 Strict Mode double-invokes an
+ * effect's setup/cleanup once on mount in `next dev` to surface unsafe side
+ * effects. Without the ref guard, a `skipConfirm` instance (mounted already
+ * in `"loading"` phase — AdminConversationAutoOpen) would call the audited
+ * action twice on every dev mount, writing two `audit_log` rows for one
+ * admin view. The ref persists across both Strict-Mode invocations of the
+ * same effect run (it is not reset between them), so only the first ever
+ * reaches the action call.
  *
  * `skipConfirm` (the audit log's own "Abrir" link — AdminConversationAutoOpen.tsx)
  * starts straight in "loading": clicking "Abrir" from an already-audited log
@@ -66,9 +87,17 @@ export function AdminConversationFlow({
     skipConfirm ? "loading" : "confirm",
   );
   const [data, setData] = useState<AdminConversationData | null>(null);
+  // One-shot guard against React Strict Mode's dev-only double-invoke of a
+  // mount effect (see this component's own doc comment) — set BEFORE the
+  // `await`, checked on entry, so the audited action call itself can only
+  // ever happen once per mounted instance, regardless of how many times the
+  // effect body runs.
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     if (phase !== "loading") return;
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     let cancelled = false;
     revealAdminConversationAction(personId, trigger.bdId).then((result) => {
       if (cancelled) return;
@@ -103,7 +132,14 @@ export function AdminConversationFlow({
   }
 
   const targetBdName = data?.targetBdName ?? trigger.bdName;
-  const title = `${l.conversationDialogTitlePrefix} ${targetBdName}`;
+  // `trigger.bdName` is `""` for a `skipConfirm` instance until `data`
+  // resolves (AdminConversationAutoOpen never knows the name upfront) — a
+  // neutral loading title avoids "Conversación con " with a trailing space.
+  const title = data?.targetBdName
+    ? `${l.conversationDialogTitlePrefix} ${data.targetBdName}`
+    : trigger.bdName
+      ? `${l.conversationDialogTitlePrefix} ${trigger.bdName}`
+      : l.timelineFilterLoading;
   const syncedThreads = data ? groupSyncedEmailThreads(data.syncedEmails) : [];
   const linkedinMessages = data ? data.linkedin.flatMap((t) => sortMessagesChronologically(t.messages)) : [];
 
@@ -145,7 +181,7 @@ export function AdminConversationFlow({
                     receivedLabel={l.timelineReceivedBadge}
                     when={when(m.sentAt)}
                     recipientPrefix={l.timelineRecipientPrefix}
-                    recipientText={null}
+                    recipientText={isSent ? addressListText(m.toAddresses) : null}
                     bodyText={m.bodyText ?? ""}
                     bodyTruncated={m.bodyTruncated}
                     bodyTruncatedNote={l.timelineBodyTruncatedNote}
@@ -182,20 +218,31 @@ export function AdminConversationFlow({
         <h3 className="section-title">{l.adminLinkedinSectionTitle}</h3>
         {linkedinMessages.length > 0 ? (
           <div className="thread">
-            {linkedinMessages.map((m) => (
-              <div key={m.id} className="thread-msg">
-                <span className="avatar avatar-sm" aria-hidden="true">
-                  {(m.senderName ?? "—").slice(0, 2).toUpperCase()}
-                </span>
-                <div>
-                  <div className="thread-msg-head">
-                    <span className="from">{m.senderName ?? l.timelineSystemActor}</span>
-                    <span className="when">{when(m.sentAt)}</span>
+            {linkedinMessages.map((m) => {
+              // Same "who sent this" distinction the deleted page's own
+              // `avatar-bd a6` / `a1` split made — the shared `Avatar`
+              // component's "bd" vs "circle" variant is the current
+              // design-system equivalent (same split OwnConversationHistory/
+              // EmailThreadMessage already use elsewhere in this feature).
+              const isTargetBd = m.senderName === targetBdName;
+              return (
+                <div key={m.id} className="thread-msg">
+                  <Avatar
+                    id={isTargetBd ? trigger.bdId : personId}
+                    initials={initialsFromName(m.senderName ?? l.emptyValue)}
+                    variant={isTargetBd ? "bd" : "circle"}
+                    size="sm"
+                  />
+                  <div>
+                    <div className="thread-msg-head">
+                      <span className="from">{m.senderName ?? l.timelineSystemActor}</span>
+                      <span className="when">{when(m.sentAt)}</span>
+                    </div>
+                    <div className="snippet">{m.content}</div>
                   </div>
-                  <div className="snippet">{m.content}</div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="meta">{l.adminNoLinkedinContent}</p>
