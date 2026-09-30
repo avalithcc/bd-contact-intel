@@ -22,7 +22,7 @@
  * transaction.
  */
 import { classifyPosition } from "@/lib/roleGroups";
-import { mergeProperties, mergeProperty, type EmailStatus, type PropertyLoss } from "@/lib/identity/matcher";
+import { mergeProperties, mergeProperty, emailStatusRank, type EmailStatus, type PropertyLoss } from "@/lib/identity/matcher";
 import { parseConnectedOnDate } from "@/lib/migration/connectedOn";
 
 // --- Row shapes (subset of src/db/schema.ts's person/personBdConnection) ---
@@ -279,13 +279,35 @@ function candidate(value: string | null, specificity?: number) {
   return { value, specificity };
 }
 
-/** Same "email fields move together" rule as identity/resolve.ts's mergeEmailFields, adapted for two full person rows. */
-function mergeEmailFields(a: MergePersonFields, b: MergePersonFields) {
-  const rank: Record<EmailStatus, number> = { verified: 2, probable: 1, none: 0 };
+/**
+ * The one shared email-winner decision for a merge: given two candidates
+ * that each carry an `email` + `emailStatus`, picks which one keeps its
+ * email column. Ties — including neither side having an email — favor `a`.
+ * Ranks by `emailStatusRank` (matcher.ts), so this can never drift from the
+ * definition every other email-status comparison in the codebase already
+ * uses.
+ *
+ * This is the single source of truth for the winner side: `mergeEmailFields`
+ * below (the live merge write path used by `/admin/duplicates` and
+ * `scripts/merge-duplicates.ts`) calls it directly, and
+ * `duplicateTiering.ts`'s `pickEmailWinnerSide` (which drives the
+ * `--tier=safe` dry-run's "which email will be discarded" line) calls it
+ * too, instead of carrying its own hand-copied rule. A test proves the two
+ * call sites agree BY CONSTRUCTION (both resolve through this function) —
+ * see tests/unit/pickEmailWinner.test.ts.
+ */
+export function pickEmailWinner<T extends { email: string | null; emailStatus: EmailStatus }>(a: T, b: T): T {
   const aHas = !!a.email;
   const bHas = !!b.email;
-  const winner =
-    aHas && !bHas ? a : bHas && !aHas ? b : !aHas && !bHas ? a : rank[b.emailStatus] > rank[a.emailStatus] ? b : a;
+  if (aHas && !bHas) return a;
+  if (bHas && !aHas) return b;
+  if (!aHas && !bHas) return a;
+  return emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus) ? b : a;
+}
+
+/** Same "email fields move together" rule as identity/resolve.ts's mergeEmailFields, adapted for two full person rows. */
+function mergeEmailFields(a: MergePersonFields, b: MergePersonFields) {
+  const winner = pickEmailWinner(a, b);
   const loser = winner === a ? b : a;
   const loss: PropertyLoss | null = loser.email && loser.email !== winner.email ? { property: "email", value: loser.email } : null;
   return {
