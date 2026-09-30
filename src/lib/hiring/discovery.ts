@@ -145,7 +145,18 @@ export async function getCandidateCompanies(
       and not exists (
         select 1 from company_probe cp
         where cp.company_key = c.company_key
-          and cp.last_probed_at >= ${cooldownDate.toISOString()}::timestamp
+          -- last_probed_at is naive UTC: cast the literal to ::timestamptz
+          -- (not naive ::timestamp) so Postgres implicit-casts the column
+          -- via session TimeZone (= UTC), the SAME comparison this app
+          -- already relies on elsewhere (effectiveActivityAtSql, the badge
+          -- counts). Do NOT wrap the column in "at time zone 'UTC'": that
+          -- yields timestamptz today (naive_col AT TIME ZONE tz ->
+          -- timestamptz) but a NAIVE timestamp once slice-1 converts this
+          -- column to timestamptz (timestamptz_col AT TIME ZONE tz ->
+          -- timestamp) -- silently falling back to the same implicit-cast
+          -- semantics anyway, but only after an easy-to-miss follow-up
+          -- edit. The bare form below needs no edit across that migration.
+          and cp.last_probed_at >= ${cooldownDate.toISOString()}::timestamptz
       )
     group by c.company_key
     having min(coalesce(c.company_category, 'unclassified')) not in (${excluded})

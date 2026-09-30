@@ -51,6 +51,22 @@ test(`parseDbTimestamp: a colon-separated negative offset (e.g. to_json's '-03:0
   assert.equal(d.getTime(), Date.UTC(2026, 8, 25, 16, 30, 0));
 });
 
+// A `timestamptz` column (or a naive column cast to one, e.g. the
+// timestamptz-migration prep's `at time zone 'UTC'` fix in
+// src/lib/hiring/discovery.ts) comes back over postgres-js in exactly this
+// shape: space-separated, bare two-digit "+00" offset. These must pass
+// through unchanged — same UTC instant regardless of the process's own
+// timezone — under BOTH `TZ=UTC` and `TZ=America/Argentina/Buenos_Aires`.
+test(`parseDbTimestamp: timestamptz wire string ("+00", no fractional seconds) passes through unchanged (${TZ_LABEL})`, () => {
+  const d = parseDbTimestamp("2026-10-12 00:00:00+00");
+  assert.equal(d.getTime(), Date.UTC(2026, 9, 12, 0, 0, 0));
+});
+
+test(`parseDbTimestamp: timestamptz wire string ("+00", with fractional seconds) passes through unchanged (${TZ_LABEL})`, () => {
+  const d = parseDbTimestamp("2026-10-12 00:00:00.123456+00");
+  assert.equal(d.getTime(), Date.UTC(2026, 9, 12, 0, 0, 0) + 123);
+});
+
 test(`parseDbTimestamp: a Date instance passes through unchanged, byte-identical instant (${TZ_LABEL})`, () => {
   const original = new Date("2026-09-25T13:30:00Z");
   const result = parseDbTimestamp(original);
