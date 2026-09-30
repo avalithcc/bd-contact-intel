@@ -17,6 +17,15 @@
 -- Values are unchanged by this cast: every row was written as UTC, so
 -- `c AT TIME ZONE 'UTC'` on a timestamptz column converts it back to the
 -- same wall-clock UTC instant as a naive timestamp.
+--
+-- MUST be run as ONE transaction (all-or-nothing, CLAUDE.md write rule 4)
+-- so every table reverts together — never plain autocommit psql, where each
+-- statement is its own implicit transaction and `SET LOCAL` would silently
+-- stop applying after the first statement, leaving later ALTERs with no
+-- lock_timeout guard at all. Run with `psql --single-transaction`, or via a
+-- postgres.js `sql.begin(...)` block — see the runbook for the exact
+-- command.
+BEGIN;
 SET LOCAL lock_timeout = '2s';
 ALTER TABLE "audit_log" ALTER COLUMN "at" SET DATA TYPE timestamp USING "at" AT TIME ZONE 'UTC';
 ALTER TABLE "bd" ALTER COLUMN "created_at" SET DATA TYPE timestamp USING "created_at" AT TIME ZONE 'UTC';
@@ -52,3 +61,4 @@ ALTER TABLE "target_company" ALTER COLUMN "created_at" SET DATA TYPE timestamp U
 ALTER TABLE "target_company" ALTER COLUMN "startup_classified_at" SET DATA TYPE timestamp USING "startup_classified_at" AT TIME ZONE 'UTC';
 ALTER TABLE "task_digest_send" ALTER COLUMN "sent_at" SET DATA TYPE timestamp USING "sent_at" AT TIME ZONE 'UTC';
 ALTER TABLE "task_digest_send" ALTER COLUMN "created_at" SET DATA TYPE timestamp USING "created_at" AT TIME ZONE 'UTC';
+COMMIT;
