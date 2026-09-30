@@ -5,6 +5,14 @@
  * I/O — the caller (`/api/gmail/sync`, slice 3) resolves `knownPersons` and
  * `neverLogRules` from the DB for the syncing BD only, and passes them in.
  *
+ * Never-log applies to the WHOLE MESSAGE, not per address (owner decision,
+ * 2026-09-30, see openspec/decisions/2026-09-30-email-sync-brief.md). If ANY
+ * participant address in From/To/Cc matches a never-log rule (exact address
+ * or exact domain, case-insensitive), the entire message is excluded — no
+ * `matches` for any CRM person, even ones that would otherwise match cleanly
+ * on a different address. A message CC'ing both a never-logged address and a
+ * known CRM contact is not stored or logged at all.
+ *
  * Multi-match decision: `email_message` has `unique(bd_id, gmail_message_id)`
  * — exactly one row per Gmail message — so a message matching several CRM
  * persons cannot be one row per person. This classifier instead returns
@@ -93,6 +101,17 @@ function isNeverLogged(address: string, rules: readonly NeverLogRule[]): boolean
   );
 }
 
+/**
+ * Whole-message never-log check (owner decision, 2026-09-30): true when ANY
+ * From/To/Cc participant — including the BD's own address, in the unlikely
+ * case a rule targets it — matches a never-log rule. Callers must treat a
+ * `true` result as "suppress the entire message for every person", not just
+ * the matching address.
+ */
+function isMessageNeverLogged(addresses: readonly string[], rules: readonly NeverLogRule[]): boolean {
+  return addresses.some((address) => isNeverLogged(address, rules));
+}
+
 export interface ClassifyGmailMessageInput {
   message: ParsedGmailMessage;
   bdEmail: string;
@@ -121,14 +140,21 @@ export function classifyGmailMessage(input: ClassifyGmailMessageInput): Classifi
     (address) => address !== "" && address !== bdEmail,
   );
 
+  // Whole-message never-log: checked over every raw participant address
+  // (including the BD's own, unfiltered), not the deduped match candidates —
+  // a never-logged address anywhere in From/To/Cc suppresses the message for
+  // every person, not just itself.
+  const allParticipantAddresses = [fromAddress, ...toAddresses, ...ccAddresses].filter((address) => address !== "");
+
   const matches: ClassifiedMatch[] = [];
-  const seenPersonIds = new Set<string>();
-  for (const address of candidateAddresses) {
-    if (isNeverLogged(address, neverLogRules)) continue;
-    const person = personByEmail.get(address);
-    if (!person || seenPersonIds.has(person.personId)) continue;
-    seenPersonIds.add(person.personId);
-    matches.push({ personId: person.personId, matchedEmail: address, matchConfidence: person.confidence });
+  if (!isMessageNeverLogged(allParticipantAddresses, neverLogRules)) {
+    const seenPersonIds = new Set<string>();
+    for (const address of candidateAddresses) {
+      const person = personByEmail.get(address);
+      if (!person || seenPersonIds.has(person.personId)) continue;
+      seenPersonIds.add(person.personId);
+      matches.push({ personId: person.personId, matchedEmail: address, matchConfidence: person.confidence });
+    }
   }
 
   return {

@@ -67,6 +67,8 @@ The timeline rendering in slice 5 needs a mockup before code.
 2. **Content:** store the **full email body**, as HubSpot does. Visibility stays per BD, and an admin can read it through the audited admin path.
 3. **First-sync window:** 90 days. Contacts who replied in that window move to `replied` on the first sync, which feeds the follow-up queue.
 
+**Decided 2026-09-30 — never-log scope.** The never-log list applies to the WHOLE MESSAGE: if any participant (from/to/cc) matches a BD's never-log rule by exact address or exact domain (case-insensitive), the entire message is not stored or logged for anyone, not only for the matching address.
+
 ## Risks
 
 - Every BD must reconnect Gmail before anything is synced for them.
