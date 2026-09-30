@@ -45,7 +45,11 @@ select cron.schedule(
         from vault.decrypted_secrets
         where name = 'gmail_sync_cron_secret'
       )
-    )
+    ),
+    -- pg_net defaults to 5000 ms; a sync run takes ~20 s, so the default
+    -- recorded a timeout on every backfill run (2026-09-30). Match the
+    -- route's maxDuration.
+    timeout_milliseconds := 60000
   );
   $$
 );
