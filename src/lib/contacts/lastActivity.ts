@@ -9,6 +9,7 @@
  * no new type invented here, just a different (denser, table-cell) label
  * for each.
  */
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -23,8 +24,12 @@ export interface LastActivityRawRow {
   // a plain column reference, so this comes back as a string at runtime
   // (e.g. "2026-09-25 13:30:00+00") even though it's typed `Date` at the
   // call site. Same class of bug src/lib/outreach/queries.ts already
-  // normalizes `lastMessageAt` for. `buildLastActivityEntries` below is
-  // the single place this gets coerced to a real `Date` — every consumer
+  // normalizes `lastMessageAt` for. When it IS a string, it can also be
+  // offset-less (`effectiveActivityAtSql()`'s `else` branch is a bare
+  // `timestamp without time zone` column before Postgres's CASE-expression
+  // type unification promotes it) — `buildLastActivityEntries` below is the
+  // single place this gets coerced to a real UTC `Date` (via the shared
+  // src/lib/db/timestamp.ts#parseDbTimestamp helper) — every consumer
   // (relative-time render, CSV export) reads the already-normalized
   // `LastActivityEntry.createdAt`, never this raw field.
   createdAt: Date | string;
@@ -89,7 +94,7 @@ export function buildLastActivityEntries(
     map.set(row.personId, {
       type: row.type,
       label: formatLastActivityLabel(row, dict),
-      createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+      createdAt: parseDbTimestamp(row.createdAt),
     });
   }
   return map;

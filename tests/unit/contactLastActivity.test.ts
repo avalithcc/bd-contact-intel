@@ -82,3 +82,22 @@ test("buildLastActivityEntries normalizes a raw-wire-format string createdAt (po
   assert.ok(entry?.createdAt instanceof Date, "createdAt must be a real Date instance, not a string");
   assert.equal(entry?.createdAt.toISOString(), new Date("2026-09-25 13:30:00+00").toISOString());
 });
+
+// The real-bug case (task instructions): `effectiveActivityAtSql()`'s `else`
+// branch is `activity.created_at`, a `timestamp WITHOUT time zone` column
+// (db/schema.ts) before Postgres's CASE-expression type unification promotes
+// it to `timestamptz` — an offset-less wire string must still be interpreted
+// as UTC here, matching `effectiveActivityAtSql()`'s "always UTC" contract,
+// regardless of the Node process's own local timezone (Vercel prod runs UTC;
+// a contributor's laptop, or Argentina's TZ, may not).
+test("buildLastActivityEntries interprets a createdAt string with NO trailing Z/offset as UTC, not the process's local timezone", () => {
+  const map = buildLastActivityEntries(
+    [{ personId: "p1", type: "email_sent", metadata: {}, createdAt: "2026-09-29T00:00:00" }],
+    dict,
+  );
+  assert.equal(
+    map.get("p1")?.createdAt.getTime(),
+    Date.UTC(2026, 8, 29, 0, 0, 0),
+    `expected UTC midnight regardless of TZ=${process.env.TZ ?? "(unset)"}`,
+  );
+});

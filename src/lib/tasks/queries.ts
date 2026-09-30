@@ -12,6 +12,7 @@ import type { TaskSubjectInput } from "@/lib/tasks/subject";
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
 import { combineOpenAndDoneTasks } from "@/lib/contacts/timelineTasks";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 
 export interface TaskFilters {
   leadId?: string;
@@ -237,11 +238,12 @@ type TaskWindowRow = {
 /** Every task timestamp column is `timestamp without time zone` holding UTC,
  * and raw `db.execute` returns it as an offset-less string. `new Date()`
  * would read that in the process's local timezone, so an offset-less value is
- * pinned to UTC explicitly, matching drizzle's own column mapper. */
+ * pinned to UTC explicitly, matching drizzle's own column mapper. Delegates
+ * to the ONE shared helper (src/lib/db/timestamp.ts#parseDbTimestamp) every
+ * other raw DB timestamp call site now uses, so this rule can never drift
+ * from theirs. */
 function toDate(value: Date | string): Date {
-  if (value instanceof Date) return value;
-  const hasOffset = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/.test(value);
-  return new Date(hasOffset ? value : `${value.replace(" ", "T")}Z`);
+  return parseDbTimestamp(value);
 }
 
 function toTaskRow(row: TaskWindowRow): TaskRow {

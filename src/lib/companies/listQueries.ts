@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { activity, bd, company, person } from "@/db/schema";
 import { accountTypeCondition, type AccountType } from "@/lib/companies/accountTypeFilter";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { HiringMatch } from "@/lib/hiring/queries";
 
 const owner = alias(bd, "company_list_owner");
@@ -146,9 +147,10 @@ export async function getCompanyListPage(
       .select({
         companyKey: activity.companyKey,
         // Raw computed timestamptz expression — postgres-js returns this as
-        // a string at runtime, not a parsed Date (same class of bug
-        // effectiveActivityTime.ts's own doc comment describes for
-        // listQueries.ts); normalized to Date below, never left as-is.
+        // a possibly offset-less string at runtime, not a parsed Date (same
+        // class of bug effectiveActivityTime.ts's own doc comment describes
+        // for listQueries.ts); pinned to UTC below via parseDbTimestamp,
+        // never left as-is.
         at: sql<Date | string>`max(${effectiveActivityAtSql()})`,
       })
       .from(activity)
@@ -174,7 +176,7 @@ export async function getCompanyListPage(
       relationshipStage: r.relationshipStage,
       contactCount: contactCountByKey.get(r.companyKey) ?? 0,
       hiring: hiringIndex.get(r.companyKey) ?? null,
-      lastActivityAt: rawAt ? new Date(rawAt) : null,
+      lastActivityAt: rawAt ? parseDbTimestamp(rawAt) : null,
       industry: r.industry,
       ownerBdId: r.ownerBdId,
       ownerName: r.ownerName,

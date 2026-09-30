@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
 import { LEADERSHIP_ROLE_GROUPS } from "@/lib/hiring/leadership";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import {
   resolveCanonicalCompanyKey,
   toOpenPosting,
@@ -544,8 +545,12 @@ export async function getCompanyPostingsForKey(
         location: r.location,
         market: r.market,
         url: r.url,
-        postedAt: r.postedAt ? new Date(r.postedAt) : null,
-        firstSeen: new Date(r.firstSeen),
+        // `job_posting.posted_at`/`first_seen` are `timestamp without time
+        // zone` columns; raw `db.execute` returns them as possibly
+        // offset-less strings, pinned to UTC via parseDbTimestamp (same
+        // class of bug src/lib/db/timestamp.ts documents).
+        postedAt: r.postedAt ? parseDbTimestamp(r.postedAt) : null,
+        firstSeen: parseDbTimestamp(r.firstSeen),
       }),
     ),
     totalCount,
