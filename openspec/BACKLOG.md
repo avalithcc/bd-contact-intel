@@ -115,10 +115,20 @@ Runs via Supabase `pg_cron` every 15 minutes (`net.http_get`,
 `replied` from an inbound signal — previously nothing captured inbound mail.
 
 Still open:
-- Mariel's mailbox is not Gmail, so it is not synced — needs its own path or
-  stays manual.
-- Admins have no UI path to another BD's email conversation yet — see
-  `admin-email-conversation-access` below.
+- Mariel cannot connect Gmail yet: Google rejects her with
+  `Error 403: org_internal` (2026-09-30). The OAuth app `crm-evolution` has an
+  **Internal** consent screen, so only accounts in the Cloud project's own
+  Google Workspace organization may authorize it, and hers is not in it —
+  either it lives in the separate Workspace created for Calendar/Drive, or she
+  signed in with a consumer Google account that merely uses her work address.
+  Fix: put her account in the same organization as Cristian and Macarena.
+  Do NOT switch the consent screen to External — `gmail.readonly` is a
+  restricted scope, so publishing needs Google's security assessment, and
+  External+Testing expires refresh tokens every 7 days, which would break her
+  sync weekly. (Correction: an earlier note here claimed her mailbox was not
+  Gmail. `avalith.net`'s MX is `aspmx.l.google.com`, so it is.)
+- Admins now reach another BD's conversation through the audited modal (#232,
+  #237); the standalone page was removed.
 
 ## Layer 3 — the pipeline nobody is using yet
 
