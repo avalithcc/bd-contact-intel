@@ -36,6 +36,7 @@ interface CompaniesPageProps {
     industry?: string;
     owner?: string;
     accountType?: string;
+    q?: string;
   }>;
 }
 
@@ -59,6 +60,10 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const industry = sp.industry || undefined;
   const owner = sp.owner || undefined;
   const accountType: AccountType | undefined = isAccountType(sp.accountType) ? sp.accountType : undefined;
+  // Text search (owner report 2026-09-30: "no tengo buscador de empresas") —
+  // trimmed here once so every consumer below (the two list reads, every
+  // href builder) agrees on what counts as "no search term".
+  const q = sp.q?.trim() || undefined;
 
   // Fetched once per request (React `cache()`, see getHiringMatchIndex's
   // doc comment) and threaded through both the view-tab count and the list
@@ -66,8 +71,8 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const hiringIndex = await getHiringMatchIndex();
 
   const [{ rows, total, totalPages }, viewCounts, filterOptions, ownerOptions] = await Promise.all([
-    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType),
-    getCompanyViewCounts(me.id, hiringIndex),
+    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType, q),
+    getCompanyViewCounts(me.id, hiringIndex, q),
     getCompanyFilterOptions(),
     listOwnerOptions(),
   ]);
@@ -81,6 +86,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     if (industry) params.set("industry", industry);
     if (owner) params.set("owner", owner);
     if (accountType) params.set("accountType", accountType);
+    if (q) params.set("q", q);
     return params;
   }
 
@@ -112,7 +118,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     }
   }
 
-  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType"): string {
+  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType" | "q"): string {
     const params = baseParams();
     params.delete(key);
     params.set("view", view);
@@ -161,6 +167,18 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
       </nav>
 
       <div className="toolbar">
+        {/* "Búsqueda" chip (owner report 2026-09-30: "no tengo buscador de
+            empresas") — same conditional-chip + × pattern as Industria/
+            Responsable/Tipo de cuenta below, so clearing the search reuses
+            the exact same affordance a BD already knows from those chips. */}
+        {q && (
+          <span className="chip">
+            <span className="k">{l.searchFilterLabel}</span> {q}
+            <Link href={clearFilterHref("q")} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          </span>
+        )}
         <span className="chip">
           <span className="k">{l.stageFilterLabel}</span> {stage ? stageLabel(stage) : l.stageAny}
           {stage && (
@@ -210,6 +228,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
           <summary className="chip chip-add">{l.addFilter}</summary>
           <form method="get" action="/companies" className="menu">
             <input type="hidden" name="view" value={view} />
+            {q && <input type="hidden" name="q" value={q} />}
             <label className="menu-item">
               {l.stageFilterLabel}
               <select name="stage" defaultValue={stage ?? ""}>

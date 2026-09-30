@@ -1,6 +1,7 @@
 import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { pickNavLabels } from "@/lib/i18n/navLabels";
+import { pickTopBarSearchLabels } from "@/lib/i18n/topBarSearchLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
@@ -41,6 +42,7 @@ export default async function AppLayout({
   const locale = await getLocale();
   const dict = t(locale);
   const labels = pickNavLabels(dict);
+  const searchLabels = pickTopBarSearchLabels(dict);
   const me = await getCurrentBd();
   const now = new Date();
   const { taskCount, followUpCount, needsReconnectBanner } = await getAppShellBadgeCounts(me.id, now);
@@ -57,6 +59,7 @@ export default async function AppLayout({
         <div className="main">
           <TopBar
             labels={labels}
+            searchLabels={searchLabels}
             locale={locale}
             me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
           />
