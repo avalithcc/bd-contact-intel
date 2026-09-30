@@ -121,6 +121,7 @@ export default async function AuditLogAdminPage({
                         <Link
                           className="btn btn-secondary btn-sm"
                           href={`/contacts/${row.personId}/conversation/${row.targetBdId}`}
+                          prefetch={false}
                         >
                           {dict.openAction}
                         </Link>

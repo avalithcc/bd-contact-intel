@@ -52,6 +52,7 @@ export function AdminViewConversationDialog({
           </button>
           <Link
             href={`/contacts/${personId}/conversation/${bdId}`}
+            prefetch={false}
             className="btn btn-primary"
             onClick={onClose}
           >
