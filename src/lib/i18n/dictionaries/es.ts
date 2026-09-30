@@ -116,9 +116,16 @@ export const es: typeof en = {
     ruleNoDowngradeLabel: "El estado no baja solo.",
     ruleNoDowngradeBody:
       "Se queda con la etapa más alta que el contacto alcanzó alguna vez, no con lo último que pasó. Si ya tuviste una reunión y después le mandás un correo, sigue en Reunión. No baja a Contactado.",
-    ruleDiscardNotForeverLabel: "Descartar no es para siempre.",
+    ruleDiscardNotForeverLabel: "Descartar no es para siempre, pero no lo deshace cualquier cosa.",
     ruleDiscardNotForeverBody:
-      "El descarte gana solo mientras sea lo más reciente. Cualquier actividad posterior lo revive automáticamente y el contacto vuelve a la etapa que le corresponde. Así que si descartaste a alguien y después te responde, no tenés que deshacer nada: la respuesta sola lo saca del descarte.",
+      "El contacto sale del descarte cuando registrás algo que llegue por lo menos tan alto como la etapa más alta que ya había alcanzado antes.",
+    discardMeetingExamplePrefix: "Si llegó a Reunión y lo descartaste, un correo posterior",
+    discardMeetingExampleStrong: "no",
+    discardMeetingExampleSuffix: "lo revive: Contactado está por debajo de Reunión. Otra reunión sí.",
+    discardContactedExampleBody:
+      "Si nunca pasó de Contactado, en cambio, cualquier correo o llamada posterior lo saca del descarte.",
+    discardSummaryBody:
+      "Dicho de otra forma: para revivirlo hace falta algo al menos tan fuerte como lo mejor que ya habías conseguido con esa persona.",
     teamActivityPrefix: "También cuenta la actividad de",
     teamActivityStrong: "todo el equipo",
     teamActivitySuffix:

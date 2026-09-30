@@ -84,8 +84,9 @@
 <tr><td>Correo enviado</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
 <tr><td>Respuesta recibida</td><td><span class="badge badge-replied">Respondió</span></td></tr>
 <tr><td>Reunión registrada</td><td><span class="badge badge-meeting">Reunión</span></td></tr>
-<tr><td>Llamada saliente, con cualquier resultado</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
-<tr><td>Llamada con resultado "conectado", entrante o saliente</td><td><span class="badge badge-replied">Respondió</span></td></tr>
+<tr><td>Llamada conectada, entrante o saliente</td><td><span class="badge badge-replied">Respondió</span></td></tr>
+<tr><td>Llamada saliente que no conectó</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
+<tr><td>Llamada entrante que no conectó</td><td>No cambia el estado</td></tr>
 <tr><td>Conexión de LinkedIn con mensajes que enviaste</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
 <tr><td>Conexión de LinkedIn con mensajes que recibiste</td><td><span class="badge badge-replied">Respondió</span></td></tr>
 </tbody></table></div>
@@ -96,7 +97,10 @@
 <div class="card-header"><h3>Dos reglas que conviene saber</h3></div>
 <div class="card-body">
 <p class="meta mb-md"><strong>El estado no baja solo.</strong> Se queda con la etapa más alta que el contacto alcanzó alguna vez, no con lo último que pasó. Si ya tuviste una reunión y después le mandás un correo, sigue en Reunión. No baja a Contactado.</p>
-<p class="meta mb-md"><strong>Descartar no es para siempre.</strong> El descarte gana solo mientras sea lo más reciente. Cualquier actividad posterior lo revive automáticamente y el contacto vuelve a la etapa que le corresponde. Así que si descartaste a alguien y después te responde, no tenés que deshacer nada: la respuesta sola lo saca del descarte.</p>
+<p class="meta mb-md"><strong>Descartar no es para siempre, pero no lo deshace cualquier cosa.</strong> El contacto sale del descarte cuando registrás algo que llegue por lo menos tan alto como la etapa más alta que ya había alcanzado antes.</p>
+<p class="meta mb-md">Si llegó a Reunión y lo descartaste, un correo posterior <strong>no</strong> lo revive: Contactado está por debajo de Reunión. Otra reunión sí.</p>
+<p class="meta mb-md">Si nunca pasó de Contactado, en cambio, cualquier correo o llamada posterior lo saca del descarte.</p>
+<p class="meta mb-md">Dicho de otra forma: para revivirlo hace falta algo al menos tan fuerte como lo mejor que ya habías conseguido con esa persona.</p>
 <p class="meta">También cuenta la actividad de <strong>todo el equipo</strong>, no solo la tuya. Si Macarena ya lo contactó, el contacto figura como Contactado aunque vos no le hayas escrito nunca.</p>
 </div></div>
 

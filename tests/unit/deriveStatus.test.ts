@@ -119,6 +119,26 @@ test("discard un-discarded by a later activity", () => {
   assert.deepEqual(result.because, { source: "activity", activityId: "a2" });
 });
 
+test("discard after reaching meeting is NOT undone by a lower-rank activity (guide copy: 'Cualquier actividad posterior' was wrong)", () => {
+  const result = deriveStatus([
+    activityEvent({ id: "a1", type: "meeting_logged", at: new Date("2026-01-01") }),
+    activityEvent({ id: "a2", type: "discarded", at: new Date("2026-01-02") }),
+    activityEvent({ id: "a3", type: "email_sent", at: new Date("2026-01-03") }),
+  ]);
+  assert.equal(result.status, "discarded");
+  assert.deepEqual(result.because, { source: "activity", activityId: "a2" });
+});
+
+test("discard after reaching meeting IS undone by another meeting (ties the previously reached stage)", () => {
+  const result = deriveStatus([
+    activityEvent({ id: "a1", type: "meeting_logged", at: new Date("2026-01-01") }),
+    activityEvent({ id: "a2", type: "discarded", at: new Date("2026-01-02") }),
+    activityEvent({ id: "a3", type: "meeting_logged", at: new Date("2026-01-03") }),
+  ]);
+  assert.equal(result.status, "meeting");
+  assert.deepEqual(result.because, { source: "activity", activityId: "a3" });
+});
+
 test("discard with zero stage events is discarded (vacuously newer than every stage event)", () => {
   const result = deriveStatus([
     activityEvent({ id: "a1", type: "discarded", at: new Date("2026-01-01") }),

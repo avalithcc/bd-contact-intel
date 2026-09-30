@@ -75,7 +75,11 @@ export default async function ContactStatusGuidePage() {
                     <tr key={row.activity}>
                       <td>{row.activity}</td>
                       <td>
-                        <span className={statusBadgeClass(row.stage)}>{dict.leadStatuses[row.stage]}</span>
+                        {row.stage ? (
+                          <span className={statusBadgeClass(row.stage)}>{dict.leadStatuses[row.stage]}</span>
+                        ) : (
+                          row.resultText
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -99,6 +103,12 @@ export default async function ContactStatusGuidePage() {
             <p className="meta mb-md">
               <strong>{l.ruleDiscardNotForeverLabel}</strong> {l.ruleDiscardNotForeverBody}
             </p>
+            <p className="meta mb-md">
+              {l.discardMeetingExamplePrefix} <strong>{l.discardMeetingExampleStrong}</strong>{" "}
+              {l.discardMeetingExampleSuffix}
+            </p>
+            <p className="meta mb-md">{l.discardContactedExampleBody}</p>
+            <p className="meta mb-md">{l.discardSummaryBody}</p>
             <p className="meta mb-0">
               {l.teamActivityPrefix} <strong>{l.teamActivityStrong}</strong>
               {l.teamActivitySuffix}

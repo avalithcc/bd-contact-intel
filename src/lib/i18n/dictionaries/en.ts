@@ -184,9 +184,16 @@ export const en = {
     ruleNoDowngradeLabel: "The status never goes down on its own.",
     ruleNoDowngradeBody:
       "It stays at the highest stage the contact ever reached, not the last thing that happened. If you already had a meeting and then send a follow-up email, it stays at Meeting. It doesn't drop back to Contacted.",
-    ruleDiscardNotForeverLabel: "Discarding isn't forever.",
+    ruleDiscardNotForeverLabel: "Discarding isn't forever, but not just anything undoes it.",
     ruleDiscardNotForeverBody:
-      "A discard only wins while it's the most recent event. Any later activity revives the contact automatically, back to whatever stage it belongs in. So if you discarded someone and they reply afterward, you don't have to undo anything: the reply alone pulls it out of the discard.",
+      "The contact leaves the discard once you record something that reaches at least as high as the highest stage it had already reached before.",
+    discardMeetingExamplePrefix: "If it reached Meeting and you discarded it, a later email",
+    discardMeetingExampleStrong: "doesn't",
+    discardMeetingExampleSuffix: "revive it: Contacted ranks below Meeting. Another meeting does.",
+    discardContactedExampleBody:
+      "If it never went past Contacted, on the other hand, any later email or call pulls it out of the discard.",
+    discardSummaryBody:
+      "Put another way: reviving it takes something at least as strong as the best you'd already gotten from that person.",
     teamActivityPrefix: "Activity from",
     teamActivityStrong: "the whole team",
     teamActivitySuffix:

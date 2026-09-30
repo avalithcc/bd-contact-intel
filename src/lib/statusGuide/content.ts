@@ -23,15 +23,26 @@ export const STATUS_STAGE_ORDER: readonly StatusStage[] = ["new", "contacted", "
  */
 export interface ActivityStageRow {
   activity: string;
-  stage: StatusStage;
+  /**
+   * Omitted for a row that does NOT move the status (`callStage`'s inbound,
+   * not-connected case returns `null`) — the page then renders `resultText`
+   * as plain text instead of a status badge, so a non-outcome can never be
+   * mistaken for a fake stage.
+   */
+  stage?: StatusStage;
+  /** Plain-text result shown instead of a badge when `stage` is absent. */
+  resultText?: string;
 }
 
 export const ACTIVITY_STAGE_ROWS: readonly ActivityStageRow[] = [
   { activity: "Correo enviado", stage: "contacted" },
   { activity: "Respuesta recibida", stage: "replied" },
   { activity: "Reunión registrada", stage: "meeting" },
-  { activity: "Llamada saliente, con cualquier resultado", stage: "contacted" },
-  { activity: 'Llamada con resultado "conectado", entrante o saliente', stage: "replied" },
+  // `callStage` (deriveStatus.ts): connected -> replied (either direction);
+  // outbound not connected -> contacted; inbound not connected -> no stage.
+  { activity: "Llamada conectada, entrante o saliente", stage: "replied" },
+  { activity: "Llamada saliente que no conectó", stage: "contacted" },
+  { activity: "Llamada entrante que no conectó", resultText: "No cambia el estado" },
   { activity: "Conexión de LinkedIn con mensajes que enviaste", stage: "contacted" },
   { activity: "Conexión de LinkedIn con mensajes que recibiste", stage: "replied" },
 ];
