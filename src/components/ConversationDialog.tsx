@@ -41,12 +41,18 @@ export function ConversationDialog({
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
+  // Depends on `open` too (bugfix, caught via the screenshot probe): the
+  // underlying `<Dialog>` unmounts its body entirely while closed (returns
+  // `null`), so the scroll container is a FRESH DOM node every time the
+  // dialog reopens — reopening with already-cached content (no `loading`
+  // transition, since a cache hit never sets `loading` back to `true`) would
+  // otherwise land on scrollTop 0 instead of the newest message.
   useEffect(() => {
-    if (loading || error) return;
+    if (!open || loading || error) return;
     const el = bodyRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [loading, error]);
+  }, [open, loading, error]);
 
   return (
     <Dialog open={open} onClose={onClose} title={title} wide>
