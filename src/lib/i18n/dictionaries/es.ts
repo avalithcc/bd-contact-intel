@@ -152,11 +152,13 @@ export const es: typeof en = {
     account: "Cuenta",
     playbook: "Guía de roles",
     // Admin-only sidenav section (admin-conversation-access mockup, screen 1:
-    // admin-conversation.html:57-61). Only "Registro de auditoría" is wired
-    // here — Duplicados/Migración exist as routes but were never in this
-    // real Sidebar to begin with (a pre-existing gap, not introduced here).
+    // admin-conversation.html:57-61), now holding both "Reportes"
+    // (owner-reporting decision 1/5) and "Registro de auditoría" —
+    // Duplicados/Migración exist as routes but were never in this real
+    // Sidebar to begin with (a pre-existing gap, not introduced here).
     administrationSection: "Administración",
     auditLog: "Registro de auditoría",
+    reports: "Reportes",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
     accountMenuLabel: "Menú de cuenta",
@@ -1430,6 +1432,77 @@ export const es: typeof en = {
       not_latest_dry_run: "Hay una simulación más reciente; esta ya no se puede aprobar.",
       review_threshold_unconfirmed: "Confirmá la casilla de revisión antes de aprobar esta corrida.",
     },
+  },
+
+  // /admin/reports (owner-reporting). Spanish-only, same R11 convention as
+  // `migration` above — the page always renders this `es.reports` object
+  // directly. `en.ts`'s `reports` copy exists only to satisfy
+  // `es: typeof en`'s excess-property check; it is never rendered.
+  reports: {
+    eyebrow: "Administración",
+    title: "reportes",
+    subtitle: "Un mismo período y un mismo BD para todas las tarjetas de esta página.",
+    adminBadge: "Solo administradores",
+    periodFilterLabel: "Período",
+    periodWeek: "Esta semana",
+    periodMonth: "Este mes",
+    periodQuarter: "Este trimestre",
+    bdFilterLabel: "Filtrar por BD",
+    allBds: "Todos los BDs",
+    applyFilter: "Aplicar",
+    periodLabel: (label: string) => `Período: ${label}`,
+    kpiNewContacts: "Contactos nuevos",
+    kpiNewContactsFoot: "personas que entraron al embudo en el período",
+    kpiReplyRate: "Tasa de respuesta",
+    kpiReplyRateFoot: "Respondió ÷ Contactado",
+    kpiMeetings: "Reuniones agendadas",
+    kpiMeetingsFoot: "en el período",
+    kpiCompaniesWon: "Empresas ganadas",
+    kpiCompaniesWonFoot: (qualified: number) => `de ${qualified} en Calificada`,
+    discardReasonsTitle: "Descartes por motivo",
+    discardReasonsEmpty: "Sin descartes registrados con el período y el BD seleccionados.",
+    discardReasonsReason: "Motivo",
+    discardReasonsCount: "Descartes",
+    funnelTitle: "Embudo de contactos",
+    funnelSubtitle: "Nuevo → Contactado → Respondió → Reunión",
+    funnelNew: "Nuevo",
+    funnelContacted: "Contactado",
+    funnelReplied: "Respondió",
+    funnelMeeting: "Reunión",
+    funnelOfContacted: "de Contactado",
+    funnelOfReplied: "de Respondió",
+    funnelDiscardedFoot: (count: number, pct: number) =>
+      `Aparte del embudo: ${count} descartado(s) (${pct}% de Nuevo) — no es una etapa de avance.`,
+    pipelineTitle: "Pipeline de empresas",
+    pipelineSubtitle: "Instantánea actual, no cambia con el período",
+    pipelineFoot: (total: number) => `Distribución real de company.relationship_stage — ${total} empresas.`,
+    stageUnknown: "Sin etapa",
+    conversionTitle: "Conversión por origen",
+    conversionSource: "Origen",
+    conversionTotal: "Total",
+    conversionFoot: '"Contactado" y en adelante son acumulativos, igual que el embudo de arriba.',
+    sourceHubspot: "HubSpot",
+    sourceLinkedin: "LinkedIn",
+    sourceManual: "Manual",
+    sourceOther: "Otro (eventos, cuentas partner)",
+    activityTitle: "Actividad por BD",
+    activityNotes: "Notas",
+    activityCalls: "Llamadas",
+    activityMeetings: "Reuniones",
+    activityEmailsSent: "Correos enviados",
+    activityRepliesReceived: "Respuestas recibidas",
+    activityTasksCompleted: "Tareas completadas",
+    activityFoot: '"Correos enviados" y "Respuestas recibidas" incluyen la sincronización de Gmail.',
+    queueTitle: "Adherencia a la cola de seguimientos",
+    queueWorked: "Trabajados",
+    queuePostponed: "Pospuestos",
+    queueSkipped: "Omitidos",
+    queueAssigned: "Asignados",
+    queueAdherence: "Adherencia",
+    queueEmpty: "La cola de seguimientos todavía no tiene historial en el período seleccionado.",
+    queueRecentFoot: "La cola de seguimientos se lanzó hace poco — con menos de un período completo de historial, esta tarjeta todavía tiene poca base para comparar.",
+    total: "Total",
+    bdColumn: "BD",
   },
 
   duplicates: {

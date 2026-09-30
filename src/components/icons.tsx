@@ -135,6 +135,20 @@ export function PlaybookIcon({ className }: { className?: string }) {
   );
 }
 
+// "Reportes" sidebar entry (owner-reporting decision 5) — a bar-chart glyph,
+// path copied 1:1 from that change's mockup (reports.html:30). The one new
+// visual asset owner-reporting needs; no equivalent existed in this file.
+export function ReportsIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M3 3v18h18" />
+      <path d="M18 17V9" />
+      <path d="M13 17V5" />
+      <path d="M8 17v-3" />
+    </Svg>
+  );
+}
+
 // Account pages icons (mockup-parity 5.1; account.html / account-email.html).
 export function MailIcon({ className }: { className?: string }) {
   return (
