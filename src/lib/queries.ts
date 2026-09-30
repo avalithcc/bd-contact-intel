@@ -173,9 +173,15 @@ function relationshipFilterCondition(key: RelationshipFilterKey) {
       // undefined, which does not fit the non-optional filter list.
       // `last_message_at` is naive UTC (query rule 2/6): interpolating the
       // raw `cutoff` Date here (query rule 1) left it an implicitly-typed
-      // naive literal; pass an explicit `::timestamptz` ISO string and
-      // convert the naive column with `at time zone 'UTC'` instead.
-      return sql`${contact.reciprocal} = true and ${contact.lastMessageAt} at time zone 'UTC' < ${cutoff.toISOString()}::timestamptz`;
+      // naive literal. Cast the literal to `::timestamptz` and leave the
+      // column bare (do NOT wrap it in `at time zone 'UTC'`) — Postgres
+      // implicit-casts the naive column via session TimeZone (= UTC), the
+      // same comparison every other `::timestamptz` literal in this app
+      // relies on, and this form stays correct with no edit once
+      // `contact.last_message_at` itself becomes `timestamptz` (wrapping it
+      // in `at time zone 'UTC'` would flip from naive->timestamptz today to
+      // timestamptz->naive after that migration, a silent trap).
+      return sql`${contact.reciprocal} = true and ${contact.lastMessageAt} < ${cutoff.toISOString()}::timestamptz`;
     }
   }
 }
