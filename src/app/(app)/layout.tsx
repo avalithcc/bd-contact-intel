@@ -4,6 +4,7 @@ import { pickNavLabels } from "@/lib/i18n/navLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
+import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { Sidebar } from "../contacts/Sidebar";
 import { TopBar } from "../contacts/TopBar";
 
@@ -38,10 +39,11 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
-  const labels = pickNavLabels(t(locale));
+  const dict = t(locale);
+  const labels = pickNavLabels(dict);
   const me = await getCurrentBd();
   const now = new Date();
-  const { taskCount, followUpCount } = await getAppShellBadgeCounts(me.id, now);
+  const { taskCount, followUpCount, needsReconnectBanner } = await getAppShellBadgeCounts(me.id, now);
 
   return (
     <ToastProvider>
@@ -53,6 +55,7 @@ export default async function AppLayout({
             locale={locale}
             me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
           />
+          {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
           {children}
         </div>
       </div>

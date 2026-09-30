@@ -754,6 +754,9 @@ export const en = {
     timelineReceivedBadge: "Received",
     timelineRecipientPrefix: "to",
     timelineThreadLoadError: "Couldn't load the thread. Try again.",
+    timelineLockedThreadBelongsTo: "This thread belongs to",
+    timelineLockedThreadPrivacyPrefix: "You can see that it exists and when it happened; its content is private to",
+    timelineLockedThreadPrivacySuffix: "(and admins).",
     historyAction: "History",
     generateMessageCta: "Generate message with AI",
     changeCompanyAction: "Change company",
@@ -1024,11 +1027,18 @@ export const en = {
     neverLogLink: "Never log",
   },
 
+  reconnectBanner: {
+    message:
+      "Reconnect Gmail to turn on automatic email sync: we'll log your contacts' replies without you having to do anything.",
+    cta: "Reconnect Gmail",
+    closeAria: "Close notice",
+  },
+
   accountEmailNeverLog: {
     breadcrumbNeverLog: "Never log",
     eyebrow: "Account · Gmail",
     title: "never log",
-    subtitle: "Emails with these addresses or domains are never stored or shown in any timeline.",
+    subtitle: "If an email includes any of these addresses or domains, it isn't logged to the CRM at all.",
     sectionTitle: "Excluded addresses and domains",
     typeLabel: "Type",
     typeAddressOption: "Email address",

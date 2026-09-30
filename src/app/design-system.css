@@ -646,3 +646,10 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
   .topbar { padding: 0 var(--space-lg); }
   .search { width: auto; flex: 1; }
 }
+
+/* --------------------------------------------- one-time reconnect banner */
+/* email-sync.html:20-28 (README decisions 5/6): full-width, dismissible,
+   built from `.alert` tokens — no other banner component exists yet. */
+.reconnect-banner { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-2xl); background: var(--color-warn-bg); color: var(--color-warn-text); border-bottom: 1px solid rgba(180, 83, 9, 0.3); font-size: var(--text-base); }
+.reconnect-banner .grow { flex: 1; }
+.reconnect-banner .close { color: inherit; }

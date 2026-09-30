@@ -666,6 +666,14 @@ export const es: typeof en = {
     timelineReceivedBadge: "Recibido",
     timelineRecipientPrefix: "para",
     timelineThreadLoadError: "No se pudo cargar el hilo. Probá de nuevo.",
+    // Locked thread marker (email-sync.html:186) — names the owning BD,
+    // same identity a locked single email_sent/reply_received entry already
+    // shows in its head (`actorName`); a locked THREAD's synthetic entry has
+    // no actorName of its own, so Timeline.tsx reads it off the thread's
+    // (unredacted) messages instead.
+    timelineLockedThreadBelongsTo: "Este hilo pertenece a",
+    timelineLockedThreadPrivacyPrefix: "Se puede ver que existe y cuándo ocurrió; su contenido es privado para",
+    timelineLockedThreadPrivacySuffix: "(y los administradores).",
     historyAction: "Historial",
     generateMessageCta: "Generar mensaje con IA",
     changeCompanyAction: "Cambiar empresa",
@@ -940,11 +948,21 @@ export const es: typeof en = {
     neverLogLink: "Nunca registrar",
   },
 
+  reconnectBanner: {
+    message:
+      "Reconectá Gmail para activar la sincronización automática de correos: vamos a registrar las respuestas de tus contactos sin que tengas que hacer nada.",
+    cta: "Reconectar Gmail",
+    closeAria: "Cerrar aviso",
+  },
+
   accountEmailNeverLog: {
     breadcrumbNeverLog: "Nunca registrar",
     eyebrow: "Cuenta · Gmail",
     title: "nunca registrar",
-    subtitle: "Los correos con estas direcciones o dominios no se guardan ni aparecen en ninguna cronología.",
+    // Owner decision (2026-10-01): the rule applies to the WHOLE message —
+    // if ANY participant matches a rule, the message is never logged at
+    // all (classify.ts), not just the matching address's own side.
+    subtitle: "Si un correo incluye alguna de estas direcciones o dominios, no se registra en el CRM.",
     sectionTitle: "Direcciones y dominios excluidos",
     typeLabel: "Tipo",
     typeAddressOption: "Dirección de correo",

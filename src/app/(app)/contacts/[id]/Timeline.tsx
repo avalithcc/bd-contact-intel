@@ -858,7 +858,20 @@ export function Timeline({
           ) : (
             <div className="locked">
               <LockIcon className="icon" />
-              <span>{l.timelineLockedContent}</span>
+              <span>
+                {(() => {
+                  // The synthetic thread entry itself carries no actorName
+                  // (it's synthesized in processedEntries above), but the
+                  // REAL messages inside `group` do — `actorName` is never
+                  // redacted, only `metadata` is (buildTimelineEntry.ts) —
+                  // and every message in one gmailThreadId shares the same
+                  // owning BD, so the first one is exactly the thread's own
+                  // owner (email-sync.html:186's "Este hilo pertenece a
+                  // Ana Pereyra").
+                  const ownerName = group.messages.find((m) => m.actorName)?.actorName ?? l.timelineSystemActor;
+                  return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+                })()}
+              </span>
             </div>
           )}
         </div>

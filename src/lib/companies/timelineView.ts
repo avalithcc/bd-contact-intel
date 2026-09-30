@@ -164,7 +164,15 @@ export function buildCompanyTimelineViewRows(
       else if (row.type === "email_sent")
         what = visible
           ? serverStrings.emailSentTo(typeof metadata.to === "string" ? metadata.to : "")
-          : typeLabel(labels, row.type);
+          // Locked company-scoped conversation row (consistency fix,
+          // 2026-10-01): name the OWNING BD, same identity a locked row
+          // already carries on the contact timeline (single-entry head) and
+          // the mockup's own locked-thread marker ("Este hilo pertenece a
+          // Ana Pereyra") — never the subject/recipient, which stay
+          // redacted via `metadata`/`visible` above.
+          : row.actorName
+            ? `${typeLabel(labels, row.type)} · ${row.actorName}`
+            : typeLabel(labels, row.type);
       else if (row.type === "status_change") {
         const from = typeof metadata.from === "string" ? stageLabelOf(metadata.from) : "";
         const to = typeof metadata.status === "string" ? stageLabelOf(metadata.status) : "";
