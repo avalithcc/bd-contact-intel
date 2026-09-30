@@ -274,14 +274,29 @@ card match `person.company_key` directly instead of resolving through
 empty. The fix is written and waiting on the branch
 `fix/company-contact-count-alias`; ship it the day an alias is created.
 
-### edit-pencil-hover
-The inline edit-pencil icon turns red on hover instead of the intended hover
-state. Fix in progress.
+### argentina-day-boundary — fix in progress
+Found by the launch-readiness audit (2026-09-30). `workedTodayExists`
+(`src/lib/followUp/queueQueries.ts`) and the follow-up subquery in
+`appShellBadgeCountsQuery.ts` bound a real instant against
+`argentinaDayBoundaries`, which `src/lib/tasks/argentinaDate.ts` documents as
+the naive 00:00-UTC scheme built only for `task.due_at`. Argentina is UTC-3, so
+work logged between ~21:00 and 24:00 ART does not count as "worked today": the
+queue item stays pending and the badge keeps counting it. `argentinaInstantBoundary`
+already exists for this. A second bug in the same family: server components
+format dates in the process timezone (UTC on Vercel) while the client Timeline
+formats in the browser (ART), so the same event shows two different dates on one
+page. A third, lower-visibility one: `planCall`/`planMeeting` read the BD's
+wall-clock entry as UTC.
 
-### contacts-list-mapping
-`/contacts` list round trips went from 4 to 2 (#196). The JSON-to-row mapping
-it added (`mapInlineDerivedColumns` in `listQueries.ts`) has no unit test;
-extract it into a DB-free module and assert it matches `attachDerivedColumns`.
+### duplicates queue — 353 open pairs, analysed 2026-09-30
+Not 11, as previously recorded: 11 `email_unverified` plus 342 `name_company`.
+Tiers from the analysis: 11 same-email plus 65 "classic split" (one side has the
+email, the other the LinkedIn profile, no conflicts) are safe to merge; 109 need
+a human because the job title or the owner conflicts; 159 are low priority with
+no email on either side; 9 have two different **verified** emails and are almost
+certainly two real people, so they should be dismissed. 27 pairs form A-B-C
+chains, so merge order matters there. Merging preserves activities, tasks,
+connections and conversations, and is reversible with no time limit.
 
 ## Deferred from crm-hubspot-ux
 
