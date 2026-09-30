@@ -72,6 +72,49 @@ test("resolveEffectiveActivityAt: a call row with a valid metadata.occurredAt us
   assert.equal(at!.getTime(), occurredAt.getTime());
 });
 
+// --- email_sent/reply_received (email-sync brief; feat/follow-up-queue
+// dependency): a synced Gmail message's real send/receive time lives in
+// metadata.occurredAt, not created_at (sync/backfill processing time). ----
+
+test("resolveEffectiveActivityAt: a reply_received row with a valid metadata.occurredAt uses that, not createdAt", () => {
+  const occurredAt = new Date("2026-09-15T10:20:00.000Z");
+  const createdAt = new Date("2026-09-30T00:00:00.000Z");
+  const at = resolveEffectiveActivityAt({
+    id: "a1",
+    type: "reply_received",
+    createdAt,
+    metadata: { gmailThreadId: "t1", occurredAt: occurredAt.toISOString() },
+  });
+  assert.equal(at!.getTime(), occurredAt.getTime());
+});
+
+test("a reply backfilled 60 days after it happened does not look like a recent touch (the exact email-sync bug this fixes)", () => {
+  const now = new Date("2026-09-30T12:00:00.000Z");
+  const syncedToday = now; // created_at = when the backfill ran, today
+  const reallySentAt = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000); // 60 days ago
+  const row = {
+    id: "reply-1",
+    type: "reply_received",
+    createdAt: syncedToday,
+    metadata: { gmailThreadId: "t1", occurredAt: reallySentAt.toISOString() },
+  };
+  assert.equal(isEffectiveActivityWithinDays(row, 30, now), false);
+  // Sanity check: if this bug were still present (using createdAt instead
+  // of occurredAt), the same row would wrongly read as within 30 days.
+  assert.ok(syncedToday.getTime() >= now.getTime() - 30 * 24 * 60 * 60 * 1000);
+});
+
+test("an email sent from Gmail today counts as a touch today, via occurredAt", () => {
+  const now = new Date("2026-09-30T12:00:00.000Z");
+  const row = {
+    id: "sent-1",
+    type: "email_sent",
+    createdAt: now,
+    metadata: { to: "jane@prospect.com", occurredAt: now.toISOString() },
+  };
+  assert.equal(isEffectiveActivityWithinDays(row, 1, now), true);
+});
+
 test("resolveEffectiveActivityAt: every other activity type always uses createdAt, even if metadata has an originalAt-shaped field", () => {
   const createdAt = new Date("2026-09-26T00:00:00.000Z");
   const at = resolveEffectiveActivityAt({

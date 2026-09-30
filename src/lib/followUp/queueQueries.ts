@@ -14,7 +14,7 @@ import { and, asc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, company, followUpQueueItem, person } from "@/db/schema";
 import { addDaysToDateString, argentinaCalendarDate, argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
-import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
+import { WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 import { buildFollowUpInsertQuery } from "@/lib/followUp/candidateQuery";
 
 export interface FollowUpQueueRow {
@@ -34,13 +34,17 @@ export interface FollowUpQueueRow {
 
 /**
  * Correlated EXISTS ("worked today"), reused by both the page read and the
- * badge count — never a per-row query (rule 7). `activity.createdAt` is
- * deliberately the raw log time, not `effectiveActivityAtSql()` — that
- * helper's job is deciding a row's EFFECTIVE time for last-touch/status
- * purposes (it can backdate a `call`'s time to `metadata.occurredAt`, a day
- * before it was logged); "worked today" asks a different question — did the
- * BD DO something today — so it must read the real log time, never a
- * backdated one.
+ * badge count — never a per-row query (rule 7). Uses
+ * `workedTodayAtSql()` (queueSelection.ts), NOT the raw `activity.created_at`
+ * (email-sync brief follow-up fix): for most types the raw log time IS the
+ * right signal — a `call` logged today about an event from yesterday still
+ * counts, since LOGGING it is the BD's action today — but a synced
+ * `email_sent`/`reply_received` row's `created_at` is only when the
+ * automated Gmail sync/backfill happened to run, not when the BD did
+ * anything. `workedTodayAtSql()` redirects those two types to
+ * `metadata.occurredAt` (the real send/receive time) while leaving `call`
+ * and everything else on `created_at` — see its doc comment for the full
+ * rationale.
  *
  * Fresh-review fix: this used to also require `activity.actorBdId = bdId`
  * (the viewing BD specifically). The approved decision is "ANY activity
@@ -52,6 +56,7 @@ export interface FollowUpQueueRow {
  */
 function workedTodayExists(now: Date) {
   const { todayStartUtc, tomorrowStartUtc } = argentinaDayBoundaries(now);
+  const workedAt = workedTodayAtSql();
   return exists(
     db
       .select({ one: sql`1` })
@@ -60,8 +65,8 @@ function workedTodayExists(now: Date) {
         and(
           eq(activity.personId, followUpQueueItem.personId),
           inArray(activity.type, [...WORKED_ACTIVITY_TYPES]),
-          sql`${activity.createdAt} >= ${todayStartUtc.toISOString()}::timestamptz`,
-          sql`${activity.createdAt} < ${tomorrowStartUtc.toISOString()}::timestamptz`,
+          sql`${workedAt} >= ${todayStartUtc.toISOString()}::timestamptz`,
+          sql`${workedAt} < ${tomorrowStartUtc.toISOString()}::timestamptz`,
         ),
       ),
   );

@@ -240,7 +240,7 @@ export async function getCompanyTimelineFilterEntriesAction(
   filter: string | undefined,
 ): Promise<CompanyTimelineFilterFetchResult> {
   try {
-    await getCurrentBd();
+    const me = await getCurrentBd();
     const validFilter = isCompanyActivityFilter(filter) ? filter : undefined;
     const [rows, dict] = await Promise.all([
       getCompanyTimeline(companyKey, { filter: validFilter }),
@@ -248,7 +248,13 @@ export async function getCompanyTimelineFilterEntriesAction(
     ]);
     const l = dict.companyRecord;
     const lc = dict.companyList;
-    const viewRows = buildCompanyTimelineViewRows(rows, dict.companyRecordServer, l, (stage) => stageLabelOf(stage, lc));
+    const viewRows = buildCompanyTimelineViewRows(
+      rows,
+      dict.companyRecordServer,
+      l,
+      (stage) => stageLabelOf(stage, lc),
+      me.id,
+    );
     return { ok: true, rows: viewRows };
   } catch (err) {
     unstable_rethrow(err);

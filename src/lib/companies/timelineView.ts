@@ -1,6 +1,7 @@
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { CompanyTimelineRow } from "@/lib/companies/recordQueries";
 import { taskActivityBody, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
+import { isTimelineEntryVisible } from "@/lib/activity/timelineVisibility";
 
 /**
  * Plain-string labels this module needs to build a row's "what" headline —
@@ -11,6 +12,11 @@ export interface CompanyTimelineViewLabels {
   meetingLogged: string;
   atNote: string;
   atEmailSent: string;
+  // Synced Gmail reply (email-sync brief) — same entry layout email_sent
+  // uses today; full-thread UI is a later slice. `atReplyReceivedDefault`
+  // is the body fallback when neither subject nor sender is available.
+  atReplyReceived: string;
+  atReplyReceivedDefault: string;
   atStatusChange: string;
   atMeetingLogged: string;
   atCall: string;
@@ -28,13 +34,27 @@ export interface CompanyTimelineViewLabels {
   taskChangeCompletedPrefix: string;
   taskChangeReopenedPrefix: string;
   taskChangeUnknownActor: string;
+  // Fresh-review BLOCKER fix, 2026-09-30 — same copy the contact timeline
+  // uses for a locked conversation-content row (timelineEntryBody.ts).
+  timelineLockedContent: string;
 }
 
 export interface CompanyTimelineViewRow extends CompanyTimelineRow {
-  /** Precomputed headline (e.g. "Nota · Ana", "Llamada · Bruno Diaz"). */
+  /** Precomputed headline (e.g. "Nota · Ana", "Llamada · Bruno Diaz"). Never derived from a locked row's metadata — see `visible`. */
   what: string;
-  /** The note body, when `type === "note"`; `null` otherwise. */
+  /** The note/reply/task body, or the locked-content copy when `!visible`; `null` for a type with no body at all. */
   body: string | null;
+  // Fresh-review BLOCKER fix, 2026-09-30: getCompanyTimeline never applied
+  // the contact timeline's privacy rule, so once the Gmail sync ran, every
+  // BD would see every other BD's email subjects/addresses on company
+  // records. `visible` is `isTimelineEntryVisible({ type, actorBdId },
+  // viewerBdId)` (src/lib/activity/timelineVisibility.ts) — the SAME check
+  // the contact timeline runs, so any future CONVERSATION_CONTENT_TYPES
+  // addition (e.g. a LinkedIn type) is covered here for free. `metadata` on
+  // this row is `null` whenever `visible` is `false` — redacted HERE,
+  // server-side, so it is never even serialized to the "use client"
+  // CompanyTimeline.tsx, not just hidden by JSX.
+  visible: boolean;
 }
 
 function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
@@ -43,6 +63,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atNote;
     case "email_sent":
       return l.atEmailSent;
+    case "reply_received":
+      return l.atReplyReceived;
     case "status_change":
       return l.atStatusChange;
     case "status_backfill":
@@ -67,6 +89,18 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
 }
 
 const TASK_ACTIVITY_TYPES_SET = new Set(["task_updated", "task_completed", "task_reopened"]);
+
+/**
+ * Same content shape as the Contact record's `entryBody` `reply_received`
+ * case (src/lib/contacts/timelineEntryBody.ts) — subject and sender
+ * address, never the body (full-thread UI is a later slice).
+ */
+function replyReceivedBody(metadata: Record<string, unknown>, l: CompanyTimelineViewLabels): string {
+  const subject = typeof metadata.subject === "string" ? metadata.subject : null;
+  const from = typeof metadata.from === "string" ? metadata.from : null;
+  const parts = [subject, from].filter((v): v is string => Boolean(v));
+  return parts.length > 0 ? parts.join(" · ") : l.atReplyReceivedDefault;
+}
 
 function taskActivityViewBody(
   type: string,
@@ -99,20 +133,38 @@ function taskActivityViewBody(
  * AND `getCompanyTimelineFilterEntriesAction`'s scoped fetch. The CLIENT
  * component (`CompanyTimeline.tsx`) only ever receives the already-formatted
  * plain strings this returns.
+ *
+ * `viewerBdId` (fresh-review BLOCKER fix, 2026-09-30) is required, not
+ * optional — every call site already has it from `getCurrentBd()`, and
+ * making it optional would silently reopen the privacy gap for any future
+ * caller that forgets to pass it.
  */
 export function buildCompanyTimelineViewRows(
   rows: readonly CompanyTimelineRow[],
   serverStrings: Dictionary["companyRecordServer"],
   labels: CompanyTimelineViewLabels,
   stageLabelOf: (stage: string) => string,
+  viewerBdId: string,
 ): CompanyTimelineViewRow[] {
   return rows.map((row) => {
-    const metadata = row.metadata ?? {};
+    // Same rule the contact timeline runs (src/lib/activity/timelineEntry.ts)
+    // — `false` only for a CONVERSATION_CONTENT_TYPES row
+    // (email_sent/reply_received) whose actorBdId isn't this viewer's own.
+    // Every other type is always `true`, so this never affects note/call/
+    // status_change/etc regardless of who logged them.
+    const visible = isTimelineEntryVisible({ type: row.type, actorBdId: row.actorBdId }, viewerBdId);
+    // Metadata is computed from the RAW row only for building `what`/`body`
+    // below — an empty object when locked, so no branch here can
+    // accidentally read a real subject/address into either. The row
+    // actually returned at the bottom carries `metadata: null` when locked.
+    const metadata = visible ? (row.metadata ?? {}) : {};
     let what: string;
     if (row.scope === "company") {
       if (row.type === "note") what = serverStrings.noteBy(row.actorName ?? "");
       else if (row.type === "email_sent")
-        what = serverStrings.emailSentTo(typeof metadata.to === "string" ? metadata.to : "");
+        what = visible
+          ? serverStrings.emailSentTo(typeof metadata.to === "string" ? metadata.to : "")
+          : typeLabel(labels, row.type);
       else if (row.type === "status_change") {
         const from = typeof metadata.from === "string" ? stageLabelOf(metadata.from) : "";
         const to = typeof metadata.status === "string" ? stageLabelOf(metadata.status) : "";
@@ -120,14 +172,20 @@ export function buildCompanyTimelineViewRows(
       } else if (row.type === "meeting_logged") what = labels.meetingLogged;
       else what = typeLabel(labels, row.type);
     } else {
+      // Never derived from metadata either way — the contact's name (not
+      // sensitive conversation content) is the only thing this headline
+      // ever shows for a person-scoped row.
       what = row.personName ? `${typeLabel(labels, row.type)} · ${row.personName}` : typeLabel(labels, row.type);
     }
-    const body =
-      row.type === "note" && typeof metadata.note === "string"
+    const body = !visible
+      ? labels.timelineLockedContent
+      : row.type === "note" && typeof metadata.note === "string"
         ? metadata.note
-        : TASK_ACTIVITY_TYPES_SET.has(row.type)
-          ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
-          : null;
-    return { ...row, what, body };
+        : row.type === "reply_received"
+          ? replyReceivedBody(metadata, labels)
+          : TASK_ACTIVITY_TYPES_SET.has(row.type)
+            ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
+            : null;
+    return { ...row, what, body, visible, metadata: visible ? row.metadata : null };
   });
 }

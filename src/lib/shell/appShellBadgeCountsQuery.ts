@@ -22,13 +22,31 @@
  * Schema-only import (no `@/db` client) so this stays importable — and this
  * file's own test stays runnable — without a live DATABASE_URL, same
  * convention as src/lib/followUp/candidateQuery.ts. `activity` is left
- * UNALIASED (rule 4/PgDialect render test below) even though this file
- * doesn't reuse `effectiveActivityAtSql()` — "worked today" deliberately
- * reads the raw log time, never the effective time (see queueQueries.ts).
+ * UNALIASED (rule 4/PgDialect render test below); the "worked today" time
+ * expression below is therefore written with LITERAL `activity.`-qualified
+ * SQL text (not `${activity.column}` interpolation) — PERFORMANCE.md's
+ * documented Drizzle 0.36.4 gotcha: `activity` is already interpolated bare
+ * as this subquery's `FROM ${activity}` target, so reusing the SAME column
+ * reference via `${activity.column}` a second time inside this NESTED
+ * correlated subquery would silently re-emit its earlier unqualified
+ * rendering instead of table-qualifying it, making the correlation always
+ * resolve inside the wrong scope. `queueSelection.ts#workedTodayAtSql()`
+ * (which DOES use `${activity.column}` interpolation, safe there because
+ * it is never nested inside another query that already bare-interpolated
+ * `activity`) is NOT reused here for that reason — this file inlines the
+ * equivalent CASE as raw text instead, kept in sync by
+ * tests/unit/queueSelection.test.ts and this file's own tests both pinning
+ * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
 import { activity, followUpQueueItem, person, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
+
+/** Raw-SQL-text twin of queueSelection.ts#workedTodayAtSql() — see this file's doc comment for why it can't reuse that helper via interpolation here. */
+const WORKED_TODAY_AT_SQL_TEXT = `(case
+            when activity.type = 'call' then activity.created_at
+            when activity.type in ('email_sent', 'reply_received') and (activity.metadata->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (activity.metadata->>'occurredAt')::timestamptz
+            else activity.created_at end)`;
 
 export interface AppShellBadgeCountsQueryParams {
   bdId: string;
@@ -81,8 +99,8 @@ export function buildAppShellBadgeCountsQuery({
             select 1 from ${activity}
             where activity.person_id = follow_up_queue_item.person_id
               and activity.type in (${workedTypes})
-              and activity.created_at >= ${todayStartUtcIso}::timestamptz
-              and activity.created_at < ${tomorrowStartUtcIso}::timestamptz
+              and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} >= ${todayStartUtcIso}::timestamptz
+              and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} < ${tomorrowStartUtcIso}::timestamptz
           )
       ) as follow_up_count
   `;

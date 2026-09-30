@@ -26,7 +26,14 @@ export async function GET(req: Request) {
     response_type: "code",
     // gmail.send cannot read the mailbox profile, so the address comes from
     // the OpenID userinfo endpoint (openid + email are non-sensitive scopes).
-    scope: "openid email https://www.googleapis.com/auth/gmail.send",
+    // gmail.readonly (owner decision, 2026-09-30 email-sync brief) lets
+    // /api/gmail/sync poll this BD's inbox. Every existing connection was
+    // granted gmail.send only, so it must reconnect once — the callback
+    // records the scopes Google actually grants and
+    // needsReconnectForSync() (src/lib/gmail/needsReconnectForSync.ts) flags
+    // a stale connection instead of letting sync fail against it.
+    scope:
+      "openid email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly",
     access_type: "offline",
     prompt: "consent",
     state,

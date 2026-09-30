@@ -78,6 +78,11 @@ export async function GET(req: NextRequest) {
     }
     const emailAddress = profile.email;
     const encryptedToken = encryptToken(tokens.refresh_token);
+    // Google's token response `scope` field is what it actually granted —
+    // may differ from what we requested if the user unchecked something in
+    // the consent screen. Recorded so needsReconnectForSync() can tell a
+    // pre-readonly connection apart from one the sync cron can use.
+    const grantedScopes: string | null = typeof tokens.scope === "string" ? tokens.scope : null;
 
     await db
       .insert(emailAccount)
@@ -87,6 +92,7 @@ export async function GET(req: NextRequest) {
         refreshTokenEncrypted: encryptedToken,
         status: "connected",
         lastErrorMessage: null,
+        grantedScopes,
       })
       .onConflictDoUpdate({
         target: emailAccount.bdId,
@@ -95,6 +101,7 @@ export async function GET(req: NextRequest) {
           refreshTokenEncrypted: encryptedToken,
           status: "connected",
           lastErrorMessage: null,
+          grantedScopes,
         },
       });
 

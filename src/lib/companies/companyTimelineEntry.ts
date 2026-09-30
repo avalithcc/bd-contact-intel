@@ -29,6 +29,12 @@ export interface CompanyTimelineEntry {
   type: string;
   createdAt: Date;
   metadata: Record<string, unknown> | null;
+  // Raw actor id (fresh-review BLOCKER fix, 2026-09-30) — needed by
+  // buildCompanyTimelineViewRows to run isTimelineEntryVisible against the
+  // viewer, the same privacy check the contact timeline already applies.
+  // `actorName` alone can't answer "is this MY row" without also knowing
+  // the id it resolved from.
+  actorBdId: string | null;
   actorName: string | null;
   personId: string | null;
   personName: string | null;
@@ -45,6 +51,7 @@ export function buildCompanyTimelineEntry(
     type: row.type,
     createdAt: row.at !== null ? parseDbTimestamp(row.at) : parseDbTimestamp(row.rawCreatedAt),
     metadata: row.metadata as Record<string, unknown> | null,
+    actorBdId: row.actorBdId,
     actorName: row.actorBdId ? (actorNameById.get(row.actorBdId) ?? null) : null,
     personId: row.personId,
     personName: row.personId ? (personNameById.get(row.personId) ?? null) : null,

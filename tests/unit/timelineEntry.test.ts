@@ -62,6 +62,45 @@ test("`at` is computed from the RAW metadata even for a locked (not-visible) ent
   assert.equal(entry.at.getTime(), createdAt.getTime());
 });
 
+test("a reply_received (synced Gmail reply) from another BD's mailbox is locked for a different viewer (email-sync brief follow-up review)", () => {
+  const createdAt = new Date("2026-09-30T09:00:00.000Z");
+  const occurredAt = new Date("2026-07-01T09:00:00.000Z");
+  const entry = buildTimelineEntry(
+    {
+      id: "a5",
+      type: "reply_received",
+      createdAt,
+      actorBdId: "other-bd",
+      actorName: "Other BD",
+      metadata: { subject: "Re: intro", from: "jane@prospect.com", occurredAt: occurredAt.toISOString() },
+    },
+    "viewer-1",
+  );
+  assert.equal(entry.visible, false);
+  assert.equal(entry.metadata, null);
+  // `at` still resolves from occurredAt even though metadata is redacted for
+  // display (buildTimelineEntry computes it from the RAW row before
+  // redaction) — the date itself is never sensitive content.
+  assert.equal(entry.at.getTime(), occurredAt.getTime());
+});
+
+test("a reply_received synced into the viewer's OWN mailbox is visible, with subject/sender intact", () => {
+  const createdAt = new Date("2026-09-30T09:00:00.000Z");
+  const entry = buildTimelineEntry(
+    {
+      id: "a6",
+      type: "reply_received",
+      createdAt,
+      actorBdId: "viewer-1",
+      actorName: "Viewer",
+      metadata: { subject: "Re: intro", from: "jane@prospect.com" },
+    },
+    "viewer-1",
+  );
+  assert.equal(entry.visible, true);
+  assert.deepEqual(entry.metadata, { subject: "Re: intro", from: "jane@prospect.com" });
+});
+
 test("status_backfill is always visible (never a conversation-content type), so its metadata (and therefore `at`) is never redacted away", () => {
   const createdAt = new Date("2026-09-26T14:32:00.000Z");
   const originalAt = new Date("2026-03-26T00:00:00.000Z");

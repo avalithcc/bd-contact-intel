@@ -20,10 +20,13 @@ export type { TimelineEntry } from "@/lib/activity/timelineEntry";
  * "Sistema" (see TIMELINE_PILL_GROUPS, timelinePills.ts, and
  * TASK_ACTIVITY_TYPES there) and are never contact-touch/discard evidence
  * (deriveStatus.ts has no case for them — see
- * tests/unit/deriveStatus.test.ts). */
+ * tests/unit/deriveStatus.test.ts). `reply_received` (email-sync brief) is
+ * a synced Gmail reply — grouped under the "Correos" pill together with
+ * `email_sent` (TIMELINE_PILL_GROUPS), never its own pill. */
 export const TIMELINE_ACTIVITY_TYPES = [
   "note",
   "email_sent",
+  "reply_received",
   "hunter_lookup",
   "status_change",
   "meeting_logged",

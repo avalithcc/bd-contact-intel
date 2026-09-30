@@ -25,7 +25,7 @@
  */
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, auditLog, bd, conversation, message, person } from "@/db/schema";
+import { activity, auditLog, bd, conversation, emailMessage, emailMessagePerson, message, person } from "@/db/schema";
 import { shouldAuditConversationView } from "@/lib/activity/conversationAudit";
 
 export interface AdminConversationEmailEntry {
@@ -47,9 +47,24 @@ export interface AdminConversationThread {
   messages: AdminConversationMessage[];
 }
 
+export interface AdminSyncedEmailMessage {
+  id: string;
+  direction: string;
+  fromAddress: string;
+  toAddresses: unknown;
+  ccAddresses: unknown;
+  subject: string | null;
+  bodyText: string | null;
+  bodyTruncated: boolean;
+  sentAt: Date;
+}
+
 export interface AdminConversationData {
   targetBdName: string;
   emailEntries: AdminConversationEmailEntry[];
+  // Synced Gmail mail (email-sync brief) matched to this person from
+  // targetBdId's mailbox — same bypass-and-audit treatment as emailEntries.
+  syncedEmails: AdminSyncedEmailMessage[];
   linkedin: AdminConversationThread[];
 }
 
@@ -92,6 +107,23 @@ export async function getConversationForAdmin(
       )
       .orderBy(desc(activity.createdAt));
 
+    const syncedEmailRows = await tx
+      .select({
+        id: emailMessage.id,
+        direction: emailMessage.direction,
+        fromAddress: emailMessage.fromAddress,
+        toAddresses: emailMessage.toAddresses,
+        ccAddresses: emailMessage.ccAddresses,
+        subject: emailMessage.subject,
+        bodyText: emailMessage.bodyText,
+        bodyTruncated: emailMessage.bodyTruncated,
+        sentAt: emailMessage.sentAt,
+      })
+      .from(emailMessage)
+      .innerJoin(emailMessagePerson, eq(emailMessagePerson.emailMessageId, emailMessage.id))
+      .where(and(eq(emailMessage.bdId, targetBdId), eq(emailMessagePerson.personId, personId)))
+      .orderBy(asc(emailMessage.sentAt));
+
     let linkedin: AdminConversationThread[] = [];
     if (personRow?.profileKey) {
       const conversationRows = await tx
@@ -125,6 +157,7 @@ export async function getConversationForAdmin(
         createdAt: r.createdAt,
         metadata: r.metadata as Record<string, unknown> | null,
       })),
+      syncedEmails: syncedEmailRows,
       linkedin,
     };
   });

@@ -45,6 +45,9 @@ function filterLabel(l: CompanyTimelineLabels, filter: CompanyActivityFilter): s
 const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactElement> = {
   note: NoteIcon,
   email_sent: MailIcon,
+  // Synced Gmail reply (email-sync brief) — same icon as email_sent, no new
+  // visual design for this entry type yet.
+  reply_received: MailIcon,
   status_change: HistoryIcon,
   status_backfill: HistoryIcon,
   meeting_logged: MeetingIcon,
@@ -271,7 +274,13 @@ export function CompanyTimeline({
                         <span className="when">{formatWhen(at)}</span>
                       </div>
                       {row.body && (
-                        <div className="tl-body">
+                        // Fresh-review BLOCKER fix, 2026-09-30: `row.visible`
+                        // (buildCompanyTimelineViewRows) mirrors the contact
+                        // timeline's locked-marker class swap — `row.body`
+                        // is already the locked-content copy when `!visible`
+                        // (computed server-side; no metadata ever reaches
+                        // this component for a locked row).
+                        <div className={row.visible ? "tl-body" : "locked"}>
                           <blockquote>{row.body}</blockquote>
                         </div>
                       )}

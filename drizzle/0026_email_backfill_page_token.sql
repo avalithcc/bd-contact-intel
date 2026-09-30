@@ -1,0 +1,1 @@
+ALTER TABLE "email_account" ADD COLUMN "backfill_page_token" text;

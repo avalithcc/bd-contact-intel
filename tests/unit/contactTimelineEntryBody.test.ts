@@ -14,6 +14,7 @@ function labels(): ContactRecordLabels {
   return {
     timelineLockedContent: "locked",
     timelineEmailSentPrefix: "Email sent to",
+    timelineReplyReceivedDefault: "Reply received.",
     timelineHunterPrefix: "Hunter",
     timelineStatusChangedPrefix: "Status changed:",
     timelineStatusBackfillPrefix: "Status recorded before the migration:",
@@ -88,4 +89,32 @@ test("entryBody for 'call' renders duration and notes (contact-record.html 'Dura
 test("entryBody for 'call' with no duration/notes falls back to the default call-logged copy", () => {
   const body = entryBody(entry({ type: "call", metadata: {} }), labels());
   assert.equal(body, "Call logged.");
+});
+
+// --- reply_received (email-sync brief follow-up review) --------------------
+
+test("entryBody for 'reply_received' shows subject and sender address, same layout email_sent uses", () => {
+  const body = entryBody(
+    entry({ type: "reply_received", metadata: { subject: "Re: intro", from: "jane@prospect.com" } }),
+    labels(),
+  );
+  assert.equal(body, "Re: intro · jane@prospect.com");
+});
+
+test("entryBody for 'reply_received' with only a sender (no subject) shows just the sender", () => {
+  const body = entryBody(entry({ type: "reply_received", metadata: { from: "jane@prospect.com" } }), labels());
+  assert.equal(body, "jane@prospect.com");
+});
+
+test("entryBody for 'reply_received' with neither subject nor sender falls back to the default copy", () => {
+  const body = entryBody(entry({ type: "reply_received", metadata: {} }), labels());
+  assert.equal(body, "Reply received.");
+});
+
+test("entryBody for 'reply_received' shows the locked marker when the entry is not visible to this viewer (privacy)", () => {
+  const body = entryBody(
+    entry({ type: "reply_received", visible: false, metadata: null }),
+    labels(),
+  );
+  assert.equal(body, "locked");
 });

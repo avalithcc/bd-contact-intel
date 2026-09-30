@@ -66,3 +66,16 @@ test("buildAppShellBadgeCountsQuery: follow_up_count excludes a merged person, s
   const { sql } = render();
   assert.match(sql, /exists\s*\(\s*select 1 from "person"\s*\n\s*where person\.id = follow_up_queue_item\.person_id\s*\n\s*and person\.merged_into_id is null/i);
 });
+
+test("buildAppShellBadgeCountsQuery: worked-today excludes 'call' from the occurredAt redirect (a call's created_at still counts)", () => {
+  const { sql } = render();
+  assert.match(sql, /when activity\.type = 'call' then activity\.created_at/i);
+});
+
+test("buildAppShellBadgeCountsQuery: worked-today redirects email_sent/reply_received to metadata.occurredAt when present", () => {
+  const { sql } = render();
+  assert.match(
+    sql,
+    /when activity\.type in \('email_sent', 'reply_received'\) and \(activity\.metadata->>'occurredAt'\) ~ '[^']+' then \(activity\.metadata->>'occurredAt'\)::timestamptz/i,
+  );
+});
