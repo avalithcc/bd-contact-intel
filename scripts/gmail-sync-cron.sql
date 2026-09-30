@@ -6,7 +6,16 @@
 -- templating step Drizzle doesn't have. Run by the orchestrator, in the
 -- Supabase SQL Editor, AFTER owner approval. Not applied by this branch.
 --
--- One-time manual dashboard steps BEFORE running this script:
+-- Uses `net.http_get`, not `net.http_post`: /api/gmail/sync
+-- (src/app/api/gmail/sync/route.ts) only exports a GET handler, so a POST
+-- would 405. In production, the `pg_cron` extension, the `pg_net` extension,
+-- and the `gmail_sync_cron_secret` Vault secret were already provisioned via
+-- SQL (not the dashboard steps below) on 2026-09-30 — this script documents
+-- the equivalent manual path for a fresh environment and matches what
+-- production actually runs.
+--
+-- One-time manual dashboard steps BEFORE running this script (skip if the
+-- extensions/secret already exist, as they do in production):
 --
 --   1. Database -> Extensions -> enable `pg_cron`.
 --   2. Database -> Extensions -> enable `pg_net`.
@@ -27,7 +36,7 @@ select cron.schedule(
   'gmail-sync-every-15-min',
   '*/15 * * * *',
   $$
-  select net.http_post(
+  select net.http_get(
     url := 'https://bd-contact-intel.vercel.app/api/gmail/sync',
     headers := jsonb_build_object(
       'Authorization',

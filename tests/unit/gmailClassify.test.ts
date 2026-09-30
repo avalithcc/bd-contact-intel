@@ -211,6 +211,70 @@ test("never-log by domain suppresses every address at that domain", () => {
   assert.deepEqual(classified.matches, []);
 });
 
+test("never-log applies to the whole message: a never-logged address anywhere suppresses matches for every other CRM contact on the same message", () => {
+  const rules: NeverLogRule[] = [{ kind: "address", value: "jane@prospect.com" }];
+  const classified = classifyGmailMessage({
+    message: parseGmailMessage(
+      fixtureMessage({
+        payload: {
+          headers: [
+            { name: "From", value: "jane@prospect.com" },
+            { name: "To", value: BD_EMAIL },
+            { name: "Cc", value: "bob@prospect.com" },
+          ],
+        },
+      }),
+    ),
+    bdEmail: BD_EMAIL,
+    knownPersons: [knownPerson(), knownPerson({ personId: "person-2", emailNormalized: "bob@prospect.com" })],
+    neverLogRules: rules,
+  });
+  assert.deepEqual(classified.matches, []);
+  assert.equal(shouldStoreClassifiedMessage(classified), false);
+});
+
+test("never-log applies to the whole message: a never-logged domain on a Cc-only participant suppresses a To match too", () => {
+  const rules: NeverLogRule[] = [{ kind: "domain", value: "spammy.com" }];
+  const classified = classifyGmailMessage({
+    message: parseGmailMessage(
+      fixtureMessage({
+        payload: {
+          headers: [
+            { name: "From", value: "jane@prospect.com" },
+            { name: "To", value: BD_EMAIL },
+            { name: "Cc", value: "someone@spammy.com" },
+          ],
+        },
+      }),
+    ),
+    bdEmail: BD_EMAIL,
+    knownPersons: [knownPerson()],
+    neverLogRules: rules,
+  });
+  assert.deepEqual(classified.matches, []);
+  assert.equal(shouldStoreClassifiedMessage(classified), false);
+});
+
+test("no never-log rules: behavior is unchanged (both CRM contacts still match)", () => {
+  const classified = classifyGmailMessage({
+    message: parseGmailMessage(
+      fixtureMessage({
+        payload: {
+          headers: [
+            { name: "From", value: "jane@prospect.com" },
+            { name: "To", value: BD_EMAIL },
+            { name: "Cc", value: "bob@prospect.com" },
+          ],
+        },
+      }),
+    ),
+    bdEmail: BD_EMAIL,
+    knownPersons: [knownPerson(), knownPerson({ personId: "person-2", emailNormalized: "bob@prospect.com" })],
+    neverLogRules: [],
+  });
+  assert.equal(classified.matches.length, 2);
+});
+
 test("never-log is scoped to the BD who set it (caller passes only that BD's rules)", () => {
   // A different BD's never-log rule for a different domain never applies —
   // enforced by the caller only ever passing the syncing BD's own rules;
