@@ -53,7 +53,13 @@ export async function updateSession(request: NextRequest) {
   // silently bypass the session gate. Each route still verifies its own
   // token — this only stops the session redirect from swallowing the
   // request before it gets there.
-  const CRON_ROUTES = ["/api/hiring/sync", "/api/hiring/discover", "/api/leads/ingest", "/api/tasks/digest"];
+  const CRON_ROUTES = [
+    "/api/hiring/sync",
+    "/api/hiring/discover",
+    "/api/leads/ingest",
+    "/api/tasks/digest",
+    "/api/gmail/sync",
+  ];
   const isCronRoute = CRON_ROUTES.some(
     (route) => path === route || path.startsWith(`${route}/`),
   );
