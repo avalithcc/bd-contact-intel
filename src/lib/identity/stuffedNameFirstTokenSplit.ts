@@ -55,10 +55,34 @@
  * DOES change the underlying tokens, but only by removing junk that was never
  * part of the name — it can only ever match an EXISTING key more closely,
  * never introduce a new collision).
+ *
+ * COMPOUND GIVEN NAMES (owner ask, 2026-09-30): when the SECOND token is a
+ * common Spanish/Portuguese given name (see commonGivenNames.ts), it belongs
+ * to the first name too ("Maria Sol Gonzalez" -> "Maria Sol" / "Gonzalez"),
+ * same "only when a token remains for the last name" guard as the
+ * middle-initial rule.
+ *
+ * LINKEDIN SCRAPE-ARTIFACT CLEANUP (owner ask, 2026-09-30): a raw value
+ * shaped exactly "<Name>Ver el perfil de <Name>" (prefix identical to the
+ * repeated suffix name) is a CONFIRMED LinkedIn scrape artifact, never a
+ * company — `stripLinkedInScrapeArtifact` extracts the clean name, and
+ * `buildFirstTokenSplitPlan` splits it directly, BYPASSING the safety gate
+ * entirely (see there for why: the gate's particle rule can actually produce
+ * a WORSE split than this module's own plain rule for these rows).
+ *
+ * MANUAL OVERRIDES (owner ask, 2026-09-30): a short, explicit, person-id-
+ * keyed list of hand-verified corrections — see
+ * stuffedNameFirstTokenSplitOverrides.ts — takes priority over both the
+ * LinkedIn cleanup and the gate.
  */
+import { isCommonGivenName } from "./commonGivenNames";
 import { deriveStuffedNameSplit, type StuffedNameSplitCandidate } from "./stuffedNameSplitBackfill";
+import {
+  findFirstTokenSplitManualOverride,
+  resolveManualOverrideFill,
+} from "./stuffedNameFirstTokenSplitOverrides";
 
-export type FirstTokenSplitRule = "plain" | "middle_initial";
+export type FirstTokenSplitRule = "plain" | "middle_initial" | "compound_given_name" | "manual_override";
 
 /** `resolvable_by_original_rule` is not one of the original module's own skip
  * reasons — it is THIS module's label for "the original, more conservative
@@ -150,6 +174,9 @@ export function deriveFirstTokenSplit(input: { firstName: string }): FirstTokenS
   if (tokens.length >= 3 && MIDDLE_INITIAL_RE.test(tokens[1]!)) {
     boundary = 2;
     rule = "middle_initial";
+  } else if (tokens.length >= 3 && isCommonGivenName(tokens[1]!)) {
+    boundary = 2;
+    rule = "compound_given_name";
   }
 
   return {
@@ -160,6 +187,27 @@ export function deriveFirstTokenSplit(input: { firstName: string }): FirstTokenS
       rule,
     },
   };
+}
+
+const LINKEDIN_ARTIFACT_PHRASE_RE = /ver el perfil de/i;
+
+/**
+ * Detects the "<Name>Ver el perfil de <Name>" LinkedIn scrape artifact
+ * (owner ask, 2026-09-30): the phrase glued directly onto the real name with
+ * NO separating space, then the SAME name repeated after it (production
+ * evidence — see stuffedNameSplitBackfill.ts's SCRAPE_ARTIFACT_PHRASES doc
+ * comment for the general phrase-detection precedent). Returns the cleaned
+ * name (the prefix) ONLY when the prefix, once whitespace-collapsed, equals
+ * the collapsed suffix EXACTLY — refuses (returns null) rather than guess
+ * when they don't match, or when the phrase isn't present at all.
+ */
+export function stripLinkedInScrapeArtifact(raw: string): string | null {
+  const match = LINKEDIN_ARTIFACT_PHRASE_RE.exec(raw);
+  if (!match) return null;
+  const prefix = collapseWhitespaceNfc(raw.slice(0, match.index));
+  const suffix = collapseWhitespaceNfc(raw.slice(match.index + match[0].length));
+  if (!prefix || prefix !== suffix) return null;
+  return prefix;
 }
 
 export type FirstTokenSplitGateResult =
@@ -191,9 +239,17 @@ export interface FirstTokenSplitFillPlanItem {
   personId: string;
   originalFirstName: string;
   originalLastName: string | null;
-  firstName: string;
-  lastName: string;
+  /** Nullable — a manual override can explicitly NULL a field (e.g. the
+   * "Contacto de 2º grado2º V" -> first_name NULL / last_name "Ciotta"
+   * override); every non-override rule always produces non-null strings. */
+  firstName: string | null;
+  lastName: string | null;
   rule: FirstTokenSplitRule;
+  /** Only set by the "create a company and link it" manual override (owner
+   * ask, 2026-09-30, person add5bf2d-...): a brand-new `company` row to
+   * create (if it doesn't already exist by key) and link via
+   * company/companyKey, in the SAME transaction as this name fill. */
+  createCompany?: { displayName: string };
 }
 
 export interface FirstTokenSplitSkipPlanItem {
@@ -221,6 +277,44 @@ export function buildFirstTokenSplitPlan(candidates: readonly StuffedNameSplitCa
   const skips: FirstTokenSplitSkipPlanItem[] = [];
 
   for (const candidate of candidates) {
+    // Manual overrides (owner ask, 2026-09-30) take priority over everything
+    // else — a hand-verified, person-id-keyed correction is never
+    // second-guessed by either the LinkedIn cleanup or the safety gate.
+    const override = findFirstTokenSplitManualOverride(candidate.personId);
+    if (override) {
+      fills.push(resolveManualOverrideFill(candidate, override));
+      continue;
+    }
+
+    // LinkedIn scrape-artifact cleanup (owner ask, 2026-09-30) bypasses the
+    // gate entirely — detecting the repeated-name shape is itself enough
+    // confidence this is a real person, and the gate's particle rule can
+    // actually produce a WORSE split than this module's own rule here (see
+    // module doc comment).
+    const linkedInCleaned = stripLinkedInScrapeArtifact(candidate.firstName);
+    if (linkedInCleaned !== null) {
+      const result = deriveFirstTokenSplit({ firstName: linkedInCleaned });
+      if (result.kind === "fill") {
+        fills.push({
+          personId: candidate.personId,
+          originalFirstName: candidate.firstName,
+          originalLastName: candidate.originalLastName,
+          firstName: result.fill.firstName,
+          lastName: result.fill.lastName,
+          rule: result.fill.rule,
+        });
+      } else {
+        skips.push({
+          personId: candidate.personId,
+          originalFirstName: candidate.firstName,
+          reason: result.reason,
+          isDigitsOnly: result.detail.isDigitsOnly,
+          isCommonNonPersonWord: result.detail.isCommonNonPersonWord,
+        });
+      }
+      continue;
+    }
+
     const gate = classifyForFirstTokenSplit(candidate);
     if (gate.kind === "ineligible") {
       // The gate's OWN "single_token" reason comes from the ORIGINAL

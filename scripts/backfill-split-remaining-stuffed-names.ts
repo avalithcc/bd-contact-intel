@@ -13,8 +13,21 @@
  *   3. Anything after a comma (a credential/title) is dropped.
  *   4. A value that becomes a single token after trimming is not split —
  *      reported in a "needs review" section instead.
+ *   5. A 2-token value whose 2nd token is a bare initial is not split
+ *      either (never fabricates a one-letter last name).
+ *   6. A common Spanish/Portuguese given name as the 2nd token stays with
+ *      the first name too ("Maria Sol Gonzalez" -> "Maria Sol" / "Gonzalez"
+ *      — see commonGivenNames.ts).
+ *   7. A confirmed "<Name>Ver el perfil de <Name>" LinkedIn scrape artifact
+ *      is cleaned (suffix stripped) and split directly, BYPASSING the
+ *      safety gate below entirely.
+ *   8. A short, explicit, hand-verified, person-id-keyed list of manual
+ *      overrides (stuffedNameFirstTokenSplitOverrides.ts) takes priority
+ *      over everything else — one of them also creates and links a brand
+ *      new `company` row in the SAME transaction (see the company-creation
+ *      handling below).
  *
- * SAFETY GATE (review fix, CRITICAL): every candidate is re-classified with
+ * SAFETY GATE (review fix, CRITICAL): every OTHER candidate is re-classified with
  * the EXISTING, more conservative classifier (stuffedNameSplitBackfill.ts's
  * deriveStuffedNameSplit) before this simpler rule is allowed to touch it —
  * see stuffedNameFirstTokenSplit.ts#classifyForFirstTokenSplit. Only rows the
@@ -65,9 +78,10 @@
  *   npx tsx --env-file=.env.local scripts/backfill-split-remaining-stuffed-names.ts --revert --execute --actor=<bd id>
  *   npx tsx --env-file=.env.local scripts/backfill-split-remaining-stuffed-names.ts --revert --audit-id=<uuid> [--execute --actor=<bd id>]
  */
-import { sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { auditLog } from "../src/db/schema";
+import { auditLog, company, person, personPropertyHistory } from "../src/db/schema";
+import { normalizeCompanyKey } from "../src/lib/companyCategories";
 import {
   buildFirstTokenSplitPlan,
   type FirstTokenSplitRule,
@@ -77,12 +91,17 @@ import {
   buildFirstTokenSplitAuditMetadata,
   FIRST_TOKEN_SPLIT_AUDIT_CAP,
   isFirstTokenSplitAuditWorthRecording,
+  type AppliedFirstTokenSplit,
 } from "../src/lib/identity/stuffedNameFirstTokenSplitAudit";
 import {
   FIRST_TOKEN_SPLIT_BACKFILL_ACTION,
   FIRST_TOKEN_SPLIT_REVERT_ACTION,
   readAllFirstTokenSplitAuditRows,
 } from "../src/lib/identity/stuffedNameFirstTokenSplitBackfillRevertDb";
+import {
+  buildFirstTokenSplitCompanyLinkHistoryRows,
+  buildFirstTokenSplitNameHistoryRows,
+} from "../src/lib/identity/stuffedNameFirstTokenSplitHistory";
 import { readStuffedNameSplitCandidates } from "../src/lib/identity/stuffedNameSplitBackfillDb";
 import {
   buildStuffedNameSplitRevertPlan,
@@ -117,7 +136,7 @@ function parseArgs(argv: readonly string[]): Args {
   return { execute, actor, revert, auditId };
 }
 
-const RULE_ORDER: FirstTokenSplitRule[] = ["plain", "middle_initial"];
+const RULE_ORDER: FirstTokenSplitRule[] = ["plain", "middle_initial", "compound_given_name", "manual_override"];
 
 // Ineligible/gate reasons first (most common in practice — the vast
 // majority of what remains after PR #186 is exactly this), then this
@@ -201,15 +220,9 @@ async function runForwardBackfill(args: Args) {
     );
   }
 
-  const appliedFills: {
-    personId: string;
-    firstName: string;
-    lastName: string;
-    originalFirstName: string;
-    originalLastName: string | null;
-    rule: FirstTokenSplitRule;
-  }[] = [];
+  const appliedFills: AppliedFirstTokenSplit[] = [];
   const skippedRacePersonIds: string[] = [];
+  const companyLinkSkippedPersonIds: string[] = [];
 
   await db.transaction(async (tx) => {
     if (plan.fills.length > 0) {
@@ -246,6 +259,55 @@ async function runForwardBackfill(args: Args) {
       }
     }
 
+    // person_property_history — one row per CHANGED field only (owner ask:
+    // "every override and fill writes the same audit and history rows as
+    // the rest").
+    const nameHistoryRows = appliedFills.flatMap((fill) => buildFirstTokenSplitNameHistoryRows(fill));
+    if (nameHistoryRows.length) await tx.insert(personPropertyHistory).values(nameHistoryRows);
+
+    // Company creation + link — ONLY for the "Smart Gen" manual override
+    // (createCompany set on its plan.fills entry). Kept as a small,
+    // separate single-row update (not folded into the batched name UPDATE
+    // above) so it can never accidentally overwrite another person's
+    // company/companyKey with a stale dry-run-time read.
+    const createCompanyByPersonId = new Map(
+      plan.fills.filter((f) => f.createCompany).map((f) => [f.personId, f.createCompany!] as const),
+    );
+    for (const fill of appliedFills) {
+      const createCompany = createCompanyByPersonId.get(fill.personId);
+      if (!createCompany) continue;
+
+      const companyKey = normalizeCompanyKey(createCompany.displayName);
+      const [existing] = await tx.select({ companyKey: company.companyKey }).from(company).where(eq(company.companyKey, companyKey));
+      if (!existing) {
+        await tx.insert(company).values({
+          companyKey,
+          displayName: createCompany.displayName,
+          relationshipStage: "prospect",
+          createdByBdId: args.actor,
+          updatedByBdId: args.actor,
+        });
+      }
+
+      // Re-check preconditions at write time (task ask: "no company") — a
+      // BD who assigned this person a company between dry run and execute
+      // is never silently overwritten.
+      const [linked] = await tx
+        .update(person)
+        .set({ company: createCompany.displayName, companyKey, updatedAt: new Date(), updatedByBdId: args.actor })
+        .where(and(eq(person.id, fill.personId), isNull(person.company), isNull(person.companyKey)))
+        .returning({ id: person.id });
+
+      if (linked) {
+        fill.linkedCompany = { companyKey, displayName: createCompany.displayName, createdNewCompany: !existing };
+        await tx
+          .insert(personPropertyHistory)
+          .values(buildFirstTokenSplitCompanyLinkHistoryRows({ personId: fill.personId, displayName: createCompany.displayName, companyKey }));
+      } else {
+        companyLinkSkippedPersonIds.push(fill.personId);
+      }
+    }
+
     if (!isFirstTokenSplitAuditWorthRecording({ appliedFills })) return;
 
     const metadata = buildFirstTokenSplitAuditMetadata({
@@ -272,6 +334,12 @@ async function runForwardBackfill(args: Args) {
     console.log(
       `${skippedRacePersonIds.length} planned fill(s) were skipped — the person's row changed since the dry ` +
         "run (see audit_log for the exact set).",
+    );
+  }
+  if (companyLinkSkippedPersonIds.length) {
+    console.log(
+      `${companyLinkSkippedPersonIds.length} company link(s) were skipped — the person already had a company ` +
+        `assigned by the time of the write: ${companyLinkSkippedPersonIds.join(", ")}`,
     );
   }
   if (appliedFills.length !== plan.fills.length) {
@@ -335,6 +403,8 @@ async function runRevert(args: Args) {
   }
 
   let revertedPersonIds: string[] = [];
+  const companiesUnlinkedPersonIds: string[] = [];
+  const companiesDeleted: string[] = [];
 
   await db.transaction(async (tx) => {
     const fillByPersonId = new Map(audit.fills.map((f) => [f.personId, f] as const));
@@ -357,6 +427,39 @@ async function runRevert(args: Args) {
       revertedPersonIds = revertedRows.map((r) => r.id);
     }
 
+    // Company un-link (+ conditional delete) — ONLY for the "Smart Gen"
+    // manual override's fill (the only one with `linkedCompany` set), and
+    // only when that person's NAME revert actually applied above.
+    for (const personId of revertedPersonIds) {
+      const linkedCompany = fillByPersonId.get(personId)?.linkedCompany;
+      if (!linkedCompany) continue;
+
+      const [unlinked] = await tx
+        .update(person)
+        .set({ company: null, companyKey: null, updatedAt: new Date(), updatedByBdId: args.actor })
+        .where(and(eq(person.id, personId), eq(person.companyKey, linkedCompany.companyKey)))
+        .returning({ id: person.id });
+      if (!unlinked) continue;
+
+      companiesUnlinkedPersonIds.push(personId);
+      await tx.insert(personPropertyHistory).values([
+        { personId, property: "company", oldValue: linkedCompany.displayName, newValue: null, changedByBdId: null, source: "migration" },
+        { personId, property: "companyKey", oldValue: linkedCompany.companyKey, newValue: null, changedByBdId: null, source: "migration" },
+      ]);
+
+      if (linkedCompany.createdNewCompany) {
+        const [stillReferenced] = await tx
+          .select({ id: person.id })
+          .from(person)
+          .where(and(eq(person.companyKey, linkedCompany.companyKey), isNull(person.mergedIntoId)))
+          .limit(1);
+        if (!stillReferenced) {
+          await tx.delete(company).where(eq(company.companyKey, linkedCompany.companyKey));
+          companiesDeleted.push(linkedCompany.companyKey);
+        }
+      }
+    }
+
     await tx.insert(auditLog).values({
       actorBdId: args.actor!,
       action: FIRST_TOKEN_SPLIT_REVERT_ACTION,
@@ -364,12 +467,20 @@ async function runRevert(args: Args) {
         revertedAuditLogId: audit.id,
         personIdsReverted: revertedPersonIds,
         personsSkipped: plan.skipped,
+        companiesUnlinkedPersonIds,
+        companiesDeleted,
       },
     });
   });
 
   console.log("");
   console.log(`Reverted ${revertedPersonIds.length} person name(s).`);
+  if (companiesUnlinkedPersonIds.length) {
+    console.log(`Unlinked company for ${companiesUnlinkedPersonIds.length} person(s): ${companiesUnlinkedPersonIds.join(", ")}`);
+  }
+  if (companiesDeleted.length) {
+    console.log(`Deleted ${companiesDeleted.length} company row(s) this run created and that nothing else references: ${companiesDeleted.join(", ")}`);
+  }
 }
 
 async function main() {

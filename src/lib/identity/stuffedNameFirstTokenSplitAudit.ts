@@ -7,16 +7,24 @@
  * name (see stuffedNameFirstTokenSplitBackfillRevertDb.ts) for a separate,
  * independently revertible audit trail.
  */
+import type { FirstTokenSplitRule } from "./stuffedNameFirstTokenSplit";
 
 export const FIRST_TOKEN_SPLIT_AUDIT_CAP = 5000;
 
 export interface AppliedFirstTokenSplit {
   personId: string;
-  firstName: string;
-  lastName: string;
+  /** Nullable — a manual override can explicitly NULL a field (owner ask,
+   * 2026-09-30, e.g. the "Ciotta"/"Smart Gen" overrides). */
+  firstName: string | null;
+  lastName: string | null;
   originalFirstName: string;
   originalLastName: string | null;
-  rule: "plain" | "middle_initial";
+  rule: FirstTokenSplitRule;
+  /** Only set when this fill ALSO linked a brand-new company (the "Smart
+   * Gen" override) — needed so --revert can detach the person's
+   * company/companyKey and, if this run created the company, delete it
+   * PROVIDED nothing else references it by revert time. */
+  linkedCompany?: { companyKey: string; displayName: string; createdNewCompany: boolean };
 }
 
 export interface FirstTokenSplitAuditMetadata {

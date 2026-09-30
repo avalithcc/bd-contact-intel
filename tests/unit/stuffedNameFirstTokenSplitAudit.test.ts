@@ -67,6 +67,24 @@ test("buildFirstTokenSplitAuditMetadata accepts exactly the cap (boundary, not o
   assert.equal(metadata.fills.length, FIRST_TOKEN_SPLIT_AUDIT_CAP);
 });
 
+test("buildFirstTokenSplitAuditMetadata accepts a null firstName/lastName (manual override) and a linkedCompany marker", () => {
+  const override = {
+    personId: "add5bf2d-6671-4a87-8254-bb3953699afb",
+    firstName: null,
+    lastName: null,
+    originalFirstName: "Smart Gen",
+    originalLastName: null,
+    rule: "manual_override" as const,
+    linkedCompany: { companyKey: "smart gen", displayName: "Smart Gen", createdNewCompany: true },
+  };
+  const metadata = buildFirstTokenSplitAuditMetadata({
+    fillsPlanned: 1,
+    appliedFills: [override],
+    skippedRacePersonIds: [],
+  });
+  assert.deepEqual(metadata.fills, [override]);
+});
+
 // --- isFirstTokenSplitAuditWorthRecording -------------------------------------
 // CRITICAL fix (same as stuffedNameSplitBackfillAudit): an empty --execute
 // re-run must never write an audit_log row — it would become the newest row

@@ -10,6 +10,7 @@ import {
   classifyForFirstTokenSplit,
   deriveFirstTokenSplit,
   NON_PERSON_SINGLE_TOKENS,
+  stripLinkedInScrapeArtifact,
 } from "@/lib/identity/stuffedNameFirstTokenSplit";
 
 function candidate(overrides: Partial<StuffedNameSplitCandidate> = {}): StuffedNameSplitCandidate {
@@ -293,4 +294,188 @@ test("buildFirstTokenSplitPlan called twice with the same input returns the same
   const first = buildFirstTokenSplitPlan(input);
   const second = buildFirstTokenSplitPlan(input);
   assert.deepEqual(first, second);
+});
+
+// --- compound given name rule (owner ask, 2026-09-30) ------------------------
+// When the SECOND token of an otherwise-ambiguous name is a common given
+// name, it belongs to the first name — but only when a token still remains
+// for the last name.
+
+test("compound given name: 'Maria Sol Gonzalez' -> 'Maria Sol' / 'Gonzalez'", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Maria Sol Gonzalez" }), {
+    kind: "fill",
+    fill: { firstName: "Maria Sol", lastName: "Gonzalez", rule: "compound_given_name" },
+  });
+});
+
+test("compound given name: 'Juan Pablo Bonilla' -> 'Juan Pablo' / 'Bonilla'", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Juan Pablo Bonilla" }), {
+    kind: "fill",
+    fill: { firstName: "Juan Pablo", lastName: "Bonilla", rule: "compound_given_name" },
+  });
+});
+
+test("compound given name is accent-insensitive: 'Carlos Andrés Toro' -> 'Carlos Andrés' / 'Toro'", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Carlos Andrés Toro" }), {
+    kind: "fill",
+    fill: { firstName: "Carlos Andrés", lastName: "Toro", rule: "compound_given_name" },
+  });
+});
+
+test("compound given name: 'Joao Paulo Fonseca' -> 'Joao Paulo' / 'Fonseca'", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Joao Paulo Fonseca" }), {
+    kind: "fill",
+    fill: { firstName: "Joao Paulo", lastName: "Fonseca", rule: "compound_given_name" },
+  });
+});
+
+test("compound given name applies to a 5+ token name too: 'Rubens Andre Pinto Moreira Piedras' -> 'Rubens Andre' / 'Pinto Moreira Piedras'", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Rubens Andre Pinto Moreira Piedras" }), {
+    kind: "fill",
+    fill: { firstName: "Rubens Andre", lastName: "Pinto Moreira Piedras", rule: "compound_given_name" },
+  });
+});
+
+test("a 2nd token that is NOT a common given name (e.g. a surname like 'Vicente') does not trigger the rule", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Alicia Vicente Andrés" }), {
+    kind: "fill",
+    fill: { firstName: "Alicia", lastName: "Vicente Andrés", rule: "plain" },
+  });
+});
+
+test("a 2nd token that is NOT a common given name at all stays with the plain rule (e.g. 'Castro' in 'Gonzalo Castro Peña')", () => {
+  assert.deepEqual(deriveFirstTokenSplit({ firstName: "Gonzalo Castro Peña" }), {
+    kind: "fill",
+    fill: { firstName: "Gonzalo", lastName: "Castro Peña", rule: "plain" },
+  });
+});
+
+// --- gate + compound given name wired together -------------------------------
+
+test("buildFirstTokenSplitPlan: an ambiguous_3 candidate whose 2nd token is a common given name is split via compound_given_name", () => {
+  const plan = buildFirstTokenSplitPlan([candidate({ personId: "p1", firstName: "Julio Andrés Guzmán" })]);
+  assert.deepEqual(plan.fills, [
+    {
+      personId: "p1",
+      originalFirstName: "Julio Andrés Guzmán",
+      originalLastName: null,
+      firstName: "Julio Andrés",
+      lastName: "Guzmán",
+      rule: "compound_given_name",
+    },
+  ]);
+  assert.deepEqual(plan.skips, []);
+});
+
+// --- LinkedIn scrape-artifact cleanup (owner ask, 2026-09-30) ----------------
+// "<Name>Ver el perfil de <Name>" where the prefix equals the repeated name:
+// strip the suffix, then split the cleaned name — bypassing the classifier
+// gate entirely, since detecting this exact repeated-name shape is itself
+// enough confidence this is a real person (never a company).
+
+test("stripLinkedInScrapeArtifact extracts the cleaned name when the prefix equals the repeated suffix name", () => {
+  assert.equal(stripLinkedInScrapeArtifact("Sarah WilsonVer el perfil de Sarah Wilson"), "Sarah Wilson");
+});
+
+test("stripLinkedInScrapeArtifact is case-insensitive on the connecting phrase", () => {
+  assert.equal(stripLinkedInScrapeArtifact("Sarah WilsonVER EL PERFIL DE Sarah Wilson"), "Sarah Wilson");
+});
+
+test("stripLinkedInScrapeArtifact returns null when the phrase isn't present", () => {
+  assert.equal(stripLinkedInScrapeArtifact("Sarah Wilson"), null);
+});
+
+test("stripLinkedInScrapeArtifact returns null when the prefix does NOT equal the repeated name (refuses to guess)", () => {
+  assert.equal(stripLinkedInScrapeArtifact("Sarah WilsonVer el perfil de Someone Else"), null);
+});
+
+test("buildFirstTokenSplitPlan splits a LinkedIn-artifact 2-token name via the plain rule, bypassing the gate (task sample)", () => {
+  const plan = buildFirstTokenSplitPlan([
+    candidate({ personId: "p1", firstName: "Sarah WilsonVer el perfil de Sarah Wilson" }),
+  ]);
+  assert.deepEqual(plan.fills, [
+    {
+      personId: "p1",
+      originalFirstName: "Sarah WilsonVer el perfil de Sarah Wilson",
+      originalLastName: null,
+      firstName: "Sarah",
+      lastName: "Wilson",
+      rule: "plain",
+    },
+  ]);
+});
+
+test("buildFirstTokenSplitPlan splits a LinkedIn-artifact name via the given-name rule (task sample)", () => {
+  const plan = buildFirstTokenSplitPlan([
+    candidate({ personId: "p1", firstName: "Hector Damian LemaVer el perfil de Hector Damian Lema" }),
+  ]);
+  assert.deepEqual(plan.fills, [
+    {
+      personId: "p1",
+      originalFirstName: "Hector Damian LemaVer el perfil de Hector Damian Lema",
+      originalLastName: null,
+      firstName: "Hector Damian",
+      lastName: "Lema",
+      rule: "compound_given_name",
+    },
+  ]);
+});
+
+test("buildFirstTokenSplitPlan splits a LinkedIn-artifact name with a particle via the PLAIN rule, bypassing the gate — the gate's particle rule would otherwise produce a different (wrong) split (task sample)", () => {
+  const plan = buildFirstTokenSplitPlan([
+    candidate({ personId: "p1", firstName: "Victor Gomez de la cruzVer el perfil de Victor Gomez de la cruz" }),
+  ]);
+  assert.deepEqual(plan.fills, [
+    {
+      personId: "p1",
+      originalFirstName: "Victor Gomez de la cruzVer el perfil de Victor Gomez de la cruz",
+      originalLastName: null,
+      firstName: "Victor",
+      lastName: "Gomez de la cruz",
+      rule: "plain",
+    },
+  ]);
+});
+
+// --- manual overrides take priority over everything else (owner ask, 2026-09-30) ---
+
+test("buildFirstTokenSplitPlan applies a manual override even though the raw value would otherwise be gate-ineligible (junk_punctuation)", () => {
+  const plan = buildFirstTokenSplitPlan([
+    candidate({
+      personId: "124682bb-c7d0-4fa1-a794-a575ff0641c0",
+      firstName: "Kimberly West-Philips, SHRM-CP",
+    }),
+  ]);
+  assert.deepEqual(plan.fills, [
+    {
+      personId: "124682bb-c7d0-4fa1-a794-a575ff0641c0",
+      originalFirstName: "Kimberly West-Philips, SHRM-CP",
+      originalLastName: null,
+      firstName: "Kimberly",
+      lastName: "West-Philips",
+      rule: "manual_override",
+    },
+  ]);
+  assert.deepEqual(plan.skips, []);
+});
+
+test("buildFirstTokenSplitPlan applies the Smart Gen override: first_name NULL and createCompany carried on the fill", () => {
+  const plan = buildFirstTokenSplitPlan([
+    candidate({
+      personId: "add5bf2d-6671-4a87-8254-bb3953699afb",
+      firstName: "Smart Gen",
+      originalLastName: null,
+    }),
+  ]);
+  assert.deepEqual(plan.fills, [
+    {
+      personId: "add5bf2d-6671-4a87-8254-bb3953699afb",
+      originalFirstName: "Smart Gen",
+      originalLastName: null,
+      firstName: null,
+      lastName: null,
+      rule: "manual_override",
+      createCompany: { displayName: "Smart Gen" },
+    },
+  ]);
 });

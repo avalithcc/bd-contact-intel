@@ -9,10 +9,20 @@
 
 export interface AuditedStuffedNameSplitFill {
   personId: string;
-  firstName: string;
-  lastName: string;
+  /** Nullable — the first-token backfill's manual overrides (owner ask,
+   * 2026-09-30) can write a NULL first_name/last_name; this generic
+   * planner is reused by that backfill's --revert too (see
+   * scripts/backfill-split-remaining-stuffed-names.ts), so it must accept
+   * null on both sides of the equality check below. */
+  firstName: string | null;
+  lastName: string | null;
   originalFirstName: string;
   originalLastName: string | null;
+  /** Only set by the first-token backfill's "Smart Gen" manual override —
+   * this generic planner ignores it entirely (name-only); the CALLING
+   * script reads it back off `toRevert`'s matching audited fill to also
+   * unlink (and conditionally delete) the linked company. */
+  linkedCompany?: { companyKey: string; displayName: string; createdNewCompany: boolean };
 }
 
 export interface CurrentPersonNameState {

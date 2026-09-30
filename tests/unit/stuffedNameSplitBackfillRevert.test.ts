@@ -12,8 +12,8 @@ import {
 
 function auditedFill(overrides: Partial<{
   personId: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   originalFirstName: string;
   originalLastName: string | null;
 }> = {}) {
@@ -100,6 +100,30 @@ test("never touches a person not listed in the audited fills, even if currentPer
     ],
   });
   assert.deepEqual(plan.toRevert.map((r) => r.personId), ["p1"]);
+});
+
+// --- nullable firstName/lastName (first-token backfill's manual overrides) --
+
+test("a manual override that wrote a NULL first_name still reverts when the current row still equals exactly what was written", () => {
+  const plan = buildStuffedNameSplitRevertPlan({
+    auditedFills: [
+      auditedFill({ personId: "p1", firstName: null, lastName: "Ciotta", originalFirstName: "Contacto de 2º grado2º V" }),
+    ],
+    currentPersons: [{ id: "p1", firstName: null, lastName: "Ciotta" }],
+  });
+  assert.deepEqual(plan.toRevert, [
+    { personId: "p1", originalFirstName: "Contacto de 2º grado2º V", originalLastName: null },
+  ]);
+  assert.deepEqual(plan.skipped, []);
+});
+
+test("a NULL-written first_name that a BD later filled in is skipped, not reverted", () => {
+  const plan = buildStuffedNameSplitRevertPlan({
+    auditedFills: [auditedFill({ personId: "p1", firstName: null, lastName: "Ciotta" })],
+    currentPersons: [{ id: "p1", firstName: "Gabriel", lastName: "Ciotta" }],
+  });
+  assert.deepEqual(plan.toRevert, []);
+  assert.deepEqual(plan.skipped, [{ personId: "p1", reason: "changed_since_backfill" }]);
 });
 
 // --- selectStuffedNameSplitAuditRow ------------------------------------------
