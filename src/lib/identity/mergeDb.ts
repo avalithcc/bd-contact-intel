@@ -8,12 +8,14 @@
  * ./resolveDb.ts and src/lib/status/recompute.ts; the planner it calls is
  * fully covered by tests/unit/identityMerge.test.ts.
  */
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, type SQL } from "drizzle-orm";
 import type { db } from "@/db";
 import {
   activity,
   auditLog,
   duplicateCandidate,
+  emailMessagePerson,
+  followUpQueueItem,
   mergeEvent,
   person,
   personBdConnection,
@@ -27,6 +29,8 @@ import {
   parseMergeSnapshot,
   planMerge,
   planUnmerge,
+  type EmailMessagePersonRow,
+  type FollowUpQueueItemRow,
   type MergeConnection,
   type MergeDuplicateCandidateRow,
   type MergeIdMapRow,
@@ -89,6 +93,83 @@ async function readReferencesOnPerson(tx: DbTransaction, personId: string): Prom
     ...taskRows.map((r) => ({ table: "task" as const, id: r.id })),
     ...signalRows.map((r) => ({ table: "signal" as const, id: r.id })),
   ];
+}
+
+function toEmailMessagePersonRow(row: typeof emailMessagePerson.$inferSelect): EmailMessagePersonRow {
+  return {
+    id: row.id,
+    emailMessageId: row.emailMessageId,
+    personId: row.personId,
+    matchedEmail: row.matchedEmail,
+    matchConfidence: row.matchConfidence,
+  };
+}
+
+function toQueueItemRow(row: typeof followUpQueueItem.$inferSelect): FollowUpQueueItemRow {
+  return {
+    id: row.id,
+    bdId: row.bdId,
+    queueDate: row.queueDate,
+    personId: row.personId,
+    position: row.position,
+    dueStatus: row.dueStatus,
+    lastTouchAt: row.lastTouchAt,
+    state: row.state,
+    snoozedUntil: row.snoozedUntil,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** Exported so this file's own PgDialect render test can pin its shape without a live DATABASE_URL — see the module doc comment. */
+export function survivorEmailMessagePersonCondition(survivorId: string, emailMessageIds: readonly string[]): SQL {
+  // `and(...)` with at least one defined argument always returns a real SQL
+  // (it only returns undefined for zero arguments) — safe to assert.
+  return and(eq(emailMessagePerson.personId, survivorId), inArray(emailMessagePerson.emailMessageId, [...emailMessageIds]))!;
+}
+
+/** Exported so this file's own PgDialect render test can pin its shape without a live DATABASE_URL — see the module doc comment. */
+export function survivorQueueItemCondition(survivorId: string, bdIds: readonly string[], queueDates: readonly string[]): SQL {
+  return and(
+    eq(followUpQueueItem.personId, survivorId),
+    inArray(followUpQueueItem.bdId, [...bdIds]),
+    inArray(followUpQueueItem.queueDate, [...queueDates]),
+  )!;
+}
+
+async function readEmailMessagePersonRowsOnPerson(tx: DbTransaction, personId: string): Promise<EmailMessagePersonRow[]> {
+  const rows = await tx.select().from(emailMessagePerson).where(eq(emailMessagePerson.personId, personId));
+  return rows.map(toEmailMessagePersonRow);
+}
+
+/** Only the survivor's rows that COULD collide (same emailMessageId as one of merged's rows) — bounded by merged's own (small) row count. */
+async function readSurvivorEmailMessagePersonRows(
+  tx: DbTransaction,
+  survivorId: string,
+  mergedRows: readonly EmailMessagePersonRow[],
+): Promise<EmailMessagePersonRow[]> {
+  if (!mergedRows.length) return [];
+  const emailMessageIds = [...new Set(mergedRows.map((r) => r.emailMessageId))];
+  const rows = await tx.select().from(emailMessagePerson).where(survivorEmailMessagePersonCondition(survivorId, emailMessageIds));
+  return rows.map(toEmailMessagePersonRow);
+}
+
+async function readQueueItemRowsOnPerson(tx: DbTransaction, personId: string): Promise<FollowUpQueueItemRow[]> {
+  const rows = await tx.select().from(followUpQueueItem).where(eq(followUpQueueItem.personId, personId));
+  return rows.map(toQueueItemRow);
+}
+
+/** Only the survivor's rows that COULD collide (same bdId+queueDate as one of merged's rows) — bounded by merged's own (small) row count. */
+async function readSurvivorQueueItemRows(
+  tx: DbTransaction,
+  survivorId: string,
+  mergedRows: readonly FollowUpQueueItemRow[],
+): Promise<FollowUpQueueItemRow[]> {
+  if (!mergedRows.length) return [];
+  const bdIds = [...new Set(mergedRows.map((r) => r.bdId))];
+  const queueDates = [...new Set(mergedRows.map((r) => r.queueDate))];
+  const rows = await tx.select().from(followUpQueueItem).where(survivorQueueItemCondition(survivorId, bdIds, queueDates));
+  return rows.map(toQueueItemRow);
 }
 
 async function readIdMapRowsOnPerson(tx: DbTransaction, personId: string): Promise<MergeIdMapRow[]> {
@@ -201,15 +282,33 @@ export async function mergeContacts(
     if (survivorRow.mergedIntoId) throw new Error("Merge refused: survivor is already merged into another person");
     if (mergedRow.mergedIntoId) throw new Error("Merge refused: merged person is already merged into another person");
 
-    const [survivorConnections, mergedConnections, referencesOnMerged, idMapRowsOnMerged, duplicateCandidatesInvolvingMerged, survivorPairedPersonIds] =
-      await Promise.all([
-        tx.select().from(personBdConnection).where(eq(personBdConnection.personId, survivorId)),
-        tx.select().from(personBdConnection).where(eq(personBdConnection.personId, mergedId)),
-        readReferencesOnPerson(tx, mergedId),
-        readIdMapRowsOnPerson(tx, mergedId),
-        readDuplicateCandidatesInvolving(tx, mergedId),
-        readSurvivorPairedPersonIds(tx, survivorId, mergedId),
-      ]);
+    const [
+      survivorConnections,
+      mergedConnections,
+      referencesOnMerged,
+      idMapRowsOnMerged,
+      duplicateCandidatesInvolvingMerged,
+      survivorPairedPersonIds,
+      emailMessagePersonRowsOnMerged,
+      queueItemRowsOnMerged,
+    ] = await Promise.all([
+      tx.select().from(personBdConnection).where(eq(personBdConnection.personId, survivorId)),
+      tx.select().from(personBdConnection).where(eq(personBdConnection.personId, mergedId)),
+      readReferencesOnPerson(tx, mergedId),
+      readIdMapRowsOnPerson(tx, mergedId),
+      readDuplicateCandidatesInvolving(tx, mergedId),
+      readSurvivorPairedPersonIds(tx, survivorId, mergedId),
+      readEmailMessagePersonRowsOnPerson(tx, mergedId),
+      readQueueItemRowsOnPerson(tx, mergedId),
+    ]);
+
+    // Only the survivor's rows that COULD collide with merged's (same
+    // emailMessageId / bdId+queueDate) — cannot run in the Promise.all above
+    // since it needs merged's rows first to know which ones to look up.
+    const [survivorEmailMessagePersonRows, survivorQueueItemRows] = await Promise.all([
+      readSurvivorEmailMessagePersonRows(tx, survivorId, emailMessagePersonRowsOnMerged),
+      readSurvivorQueueItemRows(tx, survivorId, queueItemRowsOnMerged),
+    ]);
 
     const plan = planMerge({
       survivor: toMergeFields(survivorRow),
@@ -220,6 +319,10 @@ export async function mergeContacts(
       idMapRowsOnMerged,
       duplicateCandidatesInvolvingMerged,
       survivorPairedPersonIds,
+      emailMessagePersonRowsOnMerged,
+      survivorEmailMessagePersonRows,
+      queueItemRowsOnMerged,
+      survivorQueueItemRows,
     });
 
     await tx
@@ -247,6 +350,57 @@ export async function mergeContacts(
 
     await repointReferences(tx, plan.referencesToRepoint, survivorId);
     await repointIdMapRows(tx, plan.idMapRowsToRepoint, survivorId);
+
+    // Bugfix: email_message_person was never repointed, silently hiding a
+    // merged-away person's synced Gmail messages (both read paths filter
+    // person_id directly, no chain-resolve). No collision: simple repoint by
+    // id. Collision (both persons already linked to the same message): keep
+    // survivor's row id, only overwrite matchedEmail+matchConfidence when
+    // merged's confidence wins (see planEmailMessagePersonRepoints), then
+    // drop merged's now-redundant row.
+    if (plan.emailMessagePersonRowsToRepoint.length) {
+      await tx
+        .update(emailMessagePerson)
+        .set({ personId: survivorId })
+        .where(inArray(emailMessagePerson.id, plan.emailMessagePersonRowsToRepoint.map((r) => r.id)));
+    }
+    for (const collision of plan.emailMessagePersonCollisions) {
+      const changed =
+        collision.winner.matchedEmail !== collision.survivorOriginal.matchedEmail ||
+        collision.winner.matchConfidence !== collision.survivorOriginal.matchConfidence;
+      if (changed) {
+        await tx
+          .update(emailMessagePerson)
+          .set({ matchedEmail: collision.winner.matchedEmail, matchConfidence: collision.winner.matchConfidence })
+          .where(eq(emailMessagePerson.id, collision.survivorOriginal.id));
+      }
+      await tx.delete(emailMessagePerson).where(eq(emailMessagePerson.id, collision.mergedOriginal.id));
+    }
+
+    // Bugfix companion: follow_up_queue_item was never repointed either
+    // (latent today — both its write and read paths filter
+    // isNull(person.mergedIntoId)). No collision: simple repoint by id.
+    // Collision (both persons already had a row for the same BD/day): keep
+    // survivor's row id and its own position/dueStatus/lastTouchAt; only
+    // state/snoozedUntil can move, and only to avoid resurrecting a decided
+    // state as pending (see planQueueItemRepoints) — then drop merged's
+    // now-redundant row.
+    if (plan.queueItemRowsToRepoint.length) {
+      await tx
+        .update(followUpQueueItem)
+        .set({ personId: survivorId })
+        .where(inArray(followUpQueueItem.id, plan.queueItemRowsToRepoint.map((r) => r.id)));
+    }
+    for (const collision of plan.queueItemCollisions) {
+      const changed = collision.winner.state !== collision.survivorOriginal.state || collision.winner.snoozedUntil !== collision.survivorOriginal.snoozedUntil;
+      if (changed) {
+        await tx
+          .update(followUpQueueItem)
+          .set({ state: collision.winner.state, snoozedUntil: collision.winner.snoozedUntil, updatedAt: new Date() })
+          .where(eq(followUpQueueItem.id, collision.survivorOriginal.id));
+      }
+      await tx.delete(followUpQueueItem).where(eq(followUpQueueItem.id, collision.mergedOriginal.id));
+    }
 
     for (const id of plan.duplicateCandidatesToDrop) {
       await tx.delete(duplicateCandidate).where(eq(duplicateCandidate.id, id));
@@ -330,10 +484,26 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
     ]);
     const currentSurvivorConnections = currentSurvivorConnectionRows.map(toMergeConnection);
 
+    // Current values of the survivor rows THIS merge's collisions touched —
+    // same safe-revert check as connections above (only undo if nothing has
+    // changed the winner's value since).
+    const emailMessagePersonSurvivorIds = snapshot.emailMessagePersonCollisions.map((c) => c.survivorOriginal.id);
+    const queueItemSurvivorIds = snapshot.queueItemCollisions.map((c) => c.survivorOriginal.id);
+    const [currentSurvivorEmailMessagePersonRows, currentSurvivorQueueItemRows] = await Promise.all([
+      emailMessagePersonSurvivorIds.length
+        ? tx.select().from(emailMessagePerson).where(inArray(emailMessagePerson.id, emailMessagePersonSurvivorIds))
+        : Promise.resolve([]),
+      queueItemSurvivorIds.length
+        ? tx.select().from(followUpQueueItem).where(inArray(followUpQueueItem.id, queueItemSurvivorIds))
+        : Promise.resolve([]),
+    ]);
+
     const plan = planUnmerge(snapshot, {
       currentSurvivor: toMergeFields(survivorRow),
       currentSurvivorConnections,
       laterConflictBdIds,
+      currentSurvivorEmailMessagePersonRows: currentSurvivorEmailMessagePersonRows.map(toEmailMessagePersonRow),
+      currentSurvivorQueueItemRows: currentSurvivorQueueItemRows.map(toQueueItemRow),
     });
 
     if (plan.survivorFieldReverts.length) {
@@ -392,6 +562,61 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
 
     await repointReferences(tx, plan.referencesToRepointBack, event.mergedId);
     await repointIdMapRows(tx, plan.idMapRowsToRepointBack, event.mergedId);
+
+    // No-collision rows: repoint personId back onto merged by id (never touched beyond that column, same as references above).
+    if (plan.emailMessagePersonIdsToRepointBack.length) {
+      await tx
+        .update(emailMessagePerson)
+        .set({ personId: event.mergedId })
+        .where(inArray(emailMessagePerson.id, [...plan.emailMessagePersonIdsToRepointBack]));
+    }
+    // Collisions: merged's dropped row is always re-inserted (it was deleted
+    // to resolve the unique-constraint collision, so nothing else could have
+    // touched it); survivor's row is reverted only if the merge actually
+    // changed it AND nothing has changed it again since.
+    for (const restore of plan.emailMessagePersonRestores) {
+      await tx.insert(emailMessagePerson).values({
+        id: restore.mergedOriginal.id,
+        emailMessageId: restore.mergedOriginal.emailMessageId,
+        personId: event.mergedId,
+        matchedEmail: restore.mergedOriginal.matchedEmail,
+        matchConfidence: restore.mergedOriginal.matchConfidence,
+      });
+      if (restore.survivorRevert) {
+        await tx
+          .update(emailMessagePerson)
+          .set({ matchedEmail: restore.survivorRevert.matchedEmail, matchConfidence: restore.survivorRevert.matchConfidence })
+          .where(eq(emailMessagePerson.id, restore.survivorRevert.id));
+      }
+    }
+
+    if (plan.queueItemIdsToRepointBack.length) {
+      await tx
+        .update(followUpQueueItem)
+        .set({ personId: event.mergedId })
+        .where(inArray(followUpQueueItem.id, [...plan.queueItemIdsToRepointBack]));
+    }
+    for (const restore of plan.queueItemRestores) {
+      await tx.insert(followUpQueueItem).values({
+        id: restore.mergedOriginal.id,
+        bdId: restore.mergedOriginal.bdId,
+        personId: event.mergedId,
+        queueDate: restore.mergedOriginal.queueDate,
+        position: restore.mergedOriginal.position,
+        dueStatus: restore.mergedOriginal.dueStatus,
+        lastTouchAt: restore.mergedOriginal.lastTouchAt,
+        state: restore.mergedOriginal.state,
+        snoozedUntil: restore.mergedOriginal.snoozedUntil,
+        createdAt: restore.mergedOriginal.createdAt,
+        updatedAt: restore.mergedOriginal.updatedAt,
+      });
+      if (restore.survivorRevert) {
+        await tx
+          .update(followUpQueueItem)
+          .set({ state: restore.survivorRevert.state, snoozedUntil: restore.survivorRevert.snoozedUntil, updatedAt: new Date() })
+          .where(eq(followUpQueueItem.id, restore.survivorRevert.id));
+      }
+    }
 
     for (const c of plan.duplicateCandidatesToRestore) {
       await tx

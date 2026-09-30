@@ -72,5 +72,9 @@ export function previewMergeOutcome(input: DuplicatePairPreviewInput): MergePlan
     idMapRowsOnMerged: [],
     duplicateCandidatesInvolvingMerged: [],
     survivorPairedPersonIds: [],
+    emailMessagePersonRowsOnMerged: [],
+    survivorEmailMessagePersonRows: [],
+    queueItemRowsOnMerged: [],
+    survivorQueueItemRows: [],
   });
 }
