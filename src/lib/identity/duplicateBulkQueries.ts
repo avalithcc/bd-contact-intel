@@ -40,6 +40,12 @@ export async function loadOpenDuplicatePairsForTiering(): Promise<DuplicatePairP
     })
     .from(duplicateCandidate)
     .where(eq(duplicateCandidate.status, "open"))
+    // ORDER BY is required alongside LIMIT: without it, if the queue ever
+    // reaches MAX_OPEN_PAIRS, Postgres is free to return an arbitrary subset
+    // that can differ run to run (silent, non-deterministic truncation).
+    // Ordering by id makes which pairs get cut (if it ever comes to that)
+    // deterministic and stable across runs.
+    .orderBy(duplicateCandidate.id)
     .limit(MAX_OPEN_PAIRS);
 
   if (candidates.length === 0) return [];

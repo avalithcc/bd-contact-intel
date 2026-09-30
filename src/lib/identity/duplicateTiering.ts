@@ -19,19 +19,19 @@
  * - "two_emails_same_mailbox": both sides have an email, BOTH are
  *   `emailStatus === "verified"`, the raw strings differ, but they're the
  *   same mailbox written two different ways — `.com` vs a ccTLD suffix
- *   (`.com.ar`), a dot/underscore/dash separator difference, a
- *   middle-initial token, or an accented character. Routed to "safe" (see
- *   isSameMailbox). The verified-only gate is deliberate: unverified
- *   addresses in this database are largely inferred/deduced, not observed,
- *   which is exactly where a string heuristic is least trustworthy — an
- *   unverified pair that merely LOOKS like the same mailbox still falls
- *   through to "two_emails_differ_unverified" (review), never
- *   auto-merged. This bucket exists BECAUSE two verified, differing emails
- *   do not reliably mean two different real people: of the 6 production
- *   pairs that used to land in "two_emails_differ_verified", 4 were the
- *   same person —
+ *   (`.com.ar`), a middle-initial token, or an accented character. Routed to
+ *   "safe" (see classifyMailboxMatch's "exact" and "initials" results). The
+ *   verified-only gate is deliberate: unverified addresses in this database
+ *   are largely inferred/deduced, not observed, which is exactly where a
+ *   string heuristic is least trustworthy — an unverified pair that merely
+ *   LOOKS like the same mailbox still falls through to
+ *   "two_emails_differ_unverified" (review), never auto-merged. This bucket
+ *   exists BECAUSE two verified, differing emails do not reliably mean two
+ *   different real people: of the 6 production pairs that used to land in
+ *   "two_emails_differ_verified", 4 were the same person —
  *   `abresciani@rappachiani.com` / `abresciani@rappachiani.com.ar` (ccTLD),
- *   `juanmontanaro@jpmorgan.com` / `juan.montanaro@jpmorgan.com` (dot),
+ *   `juanmontanaro@jpmorgan.com` / `juan.montanaro@jpmorgan.com` (dot — see
+ *   "two_emails_same_mailbox_ambiguous" below, this exact pair moved there),
  *   `javier.astort@wolox.com.ar` / `javier.s.astort@wolox.com.ar` (middle initial),
  *   `martín.medina@ladonware.com` / `martin.medina@ladonware.com` (accent).
  *   Merging is safe here even though `mergeEmailFields` (merge.ts) discards
@@ -42,6 +42,26 @@
  *   when exactly one local part is non-ASCII and the other is plain ASCII
  *   (an accented local part is a HubSpot-import data-entry artifact, not a
  *   different mailbox) — see the accent-survivor override below.
+ * - "two_emails_same_mailbox_ambiguous": both sides have an email, both are
+ *   `emailStatus === "verified"`, and the ONLY reason they were flagged as
+ *   the same mailbox is classifyMailboxMatch's "sole-token" result (one side
+ *   has no separator at all, so it's read as the concatenation of the
+ *   other side's tokens). Routed to "review", not "safe", because that rule
+ *   is NOT transitive: a no-separator local part accepts EVERY split of the
+ *   same character sequence, so e.g. `marcostrillo` matches BOTH
+ *   `marco.strillo` and `marcos.trillo` even though a direct comparison of
+ *   those two (`marcos.trillo` vs `marco.strillo`) is false — two different
+ *   real people. An equality relation that isn't transitive means the
+ *   "sole-token" evidence is real but not conclusive on its own, so a human
+ *   confirms it instead of either side of the binary: NOT "safe" (an
+ *   auto-merge could combine two different people on the strength of a
+ *   single ambiguous rule) and NOT "dismiss" either (deleting the rule
+ *   entirely and falling through to "two_emails_differ_verified" would
+ *   permanently mark a genuine match as not-a-duplicate, which is the
+ *   original bug this whole module exists to fix, and `--revert` cannot
+ *   undo a dismissal). A pair matched by identical token sequences or by the
+ *   middle-initial rule carries agreeing boundary information on both sides
+ *   and is not ambiguous in this way, so it stays in "two_emails_same_mailbox".
  * - "two_emails_differ_verified" / "two_emails_differ_unverified": both
  *   sides have an email, they differ, and they are NOT the same mailbox
  *   (isSameMailbox is false) — this is left as "dismiss" only when both
@@ -57,7 +77,8 @@
  * Tiers: "safe" (same_email, classic_split_no_conflict,
  * two_emails_same_mailbox) is what `--tier=safe` merges; "dismiss"
  * (two_emails_differ_verified) is what `--tier=dismiss` marks
- * not-a-duplicate; everything else is "review" and this script never
+ * not-a-duplicate; everything else — including
+ * "two_emails_same_mailbox_ambiguous" — is "review" and this script never
  * touches it.
  *
  * Transitive chains (A-B, B-C sharing person B) are never merged by this
@@ -69,7 +90,7 @@
  * ever written by this script, so there's nothing to leave half-done.
  */
 import { chooseDefaultSurvivor, type SurvivorCandidate } from "@/lib/identity/duplicateReviewView";
-import type { EmailStatus } from "@/lib/identity/matcher";
+import { emailStatusRank, type EmailStatus } from "@/lib/identity/matcher";
 
 // --- Bucket classification --------------------------------------------------
 
@@ -79,6 +100,7 @@ export type DuplicatePairBucket =
   | "classic_split_conflict"
   | "one_email_not_classic"
   | "two_emails_same_mailbox"
+  | "two_emails_same_mailbox_ambiguous"
   | "two_emails_differ_verified"
   | "two_emails_differ_unverified"
   | "no_email_titles_agree"
@@ -150,56 +172,67 @@ export function normalizeLocalPart(local: string): string[] {
 }
 
 /**
- * True when two raw email addresses are the same mailbox written two
- * different ways: same organization domain (see sameOrganizationDomain) and
- * either (a) the local-part tokens are boundary-equivalent (see below), or
- * (b) dropping every single-character token from both sides leaves identical
- * token sequences AND both sides still have at least 2 tokens (covers a
- * middle initial like `javier.astort` / `javier.s.astort`). The >=2-token
- * floor on rule B is what stops `j.smith` from matching bare `smith` — a
- * single initial with nothing else left is too little evidence to call it
- * the same mailbox.
+ * Which rule (if any) established that two raw email addresses are the same
+ * mailbox written two different ways:
+ *   - "none": not the same mailbox (different domain, or local-part tokens
+ *     that neither match exactly nor satisfy the initials rule).
+ *   - "exact": the two normalized local-part token sequences are identical
+ *     (same length, same tokens, same order) — e.g. `abresciani` vs
+ *     `abresciani` (ccTLD-only domain difference), or `martin.medina` vs
+ *     `martin.medina` (post-accent-strip). Both sides carry the same
+ *     boundary information, so this is unambiguous.
+ *   - "initials": dropping every single-character token from both sides
+ *     leaves identical token sequences AND both sides still have at least 2
+ *     tokens (covers a middle initial like `javier.astort` /
+ *     `javier.s.astort`). The >=2-token floor is what stops `j.smith` from
+ *     matching bare `smith` — a single initial with nothing else left is too
+ *     little evidence to call it the same mailbox. Also unambiguous: both
+ *     sides agree on every surviving token boundary.
+ *   - "sole-token": exactly one side has a single token (no separator at
+ *     all), and that token equals the other side's tokens concatenated with
+ *     no separator — e.g. `juanmontanaro` (one token) vs `juan.montanaro`
+ *     (two tokens). Deliberately boundary-INSENSITIVE, unlike "exact"/
+ *     "initials": a side with NO separator supplies no boundary information
+ *     to contradict, so concatenating is the only reading available for it.
  *
- * Rule A ("boundary-equivalent") is intentionally boundary-SENSITIVE, unlike
- * a naive `tokensA.join("") === tokensB.join("")` (that version made
- * `marcos.trillo` / `marco.strillo` and `ana.maria` / `an.amaria` — four
- * different real people, two false-positive pairs — compare equal, since
- * joining erases exactly the separator position that tells them apart). Rule
- * A now holds only when EITHER:
- *   - the two normalized token sequences are identical (same length, same
- *     tokens, same order) — e.g. `abresciani` vs `abresciani` (ccTLD-only
- *     difference), or `martin.medina` vs `martin.medina` (post-accent-strip); or
- *   - exactly one side has a single token, and that token equals the other
- *     side's tokens concatenated with no separator — e.g. `juanmontanaro`
- *     (one token, no separator at all) vs `juan.montanaro` (two tokens).
- * The asymmetry is deliberate: a side with NO separator supplies no boundary
- * information to contradict, so concatenating is the only reading available
- * for it. But once BOTH sides carry a separator, their token boundaries must
- * agree — disagreeing boundaries (`marcos.trillo` vs `marco.strillo`) are
- * positive evidence of two different names, not noise to erase.
+ * "sole-token" is NOT transitive, and that is exactly why callers must be
+ * able to tell it apart from "exact"/"initials" instead of folding it into
+ * one boolean. A no-separator local part accepts EVERY split of the same
+ * character sequence: `marcostrillo` matches BOTH `marco.strillo` AND
+ * `marcos.trillo` via "sole-token", even though comparing those two
+ * DIRECTLY (`marcos.trillo` vs `marco.strillo`, both separated) is "none" —
+ * four different real people, and disagreeing boundaries on both separated
+ * sides are positive evidence of two different names, not noise to erase
+ * (this is also why "exact"/"initials" never use a naive
+ * `tokensA.join("") === tokensB.join("")`: that version made
+ * `marcos.trillo`/`marco.strillo` and `ana.maria`/`an.amaria` compare equal,
+ * since joining erases exactly the separator position that tells them
+ * apart). Because "sole-token" evidence is real but not conclusive on its
+ * own, classifyDuplicatePairBucket routes a pair matched ONLY by
+ * "sole-token" to "review" ("two_emails_same_mailbox_ambiguous"), not to
+ * "safe" alongside "exact"/"initials" — see that bucket's doc comment above.
  */
-export function isSameMailbox(emailA: string, emailB: string): boolean {
+export type MailboxMatchRule = "none" | "exact" | "initials" | "sole-token";
+
+export function classifyMailboxMatch(emailA: string, emailB: string): MailboxMatchRule {
   const atA = emailA.lastIndexOf("@");
   const atB = emailB.lastIndexOf("@");
-  if (atA < 0 || atB < 0) return false;
+  if (atA < 0 || atB < 0) return "none";
 
   const localA = emailA.slice(0, atA);
   const domainA = emailA.slice(atA + 1);
   const localB = emailB.slice(0, atB);
   const domainB = emailB.slice(atB + 1);
-  if (!localA || !domainA || !localB || !domainB) return false;
+  if (!localA || !domainA || !localB || !domainB) return "none";
 
-  if (!sameOrganizationDomain(domainA, domainB)) return false;
+  if (!sameOrganizationDomain(domainA, domainB)) return "none";
 
   const tokensA = normalizeLocalPart(localA);
   const tokensB = normalizeLocalPart(localB);
-  if (tokensA.length === 0 || tokensB.length === 0) return false;
+  if (tokensA.length === 0 || tokensB.length === 0) return "none";
 
   const sameSequence = tokensA.length === tokensB.length && tokensA.every((token, i) => token === tokensB[i]);
-  const soleTokenMatchesConcatenation =
-    (tokensA.length === 1 && tokensA[0] === tokensB.join("")) ||
-    (tokensB.length === 1 && tokensB[0] === tokensA.join(""));
-  const ruleA = sameSequence || soleTokenMatchesConcatenation;
+  if (sameSequence) return "exact";
 
   // Drop single-character tokens (middle initials) from both sides before
   // comparing. The >=2 floor applies AFTER dropping: if either side is left
@@ -209,13 +242,30 @@ export function isSameMailbox(emailA: string, emailB: string): boolean {
   // sides).
   const withoutInitialsA = tokensA.filter((t) => t.length > 1);
   const withoutInitialsB = tokensB.filter((t) => t.length > 1);
-  const ruleB =
+  const initialsMatch =
     withoutInitialsA.length >= 2 &&
     withoutInitialsB.length >= 2 &&
     withoutInitialsA.length === withoutInitialsB.length &&
     withoutInitialsA.every((t, i) => t === withoutInitialsB[i]);
+  if (initialsMatch) return "initials";
 
-  return ruleA || ruleB;
+  const soleTokenMatchesConcatenation =
+    (tokensA.length === 1 && tokensA[0] === tokensB.join("")) ||
+    (tokensB.length === 1 && tokensB[0] === tokensA.join(""));
+  if (soleTokenMatchesConcatenation) return "sole-token";
+
+  return "none";
+}
+
+/**
+ * Boolean wrapper over classifyMailboxMatch, for callers that only need to
+ * know whether two addresses are the same mailbox written two different
+ * ways, not WHICH rule established it. classifyDuplicatePairBucket uses
+ * classifyMailboxMatch directly instead, because it needs to route
+ * "sole-token" matches differently (see classifyMailboxMatch's doc comment).
+ */
+export function isSameMailbox(emailA: string, emailB: string): boolean {
+  return classifyMailboxMatch(emailA, emailB) !== "none";
 }
 
 // --- Non-ASCII local-part detection (defect 3: accent-survivor override) ---
@@ -238,8 +288,6 @@ export function hasNonAsciiLocalPart(email: string): boolean {
 
 // --- Email-winner mirror (defect 4: dry-run property-loss line) ------------
 
-const EMAIL_STATUS_RANK: Record<EmailStatus, number> = { verified: 2, probable: 1, none: 0 };
-
 /**
  * Mirrors merge.ts's private `mergeEmailFields` winner rule (rank by
  * emailStatus, survivor wins ties) WITHOUT touching merge.ts — this file
@@ -247,6 +295,10 @@ const EMAIL_STATUS_RANK: Record<EmailStatus, number> = { verified: 2, probable: 
  * scripts/merge-duplicates.ts's dry run can describe in advance which email
  * a merge will discard and never disagree with what `planMerge` actually
  * does. If `mergeEmailFields`'s rule ever changes, this must change with it.
+ * Uses matcher.ts's shared `emailStatusRank` rather than a local copy of the
+ * rank table, so this can't drift from the definition `mergeEmailFields`
+ * itself is mirroring (matcher.ts and merge.ts each already have their own
+ * copy; this is deliberately not a third).
  */
 export function pickEmailWinnerSide(
   survivor: { email: string | null; emailStatus: EmailStatus },
@@ -257,7 +309,7 @@ export function pickEmailWinnerSide(
   if (survivorHas && !mergedHas) return "survivor";
   if (mergedHas && !survivorHas) return "merged";
   if (!survivorHas && !mergedHas) return "survivor";
-  return EMAIL_STATUS_RANK[merged.emailStatus] > EMAIL_STATUS_RANK[survivor.emailStatus] ? "merged" : "survivor";
+  return emailStatusRank(merged.emailStatus) > emailStatusRank(survivor.emailStatus) ? "merged" : "survivor";
 }
 
 export function classifyDuplicatePairBucket(
@@ -286,7 +338,14 @@ export function classifyDuplicatePairBucket(
     // unverified pair that merely looks like the same mailbox still needs a
     // human (falls through to the verified/unverified split below), never
     // auto-merges.
-    if (bothVerified && isSameMailbox(a.email as string, b.email as string)) return "two_emails_same_mailbox";
+    if (bothVerified) {
+      const mailboxMatch = classifyMailboxMatch(a.email as string, b.email as string);
+      // "sole-token" is not transitive (see classifyMailboxMatch's doc
+      // comment) — real evidence, but not conclusive on its own, so it goes
+      // to review rather than being treated the same as "exact"/"initials".
+      if (mailboxMatch === "exact" || mailboxMatch === "initials") return "two_emails_same_mailbox";
+      if (mailboxMatch === "sole-token") return "two_emails_same_mailbox_ambiguous";
+    }
     return bothVerified ? "two_emails_differ_verified" : "two_emails_differ_unverified";
   }
 
@@ -426,6 +485,7 @@ const ALL_BUCKETS: readonly DuplicatePairBucket[] = [
   "classic_split_conflict",
   "one_email_not_classic",
   "two_emails_same_mailbox",
+  "two_emails_same_mailbox_ambiguous",
   "two_emails_differ_verified",
   "two_emails_differ_unverified",
   "no_email_titles_agree",
