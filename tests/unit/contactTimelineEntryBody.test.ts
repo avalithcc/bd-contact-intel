@@ -91,6 +91,33 @@ test("entryBody for 'call' with no duration/notes falls back to the default call
   assert.equal(body, "Call logged.");
 });
 
+// --- email_sent: metadata.to as a string (manually composed) vs. an array
+// (synced thread message — buildSyncedActivities.ts's SyncedActivityMetadata
+// always writes `to` as string[]) ------------------------------------------
+
+test("entryBody for 'email_sent' with metadata.to as a plain string (manually composed send)", () => {
+  const body = entryBody(entry({ type: "email_sent", metadata: { to: "jane@prospect.com" } }), labels());
+  assert.equal(body, "Email sent to jane@prospect.com");
+});
+
+test("entryBody for 'email_sent' with metadata.to as a string[] (synced thread message) joins every address", () => {
+  const body = entryBody(
+    entry({ type: "email_sent", metadata: { to: ["jane@prospect.com", "john@prospect.com"] } }),
+    labels(),
+  );
+  assert.equal(body, "Email sent to jane@prospect.com, john@prospect.com");
+});
+
+test("entryBody for 'email_sent' with a single-address array still renders that one address", () => {
+  const body = entryBody(entry({ type: "email_sent", metadata: { to: ["jane@prospect.com"] } }), labels());
+  assert.equal(body, "Email sent to jane@prospect.com");
+});
+
+test("entryBody for 'email_sent' with no usable recipient falls back to the bare prefix", () => {
+  assert.equal(entryBody(entry({ type: "email_sent", metadata: {} }), labels()), "Email sent to");
+  assert.equal(entryBody(entry({ type: "email_sent", metadata: { to: [] } }), labels()), "Email sent to");
+});
+
 // --- reply_received (email-sync brief follow-up review) --------------------
 
 test("entryBody for 'reply_received' shows subject and sender address, same layout email_sent uses", () => {

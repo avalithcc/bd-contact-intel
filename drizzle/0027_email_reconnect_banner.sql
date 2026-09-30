@@ -1,0 +1,1 @@
+ALTER TABLE "email_account" ADD COLUMN "reconnect_banner_dismissed_at" timestamp;

@@ -39,7 +39,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, followUpQueueItem, person, task } from "@/db/schema";
+import { activity, emailAccount, followUpQueueItem, person, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 
 /** Raw-SQL-text twin of queueSelection.ts#workedTodayAtSql() — see this file's doc comment for why it can't reuse that helper via interpolation here. */
@@ -102,6 +102,21 @@ export function buildAppShellBadgeCountsQuery({
               and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} >= ${todayStartUtcIso}::timestamptz
               and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} < ${tomorrowStartUtcIso}::timestamptz
           )
-      ) as follow_up_count
+      ) as follow_up_count,
+      (
+        -- Reconnect banner (email-sync.html screen 4) — piggybacked onto
+        -- this SAME single round trip (PERFORMANCE.md) rather than a
+        -- second query in AppLayout. Returns the raw columns
+        -- shouldShowReconnectBanner() needs, not a precomputed boolean, so
+        -- that pure function (already unit-tested) stays the one place the
+        -- actual rule lives.
+        select json_build_object(
+          'status', email_account.status,
+          'grantedScopes', email_account.granted_scopes,
+          'dismissedAt', email_account.reconnect_banner_dismissed_at
+        )
+        from ${emailAccount}
+        where email_account.bd_id = ${bdId}::uuid
+      ) as email_account_banner_state
   `;
 }

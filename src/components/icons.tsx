@@ -307,6 +307,27 @@ export function CloseIcon({ className }: { className?: string }) {
   );
 }
 
+// Gmail reconnect CTA (email-sync.html:243,255 "Reconectar Gmail" button).
+export function LinkIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </Svg>
+  );
+}
+
+// "Ver en Gmail" (email-sync.html:155) — opens the synced thread in a new tab.
+export function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+    </Svg>
+  );
+}
+
 // "Pegar señal" quick action (mockup-port r02) — not in either approved
 // mockup's 5-action row (intentional superset, kept per owner decision);
 // a clipboard glyph distinguishes it from the note icon it previously

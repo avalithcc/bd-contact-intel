@@ -22,6 +22,28 @@ export interface SyncableAccount {
   refreshTokenEncrypted: string;
   historyId: string | null;
   backfillPageToken: string | null;
+  // Only populated (and only needed) by getSyncableAccountForBd — the
+  // manual "Sincronizar ahora" cooldown check (syncCooldown.ts). The cron
+  // path (getSyncableAccounts) never reads this field.
+  lastSyncedAt: Date | null;
+}
+
+function toSyncableAccount(r: {
+  bdId: string;
+  emailAddress: string;
+  refreshTokenEncrypted: string;
+  historyId: string | null;
+  backfillPageToken: string | null;
+  lastSyncedAt?: Date | null;
+}): SyncableAccount {
+  return {
+    bdId: r.bdId,
+    bdEmail: r.emailAddress,
+    refreshTokenEncrypted: r.refreshTokenEncrypted,
+    historyId: r.historyId,
+    backfillPageToken: r.backfillPageToken,
+    lastSyncedAt: r.lastSyncedAt ?? null,
+  };
 }
 
 /** Connected accounts that hold the readonly scope this feature needs — a pre-readonly connection is skipped, not retried, until the BD reconnects. */
@@ -42,13 +64,35 @@ export async function getSyncableAccounts(): Promise<SyncableAccount[]> {
     .filter((r): r is typeof r & { refreshTokenEncrypted: string } =>
       Boolean(r.refreshTokenEncrypted) && !needsReconnectForSync(r.grantedScopes),
     )
-    .map((r) => ({
-      bdId: r.bdId,
-      bdEmail: r.emailAddress,
-      refreshTokenEncrypted: r.refreshTokenEncrypted,
-      historyId: r.historyId,
-      backfillPageToken: r.backfillPageToken,
-    }));
+    .map(toSyncableAccount);
+}
+
+/**
+ * Same eligibility rule as `getSyncableAccounts`, scoped to one BD — backs
+ * the "Sincronizar ahora" button (email-sync.html:249): a BD can only ever
+ * trigger their OWN account's sync, and only when it's actually eligible
+ * (connected, readonly-scoped, has a refresh token) — the same guard the
+ * cron already enforces, checked again here since a manual trigger is a
+ * second, BD-initiated entry point into the same write path. Also returns
+ * `lastSyncedAt` (fresh-review fix, 2026-10-01) so the caller can run the
+ * server-side cooldown check (syncCooldown.ts) without a second round trip.
+ */
+export async function getSyncableAccountForBd(bdId: string): Promise<SyncableAccount | null> {
+  const [row] = await db
+    .select({
+      bdId: emailAccount.bdId,
+      emailAddress: emailAccount.emailAddress,
+      refreshTokenEncrypted: emailAccount.refreshTokenEncrypted,
+      historyId: emailAccount.historyId,
+      backfillPageToken: emailAccount.backfillPageToken,
+      grantedScopes: emailAccount.grantedScopes,
+      lastSyncedAt: emailAccount.lastSyncedAt,
+    })
+    .from(emailAccount)
+    .where(and(eq(emailAccount.bdId, bdId), eq(emailAccount.status, "connected")));
+
+  if (!row || !row.refreshTokenEncrypted || needsReconnectForSync(row.grantedScopes)) return null;
+  return toSyncableAccount({ ...row, refreshTokenEncrypted: row.refreshTokenEncrypted });
 }
 
 /** CRM persons matching any of `addresses` — bounded to exactly the addresses this sync run's messages mention, never the whole 26k-row table (PERFORMANCE.md). */

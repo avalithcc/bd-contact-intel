@@ -175,6 +175,8 @@ kbd, .kbd {
 .btn-sm.btn-icon { width: var(--control-height-sm); }
 .btn .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ds-spin 0.8s linear infinite; }
 @keyframes ds-spin { to { transform: rotate(360deg); } }
+/* Standalone spinner outside a `.btn` (email-sync.html's first-sync `.alert-info` — Account decision 6/7 sibling: same keyframes, no button chrome). */
+.spinner-standalone { display: inline-block; width: 16px; height: 16px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ds-spin 0.8s linear infinite; }
 .btn-group { display: inline-flex; }
 .btn-group .btn { border-radius: 0; }
 .btn-group .btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
@@ -485,10 +487,32 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .tl-body { margin-top: var(--space-2xs); font-size: var(--text-base); color: var(--color-ink-soft); }
 .tl-body blockquote { margin: var(--space-sm) 0 0; padding-left: var(--space-md); border-left: 2px solid var(--color-border-strong); color: var(--color-ink); }
 .thread { margin-top: var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
-.thread-msg { display: grid; grid-template-columns: 22px 1fr auto; gap: var(--space-sm); align-items: start; padding: var(--space-sm) var(--space-md); font-size: var(--text-base); }
+/* email-sync.html:49 (README decision 7 sign-off): avatar | content, one
+   proper head row (name + direction badge + right-aligned nowrap time) —
+   was `22px 1fr auto` for a single-line snippet + trailing `.meta` column;
+   now every `.thread-msg` renders a full message (Timeline.tsx's synced
+   thread view), so the trailing column folds into the head row instead.
+   AdminConversationReveal.tsx's OWN `.thread-msg` (LinkedIn conversation
+   reveal) is currently unreferenced/dormant (LinkedIn ingestion is off) —
+   whoever restores it should update its markup to the same avatar+content
+   shape rather than relying on the old 3-column grid. */
+.thread-msg { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-sm); font-size: var(--text-base); }
 .thread-msg + .thread-msg { border-top: 1px solid var(--color-border); }
 .thread-msg .from { font-weight: 600; }
-.thread-msg .snippet { color: var(--color-ink-soft); }
+.thread-msg .snippet { color: var(--color-ink-soft); margin-top: var(--space-2xs); }
+.thread-msg-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: nowrap; min-width: 0; }
+.thread-msg-head .who { display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.thread-msg-head .who .from { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-msg-head .when { margin-left: auto; flex: none; white-space: nowrap; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.thread-msg .recipient { display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-msg .status-marker { display: inline-flex; margin-top: var(--space-2xs); }
+/* Quoted-text collapse (email-sync.html:32-43; README decision 7). */
+.quoted-toggle { display: inline-flex; align-items: center; gap: var(--space-2xs); margin-top: var(--space-2xs); background: none; border: 0; padding: 0; font: 500 var(--text-sm) var(--font-body); color: var(--color-ink-subtle); cursor: pointer; }
+.quoted-toggle:hover { color: var(--color-ink); }
+.quoted-toggle .icon { transition: transform 0.15s ease; }
+.quoted-toggle[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.quoted-body { margin-top: var(--space-2xs); padding-left: var(--space-md); border-left: 2px dashed var(--color-border-strong); color: var(--color-ink-subtle); font-size: var(--text-sm); }
+.quoted-body[hidden] { display: none; }
 .locked { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); background: var(--color-surface-sunken); color: var(--color-ink-soft); font-size: var(--text-sm); }
 .composer { border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-2); }
 .composer textarea { border: 0; width: 100%; min-height: 64px; padding: var(--space-md); font: var(--text-base) var(--font-body); resize: vertical; background: transparent; border-radius: var(--radius-md) var(--radius-md) 0 0; }
@@ -521,7 +545,7 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .empty p { max-width: 360px; margin: 0 auto var(--space-lg); font-size: var(--text-base); }
 .skeleton { background: linear-gradient(90deg, var(--color-surface-sunken) 0%, var(--color-surface-1) 50%, var(--color-surface-sunken) 100%); background-size: 200% 100%; animation: ds-shimmer 1.4s ease infinite; border-radius: 4px; height: 12px; }
 @keyframes ds-shimmer { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .skeleton, .btn .spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .skeleton, .btn .spinner, .spinner-standalone { animation: none; } }
 
 /* --------------------------------------------------------------- dialog */
 .overlay.open { display: flex; }
@@ -622,3 +646,10 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
   .topbar { padding: 0 var(--space-lg); }
   .search { width: auto; flex: 1; }
 }
+
+/* --------------------------------------------- one-time reconnect banner */
+/* email-sync.html:20-28 (README decisions 5/6): full-width, dismissible,
+   built from `.alert` tokens — no other banner component exists yet. */
+.reconnect-banner { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-2xl); background: var(--color-warn-bg); color: var(--color-warn-text); border-bottom: 1px solid rgba(180, 83, 9, 0.3); font-size: var(--text-base); }
+.reconnect-banner .grow { flex: 1; }
+.reconnect-banner .close { color: inherit; }

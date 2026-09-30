@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
 import { unstable_rethrow } from "next/navigation";
 import { isValidBearer } from "@/lib/cronAuth";
-import { decryptToken } from "@/lib/gmail/crypto";
-import { refreshGmailAccessToken } from "@/lib/gmail/accessToken";
-import { createGmailClient } from "@/lib/gmail/client";
-import { syncAccountIncremental } from "@/lib/gmail/syncAccount";
-import { backfillAccountFirstSync } from "@/lib/gmail/backfillAccount";
-import {
-  getKnownPersonsForAddresses,
-  getNeverLogRules,
-  getPlatformSentGmailMessageIds,
-  getSyncableAccounts,
-  updateAccountAfterSync,
-  writeSyncedMessages,
-} from "@/lib/gmail/syncQueries";
+import { getSyncableAccounts, updateAccountAfterSync } from "@/lib/gmail/syncQueries";
+import { syncOneAccountNow } from "@/lib/gmail/syncOneAccountNow";
 
 /**
  * Polls every connected, readonly-scoped BD's Gmail inbox for CRM-matched
@@ -43,17 +32,6 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const PER_BD_BUDGET_MS = 20_000;
-const BACKFILL_WINDOW_DAYS = 90;
-
-interface AccountSyncResult {
-  bdId: string;
-  status: "ok" | "backfilling" | "reauth_required" | "error";
-  messagesFetched?: number;
-  messagesStored?: number;
-  error?: string;
-}
-
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!isValidBearer(authHeader, process.env.CRON_SECRET)) {
@@ -61,81 +39,16 @@ export async function GET(request: Request) {
   }
 
   const accounts = await getSyncableAccounts();
-  const results: AccountSyncResult[] = [];
+  const results = [];
 
   for (const account of accounts) {
     try {
-      const refreshToken = decryptToken(account.refreshTokenEncrypted);
-      const tokenResult = await refreshGmailAccessToken(refreshToken);
-      if (!tokenResult.ok) {
-        await updateAccountAfterSync(account.bdId, { syncError: tokenResult.classification.message });
-        results.push({
-          bdId: account.bdId,
-          status: tokenResult.classification.kind === "revoked" ? "reauth_required" : "error",
-          error: tokenResult.classification.message,
-        });
-        continue;
-      }
-
-      const client = createGmailClient(tokenResult.accessToken);
-      const deps = {
-        client,
-        bdId: account.bdId,
-        bdEmail: account.bdEmail,
-        deadlineAt: Date.now() + PER_BD_BUDGET_MS,
-        getKnownPersons: getKnownPersonsForAddresses,
-        getNeverLogRules: () => getNeverLogRules(account.bdId),
-        getPlatformSentIds: (ids: string[]) => getPlatformSentGmailMessageIds(account.bdId, ids),
-        writeMessages: (classified: Parameters<typeof writeSyncedMessages>[1]) =>
-          writeSyncedMessages(account.bdId, classified),
-      };
-
-      if (!account.historyId) {
-        const outcome = await backfillAccountFirstSync({
-          ...deps,
-          pageToken: account.backfillPageToken,
-          windowDays: BACKFILL_WINDOW_DAYS,
-          now: new Date(),
-        });
-        await updateAccountAfterSync(account.bdId, {
-          backfillPageToken: outcome.nextPageToken,
-          ...(outcome.finalHistoryId ? { historyId: outcome.finalHistoryId } : {}),
-          syncError: null,
-        });
-        results.push({
-          bdId: account.bdId,
-          status: "backfilling",
-          messagesFetched: outcome.messagesFetched,
-          messagesStored: outcome.messagesStored,
-        });
-        continue;
-      }
-
-      const outcome = await syncAccountIncremental({ ...deps, historyId: account.historyId });
-
-      if (outcome.status === "needs_baseline") {
-        // Stale/404 history.list — reset to the backfill path (bounded
-        // messages.list re-baseline) rather than retrying the same expired cursor.
-        await updateAccountAfterSync(account.bdId, { historyId: null, backfillPageToken: null, syncError: null });
-        results.push({ bdId: account.bdId, status: "backfilling" });
-        continue;
-      }
-
-      await updateAccountAfterSync(account.bdId, {
-        ...(outcome.newHistoryId ? { historyId: outcome.newHistoryId } : {}),
-        syncError: null,
-      });
-      results.push({
-        bdId: account.bdId,
-        status: "ok",
-        messagesFetched: outcome.messagesFetched,
-        messagesStored: outcome.messagesStored,
-      });
+      results.push(await syncOneAccountNow(account));
     } catch (error) {
       unstable_rethrow(error);
       const message = error instanceof Error ? error.message : String(error);
       await updateAccountAfterSync(account.bdId, { syncError: message }).catch(() => {});
-      results.push({ bdId: account.bdId, status: "error", error: message });
+      results.push({ bdId: account.bdId, status: "error" as const, error: message });
     }
   }
 

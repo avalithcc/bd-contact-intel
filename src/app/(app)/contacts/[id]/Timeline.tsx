@@ -20,12 +20,22 @@ import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
-import { groupEmailThreads } from "@/lib/contacts/emailThreads";
-import { callWhatLabel, entryBody } from "@/lib/contacts/timelineEntryBody";
+import {
+  groupEmailThreads,
+  isInferredThread,
+  threadContextSummary,
+  type EmailThreadGroup,
+} from "@/lib/contacts/emailThreads";
+import { callWhatLabel, emailRecipientText, entryBody } from "@/lib/contacts/timelineEntryBody";
+import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
 import { useToast } from "@/components/ToastProvider";
+import { Avatar } from "@/components/Avatar";
+import { initialsFromName } from "@/components/initials";
 import {
   CallIcon,
+  ChevronDownIcon,
   DiscardIcon,
+  ExternalLinkIcon,
   HistoryIcon,
   LockIcon,
   MailIcon,
@@ -38,6 +48,8 @@ import { CompleteTaskButton } from "./CompleteTaskButton";
 import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
 import { getTimelinePillEntriesAction } from "../actions";
+import { getThreadBodiesAction } from "./threadActions";
+import type { ThreadMessageBody } from "@/lib/gmail/threadMessages";
 import styles from "./page.module.css";
 
 export interface TimelineTask {
@@ -69,6 +81,13 @@ export interface TimelineTask {
 // this file used to have (see git history).
 export interface TimelineProps {
   personId: string;
+  // Synced-thread "Recibido" messages (email-sync.html screen 1) never
+  // carry the contact's own name in `actorName` — every `email_sent`/
+  // `reply_received` row's `actorBdId`/`actorName` is the MAILBOX OWNER
+  // (see src/lib/gmail/syncQueries.ts#writeSyncedMessages), so the
+  // counterpart's identity for a "Recibido" message is simply this record's
+  // own contact.
+  personName: string;
   labels: ContactRecordLabels;
   // Server-fetched initial page for `activePill` (or the unfiltered "Todo"
   // page when `activePill` is undefined) — see the "Instant pill filtering"
@@ -110,6 +129,12 @@ export interface TimelineProps {
   // receive the function template itself (see the doc comment on
   // `contactRecordServer` in dictionaries/es.ts).
   mergeInfo: { unifiedFromCount: number; hasMergeEvent: boolean; at: Date; bodyText: string } | null;
+  // The activity row that fired the CURRENT `replied` status, or `null`
+  // (status isn't `replied`, or it came from a connection row instead of an
+  // activity — see StatusBecause, src/lib/status/deriveStatus.ts). Drives
+  // the "Marcó el estado como Respondió" marker (email-sync.html:165) on
+  // the one synced message inside a thread that actually moved the needle.
+  statusMovedByActivityId: string | null;
 }
 
 /** Cache key for the "Todo" (unfiltered) scope — `TimelinePillKey` never collides with this string. */
@@ -245,6 +270,7 @@ function monthLabel(at: Date): string {
  */
 export function Timeline({
   personId,
+  personName,
   labels: l,
   entries,
   countsByType,
@@ -256,10 +282,52 @@ export function Timeline({
   taskLabels,
   isAdmin,
   mergeInfo,
+  statusMovedByActivityId,
 }: TimelineProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [editingTask, setEditingTask] = useState<TimelineTask | null>(null);
+  // On-demand thread bodies (task brief §1 — never fetched during the
+  // page's own render). Keyed by `gmailThreadId`, only ever populated the
+  // first time that thread is expanded; re-collapsing/re-expanding reuses
+  // the cached entry instead of re-fetching.
+  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null);
+  const [threadBodies, setThreadBodies] = useState<Record<string, Record<string, ThreadMessageBody>>>({});
+  const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
+  const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
+
+  function toggleQuoted(messageId: string) {
+    setExpandedQuotedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
+  }
+
+  function toggleThread(threadId: string) {
+    if (expandedThreadId === threadId) {
+      setExpandedThreadId(null);
+      return;
+    }
+    setExpandedThreadId(threadId);
+    if (threadBodies[threadId]) return;
+    setLoadingThreadId(threadId);
+    getThreadBodiesAction(personId, threadId)
+      .then((result) => {
+        setLoadingThreadId(null);
+        if (!result.ok) {
+          showToast(l.timelineThreadLoadError, "error");
+          return;
+        }
+        const byGmailMessageId = Object.fromEntries(result.messages.map((m) => [m.gmailMessageId, m]));
+        setThreadBodies((prev) => ({ ...prev, [threadId]: byGmailMessageId }));
+      })
+      .catch(() => {
+        setLoadingThreadId(null);
+        showToast(l.timelineThreadLoadError, "error");
+      });
+  }
   // "task" (the Tareas pill) is never a real activity scope for the
   // cache/fetch engine below — it's tracked entirely by `isTasksActive`
   // instead, since its data (`tasks`) is always fully loaded already, never
@@ -644,6 +712,181 @@ export function Timeline({
     );
   }
 
+  /**
+   * One message inside an expanded synced thread (email-sync.html:158-174).
+   * `body` is `undefined` while the thread's bodies are still loading —
+   * renders a couple of skeleton lines instead of the (missing) real text.
+   */
+  function renderThreadMessage(m: TimelineEntry, body: ThreadMessageBody | undefined, loading: boolean) {
+    const isSent = m.type === "email_sent";
+    const avatarId = isSent ? (m.actorBdId ?? meId) : personId;
+    const senderName = isSent ? (m.actorName ?? l.timelineSystemActor) : personName;
+    const to = emailRecipientText(m.metadata);
+    const movedStatus = m.id === statusMovedByActivityId;
+    const quotedOpen = expandedQuotedIds.has(m.id);
+    const split = body?.bodyText ? splitQuotedText(body.bodyText) : null;
+
+    return (
+      <div key={m.id} className="thread-msg">
+        <Avatar id={avatarId} initials={initialsFromName(senderName)} variant={isSent ? "bd" : "circle"} size="sm" />
+        <div>
+          <div className="thread-msg-head">
+            <span className="who">
+              <span className="from">{senderName}</span>{" "}
+              <span className={isSent ? "badge badge-info no-dot" : "badge badge-success no-dot"}>
+                {isSent ? l.timelineSentBadge : l.timelineReceivedBadge}
+              </span>
+            </span>
+            <span className="when">{formatWhen(m.at)}</span>
+          </div>
+          {to && (
+            <span className="meta recipient">
+              {l.timelineRecipientPrefix} {to}
+            </span>
+          )}
+          {movedStatus && <span className="badge badge-replied no-dot status-marker">{l.timelineStatusMovedMarker}</span>}
+          {loading ? (
+            <>
+              <div className="skeleton mt-2xs" style={{ width: "90%" }} />
+              <div className="skeleton mt-2xs" style={{ width: "60%" }} />
+            </>
+          ) : split ? (
+            <>
+              <div className="snippet" style={{ whiteSpace: "pre-wrap" }}>
+                {split.main}
+              </div>
+              {split.quoted && (
+                <>
+                  <button
+                    type="button"
+                    className="quoted-toggle"
+                    aria-expanded={quotedOpen}
+                    onClick={() => toggleQuoted(m.id)}
+                  >
+                    <ChevronDownIcon className="icon" />
+                    {quotedOpen ? l.timelineQuotedHide : l.timelineQuotedShow}
+                  </button>
+                  <div className="quoted-body" hidden={!quotedOpen} style={{ whiteSpace: "pre-wrap" }}>
+                    {split.quoted}
+                  </div>
+                </>
+              )}
+              {body?.bodyTruncated && <p className="meta mt-2xs">{l.timelineBodyTruncatedNote}</p>}
+            </>
+          ) : (
+            <div className="snippet">{entryBody(m, l)}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * The "Correos" pill's thread card (email-sync.html:151-187). Collapsed
+   * by default — the intro line + "Ver en Gmail" are always visible, but
+   * the per-message list (and its bodies) is only fetched once the BD
+   * clicks to expand it (task brief §1: never a round trip on page load).
+   */
+  function renderEmailThreadCard(threadId: string, group: EmailThreadGroup<TimelineEntry>, when: Date) {
+    const inferred = isInferredThread(group);
+    const { matchedEmail, direction } = threadContextSummary(group);
+    const subject = group.messages[0]?.metadata?.subject;
+    const subjectText = typeof subject === "string" && subject ? subject : l.timelineThreadNoSubject;
+    const isExpanded = expandedThreadId === threadId;
+    const isLoadingThread = loadingThreadId === threadId;
+    const bodiesForThread = threadBodies[threadId];
+
+    return (
+      <div key={`thread-${threadId}`} className="tl-item">
+        <div className="tl-icon email">
+          <MailIcon className="icon" />
+        </div>
+        <div className="tl-card">
+          <div className="tl-head">
+            <span className="what">
+              {l.timelineThreadWhatPrefix} · {subjectText}
+            </span>
+            <span className="badge badge-info no-dot">
+              {group.messages.length} {l.timelineFilterEmail.toLowerCase()}
+            </span>
+            <span className="when">{formatWhen(when)}</span>
+          </div>
+          {group.visible ? (
+            <>
+              <div className="tl-body">
+                {/* Contextual summary (email-sync.html:180: "Con
+                    d.salazar@despegar.com Deducido · Diego Salazar ·
+                    saliente") replaces the generic sync-explanation intro —
+                    mockup-fidelity fix, 2026-10-01. `personName` is always
+                    the counterpart here: a thread only ever shows on the ONE
+                    contact record it's grouped under. */}
+                <p>
+                  {l.timelineThreadContextPrefix}{" "}
+                  {matchedEmail && <span className="mono">{matchedEmail}</span>}
+                  {inferred && (
+                    <>
+                      {" "}
+                      <span className="badge badge-probable" title={l.inferredMatchHint}>
+                        {l.inferredBadge}
+                      </span>
+                    </>
+                  )}{" "}
+                  · {personName} · {direction === "inbound" ? l.timelineThreadInbound : l.timelineThreadOutbound}
+                </p>
+                <a
+                  className="btn btn-ghost btn-sm mt-md"
+                  href={`https://mail.google.com/mail/u/0/#all/${threadId}`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <ExternalLinkIcon className="icon" />
+                  {l.timelineViewInGmail}
+                </a>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm mt-md"
+                aria-expanded={isExpanded}
+                onClick={() => toggleThread(threadId)}
+              >
+                <ChevronDownIcon className="icon" />
+                {isExpanded ? l.timelineHideMessages : l.timelineShowMessages}
+                {isLoadingThread && <span className="spinner" aria-hidden="true" />}
+              </button>
+              {isExpanded && (
+                <div className="thread">
+                  {group.messages.map((m) => {
+                    const gmailMessageId = typeof m.metadata?.gmailMessageId === "string" ? m.metadata.gmailMessageId : null;
+                    const body = gmailMessageId ? bodiesForThread?.[gmailMessageId] : undefined;
+                    return renderThreadMessage(m, body, isLoadingThread);
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="locked">
+              <LockIcon className="icon" />
+              <span>
+                {(() => {
+                  // The synthetic thread entry itself carries no actorName
+                  // (it's synthesized in processedEntries above), but the
+                  // REAL messages inside `group` do — `actorName` is never
+                  // redacted, only `metadata` is (buildTimelineEntry.ts) —
+                  // and every message in one gmailThreadId shares the same
+                  // owning BD, so the first one is exactly the thread's own
+                  // owner (email-sync.html:186's "Este hilo pertenece a
+                  // Ana Pereyra").
+                  const ownerName = group.messages.find((m) => m.actorName)?.actorName ?? l.timelineSystemActor;
+                  return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+                })()}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderActivityPill(pill: TimelinePillKey) {
     const Icon = PILL_ICON[pill];
     return (
@@ -798,40 +1041,7 @@ export function Timeline({
 
                 const threadGroup = threadGroupsById.get(entry.id);
                 if (threadGroup) {
-                  return (
-                    <div key={entry.id} className="tl-item">
-                      <div className="tl-icon email">
-                        <MailIcon className="icon" />
-                      </div>
-                      <div className="tl-card">
-                        <div className="tl-head">
-                          <span className="what">{l.timelineFilterEmail}</span>
-                          <span className="badge badge-info no-dot">
-                            {threadGroup.messages.length} {l.timelineFilterEmail.toLowerCase()}
-                          </span>
-                          <span className="when">{formatWhen(threadGroup.latestAt)}</span>
-                        </div>
-                        {threadGroup.visible ? (
-                          <div className="thread">
-                            {threadGroup.messages.map((m) => (
-                              <div key={m.id} className="thread-msg">
-                                <div>
-                                  <span className="from">{m.actorName ?? l.timelineSystemActor}</span>
-                                  <div className="snippet">{entryBody(m, l)}</div>
-                                </div>
-                                <span className="meta">{format(m.createdAt, "d MMM", { locale: es })}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="locked">
-                            <LockIcon className="icon" />
-                            <span>{l.timelineLockedContent}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
+                  return renderEmailThreadCard(threadGroup.threadId, threadGroup, threadGroup.latestAt);
                 }
 
                 const timelineEntry = entry as TimelineEntry;

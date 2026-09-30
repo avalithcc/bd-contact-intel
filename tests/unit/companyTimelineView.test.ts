@@ -212,7 +212,7 @@ test("another BD's reply_received on a company timeline is locked: no subject/ad
   assert.doesNotMatch(view.what + view.body, /jane@prospect\.com|Re: intro/);
 });
 
-test("a company-scoped email_sent from another BD is locked: the headline falls back to the generic label, no recipient address leaked", () => {
+test("a company-scoped email_sent from another BD is locked: the headline names the owning BD, never the recipient address or subject", () => {
   const rows = [
     {
       ...baseRow,
@@ -225,9 +225,28 @@ test("a company-scoped email_sent from another BD is locked: the headline falls 
   ];
   const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
   assert.equal(view.visible, false);
-  assert.equal(view.what, "Correo", "company-scoped email_sent's headline must not call emailSentTo() when locked");
-  assert.doesNotMatch(view.what, /jane@prospect\.com/);
+  assert.equal(
+    view.what,
+    "Correo · Other BD",
+    "company-scoped email_sent's headline must not call emailSentTo() when locked, but must still name the owning BD",
+  );
+  assert.doesNotMatch(view.what, /jane@prospect\.com|Propuesta/);
   assert.equal(view.metadata, null);
+});
+
+test("a company-scoped, locked conversation row with no known actor name falls back to the bare type label", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "email_sent",
+      actorBdId: "other-bd",
+      actorName: null,
+      metadata: { to: "jane@prospect.com", subject: "Propuesta" },
+      scope: "company" as const,
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
+  assert.equal(view.what, "Correo");
 });
 
 test("the OWNER (same actorBdId as the viewer) sees a synced email_sent/reply_received in full — subject, address, and metadata intact", () => {

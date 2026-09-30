@@ -41,6 +41,25 @@ export interface TimelineEntryForBody {
   actorName: string | null;
 }
 
+/**
+ * `metadata.to` is a single string for a manually composed send
+ * (src/app/(app)/contacts/actions.ts#sendContactEmailAction) but a
+ * `string[]` for a synced thread message (src/lib/gmail/
+ * buildSyncedActivities.ts's SyncedActivityMetadata always writes it as an
+ * array, even for one recipient) — the one shared place both `entryBody`'s
+ * `email_sent` case and Timeline.tsx's expanded-thread "para ..." line
+ * normalize either shape, so there is exactly one code path for it.
+ */
+export function emailRecipientText(metadata: Record<string, unknown> | null | undefined): string | null {
+  const to = metadata?.to;
+  if (typeof to === "string") return to || null;
+  if (Array.isArray(to)) {
+    const addresses = to.filter((v): v is string => typeof v === "string" && v !== "");
+    return addresses.length > 0 ? addresses.join(", ") : null;
+  }
+  return null;
+}
+
 function discardBody(metadata: Record<string, unknown>, l: ContactRecordLabels): string {
   const reason = typeof metadata.reason === "string" ? metadata.reason : null;
   const note = typeof metadata.note === "string" ? metadata.note : null;
@@ -75,8 +94,10 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
   switch (entry.type as TimelineActivityType) {
     case "note":
       return typeof metadata.note === "string" ? metadata.note : "";
-    case "email_sent":
-      return typeof metadata.to === "string" ? `${l.timelineEmailSentPrefix} ${metadata.to}` : l.timelineEmailSentPrefix;
+    case "email_sent": {
+      const to = emailRecipientText(metadata);
+      return to ? `${l.timelineEmailSentPrefix} ${to}` : l.timelineEmailSentPrefix;
+    }
     // Synced Gmail reply (email-sync brief) — same entry layout email_sent
     // uses, showing the subject and the sender address (metadata.from) from
     // src/lib/gmail/buildSyncedActivities.ts's metadata shape, never the
