@@ -212,7 +212,7 @@ export function normalizeLocalPart(local: string): string[] {
  * "sole-token" to "review" ("two_emails_same_mailbox_ambiguous"), not to
  * "safe" alongside "exact"/"initials" — see that bucket's doc comment above.
  */
-export type MailboxMatchRule = "none" | "exact" | "initials" | "sole-token";
+export type MailboxMatchRule = "none" | "exact" | "initials" | "sole-token" | "cctld";
 
 export function classifyMailboxMatch(emailA: string, emailB: string): MailboxMatchRule {
   const atA = emailA.lastIndexOf("@");
@@ -231,8 +231,19 @@ export function classifyMailboxMatch(emailA: string, emailB: string): MailboxMat
   const tokensB = normalizeLocalPart(localB);
   if (tokensA.length === 0 || tokensB.length === 0) return "none";
 
+  // `sameOrganizationDomain` accepts a ccTLD extension, and that relation is
+  // NOT transitive: `acme.com.ar` and `acme.com.mx` are each an extension of
+  // `acme.com`, but not of each other. A hub domain would therefore let two
+  // unrelated country mailboxes merge into it across separate runs. So a
+  // ccTLD-related pair is downgraded to "cctld" no matter how well the local
+  // parts agree — `abresciani@rappachiani.com` and `abresciani@….com.ar` may
+  // be one person or the Argentine office of the same company, and only a
+  // human can say which. That leaves exact domain equality as the only
+  // domain relation feeding the auto-merge tier, which is transitive.
+  const domainsIdentical = domainA.trim().toLowerCase() === domainB.trim().toLowerCase();
+
   const sameSequence = tokensA.length === tokensB.length && tokensA.every((token, i) => token === tokensB[i]);
-  if (sameSequence) return "exact";
+  if (sameSequence) return domainsIdentical ? "exact" : "cctld";
 
   // Drop single-character tokens (middle initials) from both sides before
   // comparing. The >=2 floor applies AFTER dropping: if either side is left
@@ -247,7 +258,7 @@ export function classifyMailboxMatch(emailA: string, emailB: string): MailboxMat
     withoutInitialsB.length >= 2 &&
     withoutInitialsA.length === withoutInitialsB.length &&
     withoutInitialsA.every((t, i) => t === withoutInitialsB[i]);
-  if (initialsMatch) return "initials";
+  if (initialsMatch) return domainsIdentical ? "initials" : "cctld";
 
   const soleTokenMatchesConcatenation =
     (tokensA.length === 1 && tokensA[0] === tokensB.join("")) ||
@@ -340,11 +351,13 @@ export function classifyDuplicatePairBucket(
     // auto-merges.
     if (bothVerified) {
       const mailboxMatch = classifyMailboxMatch(a.email as string, b.email as string);
-      // "sole-token" is not transitive (see classifyMailboxMatch's doc
-      // comment) — real evidence, but not conclusive on its own, so it goes
-      // to review rather than being treated the same as "exact"/"initials".
+      // "sole-token" and "cctld" are both non-transitive (see
+      // classifyMailboxMatch's doc comment) — real evidence, but not
+      // conclusive on its own, so they go to review rather than being treated
+      // the same as "exact"/"initials". Only the two transitive rules, both
+      // requiring identical domains, reach the auto-merge tier.
       if (mailboxMatch === "exact" || mailboxMatch === "initials") return "two_emails_same_mailbox";
-      if (mailboxMatch === "sole-token") return "two_emails_same_mailbox_ambiguous";
+      if (mailboxMatch === "sole-token" || mailboxMatch === "cctld") return "two_emails_same_mailbox_ambiguous";
     }
     return bothVerified ? "two_emails_differ_verified" : "two_emails_differ_unverified";
   }

@@ -165,6 +165,40 @@ test("isSameMailbox: mirrors the non-transitive sole-token matches (boolean wrap
   assert.equal(isSameMailbox("marcos.trillo@empresa.com", "marco.strillo@empresa.com"), false);
 });
 
+test("classifyMailboxMatch: a ccTLD-related domain is 'cctld', never 'exact', however well the local parts agree", () => {
+  // sameOrganizationDomain accepts a ccTLD extension, and that relation is not
+  // transitive: acme.com.ar and acme.com.mx are each an extension of acme.com
+  // but not of each other. Left as "exact", the hub domain would let two
+  // unrelated country mailboxes merge into it across separate runs.
+  assert.equal(classifyMailboxMatch("javier.astort@acme.com.ar", "javier.astort@acme.com"), "cctld");
+  assert.equal(classifyMailboxMatch("javier.astort@acme.com", "javier.astort@acme.com.mx"), "cctld");
+  assert.equal(classifyMailboxMatch("javier.astort@acme.com.ar", "javier.astort@acme.com.mx"), "none");
+  // The middle-initial rule is downgraded the same way.
+  assert.equal(classifyMailboxMatch("javier.astort@acme.com.ar", "javier.s.astort@acme.com"), "cctld");
+});
+
+test("classifyMailboxMatch: every rule reaching the auto-merge tier requires identical domains", () => {
+  // The transitivity argument for tier `safe` rests on this: with identical
+  // domains, "exact" and "initials" both reduce to equality of a derived token
+  // sequence, which is transitive.
+  for (const rule of ["exact", "initials"] as const) {
+    const pair =
+      rule === "exact"
+        ? (["a.b@acme.com", "a.b@acme.com"] as const)
+        : (["javier.astort@acme.com", "javier.s.astort@acme.com"] as const);
+    assert.equal(classifyMailboxMatch(pair[0], pair[1]), rule);
+  }
+});
+
+test("classifyDuplicatePairBucket: a ccTLD-related same-mailbox pair goes to review, not safe and not dismiss", () => {
+  const bucket = classifyDuplicatePairBucket(
+    pf({ email: "abresciani@rappachiani.com", emailStatus: "verified" }),
+    pf({ email: "abresciani@rappachiani.com.ar", emailStatus: "verified" }),
+  );
+  assert.equal(bucket, "two_emails_same_mailbox_ambiguous");
+  assert.equal(tierForBucket(bucket), "review");
+});
+
 // --- Defect 1: rule A must be boundary-sensitive, not a naive join("") ------
 
 test("isSameMailbox: boundary disagreement between two separated local parts is false (marcos.trillo vs marco.strillo)", () => {
@@ -226,15 +260,17 @@ test("hasNonAsciiLocalPart: detects an accented local part, not a plain ASCII on
   assert.equal(hasNonAsciiLocalPart("martin.medina@ladonware.com"), false);
 });
 
-test("classifyDuplicatePairBucket: two verified emails that are the same mailbox (identical token sequences, ccTLD suffix) is safe, not dismiss", () => {
-  // Changed from the old juanmontanaro/juan.montanaro fixture: that pair
-  // matches ONLY via the sole-token concatenation rule, which is not
-  // transitive (see Issue 1 above) and now routes to
-  // "two_emails_same_mailbox_ambiguous" / tier "review", not "safe". This
-  // test keeps the original intent (a same-mailbox pair must not be
-  // dismissed) using a pair matched by identical token sequences instead.
-  const a = pf({ email: "abresciani@rappachiani.com", emailStatus: "verified" });
-  const b = pf({ email: "abresciani@rappachiani.com.ar", emailStatus: "verified" });
+test("classifyDuplicatePairBucket: two verified emails that are the same mailbox (identical token sequences, same domain) is safe, not dismiss", () => {
+  // The fixture has moved twice, both times because the pair it used stopped
+  // qualifying for the auto-merge tier, never because the intent changed: the
+  // point is still that a same-mailbox pair must not be dismissed.
+  //   - juanmontanaro/juan.montanaro matches only via the sole-token rule.
+  //   - abresciani@rappachiani.com/.com.ar matches only across a ccTLD suffix.
+  // Both relations are non-transitive, so both now route to
+  // "two_emails_same_mailbox_ambiguous" / tier "review" and have their own
+  // tests above. Only identical domains reach tier "safe".
+  const a = pf({ email: "martín.medina@ladonware.com", emailStatus: "verified" });
+  const b = pf({ email: "martin.medina@ladonware.com", emailStatus: "verified" });
   const bucket = classifyDuplicatePairBucket(a, b);
   assert.equal(bucket, "two_emails_same_mailbox");
   assert.equal(tierForBucket(bucket), "safe");
@@ -414,11 +450,15 @@ test("planDuplicateTierRun: tier=dismiss selects the two-different-verified-emai
 });
 
 test("planDuplicateTierRun: a same-mailbox verified pair (identical token sequences) lands in the safe plan, not the dismiss plan", () => {
-  // Changed from the old juanmontanaro/juan.montanaro fixture for the same
-  // reason as the classifyDuplicatePairBucket test above: that pair now
-  // belongs in "review", not "safe". See the dedicated sole-token test below.
-  const a = planPerson({ id: "a", email: "abresciani@rappachiani.com", emailStatus: "verified" });
-  const b = planPerson({ id: "b", email: "abresciani@rappachiani.com.ar", emailStatus: "verified" });
+  // The fixture has moved twice for the same reason as the
+  // classifyDuplicatePairBucket test above: juanmontanaro/juan.montanaro
+  // matches only via the sole-token rule, and abresciani@….com/.com.ar only
+  // across a ccTLD suffix, so both now belong in "review". Plus-addressing on
+  // one identical domain is an "exact" match and stays in "safe" — and unlike
+  // the accented Medina pair it does not also exercise the ASCII-survivor
+  // swap, which keeps this test about tier routing alone.
+  const a = planPerson({ id: "a", email: "juan.montanaro+crm@jpmorgan.com", emailStatus: "verified" });
+  const b = planPerson({ id: "b", email: "juan.montanaro@jpmorgan.com", emailStatus: "verified" });
   const pairs: DuplicatePairPlanInput[] = [pairInput("c1", a, b, "name_company")];
 
   const safePlan = planDuplicateTierRun(pairs, "safe");
