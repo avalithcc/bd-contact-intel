@@ -11,7 +11,7 @@
  * Never treated as verified: writes `email_status = 'probable'` (the
  * existing "unverified" vocabulary) with `email_source = 'pattern_inferred'`
  * — a NEW email_source value, never `'verified'`. The record page renders
- * "Inferido" for it (see PropertyList.tsx/AboutPane.tsx's `emailInferred`
+ * "Deducido" for it (see PropertyList.tsx/AboutPane.tsx's `emailInferred`
  * prop, wired through src/app/(app)/contacts/[id]/page.tsx).
  *
  * Collisions (contact-identity spirit: a wrong email is worse than a missing

@@ -31,7 +31,7 @@ The 12-month window replaces the brief's "replied anywhere" rule. A reply from y
 **Stage 1 (approved).** Infer emails for free from a company's own email pattern:
 - A domain qualifies when it has at least 2 known emails with first and last names, and at least 80% of them follow one pattern (`first.last`, `flast`, `first`, …).
 - Personal-mail domains are excluded (gmail, hotmail, outlook, yahoo, icloud, live, …).
-- Inferred emails are stored as **inferred / unverified**, shown as "Inferido" on the record, and never treated as verified.
+- Inferred emails are stored as **inferred / unverified**, shown as "Deducido" on the record, and never treated as verified.
 
 **Stage 2 (deferred).** Decide on Hunter Domain Search for the remaining domains only after seeing how inferred emails bounce once BDs use them.
 

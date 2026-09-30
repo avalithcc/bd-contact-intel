@@ -45,7 +45,7 @@ export interface PropertyListProps {
   ownerHint: string | null;
   emailVerified: boolean;
   // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — renders
-  // "Inferido" next to the value, same spot as the verified badge (mutually
+  // "Deducido" next to the value, same spot as the verified badge (mutually
   // exclusive: email_status is one of 'verified'/'probable'/'none').
   emailInferred: boolean;
   hunterHint: string | null;

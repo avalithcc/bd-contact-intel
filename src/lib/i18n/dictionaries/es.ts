@@ -637,7 +637,7 @@ export const es: typeof en = {
     // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — never
     // shown alongside verifiedBadge, since email_status can only be one of
     // 'verified'/'probable'/'none' at a time.
-    inferredBadge: "Inferido",
+    inferredBadge: "Deducido",
     linkedInBadge: "LinkedIn",
     historyAction: "Historial",
     generateMessageCta: "Generar mensaje con IA",
