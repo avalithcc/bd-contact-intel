@@ -154,10 +154,14 @@ export const es: typeof en = {
     // Admin-only sidenav section (admin-conversation-access mockup, screen 1:
     // admin-conversation.html:57-61), now holding both "Reportes"
     // (owner-reporting decision 1/5) and "Registro de auditoría" —
-    // Duplicados/Migración exist as routes but were never in this real
-    // Sidebar to begin with (a pre-existing gap, not introduced here).
+    // Migración exists as a route but is deliberately not linked here: it is
+    // a one-off tool, not ongoing work. Duplicados WAS an unlinked route for
+    // the same reason until the queue turned out to hold 268 pairs of real
+    // owner work — a page nobody can reach is a page that does not exist, so
+    // it is now in the menu.
     administrationSection: "Administración",
     auditLog: "Registro de auditoría",
+    duplicates: "Duplicados",
     reports: "Reportes",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",

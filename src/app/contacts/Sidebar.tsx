@@ -16,6 +16,7 @@ import {
   PlaybookIcon,
   AccountIcon,
   EyeIcon,
+  PersonIcon,
   ReportsIcon,
 } from "@/components/icons";
 
@@ -149,6 +150,14 @@ export function Sidebar({
           >
             <ReportsIcon className="icon" />
             {labels.reports}
+          </Link>
+          <Link
+            href="/admin/duplicates"
+            className={`nav-item${isActive("/admin/duplicates") ? " active" : ""}`}
+            aria-current={isActive("/admin/duplicates") ? "page" : undefined}
+          >
+            <PersonIcon className="icon" />
+            {labels.duplicates}
           </Link>
           <Link
             href="/admin/audit-log"

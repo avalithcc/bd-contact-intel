@@ -186,6 +186,7 @@ export const en = {
     playbook: "Role guide",
     administrationSection: "Administration",
     auditLog: "Audit log",
+    duplicates: "Duplicates",
     reports: "Reports",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
