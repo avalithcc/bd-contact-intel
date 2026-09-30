@@ -10,6 +10,7 @@ import {
   addDaysToDateString,
   argentinaCalendarDate,
   argentinaDayBoundaries,
+  argentinaInstantBoundary,
   formatTaskDueDate,
   taskDueDate,
 } from "@/lib/tasks/argentinaDate";
@@ -65,6 +66,28 @@ test("taskDueDate reads due_at's stored calendar date directly, without the ART 
 test("formatTaskDueDate displays the stored UTC calendar date regardless of the caller's timezone", () => {
   assert.equal(formatTaskDueDate(new Date("2026-09-29T00:00:00Z")), "29 sep");
   assert.equal(formatTaskDueDate(new Date("2026-09-28T00:00:00Z")), "28 sep");
+});
+
+/**
+ * `argentinaInstantBoundary` is the OTHER kind of boundary this module
+ * produces — unlike `todayStartUtc`/`tomorrowStartUtc` (deliberately the
+ * naive 00:00 UTC scheme matching `due_at`'s calendar-date-only encoding,
+ * see `ArgentinaDayBoundaries`'s own doc comment), this is the REAL instant
+ * ART midnight falls on, for filtering genuine timestamp columns
+ * (`activity.created_at`, `person.created_at`, ...) by a calendar-day/period
+ * boundary. ART midnight on a given calendar date is 03:00 UTC that same
+ * date (fixed UTC-3 offset, no DST since 2009 — the module's own governing
+ * assumption).
+ */
+test("argentinaInstantBoundary returns the real UTC instant of ART midnight for a calendar date", () => {
+  assert.equal(argentinaInstantBoundary("2026-09-29").toISOString(), "2026-09-29T03:00:00.000Z");
+  assert.equal(argentinaInstantBoundary("2026-01-01").toISOString(), "2026-01-01T03:00:00.000Z");
+});
+
+test("argentinaInstantBoundary round-trips with argentinaCalendarDate at the exact boundary", () => {
+  const boundary = argentinaInstantBoundary("2026-09-29");
+  assert.equal(argentinaCalendarDate(boundary), "2026-09-29");
+  assert.equal(argentinaCalendarDate(new Date(boundary.getTime() - 1)), "2026-09-28");
 });
 
 /**

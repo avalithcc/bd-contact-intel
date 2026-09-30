@@ -1,0 +1,126 @@
+/**
+ * PgDialect render tests for src/lib/reports/queries.ts — the owner-reports
+ * page's two round trips (PERFORMANCE.md: "round trips are the budget").
+ * Schema-only assertions on the rendered SQL text/params, no live DB — same
+ * convention as tests/unit/appShellBadgeCountsQuery.test.ts.
+ */
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { PgDialect } from "drizzle-orm/pg-core";
+import {
+  buildReportAggregatesQuery,
+  buildReportPerBdQuery,
+  type ReportAggregatesParams,
+  type ReportPerBdParams,
+} from "@/lib/reports/queries";
+
+const dialect = new PgDialect();
+
+const AGG_PARAMS: ReportAggregatesParams = { fromIso: "2026-09-01T03:00:00.000Z", toIso: "2026-09-30T14:00:00.000Z", bdId: null };
+const PER_BD_PARAMS: ReportPerBdParams = {
+  fromIso: "2026-09-01T03:00:00.000Z",
+  toIso: "2026-09-30T14:00:00.000Z",
+  fromDate: "2026-09-01",
+  toDateExclusive: "2026-10-01",
+  bdId: null,
+};
+
+function renderAgg(params: ReportAggregatesParams = AGG_PARAMS) {
+  return dialect.sqlToQuery(buildReportAggregatesQuery(params));
+}
+function renderPerBd(params: ReportPerBdParams = PER_BD_PARAMS) {
+  return dialect.sqlToQuery(buildReportPerBdQuery(params));
+}
+
+test("buildReportAggregatesQuery: person scope excludes merged persons and filters the period", () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /person\.merged_into_id is null/i);
+  assert.match(sql, /person\.created_at >= \$\d+::timestamptz/i);
+  assert.match(sql, /person\.created_at < \$\d+::timestamptz/i);
+});
+
+test("buildReportAggregatesQuery: nullable bd filter uses the same '::uuid is null or column = ::uuid' shape for person and company", () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /\$\d+::uuid is null or person\.owner_bd_id = \$\d+::uuid/i);
+  assert.match(sql, /\$\d+::uuid is null or company\.owner_bd_id = \$\d+::uuid/i);
+});
+
+test("buildReportAggregatesQuery: selects the 4 expected json columns", () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /as funnel/i);
+  assert.match(sql, /as source_status/i);
+  assert.match(sql, /as discard_reasons/i);
+  assert.match(sql, /as pipeline/i);
+});
+
+test("buildReportAggregatesQuery: discard reasons filter type='discarded', join person, and use effectiveActivityAtSql (status_backfill honored)", () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /activity\.type = 'discarded'/i);
+  assert.match(sql, /join person on person\.id = activity\.person_id/i);
+  assert.match(sql, /when "activity"\."type" = .status_backfill./i);
+});
+
+test("buildReportAggregatesQuery: pipeline groups by relationship_stage and does NOT filter by period (decision 7)", () => {
+  const { sql } = renderAgg();
+  const pipelineSection = sql.slice(sql.indexOf("rpt_pipeline"), sql.indexOf("rpt_pipeline") + 400);
+  assert.match(pipelineSection, /group by company\.relationship_stage/i);
+  assert.doesNotMatch(pipelineSection, /created_at/i);
+});
+
+test("buildReportAggregatesQuery: source_status groups by source_key and status (bucketing stays in JS, decision 8)", () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /group by rpt_person_scope\.source_key, rpt_person_scope\.status/i);
+});
+
+test('"activity" is never aliased where referenced fully-qualified by its real name (rule 4)', () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /from "activity"\s*\n/i);
+});
+
+test("buildReportPerBdQuery: base is the small bd table, left-joined to each pre-aggregated pivot", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /from "bd"\s*\n/i);
+  assert.match(sql, /left join rpt_activity_pivot/i);
+  assert.match(sql, /left join rpt_tasks_pivot/i);
+  assert.match(sql, /left join rpt_queue_pivot/i);
+});
+
+test("buildReportPerBdQuery: activity pivot uses effectiveActivityAtSql and the 5 named activity types", () => {
+  const { sql, params } = renderPerBd();
+  assert.match(sql, /when "activity"\."type" = .status_backfill./i);
+  for (const t of ["note", "call", "meeting_logged", "email_sent", "reply_received"]) {
+    assert.ok(params.includes(t), `expected activity type "${t}" among bound params`);
+  }
+});
+
+test("buildReportPerBdQuery: tasks pivot filters status='done' and updated_at range", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /task\.status = 'done'/i);
+  assert.match(sql, /task\.updated_at >= \$\d+::timestamptz/i);
+  assert.match(sql, /task\.updated_at < \$\d+::timestamptz/i);
+});
+
+test("buildReportPerBdQuery: queue pivot scopes queue_date by the ART calendar range (date columns, not timestamptz)", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /follow_up_queue_item\.queue_date >= \$\d+::date/i);
+  assert.match(sql, /follow_up_queue_item\.queue_date < \$\d+::date/i);
+});
+
+test("buildReportPerBdQuery: queue pivot's worked-check is a correlated EXISTS against activity, keyed off queue_date (not a fixed 'today')", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /exists\s*\(\s*select 1 from "activity"/i);
+  assert.match(sql, /activity\.person_id = follow_up_queue_item\.person_id/i);
+  assert.match(sql, /follow_up_queue_item\.queue_date::timestamptz \+ interval '3 hours'/i);
+});
+
+test("buildReportPerBdQuery: nullable bd filter applies to actor_bd_id, assigned_to_bd_id, and follow_up_queue_item.bd_id independently", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /\$\d+::uuid is null or activity\.actor_bd_id = \$\d+::uuid/i);
+  assert.match(sql, /\$\d+::uuid is null or task\.assigned_to_bd_id = \$\d+::uuid/i);
+  assert.match(sql, /\$\d+::uuid is null or follow_up_queue_item\.bd_id = \$\d+::uuid/i);
+});
+
+test("buildReportPerBdQuery params round-trip with a real bd id (not always null)", () => {
+  const { params } = renderPerBd({ ...PER_BD_PARAMS, bdId: "00000000-0000-0000-0000-000000000001" });
+  assert.ok(params.includes("00000000-0000-0000-0000-000000000001"));
+});
