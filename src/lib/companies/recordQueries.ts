@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { buildCompanyTimelineEntry, type CompanyTimelineEntry } from "@/lib/companies/companyTimelineEntry";
+import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
 import type {
   CompanyActivityFilter,
   CompanyPropertyHistoryRow,
@@ -121,12 +122,12 @@ export async function getCompanyTimeline(
       // `NULL` branch) — `rawCreatedAt` below is the display fallback for
       // exactly that case.
       at: sql<Date | string | null>`${effectiveActivityAtSql()}`,
-      // Fresh-review fix: a non-touch row still needs SOME time to render in
-      // the company timeline — it just must never sort as the newest touch
-      // (see `nulls last` below) or show as epoch 1970 (`new Date(null)`).
-      // Drizzle's typed column mapper parses this as a real Date already
-      // (it's a plain column reference, not a computed `sql` expression);
-      // still routed through `parseDbTimestamp` below for symmetry/safety.
+      // A non-touch row still needs SOME time to render in the company
+      // timeline (this is the DISPLAY fallback the ORDER BY below also
+      // uses — see that comment). Drizzle's typed column mapper parses
+      // this as a real Date already (it's a plain column reference, not a
+      // computed `sql` expression); still routed through `parseDbTimestamp`
+      // below for symmetry/safety.
       rawCreatedAt: activity.createdAt,
       metadata: activity.metadata,
       actorBdId: activity.actorBdId,
@@ -134,14 +135,9 @@ export async function getCompanyTimeline(
     })
     .from(activity)
     .where(filterCondition ? and(baseWhere, filterCondition) : baseWhere)
-    // nulls last: a non-touch row (effective time NULL) must never outrank a
-    // real touch for this bounded LIMIT — Postgres's default for `DESC` is
-    // `NULLS FIRST`, which would otherwise let a same-day task_updated/etc.
-    // edit "become" the newest row in the timeline ahead of an older but
-    // real touch (email/call/note/...). Same fix/rationale as
-    // src/lib/contacts/listQueries.ts's "Última actividad" pick and
-    // src/lib/activity/queries.ts's getPersonTimeline.
-    .orderBy(sql`${effectiveActivityAtSql()} desc nulls last`)
+    // DISPLAY time, not "last touch" time — see timelineOrder.ts's doc
+    // comment for why this timeline must NOT use `NULLS LAST` here.
+    .orderBy(timelineOrderBySql())
     .limit(TIMELINE_LIMIT);
 
   // Batched name lookups for whichever person/actor ids actually showed up

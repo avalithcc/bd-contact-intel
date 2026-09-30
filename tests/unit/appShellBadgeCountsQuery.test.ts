@@ -61,3 +61,8 @@ test('"activity" is never aliased where it is also referenced fully-qualified by
   const { sql } = render();
   assert.match(sql, /from "activity"\s*\n/i, "expected an unaliased FROM \"activity\"");
 });
+
+test("buildAppShellBadgeCountsQuery: follow_up_count excludes a merged person, same guard as readQueueRows (queueQueries.ts)", () => {
+  const { sql } = render();
+  assert.match(sql, /exists\s*\(\s*select 1 from "person"\s*\n\s*where person\.id = follow_up_queue_item\.person_id\s*\n\s*and person\.merged_into_id is null/i);
+});

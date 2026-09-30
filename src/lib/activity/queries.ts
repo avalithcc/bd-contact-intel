@@ -5,8 +5,8 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { recomputePersonStatus } from "@/lib/status/recompute";
-import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { buildTimelineEntry, type TimelineEntry } from "@/lib/activity/timelineEntry";
+import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
 import { TIMELINE_PILL_GROUPS, type TimelinePillKey } from "@/lib/activity/timelinePills";
 
 export type { TimelinePillKey } from "@/lib/activity/timelinePills";
@@ -198,12 +198,9 @@ export async function getPersonTimeline(
       .from(activity)
       .leftJoin(bd, eq(bd.id, activity.actorBdId))
       .where(typeCondition)
-      // nulls last: a non-touch row (task_updated/etc., effective time
-      // NULL) must never outrank a real touch for this bounded LIMIT — same
-      // fix/rationale as listQueries.ts's "Última actividad" pick. Each
-      // returned row still renders fine either way: buildTimelineEntry
-      // falls back to createdAt for a non-touch row's own `at`.
-      .orderBy(sql`${effectiveActivityAtSql()} desc nulls last`)
+      // DISPLAY time, not "last touch" time — see timelineOrder.ts's doc
+      // comment for why this timeline must NOT use `NULLS LAST` here.
+      .orderBy(timelineOrderBySql())
       .limit(opts.limit ?? 100),
     db
       .select({ type: activity.type, count: sql<number>`count(*)` })

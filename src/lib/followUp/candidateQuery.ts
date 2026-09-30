@@ -110,17 +110,18 @@ function fuqOrderBy() {
  *
  * Fresh-review fix: this used to never reference `follow_up_queue_item` at
  * all, so "Posponer a mañana"/"Omitir hoy" (`state`/`snoozed_until`,
- * queueQueries.ts#setFollowUpItemState) had no effect on selection — a
- * postponed/skipped contact would immediately reappear if materialization
- * ever ran again for the SAME queue_date (defensive: normally guarded
- * entirely by `ensureTodayFollowUpQueue` never re-running the same day, but
- * the SQL itself should not silently rely on that alone), and — the actual
- * bug — a person snoozed further out than "tomorrow" would never be
+ * queueQueries.ts#setFollowUpItemState) had no effect on selection — the
+ * actual bug: a person snoozed further out than "tomorrow" would never be
  * excluded on the days in between. The `NOT EXISTS` below excludes anyone
  * with a prior `follow_up_queue_item` row for this SAME `bdId` whose
  * `snoozed_until` is still in the future relative to the queue_date being
  * computed; once `queueDate` reaches `snoozed_until`, the exclusion lifts
  * and the person is eligible again (still subject to every other rule).
+ * Defense-in-depth for the SAME-queue_date case too: `ensureTodayFollowUpQueue`'s
+ * `pg_advisory_xact_lock` already keeps materialization from ever re-running
+ * for a day that's already been computed, so a postponed/skipped contact
+ * reappearing that same day shouldn't happen regardless — this `NOT EXISTS`
+ * just means the SQL itself doesn't silently depend on that alone.
  */
 export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: number = FOLLOW_UP_DAILY_CAP) {
   return sql`

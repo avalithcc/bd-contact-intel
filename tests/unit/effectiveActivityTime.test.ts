@@ -143,3 +143,45 @@ test("buildSinceIso: 0 or negative days still returns a valid ISO string (no NaN
   assert.equal(buildSinceIso(0, now), now.toISOString());
   assert.doesNotThrow(() => new Date(buildSinceIso(7, now)).toISOString());
 });
+
+/**
+ * Timeline ordering scenario (fresh-review fix): getPersonTimeline/
+ * getCompanyTimeline order by
+ * `coalesce(effectiveActivityAtSql(), activity.created_at) DESC`
+ * (src/lib/activity/timelineOrder.ts) — i.e. exactly
+ * `resolveEffectiveActivityAt(row) ?? row.createdAt`, descending. This pins
+ * that JS-side equivalent of the rule: a `task_updated` row created AFTER
+ * 60 older touch rows must sort first and survive a `LIMIT` that only
+ * keeps the newest N — the bug `NULLS LAST` caused (a non-touch row always
+ * sorting last, cut by the limit on a busy record) is impossible here since
+ * `coalesce`/`??` never produces a value that sorts as "oldest".
+ */
+test("timeline ordering: a task_updated row newer than 60 other activities appears first in a limited timeline page", () => {
+  const now = new Date("2026-09-29T12:00:00.000Z");
+  const olderTouchRows = Array.from({ length: 60 }, (_, i) => ({
+    id: `touch-${i}`,
+    type: "email_sent",
+    createdAt: new Date(now.getTime() - (i + 1) * 60 * 60 * 1000), // each 1h older than the last
+    metadata: {},
+  }));
+  const newestTaskEdit = {
+    id: "task-edit-1",
+    type: "task_updated",
+    createdAt: now, // newer than every touch row above
+    metadata: {},
+  };
+
+  const rows = [...olderTouchRows, newestTaskEdit];
+  const sorted = [...rows].sort((a, b) => {
+    const atA = (resolveEffectiveActivityAt(a) ?? a.createdAt).getTime();
+    const atB = (resolveEffectiveActivityAt(b) ?? b.createdAt).getTime();
+    return atB - atA;
+  });
+  const limitedPage = sorted.slice(0, 50); // a bounded LIMIT smaller than the full 61 rows
+
+  assert.equal(sorted[0]!.id, "task-edit-1", "the task edit must sort first — it is the newest row");
+  assert.ok(
+    limitedPage.some((r) => r.id === "task-edit-1"),
+    "the task edit must survive the LIMIT, not be cut as if it were the oldest row",
+  );
+});

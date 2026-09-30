@@ -13,8 +13,11 @@
  * - `follow_up_count`: `getFollowUpQueueBadgeCount` — this BD's `pending`
  *   queue rows for today's `queue_date` that have NOT been worked today (ANY
  *   BD, not just this one — see queueQueries.ts's `workedTodayExists` doc
- *   comment). Never materializes an un-materialized day (reads 0 rows ->
- *   0 for free), matching the original function's contract.
+ *   comment) AND whose person is not merged (matches `readQueueRows`'s own
+ *   `isNull(person.mergedIntoId)` join filter — without this, a merged
+ *   person could inflate the badge past what the page itself shows). Never
+ *   materializes an un-materialized day (reads 0 rows -> 0 for free),
+ *   matching the original function's contract.
  *
  * Schema-only import (no `@/db` client) so this stays importable — and this
  * file's own test stays runnable — without a live DATABASE_URL, same
@@ -24,7 +27,7 @@
  * reads the raw log time, never the effective time (see queueQueries.ts).
  */
 import { sql } from "drizzle-orm";
-import { activity, followUpQueueItem, task } from "@/db/schema";
+import { activity, followUpQueueItem, person, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 
 export interface AppShellBadgeCountsQueryParams {
@@ -63,6 +66,17 @@ export function buildAppShellBadgeCountsQuery({
         where follow_up_queue_item.bd_id = ${bdId}::uuid
           and follow_up_queue_item.queue_date = ${queueDate}::date
           and follow_up_queue_item.state = 'pending'
+          -- Fresh-review fix: without this, a merged person still counted
+          -- toward the badge while readQueueRows (queueQueries.ts) already
+          -- hides them from the page itself -- the badge said 3, the page
+          -- showed 2. Same "merged persons are hidden from every read"
+          -- guard (design D1/D6) as that function's own isNull(person.
+          -- mergedIntoId) join filter.
+          and exists (
+            select 1 from ${person}
+            where person.id = follow_up_queue_item.person_id
+              and person.merged_into_id is null
+          )
           and not exists (
             select 1 from ${activity}
             where activity.person_id = follow_up_queue_item.person_id
