@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import Link from "next/link";
 import { EditTaskDialog, type EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
+import { formatArgentinaDayMonthTime, formatArgentinaMonthYear } from "@/lib/i18n/format";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
 import {
   TIMELINE_PILL_KEYS,
@@ -261,12 +260,11 @@ function filterHref(personId: string, pill?: TimelinePillKey | "task"): string {
 }
 
 function formatWhen(at: Date): string {
-  return format(at, "d MMM, HH:mm", { locale: es });
+  return formatArgentinaDayMonthTime(at);
 }
 
 function monthLabel(at: Date): string {
-  const label = format(at, "MMMM yyyy", { locale: es });
-  return label.charAt(0).toUpperCase() + label.slice(1);
+  return formatArgentinaMonthYear(at);
 }
 
 /**
