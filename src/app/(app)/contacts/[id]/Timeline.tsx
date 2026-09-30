@@ -56,7 +56,7 @@ import {
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
-import { AdminViewConversationDialog } from "./AdminViewConversationDialog";
+import { AdminConversationFlow } from "./AdminConversationFlow";
 import { canShowAdminConversationAction } from "@/lib/activity/adminConversationAccess";
 import { getTimelinePillEntriesAction } from "../actions";
 import { getThreadBodiesAction } from "./threadActions";
@@ -84,9 +84,10 @@ export interface TimelineTask {
 // feeding `buildConnectionTimelineEntries`/`linkedinEntryAccess`
 // (src/lib/contacts/connectionTimelineEntries.ts) to synthesize the
 // "Mensaje de LinkedIn enviado"/"Respuesta de LinkedIn recibida" cards
-// (contact-record.html:124-131) and gate `AdminConversationReveal`
-// (./AdminConversationReveal.tsx). All of that is untouched in the DB and
-// in connectionTimelineEntries.ts; to restore, re-add both props here and
+// (contact-record.html:124-131) and gate the old inline
+// `AdminConversationReveal` (deleted 2026-09-30, superseded by
+// AdminConversationFlow.tsx's shared modal). All of that is untouched in
+// the DB and in connectionTimelineEntries.ts; to restore, re-add both props here and
 // in page.tsx's <Timeline connections={record.connections}
 // viewerBdId={me.id} />, then bring back the imports/const/render branch
 // this file used to have (see git history).
@@ -349,10 +350,13 @@ export function Timeline({
   const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
   const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
   // Admin's "Ver conversación (queda registrado)" action (admin-conversation-
-  // access mockup, screen 1) — one dialog instance shared by every locked row,
-  // rather than one per BD like the mockup's own `#confirm-view-juan`/`-ana`
-  // anchors, since the set of BDs a contact has locked content from isn't
-  // known ahead of render time here the way the mockup's fixed sample is.
+  // access mockup, screen 1) — one AdminConversationFlow instance shared by
+  // every locked row, rather than one per BD like the mockup's own
+  // `#confirm-view-juan`/`-ana` anchors, since the set of BDs a contact has
+  // locked content from isn't known ahead of render time here the way the
+  // mockup's fixed sample is. Confirming opens the SAME shared
+  // ConversationDialog ConversationHistoryCard's own "Ver" action uses
+  // (owner decision 2026-09-30) — no more navigating to a separate page.
   const [pendingAdminView, setPendingAdminView] = useState<{ bdId: string; bdName: string } | null>(null);
 
   function toggleQuoted(messageId: string) {
@@ -1242,14 +1246,13 @@ export function Timeline({
       )}
 
       {pendingAdminView && (
-        <AdminViewConversationDialog
-          open
-          onClose={() => setPendingAdminView(null)}
+        <AdminConversationFlow
+          key={pendingAdminView.bdId}
+          trigger={pendingAdminView}
           personId={personId}
           personName={personName}
-          bdId={pendingAdminView.bdId}
-          bdName={pendingAdminView.bdName}
           labels={l}
+          onClose={() => setPendingAdminView(null)}
         />
       )}
 

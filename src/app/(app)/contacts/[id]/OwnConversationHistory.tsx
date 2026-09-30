@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronDownIcon } from "@/components/icons";
+import { EyeIcon } from "@/components/icons";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
+import { ConversationDialog } from "@/components/ConversationDialog";
+import { sortMessagesChronologically } from "@/lib/activity/conversationMessageOrder";
 import { getOwnConversationMessagesAction } from "./ownConversationActions";
 import type { OwnConversationMessage } from "@/lib/activity/getOwnConversationMessages";
 
@@ -13,19 +15,23 @@ import type { OwnConversationMessage } from "@/lib/activity/getOwnConversationMe
  * The viewing BD's own row inside the right panel's "Historial de
  * conversaciones" card (owner decision 2026-09-30; contact-record.html:
  * 172-178) — count + last message date are already on screen (page.tsx,
- * from `record.connections`, no extra query); this only adds the
- * expandable FULL message history, fetched on demand
- * (getOwnConversationMessagesAction) the first time it's expanded, never
- * during the record page's own render. Every OTHER BD's connection renders
- * as a plain locked row directly in page.tsx — this component only ever
- * mounts for the viewer's OWN connection.
+ * from `record.connections`, no extra query). "Ver mensajes" opens the
+ * shared `ConversationDialog` (same modal the admin bypass uses,
+ * AdminConversationFlow.tsx) instead of expanding inline in the narrow
+ * sidebar column (owner complaint 2026-09-30: an inline expansion here was
+ * an endless vertical scroll in a narrow column). Content is fetched on
+ * demand (getOwnConversationMessagesAction) the first time the dialog opens
+ * — never during the record page's own render — and cached for the life of
+ * this mount, so reopening doesn't refetch. Every OTHER BD's connection
+ * renders as a plain locked row directly in ConversationHistoryCard.tsx —
+ * this component only ever mounts for the viewer's OWN connection.
  */
 export function OwnConversationHistory({
   personId,
   bdName,
   summaryText,
+  dialogTitle,
   showMessagesLabel,
-  hideMessagesLabel,
   noContentLabel,
   genericErrorLabel,
   emptyValue,
@@ -35,25 +41,26 @@ export function OwnConversationHistory({
   personId: string;
   bdName: string;
   summaryText: string;
+  // Precomposed by ConversationHistoryCard (`${conversationDialogTitlePrefix}
+  // ${personName}`) — the modal is titled by the CONTACT (the counterpart of
+  // this BD's own conversation), not by `bdName` (the viewer's own name,
+  // shown on the row itself so every BD with history is listed the same
+  // way — see that card's own doc comment).
+  dialogTitle: string;
   showMessagesLabel: string;
-  hideMessagesLabel: string;
   noContentLabel: string;
   genericErrorLabel: string;
   emptyValue: string;
   sentBadgeLabel: string;
   receivedBadgeLabel: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<OwnConversationMessage[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  function toggle() {
-    if (expanded) {
-      setExpanded(false);
-      return;
-    }
-    setExpanded(true);
+  function openDialog() {
+    setOpen(true);
     if (messages !== null) return;
     setLoading(true);
     setError(false);
@@ -64,7 +71,7 @@ export function OwnConversationHistory({
           setError(true);
           return;
         }
-        setMessages(result.messages);
+        setMessages(sortMessagesChronologically(result.messages));
       })
       .catch(() => {
         setLoading(false);
@@ -77,63 +84,50 @@ export function OwnConversationHistory({
       <div className="grow">
         <div className="n">{bdName}</div>
         <div className="s">{summaryText}</div>
-        {expanded && (
-          <div className="thread mt-lg">
-            {loading ? (
-              <div className="thread-msg">
-                <span className="avatar avatar-sm" aria-hidden="true" />
+      </div>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={openDialog}>
+        <EyeIcon className="icon" />
+        {showMessagesLabel}
+      </button>
+
+      <ConversationDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={dialogTitle}
+        loading={loading}
+        error={error}
+        errorLabel={genericErrorLabel}
+      >
+        {messages && messages.length === 0 ? (
+          <p className="meta">{noContentLabel}</p>
+        ) : (
+          <div className="thread">
+            {messages?.map((m) => (
+              <div key={m.id} className="thread-msg">
+                <Avatar
+                  id={m.id}
+                  initials={initialsFromName(m.senderName ?? emptyValue)}
+                  variant={m.direction === "sent" ? "bd" : "circle"}
+                  size="sm"
+                />
                 <div>
-                  <div className="skeleton" style={{ width: "90%" }} />
-                  <div className="skeleton mt-2xs" style={{ width: "60%" }} />
-                </div>
-              </div>
-            ) : error ? (
-              <div className="thread-msg">
-                <span className="error-text" role="alert">
-                  {genericErrorLabel}
-                </span>
-              </div>
-            ) : messages && messages.length === 0 ? (
-              <div className="thread-msg">{noContentLabel}</div>
-            ) : (
-              // `.thread-msg`'s grid is avatar (22px) | content (design-system.css)
-              // — same shape Timeline.tsx's own renderThreadMessage uses, NOT the
-              // dormant 3-column `avatar | snippet | meta` markup
-              // AdminConversationReveal.tsx (unreferenced, see that file's own
-              // doc comment) used to have; design-system.css explicitly flags
-              // that shape as stale for whoever restores this.
-              messages?.map((m) => (
-                <div key={m.id} className="thread-msg">
-                  <Avatar
-                    id={m.id}
-                    initials={initialsFromName(m.senderName ?? emptyValue)}
-                    variant={m.direction === "sent" ? "bd" : "circle"}
-                    size="sm"
-                  />
-                  <div>
-                    <div className="thread-msg-head">
-                      <span className="who">
-                        <span className="from">{m.senderName ?? emptyValue}</span>
-                        <span className={m.direction === "sent" ? "badge badge-info no-dot" : "badge badge-success no-dot"}>
-                          {m.direction === "sent" ? sentBadgeLabel : receivedBadgeLabel}
-                        </span>
+                  <div className="thread-msg-head">
+                    <span className="who">
+                      <span className="from">{m.senderName ?? emptyValue}</span>
+                      <span className={m.direction === "sent" ? "badge badge-info no-dot" : "badge badge-success no-dot"}>
+                        {m.direction === "sent" ? sentBadgeLabel : receivedBadgeLabel}
                       </span>
-                      <span className="when">{format(m.sentAt, "d MMM", { locale: es })}</span>
-                    </div>
-                    {/* Rendered as text, never HTML — imported LinkedIn message content is untrusted free text. */}
-                    <div className="snippet">{m.content}</div>
+                    </span>
+                    <span className="when">{format(m.sentAt, "d MMM", { locale: es })}</span>
                   </div>
+                  {/* Rendered as text, never HTML — imported LinkedIn message content is untrusted free text. */}
+                  <div className="snippet">{m.content}</div>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </div>
         )}
-      </div>
-      <button type="button" className="btn btn-ghost btn-sm" aria-expanded={expanded} onClick={toggle}>
-        <ChevronDownIcon className="icon" />
-        {expanded ? hideMessagesLabel : showMessagesLabel}
-        {loading && <span className="spinner" aria-hidden="true" />}
-      </button>
+      </ConversationDialog>
     </div>
   );
 }

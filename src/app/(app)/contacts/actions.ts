@@ -321,15 +321,16 @@ export type RevealAdminConversationResult =
   | { ok: false; reason: "not_admin" | "invalid" | "not_found" };
 
 /**
- * Inline "Ver conversación" reveal (mockup-port r04; contact-record-
- * admin.html:130/137 — the mockup shows this expanded directly in the
- * timeline, not only on the separate `/contacts/[id]/conversation/[bdId]`
- * page). Goes through the EXACT SAME audited path that page already uses
- * (`getConversationForAdmin` — writes `audit_log(view_conversation)` before
- * returning content, and skips the audit write only when the viewer is
- * looking at their own conversation, `shouldAuditConversationView`). The
- * separate page stays as a deep link (bookmarkable, no client JS needed to
- * reach it); this action is what powers the inline expand.
+ * Powers the shared admin conversation modal (owner decision 2026-09-30;
+ * `AdminConversationFlow.tsx`, used by ConversationHistoryCard.tsx,
+ * Timeline.tsx and AdminConversationAutoOpen.tsx) — the standalone
+ * `/contacts/[id]/conversation/[bdId]` page this action originally backed
+ * (mockup-port r04) is deleted; every "Ver conversación" entry point now
+ * opens the same modal instead. Goes through the SAME audited path that
+ * page always used (`getConversationForAdmin` — writes
+ * `audit_log(view_conversation)` before returning content, and skips the
+ * audit write only when the viewer is looking at their own conversation,
+ * `shouldAuditConversationView`).
  */
 export async function revealAdminConversationAction(
   personId: string,

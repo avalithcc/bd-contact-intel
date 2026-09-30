@@ -851,9 +851,25 @@ export const en = {
     linkedinRepliedPrefix: "LinkedIn reply received",
     linkedinSentPrefix: "LinkedIn message sent",
     linkedinConversationOfPrefix: "conversation with",
-    adminAuditAlertTitle: "You are viewing another BD's conversation",
     adminNoConversationContent: "No conversation content on file.",
-    adminOpenAsPage: "Open as a page",
+    // Shared ConversationDialog title (owner decision 2026-09-30) — both the
+    // viewing BD's own history and the admin bypass compose
+    // `${conversationDialogTitlePrefix} ${counterpartName}`.
+    conversationDialogTitlePrefix: "Conversation with",
+    // Admin modal's audit banner (owner decision 2026-09-30) — composed as
+    // `${adminAuditBannerPrefix} ${bdName} ${adminAuditBannerSuffix}`,
+    // client-side (ConversationDialog/AdminConversationFlow are client
+    // components, see ClientStrings), same "prefix + interpolated name"
+    // pattern the confirmation dialog below already uses.
+    adminAuditBannerPrefix: "You're viewing",
+    adminAuditBannerSuffix: "'s conversation as an administrator — this access was recorded",
+    // Admin modal's three sections (ported from the deleted standalone
+    // `/contacts/[id]/conversation/[bdId]` page — same copy).
+    adminSyncedEmailSectionTitle: "Synced email",
+    adminNoSyncedEmailContent: "No synced email with this BD.",
+    adminLegacyEmailSectionTitle: "Email (manual record)",
+    adminLinkedinSectionTitle: "LinkedIn conversation",
+    adminNoLinkedinContent: "No LinkedIn conversation with this BD.",
     // --- admin "Ver conversación" confirmation dialog (admin-conversation-
     // access mockup, screen 1) — plain strings only (Timeline.tsx is a client
     // component, see ClientStrings): the dialog composes
@@ -925,7 +941,6 @@ export const en = {
       `${statusLabel} because ${sourceDescription} on ${dateLabel}.`,
     timelineLockedOwnedBy: (bdName: string) =>
       `This conversation belongs to ${bdName}. You can see that it exists and when it happened; its content is private to ${bdName} (and admins).`,
-    adminAuditAlertBody: (bdName: string) => `This view was recorded in the audit log (conversation with ${bdName}).`,
     hiringBadge: (count: number) => `Hiring · ${count} IT roles`,
     companyContactCount: (count: number) => `${count} contacts at this company`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} messages · last ${dateLabel}`,
@@ -958,30 +973,6 @@ export const en = {
     assocViewAll: (n: number) => `View all ${n} in Contacts`,
     vacantesFooter: (total: number, latam: number, us: number) =>
       `${total} open IT roles · ${latam} LATAM · ${us} US`,
-  },
-
-  // Admin-only bypass view (/contacts/[id]/conversation/[bdId], task 11.3;
-  // admin-access-audit spec). Server-rendered, no client component — plain
-  // strings for consistency with the rest of the dictionary, not bound by
-  // ClientStrings since this page never crosses to a "use client" boundary.
-  adminConversation: {
-    backLink: "Back to the record",
-    title: "Conversation with",
-    syncedEmailSectionTitle: "Synced email",
-    noSyncedEmailContent: "No synced email with this BD.",
-    legacyEmailSectionTitle: "Email (manual record)",
-    linkedinSectionTitle: "LinkedIn conversation",
-    noEmailContent: "No emails sent by this BD.",
-    noLinkedinContent: "No LinkedIn conversation with this BD.",
-    // Audit banner (admin-conversation-access mockup, admin-conversation.html:208)
-    // — a server-only function template (this dict section is never passed to
-    // a client component, see contactRecordServer's own doc comment for why
-    // that split exists elsewhere). Owner decision (2026-09-30): no promise
-    // that the BD can see this, unlike the mockup's earlier draft copy.
-    auditBannerTitle: (bdName: string) =>
-      `You're viewing ${bdName}'s conversation as an administrator — this access was recorded`,
-    auditBannerBody: (actorName: string, bdName: string, personName: string, dateLabel: string) =>
-      `Audit log: ${actorName} · ${bdName}'s conversation with ${personName} · ${dateLabel}.`,
   },
 
   login: {
