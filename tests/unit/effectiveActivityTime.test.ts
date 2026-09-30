@@ -26,9 +26,10 @@ const dialect = new PgDialect();
 
 test("effectiveActivityAtSql(): the rendered CASE returns NULL for every NON_TOUCH_ACTIVITY_TYPES value, checked before the status_backfill/call branches", () => {
   const renderedSql = dialect.sqlToQuery(effectiveActivityAtSql()).sql;
-  assert.match(renderedSql, /case\s+when\s+"activity"\."type"\s+in\s+\(\$1, \$2, \$3\)\s+then\s+null/i);
+  const placeholders = NON_TOUCH_ACTIVITY_TYPES.map((_, i) => `\\$${i + 1}`).join(", ");
+  assert.match(renderedSql, new RegExp(`case\\s+when\\s+"activity"\\."type"\\s+in\\s+\\(${placeholders}\\)\\s+then\\s+null`, "i"));
   const { params } = dialect.sqlToQuery(effectiveActivityAtSql());
-  assert.deepEqual(params.slice(0, 3), [...NON_TOUCH_ACTIVITY_TYPES]);
+  assert.deepEqual(params.slice(0, NON_TOUCH_ACTIVITY_TYPES.length), [...NON_TOUCH_ACTIVITY_TYPES]);
 });
 
 test("resolveEffectiveActivityAt: a status_backfill row with a valid metadata.originalAt uses that, not createdAt", () => {
