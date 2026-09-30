@@ -259,7 +259,7 @@ export function CompanyAboutPane({
           ) : (
             <dd>
               <span className={stageBadgeClass}>{stage && isStage(stage) ? stageLabel(l, stage) : l.emptyValue}</span>
-              <button type="button" className="edit" onClick={() => setEditingStage(true)} aria-label={l.edit}>
+              <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={() => setEditingStage(true)} aria-label={l.edit}>
                 <EditPencilIcon className="icon" />
               </button>
             </dd>
@@ -314,7 +314,7 @@ export function CompanyAboutPane({
           ) : (
             <dd>
               {revenuePotential != null ? revenuePotential.toLocaleString() : l.emptyValue}
-              <button type="button" className="edit" onClick={() => setEditingRevenue(true)} aria-label={l.edit}>
+              <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={() => setEditingRevenue(true)} aria-label={l.edit}>
                 <EditPencilIcon className="icon" />
               </button>
             </dd>
@@ -453,7 +453,7 @@ function TextPropertyRow({ label, value, editing, busy, error, hint, labels: l, 
       <dt>{label}</dt>
       <dd>
         {value ?? l.emptyValue}
-        <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
       </dd>
@@ -533,7 +533,7 @@ function OwnerPropertyRow({
       <dt>{label}</dt>
       <dd>
         {ownerName ?? l.emptyValue}
-        <button type="button" className="edit" onClick={onStartEdit} aria-label={l.edit}>
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
       </dd>
