@@ -6,7 +6,10 @@ app is finished enough to look ready and has never been used by anyone.
 
 Inventoried against production on 2026-09-28. Refreshed 2026-09-30 against PRs
 #198–#223 (Seguimientos queue, email sync, task edit/bulk create, pipeline
-backfill, account-type filter, playbook, DMARC fix).
+backfill, account-type filter, playbook, DMARC fix). Re-verified 2026-09-30
+against PRs #224–#251 (Argentina timezone fixes, owner reports, audited admin
+conversation access, company search, Digital Finance Forum import, remaining
+name splits, duplicates-queue tooling).
 
 ## Where we actually are
 
@@ -76,6 +79,61 @@ still the test.**
 - Custom SMTP via HostGator `notificaciones@avalith.net`; password reset
   verified end to end. DMARC `rua` fixed 2026-09-30 — now points to
   `notificaciones@avalith.net` (was the placeholder `email@yourdomain.com`).
+- Argentina timezone fixes (#247): `workedTodayExists` and the follow-up badge
+  now bound the real instant with `argentinaInstantDayWindow` instead of the
+  naive 00:00-UTC `argentinaDayBoundaries` scheme (built only for
+  `task.due_at`); server and client date rendering unified on Argentina time
+  everywhere (`contacts/[id]`, `companies/[key]`, both Timelines); `planCall`/
+  `planMeeting` now parse the BD's wall-clock date/time input as ART instead
+  of the server process's timezone. A guard test fails the build if a new
+  caller imports `argentinaDayBoundaries` without being classified as
+  `due_at`-only.
+- Remaining stuffed-name split (#226): first-token/compound-given-name rule,
+  gated behind the original classifier, applied in production 2026-09-30 —
+  48 persons split, audit row `person_first_token_split_backfill`,
+  `person_property_history` per field, `--revert` supported. Re-run finds 0
+  remaining under this rule.
+- Audited admin access to BD conversations (#232) and one shared conversation
+  modal (#237): admins can view another BD's conversation — including synced
+  Gmail threads, previously ignored by that view — after an explicit confirm;
+  every view writes to `audit_log` before the read; the BD is never notified.
+  The earlier standalone admin page is deleted in favor of one
+  `ConversationDialog` used by both the BD's own view and the admin path.
+- Owner reporting (#234, #239): Administración → Reportes (admin-only) —
+  KPIs, discard-reason breakdown, contact funnel by source, company pipeline,
+  per-BD activity, tasks completed, follow-up queue adherence; period
+  (week/month/quarter, Argentina calendar) and BD filter in the URL. A
+  follow-up fix (#239) made the BD filter actually apply on change and fixed
+  the KPI/activity-table scope mismatch.
+- Company search (#242): tokenized ILIKE search over `display_name`, `domain`
+  and `company_alias` via a correlated `EXISTS`, applied to both the page
+  query and the view-tab counts; the header search is now context-aware
+  instead of always routing to `/contacts`.
+- Merge data-safety fixes: `mergeContacts` now repoints
+  `email_message_person` and `follow_up_queue_item` onto the survivor, which
+  it previously missed, silently losing synced Gmail messages on a merged
+  contact (#248); conversations now resolve through every profile key a
+  merged person has ever absorbed, at any chain depth, not just its own
+  (#243).
+- Duplicates-queue tooling: `scripts/merge-duplicates.ts`, an owner-run bulk
+  merge CLI with same-mailbox detection (#249); its automatic `dismiss` tier
+  was retired after production inspection showed the "two differing verified
+  emails means two different people" premise held only 2 times out of 9 —
+  dismissal is human-only in `/admin/duplicates` again (#250); three
+  confirmed duplicate triangles (9 person rows) collapsed by hand via a
+  one-off script (#251). See **Known defects → duplicates queue** for current
+  counts.
+- Digital Finance Forum 2026 import (#244): 1,001 persons created (9 existing
+  matched), 365 companies created (136 matched), 998 phone numbers, all
+  assigned to Mariel; CP437/CP850 mojibake repaired on ingest; full
+  `--revert` supported.
+- Smaller fixes: `pg_net` cron timeout raised to 60s to stop backfill runs
+  timing out (#224); inbound Gmail matching now keys on sender only, so a
+  contact merely cc'd on automated mail no longer flips to `replied` (#230,
+  with `scripts/cleanup-misattributed-inbound.ts` to fix past cases);
+  contacts board now fills the viewport with per-column scroll instead of a
+  scrollbar far below the fold (#231); developer/sales_bd role groups hidden
+  from `/contacts` by default, with an "Ocultos" chip to show them (#229).
 
 ## Layer 1 — before the team comes in
 
@@ -85,9 +143,18 @@ These are the things that make the first week survivable.
 Calls, meetings, tasks and discards are complete, reachable, and have **never
 run once** outside a test. Before the team arrives, each needs one real
 end-to-end pass against production data by someone who will not forgive a rough
-edge. This is not QA theatre — `task.description` and `task.leadId` have full
-schema, indexes, joins and rendering with **no write path anywhere**, which is
-exactly the class of gap that only surfaces when a human tries to use the thing.
+edge. This is not QA theatre — `task.leadId` has full schema, indexes, joins
+and rendering with **no write path anywhere** (`createTaskAction` declares
+`leadId?: string` but its only caller, `NewTaskButton.tsx`, never passes it;
+bulk create never touches it; `TaskEditInput`/`resolveTaskSubject` don't even
+have the field), which is exactly the class of gap that only surfaces when a
+human tries to use the thing. (Correction: `task.description` is not part of
+this gap — it has three live write paths: per-record create
+(`NewTaskButton.tsx` → `createTaskAction` → `createTask`), bulk create from the
+contacts list (`BulkActionsBar.tsx` → `bulkCreateTaskAction` →
+`buildBulkTaskRows` → `bulkCreateTasks`), and edit (`EditTaskDialog.tsx` →
+`updateTaskAction` → `updateTaskWithActivity`, commit `fa46a0e`). The earlier
+note here predates that commit.)
 
 ### bd-password-reset (manual) — shipped, not yet run
 `scripts/reset-bd-password.ts` (PR #179) sets a random temporary password
@@ -132,28 +199,24 @@ Still open:
 
 ## Layer 3 — the pipeline nobody is using yet
 
-### owner-reporting
-Mockup in progress (2026-09-30). Reports for the owner to act on pipeline
-data: discard-reason breakdown, funnel conversion by stage and by source,
-activity per BD over time.
-
-**Correction to this item's original premise:** it claimed discard reasons must
-first become a fixed code rather than free text. **They already are** —
-`wrong_profile`, `not_interested`, `other_vendor`, `left_company`, `bad_data`,
-`other`, validated, with a note required for `other`. They are stored in
-`activity.metadata` JSONB, so they are queryable but not independently indexed.
-What is missing is not the vocabulary; it is that zero discards exist to report
-on.
+### owner-reporting — shipped
+No longer a mockup: built and merged (#234, BD-filter/drilldown fix #239) —
+see **Shipped** above. Discard reasons were already a fixed, validated code
+list before this shipped (`wrong_profile`, `not_interested`, `other_vendor`,
+`left_company`, `bad_data`, `other`, a note required for `other`), stored in
+`activity.metadata` JSONB — queryable but not independently indexed. What the
+report still can't show is discards, because production has none recorded
+yet (unverified whether that count has changed since the 2026-09-28
+inventory).
 
 ## Layer 4 — product depth
 
-### admin-email-conversation-access
-Mockup in progress (2026-09-30). `getConversationForAdmin` serves unredacted
-`email_sent` content as well as LinkedIn threads, and both its UI entry points
-were LinkedIn surfaces that are now hidden — so admins have no UI path to
-another BD's email content. The route and its audit trail still work.
-Near-zero impact today (one `email_sent` row), but it matters as email becomes
-the channel.
+### admin-email-conversation-access — shipped
+No longer a mockup: `getConversationForAdmin` now has a real UI path — the
+audited confirm-then-view flow (#232) and the shared `ConversationDialog`
+that replaced the standalone page (#237); see **Shipped** above. It serves
+synced Gmail threads as well as LinkedIn history, and every view is logged to
+`audit_log` before the read.
 
 ### auth-security — remaining
 - The invite email template still uses the default `{{ .ConfirmationURL }}`.
@@ -164,9 +227,13 @@ the channel.
 ### timestamptz migration
 All timestamp columns are `timestamp without time zone`. Plan:
 `openspec/decisions/2026-09-30-timestamptz-migration-plan.md`. Slice 0 (prep,
-no schema change) is done (#221). Slices 1–6 — small tables, imported tables,
-lead/person, company, activity/task, email/follow-up tables — are pending.
-Until they land, run local checks with `TZ=UTC`.
+no schema change) is done and merged (#221). Slices 1–6 — small tables,
+imported tables, lead/person, company, activity/task, email/follow-up
+tables — are still pending on `main`: confirmed by checking out the plan's
+slice list against merged PRs in this pass. (A slice-1 branch with the
+22-table conversion written exists in the repo but has not merged as of this
+check — treat that as in-flight, not shipped, until it lands on `main`.)
+Until slices land, run local checks with `TZ=UTC`.
 
 ### click-to-call — research first
 Owner request (2026-09-30): evaluate whether a BD can place a call to a
@@ -260,12 +327,17 @@ model per task. Nothing is decided yet; this is a research item.
   (`scripts/backfill-split-stuffed-names.ts`, PR #186, audit row `df7a98fe`,
   revertible). The rest are genuinely ambiguous ("Gonzalo Castro Peña": one
   given name and two surnames, or the reverse), start with a particle, or are
-  junk. **A first-token split for this remainder is in progress** — count
-  pending.
+  junk. **Shipped 2026-09-30 (#226):** a first-token/compound-given-name rule
+  (gated behind the original classifier) split 48 of the remainder in
+  production; audit row `person_first_token_split_backfill`, revertible;
+  re-run finds 0 left under this rule.
 - 233 contacts with no name at all whose email cannot be split reliably
   (`gusoliva@`, `maria.laura.fantoni@`, digits, initials). Needs another
-  source (LinkedIn, enrichment) or a BD.
-- 11 duplicate pairs open in `/admin/duplicates` — still owner action.
+  source (LinkedIn, enrichment) or a BD. (Count not re-verified this pass —
+  no database access in this session.)
+- Duplicate pairs open in `/admin/duplicates` — see **duplicates queue**
+  below; the "11 pairs" figure recorded here previously is stale (see that
+  entry for why and for the current count).
 
 ### company-contact-counts
 The `/companies` list's "Contactos" column and the company record's contacts
@@ -274,29 +346,104 @@ card match `person.company_key` directly instead of resolving through
 empty. The fix is written and waiting on the branch
 `fix/company-contact-count-alias`; ship it the day an alias is created.
 
-### argentina-day-boundary — fix in progress
-Found by the launch-readiness audit (2026-09-30). `workedTodayExists`
-(`src/lib/followUp/queueQueries.ts`) and the follow-up subquery in
-`appShellBadgeCountsQuery.ts` bound a real instant against
-`argentinaDayBoundaries`, which `src/lib/tasks/argentinaDate.ts` documents as
-the naive 00:00-UTC scheme built only for `task.due_at`. Argentina is UTC-3, so
-work logged between ~21:00 and 24:00 ART does not count as "worked today": the
-queue item stays pending and the badge keeps counting it. `argentinaInstantBoundary`
-already exists for this. A second bug in the same family: server components
-format dates in the process timezone (UTC on Vercel) while the client Timeline
-formats in the browser (ART), so the same event shows two different dates on one
-page. A third, lower-visibility one: `planCall`/`planMeeting` read the BD's
-wall-clock entry as UTC.
+### argentina-day-boundary — shipped
+Found by the launch-readiness audit (2026-09-30), fixed and merged the same
+day (#247) — see **Shipped** above for the three bugs and their fixes.
 
-### duplicates queue — 353 open pairs, analysed 2026-09-30
-Not 11, as previously recorded: 11 `email_unverified` plus 342 `name_company`.
-Tiers from the analysis: 11 same-email plus 65 "classic split" (one side has the
-email, the other the LinkedIn profile, no conflicts) are safe to merge; 109 need
-a human because the job title or the owner conflicts; 159 are low priority with
-no email on either side; 9 have two different **verified** emails and are almost
-certainly two real people, so they should be dismissed. 27 pairs form A-B-C
-chains, so merge order matters there. Merging preserves activities, tasks,
-connections and conversations, and is reversible with no time limit.
+### duplicates queue — 244 open, 98 merged, 2 dismissed (2026-09-30)
+Previously recorded as 353 open pairs with a recommendation to dismiss 9
+pairs whose two sides had different **verified** emails, on the premise that
+two differing verified emails mean two different people. **That premise was
+wrong far more often than it was right:** every pair that ever landed in that
+bucket was inspected by hand against production, and it held 2 times out of
+9 — the 7 misses were a ccTLD suffix, a dot separator, a middle initial, an
+accented local part, a typo, a short form beside a full one, and a personal
+address beside a work one (PR #249, #250; commits `7ffe9f4`, `530c606`). The
+automatic `dismiss` tier has been **retired**: `scripts/merge-duplicates.ts
+--tier=dismiss` now exits 1 with a pointer to `/admin/duplicates` — dismissal
+is a human judgement call there again, with no automation.
+
+Current counts, measured read-only against production after the last run:
+**244 open, 98 merged, 2 dismissed**; 27,528 active contacts. The merges came
+in four passes — 70 and 4 by `scripts/merge-duplicates.ts --tier=safe` (runs
+`e4f4a779`, `d097caed`), then 3 and 5 confirmed triangles by
+`scripts/merge-triangles-2026-09.ts` (batches "a" and "b", PR #251 and its
+follow-up). The 2 dismissals were run `de3d64b7`, before the tier was retired;
+both were verified by hand first as genuinely different people
+(`juan.barrere`/`juan.vespa@pampaenergia.com`,
+`jose.tanaka`/`jose.somale@tecpetrol.com` — different surname tokens in the
+local part, which is the signal that actually separates the two groups).
+
+Bucket breakdown of the 244 open pairs, from a `--tier=safe` dry run:
+
+| Bucket | Pairs | Why it is not automatic |
+| --- | --- | --- |
+| `classic_split_no_conflict` | 0 | all cleared |
+| `classic_split_conflict` | 71 | job title or owner disagree |
+| `one_email_not_classic` | 20 | one email, no complementary LinkedIn row |
+| `two_emails_differ_unverified` | 8 | neither side verified |
+| `no_email_titles_agree` | 46 | no email on either side |
+| `no_email_titles_conflict` | 109 | no email AND the titles contradict |
+
+The last two rows are the bulk of the queue: **155 pairs where neither side
+has an email at all**, matched only on name plus company, and 109 of those
+also have contradicting job titles. Those are as likely to be namesakes as
+duplicates — the `juan.barrere`/`juan.vespa` pair above was exactly this
+shape and was only settled because both sides happened to have an email. A
+wrong merge puts one person's activity on another person's record, which is
+worse than leaving the pair open, so these need a human with account
+knowledge, not a rule.
+
+Note the recurring trap: the `classic_split_no_conflict` bucket repeatedly
+reports as tier `safe` and is then skipped entirely, because every one of its
+pairs sits in a closed triangle (3 rows, all 3 pairs open) and the bulk CLI
+refuses any pair whose person appears in another open pair. Those are handled
+by `scripts/merge-triangles-2026-09.ts`, which takes explicit person ids and
+a `--batch=` name.
+
+Merging preserves activities,
+tasks, connections and conversations, and is reversible with no time limit
+via `--revert=<runId>`.
+
+### pickEmailWinnerSide is a hand-copy, not a shared function
+`pickEmailWinnerSide` in `src/lib/identity/duplicateTiering.ts` duplicates the
+private `mergeEmailFields` rule in `src/lib/identity/merge.ts` by hand,
+because the original is not exported. It only drives the dry-run report in
+`scripts/merge-duplicates.ts`, so a divergence between the two would mislead
+the operator reading the report rather than corrupt any written data — the
+actual merge still goes through `mergeEmailFields` itself. Verified to agree
+with reality on all 4 merges of run `d097caed` (source: PR #249, "Known
+debt"). Note: another agent may be working on this right now; recorded here
+as outstanding debt regardless, for reconciliation.
+
+### task.contactId — dead legacy column, no user-facing impact
+Same shape as `task.leadId` above, but lower priority since no user can reach
+it: `task.contactId` (`src/db/schema.ts:1157`, indexed as `task_contact_idx`
+at `schema.ts:1180`) is selected and joined on every task read
+(`src/lib/tasks/queries.ts`), but no write path ever sets it — `createTaskAction`
+declares it in its input type, but its only caller never passes it, and bulk
+create never touches it. Unlike `leadId`, it isn't even in
+`TaskSubjectInput` (`src/lib/tasks/subject.ts`), so no renderer consults it
+either. Both `leadId` and `contactId` are pre-Unified-Contact legacy columns
+superseded by `personId`. Open question, not a recommendation: delete the
+columns, or build a lead/contact subject picker — owner's call; a picker
+would need a mockup first.
+
+### task creation writes no activity row
+`createTask` and `bulkCreateTasks` write **no** `task_created` activity —
+documented deliberately at `src/lib/tasks/bulkCreateDb.ts:20-24`. Only edit,
+completion and reopening log an `activity` row naming the actor
+(`updateTaskWithActivity`). Worth recording plainly: the project rule "every
+task change logs an activity naming the actor" currently applies to
+edit/complete/reopen but not to creation, and that asymmetry is easy to
+mistake for a bug later if no one writes down that it's intentional.
+
+### unit-test flake, unattributed
+One unreproducible unit-test failure was observed in 1 of 18 consecutive
+suite runs on 2026-09-30. It could not be attributed to a specific test name
+in 17 further runs — i.e. it has not recurred since, and no failing test name
+was identified when it did occur. Not independently reproduced or
+investigated further in this pass.
 
 ## Deferred from crm-hubspot-ux
 
