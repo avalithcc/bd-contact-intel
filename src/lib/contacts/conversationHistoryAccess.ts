@@ -22,10 +22,13 @@ import {
  *
  * Deliberate collapse of `admin-bypass` into "locked" here: the old inline
  * `AdminConversationReveal` (removed 2026-09-28) is NOT being restored in
- * the timeline — an admin's audited bypass now only happens through the
- * dedicated `/contacts/[id]/conversation/[bdId]` page (linked from the
- * right panel card instead, see `conversationOfPrefix` usage in page.tsx).
- * Only the connection's OWNING BD ever sees an unlocked entry inline.
+ * the timeline. An admin still gets an entry point — the SAME locked-row
+ * "Ver conversación (queda registrado)" action email_sent/reply_received
+ * rows use (admin-conversation-access, `renderAdminViewAction` in
+ * Timeline.tsx) — but it always navigates to the audited
+ * `/contacts/[id]/conversation/[bdId]` page rather than revealing content
+ * inline. Only the connection's OWNING BD ever sees an unlocked entry
+ * inline.
  */
 export function isLinkedinEntryLocked(access: LinkedinEntryAccess): boolean {
   return access !== "own";
