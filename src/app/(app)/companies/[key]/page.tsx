@@ -140,8 +140,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   // Formats each row's "what"/"body" SERVER-SIDE, using `dict.companyRecordServer`'s
   // FORMATTER FUNCTIONS — see buildCompanyTimelineViewRows's doc comment for
   // why that step can never move into the "use client" CompanyTimeline.tsx.
-  const timelineViewRows = buildCompanyTimelineViewRows(timelineRows, dict.companyRecordServer, l, (stage) =>
-    stageLabelOf(stage, lc),
+  const timelineViewRows = buildCompanyTimelineViewRows(
+    timelineRows,
+    dict.companyRecordServer,
+    l,
+    (stage) => stageLabelOf(stage, lc),
+    me.id,
   );
 
   const newContactLabels: NewContactDialogLabels = {

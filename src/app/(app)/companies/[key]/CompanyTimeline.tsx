@@ -274,7 +274,13 @@ export function CompanyTimeline({
                         <span className="when">{formatWhen(at)}</span>
                       </div>
                       {row.body && (
-                        <div className="tl-body">
+                        // Fresh-review BLOCKER fix, 2026-09-30: `row.visible`
+                        // (buildCompanyTimelineViewRows) mirrors the contact
+                        // timeline's locked-marker class swap — `row.body`
+                        // is already the locked-content copy when `!visible`
+                        // (computed server-side; no metadata ever reaches
+                        // this component for a locked row).
+                        <div className={row.visible ? "tl-body" : "locked"}>
                           <blockquote>{row.body}</blockquote>
                         </div>
                       )}

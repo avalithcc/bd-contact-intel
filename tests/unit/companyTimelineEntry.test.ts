@@ -75,6 +75,14 @@ test("buildCompanyTimelineEntry: resolves actorName/personName from the given ma
   assert.equal(entry.scope, "contact");
 });
 
+// Fresh-review BLOCKER fix, 2026-09-30: buildCompanyTimelineViewRows needs
+// the raw actorBdId (not just the resolved actorName) to run
+// isTimelineEntryVisible, the same privacy check the contact timeline uses.
+test("buildCompanyTimelineEntry: exposes the raw actorBdId (needed for the privacy check downstream), not just the resolved actorName", () => {
+  const entry = buildCompanyTimelineEntry(rawRow({ actorBdId: "bd1" }), noNames, noNames);
+  assert.equal(entry.actorBdId, "bd1");
+});
+
 test("buildCompanyTimelineEntry: no personId -> scope 'company', no actor/person lookups attempted", () => {
   const entry = buildCompanyTimelineEntry(rawRow({ actorBdId: null, personId: null }), noNames, noNames);
   assert.equal(entry.scope, "company");

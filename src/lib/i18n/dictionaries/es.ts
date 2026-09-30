@@ -1053,6 +1053,10 @@ export const es: typeof en = {
     timelineFilterStageChange: "Cambios de etapa",
     timelineFilterContactActivity: "Actividad de contactos",
     timelineEmpty: "Todavía no hay actividad registrada.",
+    // Fresh-review BLOCKER fix, 2026-09-30 — same copy the contact timeline
+    // uses (src/lib/i18n/dictionaries/es.ts's own timelineLockedContent, in
+    // the contactRecord section) for a locked conversation-content row.
+    timelineLockedContent: "Contenido privado para el BD que lo registró (y los administradores).",
     meetingLogged: "Reunión registrada",
     atNote: "Nota",
     atEmailSent: "Correo enviado",

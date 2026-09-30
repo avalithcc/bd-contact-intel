@@ -1151,6 +1151,10 @@ export const en = {
     timelineFilterStageChange: "Stage changes",
     timelineFilterContactActivity: "Contact activity",
     timelineEmpty: "No activity logged yet.",
+    // Fresh-review BLOCKER fix, 2026-09-30 — same copy the contact timeline
+    // uses (src/lib/i18n/dictionaries/en.ts's own timelineLockedContent, in
+    // the contactRecord section) for a locked conversation-content row.
+    timelineLockedContent: "Private to the BD who logged it (and admins).",
     meetingLogged: "Meeting logged",
     atNote: "Note",
     atEmailSent: "Email sent",
