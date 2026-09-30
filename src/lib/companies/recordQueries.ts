@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
-import { parseDbTimestamp } from "@/lib/db/timestamp";
+import { buildCompanyTimelineEntry, type CompanyTimelineEntry } from "@/lib/companies/companyTimelineEntry";
 import type {
   CompanyActivityFilter,
   CompanyPropertyHistoryRow,
@@ -59,16 +59,11 @@ async function getCompanyPersonIds(companyKey: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-export interface CompanyTimelineRow {
-  id: string;
-  type: string;
-  createdAt: Date;
-  metadata: Record<string, unknown> | null;
-  actorName: string | null;
-  personId: string | null;
-  personName: string | null;
-  scope: "company" | "contact";
-}
+// Re-exported (not redefined) so every existing importer of
+// `CompanyTimelineRow` from this module keeps working — the canonical shape
+// now lives in companyTimelineEntry.ts, next to the pure mapping function
+// that builds it.
+export type { CompanyTimelineEntry as CompanyTimelineRow } from "@/lib/companies/companyTimelineEntry";
 
 /**
  * Narrows the Activity tab's base WHERE (company row OR a row from any
@@ -106,7 +101,7 @@ function companyFilterCondition(filter: CompanyActivityFilter | undefined) {
 export async function getCompanyTimeline(
   companyKey: string,
   opts: { filter?: CompanyActivityFilter } = {},
-): Promise<CompanyTimelineRow[]> {
+): Promise<CompanyTimelineEntry[]> {
   const personIds = await getCompanyPersonIds(companyKey);
 
   const baseWhere = personIds.length
@@ -121,15 +116,32 @@ export async function getCompanyTimeline(
       // Raw computed timestamptz — postgres-js returns a possibly
       // offset-less string at runtime, pinned to UTC below via
       // parseDbTimestamp (same class of bug effectiveActivityTime.ts
-      // documents).
-      at: sql<Date | string>`${effectiveActivityAtSql()}`,
+      // documents). `null` for a NON_TOUCH_ACTIVITY_TYPES row
+      // (task_updated/task_completed/task_reopened, effectiveActivityAtSql's
+      // `NULL` branch) — `rawCreatedAt` below is the display fallback for
+      // exactly that case.
+      at: sql<Date | string | null>`${effectiveActivityAtSql()}`,
+      // Fresh-review fix: a non-touch row still needs SOME time to render in
+      // the company timeline — it just must never sort as the newest touch
+      // (see `nulls last` below) or show as epoch 1970 (`new Date(null)`).
+      // Drizzle's typed column mapper parses this as a real Date already
+      // (it's a plain column reference, not a computed `sql` expression);
+      // still routed through `parseDbTimestamp` below for symmetry/safety.
+      rawCreatedAt: activity.createdAt,
       metadata: activity.metadata,
       actorBdId: activity.actorBdId,
       personId: activity.personId,
     })
     .from(activity)
     .where(filterCondition ? and(baseWhere, filterCondition) : baseWhere)
-    .orderBy(desc(sql`${effectiveActivityAtSql()}`))
+    // nulls last: a non-touch row (effective time NULL) must never outrank a
+    // real touch for this bounded LIMIT — Postgres's default for `DESC` is
+    // `NULLS FIRST`, which would otherwise let a same-day task_updated/etc.
+    // edit "become" the newest row in the timeline ahead of an older but
+    // real touch (email/call/note/...). Same fix/rationale as
+    // src/lib/contacts/listQueries.ts's "Última actividad" pick and
+    // src/lib/activity/queries.ts's getPersonTimeline.
+    .orderBy(sql`${effectiveActivityAtSql()} desc nulls last`)
     .limit(TIMELINE_LIMIT);
 
   // Batched name lookups for whichever person/actor ids actually showed up
@@ -145,16 +157,7 @@ export async function getCompanyTimeline(
   const personNameById = new Map(people.map((p) => [p.id, [p.firstName, p.lastName].filter(Boolean).join(" ") || null]));
   const actorNameById = new Map(actors.map((a) => [a.id, a.name]));
 
-  return rows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    createdAt: parseDbTimestamp(r.at),
-    metadata: r.metadata as Record<string, unknown> | null,
-    actorName: r.actorBdId ? (actorNameById.get(r.actorBdId) ?? null) : null,
-    personId: r.personId,
-    personName: r.personId ? (personNameById.get(r.personId) ?? null) : null,
-    scope: r.personId ? "contact" : "company",
-  }));
+  return rows.map((r) => buildCompanyTimelineEntry(r, personNameById, actorNameById));
 }
 
 /**
