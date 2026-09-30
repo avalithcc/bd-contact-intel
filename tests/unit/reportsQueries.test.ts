@@ -93,11 +93,19 @@ test("buildReportPerBdQuery: activity pivot uses effectiveActivityAtSql and the 
   }
 });
 
-test("buildReportPerBdQuery: tasks pivot filters status='done' and updated_at range", () => {
+test("buildReportPerBdQuery: 'Tareas completadas' sources the task_completed activity's raw created_at, never task.updated_at nor effectiveActivityAtSql (coordinator fix)", () => {
   const { sql } = renderPerBd();
-  assert.match(sql, /task\.status = 'done'/i);
-  assert.match(sql, /task\.updated_at >= \$\d+::timestamptz/i);
-  assert.match(sql, /task\.updated_at < \$\d+::timestamptz/i);
+  assert.doesNotMatch(sql, /task\.updated_at/i, "task.updated_at is bumped by any edit, not just completion");
+  assert.match(sql, /join "activity" on activity\.type = 'task_completed' and \(activity\.metadata->>'taskId'\)::uuid = task\.id/i);
+  assert.match(sql, /pbc_completed_at >= \$\d+::timestamptz/i);
+  assert.match(sql, /pbc_completed_at < \$\d+::timestamptz/i);
+});
+
+test("buildReportPerBdQuery: 'Tareas completadas' keeps only the LATEST task_completed per task, only while the task is currently 'done'", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /distinct on \(task\.id\)/i);
+  assert.match(sql, /order by task\.id, activity\.created_at desc/i);
+  assert.match(sql, /rpt_task_completions[\s\S]*?where task\.status = 'done'/i);
 });
 
 test("buildReportPerBdQuery: queue pivot scopes queue_date by the ART calendar range (date columns, not timestamptz)", () => {

@@ -19,6 +19,24 @@
  * interpolation, mirroring appShellBadgeCountsQuery.ts's own documented
  * workaround. `effectiveActivityAtSql()` itself is safe to call fresh
  * multiple times in the same statement (it builds a new tree per call).
+ *
+ * "Tareas completadas" (`rpt_task_completions`/`rpt_tasks_pivot`) deliberately
+ * does NOT use `task.updated_at` (bumped by ANY edit — a done task renamed
+ * later would be re-counted on the edit's date, not the completion's) and
+ * does NOT use `effectiveActivityAtSql()` (`task_completed` is one of
+ * `NON_TOUCH_ACTIVITY_TYPES`, so that helper returns `NULL` for it by
+ * design). The real signal is the `task_completed` activity row's own raw
+ * `created_at`, joined via `(activity.metadata->>'taskId')::uuid = task.id`
+ * (same join `getTaskCompletionInfo`, src/lib/tasks/queries.ts, already
+ * uses). `distinct on (task.id) ... order by task.id, activity.created_at
+ * desc` keeps only the LATEST completion per task — a task completed,
+ * reopened, and completed again counts once, on its latest completion —
+ * and `task.status = 'done'` (current status) excludes a task that was
+ * later reopened entirely, matching README decision 9's "did the BD close
+ * things out" meaning, not "did the BD ever mark it done at some point".
+ * The pure twin of this exact rule (`pickLatestCompletion`/
+ * `isCompletionCountable`, src/lib/reports/taskCompletions.ts) pins it in a
+ * fast unit test with plain fixtures.
  */
 import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, person, task } from "@/db/schema";
@@ -129,15 +147,23 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
         and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
       group by activity.actor_bd_id
     ),
-    rpt_tasks_pivot as (
-      select task.assigned_to_bd_id as pbc_bd_id, count(*)::int as pbc_tasks_completed
+    rpt_task_completions as (
+      select distinct on (task.id)
+        task.assigned_to_bd_id as pbc_bd_id,
+        activity.created_at as pbc_completed_at
       from ${task}
+      join ${activity} on activity.type = 'task_completed' and (activity.metadata->>'taskId')::uuid = task.id
       where task.status = 'done'
         and task.assigned_to_bd_id is not null
         and (${bdId}::uuid is null or task.assigned_to_bd_id = ${bdId}::uuid)
-        and task.updated_at >= ${fromIso}::timestamptz
-        and task.updated_at < ${toIso}::timestamptz
-      group by task.assigned_to_bd_id
+      order by task.id, activity.created_at desc
+    ),
+    rpt_tasks_pivot as (
+      select pbc_bd_id, count(*)::int as pbc_tasks_completed
+      from rpt_task_completions
+      where pbc_completed_at >= ${fromIso}::timestamptz
+        and pbc_completed_at < ${toIso}::timestamptz
+      group by pbc_bd_id
     ),
     rpt_queue_pivot as (
       select

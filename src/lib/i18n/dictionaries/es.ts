@@ -1461,6 +1461,12 @@ export const es: typeof en = {
     kpiCompaniesWonFoot: (qualified: number) => `de ${qualified} en Calificada`,
     discardReasonsTitle: "Descartes por motivo",
     discardReasonsEmpty: "Sin descartes registrados con el período y el BD seleccionados.",
+    // Collapsed illustrative reference (mockup reports.html:89-93), restored
+    // per owner approval — a fixed, hard-coded example distribution, never
+    // real data, shown only alongside the empty state above.
+    discardReferenceSummary: "Referencia: así se vería con datos (ilustrativo, no real)",
+    discardReferenceAriaLabel: "Distribución ilustrativa de los 4 motivos de descarte más frecuentes",
+    discardReferenceRemainingPrefix: "Motivos restantes, fuera de la barra por ser los menos frecuentes:",
     discardReasonsReason: "Motivo",
     discardReasonsCount: "Descartes",
     funnelTitle: "Embudo de contactos",
@@ -1492,7 +1498,8 @@ export const es: typeof en = {
     activityEmailsSent: "Correos enviados",
     activityRepliesReceived: "Respuestas recibidas",
     activityTasksCompleted: "Tareas completadas",
-    activityFoot: '"Correos enviados" y "Respuestas recibidas" incluyen la sincronización de Gmail.',
+    activityFoot:
+      '"Correos enviados" y "Respuestas recibidas" incluyen la sincronización de Gmail. "Tareas completadas" cuenta la última finalización de cada tarea que sigue en estado Hecha hoy, por la fecha en que se completó (no la de la última edición).',
     queueTitle: "Adherencia a la cola de seguimientos",
     queueWorked: "Trabajados",
     queuePostponed: "Pospuestos",

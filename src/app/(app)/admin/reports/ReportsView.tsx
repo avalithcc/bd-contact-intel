@@ -25,6 +25,24 @@ function pctOf(n: number, total: number): number {
   return total > 0 ? Math.round((n / total) * 100) : 0;
 }
 
+/**
+ * Collapsed illustrative reference for the "Descartes por motivo" empty
+ * state (mockup reports.html:89-93, decision 3) — a FIXED, hard-coded
+ * example distribution, never real data (real data, when present, renders
+ * the actual table below instead). Bar widths/colors and counts are copied
+ * 1:1 from the approved mockup.
+ */
+const DISCARD_REFERENCE_BAR = [
+  { reason: "wrong_profile" as const, count: 17, barClass: "bar-info", widthPct: 37 },
+  { reason: "not_interested" as const, count: 11, barClass: "bar-warn", widthPct: 24 },
+  { reason: "other_vendor" as const, count: 9, barClass: "bar-success", widthPct: 20 },
+  { reason: "left_company" as const, count: 7, barClass: "bar-neutral", widthPct: 15 },
+];
+const DISCARD_REFERENCE_REMAINING = [
+  { reason: "bad_data" as const, count: 4 },
+  { reason: "other" as const, count: 2 },
+];
+
 export function buildReportsHref(period: ReportPeriod, bdId: string | null): string {
   const params = new URLSearchParams();
   if (period !== "month") params.set("period", period);
@@ -35,10 +53,10 @@ export function buildReportsHref(period: ReportPeriod, bdId: string | null): str
 
 /**
  * Pure presentation for /admin/reports (owner-reporting) — no auth gate, no
- * DB. `page.tsx` fetches the two round trips and renders this; the
- * screenshot probe (src/app/login-reports-probe) renders it with a
- * hard-coded stub `ReportAggregatesResult`/`ReportPerBdRow[]` instead, so a
- * mockup-parity screenshot never touches production data.
+ * DB. `page.tsx` fetches the two round trips and renders this; a throwaway
+ * screenshot probe (deleted after use) rendered it with a hard-coded stub
+ * `ReportAggregatesResult`/`ReportPerBdRow[]` instead, so a mockup-parity
+ * screenshot never touched production data.
  */
 export function ReportsView({
   period,
@@ -183,6 +201,26 @@ export function ReportsView({
                 <InfoIcon className="icon icon-lg" />
               </div>
               <p>{dict.discardReasonsEmpty}</p>
+              <details className="mt-lg">
+                <summary className="soft small">{dict.discardReferenceSummary}</summary>
+                <div className="bar-track mt-md" role="img" aria-label={dict.discardReferenceAriaLabel}>
+                  {DISCARD_REFERENCE_BAR.map((r) => (
+                    <span key={r.reason} className={r.barClass} style={{ width: `${r.widthPct}%` }} />
+                  ))}
+                </div>
+                <div className="legend">
+                  {DISCARD_REFERENCE_BAR.map((r) => (
+                    <span key={r.reason}>
+                      <i className={r.barClass} />
+                      {discardReasonLabel(r.reason, es)} {r.count}
+                    </span>
+                  ))}
+                </div>
+                <p className="meta mt-md">
+                  {dict.discardReferenceRemainingPrefix}{" "}
+                  {DISCARD_REFERENCE_REMAINING.map((r) => `${discardReasonLabel(r.reason, es)} ${r.count}`).join(" · ")}.
+                </p>
+              </details>
             </div>
           ) : (
             <table className="data compact">
