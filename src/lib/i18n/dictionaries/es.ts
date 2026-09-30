@@ -662,6 +662,9 @@ export const es: typeof en = {
     timelineFilterCall: "Llamadas",
     timelineFilterDiscarded: "Descarte",
     timelineFilterStatusBackfill: "Estado respaldado",
+    // DFF-2026 import (src/lib/dff2026/planImport.ts) — event name comes
+    // from the activity's own metadata, never hardcoded.
+    timelineFilterEventAttendance: "Asistencia a evento",
     // Filter PILLS (contact-record.html:97-106), grouped per
     // @/lib/activity/timelinePills — distinct from the singular
     // `timelineFilter*` keys above, which label individual timeline entries.
@@ -675,6 +678,8 @@ export const es: typeof en = {
     timelineLockedContent: "Contenido privado para el BD que lo registró (y los administradores).",
     timelineSystemActor: "Sistema",
     timelineEmailSentPrefix: "Correo enviado a",
+    // DFF-2026 import — body prefix; event name is appended from metadata.
+    timelineEventAttendancePrefix: "Asistió a",
     // Fallback body when a synced reply has neither subject nor sender
     // address available (should be rare — every synced message carries at
     // least the sender).
@@ -1242,6 +1247,9 @@ export const es: typeof en = {
     atTaskUpdated: "Tarea editada",
     atTaskCompleted: "Tarea completada",
     atTaskReopened: "Tarea reabierta",
+    // DFF-2026 import (src/lib/dff2026/planImport.ts).
+    atEventAttendance: "Asistencia a evento",
+    eventAttendancePrefix: "Asistió a",
     taskChangeFieldTitle: "Título",
     taskChangeFieldDue: "Vencimiento",
     taskChangeFieldAssignee: "Asignada a",

@@ -32,6 +32,17 @@ test("effectiveActivityAtSql(): the rendered CASE returns NULL for every NON_TOU
   assert.deepEqual(params.slice(0, NON_TOUCH_ACTIVITY_TYPES.length), [...NON_TOUCH_ACTIVITY_TYPES]);
 });
 
+test("event_attendance (DFF-2026 import) is pinned in NON_TOUCH_ACTIVITY_TYPES — bulk-recorded attendance never looks like a BD touch today", () => {
+  assert.ok((NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes("event_attendance"));
+  const at = resolveEffectiveActivityAt({
+    id: "a1",
+    type: "event_attendance",
+    createdAt: new Date("2026-09-30T09:00:00.000Z"), // the import date
+    metadata: { source: "dff-2026", eventName: "Digital Finance Forum 2026", attended: true },
+  });
+  assert.equal(at, null);
+});
+
 test("resolveEffectiveActivityAt: a status_backfill row with a valid metadata.originalAt uses that, not createdAt", () => {
   const originalAt = new Date("2026-06-01T00:00:00.000Z");
   const createdAt = new Date("2026-09-26T00:00:00.000Z"); // migration run date

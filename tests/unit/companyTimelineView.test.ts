@@ -31,6 +31,8 @@ const labels = {
   atTaskUpdated: "Tarea editada",
   atTaskCompleted: "Tarea completada",
   atTaskReopened: "Tarea reabierta",
+  atEventAttendance: "Asistencia a evento",
+  eventAttendancePrefix: "Asistió a",
   taskChangeFieldTitle: "Título",
   taskChangeFieldDue: "Vencimiento",
   taskChangeFieldAssignee: "Asignada a",
@@ -108,6 +110,24 @@ test("buildCompanyTimelineViewRows: a task_updated row's body names the actor, n
   const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
   assert.equal(view.what, "Tarea editada · Bruno Diaz");
   assert.equal(view.body, "Macarena editó la tarea «Enviar propuesta»: Vencimiento 12 oct → 20 oct");
+});
+
+// --- event_attendance (DFF-2026 import) -------------------------------------
+
+test("buildCompanyTimelineViewRows: a contact-scoped event_attendance row names the person and the event, from metadata", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "event_attendance",
+      metadata: { source: "dff-2026", eventName: "Digital Finance Forum 2026", attended: true, importedAt: "2026-09-30T00:00:00.000Z" },
+      scope: "contact" as const,
+      personId: "p1",
+      personName: "Bruno Diaz",
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
+  assert.equal(view.what, "Asistencia a evento · Bruno Diaz");
+  assert.equal(view.body, "Asistió a Digital Finance Forum 2026");
 });
 
 // --- reply_received (email-sync brief follow-up review) --------------------

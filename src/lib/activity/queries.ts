@@ -36,6 +36,10 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "task_updated",
   "task_completed",
   "task_reopened",
+  // DFF-2026 import (src/lib/dff2026/planImport.ts) — bulk-recorded event
+  // attendance, not a BD's real-time action. Grouped under the "Sistema"
+  // pill with the other internal/migration types (TIMELINE_PILL_GROUPS).
+  "event_attendance",
 ] as const;
 
 export type TimelineActivityType = (typeof TIMELINE_ACTIVITY_TYPES)[number];

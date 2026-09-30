@@ -233,8 +233,12 @@ test("pure planner: never mutates its inputs, and calling it twice with the same
   const recordsSnapshot = JSON.parse(JSON.stringify(records));
   const existingSnapshot = JSON.parse(JSON.stringify([...context.existingPersonsByEmail.entries()]));
 
-  const planA = buildImportPlan(records, "all", context, genIdSeq());
-  const planB = buildImportPlan(records, "all", context, genIdSeq());
+  // A fixed clock, not `new Date()` — `buildExistingUpdate`'s `updatedAt`
+  // fill is otherwise wall-clock-dependent, which would make this exact
+  // "call it twice" comparison flaky by a few milliseconds.
+  const fixedNow = () => new Date("2026-09-30T12:00:00.000Z");
+  const planA = buildImportPlan(records, "all", context, genIdSeq(), fixedNow);
+  const planB = buildImportPlan(records, "all", context, genIdSeq(), fixedNow);
 
   assert.deepEqual(planA, planB);
   assert.deepEqual(JSON.parse(JSON.stringify(records)), recordsSnapshot);

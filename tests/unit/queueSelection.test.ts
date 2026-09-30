@@ -8,9 +8,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { resolveWorkedTodayAt, workedTodayAtSql } from "@/lib/followUp/queueSelection";
+import { resolveWorkedTodayAt, WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 
 const dialect = new PgDialect();
+
+test("event_attendance (DFF-2026 import) is excluded from WORKED_ACTIVITY_TYPES — attending an event is not a BD's outreach and must not count as worked today", () => {
+  assert.ok(!WORKED_ACTIVITY_TYPES.has("event_attendance"));
+});
 
 test("resolveWorkedTodayAt: a platform email_sent (no occurredAt) uses createdAt", () => {
   const createdAt = new Date("2026-09-30T09:00:00.000Z");

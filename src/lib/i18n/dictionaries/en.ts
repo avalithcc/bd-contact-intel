@@ -749,6 +749,9 @@ export const en = {
     timelineFilterCall: "Calls",
     timelineFilterDiscarded: "Discard",
     timelineFilterStatusBackfill: "Backfilled status",
+    // DFF-2026 import (src/lib/dff2026/planImport.ts) — event name comes
+    // from the activity's own metadata, never hardcoded.
+    timelineFilterEventAttendance: "Event attendance",
     // Filter PILLS (contact-record.html:97-106), grouped per
     // @/lib/activity/timelinePills — distinct from the singular
     // `timelineFilter*` keys above, which label individual timeline entries.
@@ -762,6 +765,8 @@ export const en = {
     timelineLockedContent: "Private to the BD who logged it (and admins).",
     timelineSystemActor: "System",
     timelineEmailSentPrefix: "Email sent to",
+    // DFF-2026 import — body prefix; event name is appended from metadata.
+    timelineEventAttendancePrefix: "Attended",
     // Fallback body when a synced reply has neither subject nor sender
     // address available (should be rare — every synced message carries at
     // least the sender).
@@ -1304,6 +1309,9 @@ export const en = {
     atTaskUpdated: "Task edited",
     atTaskCompleted: "Task completed",
     atTaskReopened: "Task reopened",
+    // DFF-2026 import (src/lib/dff2026/planImport.ts).
+    atEventAttendance: "Event attendance",
+    eventAttendancePrefix: "Attended",
     taskChangeFieldTitle: "Title",
     taskChangeFieldDue: "Due date",
     taskChangeFieldAssignee: "Assigned to",

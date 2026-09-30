@@ -29,18 +29,30 @@ import type { AttendeeRecord } from "./buildAttendeeRecords";
 
 export const DFF_2026_SOURCE_KEY = "dff-2026";
 export const DFF_2026_EVENT_NAME = "Digital Finance Forum 2026";
-/** New activity type (justified, per task brief): none of the existing
+/**
+ * New activity type (justified, per task brief): none of the existing
  * types fit "this person registered for / attended one specific event" —
  * `note` is a WORKED_ACTIVITY_TYPES entry and would wrongly count a bulk
  * historical import as "worked today"; `status_backfill` is reserved for
  * status-cache reconstructions and carries `metadata.status` semantics this
- * import has no use for. Excluded from `NON_TOUCH_ACTIVITY_TYPES`
- * (src/lib/contacts/effectiveActivityTime.ts) so it never makes 738+
- * contacts look "active today" in the last-activity column/sort/filter, and
- * — by simply never being added to it — already excluded from
- * `WORKED_ACTIVITY_TYPES` (src/lib/followUp/queueSelection.ts) and from
- * status derivation (src/lib/status/deriveStatus.ts only recognizes types
- * it explicitly lists; an unrecognized type contributes no stage/discard). */
+ * import has no use for.
+ *
+ * Included in `NON_TOUCH_ACTIVITY_TYPES` (src/lib/contacts/
+ * effectiveActivityTime.ts) so it never makes 700+ contacts look "active
+ * today" in the last-activity column/sort/filter; simply never added to
+ * `WORKED_ACTIVITY_TYPES` (src/lib/followUp/queueSelection.ts), so it
+ * cannot count as "worked today" either (both pinned by
+ * tests/unit/effectiveActivityTime.test.ts and tests/unit/
+ * queueSelection.test.ts). `deriveStatus.ts` only recognizes types it
+ * explicitly lists, so this contributes no stage/discard there either.
+ *
+ * VISIBLE on the contact and company record timelines (owner correction,
+ * 2026-09-30 — the first cut left it un-renderable): listed in
+ * `TIMELINE_ACTIVITY_TYPES` (src/lib/activity/queries.ts) and grouped under
+ * the existing "Sistema" pill (`TIMELINE_PILL_GROUPS`, timelinePills.ts) —
+ * a bulk-imported historical fact, not a BD's real-time action, same
+ * bucket as `status_backfill`/`hunter_lookup`.
+ */
 export const DFF_2026_ATTENDANCE_ACTIVITY_TYPE = "event_attendance";
 
 export type ImportScope = "all" | "attended";
@@ -254,6 +266,7 @@ function buildExistingUpdate(
   companiesToCreate: Map<string, CompanyToCreate>,
   matchedCompanyKeys: Set<string>,
   report: ImportReport,
+  now: () => Date,
 ): ExistingPersonUpdatePlan {
   const mobilePhone = resolvePhone(record.mobilePhoneRaw, record.email, report);
   const companyKey = record.companyRaw ? resolveCompanyKey(record.companyRaw, ctx, companiesToCreate, matchedCompanyKeys) : null;
@@ -314,7 +327,12 @@ function buildExistingUpdate(
     reassignedFromName = ctx.bdNamesById.get(existing.ownerBdId) ?? existing.ownerBdId;
   }
 
-  if (Object.keys(personUpdate).length > 0) personUpdate.updatedAt = new Date();
+  // `now()` (injected, defaults to real `Date`) — overwrites whatever
+  // `planHubSpotRefill` itself already set here, so the final value is
+  // ALWAYS deterministic under an injected clock, regardless of refill.ts's
+  // own internal `new Date()` call. Keeps this function callable twice with
+  // the same input for the same result (pure-planner rule).
+  if (Object.keys(personUpdate).length > 0) personUpdate.updatedAt = now();
 
   return { personId: existing.id, personUpdate, historyRows, reassignedFromBdId, reassignedFromName };
 }
@@ -344,6 +362,7 @@ export function buildImportPlan(
   scope: ImportScope,
   ctx: ImportContext,
   genId: () => string = randomUUID,
+  now: () => Date = () => new Date(),
 ): DffImportPlan {
   const inScope = scope === "attended" ? records.filter((r) => r.attended) : records;
   const companiesToCreate = new Map<string, CompanyToCreate>();
@@ -364,7 +383,7 @@ export function buildImportPlan(
 
     let personId: string;
     if (existing) {
-      const update = buildExistingUpdate(record, existing, ctx, companiesToCreate, matchedCompanyKeys, report);
+      const update = buildExistingUpdate(record, existing, ctx, companiesToCreate, matchedCompanyKeys, report, now);
       updates.push(update);
       personId = existing.id;
       if (update.reassignedFromBdId) {

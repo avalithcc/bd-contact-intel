@@ -18,11 +18,11 @@ import {
   resolveScopeEntries,
 } from "@/lib/activity/timelinePills";
 
-test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the 4 internal types under system", () => {
+test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the internal/bulk-import types under system", () => {
   assert.deepEqual([...TIMELINE_PILL_KEYS], ["note", "call", "email_sent", "meeting_logged", "system"]);
   assert.deepEqual(
     [...TIMELINE_PILL_GROUPS.system].sort(),
-    ["discarded", "hunter_lookup", "status_backfill", "status_change"].sort(),
+    ["discarded", "event_attendance", "hunter_lookup", "status_backfill", "status_change"].sort(),
   );
 });
 

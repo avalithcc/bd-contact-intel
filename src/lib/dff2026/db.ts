@@ -188,11 +188,15 @@ export async function executeDffImport(
       if (batch.length) await tx.insert(personPropertyHistory).values(batch);
     }
 
+    // The source file carries no per-attendee attendance date — `importedAt`
+    // is labeled as exactly that (when THIS script ran), never a stand-in
+    // for when the event actually happened, per owner instruction.
+    const importedAt = new Date().toISOString();
     const attendanceRowsToInsert = plan.attendance.map((a) => ({
       personId: a.personId,
       actorBdId,
       type: DFF_2026_ATTENDANCE_ACTIVITY_TYPE,
-      metadata: { source: DFF_2026_SOURCE_KEY, eventName: DFF_2026_EVENT_NAME, attended: true },
+      metadata: { source: DFF_2026_SOURCE_KEY, eventName: DFF_2026_EVENT_NAME, attended: true, importedAt },
     }));
     const attendanceActivityIds: string[] = [];
     for (const batch of chunk(attendanceRowsToInsert, WRITE_BATCH_SIZE)) {

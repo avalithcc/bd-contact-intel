@@ -14,6 +14,7 @@ function labels(): ContactRecordLabels {
   return {
     timelineLockedContent: "locked",
     timelineEmailSentPrefix: "Email sent to",
+    timelineEventAttendancePrefix: "Attended",
     timelineReplyReceivedDefault: "Reply received.",
     timelineHunterPrefix: "Hunter",
     timelineStatusChangedPrefix: "Status changed:",
@@ -59,6 +60,19 @@ test("a status_backfill activity with status 'discarded' ALSO shows its reason, 
 test("a status_backfill activity with a non-discarded status still shows the status label prefix, unaffected", () => {
   const body = entryBody(entry({ type: "status_backfill", metadata: { status: "contacted" } }), labels());
   assert.equal(body, "Status recorded before the migration: Contacted");
+});
+
+test("event_attendance (DFF-2026 import) shows the event name from metadata, never hardcoded", () => {
+  const body = entryBody(
+    entry({ type: "event_attendance", metadata: { source: "dff-2026", eventName: "Digital Finance Forum 2026", attended: true } }),
+    labels(),
+  );
+  assert.equal(body, "Attended Digital Finance Forum 2026");
+});
+
+test("event_attendance with no eventName in metadata falls back to the bare prefix", () => {
+  const body = entryBody(entry({ type: "event_attendance", metadata: { source: "dff-2026", attended: true } }), labels());
+  assert.equal(body, "Attended");
 });
 
 test("a status_backfill discarded with no reason falls back to the default discarded copy", () => {
