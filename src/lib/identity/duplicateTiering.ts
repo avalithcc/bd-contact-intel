@@ -18,9 +18,13 @@
  *   with a profile_key on the complementary side.
  * - "two_emails_same_mailbox": both sides have an email, BOTH are
  *   `emailStatus === "verified"`, the raw strings differ, but they're the
- *   same mailbox written two different ways — `.com` vs a ccTLD suffix
- *   (`.com.ar`), a middle-initial token, or an accented character. Routed to
- *   "safe" (see classifyMailboxMatch's "exact" and "initials" results). The
+ *   same mailbox on THE SAME DOMAIN written two different ways — a
+ *   separator, a middle-initial token, an accented character, or
+ *   plus-addressing. Routed to "safe" (see classifyMailboxMatch's "exact"
+ *   and "initials" results). Identical domains are required precisely so
+ *   that this tier is transitive; a ccTLD-related domain goes to
+ *   "two_emails_same_mailbox_ambiguous" instead, for the reason given
+ *   there. The
  *   verified-only gate is deliberate: unverified addresses in this database
  *   are largely inferred/deduced, not observed, which is exactly where a
  *   string heuristic is least trustworthy — an unverified pair that merely
@@ -28,12 +32,17 @@
  *   "two_emails_differ_unverified" (review), never auto-merged. This bucket
  *   exists BECAUSE two verified, differing emails do not reliably mean two
  *   different real people: of the 6 production pairs that used to land in
- *   "two_emails_differ_verified", 4 were the same person —
- *   `abresciani@rappachiani.com` / `abresciani@rappachiani.com.ar` (ccTLD),
- *   `juanmontanaro@jpmorgan.com` / `juan.montanaro@jpmorgan.com` (dot — see
- *   "two_emails_same_mailbox_ambiguous" below, this exact pair moved there),
+ *   "two_emails_differ_verified", 4 were the same person. Only 2 of those 4
+ *   are in THIS bucket today —
  *   `javier.astort@wolox.com.ar` / `javier.s.astort@wolox.com.ar` (middle initial),
  *   `martín.medina@ladonware.com` / `martin.medina@ladonware.com` (accent).
+ *   The other 2 have since moved to "two_emails_same_mailbox_ambiguous",
+ *   each because the rule that matched them turned out to be
+ *   non-transitive: `juanmontanaro@jpmorgan.com` /
+ *   `juan.montanaro@jpmorgan.com` (sole-token) and
+ *   `abresciani@rappachiani.com` / `abresciani@rappachiani.com.ar` (ccTLD).
+ *   All 4 were merged by run d097caed before that tightening, which is why
+ *   they are named here: they are the evidence, not the current contents.
  *   Merging is safe here even though `mergeEmailFields` (merge.ts) discards
  *   one of the two addresses: the discarded address is recorded as a
  *   `PropertyLoss` in the merge snapshot, so it's recoverable via
@@ -43,25 +52,33 @@
  *   (an accented local part is a HubSpot-import data-entry artifact, not a
  *   different mailbox) — see the accent-survivor override below.
  * - "two_emails_same_mailbox_ambiguous": both sides have an email, both are
- *   `emailStatus === "verified"`, and the ONLY reason they were flagged as
- *   the same mailbox is classifyMailboxMatch's "sole-token" result (one side
- *   has no separator at all, so it's read as the concatenation of the
- *   other side's tokens). Routed to "review", not "safe", because that rule
- *   is NOT transitive: a no-separator local part accepts EVERY split of the
- *   same character sequence, so e.g. `marcostrillo` matches BOTH
+ *   `emailStatus === "verified"`, and they were flagged as the same mailbox
+ *   only by a rule that is NOT transitive — classifyMailboxMatch's
+ *   "sole-token" (one side has no separator at all, so it's read as the
+ *   concatenation of the other side's tokens) or "cctld" (the two domains
+ *   differ but one is a ccTLD extension of the other). Routed to "review",
+ *   not "safe". Take "sole-token": a no-separator local part accepts EVERY
+ *   split of the same character sequence, so e.g. `marcostrillo` matches BOTH
  *   `marco.strillo` and `marcos.trillo` even though a direct comparison of
  *   those two (`marcos.trillo` vs `marco.strillo`) is false — two different
- *   real people. An equality relation that isn't transitive means the
- *   "sole-token" evidence is real but not conclusive on its own, so a human
- *   confirms it instead of either side of the binary: NOT "safe" (an
- *   auto-merge could combine two different people on the strength of a
- *   single ambiguous rule) and NOT "dismiss" either (deleting the rule
- *   entirely and falling through to "two_emails_differ_verified" would
- *   permanently mark a genuine match as not-a-duplicate, which is the
- *   original bug this whole module exists to fix, and `--revert` cannot
- *   undo a dismissal). A pair matched by identical token sequences or by the
- *   middle-initial rule carries agreeing boundary information on both sides
- *   and is not ambiguous in this way, so it stays in "two_emails_same_mailbox".
+ *   real people. "cctld" fails the same way one level down: `acme.com.ar`
+ *   and `acme.com.mx` are each an extension of `acme.com` but not of each
+ *   other, so a hub domain would let two unrelated country mailboxes merge
+ *   into it across separate runs (the chain guard below only covers pairs
+ *   open in the SAME run). An equality relation that isn't transitive means
+ *   the evidence is real but not conclusive on its own, so a human confirms
+ *   it instead of either side of the binary: NOT "safe" (an auto-merge could
+ *   combine two different people on the strength of a single ambiguous rule)
+ *   and NOT "dismiss" either (dropping the rule entirely and falling through
+ *   to "two_emails_differ_verified" would permanently mark a genuine match as
+ *   not-a-duplicate, which is the original bug this whole module exists to
+ *   fix, and `--revert` cannot undo a dismissal). What is left in
+ *   "two_emails_same_mailbox" — identical token sequences or the
+ *   middle-initial rule, both on one identical domain — reduces to equality
+ *   of a derived token sequence, which IS transitive. That is the property
+ *   the auto-merge tier needs: it must be closed under the relation it uses,
+ *   or merging pairwise can still combine two people the relation itself
+ *   calls different.
  * - "two_emails_differ_verified" / "two_emails_differ_unverified": both
  *   sides have an email, they differ, and they are NOT the same mailbox
  *   (isSameMailbox is false) — this is left as "dismiss" only when both
@@ -194,10 +211,18 @@ export function normalizeLocalPart(local: string): string[] {
  *     (two tokens). Deliberately boundary-INSENSITIVE, unlike "exact"/
  *     "initials": a side with NO separator supplies no boundary information
  *     to contradict, so concatenating is the only reading available for it.
+ *   - "cctld": the local parts matched by the "exact" or "initials" rule,
+ *     but the two DOMAINS are not identical — one is a ccTLD extension of
+ *     the other (`rappachiani.com` vs `rappachiani.com.ar`). Reported
+ *     separately because the domain relation carries its own ambiguity, no
+ *     matter how well the local parts agree: the address may belong to one
+ *     person or to that company's country office, and only a human can say.
  *
- * "sole-token" is NOT transitive, and that is exactly why callers must be
- * able to tell it apart from "exact"/"initials" instead of folding it into
- * one boolean. A no-separator local part accepts EVERY split of the same
+ * "exact" and "initials" both require identical domains, and both reduce to
+ * equality of a derived token sequence, so both are transitive. "sole-token"
+ * and "cctld" are NOT, and that is exactly why callers must be able to tell
+ * them apart from "exact"/"initials" instead of folding everything into one
+ * boolean. A no-separator local part accepts EVERY split of the same
  * character sequence: `marcostrillo` matches BOTH `marco.strillo` AND
  * `marcos.trillo` via "sole-token", even though comparing those two
  * DIRECTLY (`marcos.trillo` vs `marco.strillo`, both separated) is "none" —
@@ -207,10 +232,12 @@ export function normalizeLocalPart(local: string): string[] {
  * `tokensA.join("") === tokensB.join("")`: that version made
  * `marcos.trillo`/`marco.strillo` and `ana.maria`/`an.amaria` compare equal,
  * since joining erases exactly the separator position that tells them
- * apart). Because "sole-token" evidence is real but not conclusive on its
- * own, classifyDuplicatePairBucket routes a pair matched ONLY by
- * "sole-token" to "review" ("two_emails_same_mailbox_ambiguous"), not to
- * "safe" alongside "exact"/"initials" — see that bucket's doc comment above.
+ * apart). "cctld" repeats the failure at the domain layer: `acme.com.ar` and
+ * `acme.com.mx` are each an extension of `acme.com` but not of each other.
+ * Because both kinds of evidence are real but not conclusive on their own,
+ * classifyDuplicatePairBucket routes a pair matched only by "sole-token" or
+ * "cctld" to "review" ("two_emails_same_mailbox_ambiguous"), not to "safe"
+ * alongside "exact"/"initials" — see that bucket's doc comment above.
  */
 export type MailboxMatchRule = "none" | "exact" | "initials" | "sole-token" | "cctld";
 
