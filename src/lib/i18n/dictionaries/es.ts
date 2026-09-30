@@ -72,7 +72,7 @@ export const es: typeof en = {
     eyebrow: "Guía",
     title: "guía de roles",
     subtitle:
-      'A quién conviene contactar en cada empresa, qué decide ese rol y qué dolor resuelve Avalith — organizado por grupo de rol. Lo marcado "(supuesto)" no está confirmado por una fuente interna; queda para que el owner lo confirme o corrija.',
+      'A quién conviene contactar en cada empresa, qué decide ese rol y qué dolor resuelve Avalith — organizado por grupo de rol.',
     priorityReferenceAriaLabel: "Referencia de prioridad",
     priorityLabel: "Prioridad:",
     priorityAlta: "Alta",

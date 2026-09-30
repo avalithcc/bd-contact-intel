@@ -146,7 +146,7 @@ export const en = {
     eyebrow: "Guide",
     title: "role guide",
     subtitle:
-      'Who to contact at each company, what that role decides and what pain Avalith solves for them — organized by role group. Anything marked "(supuesto)" is not confirmed by an internal source; left for the owner to confirm or correct.',
+      'Who to contact at each company, what that role decides and what pain Avalith solves for them — organized by role group.',
     priorityReferenceAriaLabel: "Priority reference",
     priorityLabel: "Priority:",
     priorityAlta: "High",
