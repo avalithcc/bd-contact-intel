@@ -7,6 +7,7 @@
  * contact evidence → `contacted`; an outcome of `connected` in either
  * direction is a reply → `replied`). Mirrors meeting.ts/discard.ts.
  */
+import { argentinaWallClockToUtc } from "@/lib/tasks/argentinaDate";
 
 // Fixed codes from the contact-record mockup's "Resultado" select.
 export const CALL_OUTCOME_CODES = [
@@ -78,10 +79,17 @@ function parseDurationMinutes(rawDurationMinutes: string): number | null {
 /**
  * `rawDate` is a `YYYY-MM-DD` input value (blank defaults to `now`, unlike
  * meeting.ts's required date — a call is usually logged right after it
- * happens); `rawTime` an optional `HH:mm`, defaulting to midnight local time
- * when a date IS given. An unrecognized `rawDirection` defaults to
- * `"outbound"` (same defensive default as a blank one) rather than
- * rejecting the whole log over a corrupted `<select>` value.
+ * happens); `rawTime` an optional `HH:mm`, defaulting to midnight when a
+ * date IS given. Both are entered by the BD as Argentina wall-clock time,
+ * converted via `argentinaWallClockToUtc` regardless of the server
+ * process's own timezone (bug fix: this used to build `new Date` directly
+ * from the raw strings, which the JS spec parses as LOCAL time in the
+ * CALLING PROCESS's timezone — UTC on Vercel — storing every explicit
+ * date/time call log 3 hours off from what the BD actually entered,
+ * corrupting ordering against genuinely-correct UTC instants from the Gmail
+ * sync). An unrecognized `rawDirection` defaults to `"outbound"` (same
+ * defensive default as a blank one) rather than rejecting the whole log
+ * over a corrupted `<select>` value.
  *
  * `now` defaults to the real current time and is only ever overridden by
  * tests — it is BOTH the "blank date" fallback and the future-date guard's
@@ -102,7 +110,7 @@ export function planCall(
   const direction = isCallDirection(rawDirection.trim()) ? (rawDirection.trim() as CallDirection) : "outbound";
 
   const date = rawDate.trim();
-  const occurredAtDate = date ? new Date(`${date}T${rawTime.trim() || "00:00"}:00`) : now;
+  const occurredAtDate = date ? argentinaWallClockToUtc(date, rawTime.trim() || "00:00") : now;
 
   if (occurredAtDate.getTime() - now.getTime() > FUTURE_CLOCK_SKEW_TOLERANCE_MS) {
     throw new CallOccurredAtInFutureError();

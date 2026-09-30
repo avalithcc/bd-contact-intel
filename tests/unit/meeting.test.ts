@@ -11,15 +11,23 @@ test("a missing date is rejected", () => {
   assert.throws(() => planMeeting("", "11:00", ""), MeetingDateRequiredError);
 });
 
-test("date + time combine into one ISO instant", () => {
+/**
+ * 11:00 ART = 14:00 UTC (fixed UTC-3 offset). Hardcoded, not computed via
+ * `argentinaWallClockToUtc` itself (that would be tautological) — pins the
+ * bug fix: `planMeeting` used to build `new Date` directly from the raw
+ * strings, parsed as LOCAL time in the CALLING PROCESS's timezone (UTC on
+ * Vercel), storing every meeting 3h off from what the BD entered. Must pass
+ * under both `TZ=UTC` and `TZ=America/Argentina/Buenos_Aires`.
+ */
+test("date + time combine into one ISO instant, interpreted as Argentina wall-clock time", () => {
   const plan = planMeeting("2026-10-21", "11:00", "");
-  assert.equal(plan.at, new Date("2026-10-21T11:00:00").toISOString());
+  assert.equal(plan.at, "2026-10-21T14:00:00.000Z");
   assert.equal(plan.notes, null);
 });
 
-test("a missing time defaults to midnight", () => {
+test("a missing time defaults to midnight ART (03:00 UTC)", () => {
   const plan = planMeeting("2026-10-21", "", "");
-  assert.equal(plan.at, new Date("2026-10-21T00:00:00").toISOString());
+  assert.equal(plan.at, "2026-10-21T03:00:00.000Z");
 });
 
 test("notes are trimmed, blank collapses to null", () => {
