@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, bd, company, person } from "@/db/schema";
 import { accountTypeCondition, type AccountType } from "@/lib/companies/accountTypeFilter";
+import { companySearchCondition } from "@/lib/companies/searchCondition";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { HiringMatch } from "@/lib/hiring/queries";
@@ -74,6 +75,14 @@ export interface CompanyListPage {
  * is negligible next to the pagination query's own cost, so one wasn't
  * added speculatively (PERFORMANCE.md: round trips are the budget, not
  * every column needing its own index).
+ *
+ * `q` (owner report 2026-09-30: "no tengo buscador de empresas") is folded
+ * into this SAME `conditions[]` array — the total count query and the page
+ * query below therefore always agree on which rows match, same as every
+ * other filter here. `companySearchCondition` (searchCondition.ts) is the
+ * one place the match rule lives; `getCompanyViewCounts` below takes the
+ * same `q` and applies the identical condition so the view-tab badges can
+ * never disagree with what the table actually shows.
  */
 export async function getCompanyListPage(
   view: CompanyListView,
@@ -85,6 +94,7 @@ export async function getCompanyListPage(
   industryFilter?: string,
   ownerFilter?: string,
   accountTypeFilter?: AccountType,
+  q?: string,
 ): Promise<CompanyListPage> {
   const conditions: SQL[] = [];
   if (stage) conditions.push(eq(company.relationshipStage, stage));
@@ -93,6 +103,8 @@ export async function getCompanyListPage(
   if (ownerFilter) conditions.push(eq(company.ownerBdId, ownerFilter));
   const accountTypeWhere = accountTypeCondition(accountTypeFilter);
   if (accountTypeWhere) conditions.push(accountTypeWhere);
+  const searchWhere = companySearchCondition(q);
+  if (searchWhere) conditions.push(searchWhere);
 
   let hiringKeys: string[] | null = null;
   if (view === "hiring") {
@@ -194,17 +206,30 @@ export interface CompanyViewCounts {
   hiring: number;
 }
 
-/** View-tab counts (companies.html:65) — three fixed queries, no per-row cost. */
+/**
+ * View-tab counts (companies.html:65) — three fixed queries, no per-row
+ * cost. `q` (owner report 2026-09-30) is ANDed into each of the three
+ * view's own condition — same `companySearchCondition` the page/count query
+ * above uses, so a BD searching "acme" sees the All/Mine/Hiring tab badges
+ * agree with the table, exactly like the account-type filter and
+ * role-visibility work (getSystemViewCounts) did for /contacts.
+ */
 export async function getCompanyViewCounts(
   meBdId: string,
   hiringIndex: Map<string, HiringMatch>,
+  q?: string,
 ): Promise<CompanyViewCounts> {
   const hiringKeys = [...hiringIndex.keys()];
+  const searchWhere = companySearchCondition(q);
+  const mineWhere = searchWhere ? and(eq(company.ownerBdId, meBdId), searchWhere) : eq(company.ownerBdId, meBdId);
+  const hiringWhere = searchWhere
+    ? and(inArray(company.companyKey, hiringKeys), searchWhere)
+    : inArray(company.companyKey, hiringKeys);
   const [[allRow], [mineRow], hiringRows] = await Promise.all([
-    db.select({ count: sql<number>`count(*)::int` }).from(company),
-    db.select({ count: sql<number>`count(*)::int` }).from(company).where(eq(company.ownerBdId, meBdId)),
+    db.select({ count: sql<number>`count(*)::int` }).from(company).where(searchWhere),
+    db.select({ count: sql<number>`count(*)::int` }).from(company).where(mineWhere),
     hiringKeys.length
-      ? db.select({ count: sql<number>`count(*)::int` }).from(company).where(inArray(company.companyKey, hiringKeys))
+      ? db.select({ count: sql<number>`count(*)::int` }).from(company).where(hiringWhere)
       : Promise.resolve([{ count: 0 }]),
   ]);
   return {

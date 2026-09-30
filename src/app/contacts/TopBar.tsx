@@ -1,17 +1,30 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./TopBar.module.css";
 import { NAVIGATION } from "./Sidebar";
 import type { NavLabels } from "@/lib/i18n/navLabels";
+import type { TopBarSearchLabels } from "@/lib/i18n/topBarSearchLabels";
+import { resolveTopBarSearchTarget, topBarSearchBasePath } from "@/lib/shell/topBarSearchTarget";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { ChevronDownIcon, AccountIcon } from "@/components/icons";
 import { SignOutButton } from "../SignOutButton";
 import type { Locale } from "@/lib/i18n/locales";
+
+/** Reads the current `?q=` straight off `window.location.search` — not
+ * `useSearchParams()`, which would force this always-mounted shell
+ * component into the Suspense-boundary dance (same tradeoff
+ * BulkResultToast.tsx's own doc comment already documents for this exact
+ * hook). SSR-safe: returns "" on the server, then corrects itself once the
+ * effect below runs client-side. */
+function readCurrentSearchTerm(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("q") ?? "";
+}
 
 function breadcrumbFor(pathname: string, labels: NavLabels): string {
   // /account, /account/email — not in the sidenav NAVIGATION list (they're
@@ -33,11 +46,19 @@ function breadcrumbFor(pathname: string, labels: NavLabels): string {
 /**
  * App shell top bar (design.md D9, Phase 8; account menu added in tasks.md
  * mockup-parity 3.1/3.2 — see below for the "Crear" menu it shipped
- * alongside, later removed). Search is contacts-only (owner decision,
- * tasks.md 8.2): it submits to `/contacts` (task 12.2 — this route didn't
- * exist yet when the shell shipped, so it targeted `/`), using the same `q`
- * param that page reads (getContactListPage's search condition,
- * listQueries.ts).
+ * alongside, later removed).
+ *
+ * Search is context-aware (owner report 2026-09-30: "no tengo buscador de
+ * empresas, solo está el de contactos. Aunque entre a Empresas, en el
+ * header sigue apareciendo el buscador de contactos"). It used to be
+ * contacts-only unconditionally (owner decision, tasks.md 8.2); it now
+ * resolves its target from the current route
+ * (`resolveTopBarSearchTarget`, src/lib/shell/topBarSearchTarget.ts):
+ * `/companies*` submits to `/companies?q=…` (getCompanyListPage's search
+ * condition, src/lib/companies/searchCondition.ts), everywhere else keeps
+ * submitting to `/contacts?q=…` (getContactListPage's search condition,
+ * src/lib/contacts/listQueries.ts) — same `q` param either page already
+ * reads.
  *
  * The mockup's "Crear" menu (contacts.html:40-47, design-system.html) lists
  * Contacto/Tarea/Nota en un contacto/Importar contactos. It shipped here
@@ -69,21 +90,39 @@ function breadcrumbFor(pathname: string, labels: NavLabels): string {
  */
 export function TopBar({
   labels,
+  searchLabels,
   me,
   locale,
 }: {
   labels: NavLabels;
+  searchLabels: TopBarSearchLabels;
   me: { id: string; name: string; role: "admin" | "bd" };
   locale: Locale;
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [q, setQ] = useState("");
+  const searchTarget = resolveTopBarSearchTarget(pathname);
+  const [q, setQ] = useState(readCurrentSearchTerm);
+
+  // Re-seeds the box from the URL whenever the route changes — e.g.
+  // switching from a `/contacts?q=acme` search to `/companies` (no `q`)
+  // must not leave "acme" showing in what is now the companies search box.
+  // TopBar itself never unmounts between navigations (it lives in the
+  // shared app-shell layout), so this can't rely on a fresh `useState` init.
+  useEffect(() => {
+    setQ(readCurrentSearchTerm());
+  }, [pathname]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push(q ? `/contacts?q=${encodeURIComponent(q)}` : "/contacts");
+    const basePath = topBarSearchBasePath(searchTarget);
+    router.push(q ? `${basePath}?q=${encodeURIComponent(q)}` : basePath);
   }
+
+  const searchCopy =
+    searchTarget === "companies"
+      ? { label: searchLabels.companiesLabel, placeholder: searchLabels.companiesPlaceholder }
+      : { label: searchLabels.contactsLabel, placeholder: searchLabels.contactsPlaceholder };
 
   const accountLabel = me.name || labels.account;
   const roleLabel = me.role === "admin" ? labels.roleAdmin : labels.roleBd;
@@ -94,10 +133,11 @@ export function TopBar({
         <span>{breadcrumbFor(pathname, labels)}</span>
       </nav>
       <form className="search" onSubmit={onSubmit} role="search">
-        <span className="sr-only">Buscar contactos</span>
+        <span className="sr-only">{searchCopy.label}</span>
         <input
           type="search"
-          placeholder="Buscar contactos por nombre, empresa o correo electrónico"
+          placeholder={searchCopy.placeholder}
+          aria-label={searchCopy.label}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />

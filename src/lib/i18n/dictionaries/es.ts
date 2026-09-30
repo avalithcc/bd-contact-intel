@@ -167,6 +167,20 @@ export const es: typeof en = {
     roleBd: "BD",
   },
 
+  // App shell header search (TopBar.tsx) — owner report 2026-09-30: "no
+  // tengo buscador de empresas, solo está el de contactos. Aunque entre a
+  // Empresas, en el header sigue apareciendo el buscador de contactos."
+  // `*Label` doubles as the `sr-only` text AND the input's `aria-label`
+  // (the two must always say the same thing); `*Placeholder` is the
+  // visible, more detailed hint — kept as a separate key so the two can
+  // never silently drift apart when only one gets edited.
+  topBarSearch: {
+    contactsLabel: "Buscar contactos",
+    contactsPlaceholder: "Buscar contactos por nombre, empresa o correo electrónico",
+    companiesLabel: "Buscar empresas",
+    companiesPlaceholder: "Buscar empresas por nombre o dominio",
+  },
+
   home: {
     title: "base de contactos",
     signedInAs: (name, email) => `Sesión iniciada como ${name} (${email})`,
@@ -1780,6 +1794,7 @@ export const es: typeof en = {
     viewHiring: "Contratando ahora",
     stageAny: "Cualquiera",
     stageFilterLabel: "Etapa:",
+    searchFilterLabel: "Búsqueda:",
     addFilter: "Agregar filtro",
     removeFilter: "Quitar filtro",
     filterIndustryLabel: "Industria:",

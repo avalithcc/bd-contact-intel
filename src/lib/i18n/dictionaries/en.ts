@@ -196,6 +196,17 @@ export const en = {
     roleBd: "BD",
   },
 
+  // App shell header search (TopBar.tsx) — see es.ts's matching section for
+  // the owner report this closes. `*Label` doubles as the `sr-only` text
+  // AND the input's `aria-label`; `*Placeholder` is the separate, more
+  // detailed visible hint.
+  topBarSearch: {
+    contactsLabel: "Search contacts",
+    contactsPlaceholder: "Search contacts by name, company or email",
+    companiesLabel: "Search companies",
+    companiesPlaceholder: "Search companies by name or domain",
+  },
+
   home: {
     title: "contact base",
     signedInAs: (name: string, email: string) => `Signed in as ${name} (${email})`,
@@ -1833,6 +1844,7 @@ export const en = {
     viewHiring: "Hiring now",
     stageAny: "Any",
     stageFilterLabel: "Stage:",
+    searchFilterLabel: "Search:",
     addFilter: "Add filter",
     removeFilter: "Remove filter",
     filterIndustryLabel: "Industry:",
