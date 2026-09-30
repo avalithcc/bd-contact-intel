@@ -8,6 +8,7 @@ import {
   ContactsIcon,
   CompaniesIcon,
   TasksIcon,
+  FollowUpIcon,
   OutreachIcon,
   HiringIcon,
   WhatsNewIcon,
@@ -54,6 +55,7 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "leads", href: "/contacts", icon: ContactsIcon },
       { labelKey: "companies", href: "/companies", icon: CompaniesIcon },
       { labelKey: "tasks", href: "/tasks", icon: TasksIcon },
+      { labelKey: "followUps", href: "/follow-ups", icon: FollowUpIcon },
       { labelKey: "outreach", href: "/contacts?view=outreach", icon: OutreachIcon },
     ],
   },
@@ -81,10 +83,25 @@ export const NAVIGATION: SidebarSection[] = [
  * simplification to stay faithful to the approved mockup, which has no JS
  * toggle of its own.
  */
-export function Sidebar({ labels, taskCount }: { labels: NavLabels; taskCount?: number }) {
+export function Sidebar({
+  labels,
+  taskCount,
+  followUpCount,
+}: {
+  labels: NavLabels;
+  taskCount?: number;
+  followUpCount?: number;
+}) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname.startsWith(href);
+  // "Tareas"/"Seguimientos" are the only two items with a cheap badge count
+  // today (see the comment above NAVIGATION) — both riding the pill-count
+  // class the mockup already ships.
+  const pillCountByLabelKey: Partial<Record<SidebarItem["labelKey"], number | undefined>> = {
+    tasks: taskCount,
+    followUps: followUpCount,
+  };
 
   return (
     <nav className="sidenav" aria-label="Principal">
@@ -104,7 +121,9 @@ export function Sidebar({ labels, taskCount }: { labels: NavLabels; taskCount?: 
             >
               <item.icon className="icon" />
               {labels[item.labelKey]}
-              {item.labelKey === "tasks" && !!taskCount && <span className="pill-count">{taskCount}</span>}
+              {!!pillCountByLabelKey[item.labelKey] && (
+                <span className="pill-count">{pillCountByLabelKey[item.labelKey]}</span>
+              )}
             </Link>
           ))}
         </div>

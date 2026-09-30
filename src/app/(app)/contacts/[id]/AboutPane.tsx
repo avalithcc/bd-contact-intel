@@ -54,9 +54,10 @@ export interface AboutPaneProps {
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   messageLabels: GenerateMessageLabels;
   locale: Locale;
-  // Board drag/keyboard-menu handoff (task 10.5, 14.1): opens the matching
-  // quick-action composer on load, e.g. `?openAction=meeting`.
-  initialAction?: "email" | "meeting" | "discard" | null;
+  // Board drag/keyboard-menu handoff (task 10.5, 14.1), plus the follow-up
+  // queue's deep-link quick actions: opens the matching quick-action
+  // composer on load, e.g. `?openAction=meeting`.
+  initialAction?: "email" | "meeting" | "discard" | "call" | "task" | null;
 }
 
 /**

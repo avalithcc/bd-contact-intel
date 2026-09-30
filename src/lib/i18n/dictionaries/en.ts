@@ -146,6 +146,7 @@ export const en = {
     leads: "Leads",
     companies: "Companies",
     tasks: "Tasks",
+    followUps: "Follow-ups",
     outreach: "Outreach",
     hiring: "Hiring",
     whatsNew: "What's New",
@@ -994,6 +995,27 @@ export const en = {
     taskCreateError: "Could not create the task. Try again.",
     cancel: "Cancel",
     // --- end tasks: new task dialog ---
+  },
+
+  // Follow-up queue (openspec/changes/follow-up-queue) — per-BD daily list
+  // of due contacts (decision brief "1. Follow-up cadence").
+  followUpsPage: {
+    eyebrow: "Follow-ups",
+    title: "today's follow-ups.",
+    subtitle:
+      "Your own contacts, last touched less than 12 months ago, due for a follow-up: Replied with 3+ days since the last touch, or Contacted with 7+ days. Up to 10 per day, replied first and, within each status, the most recent touch first.",
+    pendingSuffix: (total: number) => `of ${total} pending today`,
+    progressAriaLabel: (done: number, total: number) => `${done} of ${total} completed today`,
+    openRecord: "Open record",
+    ariaActionsFor: (name: string) => `Quick actions for ${name}`,
+    personHeadline: (jobTitle: string, companyName: string) => `${jobTitle} at ${companyName}`,
+    emptyTitle: "You're all caught up",
+    emptyBody: "No follow-ups are due today. Check back tomorrow or review your uncontacted contacts.",
+    emptyCta: "View uncontacted",
+    postponeMenuLabel: "Postpone",
+    postponeTomorrow: "Postpone to tomorrow",
+    skipToday: "Skip today",
+    postponeError: "Could not postpone. Try again.",
   },
 
   companiesPage: {

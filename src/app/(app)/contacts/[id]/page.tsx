@@ -36,10 +36,13 @@ interface ContactRecordPageProps {
   searchParams: Promise<{ activityType?: string; openAction?: string }>;
 }
 
-// Board drag/keyboard-menu targets (task 10.5, 14.1) — the ONLY quick
-// actions a `?openAction=` link is allowed to auto-open; anything else is
-// ignored rather than trusted blindly from a query string.
-const OPEN_ACTION_VALUES = ["email", "meeting", "discard"] as const;
+// Board drag/keyboard-menu targets (task 10.5, 14.1) plus the follow-up
+// queue's deep-link quick actions (openspec/changes/follow-up-queue mockup
+// note: "clicking an action navigates to the record with that dialog
+// open") — the ONLY quick actions a `?openAction=` link is allowed to
+// auto-open; anything else is ignored rather than trusted blindly from a
+// query string.
+const OPEN_ACTION_VALUES = ["email", "meeting", "discard", "call", "task"] as const;
 type OpenActionParam = (typeof OPEN_ACTION_VALUES)[number];
 function isOpenActionParam(value: string | undefined): value is OpenActionParam {
   return !!value && (OPEN_ACTION_VALUES as readonly string[]).includes(value);

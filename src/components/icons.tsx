@@ -73,6 +73,18 @@ export function TasksIcon({ className }: { className?: string }) {
   );
 }
 
+// "Seguimientos" sidebar entry (follow-up-queue mockup) — path copied 1:1
+// from that mockup's nav item (a clock-with-history glyph, distinct from
+// TasksIcon's checkbox so the two rows aren't visually confusable).
+export function FollowUpIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5M12 7v5l4 2" />
+    </Svg>
+  );
+}
+
 // No standalone "Outreach" row exists in the approved mockup anymore — it
 // redirects into Contactos (see outreach.html's "Trasladado" note). This
 // icon (arrow, reused from that same page's before/after table) is a

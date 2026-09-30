@@ -13,11 +13,23 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   buildSinceIso,
+  effectiveActivityAtSql,
   isEffectiveActivityWithinDays,
+  NON_TOUCH_ACTIVITY_TYPES,
   resolveEffectiveActivityAt,
 } from "@/lib/contacts/effectiveActivityTime";
+
+const dialect = new PgDialect();
+
+test("effectiveActivityAtSql(): the rendered CASE returns NULL for every NON_TOUCH_ACTIVITY_TYPES value, checked before the status_backfill/call branches", () => {
+  const renderedSql = dialect.sqlToQuery(effectiveActivityAtSql()).sql;
+  assert.match(renderedSql, /case\s+when\s+"activity"\."type"\s+in\s+\(\$1, \$2, \$3\)\s+then\s+null/i);
+  const { params } = dialect.sqlToQuery(effectiveActivityAtSql());
+  assert.deepEqual(params.slice(0, 3), [...NON_TOUCH_ACTIVITY_TYPES]);
+});
 
 test("resolveEffectiveActivityAt: a status_backfill row with a valid metadata.originalAt uses that, not createdAt", () => {
   const originalAt = new Date("2026-06-01T00:00:00.000Z");
@@ -28,13 +40,13 @@ test("resolveEffectiveActivityAt: a status_backfill row with a valid metadata.or
     createdAt,
     metadata: { originalAt: originalAt.toISOString() },
   });
-  assert.equal(at.getTime(), originalAt.getTime());
+  assert.equal(at!.getTime(), originalAt.getTime());
 });
 
 test("resolveEffectiveActivityAt: a status_backfill row with missing/unparseable originalAt falls back to createdAt", () => {
   const createdAt = new Date("2026-09-26T00:00:00.000Z");
   assert.equal(
-    resolveEffectiveActivityAt({ id: "a1", type: "status_backfill", createdAt, metadata: {} }).getTime(),
+    resolveEffectiveActivityAt({ id: "a1", type: "status_backfill", createdAt, metadata: {} })!.getTime(),
     createdAt.getTime(),
   );
   assert.equal(
@@ -43,7 +55,7 @@ test("resolveEffectiveActivityAt: a status_backfill row with missing/unparseable
       type: "status_backfill",
       createdAt,
       metadata: { originalAt: "not-a-date" },
-    }).getTime(),
+    })!.getTime(),
     createdAt.getTime(),
   );
 });
@@ -57,7 +69,7 @@ test("resolveEffectiveActivityAt: a call row with a valid metadata.occurredAt us
     createdAt,
     metadata: { outcome: "connected", direction: "outbound", occurredAt: occurredAt.toISOString() },
   });
-  assert.equal(at.getTime(), occurredAt.getTime());
+  assert.equal(at!.getTime(), occurredAt.getTime());
 });
 
 test("resolveEffectiveActivityAt: every other activity type always uses createdAt, even if metadata has an originalAt-shaped field", () => {
@@ -68,7 +80,20 @@ test("resolveEffectiveActivityAt: every other activity type always uses createdA
     createdAt,
     metadata: { originalAt: "2020-01-01T00:00:00.000Z" },
   });
-  assert.equal(at.getTime(), createdAt.getTime());
+  assert.equal(at!.getTime(), createdAt.getTime());
+});
+
+test("resolveEffectiveActivityAt: a non-touch type (task_updated/task_completed/task_reopened) is null, never createdAt", () => {
+  const createdAt = new Date("2026-09-26T00:00:00.000Z");
+  for (const type of NON_TOUCH_ACTIVITY_TYPES) {
+    assert.equal(resolveEffectiveActivityAt({ id: "t1", type, createdAt, metadata: {} }), null, `expected "${type}" to be null`);
+  }
+});
+
+test("isEffectiveActivityWithinDays: a non-touch type is never 'within days', even if its createdAt is today", () => {
+  const now = new Date("2026-09-26T12:00:00.000Z");
+  const row = { id: "t1", type: "task_updated", createdAt: now, metadata: {} };
+  assert.equal(isEffectiveActivityWithinDays(row, 30, now), false);
 });
 
 test("isEffectiveActivityWithinDays: a HubSpot/collapse/fold backfill imported TODAY but reconstructing an OLD event does NOT count as recent — the exact bug this fixes", () => {
@@ -117,4 +142,46 @@ test("buildSinceIso: 0 or negative days still returns a valid ISO string (no NaN
   const now = new Date("2026-09-26T12:00:00.000Z");
   assert.equal(buildSinceIso(0, now), now.toISOString());
   assert.doesNotThrow(() => new Date(buildSinceIso(7, now)).toISOString());
+});
+
+/**
+ * Timeline ordering scenario (fresh-review fix): getPersonTimeline/
+ * getCompanyTimeline order by
+ * `coalesce(effectiveActivityAtSql(), activity.created_at) DESC`
+ * (src/lib/activity/timelineOrder.ts) — i.e. exactly
+ * `resolveEffectiveActivityAt(row) ?? row.createdAt`, descending. This pins
+ * that JS-side equivalent of the rule: a `task_updated` row created AFTER
+ * 60 older touch rows must sort first and survive a `LIMIT` that only
+ * keeps the newest N — the bug `NULLS LAST` caused (a non-touch row always
+ * sorting last, cut by the limit on a busy record) is impossible here since
+ * `coalesce`/`??` never produces a value that sorts as "oldest".
+ */
+test("timeline ordering: a task_updated row newer than 60 other activities appears first in a limited timeline page", () => {
+  const now = new Date("2026-09-29T12:00:00.000Z");
+  const olderTouchRows = Array.from({ length: 60 }, (_, i) => ({
+    id: `touch-${i}`,
+    type: "email_sent",
+    createdAt: new Date(now.getTime() - (i + 1) * 60 * 60 * 1000), // each 1h older than the last
+    metadata: {},
+  }));
+  const newestTaskEdit = {
+    id: "task-edit-1",
+    type: "task_updated",
+    createdAt: now, // newer than every touch row above
+    metadata: {},
+  };
+
+  const rows = [...olderTouchRows, newestTaskEdit];
+  const sorted = [...rows].sort((a, b) => {
+    const atA = (resolveEffectiveActivityAt(a) ?? a.createdAt).getTime();
+    const atB = (resolveEffectiveActivityAt(b) ?? b.createdAt).getTime();
+    return atB - atA;
+  });
+  const limitedPage = sorted.slice(0, 50); // a bounded LIMIT smaller than the full 61 rows
+
+  assert.equal(sorted[0]!.id, "task-edit-1", "the task edit must sort first — it is the newest row");
+  assert.ok(
+    limitedPage.some((r) => r.id === "task-edit-1"),
+    "the task edit must survive the LIMIT, not be cut as if it were the oldest row",
+  );
 });

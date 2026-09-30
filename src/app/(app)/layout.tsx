@@ -2,8 +2,7 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { pickNavLabels } from "@/lib/i18n/navLabels";
 import { getCurrentBd } from "@/lib/queries";
-import { getTaskBadgeCount } from "@/lib/tasks/queries";
-import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
+import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { Sidebar } from "../contacts/Sidebar";
 import { TopBar } from "../contacts/TopBar";
@@ -18,12 +17,14 @@ import { TopBar } from "../contacts/TopBar";
  * under this layout (contacts/tasks/hiring/discovery/whats-new) — not a
  * new heavy query, just one more call site for it.
  *
- * `getTaskBadgeCount(me.id, ...)` (task-reminders backlog) is the sidebar's
- * "Tareas" count — today + overdue open tasks for the signed-in BD. It's
- * the one new round trip this layout adds (a single bounded `count(*)`,
- * covered by task_assignee_idx/task_status_idx/task_due_idx); `me.id` above
- * is free since `getCurrentBd()` is already paid for by every page under
- * this layout.
+ * `getAppShellBadgeCounts(me.id, ...)` (task-reminders backlog; follow-up-
+ * queue) is the sidebar's "Tareas"/"Seguimientos" counts — ONE round trip,
+ * two independent scalar subqueries in a single statement (fresh-review
+ * fix: this used to be two separate sequential calls,
+ * `getTaskBadgeCount`/`getFollowUpQueueBadgeCount`, doubling the shell's own
+ * query budget on every page view — see appShellBadgeCountsQuery.ts's doc
+ * comment). `me.id` above is free since `getCurrentBd()` is already paid
+ * for by every page under this layout.
  *
  * mockup-port 02: the `.app`/`.main` wrapper below is contacts.html's own
  * shell grid (design-system.css) — `.app { grid-template-columns:
@@ -39,13 +40,13 @@ export default async function AppLayout({
   const locale = await getLocale();
   const labels = pickNavLabels(t(locale));
   const me = await getCurrentBd();
-  const { tomorrowStartUtc } = argentinaDayBoundaries(new Date());
-  const taskCount = await getTaskBadgeCount(me.id, tomorrowStartUtc);
+  const now = new Date();
+  const { taskCount, followUpCount } = await getAppShellBadgeCounts(me.id, now);
 
   return (
     <ToastProvider>
       <div className="app">
-        <Sidebar labels={labels} taskCount={taskCount} />
+        <Sidebar labels={labels} taskCount={taskCount} followUpCount={followUpCount} />
         <div className="main">
           <TopBar
             labels={labels}

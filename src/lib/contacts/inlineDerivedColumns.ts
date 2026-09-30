@@ -32,11 +32,14 @@ const EMPTY_BD_CONNECTION_SUMMARY: BdConnectionSummary = { avatars: [], title: "
 /** One `lastActivityRaw` correlated-subquery result: `createdAt` is the
  * `effectiveActivityAtSql()` timestamptz expression, rendered to JSON text
  * by Postgres's `json_build_object` (`to_json`) — a wire STRING, never a JS
- * `Date`, at this layer. */
+ * `Date`, at this layer. `null` when the picked row is a
+ * NON_TOUCH_ACTIVITY_TYPES type (effectiveActivityAtSql's `NULL` branch) —
+ * only reachable when a person's ONLY activity is non-touch; treated the
+ * same as no last activity at all (see `mapInlineDerivedColumns` below). */
 export interface InlineLastActivityRaw {
   type: string;
   metadata: unknown;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 export interface InlineDerivedRawRow extends ContactListRowBase {
@@ -87,13 +90,14 @@ export function mapInlineDerivedColumns<
       bdConnections: bdConnectionsRaw?.length
         ? buildBdConnectionSummaries(bdConnectionsRaw)
         : EMPTY_BD_CONNECTION_SUMMARY,
-      lastActivity: lastActivityRaw
-        ? {
-            type: lastActivityRaw.type,
-            label: formatLastActivityLabel(lastActivityRaw, dict),
-            createdAt: parseEffectiveActivityAt(lastActivityRaw.createdAt),
-          }
-        : null,
+      lastActivity:
+        lastActivityRaw && lastActivityRaw.createdAt !== null
+          ? {
+              type: lastActivityRaw.type,
+              label: formatLastActivityLabel(lastActivityRaw, dict),
+              createdAt: parseEffectiveActivityAt(lastActivityRaw.createdAt),
+            }
+          : null,
     } satisfies ContactListRow;
   });
 }

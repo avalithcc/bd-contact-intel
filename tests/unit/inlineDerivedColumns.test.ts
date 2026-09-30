@@ -177,6 +177,14 @@ test("mapInlineDerivedColumns: createdAt with NO trailing Z/offset is interprete
   );
 });
 
+test("mapInlineDerivedColumns: a lastActivityRaw with createdAt null (person's only activity is a non-touch type) yields lastActivity null, not a crash", () => {
+  const [row] = mapInlineDerivedColumns(
+    [rowWith({ id: "p1" }, [], { type: "task_updated", metadata: {}, createdAt: null })],
+    dict,
+  );
+  assert.equal(row.lastActivity, null);
+});
+
 // (d) parity: for the same underlying data, `mapInlineDerivedColumns`
 // (inline JSON columns) and the pure helpers `attachDerivedColumns` batches
 // through (`groupBdConnectionsByPerson`, `buildBdConnectionSummaries`,

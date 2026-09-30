@@ -101,3 +101,11 @@ test("buildLastActivityEntries interprets a createdAt string with NO trailing Z/
     `expected UTC midnight regardless of TZ=${process.env.TZ ?? "(unset)"}`,
   );
 });
+
+test("buildLastActivityEntries skips a row with createdAt null (person's only activity is a non-touch type) instead of coercing new Date(null)", () => {
+  const map = buildLastActivityEntries(
+    [{ personId: "p1", type: "task_updated", metadata: {}, createdAt: null }],
+    dict,
+  );
+  assert.equal(map.get("p1"), undefined);
+});

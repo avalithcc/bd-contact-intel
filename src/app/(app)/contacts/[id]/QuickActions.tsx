@@ -49,9 +49,10 @@ export interface QuickActionsProps {
   // /whats-new.
   messageLabels: GenerateMessageLabels;
   locale: Locale;
-  // Board drag/keyboard-menu handoff (task 10.5, 14.1): pre-opens this
-  // composer on mount, e.g. arriving from `/contacts/[id]?openAction=meeting`.
-  initialAction?: "email" | "meeting" | "discard" | null;
+  // Board drag/keyboard-menu handoff (task 10.5, 14.1), plus the follow-up
+  // queue's deep-link quick actions: pre-opens this composer on mount, e.g.
+  // arriving from `/contacts/[id]?openAction=meeting`.
+  initialAction?: "email" | "meeting" | "discard" | "call" | "task" | null;
   // "Tarea" quick action's assignee `<select>` (task-essentials backlog item
   // 2) — the same `bd` list `PropertyList`'s owner `<select>` already uses.
   assigneeOptions: TaskAssigneeOption[];
