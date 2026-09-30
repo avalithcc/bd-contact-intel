@@ -15,6 +15,7 @@ import {
   DiscoveryIcon,
   PlaybookIcon,
   AccountIcon,
+  EyeIcon,
 } from "@/components/icons";
 
 export interface SidebarItem {
@@ -88,10 +89,16 @@ export function Sidebar({
   labels,
   taskCount,
   followUpCount,
+  isAdmin,
 }: {
   labels: NavLabels;
   taskCount?: number;
   followUpCount?: number;
+  // Admin-only "Administración" section (admin-conversation-access mockup,
+  // screen 1: admin-conversation.html:57-61) — only "Registro de auditoría"
+  // is wired here; see NAVIGATION's own comment for why Duplicados/Migración
+  // stay out of this real Sidebar for now.
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -129,6 +136,20 @@ export function Sidebar({
           ))}
         </div>
       ))}
+
+      {isAdmin && (
+        <div className="nav-section">
+          <div className="nav-title">{labels.administrationSection}</div>
+          <Link
+            href="/admin/audit-log"
+            className={`nav-item${isActive("/admin/audit-log") ? " active" : ""}`}
+            aria-current={isActive("/admin/audit-log") ? "page" : undefined}
+          >
+            <EyeIcon className="icon" />
+            {labels.auditLog}
+          </Link>
+        </div>
+      )}
 
       <div className="sidenav-footer">
         {/* "Guía de roles" (openspec/changes/bd-playbook, owner decision

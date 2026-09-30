@@ -4,15 +4,14 @@
   font-size: var(--text-sm);
 }
 
-.auditNotice {
-  color: var(--color-warn-text, var(--color-ink-muted));
-  font-weight: 600;
-}
-
 .section {
   margin-top: var(--space-xl);
 }
 
+/* Legacy `emailEntries` cards (manual, pre-email-sync `email_sent` activity)
+   — not in the mockup's own sample data, so no design-system equivalent to
+   port onto; kept as its own simple card style rather than forcing it into
+   `.thread`/`.thread-msg`, which assume a synced message's richer shape. */
 .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -20,17 +19,7 @@
   margin-bottom: var(--space-md);
 }
 
-.message {
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
 .meta {
   color: var(--color-ink-muted);
   font-size: var(--text-sm);
-}
-
-.empty {
-  color: var(--color-ink-muted);
 }

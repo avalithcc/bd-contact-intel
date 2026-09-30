@@ -105,7 +105,7 @@ export function AdminConversationReveal({
       >
         {l.viewConversationLink} ({l.viewConversationAuditHint})
       </button>
-      <Link href={`/contacts/${personId}/conversation/${bdId}`} className="btn btn-ghost btn-sm">
+      <Link prefetch={false} href={`/contacts/${personId}/conversation/${bdId}`} className="btn btn-ghost btn-sm">
         {l.adminOpenAsPage}
       </Link>
       {error && (

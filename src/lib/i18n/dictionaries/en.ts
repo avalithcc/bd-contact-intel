@@ -184,6 +184,8 @@ export const en = {
     discovery: "Discovery",
     account: "Account",
     playbook: "Role guide",
+    administrationSection: "Administration",
+    auditLog: "Audit log",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
     // TopBar account menu (tasks.md mockup-parity 3.2).
@@ -851,12 +853,29 @@ export const en = {
     adminAuditAlertTitle: "You are viewing another BD's conversation",
     adminNoConversationContent: "No conversation content on file.",
     adminOpenAsPage: "Open as a page",
+    // --- admin "Ver conversación" confirmation dialog (admin-conversation-
+    // access mockup, screen 1) — plain strings only (Timeline.tsx is a client
+    // component, see ClientStrings): the dialog composes
+    // `${adminViewDialogTitlePrefix} ${bdName}?` / `${adminViewDialogBodyPrefix}
+    // ${bdName} ${adminViewDialogBodyWith} ${personName}.` in code, the same
+    // "prefix + interpolated name" pattern timelineLockedThreadBelongsTo above
+    // already uses.
+    adminViewDialogTitlePrefix: "View the conversation of",
+    adminViewDialogBodyPrefix: "You're about to view the conversation of",
+    adminViewDialogBodyWith: "with",
+    // Owner decision (2026-09-30): the conversation's owner is never notified
+    // and has no way to see this view — this copy states that plainly instead
+    // of the earlier "they'll be able to see you viewed it" wording.
+    adminAuditConfirmTitle: "This view is recorded",
+    adminAuditConfirmBody:
+      "It's saved to the audit log with your name, the date, and whose conversation it is. The log is visible to admins only; they are never notified and cannot see that you viewed it.",
     stageBadgePrefix: "Stage:",
     conversationHistoryTitle: "Conversation history",
     conversationHistoryIntroPrefix: "Conversation history exists with:",
     conversationHistoryPrivateFooter: "Content is private to each BD.",
     conversationHistoryAdminFooter:
       "Admins can open any conversation; every view is recorded in the audit log.",
+    conversationHistoryViewAction: "View",
     tasksCardTitle: "Tasks",
     addTaskAction: "Add task",
     changeCompanyAria: "Change company",
@@ -909,6 +928,7 @@ export const en = {
     hiringBadge: (count: number) => `Hiring · ${count} IT roles`,
     companyContactCount: (count: number) => `${count} contacts at this company`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} messages · last ${dateLabel}`,
+    lockedConversationThreadCount: (count: number) => (count === 1 ? "1 email thread" : `${count} email threads`),
     lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
     touchpointsFoot: (linkedin: number, email: number, notes: number) =>
       `${linkedin} LinkedIn · ${email} emails · ${notes} notes`,
@@ -946,11 +966,21 @@ export const en = {
   adminConversation: {
     backLink: "Back to the record",
     title: "Conversation with",
-    auditNotice: "This view is recorded in the audit log.",
-    emailSectionTitle: "Emails",
+    syncedEmailSectionTitle: "Synced email",
+    noSyncedEmailContent: "No synced email with this BD.",
+    legacyEmailSectionTitle: "Email (manual record)",
     linkedinSectionTitle: "LinkedIn conversation",
     noEmailContent: "No emails sent by this BD.",
     noLinkedinContent: "No LinkedIn conversation with this BD.",
+    // Audit banner (admin-conversation-access mockup, admin-conversation.html:208)
+    // — a server-only function template (this dict section is never passed to
+    // a client component, see contactRecordServer's own doc comment for why
+    // that split exists elsewhere). Owner decision (2026-09-30): no promise
+    // that the BD can see this, unlike the mockup's earlier draft copy.
+    auditBannerTitle: (bdName: string) =>
+      `You're viewing ${bdName}'s conversation as an administrator — this access was recorded`,
+    auditBannerBody: (actorName: string, bdName: string, personName: string, dateLabel: string) =>
+      `Audit log: ${actorName} · ${bdName}'s conversation with ${personName} · ${dateLabel}.`,
   },
 
   login: {
@@ -1531,6 +1561,26 @@ export const en = {
       already_resolved: "This pair was already resolved by someone else.",
       unexpected: "The action could not be completed. Please try again.",
     },
+  },
+
+  auditLog: {
+    eyebrow: "Admin",
+    title: "audit log",
+    subtitle: "Who viewed another BD's conversation, with whom, and when.",
+    noteBodyPrefix: "Conversation views only.",
+    noteBodyBeforeLink: "Other audited actions (merges, undo merge) already have their own view in",
+    noteLinkText: "Duplicates → merge history",
+    cardTitle: "Conversation views",
+    colWhen: "When",
+    colAdmin: "Admin",
+    colContact: "Contact",
+    colConversationOf: "Conversation of",
+    openAction: "Open",
+    emptyState: "No conversation views recorded yet.",
+    prevPage: "Previous",
+    nextPage: "Next",
+    pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
+    showingRange: (from: number, to: number, total: number) => `Showing ${from}-${to} of ${total}`,
   },
 
   // `/contacts` list (task 12.2-12.4; contact-list spec). System view labels

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Registro de auditoría · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* ---------------------------------------------------------------------
+   Additions for this mockup only (not yet in the shared design system).
+   Flagged in README.md (decision 6) for owner sign-off; if approved, fold
+   into crm-hubspot-ux/mockups/styles.css.
+   --------------------------------------------------------------------- */
+
+/* Admin-only affordance on a locked thread row: reuses .locked (email-sync)
+   plus a footer action row. New: .locked has no precedent for an action
+   inside it — every existing use (email-sync mockup, contact-record.html)
+   is read-only chrome for non-admins. */
+.locked-actions { margin-top: var(--space-sm); }
+
+.mockup-index { display: flex; flex-wrap: wrap; gap: var(--space-sm); padding: var(--space-lg) var(--space-2xl) 0; }
+.mockup-index a { font-size: var(--text-sm); }
+.screen-title { font: 700 0.7rem var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-subtle); padding: var(--space-2xl) var(--space-2xl) 0; }
+.screen-hr { border: 0; border-top: 2px solid var(--color-border-strong); margin: 0; }
+</style>
+</head>
+<body>
+<div class="mock-note" role="note" style="margin:var(--space-lg) var(--space-2xl) 0;"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota de mockup.</strong> Un único archivo con las 3 pantallas del cambio <span class="mono">admin-conversation-access</span> (backlog: <span class="mono">admin-email-conversation-access</span>). Nada de esto está implementado — la ruta <span class="mono">/contacts/[id]/conversation/[bdId]</span> y <span class="mono">getConversationForAdmin</span> ya existen, pero sin entrada de UI. Ver <a href="README.md">README.md</a> para las decisiones numeradas pendientes de aprobación. <strong>Decisión del owner (2026-09-30):</strong> el BD dueño de la conversación NO es notificado y NO tiene forma de ver que un administrador la visualizó — el registro de auditoría es visible únicamente para administradores. Las decisiones 1 y 2 del README quedan resueltas así; el copy de este mockup ya refleja esa decisión.</div><span class="tag tag-scope">En alcance: admin-conversation-access</span></div>
+<nav class="mockup-index" aria-label="Saltar a una pantalla">
+<a href="#screen-1">1. Ficha de contacto · hilo bloqueado + acción de administrador</a>
+<a href="#screen-2">2. Vista de conversación (administrador)</a>
+<a href="#screen-3">3. Administración → Registro de auditoría</a>
+</nav>
+
+<!-- ===================================================================
+     SCREEN 1 — Contact record (admin view), locked thread rows with the
+     new "Ver conversación" entry point. Reuses contact-record-admin.html's
+     RecordShell and email-sync.html's .locked block.
+     =================================================================== -->
+<div class="screen-title" id="screen-1">1 / 3 · Ficha de contacto (vista administrador) — hilos bloqueados</div>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item" href="#screen-3"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Registro de auditoría</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="../../crm-hubspot-ux/mockups/contacts.html">Contactos</a><span class="sep">/</span><span>Valentina Rojas</span></nav>
+<label class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo electrónico"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a3">CC</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">Administrador</span></span></div>
+</div>
+</details>
+</div>
+</header>
+<div class="record-note"><div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota de mockup.</strong> Misma ficha que <a href="../../email-sync/mockups/email-sync.html#screen-1">email-sync.html, pantalla 1</a> (pestaña Correos), vista por un <strong>administrador</strong>. Los tres hilos bloqueados ahora muestran la acción nueva "Ver conversación" — hoy no existe ningún botón dentro de <span class="mono">.locked</span>. Comparar con la <a href="../../email-sync/mockups/email-sync.html#screen-1">vista de BD</a>, donde el mismo bloque no tiene acción.</div><span class="tag tag-scope">En alcance: admin-conversation-access</span></div></div>
+<div class="record">
+<aside class="record-left" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en Mercado Libre</p></div>
+<div class="row wrap"><span class="badge badge-replied">Respondió</span><span class="badge badge-verified">Verificado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-replied">Respondió</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>v.rojas@mercadolibre.com <span class="badge badge-verified">Verificado</span></dd></div>
+</dl>
+</aside>
+<main class="record-main">
+<div class="tabs" role="tablist" aria-label="Secciones de la ficha">
+<button class="tab" role="tab" aria-selected="true">Actividad</button>
+<button class="tab" role="tab" aria-selected="false">Resumen</button>
+</div>
+<section>
+<div class="timeline-toolbar" role="group" aria-label="Filtrar por tipo de actividad">
+<button class="filter-pill on">Todo <span class="n">16</span></button>
+<button class="filter-pill"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Correos <span class="n">4</span></button>
+<button class="filter-pill"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>LinkedIn <span class="n">4</span></button>
+<span class="grow"></span><button class="btn btn-ghost btn-sm">Más recientes primero<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+</div>
+
+<div class="tl-group">Octubre 2026</div>
+<div class="tl">
+
+<!-- Locked: Juan Martínez's synced email thread. Admin-only action added
+     below the .locked block (new — see README decision 3). -->
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Hilo de correo · Squads senior para Mercado Pago</span><span class="when">13 oct, 16:40</span></div>
+<div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Este hilo pertenece a Juan Martínez. Se puede ver que existe y cuándo ocurrió; su contenido es privado para Juan (y los administradores).</span></div>
+<div class="locked-actions row"><a class="btn btn-secondary btn-sm" href="#confirm-view-juan"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver conversación (queda registrado)</a></div>
+</div></div>
+
+<!-- Locked: Juan Martínez's legacy LinkedIn conversation. Same target page
+     as the row above — both belong to the same BD (README decision 4). -->
+<div class="tl-item"><div class="tl-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Conversación de LinkedIn · Juan Martínez</span><span class="badge badge-replied">Respuesta recibida</span><span class="when">12 oct, 18:04</span></div>
+<div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Este hilo pertenece a Juan Martínez. Se puede ver que existe y cuándo ocurrió; su contenido es privado para Juan (y los administradores).</span></div>
+<div class="locked-actions row"><a class="btn btn-secondary btn-sm" href="#confirm-view-juan"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver conversación (queda registrado)</a></div>
+</div></div>
+
+<!-- Locked: Ana Pereyra's synced email thread (same scenario as
+     email-sync.html screen 1). Different BD → different target page. -->
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Hilo de correo · presupuesto de plataforma 2027</span><span class="when">2 oct, 08:12</span></div>
+<div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Este hilo pertenece a Ana Pereyra. Se puede ver que existe y cuándo ocurrió; su contenido es privado para Ana (y los administradores).</span></div>
+<div class="locked-actions row"><a class="btn btn-secondary btn-sm" href="#confirm-view-ana"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver conversación (queda registrado)</a></div>
+</div></div>
+
+</div>
+</section>
+</main>
+<aside class="record-right" aria-label="Asociaciones">
+<div class="card assoc"><div class="card-header"><h3>Historial de conversaciones</h3></div>
+<div class="card-body">
+<p class="small">Existe historial de conversaciones con: <strong>Juan Martínez</strong>, <strong>Ana Pereyra</strong>.</p>
+<div class="assoc-row"><div class="grow"><div class="n">Juan Martínez</div><div class="s">1 hilo de correo · 1 conversación de LinkedIn</div></div><a class="btn btn-secondary btn-sm" href="#confirm-view-juan"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver</a></div>
+<div class="assoc-row"><div class="grow"><div class="n">Ana Pereyra</div><div class="s">1 hilo de correo</div></div><a class="btn btn-secondary btn-sm" href="#confirm-view-ana"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver</a></div>
+<p class="meta mt-lg">Los administradores pueden abrir cualquier conversación; cada visualización queda registrada en el registro de auditoría.</p>
+</div></div>
+</aside>
+</div>
+</div>
+</div>
+
+<!-- Confirmation dialogs — one per target BD, so the copy can name them.
+     Same modal pattern as duplicates.html's "¿Deshacer la fusión?". -->
+<div class="overlay" id="confirm-view-juan" role="dialog" aria-modal="true" aria-labelledby="cvj-title">
+<div class="dialog">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><h2 id="cvj-title">¿Ver la conversación de Juan Martínez?</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#screen-1" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body">
+<p>Vas a ver el correo y la conversación de LinkedIn de <strong>Juan Martínez</strong> con <strong>Valentina Rojas</strong>.</p>
+<div class="alert alert-audit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><div class="title">Esta visualización queda registrada</div>Se guarda en el registro de auditoría con tu nombre, la fecha y a quién pertenece la conversación. El registro es visible únicamente para administradores; Juan no es notificado ni puede ver que la visualizaste.</div></div>
+</div>
+<div class="dialog-footer"><a class="btn btn-secondary" href="#screen-1">Cancelar</a><a class="btn btn-primary" href="#screen-2"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver conversación</a></div>
+</div></div>
+
+<div class="overlay" id="confirm-view-ana" role="dialog" aria-modal="true" aria-labelledby="cva-title">
+<div class="dialog">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><h2 id="cva-title">¿Ver la conversación de Ana Pereyra?</h2><a class="btn btn-ghost btn-icon btn-sm close" href="#screen-1" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
+<div class="dialog-body">
+<p>Vas a ver el correo sincronizado de <strong>Ana Pereyra</strong> con <strong>Valentina Rojas</strong>.</p>
+<div class="alert alert-audit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><div class="title">Esta visualización queda registrada</div>Se guarda en el registro de auditoría con tu nombre, la fecha y a quién pertenece la conversación. El registro es visible únicamente para administradores; Ana no es notificada ni puede ver que la visualizaste.</div></div>
+</div>
+<div class="dialog-footer"><a class="btn btn-secondary" href="#screen-1">Cancelar</a><a class="btn btn-primary" href="#screen-2b"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Ver conversación</a></div>
+</div></div>
+
+<hr class="screen-hr">
+
+<!-- ===================================================================
+     SCREEN 2 — Dedicated conversation view (admin only), matching the
+     real route src/app/(app)/contacts/[id]/conversation/[bdId]/page.tsx.
+     Full width, banner up top, grouped by source (synced email, then
+     legacy LinkedIn).
+     =================================================================== -->
+<div class="screen-title" id="screen-2">2 / 3 · Vista de conversación (administrador) — Juan Martínez · Valentina Rojas</div>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item" href="#screen-3"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Registro de auditoría</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="#screen-1">Contactos</a><span class="sep">/</span><a href="#screen-1">Valentina Rojas</a><span class="sep">/</span><span>Conversación con Juan Martínez</span></nav>
+<label class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo electrónico"><kbd>/</kbd></label>
+</header>
+<div class="record-note"><div class="alert alert-audit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><div class="title">Estás viendo la conversación de Juan Martínez como administrador — este acceso quedó registrado</div>Registro de auditoría: Cristian Civita · conversación de Juan Martínez con Valentina Rojas · 15 oct 2026, 10:42.</div></div></div>
+<main class="page">
+<a class="btn btn-ghost btn-sm mb-lg" href="#screen-1"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Volver a la ficha</a>
+<div class="page-header"><div class="titles"><div class="eyebrow">Conversación con Juan Martínez</div><h1>valentina rojas<span class="dot">.</span></h1><p class="meta">VP de Ingeniería en Mercado Libre</p></div></div>
+
+<h2 class="section-title mt-xl">Correos sincronizados</h2>
+<div class="tl">
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Hilo de correo · Squads senior para Mercado Pago</span><span class="badge badge-info no-dot">2 mensajes</span><span class="when">13 oct, 16:40</span></div>
+<div class="thread">
+<div class="thread-msg"><span class="avatar avatar-sm a6 avatar-bd">JM</span><div>
+<div class="thread-msg-head"><span class="who"><span class="from">Juan Martínez</span> <span class="badge badge-info no-dot">Enviado</span></span><span class="when">13 oct, 16:40</span></div>
+<span class="meta recipient">para v.rojas@mercadolibre.com</span>
+<div class="snippet">Valentina, un gusto retomar contacto. En Avalith armamos squads senior nearshore; ¿tiene sentido ver el plan de Q1 con tu equipo de plataforma?</div>
+</div></div>
+<div class="thread-msg"><span class="avatar avatar-sm a1">VR</span><div>
+<div class="thread-msg-head"><span class="who"><span class="from">Valentina Rojas</span> <span class="badge badge-success no-dot">Recibido</span></span><span class="when">14 oct, 08:55</span></div>
+<div class="snippet">Hola Juan, gracias. Ahora estamos cerrando el plan Q1, te escribo a fin de mes.</div>
+</div></div>
+</div></div></div>
+</div>
+
+<h2 class="section-title mt-xl">Conversación de LinkedIn</h2>
+<div class="tl">
+<div class="tl-item"><div class="tl-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Conversación de LinkedIn</span><span class="badge badge-replied">Respuesta recibida</span><span class="when">12 oct, 18:04</span></div>
+<div class="thread">
+<div class="thread-msg"><span class="avatar avatar-sm a6 avatar-bd">JM</span><div><span class="from">Juan Martínez</span><div class="snippet">Hola Valentina, vi que Mercado Libre está sumando equipos de plataforma en Córdoba. En Avalith armamos squads nearshore senior; ¿te sirve una llamada corta?</div></div><span class="meta">3 oct</span></div>
+<div class="thread-msg"><span class="avatar avatar-sm a1">VR</span><div><span class="from">Valentina Rojas</span><div class="snippet">Hola Juan, gracias. Ahora estamos cerrando el plan Q1. Escribime a fin de mes y lo vemos con mi equipo.</div></div><span class="meta">12 oct</span></div>
+</div></div></div>
+</div>
+</main>
+</div>
+</div>
+<hr class="screen-hr">
+
+<!-- Same page, Ana Pereyra variant: only the "Correos sincronizados"
+     section has content, "Conversación de LinkedIn" shows the empty state
+     (reuses .empty, same as any other list in the app). Kept as its own
+     anchor so the record-right "Ver" link in screen 1 has a real target. -->
+<div class="screen-title" id="screen-2b">2b / 3 · Vista de conversación (administrador) — Ana Pereyra · Valentina Rojas (sin LinkedIn)</div>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item" href="#screen-3"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Registro de auditoría</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="#screen-1">Contactos</a><span class="sep">/</span><a href="#screen-1">Valentina Rojas</a><span class="sep">/</span><span>Conversación con Ana Pereyra</span></nav>
+<label class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo electrónico"><kbd>/</kbd></label>
+</header>
+<div class="record-note"><div class="alert alert-audit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><div class="title">Estás viendo la conversación de Ana Pereyra como administrador — este acceso quedó registrado</div>Registro de auditoría: Cristian Civita · conversación de Ana Pereyra con Valentina Rojas · 15 oct 2026, 10:44.</div></div></div>
+<main class="page">
+<a class="btn btn-ghost btn-sm mb-lg" href="#screen-1"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Volver a la ficha</a>
+<div class="page-header"><div class="titles"><div class="eyebrow">Conversación con Ana Pereyra</div><h1>valentina rojas<span class="dot">.</span></h1><p class="meta">VP de Ingeniería en Mercado Libre</p></div></div>
+
+<h2 class="section-title mt-xl">Correos sincronizados</h2>
+<div class="tl">
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Hilo de correo · presupuesto de plataforma 2027</span><span class="badge badge-info no-dot">2 mensajes</span><span class="when">2 oct, 08:12</span></div>
+<div class="thread">
+<div class="thread-msg"><span class="avatar avatar-sm a1 avatar-bd">AP</span><div>
+<div class="thread-msg-head"><span class="who"><span class="from">Ana Pereyra</span> <span class="badge badge-info no-dot">Enviado</span></span><span class="when">2 oct, 08:12</span></div>
+<span class="meta recipient">para v.rojas@mercadolibre.com</span>
+<div class="snippet">Valentina, ¿tenés margen esta semana para hablar del presupuesto de plataforma de 2027?</div>
+</div></div>
+<div class="thread-msg"><span class="avatar avatar-sm a1">VR</span><div>
+<div class="thread-msg-head"><span class="who"><span class="from">Valentina Rojas</span> <span class="badge badge-success no-dot">Recibido</span></span><span class="when">2 oct, 11:30</span></div>
+<div class="snippet">Recién en noviembre lo tenemos cerrado, te aviso.</div>
+</div></div>
+</div></div></div>
+</div>
+
+<h2 class="section-title mt-xl">Conversación de LinkedIn</h2>
+<div class="empty"><div class="empty-icon"><svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></div><h3>No hay conversación de LinkedIn con Ana Pereyra</h3></div>
+</main>
+</div>
+</div>
+<div class="toast-region"><div class="toast" role="status"><svg class="icon ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Visualización registrada en el registro de auditoría</div></div>
+<hr class="screen-hr">
+
+<!-- ===================================================================
+     SCREEN 3 — Administración → Registro de auditoría. New nav item,
+     new page. Minimal: one table, no filters beyond search.
+     =================================================================== -->
+<div class="screen-title" id="screen-3">3 / 3 · Administración → Registro de auditoría</div>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="#screen-3"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Registro de auditoría</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><span>Administración</span><span class="sep">/</span><span>Registro de auditoría</span></nav>
+<label class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div>Solo visualizaciones de conversación (<span class="mono">audit_log.action = 'view_conversation'</span>), acotado a los últimos 90 días. Otras acciones auditadas (fusiones, deshacer fusión) ya tienen su propia vista en <a href="../../crm-hubspot-ux/mockups/duplicates.html#history">Duplicados → historial de fusiones</a>; ver decisión 5 sobre unificarlas más adelante.</div></div>
+<div class="page-header"><div class="titles"><div class="eyebrow">Administración</div><h1>registro de auditoría<span class="dot">.</span></h1><p class="meta">Quién vio la conversación de otro BD, con quién y cuándo.</p></div></div>
+
+<div class="card"><div class="card-header"><h3>Visualizaciones de conversación</h3><span class="actions"><label class="sr-only" for="al-search">Buscar en el registro</label><input class="input input-sm" id="al-search" type="search" placeholder="Buscar por administrador o contacto"></span></div>
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Cuándo</th><th>Administrador</th><th>Contacto</th><th>Conversación de</th><th></th></tr></thead>
+<tbody>
+<tr><td class="meta">15 oct 2026, 10:44</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a3">CC</span>Cristian Civita</span></td><td><a class="strong" href="#screen-1">Valentina Rojas</a></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">AP</span>Ana Pereyra</span></td><td class="right"><a class="btn btn-secondary btn-sm" href="#screen-2b">Abrir</a></td></tr>
+<tr><td class="meta">15 oct 2026, 10:42</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a3">CC</span>Cristian Civita</span></td><td><a class="strong" href="#screen-1">Valentina Rojas</a></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a6">JM</span>Juan Martínez</span></td><td class="right"><a class="btn btn-secondary btn-sm" href="#screen-2">Abrir</a></td></tr>
+<tr><td class="meta">9 oct 2026, 09:18</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a3">CC</span>Cristian Civita</span></td><td><span class="soft">Ricardo Almeida</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">AP</span>Ana Pereyra</span></td><td class="right"><a class="btn btn-secondary btn-sm" href="#screen-3">Abrir</a></td></tr>
+<tr><td class="meta">2 oct 2026, 14:05</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a3">CC</span>Cristian Civita</span></td><td><span class="soft">Diego Salazar</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a6">JM</span>Juan Martínez</span></td><td class="right"><a class="btn btn-secondary btn-sm" href="#screen-3">Abrir</a></td></tr>
+</tbody>
+</table></div>
+<div class="card-footer row"><span class="meta">Mostrando 4 de 4 · últimos 90 días</span></div>
+</div>
+</main>
+</div>
+</div>
+
+</body>
+</html>

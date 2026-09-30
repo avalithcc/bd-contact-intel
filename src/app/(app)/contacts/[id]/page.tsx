@@ -6,6 +6,7 @@ import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
+import { getLockedConversationSummaries } from "@/lib/activity/lockedConversationSummaries";
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
@@ -28,6 +29,7 @@ import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
+import { AdminConversationHistoryCard } from "./AdminConversationHistoryCard";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
 import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
@@ -122,6 +124,13 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // its own "Tareas" pill, plus the TRUE (never-capped) counts for its pill/
   // Todo totals.
   const openTasks = personTasks.filter((t) => t.status === "open");
+  // Right-rail "Historial de conversaciones" card (admin-conversation-access
+  // mockup) — admin-only, so a non-admin's render pays zero extra round
+  // trips for this (the ternary skips the query entirely rather than
+  // fetching and discarding).
+  const lockedConversationSummaries = isAdmin
+    ? await getLockedConversationSummaries(record.person.id, me.id)
+    : [];
   // R3 (design.md): reassignment is only allowed while the person has no
   // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
   // enforces server-side for updateContactOwnerAction (task 13.3).
@@ -510,6 +519,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
             `connectionsWithHistory` filter above, and this block (see git
             history of this file).
           */}
+
+          {isAdmin && (
+            <AdminConversationHistoryCard
+              personId={record.person.id}
+              personName={name}
+              summaries={lockedConversationSummaries.map((s) => ({
+                bdId: s.bdId,
+                bdName: s.bdName,
+                summaryText: dict.contactRecordServer.lockedConversationThreadCount(s.threadCount),
+              }))}
+              labels={l}
+            />
+          )}
 
           <div className="card assoc">
             <div className="card-header">

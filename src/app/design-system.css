@@ -569,6 +569,12 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .quoted-body { margin-top: var(--space-2xs); padding-left: var(--space-md); border-left: 2px dashed var(--color-border-strong); color: var(--color-ink-subtle); font-size: var(--text-sm); }
 .quoted-body[hidden] { display: none; }
 .locked { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); background: var(--color-surface-sunken); color: var(--color-ink-soft); font-size: var(--text-sm); }
+/* Admin-only action row inside a locked thread card (admin-conversation-access
+   mockup, README decision 6 — accepted, folded in here). The one exception to
+   `.locked` being read-only chrome for non-admins: an admin's "Ver
+   conversación" button sits below it, never inside it, so `.locked`'s own
+   layout is untouched. */
+.locked-actions { margin-top: var(--space-sm); }
 .composer { border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-2); }
 .composer textarea { border: 0; width: 100%; min-height: 64px; padding: var(--space-md); font: var(--text-base) var(--font-body); resize: vertical; background: transparent; border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .composer textarea:focus { outline: none; }

@@ -151,6 +151,12 @@ export const es: typeof en = {
     discovery: "Descubrimiento",
     account: "Cuenta",
     playbook: "Guía de roles",
+    // Admin-only sidenav section (admin-conversation-access mockup, screen 1:
+    // admin-conversation.html:57-61). Only "Registro de auditoría" is wired
+    // here — Duplicados/Migración exist as routes but were never in this
+    // real Sidebar to begin with (a pre-existing gap, not introduced here).
+    administrationSection: "Administración",
+    auditLog: "Registro de auditoría",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
     accountMenuLabel: "Menú de cuenta",
@@ -774,12 +780,23 @@ export const es: typeof en = {
     adminAuditAlertTitle: "Está viendo la conversación de otro BD",
     adminNoConversationContent: "Sin contenido de conversación registrado.",
     adminOpenAsPage: "Abrir en una página",
+    adminViewDialogTitlePrefix: "¿Ver la conversación de",
+    adminViewDialogBodyPrefix: "Vas a ver la conversación de",
+    adminViewDialogBodyWith: "con",
+    adminAuditConfirmTitle: "Esta visualización queda registrada",
+    adminAuditConfirmBody:
+      "Se guarda en el registro de auditoría con tu nombre, la fecha y a quién pertenece la conversación. El registro es visible únicamente para administradores; no se notifica a nadie ni puede verse que la visualizaste.",
     stageBadgePrefix: "Etapa:",
     conversationHistoryTitle: "Historial de conversaciones",
     conversationHistoryIntroPrefix: "Existe historial de conversaciones con:",
     conversationHistoryPrivateFooter: "El contenido es privado para cada BD.",
     conversationHistoryAdminFooter:
       "Los administradores pueden abrir cualquier conversación; cada visualización queda registrada en el registro de auditoría.",
+    // Right-rail card's own "Ver" link (admin-conversation.html:141-142) —
+    // shorter than the per-row `viewConversationLink` ("Ver conversación")
+    // since this button already sits under a card titled "Historial de
+    // conversaciones", naming the BD right next to it.
+    conversationHistoryViewAction: "Ver",
     tasksCardTitle: "Tareas",
     addTaskAction: "Agregar tarea",
     changeCompanyAria: "Cambiar empresa",
@@ -838,6 +855,11 @@ export const es: typeof en = {
     hiringBadge: (count: number) => `Contratando · ${count} puestos de IT`,
     companyContactCount: (count: number) => `${count} contactos en esta empresa`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} mensajes · último ${dateLabel}`,
+    // Right-rail card, admin-only (admin-conversation-access mockup,
+    // admin-conversation.html:141-142: "1 hilo de correo"). Composed
+    // server-side (page.tsx) — the card itself is a client component and
+    // can't hold a function template (ClientStrings).
+    lockedConversationThreadCount: (count: number) => (count === 1 ? "1 hilo de correo" : `${count} hilos de correo`),
     lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
     touchpointsFoot: (linkedin: number, email: number, notes: number) =>
       `${linkedin} LinkedIn · ${email} correos · ${notes} notas`,
@@ -864,11 +886,16 @@ export const es: typeof en = {
   adminConversation: {
     backLink: "Volver a la ficha",
     title: "Conversación con",
-    auditNotice: "Esta visualización queda registrada en el registro de auditoría.",
-    emailSectionTitle: "Correos",
+    syncedEmailSectionTitle: "Correos sincronizados",
+    noSyncedEmailContent: "No hay correo sincronizado con este BD.",
+    legacyEmailSectionTitle: "Correos (registro manual)",
     linkedinSectionTitle: "Conversación de LinkedIn",
     noEmailContent: "Este BD no envió correos.",
     noLinkedinContent: "No hay conversación de LinkedIn con este BD.",
+    auditBannerTitle: (bdName: string) =>
+      `Estás viendo la conversación de ${bdName} como administrador — este acceso quedó registrado`,
+    auditBannerBody: (actorName: string, bdName: string, personName: string, dateLabel: string) =>
+      `Registro de auditoría: ${actorName} · conversación de ${bdName} con ${personName} · ${dateLabel}.`,
   },
 
   login: {
@@ -1454,6 +1481,30 @@ export const es: typeof en = {
       already_resolved: "Este par ya fue resuelto por otra persona.",
       unexpected: "La acción no se pudo completar. Intenta de nuevo.",
     },
+  },
+
+  // Registro de auditoría (admin-conversation-access mockup, screen 3:
+  // admin-conversation.html:310-355). Spanish-only regardless of `locale`,
+  // same rationale as duplicates/migration above (design D10, R11) — the
+  // page reads `es.auditLog` directly, never through `getDictionary()`.
+  auditLog: {
+    eyebrow: "Administración",
+    title: "registro de auditoría",
+    subtitle: "Quién vio la conversación de otro BD, con quién y cuándo.",
+    noteBodyPrefix: "Solo visualizaciones de conversación.",
+    noteBodyBeforeLink: "Otras acciones auditadas (fusiones, deshacer fusión) ya tienen su propia vista en",
+    noteLinkText: "Duplicados → historial de fusiones",
+    cardTitle: "Visualizaciones de conversación",
+    colWhen: "Cuándo",
+    colAdmin: "Administrador",
+    colContact: "Contacto",
+    colConversationOf: "Conversación de",
+    openAction: "Abrir",
+    emptyState: "Todavía no hay visualizaciones registradas.",
+    prevPage: "Anterior",
+    nextPage: "Siguiente",
+    pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,
+    showingRange: (from: number, to: number, total: number) => `Mostrando ${from}–${to} de ${total}`,
   },
 
   contactList: {
