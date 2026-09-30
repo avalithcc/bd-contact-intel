@@ -56,6 +56,14 @@ const OTRO_KEY = normalizeNameKey("Otro");
  * OTRO CARGO is blank, the job title is left null rather than falling back
  * to the literal word "Otro". CARGO is used verbatim in every other case,
  * even when OTRO CARGO also happens to carry a (presumably stale) value.
+ *
+ * No title-casing is applied anywhere in this module — a value like
+ * "Gerente De Área" (capitalized "De") ships EXACTLY as it reads in the
+ * source file; this import only fixes the 4 verified mojibake characters
+ * (cleanField -> repairMojibake) and never reshapes casing. Confirmed by
+ * inspection (owner report, 2026-09-30 dry run): the "De" capitalization
+ * is a pre-existing characteristic of the CARGO column itself, not
+ * something this parser introduces.
  */
 export function resolveJobTitle(cargo: string | null, otroCargo: string | null): string | null {
   if (cargo && normalizeNameKey(cargo) === OTRO_KEY) return otroCargo;

@@ -169,11 +169,34 @@ function resolvePhone(raw: string | null, email: string, report: ImportReport): 
   return formatPhoneForDisplay(raw);
 }
 
-/** Resolves EMPRESA to a `company_key` the same way src/lib/queries.ts's
+/**
+ * Resolves EMPRESA to a `company_key` the same way src/lib/queries.ts's
  * `companyKeyFilter` reads it on the way out: normalize, then resolve
  * through `company_alias` to a canonical key before ever looking at
  * `company` — so a raw name that's an alias of an already-tracked company
- * links to that ONE row instead of creating a near-duplicate. */
+ * links to that ONE row instead of creating a near-duplicate.
+ *
+ * ALL-CAPS company names (owner report, 2026-09-30 dry run: "ACCENTURE",
+ * "360 ENERGY SA"): `normalizeCompanyKey` already lowercases before hashing,
+ * so "ACCENTURE" and an existing "Accenture" row resolve to the SAME
+ * `company_key` regardless of case — the 109 companies that already exist
+ * by exact name match correctly here, and (per src/lib/dff2026/db.ts's
+ * `onConflictDoNothing`) an existing row's `display_name` is NEVER
+ * overwritten by this import.
+ *
+ * Decision (case only ever matters for a BRAND-NEW company row, created
+ * below): `display_name` is stored EXACTLY as EMPRESA reads, ALL-CAPS
+ * included — deliberately NOT title-cased. A generic "capitalize each
+ * word" pass over a company name is a much riskier transform than over a
+ * job title: it would as happily turn "360 ENERGY SA" into "360 Energy Sa"
+ * (wrong — "SA" is a legal-entity suffix, not a word to re-case) or "KPMG"/
+ * "IBM" into "Kpmg"/"Ibm" as it would fix a real name, with no dictionary
+ * of acronyms/legal suffixes to tell the two apart. Leaving the raw value
+ * in place is an easily-fixed-by-hand ALL-CAPS display name; a wrong guess
+ * would silently corrupt a real brand name the same way the mojibake bug
+ * did. `person.company` already stores the raw EMPRESA text regardless
+ * (see buildNewPerson/buildExistingUpdate below), unaffected by this.
+ */
 function resolveCompanyKey(
   raw: string,
   ctx: ImportContext,

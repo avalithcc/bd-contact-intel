@@ -154,6 +154,23 @@ test("company: an alias redirects to its canonical existing company (matched, no
   assert.equal(plan.report.companiesCreated, 0);
 });
 
+test("company: an ALL-CAPS raw name still matches an existing company by key (case-insensitive) and keeps its display name, but a brand-new company is created with the raw ALL-CAPS text (a deliberate decision, not title-cased)", () => {
+  const canonicalKey = normalizeCompanyKey("Accenture"); // == normalizeCompanyKey("ACCENTURE")
+  const plan = buildImportPlan(
+    [
+      record({ companyRaw: "ACCENTURE", email: "a@x.com", emailNormalized: "a@x.com" }),
+      record({ companyRaw: "360 ENERGY SA", email: "b@x.com", emailNormalized: "b@x.com" }),
+    ],
+    "all",
+    ctx({ existingCompaniesByKey: new Map([[canonicalKey, { companyKey: canonicalKey, displayName: "Accenture" }]]) }),
+  );
+  const accenturePerson = plan.creates.find((c) => c.email === "a@x.com")!;
+  assert.equal(accenturePerson.companyKey, canonicalKey); // matched despite the case difference
+  assert.equal(accenturePerson.company, "ACCENTURE"); // person.company keeps the raw text regardless
+  assert.equal(plan.report.companiesMatched, 1);
+  assert.deepEqual(plan.companiesToCreate, [{ companyKey: normalizeCompanyKey("360 ENERGY SA"), displayName: "360 ENERGY SA" }]); // new company: stored as-is, not title-cased
+});
+
 test("company: no match queues one new company row, deduped across rows", () => {
   const plan = buildImportPlan(
     [record({ companyRaw: "Brand New Co", email: "a@x.com", emailNormalized: "a@x.com" }), record({ companyRaw: "Brand New Co", email: "b@x.com", emailNormalized: "b@x.com" })],
