@@ -31,7 +31,6 @@ test("buildFirstTokenSplitAuditMetadata reports fillsApplied/fillsSkippedRace an
   assert.equal(metadata.fillsApplied, 2);
   assert.equal(metadata.fillsSkippedRace, 0);
   assert.deepEqual(metadata.fills, [fill("p1"), fill("p2", "Augusto D.", "Schultheis")]);
-  assert.equal(metadata.fillsTruncated, false);
 });
 
 test("buildFirstTokenSplitAuditMetadata reports a race-skipped fill without dropping it (applied < planned)", () => {
@@ -46,16 +45,26 @@ test("buildFirstTokenSplitAuditMetadata reports a race-skipped fill without drop
   assert.notEqual(metadata.fillsApplied, metadata.fillsPlanned);
 });
 
-test("buildFirstTokenSplitAuditMetadata truncates the fill list past the cap, but keeps the true applied count", () => {
+test("buildFirstTokenSplitAuditMetadata REFUSES (throws) rather than truncate the fill list past the cap — a truncated audit row would silently break --revert for the overflow rows (review fix)", () => {
   const many = Array.from({ length: FIRST_TOKEN_SPLIT_AUDIT_CAP + 50 }, (_, i) => fill(`person-${i}`));
+  assert.throws(() =>
+    buildFirstTokenSplitAuditMetadata({
+      fillsPlanned: many.length,
+      appliedFills: many,
+      skippedRacePersonIds: [],
+    }),
+  );
+});
+
+test("buildFirstTokenSplitAuditMetadata accepts exactly the cap (boundary, not off-by-one)", () => {
+  const atCap = Array.from({ length: FIRST_TOKEN_SPLIT_AUDIT_CAP }, (_, i) => fill(`person-${i}`));
   const metadata = buildFirstTokenSplitAuditMetadata({
-    fillsPlanned: many.length,
-    appliedFills: many,
+    fillsPlanned: atCap.length,
+    appliedFills: atCap,
     skippedRacePersonIds: [],
   });
-  assert.equal(metadata.fillsApplied, many.length);
+  assert.equal(metadata.fillsApplied, FIRST_TOKEN_SPLIT_AUDIT_CAP);
   assert.equal(metadata.fills.length, FIRST_TOKEN_SPLIT_AUDIT_CAP);
-  assert.equal(metadata.fillsTruncated, true);
 });
 
 // --- isFirstTokenSplitAuditWorthRecording -------------------------------------

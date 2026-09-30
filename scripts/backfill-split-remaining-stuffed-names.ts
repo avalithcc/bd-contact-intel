@@ -14,6 +14,15 @@
  *   4. A value that becomes a single token after trimming is not split —
  *      reported in a "needs review" section instead.
  *
+ * SAFETY GATE (review fix, CRITICAL): every candidate is re-classified with
+ * the EXISTING, more conservative classifier (stuffedNameSplitBackfill.ts's
+ * deriveStuffedNameSplit) before this simpler rule is allowed to touch it —
+ * see stuffedNameFirstTokenSplit.ts#classifyForFirstTokenSplit. Only rows the
+ * original rule itself calls "ambiguous_3"/"ambiguous_many" are split here;
+ * company names, junk, particle-first data, and rows the original rule can
+ * already resolve are routed to "needs review", UNSPLIT, labelled with the
+ * gate's reason.
+ *
  * Reads the exact same candidate set as scripts/backfill-split-stuffed-
  * names.ts (readStuffedNameSplitCandidates: non-merged, first_name has
  * whitespace, last_name empty) — reused as-is rather than duplicating the
@@ -34,6 +43,10 @@
  *      first_name still equals exactly what was read AND last_name is still
  *      empty, at write time. A row that changed since the dry run is
  *      skipped, not overwritten, and reported as `fillsSkippedRace`.
+ *   4. Cap refusal (review fix) — if the plan has more fills than
+ *      FIRST_TOKEN_SPLIT_AUDIT_CAP, `--execute` REFUSES outright rather than
+ *      silently truncating the audit metadata (a truncated audit row could
+ *      never fully `--revert`). Split the run into smaller batches instead.
  *
  * Revert: `--revert` (dry run) or `--revert --execute --actor=<bd id>`
  * (applies) — reuses the fully generic revert selection/plan from
@@ -58,9 +71,11 @@ import { auditLog } from "../src/db/schema";
 import {
   buildFirstTokenSplitPlan,
   type FirstTokenSplitRule,
+  type FirstTokenSplitSkipReason,
 } from "../src/lib/identity/stuffedNameFirstTokenSplit";
 import {
   buildFirstTokenSplitAuditMetadata,
+  FIRST_TOKEN_SPLIT_AUDIT_CAP,
   isFirstTokenSplitAuditWorthRecording,
 } from "../src/lib/identity/stuffedNameFirstTokenSplitAudit";
 import {
@@ -104,13 +119,29 @@ function parseArgs(argv: readonly string[]): Args {
 
 const RULE_ORDER: FirstTokenSplitRule[] = ["plain", "middle_initial"];
 
+// Ineligible/gate reasons first (most common in practice — the vast
+// majority of what remains after PR #186 is exactly this), then this
+// module's own post-gate skip reasons.
+const SKIP_REASON_ORDER: FirstTokenSplitSkipReason[] = [
+  "looks_like_company",
+  "junk_digit",
+  "junk_at",
+  "junk_punctuation",
+  "junk_scrape_artifact",
+  "particle_first",
+  "owner_excluded",
+  "resolvable_by_original_rule",
+  "single_token",
+  "bare_initial_last_name",
+];
+
 async function runForwardBackfill(args: Args) {
   const candidates = await readStuffedNameSplitCandidates();
   const plan = buildFirstTokenSplitPlan(candidates);
 
   console.log(`Candidates read (non-merged, first_name has whitespace, last_name empty): ${candidates.length}`);
-  console.log(`Fills found: ${plan.fills.length}`);
-  console.log(`Needs-review (skipped) found: ${plan.skips.length}`);
+  console.log(`Fills found (gate-eligible: ambiguous_3/ambiguous_many only): ${plan.fills.length}`);
+  console.log(`Needs-review (gate-ineligible or still-ambiguous) found: ${plan.skips.length}`);
 
   const fillsByRule = new Map<FirstTokenSplitRule, typeof plan.fills>();
   for (const fill of plan.fills) {
@@ -129,21 +160,45 @@ async function runForwardBackfill(args: Args) {
     }
   }
 
-  console.log("");
-  console.log(`Needs review — not split, single token after trim (${plan.skips.length}):`);
+  const skipsByReason = new Map<FirstTokenSplitSkipReason, typeof plan.skips>();
   for (const skip of plan.skips) {
-    const flags = [
-      skip.isDigitsOnly ? "digits" : null,
-      skip.isCommonNonPersonWord ? "common non-person word" : null,
-    ].filter((f): f is string => f !== null);
-    const flagText = flags.length ? ` [${flags.join(", ")}]` : "";
-    console.log(`  ${skip.personId}: "${skip.originalFirstName}"${flagText}`);
+    const list = skipsByReason.get(skip.reason) ?? [];
+    list.push(skip);
+    skipsByReason.set(skip.reason, list);
+  }
+  console.log("");
+  console.log(`Needs review — not split (${plan.skips.length}), grouped by reason:`);
+  for (const reason of SKIP_REASON_ORDER) {
+    const list = skipsByReason.get(reason) ?? [];
+    if (list.length === 0) continue;
+    console.log(`  ${reason} (${list.length}):`);
+    for (const skip of list) {
+      const flags = [
+        skip.isDigitsOnly ? "digits" : null,
+        skip.isCommonNonPersonWord ? "common non-person word" : null,
+      ].filter((f): f is string => f !== null);
+      const flagText = flags.length ? ` [${flags.join(", ")}]` : "";
+      console.log(`    ${skip.personId}: "${skip.originalFirstName}"${flagText}`);
+    }
   }
 
   if (!args.execute) {
     console.log("");
     console.log("Dry run only — no writes performed. Re-run with --execute --actor=<bd id> to apply.");
+    if (plan.fills.length > FIRST_TOKEN_SPLIT_AUDIT_CAP) {
+      console.log(
+        `WARNING: ${plan.fills.length} planned fill(s) exceed the ${FIRST_TOKEN_SPLIT_AUDIT_CAP}-row audit cap — ` +
+          "--execute will REFUSE until this run is split into smaller batches.",
+      );
+    }
     return;
+  }
+
+  if (plan.fills.length > FIRST_TOKEN_SPLIT_AUDIT_CAP) {
+    throw new Error(
+      `Refusing to execute: ${plan.fills.length} planned fill(s) exceed the ${FIRST_TOKEN_SPLIT_AUDIT_CAP}-row ` +
+        "audit cap — no writes performed. Split this run into smaller batches instead.",
+    );
   }
 
   const appliedFills: {

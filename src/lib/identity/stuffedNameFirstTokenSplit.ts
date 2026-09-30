@@ -11,20 +11,41 @@
  *      after the first word stays with the first name ("Augusto D." /
  *      "Schultheis") — but only when a token still remains afterward to
  *      serve as the last name; a bare 2-token "Ana J" is NOT widened (there
- *      would be no last name left), so it falls through to rule 1.
+ *      would be no last name left), so it falls through to rule 1 — and rule
+ *      1 itself refuses a bare-initial 2nd token too (review fix, see
+ *      `bare_initial_last_name` below): a single letter is never a real
+ *      surname.
  *   3. Anything after a comma is a credential or title and is DROPPED
  *      ("Kimberly West-Philips, SHRM-CP" -> "Kimberly" / "West-Philips").
  *   4. Trim whitespace; a value that becomes a single token after trimming
  *      (or that collapses to zero tokens once the comma-dropped part is
  *      removed) is NOT split.
  *
- * Deliberately simpler than stuffedNameSplitBackfill.ts#deriveStuffedNameSplit
- * (no surname-particle handling, no email tie-breaker, no re-casing) — that
- * module's conservative rule already handled every case it could resolve
- * with confidence; this owner-approved rule exists specifically to clear the
- * ambiguous remainder it deliberately refused. The two rules are kept as
- * SEPARATE modules/scripts/audit actions on purpose, so each has its own
- * revertible audit trail.
+ * SAFETY GATE (review fix, CRITICAL): this rule is intentionally blunter than
+ * stuffedNameSplitBackfill.ts#deriveStuffedNameSplit (no surname-particle
+ * handling, no email tie-breaker, no company detection of its own), so it
+ * must NEVER run directly against a raw candidate — `classifyForFirstTokenSplit`
+ * re-classifies every candidate with the EXISTING, more conservative
+ * classifier FIRST, and only a candidate the original rule itself calls
+ * "ambiguous_3" / "ambiguous_many" (a Latin-alphabet, no-digit/no-@,
+ * non-particle, non-company set of 3 or 5+ tokens it deliberately refused to
+ * guess at) is eligible to be split here. Everything else — company names
+ * (`looks_like_company`), junk (`junk_digit`/`junk_at`/`junk_punctuation`/
+ * `junk_scrape_artifact`), particle-first data, owner exclusions, AND rows
+ * the original rule could already resolve with confidence
+ * (`resolvable_by_original_rule`) — is routed to needs review, UNSPLIT. See
+ * `buildFirstTokenSplitPlan` and tests/unit/stuffedNameFirstTokenSplit.test.ts.
+ *
+ * KNOWN TRADEOFF: because the existing classifier tokenizes on whitespace
+ * only (it does not know about credential commas), ANY comma anywhere in the
+ * raw value makes some token contain a literal "," character, which always
+ * fails its charset check (`junk_punctuation`) — so rule 3 above (comma-drop)
+ * can never fire through this gate today; it stays fully tested as a
+ * standalone rule (`deriveFirstTokenSplit`) for completeness and for the day
+ * the gate is revisited, but a live comma-suffixed row will show up in needs
+ * review as `junk_punctuation`, not get auto-split. Flagged here on purpose —
+ * this is a deliberate conservative regression versus the original ask, not
+ * an oversight.
  *
  * No `duplicate_candidate` queueing here either, for the same reason as
  * stuffedNameSplitBackfill.ts: `buildNameCompanyKey` (src/lib/identity/
@@ -35,10 +56,27 @@
  * part of the name — it can only ever match an EXISTING key more closely,
  * never introduce a new collision).
  */
+import { deriveStuffedNameSplit, type StuffedNameSplitCandidate } from "./stuffedNameSplitBackfill";
 
 export type FirstTokenSplitRule = "plain" | "middle_initial";
 
-export type FirstTokenSplitSkipReason = "single_token";
+/** `resolvable_by_original_rule` is not one of the original module's own skip
+ * reasons — it is THIS module's label for "the original, more conservative
+ * classifier already resolves this with a FILL, so the blunter first-token
+ * rule must never touch it (it would already have been backfilled by
+ * scripts/backfill-split-stuffed-names.ts if it were still a live
+ * candidate)." */
+export type FirstTokenSplitSkipReason =
+  | "single_token"
+  | "bare_initial_last_name"
+  | "resolvable_by_original_rule"
+  | "owner_excluded"
+  | "junk_digit"
+  | "junk_at"
+  | "junk_scrape_artifact"
+  | "particle_first"
+  | "junk_punctuation"
+  | "looks_like_company";
 
 export interface FirstTokenSplitFill {
   firstName: string;
@@ -65,15 +103,30 @@ export type FirstTokenSplitResult =
  */
 export const NON_PERSON_SINGLE_TOKENS: ReadonlySet<string> = new Set(["pagos"]);
 
+const NO_SKIP_DETAIL: FirstTokenSplitSkipDetail = { isDigitsOnly: false, isCommonNonPersonWord: false };
+
 const MIDDLE_INITIAL_RE = /^\p{L}\.?$/u;
 
 function collapseWhitespaceNfc(raw: string): string {
   return raw.normalize("NFC").trim().replace(/\s+/g, " ");
 }
 
+/** Shared by both the gate's own "single_token" reason (raw firstName, no
+ * comma-drop — that's how the original classifier reaches this reason) and
+ * this module's own post-comma-drop "single_token" reason: same detail
+ * shape either way, computed from whatever single token remains. */
+function singleTokenDetail(collapsedSingleToken: string): FirstTokenSplitSkipDetail {
+  return {
+    isDigitsOnly: /^\d+$/.test(collapsedSingleToken),
+    isCommonNonPersonWord: NON_PERSON_SINGLE_TOKENS.has(collapsedSingleToken.toLowerCase()),
+  };
+}
+
 /**
  * Derives a first/last split from ONE stuffed `first_name` value using the
- * "first token is the given name" rule. Pure.
+ * "first token is the given name" rule. Pure. Does NOT gate on the original
+ * classifier — see `classifyForFirstTokenSplit` for that; callers reading
+ * live candidates must gate first (`buildFirstTokenSplitPlan` already does).
  */
 export function deriveFirstTokenSplit(input: { firstName: string }): FirstTokenSplitResult {
   const commaIndex = input.firstName.indexOf(",");
@@ -82,15 +135,14 @@ export function deriveFirstTokenSplit(input: { firstName: string }): FirstTokenS
   const tokens = collapsed.split(" ").filter(Boolean);
 
   if (tokens.length <= 1) {
-    const token = tokens[0] ?? "";
-    return {
-      kind: "skip",
-      reason: "single_token",
-      detail: {
-        isDigitsOnly: /^\d+$/.test(token),
-        isCommonNonPersonWord: NON_PERSON_SINGLE_TOKENS.has(token.toLowerCase()),
-      },
-    };
+    return { kind: "skip", reason: "single_token", detail: singleTokenDetail(tokens[0] ?? "") };
+  }
+
+  // Review fix: a 2-token value whose 2nd token is only a bare initial is
+  // never a real surname — e.g. "Ana J", "Juan D." — route to needs review
+  // instead of fabricating a one-letter last name.
+  if (tokens.length === 2 && MIDDLE_INITIAL_RE.test(tokens[1]!)) {
+    return { kind: "skip", reason: "bare_initial_last_name", detail: NO_SKIP_DETAIL };
   }
 
   let boundary = 1;
@@ -110,15 +162,29 @@ export function deriveFirstTokenSplit(input: { firstName: string }): FirstTokenS
   };
 }
 
-export interface FirstTokenSplitCandidate {
-  personId: string;
-  /** Raw value as read from `person.first_name` — the write-time re-check
-   * compares against this exact string, and the audit/revert path needs it
-   * to restore the pre-backfill value. */
-  firstName: string;
-  /** Raw value as read from `person.last_name` (null or blank) — needed so
-   * revert restores the exact pre-backfill shape, not just NULL/NULL. */
-  originalLastName: string | null;
+export type FirstTokenSplitGateResult =
+  | { kind: "eligible" }
+  | { kind: "ineligible"; reason: FirstTokenSplitSkipReason };
+
+/**
+ * SAFETY GATE (review fix): re-classifies `candidate` with the EXISTING,
+ * more conservative classifier (deriveStuffedNameSplit — its skip-reason
+ * detection, COMPANY_SUFFIX_WORDS/companyKey match, digit/@/punctuation
+ * checks, and particle-first check) BEFORE this module's blunter first-token
+ * rule is allowed to touch it. Only "ambiguous_3" / "ambiguous_many" (the
+ * original rule's OWN "structurally a name, but genuinely ambiguous" verdict)
+ * are eligible. Everything else — every other skip reason, AND any candidate
+ * the original rule can already resolve as a FILL — is ineligible. Pure.
+ */
+export function classifyForFirstTokenSplit(candidate: StuffedNameSplitCandidate): FirstTokenSplitGateResult {
+  const original = deriveStuffedNameSplit(candidate);
+  if (original.kind === "fill") {
+    return { kind: "ineligible", reason: "resolvable_by_original_rule" };
+  }
+  if (original.reason === "ambiguous_3" || original.reason === "ambiguous_many") {
+    return { kind: "eligible" };
+  }
+  return { kind: "ineligible", reason: original.reason };
 }
 
 export interface FirstTokenSplitFillPlanItem {
@@ -133,6 +199,7 @@ export interface FirstTokenSplitFillPlanItem {
 export interface FirstTokenSplitSkipPlanItem {
   personId: string;
   originalFirstName: string;
+  reason: FirstTokenSplitSkipReason;
   isDigitsOnly: boolean;
   isCommonNonPersonWord: boolean;
 }
@@ -145,13 +212,35 @@ export interface FirstTokenSplitPlan {
 /**
  * Pure planner: never mutates `candidates` — safe to call twice with the
  * same input for the same result (see
- * tests/unit/stuffedNameFirstTokenSplit.test.ts).
+ * tests/unit/stuffedNameFirstTokenSplit.test.ts). Gates every candidate
+ * through `classifyForFirstTokenSplit` before ever calling
+ * `deriveFirstTokenSplit`.
  */
-export function buildFirstTokenSplitPlan(candidates: readonly FirstTokenSplitCandidate[]): FirstTokenSplitPlan {
+export function buildFirstTokenSplitPlan(candidates: readonly StuffedNameSplitCandidate[]): FirstTokenSplitPlan {
   const fills: FirstTokenSplitFillPlanItem[] = [];
   const skips: FirstTokenSplitSkipPlanItem[] = [];
 
   for (const candidate of candidates) {
+    const gate = classifyForFirstTokenSplit(candidate);
+    if (gate.kind === "ineligible") {
+      // The gate's OWN "single_token" reason comes from the ORIGINAL
+      // classifier tokenizing the raw firstName (no comma-drop) — compute
+      // the same isDigitsOnly/isCommonNonPersonWord flags from that same
+      // raw value so needs-review reporting is consistent either way.
+      const detail =
+        gate.reason === "single_token"
+          ? singleTokenDetail(collapseWhitespaceNfc(candidate.firstName))
+          : NO_SKIP_DETAIL;
+      skips.push({
+        personId: candidate.personId,
+        originalFirstName: candidate.firstName,
+        reason: gate.reason,
+        isDigitsOnly: detail.isDigitsOnly,
+        isCommonNonPersonWord: detail.isCommonNonPersonWord,
+      });
+      continue;
+    }
+
     const result = deriveFirstTokenSplit(candidate);
     if (result.kind === "fill") {
       fills.push({
@@ -166,6 +255,7 @@ export function buildFirstTokenSplitPlan(candidates: readonly FirstTokenSplitCan
       skips.push({
         personId: candidate.personId,
         originalFirstName: candidate.firstName,
+        reason: result.reason,
         isDigitsOnly: result.detail.isDigitsOnly,
         isCommonNonPersonWord: result.detail.isCommonNonPersonWord,
       });

@@ -27,7 +27,6 @@ export interface FirstTokenSplitAuditMetadata {
    * silently dropped. */
   fillsSkippedRace: number;
   fills: AppliedFirstTokenSplit[];
-  fillsTruncated: boolean;
 }
 
 /**
@@ -40,17 +39,31 @@ export function isFirstTokenSplitAuditWorthRecording(input: { appliedFills: read
   return input.appliedFills.length > 0;
 }
 
+/**
+ * Review fix: REFUSES (throws) rather than truncate when `appliedFills`
+ * exceeds the cap — silently truncating the `fills` list would write an
+ * audit_log row that can no longer revert the overflow rows (the revert
+ * planner only ever sees what's in the audit metadata), which is worse than
+ * failing loudly. Callers must never let a single run exceed the cap — split
+ * into smaller batches instead. This is a hard invariant, checked here (not
+ * just in the calling script) so it holds regardless of caller.
+ */
 export function buildFirstTokenSplitAuditMetadata(input: {
   fillsPlanned: number;
   appliedFills: readonly AppliedFirstTokenSplit[];
   skippedRacePersonIds: readonly string[];
 }): FirstTokenSplitAuditMetadata {
-  const fillsTruncated = input.appliedFills.length > FIRST_TOKEN_SPLIT_AUDIT_CAP;
+  if (input.appliedFills.length > FIRST_TOKEN_SPLIT_AUDIT_CAP) {
+    throw new Error(
+      `Refusing to write audit_log: ${input.appliedFills.length} applied fill(s) exceed the ` +
+        `${FIRST_TOKEN_SPLIT_AUDIT_CAP}-row audit cap — truncating would silently break --revert for the ` +
+        "overflow rows. Split this run into smaller batches instead.",
+    );
+  }
   return {
     fillsPlanned: input.fillsPlanned,
     fillsApplied: input.appliedFills.length,
     fillsSkippedRace: input.skippedRacePersonIds.length,
-    fills: fillsTruncated ? input.appliedFills.slice(0, FIRST_TOKEN_SPLIT_AUDIT_CAP) : [...input.appliedFills],
-    fillsTruncated,
+    fills: [...input.appliedFills],
   };
 }
