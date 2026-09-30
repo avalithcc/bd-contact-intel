@@ -168,6 +168,47 @@ no schema change) is done (#221). Slices 1–6 — small tables, imported tables
 lead/person, company, activity/task, email/follow-up tables — are pending.
 Until they land, run local checks with `TZ=UTC`.
 
+### click-to-call — research first
+Owner request (2026-09-30): evaluate whether a BD can place a call to a
+contact from inside the platform.
+
+Why it matters now: the Digital Finance Forum import (#244) added **998 phone
+numbers**, and `person.mobile_phone`/`phone` are already surfaced, editable and
+exported. Calling is suddenly the channel with the most raw material — and
+`activity` has had a `call` type with an `occurredAt` metadata path since the
+beginning, yet production holds **zero logged calls**.
+
+What already works, and costs nothing:
+- `toTelHref` (`src/lib/phone.ts`) already renders phone rows as `tel:` links on
+  the contact record, so a click already dials from a mobile or from any
+  desktop softphone. Before buying anything, confirm whether that alone covers
+  the need.
+
+What "call from the platform" usually means, in increasing cost:
+1. `tel:` links (today) — free, no infra, no automatic logging.
+2. Click-to-call through a provider that rings the BD's own phone first and
+   then the contact — moderate cost, no browser audio, works from a laptop.
+3. A WebRTC softphone in the browser (Twilio Voice, Vonage and similar) — real
+   per-minute cost, needs a purchased number, and raises call-recording and
+   consent questions under Argentine law.
+
+The valuable part is probably NOT the dialing — it is **automatic call logging**:
+a `call` activity written with duration and outcome without the BD having to
+remember, which is exactly the step that is failing today (zero calls logged).
+A brief should weigh "make logging effortless" against "make dialing possible".
+
+Blocking dependency: the imported numbers are stored raw, mostly 10 digits with
+no country code (see the phone decision in this file's Shipped section). Any
+provider needs E.164 (`+54 9 ...`), so the normalization question the owner
+deferred has to be answered first — and it cannot be answered by digits alone,
+since a 10-digit Argentine number does not say whether it is a mobile or a
+landline.
+
+Output: a decision brief in `openspec/decisions/` covering the three options
+with real pricing, the recording/consent constraint, what changes in the data
+model (if anything), and an explicit recommendation — including the honest
+option of "the `tel:` link is enough; spend the effort on logging instead".
+
 ### linkedin-chrome-extension — not started
 Owner request (2026-09-30): a Chrome extension so that, when a BD connects
 with someone on LinkedIn, that person can be pushed into this CRM from the
