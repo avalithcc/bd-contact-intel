@@ -20,6 +20,17 @@ import { useEffect, useRef, useState } from "react";
 import type { FilterChip, FilterChipField } from "@/lib/contacts/filterChips";
 import { FILTER_FIELD_LABEL } from "@/lib/contacts/filterChips";
 import { EXTRA_FILTER_MENU_ORDER, FILTER_FIELD_KIND, FILTER_MENU_ORDER } from "@/lib/contacts/filterFieldKinds";
+import { ROLE_GROUPS } from "@/lib/roleGroups";
+import { PRIORITY_BADGE_CLASS, ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
+import { InfoIcon } from "@/components/icons";
+
+// "Por qué estos grupos de rol" disclosure (openspec/changes/bd-playbook,
+// surface 2) — shows only the extremes (Alta/No priorizar), same as the
+// approved mockup (bd-playbook.html); the rest is one click away via the
+// full guide link. Computed once at module scope: pure static content, no
+// props needed.
+const ALTA_GROUPS = ROLE_GROUPS.filter((g) => ROLE_GROUP_PLAYBOOK[g.key].priority === "alta");
+const NO_PRIORIZAR_GROUPS = ROLE_GROUPS.filter((g) => ROLE_GROUP_PLAYBOOK[g.key].priority === "no_priorizar");
 
 export interface SelectOption {
   value: string;
@@ -32,6 +43,9 @@ export interface FilterMenuLabels {
   applyLabel: string;
   cancelLabel: string;
   anyLabel: string;
+  roleGroupFilterHintLabel: string;
+  roleGroupFilterHintMenuLabel: string;
+  roleGroupFilterGuideLink: string;
 }
 
 export interface FilterMenuProps {
@@ -109,6 +123,7 @@ export function FilterMenu({
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState<FilterChipField | null>(null);
   const current = new URLSearchParams(baseParamsQuery);
+  const roleGroupLabelByKey = new Map(roleGroupOptions.map((o) => [o.value, o.label]));
   const editorRef = useRef<HTMLFormElement>(null);
   const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -247,6 +262,33 @@ export function FilterMenu({
                 ×
               </a>
             </span>
+            {chip.field === "roleGroup" && (
+              <details className="dropdown">
+                <summary
+                  className="btn btn-ghost btn-sm btn-icon"
+                  aria-label={l.roleGroupFilterHintLabel}
+                  title={l.roleGroupFilterHintLabel}
+                >
+                  <InfoIcon className="icon" />
+                </summary>
+                <div className="menu left" style={{ width: 280 }}>
+                  <div className="menu-label">{l.roleGroupFilterHintMenuLabel}</div>
+                  {[...ALTA_GROUPS, ...NO_PRIORIZAR_GROUPS].map((g) => {
+                    const entry = ROLE_GROUP_PLAYBOOK[g.key];
+                    return (
+                      <a key={g.key} className="menu-item" href={`/playbook#${g.key}`}>
+                        <span className={`${PRIORITY_BADGE_CLASS[entry.priority]} no-dot`}>{entry.priorityLabel}</span>
+                        {roleGroupLabelByKey.get(g.key) ?? g.key}
+                      </a>
+                    );
+                  })}
+                  <div className="menu-sep" />
+                  <a className="menu-item" href="/playbook">
+                    {l.roleGroupFilterGuideLink}
+                  </a>
+                </div>
+              </details>
+            )}
             {editing === chip.field && renderEditor(chip.field)}
           </span>
         );

@@ -96,6 +96,9 @@ export const en = {
     filter: "Filter",
     roleGroupLabel: "Role group",
     allGroups: "All groups",
+    roleGroupFilterHintLabel: "Why these role groups",
+    roleGroupFilterHintMenuLabel: "Priority by role group",
+    roleGroupFilterGuideLink: "See the full guide →",
     marketLabel: "Market",
     allMarkets: "All markets",
     // Sub-filter within the "us" market only — matches
@@ -132,6 +135,34 @@ export const en = {
   },
 
   roleGroups,
+
+  // "Role guide" page chrome (openspec/changes/bd-playbook). Per-role-group
+  // body copy is NOT here — it's static content in
+  // src/lib/roleGroupPlaybook.ts (keyed by RoleGroupKey), reused by both the
+  // standalone page and the in-context hints. That content module is
+  // Spanish-only (product ships Spanish-only per D10, locales.ts) — this
+  // section only translates the page's own labels/legend/field headers.
+  bdPlaybook: {
+    eyebrow: "Guide",
+    title: "role guide",
+    subtitle:
+      'Who to contact at each company, what that role decides and what pain Avalith solves for them — organized by role group.',
+    priorityReferenceAriaLabel: "Priority reference",
+    priorityLabel: "Priority:",
+    priorityAlta: "High",
+    priorityMedia: "Medium",
+    priorityBaja: "Low",
+    priorityNoPriorizar: "Don't prioritize",
+    priorityRevisar: "Review / not assessable",
+    notWorthTitle: "Role groups not worth prioritizing.",
+    notWorthNoPriorizarLabel: "Don't prioritize:",
+    notWorthLowLabel: "Low priority:",
+    notWorthReviewLabel: "Not assessable without more data:",
+    fieldDecides: "What they decide",
+    fieldPain: "Pain Avalith solves",
+    fieldWrongPerson: "When they're the wrong person",
+  },
+
   companyCategories,
   relationshipFilters,
   markets,
@@ -152,6 +183,7 @@ export const en = {
     whatsNew: "What's New",
     discovery: "Discovery",
     account: "Account",
+    playbook: "Role guide",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
     // TopBar account menu (tasks.md mockup-parity 3.2).
@@ -588,6 +620,10 @@ export const en = {
     propPhone: "Phone",
     propMobilePhone: "Mobile",
     propJobTitle: "Title",
+    jobTitleHintLabel: "Why this role",
+    jobTitleHintMenuLabel: "Why contact this role",
+    jobTitlePainPrefix: "Pain Avalith solves:",
+    jobTitleGuideLinkText: "See the full guide for this group →",
     propRoleGroup: "Role group",
     propSeniority: "Seniority",
     propCity: "City",

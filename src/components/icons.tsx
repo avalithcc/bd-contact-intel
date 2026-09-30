@@ -124,6 +124,17 @@ export function DiscoveryIcon({ className }: { className?: string }) {
   );
 }
 
+// "Guía de roles" sidebar entry (openspec/changes/bd-playbook) — an open-book
+// glyph, path copied 1:1 from bd-playbook.html's nav item.
+export function PlaybookIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M12 7v14" />
+      <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+    </Svg>
+  );
+}
+
 // Account pages icons (mockup-parity 5.1; account.html / account-email.html).
 export function MailIcon({ className }: { className?: string }) {
   return (

@@ -13,6 +13,7 @@ import {
   HiringIcon,
   WhatsNewIcon,
   DiscoveryIcon,
+  PlaybookIcon,
   AccountIcon,
 } from "@/components/icons";
 
@@ -130,6 +131,22 @@ export function Sidebar({
       ))}
 
       <div className="sidenav-footer">
+        {/* "Guía de roles" (openspec/changes/bd-playbook, owner decision
+            2026-09-30): grouped with "Cuenta" as a reference/setup item with
+            no live count, not under "Espacio de trabajo" (reserved for
+            objects a BD works through with counts/pills). This group is
+            expected to grow with more reference items later; if it doesn't,
+            this entry moves into "Mi perfil" (/account) instead — the route
+            below (src/app/(app)/playbook) is self-contained for exactly
+            that move. */}
+        <Link
+          href="/playbook"
+          className={`nav-item${isActive("/playbook") ? " active" : ""}`}
+          aria-current={isActive("/playbook") ? "page" : undefined}
+        >
+          <PlaybookIcon className="icon" />
+          {labels.playbook}
+        </Link>
         <Link href="/account" className="nav-item">
           <AccountIcon className="icon" />
           {labels.account}
