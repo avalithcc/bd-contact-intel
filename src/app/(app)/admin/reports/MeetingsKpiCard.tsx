@@ -6,9 +6,27 @@ import { es } from "date-fns/locale";
 import { KpiDrilldownCard } from "./KpiDrilldownCard";
 import { getMeetingsDrilldownAction } from "./actions";
 import type { MeetingDrilldownRow } from "@/lib/reports/meetingsDrilldown";
-import { es as esDict } from "@/lib/i18n/dictionaries/es";
+import type { ClientStrings } from "@/lib/i18n/clientStrings";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
-const dict = esDict.reports;
+// ClientStrings-wrapped — see WonCompaniesKpiCard.tsx's matching doc
+// comment for the "why" (review fix: no raw dictionary module import at
+// client module scope).
+export type MeetingsKpiCardLabels = ClientStrings<
+  Pick<
+    Dictionary["reports"],
+    | "kpiMeetings"
+    | "meetingsDialogTitle"
+    | "meetingsDialogColContact"
+    | "meetingsDialogColCompany"
+    | "meetingsDialogColBd"
+    | "meetingsDialogColDate"
+    | "meetingsDialogEmpty"
+    | "dialogClose"
+    | "dialogLoading"
+    | "dialogError"
+  >
+>;
 
 /**
  * "Reuniones agendadas" KPI (reports-bd-filter-drilldown, owner request):
@@ -24,35 +42,37 @@ export function MeetingsKpiCard({
   fromIso,
   toIso,
   bdId,
+  labels: l,
 }: {
   value: number;
   foot: React.ReactNode;
   fromIso: string;
   toIso: string;
   bdId: string | null;
+  labels: MeetingsKpiCardLabels;
 }) {
   return (
     <KpiDrilldownCard<MeetingDrilldownRow>
       toneClass="success"
-      label={dict.kpiMeetings}
+      label={l.kpiMeetings}
       value={value}
       foot={foot}
-      dialogTitle={dict.meetingsDialogTitle}
-      closeLabel={dict.dialogClose}
-      loadingLabel={dict.dialogLoading}
-      errorLabel={dict.dialogError}
+      dialogTitle={l.meetingsDialogTitle}
+      closeLabel={l.dialogClose}
+      loadingLabel={l.dialogLoading}
+      errorLabel={l.dialogError}
       fetchRows={() => getMeetingsDrilldownAction({ fromIso, toIso, bdId })}
       renderList={(rows) =>
         rows.length === 0 ? (
-          <p className="meta">{dict.meetingsDialogEmpty}</p>
+          <p className="meta">{l.meetingsDialogEmpty}</p>
         ) : (
           <table className="data compact">
             <thead>
               <tr>
-                <th>{dict.meetingsDialogColContact}</th>
-                <th>{dict.meetingsDialogColCompany}</th>
-                <th>{dict.meetingsDialogColBd}</th>
-                <th className="right">{dict.meetingsDialogColDate}</th>
+                <th>{l.meetingsDialogColContact}</th>
+                <th>{l.meetingsDialogColCompany}</th>
+                <th>{l.meetingsDialogColBd}</th>
+                <th className="right">{l.meetingsDialogColDate}</th>
               </tr>
             </thead>
             <tbody>

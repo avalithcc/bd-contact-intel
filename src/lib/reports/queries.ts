@@ -321,6 +321,12 @@ export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownP
         and exists (select 1 from rpt_won_companies where rpt_won_companies.pbc_company_key = person.company_key)
       order by person.company_key, person.updated_at desc, person.id
     ),
+    -- ", activity.id" (end of the ORDER BY below) breaks a tie between two
+    -- 'won' status_change rows with the identical created_at (review fix: a
+    -- bulk import writes exactly that) -- without it, DISTINCT ON's pick
+    -- among tied rows is unspecified and the displayed "Ganada" date could
+    -- flip between requests. Same tie-break rpt_won_company_person_owner
+    -- already uses.
     rpt_won_at as (
       select distinct on (activity.company_key)
         activity.company_key as pbc_company_key,
@@ -330,7 +336,7 @@ export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownP
         and activity.person_id is null
         and activity.metadata->>'status' = 'won'
         and exists (select 1 from rpt_won_companies where rpt_won_companies.pbc_company_key = activity.company_key)
-      order by activity.company_key, activity.created_at desc
+      order by activity.company_key, activity.created_at desc, activity.id
     )
     select
       rpt_won_companies.pbc_company_key as company_key,

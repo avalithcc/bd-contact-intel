@@ -13,10 +13,41 @@ import { InfoIcon } from "@/components/icons";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { BdFilterSelect } from "./BdFilterSelect";
-import { WonCompaniesKpiCard } from "./WonCompaniesKpiCard";
-import { MeetingsKpiCard } from "./MeetingsKpiCard";
+import { WonCompaniesKpiCard, type WonCompaniesKpiCardLabels } from "./WonCompaniesKpiCard";
+import { MeetingsKpiCard, type MeetingsKpiCardLabels } from "./MeetingsKpiCard";
 
 const dict = es.reports;
+
+// Narrow, ClientStrings-checked slices for the two "use client" drilldown
+// cards (review fix) — neither card imports the raw dictionary module
+// itself anymore; see WonCompaniesKpiCard.tsx's doc comment for why.
+const wonCompaniesKpiLabels: WonCompaniesKpiCardLabels = {
+  kpiCompaniesWon: dict.kpiCompaniesWon,
+  wonCompaniesDialogTitle: dict.wonCompaniesDialogTitle,
+  wonCompaniesDialogSubtitle: dict.wonCompaniesDialogSubtitle,
+  wonCompaniesDialogColCompany: dict.wonCompaniesDialogColCompany,
+  wonCompaniesDialogColOwner: dict.wonCompaniesDialogColOwner,
+  wonCompaniesDialogColWonAt: dict.wonCompaniesDialogColWonAt,
+  wonCompaniesDialogWonAtApprox: dict.wonCompaniesDialogWonAtApprox,
+  wonCompaniesDialogNoOwner: dict.wonCompaniesDialogNoOwner,
+  wonCompaniesDialogFootnote: dict.wonCompaniesDialogFootnote,
+  wonCompaniesDialogEmpty: dict.wonCompaniesDialogEmpty,
+  dialogClose: dict.dialogClose,
+  dialogLoading: dict.dialogLoading,
+  dialogError: dict.dialogError,
+};
+const meetingsKpiLabels: MeetingsKpiCardLabels = {
+  kpiMeetings: dict.kpiMeetings,
+  meetingsDialogTitle: dict.meetingsDialogTitle,
+  meetingsDialogColContact: dict.meetingsDialogColContact,
+  meetingsDialogColCompany: dict.meetingsDialogColCompany,
+  meetingsDialogColBd: dict.meetingsDialogColBd,
+  meetingsDialogColDate: dict.meetingsDialogColDate,
+  meetingsDialogEmpty: dict.meetingsDialogEmpty,
+  dialogClose: dict.dialogClose,
+  dialogLoading: dict.dialogLoading,
+  dialogError: dict.dialogError,
+};
 
 const SOURCE_LABEL: Record<SourceBucket, string> = {
   hubspot: dict.sourceHubspot,
@@ -188,11 +219,13 @@ export function ReportsView({
           fromIso={range.fromIso}
           toIso={range.toIso}
           bdId={bdId}
+          labels={meetingsKpiLabels}
         />
         <WonCompaniesKpiCard
           value={pipelineRows.find((r) => r.stage === "won")?.count ?? 0}
           foot={dict.kpiCompaniesWonFoot(qualifiedCount)}
           bdId={bdId}
+          labels={wonCompaniesKpiLabels}
         />
       </div>
 

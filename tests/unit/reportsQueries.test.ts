@@ -196,6 +196,12 @@ test("buildWonCompaniesDrilldownQuery: owner_bd_id/owner_bd_name fall back to th
   assert.match(sql, /coalesce\(rpt_won_companies\.pbc_owner_bd_id, rpt_won_company_person_owner\.pbc_owner_bd_id\) as owner_bd_id/i);
 });
 
+test("buildWonCompaniesDrilldownQuery: rpt_won_at's DISTINCT ON breaks a created_at tie with activity.id (review fix — a bulk import can write two 'won' rows with the identical timestamp)", () => {
+  const { sql } = renderWon({ bdId: null });
+  assert.match(sql, /distinct on \(activity\.company_key\)/i);
+  assert.match(sql, /order by activity\.company_key, activity\.created_at desc, activity\.id/i);
+});
+
 function renderMeetings(params: MeetingsDrilldownParams) {
   return dialect.sqlToQuery(buildMeetingsDrilldownQuery(params));
 }
