@@ -13,11 +13,23 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   buildSinceIso,
+  effectiveActivityAtSql,
   isEffectiveActivityWithinDays,
+  NON_TOUCH_ACTIVITY_TYPES,
   resolveEffectiveActivityAt,
 } from "@/lib/contacts/effectiveActivityTime";
+
+const dialect = new PgDialect();
+
+test("effectiveActivityAtSql(): the rendered CASE returns NULL for every NON_TOUCH_ACTIVITY_TYPES value, checked before the status_backfill/call branches", () => {
+  const renderedSql = dialect.sqlToQuery(effectiveActivityAtSql()).sql;
+  assert.match(renderedSql, /case\s+when\s+"activity"\."type"\s+in\s+\(\$1, \$2, \$3\)\s+then\s+null/i);
+  const { params } = dialect.sqlToQuery(effectiveActivityAtSql());
+  assert.deepEqual(params.slice(0, 3), [...NON_TOUCH_ACTIVITY_TYPES]);
+});
 
 test("resolveEffectiveActivityAt: a status_backfill row with a valid metadata.originalAt uses that, not createdAt", () => {
   const originalAt = new Date("2026-06-01T00:00:00.000Z");
@@ -28,13 +40,13 @@ test("resolveEffectiveActivityAt: a status_backfill row with a valid metadata.or
     createdAt,
     metadata: { originalAt: originalAt.toISOString() },
   });
-  assert.equal(at.getTime(), originalAt.getTime());
+  assert.equal(at!.getTime(), originalAt.getTime());
 });
 
 test("resolveEffectiveActivityAt: a status_backfill row with missing/unparseable originalAt falls back to createdAt", () => {
   const createdAt = new Date("2026-09-26T00:00:00.000Z");
   assert.equal(
-    resolveEffectiveActivityAt({ id: "a1", type: "status_backfill", createdAt, metadata: {} }).getTime(),
+    resolveEffectiveActivityAt({ id: "a1", type: "status_backfill", createdAt, metadata: {} })!.getTime(),
     createdAt.getTime(),
   );
   assert.equal(
@@ -43,7 +55,7 @@ test("resolveEffectiveActivityAt: a status_backfill row with missing/unparseable
       type: "status_backfill",
       createdAt,
       metadata: { originalAt: "not-a-date" },
-    }).getTime(),
+    })!.getTime(),
     createdAt.getTime(),
   );
 });
@@ -57,7 +69,7 @@ test("resolveEffectiveActivityAt: a call row with a valid metadata.occurredAt us
     createdAt,
     metadata: { outcome: "connected", direction: "outbound", occurredAt: occurredAt.toISOString() },
   });
-  assert.equal(at.getTime(), occurredAt.getTime());
+  assert.equal(at!.getTime(), occurredAt.getTime());
 });
 
 test("resolveEffectiveActivityAt: every other activity type always uses createdAt, even if metadata has an originalAt-shaped field", () => {
@@ -68,7 +80,20 @@ test("resolveEffectiveActivityAt: every other activity type always uses createdA
     createdAt,
     metadata: { originalAt: "2020-01-01T00:00:00.000Z" },
   });
-  assert.equal(at.getTime(), createdAt.getTime());
+  assert.equal(at!.getTime(), createdAt.getTime());
+});
+
+test("resolveEffectiveActivityAt: a non-touch type (task_updated/task_completed/task_reopened) is null, never createdAt", () => {
+  const createdAt = new Date("2026-09-26T00:00:00.000Z");
+  for (const type of NON_TOUCH_ACTIVITY_TYPES) {
+    assert.equal(resolveEffectiveActivityAt({ id: "t1", type, createdAt, metadata: {} }), null, `expected "${type}" to be null`);
+  }
+});
+
+test("isEffectiveActivityWithinDays: a non-touch type is never 'within days', even if its createdAt is today", () => {
+  const now = new Date("2026-09-26T12:00:00.000Z");
+  const row = { id: "t1", type: "task_updated", createdAt: now, metadata: {} };
+  assert.equal(isEffectiveActivityWithinDays(row, 30, now), false);
 });
 
 test("isEffectiveActivityWithinDays: a HubSpot/collapse/fold backfill imported TODAY but reconstructing an OLD event does NOT count as recent — the exact bug this fixes", () => {

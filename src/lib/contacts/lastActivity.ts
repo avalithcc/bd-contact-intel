@@ -31,8 +31,12 @@ export interface LastActivityRawRow {
   // single place this gets coerced to a real UTC `Date` (via the shared
   // src/lib/db/timestamp.ts#parseDbTimestamp helper) — every consumer
   // (relative-time render, CSV export) reads the already-normalized
-  // `LastActivityEntry.createdAt`, never this raw field.
-  createdAt: Date | string;
+  // `LastActivityEntry.createdAt`, never this raw field. `null` when the
+  // picked row is a NON_TOUCH_ACTIVITY_TYPES type (effectiveActivityAtSql's
+  // NULL branch) — only reachable when a person's ONLY activity is
+  // non-touch; buildLastActivityEntries treats that the same as "no last
+  // activity" (skips the row instead of coercing `null` into a Date).
+  createdAt: Date | string | null;
 }
 
 export interface LastActivityEntry {
@@ -84,13 +88,18 @@ export function formatLastActivityLabel(
 }
 
 /** One raw row per person (the DB layer already dedups to the single most
- * recent row via `DISTINCT ON`) mapped into the render-ready entry. */
+ * recent row via `DISTINCT ON`) mapped into the render-ready entry. A `null`
+ * `createdAt` (the DISTINCT ON pick landed on a NON_TOUCH_ACTIVITY_TYPES row
+ * because that person has no real touch at all) is skipped — same as having
+ * zero activity rows — rather than coerced into a bogus `new Date(null)`
+ * (1970-01-01). */
 export function buildLastActivityEntries(
   rows: LastActivityRawRow[],
   dict: Dict,
 ): Map<string, LastActivityEntry> {
   const map = new Map<string, LastActivityEntry>();
   for (const row of rows) {
+    if (row.createdAt === null) continue;
     map.set(row.personId, {
       type: row.type,
       label: formatLastActivityLabel(row, dict),

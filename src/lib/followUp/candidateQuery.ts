@@ -1,10 +1,15 @@
 /**
- * SQL-side twin of src/lib/followUp/queueSelection.ts's eligibility/ordering
- * rule — the ONE production round trip that decides a BD's daily follow-up
- * queue (rule: "the selection query is one round trip"). Schema-only import
- * (no `@/db` client), so this stays importable — and this file's own test
- * stays runnable — without a live DATABASE_URL, same convention as
- * src/lib/companies/defaultPipelineStageQuery.ts.
+ * The ONE production round trip that decides a BD's daily follow-up queue
+ * (rule: "the selection query is one round trip"; openspec/decisions/
+ * 2026-09-30-decision-brief.md "1. Follow-up cadence — decided"). This is
+ * the single canonical place the eligibility/ordering rule is written down
+ * and enforced: owned by the BD, not merged, `status` is `replied` (due at
+ * 3+ days since the last touch) or `contacted` (due at 7+ days), last
+ * touched within 12 months, ordered replied-first then most-recent-touch-
+ * first, tie-broken by company name ascending, capped at `FOLLOW_UP_DAILY_CAP`.
+ * Schema-only import (no `@/db` client), so this stays importable — and
+ * this file's own test stays runnable — without a live DATABASE_URL, same
+ * convention as src/lib/companies/defaultPipelineStageQuery.ts.
  *
  * Every table is interpolated via its Drizzle schema object and left
  * UNALIASED in FROM/JOIN, with every column reference elsewhere written as
@@ -86,8 +91,10 @@ export function fuqCandidatesCte() {
 }
 
 /** Shared `ORDER BY`: replied first, then most-recent-last-touch first,
- * tie-broken by company name ascending — matches
- * queueSelection.ts#selectFollowUpQueue exactly. */
+ * tie-broken by company name ascending — the one place this ordering rule
+ * is written down; see this file's own top-of-file doc comment for the full
+ * eligibility rule (thresholds + recency window) enforced above in
+ * `fuqCandidatesCte()`. */
 function fuqOrderBy() {
   return sql`(fuq_status = 'replied') desc, fuq_last_touch desc, fuq_company_name asc nulls last`;
 }
@@ -100,6 +107,20 @@ function fuqOrderBy() {
  * function's doc comment). `bdId` is a plain uuid string, `queueDate` a
  * plain `YYYY-MM-DD` string (rule 1: never a JS `Date` in a raw `sql`
  * template) — both explicitly cast on the SQL side.
+ *
+ * Fresh-review fix: this used to never reference `follow_up_queue_item` at
+ * all, so "Posponer a mañana"/"Omitir hoy" (`state`/`snoozed_until`,
+ * queueQueries.ts#setFollowUpItemState) had no effect on selection — a
+ * postponed/skipped contact would immediately reappear if materialization
+ * ever ran again for the SAME queue_date (defensive: normally guarded
+ * entirely by `ensureTodayFollowUpQueue` never re-running the same day, but
+ * the SQL itself should not silently rely on that alone), and — the actual
+ * bug — a person snoozed further out than "tomorrow" would never be
+ * excluded on the days in between. The `NOT EXISTS` below excludes anyone
+ * with a prior `follow_up_queue_item` row for this SAME `bdId` whose
+ * `snoozed_until` is still in the future relative to the queue_date being
+ * computed; once `queueDate` reaches `snoozed_until`, the exclusion lifts
+ * and the person is eligible again (still subject to every other rule).
  */
 export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: number = FOLLOW_UP_DAILY_CAP) {
   return sql`
@@ -112,6 +133,13 @@ export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: n
         row_number() over (order by ${fuqOrderBy()}) as fuq_position
       from fuq_due
       where fuq_owner_bd_id = ${bdId}::uuid
+        and not exists (
+          select 1 from ${followUpQueueItem} fuq_prior
+          where fuq_prior.bd_id = ${bdId}::uuid
+            and fuq_prior.person_id = fuq_due.fuq_person_id
+            and fuq_prior.state in ('postponed', 'skipped')
+            and fuq_prior.snoozed_until > ${queueDate}::date
+        )
       order by ${fuqOrderBy()}
       limit ${cap}
     ) as fuq_selected
@@ -125,6 +153,13 @@ export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: n
  * actually enter the queue once capped at `cap`. Handed to the orchestrator
  * to smoke-test the brief's "Cristian and Macarena hit the cap, Mariel has
  * only a handful" expectation against prod.
+ *
+ * Does NOT apply `buildFollowUpInsertQuery`'s snoozed-until exclusion — this
+ * query has no single `bdId`/`queueDate` to scope that check to (it spans
+ * every BD at once, for a snapshot estimate). `eligible_count`/`queue_count`
+ * can therefore run slightly high on a day when someone has active
+ * postponed/skipped rows; the real materialization is always the source of
+ * truth.
  */
 export function buildFollowUpVerificationQuery(cap: number = FOLLOW_UP_DAILY_CAP) {
   return sql`

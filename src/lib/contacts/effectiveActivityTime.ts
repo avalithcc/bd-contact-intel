@@ -36,7 +36,36 @@ import { activityRowToStatusEvent, type ActivityRowForStatus } from "@/lib/statu
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-export function resolveEffectiveActivityAt(row: ActivityRowForStatus): Date {
+/**
+ * Activity types that record an editorial change to a Task association
+ * (feat/task-edit: `task_updated`/`task_completed`/`task_reopened`) — NOT
+ * BD engagement with the Contact itself. Editing a task's due date is not a
+ * "touch" the way sending an email or logging a call is, so both twins
+ * below treat these types as having NO effective time (SQL: `NULL`, which
+ * `max()`/`coalesce()` ignore exactly like "no activity at all"; JS: `null`).
+ * A person whose ONLY recorded activity is one of these types reads as
+ * never-touched, not "touched when the task was edited" — every caller that
+ * aggregates or orders by effective time already coalesces a missing value
+ * to `-infinity`/falls back to `createdAt` for display (see
+ * defaultPipelineStageQuery.ts, candidateQuery.ts, timelineEntry.ts,
+ * timelineGrouping.ts), so this list is defined ONCE here and both twins
+ * reference it — no second definition to drift.
+ */
+export const NON_TOUCH_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened"] as const;
+
+function isNonTouchActivityType(type: string): boolean {
+  return (NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * `Date | null` — `null` for `NON_TOUCH_ACTIVITY_TYPES` (see above), matching
+ * `effectiveActivityAtSql()`'s `NULL` branch exactly. Every caller that needs
+ * a value even for a non-touch row (e.g. a timeline row still needs SOME
+ * date to render) falls back to `row.createdAt` itself at the call site,
+ * same as the SQL twin's callers fall back via `coalesce`.
+ */
+export function resolveEffectiveActivityAt(row: ActivityRowForStatus): Date | null {
+  if (isNonTouchActivityType(row.type)) return null;
   return activityRowToStatusEvent(row).at;
 }
 
@@ -51,6 +80,10 @@ export function resolveEffectiveActivityAt(row: ActivityRowForStatus): Date {
  */
 export function effectiveActivityAtSql() {
   return sql`(case
+    when ${activity.type} in (${sql.join(
+      NON_TOUCH_ACTIVITY_TYPES.map((t) => sql`${t}`),
+      sql`, `,
+    )}) then null
     when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz
     when ${activity.type} = 'call' and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
     else ${activity.createdAt} end)`;
@@ -58,14 +91,19 @@ export function effectiveActivityAtSql() {
 
 /** Same semantics as the SQL EXISTS filter's `effectiveAt >= since` check —
  * used here only to pin the rule in a unit test; the actual filter runs in
- * SQL (listQueries.ts), never by fetching rows into JS to check this. */
+ * SQL (listQueries.ts), never by fetching rows into JS to check this. A
+ * non-touch row (`resolveEffectiveActivityAt` returns `null`) is never
+ * "within days" — matches the SQL EXISTS filter, where `NULL >= since` is
+ * never true either. */
 export function isEffectiveActivityWithinDays(
   row: ActivityRowForStatus,
   days: number,
   now: Date = new Date(),
 ): boolean {
+  const at = resolveEffectiveActivityAt(row);
+  if (!at) return false;
   const since = new Date(now.getTime() - days * MS_PER_DAY);
-  return resolveEffectiveActivityAt(row) >= since;
+  return at >= since;
 }
 
 /**

@@ -67,7 +67,10 @@ function monthKeyOf(date: Date): string {
 export function groupTimelineEntries<T extends TimelineGroupingActivityEntry>(
   entries: readonly T[],
 ): TimelineGroup<GroupedActivityEntry<T>>[] {
-  const withAt = entries.map((entry) => ({ entry, at: resolveEffectiveActivityAt(entry) }));
+  // Fall back to the entry's own createdAt for a non-touch row
+  // (NON_TOUCH_ACTIVITY_TYPES) — it still needs a month bucket to render in,
+  // it just isn't counted as a "touch" anywhere else.
+  const withAt = entries.map((entry) => ({ entry, at: resolveEffectiveActivityAt(entry) ?? entry.createdAt }));
   // Newest-first within each bucket, buckets newest-first overall.
   withAt.sort((a, b) => b.at.getTime() - a.at.getTime());
 

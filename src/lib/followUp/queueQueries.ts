@@ -3,8 +3,14 @@
  * (unlike queueSelection.ts/candidateQuery.ts) this file needs a live
  * DATABASE_URL and is not unit-tested directly (same split as
  * src/lib/identity/resolveDb.ts vs. resolve.ts).
+ *
+ * The sidebar badge count used to live here (`getFollowUpQueueBadgeCount`)
+ * but was folded into `src/lib/shell/appShellBadgeCounts.ts` (fresh-review
+ * fix: AppLayout was running it as a SEPARATE round trip from the task
+ * badge — see that module's doc comment) — deleted here rather than kept
+ * as unused dead code.
  */
-import { and, asc, eq, exists, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, company, followUpQueueItem, person } from "@/db/schema";
 import { addDaysToDateString, argentinaCalendarDate, argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
@@ -26,12 +32,25 @@ export interface FollowUpQueueRow {
   workedToday: boolean;
 }
 
-/** Correlated EXISTS ("worked today"), reused by both the page read and the
+/**
+ * Correlated EXISTS ("worked today"), reused by both the page read and the
  * badge count — never a per-row query (rule 7). `activity.createdAt` is
- * deliberately the raw log time, not `effectiveActivityAtSql()` — see
- * queueSelection.ts#wasWorkedToday's doc comment for why those two must not
- * be conflated. */
-function workedTodayExists(bdId: string, now: Date) {
+ * deliberately the raw log time, not `effectiveActivityAtSql()` — that
+ * helper's job is deciding a row's EFFECTIVE time for last-touch/status
+ * purposes (it can backdate a `call`'s time to `metadata.occurredAt`, a day
+ * before it was logged); "worked today" asks a different question — did the
+ * BD DO something today — so it must read the real log time, never a
+ * backdated one.
+ *
+ * Fresh-review fix: this used to also require `activity.actorBdId = bdId`
+ * (the viewing BD specifically). The approved decision is "ANY activity
+ * logged on that contact today, by any BD" — a contact can be worked by a
+ * teammate (e.g. covering while the owner is out) and it still counts, same
+ * as every other "worked" signal in this app is contact-scoped, not
+ * actor-scoped. `WORKED_ACTIVITY_TYPES` (queueSelection.ts) still gates
+ * which activity types count.
+ */
+function workedTodayExists(now: Date) {
   const { todayStartUtc, tomorrowStartUtc } = argentinaDayBoundaries(now);
   return exists(
     db
@@ -40,7 +59,6 @@ function workedTodayExists(bdId: string, now: Date) {
       .where(
         and(
           eq(activity.personId, followUpQueueItem.personId),
-          eq(activity.actorBdId, bdId),
           inArray(activity.type, [...WORKED_ACTIVITY_TYPES]),
           sql`${activity.createdAt} >= ${todayStartUtc.toISOString()}::timestamptz`,
           sql`${activity.createdAt} < ${tomorrowStartUtc.toISOString()}::timestamptz`,
@@ -63,12 +81,22 @@ async function readQueueRows(bdId: string, queueDate: string, now: Date): Promis
       jobTitle: person.jobTitle,
       companyKey: person.companyKey,
       companyName: company.displayName,
-      workedToday: workedTodayExists(bdId, now),
+      workedToday: workedTodayExists(now),
     })
     .from(followUpQueueItem)
     .innerJoin(person, eq(person.id, followUpQueueItem.personId))
     .leftJoin(company, eq(company.companyKey, person.companyKey))
-    .where(and(eq(followUpQueueItem.bdId, bdId), eq(followUpQueueItem.queueDate, queueDate)))
+    .where(
+      and(
+        eq(followUpQueueItem.bdId, bdId),
+        eq(followUpQueueItem.queueDate, queueDate),
+        // Defense in depth: a person queued this morning could be merged
+        // away later the same day (a duplicate cleanup can run any time) —
+        // merged persons are hidden from every read in this app (design
+        // D1/D6), including a day's already-materialized queue rows.
+        isNull(person.mergedIntoId),
+      ),
+    )
     .orderBy(asc(followUpQueueItem.position));
 
   return rows.map((r) => ({
@@ -127,38 +155,14 @@ export async function getFollowUpQueuePage(bdId: string, now: Date): Promise<Fol
 }
 
 /**
- * Sidebar badge count (AppLayout, one extra round trip — same budget as
- * `getTaskBadgeCount`). Deliberately does NOT materialize: "if the day
- * isn't materialized yet, show no badge" (spec) — reading zero rows for an
- * un-materialized day already returns 0 for free, so this never triggers
- * the once-a-day materialization path itself. One round trip: `state =
- * 'pending' AND NOT (worked today)` counted directly in SQL, never fetched
- * into JS to filter.
- */
-export async function getFollowUpQueueBadgeCount(bdId: string, now: Date): Promise<number> {
-  const queueDate = argentinaCalendarDate(now);
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(followUpQueueItem)
-    .where(
-      and(
-        eq(followUpQueueItem.bdId, bdId),
-        eq(followUpQueueItem.queueDate, queueDate),
-        eq(followUpQueueItem.state, "pending"),
-        sql`not ${workedTodayExists(bdId, now)}`,
-      ),
-    );
-  return row?.count ?? 0;
-}
-
-/**
  * "Posponer a mañana" / "Omitir hoy" (mockup README decision 5): both leave
  * today's active list without being counted as worked and without logging
  * an activity or needing a reason — the only difference is the `state`
  * value stored, kept for display/analytics. `snoozedUntil` is set to
- * tomorrow's ART calendar date either way (see queueSelection.ts's doc
- * comment on why this rarely matters to the real selection query, but is
- * still stored per the spec). Scoped to `bdId` too — defense in depth
+ * tomorrow's ART calendar date either way — `buildFollowUpInsertQuery`
+ * (candidateQuery.ts) excludes this person from selection on any day before
+ * `snoozedUntil` arrives, then re-includes them once it does (still subject
+ * to every other eligibility rule). Scoped to `bdId` too — defense in depth
  * against a BD acting on another BD's row via a guessed id.
  */
 async function setFollowUpItemState(

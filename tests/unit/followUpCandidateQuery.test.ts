@@ -89,3 +89,12 @@ test("buildFollowUpVerificationQuery: groups by owner and caps queue_count at th
   assert.match(renderedSql, /group by fuq_owner_bd_id/i);
   assert.match(renderedSql, /least\(count\(\*\), \$\d+\)/i);
 });
+
+test("buildFollowUpInsertQuery: excludes a person with a prior postponed/skipped row still snoozed past the queue date being computed", () => {
+  const renderedSql = renderInsert();
+  assert.match(renderedSql, /not exists\s*\(\s*select 1 from "follow_up_queue_item" fuq_prior/i);
+  assert.match(renderedSql, /fuq_prior\.bd_id = \$\d+::uuid/i);
+  assert.match(renderedSql, /fuq_prior\.person_id = fuq_due\.fuq_person_id/i);
+  assert.match(renderedSql, /fuq_prior\.state in \('postponed', 'skipped'\)/i);
+  assert.match(renderedSql, /fuq_prior\.snoozed_until > \$\d+::date/i);
+});

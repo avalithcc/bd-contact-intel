@@ -198,7 +198,12 @@ export async function getPersonTimeline(
       .from(activity)
       .leftJoin(bd, eq(bd.id, activity.actorBdId))
       .where(typeCondition)
-      .orderBy(desc(effectiveActivityAtSql()))
+      // nulls last: a non-touch row (task_updated/etc., effective time
+      // NULL) must never outrank a real touch for this bounded LIMIT — same
+      // fix/rationale as listQueries.ts's "Última actividad" pick. Each
+      // returned row still renders fine either way: buildTimelineEntry
+      // falls back to createdAt for a non-touch row's own `at`.
+      .orderBy(sql`${effectiveActivityAtSql()} desc nulls last`)
       .limit(opts.limit ?? 100),
     db
       .select({ type: activity.type, count: sql<number>`count(*)` })

@@ -276,16 +276,26 @@ async function attachDerivedColumns(
         // Effective time (bug fix), not raw created_at — see
         // effectiveActivityAtSql's doc comment. Aliased `createdAt` so
         // buildLastActivityEntries' output shape is unchanged. Typed
-        // `Date | string` (not just `Date`): postgres-js returns this
+        // `Date | string | null` (not just `Date`): postgres-js returns this
         // COMPUTED expression's wire value as a string at runtime (same
         // class of bug src/lib/outreach/queries.ts already normalizes
         // `lastMessageAt` for) — buildLastActivityEntries is the single
-        // place that gets coerced to a real Date.
-        createdAt: sql<Date | string>`${effectiveActivityAtSql()}`,
+        // place that gets coerced to a real Date — and `null` for a
+        // NON_TOUCH_ACTIVITY_TYPES row (task_updated/etc.), same as the SQL
+        // twin's `NULL` branch.
+        createdAt: sql<Date | string | null>`${effectiveActivityAtSql()}`,
       })
       .from(activity)
       .where(and(inArray(activity.personId, ids), sql`${activity.personId} is not null`))
-      .orderBy(activity.personId, desc(effectiveActivityAtSql())),
+      // `nulls last`: a non-touch row (effective time NULL) must never win
+      // this DISTINCT ON pick over a real touch — Postgres's default for
+      // `DESC` is `NULLS FIRST`, which would otherwise let a same-day
+      // task_updated/etc. edit "become" a contact's most recent activity
+      // ahead of an older but real touch (email/call/note/...). If a
+      // person's ONLY activity rows are non-touch, this still picks one of
+      // them (DISTINCT ON always picks exactly one), with `createdAt: null`
+      // — buildLastActivityEntries treats that the same as "no activity".
+      .orderBy(activity.personId, sql`${effectiveActivityAtSql()} desc nulls last`),
   ]);
 
   const groupedConnections = groupBdConnectionsByPerson(connectionRows);
@@ -439,7 +449,7 @@ export async function getContactListPage(
       // `effectiveActivityAtSql()`, NOT `created_at` — see that helper's doc
       // comment), `activity.id desc` as a tiebreak for two rows sharing the
       // exact same effective timestamp.
-      lastActivityRaw: sql<{ type: string; metadata: unknown; createdAt: string } | null>`(
+      lastActivityRaw: sql<{ type: string; metadata: unknown; createdAt: string | null } | null>`(
         select json_build_object(
           'type', activity.type,
           'metadata', activity.metadata,
@@ -447,7 +457,11 @@ export async function getContactListPage(
         )
         from ${activity}
         where activity.person_id = pcl_page.id
-        order by ${effectiveActivityAtSql()} desc, activity.id desc
+        -- nulls last: a non-touch row (task_updated/etc., effective time
+        -- NULL) must never win this "single most recent" pick over a real
+        -- touch — see attachDerivedColumns' DISTINCT ON above for the same
+        -- fix and full rationale.
+        order by ${effectiveActivityAtSql()} desc nulls last, activity.id desc
         limit 1
       )`,
     })
