@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { es } from "@/lib/i18n/dictionaries/es";
 import type { ReportPeriod, ReportPeriodRange } from "@/lib/reports/period";
+import { buildReportsHref } from "@/lib/reports/reportsHref";
 import { buildFunnelBreakdown } from "@/lib/reports/funnel";
 import { buildSourceConversionRows, type SourceBucket } from "@/lib/reports/sourceBucket";
 import { buildDiscardReasonRows, discardReasonLabel, totalDiscardCount } from "@/lib/reports/discardReasons";
@@ -11,8 +12,42 @@ import { stageBadgeClass, stageLabelOf } from "@/lib/companies/listMappers";
 import { InfoIcon } from "@/components/icons";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
+import { BdFilterSelect } from "./BdFilterSelect";
+import { WonCompaniesKpiCard, type WonCompaniesKpiCardLabels } from "./WonCompaniesKpiCard";
+import { MeetingsKpiCard, type MeetingsKpiCardLabels } from "./MeetingsKpiCard";
 
 const dict = es.reports;
+
+// Narrow, ClientStrings-checked slices for the two "use client" drilldown
+// cards (review fix) — neither card imports the raw dictionary module
+// itself anymore; see WonCompaniesKpiCard.tsx's doc comment for why.
+const wonCompaniesKpiLabels: WonCompaniesKpiCardLabels = {
+  kpiCompaniesWon: dict.kpiCompaniesWon,
+  wonCompaniesDialogTitle: dict.wonCompaniesDialogTitle,
+  wonCompaniesDialogSubtitle: dict.wonCompaniesDialogSubtitle,
+  wonCompaniesDialogColCompany: dict.wonCompaniesDialogColCompany,
+  wonCompaniesDialogColOwner: dict.wonCompaniesDialogColOwner,
+  wonCompaniesDialogColWonAt: dict.wonCompaniesDialogColWonAt,
+  wonCompaniesDialogWonAtApprox: dict.wonCompaniesDialogWonAtApprox,
+  wonCompaniesDialogNoOwner: dict.wonCompaniesDialogNoOwner,
+  wonCompaniesDialogFootnote: dict.wonCompaniesDialogFootnote,
+  wonCompaniesDialogEmpty: dict.wonCompaniesDialogEmpty,
+  dialogClose: dict.dialogClose,
+  dialogLoading: dict.dialogLoading,
+  dialogError: dict.dialogError,
+};
+const meetingsKpiLabels: MeetingsKpiCardLabels = {
+  kpiMeetings: dict.kpiMeetings,
+  meetingsDialogTitle: dict.meetingsDialogTitle,
+  meetingsDialogColContact: dict.meetingsDialogColContact,
+  meetingsDialogColCompany: dict.meetingsDialogColCompany,
+  meetingsDialogColBd: dict.meetingsDialogColBd,
+  meetingsDialogColDate: dict.meetingsDialogColDate,
+  meetingsDialogEmpty: dict.meetingsDialogEmpty,
+  dialogClose: dict.dialogClose,
+  dialogLoading: dict.dialogLoading,
+  dialogError: dict.dialogError,
+};
 
 const SOURCE_LABEL: Record<SourceBucket, string> = {
   hubspot: dict.sourceHubspot,
@@ -42,14 +77,6 @@ const DISCARD_REFERENCE_REMAINING = [
   { reason: "bad_data" as const, count: 4 },
   { reason: "other" as const, count: 2 },
 ];
-
-export function buildReportsHref(period: ReportPeriod, bdId: string | null): string {
-  const params = new URLSearchParams();
-  if (period !== "month") params.set("period", period);
-  if (bdId) params.set("bd", bdId);
-  const qs = params.toString();
-  return qs ? `/admin/reports?${qs}` : "/admin/reports";
-}
 
 /**
  * Pure presentation for /admin/reports (owner-reporting) — no auth gate, no
@@ -151,17 +178,14 @@ export function ReportsView({
             <label className="label sr-only" htmlFor="bd-filter">
               {dict.bdFilterLabel}
             </label>
-            <select id="bd-filter" name="bd" className="select input-sm" defaultValue={bdId ?? "all"}>
-              <option value="all">{dict.allBds}</option>
-              {perBd.map((row) => (
-                <option key={row.bdId} value={row.bdId}>
-                  {row.bdName}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="btn btn-ghost btn-sm">
-              {dict.applyFilter}
-            </button>
+            <BdFilterSelect period={period} bdId={bdId} options={aggregates.bdOptions} allLabel={dict.allBds} />
+            {/* No-JS fallback only (bug fix: BdFilterSelect now applies on
+                change for everyone else) — invisible whenever JS runs. */}
+            <noscript>
+              <button type="submit" className="btn btn-ghost btn-sm">
+                {dict.applyFilter}
+              </button>
+            </noscript>
           </form>
         </div>
         <span className="meta">{dict.periodLabel(range.label)}</span>
@@ -178,16 +202,31 @@ export function ReportsView({
           <div className="value">{funnel.replyRatePct}%</div>
           <div className="foot">{dict.kpiReplyRateFoot}</div>
         </div>
-        <div className="stat success">
-          <div className="label">{dict.kpiMeetings}</div>
-          <div className="value">{funnel.meeting}</div>
-          <div className="foot">{dict.kpiMeetingsFoot}</div>
-        </div>
-        <div className="stat warn">
-          <div className="label">{dict.kpiCompaniesWon}</div>
-          <div className="value">{pipelineRows.find((r) => r.stage === "won")?.count ?? 0}</div>
-          <div className="foot">{dict.kpiCompaniesWonFoot(qualifiedCount)}</div>
-        </div>
+        {/* Bug fix: this KPI used to reuse `funnel.meeting` (persons whose
+            CURRENT status is "meeting", scoped by person.owner_bd_id) —
+            inconsistent with "Actividad por BD"'s own "Reuniones" column
+            (activity.actor_bd_id), so filtering by a BD who logged meetings
+            for OTHER BDs' contacts showed 0 here while the activity table
+            showed a real count. Now sourced from `activityTotal.meetings`
+            (same actor-scoped, period-scoped rpt_activity_pivot query as
+            the activity table), so the two numbers can never disagree. The
+            "Embudo de contactos" card's own "Reunión" row below keeps the
+            owner-scoped `funnel.meeting` definition — a deliberately
+            different question ("how far did MY contacts progress"). */}
+        <MeetingsKpiCard
+          value={activityTotal.meetings}
+          foot={activityTotal.meetings === 0 ? dict.kpiMeetingsEmptyFoot : dict.kpiMeetingsFoot}
+          fromIso={range.fromIso}
+          toIso={range.toIso}
+          bdId={bdId}
+          labels={meetingsKpiLabels}
+        />
+        <WonCompaniesKpiCard
+          value={pipelineRows.find((r) => r.stage === "won")?.count ?? 0}
+          foot={dict.kpiCompaniesWonFoot(qualifiedCount)}
+          bdId={bdId}
+          labels={wonCompaniesKpiLabels}
+        />
       </div>
 
       <div className="card mb-lg">
@@ -323,6 +362,12 @@ export function ReportsView({
               ))}
             </div>
             <p className="meta mt-md">{dict.pipelineFoot(pipelineRows.reduce((s, r) => s + r.count, 0))}</p>
+            {/* Prod bug fix (2026-09-30): filtered by BD, this card now
+                rolls up through owned people too (companyBelongsToBdSql,
+                queries.ts) — same rule "Empresas ganadas"'s own drilldown
+                documents, spelled out here since it changes which companies
+                count once a BD is selected. */}
+            {bdId && <p className="meta">{dict.wonCompaniesDialogFootnote}</p>}
           </div>
         </div>
       </div>

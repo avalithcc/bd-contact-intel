@@ -1458,6 +1458,12 @@ export const es: typeof en = {
     kpiReplyRateFoot: "Respondió ÷ Contactado",
     kpiMeetings: "Reuniones agendadas",
     kpiMeetingsFoot: "en el período",
+    // Prod (2026-09-30): 0 meeting_logged rows exist in the whole DB today
+    // — the KPI is genuinely 0, not broken. Shown instead of kpiMeetingsFoot
+    // whenever the value is 0, so a real "nothing logged yet" reads
+    // differently from "en el período" (which implies data that just isn't
+    // there for THIS period).
+    kpiMeetingsEmptyFoot: "Todavía no se registraron reuniones",
     kpiCompaniesWon: "Empresas ganadas",
     kpiCompaniesWonFoot: (qualified: number) => `de ${qualified} en Calificada`,
     discardReasonsTitle: "Descartes por motivo",
@@ -1511,6 +1517,32 @@ export const es: typeof en = {
     queueRecentFoot: "La cola de seguimientos se lanzó hace poco — con menos de un período completo de historial, esta tarjeta todavía tiene poca base para comparar.",
     total: "Total",
     bdColumn: "BD",
+    dialogClose: "Cerrar",
+    dialogLoading: "Cargando…",
+    dialogError: "No se pudo cargar la lista.",
+    wonCompaniesDialogTitle: "Empresas ganadas",
+    // Prod bug fix (2026-09-30): this is decision 7's CURRENT snapshot
+    // (same as "Pipeline de empresas" above it), never the period filter —
+    // spelled out here so nobody reads this list as "ganadas EN el período".
+    wonCompaniesDialogSubtitle: "Instantánea actual, no cambia con el período — igual que el Pipeline de arriba.",
+    wonCompaniesDialogColCompany: "Empresa",
+    wonCompaniesDialogColOwner: "BD dueño",
+    wonCompaniesDialogColWonAt: "Ganada",
+    wonCompaniesDialogWonAtApprox: "aprox.",
+    wonCompaniesDialogNoOwner: "Sin dueño asignado",
+    // Prod bug fix (2026-09-30): both real won companies had no
+    // company.owner_bd_id, which made this KPI read 0 for every BD. A
+    // company now counts for a BD via its own owner OR any owned contact's
+    // owner — documented here since that's not obvious from the BD column
+    // alone.
+    wonCompaniesDialogFootnote: "Se cuenta por dueño de la empresa o de alguno de sus contactos.",
+    wonCompaniesDialogEmpty: "No hay empresas ganadas para este filtro.",
+    meetingsDialogTitle: "Reuniones agendadas",
+    meetingsDialogColContact: "Contacto",
+    meetingsDialogColCompany: "Empresa",
+    meetingsDialogColBd: "BD",
+    meetingsDialogColDate: "Fecha",
+    meetingsDialogEmpty: "No hay reuniones registradas para este filtro.",
   },
 
   duplicates: {
