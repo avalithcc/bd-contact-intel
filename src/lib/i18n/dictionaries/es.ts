@@ -89,6 +89,73 @@ export const es: typeof en = {
     fieldWrongPerson: "Cuándo es la persona equivocada",
   },
 
+  // "Estados de contacto" — status/pipeline guide page chrome
+  // (openspec/changes/contact-status-guide/mockups/contact-status.html).
+  // Reuses `leadStatuses` (contact status labels) and `companyList`'s
+  // stage* labels (company pipeline stage labels) rather than duplicating
+  // them here — only this page's own narrative copy lives in this section.
+  // Some sentences that mix a bold lead-in with regular text are split into
+  // a `*Label`/`*Body` (or `*Prefix`/`*Strong`/`*Suffix`) pair so the page
+  // can render the emphasis the approved copy has, without embedding markup
+  // in the dictionary string itself.
+  contactStatusGuide: {
+    eyebrow: "Guía",
+    title: "Cómo funcionan los estados de un contacto",
+    lead: "El estado de un contacto no se elige: lo calcula el sistema a partir de la actividad que registrás. No hay ningún lugar donde cambiarlo a mano, y eso es a propósito.",
+    stagesAriaLabel: "Las cuatro etapas, en orden",
+    stagesIntroLabel: "Hay cuatro etapas, en orden:",
+    stagesIntroSuffix: "El contacto queda siempre en la más alta que alcanzó.",
+    sectionTriggersTitle: "Qué mueve cada etapa",
+    sectionTriggersIntro: "Solo estas acciones cambian el estado. Cualquier otra cosa lo deja como está.",
+    tableActivityHeader: "Lo que registrás",
+    tableResultHeader: "El contacto pasa a",
+    noteRuleLabel: "Una nota no mueve el estado.",
+    noteRuleBody:
+      "Sirve para dejar contexto, no para registrar que pasó algo con la persona. Si llamaste, registrá la llamada; la nota es aparte.",
+    sectionRulesTitle: "Dos reglas que conviene saber",
+    ruleNoDowngradeLabel: "El estado no baja solo.",
+    ruleNoDowngradeBody:
+      "Se queda con la etapa más alta que el contacto alcanzó alguna vez, no con lo último que pasó. Si ya tuviste una reunión y después le mandás un correo, sigue en Reunión. No baja a Contactado.",
+    ruleDiscardNotForeverLabel: "Descartar no es para siempre, pero no lo deshace cualquier cosa.",
+    ruleDiscardNotForeverBody:
+      "El contacto sale del descarte cuando registrás algo que llegue por lo menos tan alto como la etapa más alta que ya había alcanzado antes.",
+    discardMeetingExamplePrefix: "Si llegó a Reunión y lo descartaste, un correo posterior",
+    discardMeetingExampleStrong: "no",
+    discardMeetingExampleSuffix: "lo revive: Contactado está por debajo de Reunión. Otra reunión sí.",
+    discardContactedExampleBody:
+      "Si nunca pasó de Contactado, en cambio, cualquier correo o llamada posterior lo saca del descarte.",
+    discardSummaryBody:
+      "Dicho de otra forma: para revivirlo hace falta algo al menos tan fuerte como lo mejor que ya habías conseguido con esa persona.",
+    teamActivityPrefix: "También cuenta la actividad de",
+    teamActivityStrong: "todo el equipo",
+    teamActivitySuffix:
+      ", no solo la tuya. Si Macarena ya lo contactó, el contacto figura como Contactado aunque vos no le hayas escrito nunca.",
+    sectionAfterMeetingTitle: "Qué pasa después de la reunión",
+    ceilingLabel: "Reunión es el techo del contacto.",
+    ceilingBody:
+      "No hay una etapa más alta: por más reuniones, propuestas o llamadas que sigan, la persona se queda ahí. Eso no es un límite del sistema, es que a partir de ese punto lo que avanza ya no es la persona.",
+    companyStageLabel: "El negocio sigue en la empresa, no en el contacto.",
+    companyStageBody: "Abrí la ficha de la empresa y ahí está la etapa comercial:",
+    tableCompanyStageHeader: "Etapa de la empresa",
+    tableWhenToMoveHeader: "Cuándo moverla",
+    manualLabel: "Esta sí la movés vos, a mano.",
+    manualBody:
+      "Es la diferencia importante con el estado del contacto: el estado se calcula solo a partir de lo que registrás, la etapa de la empresa la elegís. Nadie la va a mover por vos, y ninguna actividad la cambia sola.",
+    stageChangeLoggedNote: "Cada cambio de etapa queda registrado en la cronología de la empresa, con tu nombre y la fecha.",
+    whySeparateLabel: "Por qué están separados.",
+    whySeparateBody:
+      "Una empresa suele tener varios contactos: el que te atendió primero, el técnico que validó, el que firma. Cada uno avanza por su cuenta en su propio estado, pero la oportunidad es una sola y es de la empresa. Por eso el embudo comercial vive ahí.",
+    sectionPracticeTitle: "Qué significa en la práctica",
+    noRecordLabel: "Si no registrás, el contacto no avanza.",
+    noRecordBody:
+      "No es que el tablero esté desactualizado: para el sistema, una llamada que no registraste no existe. Un contacto con el que hablaste tres veces sigue figurando en Nuevo hasta que quede alguna actividad cargada.",
+    practicalWhyPrefix:
+      'Esto es a propósito. Un estado que se elige a mano miente: alguien marca "Contactado" sin haber escrito, o escribe y se olvida de mover la etiqueta. Acá el estado no puede separarse de los hechos, porque',
+    practicalWhyStrong: "es",
+    practicalWhySuffix: "los hechos. No hay forma de tener a alguien en Respondió sin una respuesta registrada.",
+    closingStatement: "El trato es ese: el tablero refleja la realidad exactamente en la medida en que la carguen.",
+  },
+
   companyCategories: {
     fintech_payments: "Fintech y Pagos",
     banking_insurance: "Banca y Seguros",
@@ -151,6 +218,13 @@ export const es: typeof en = {
     discovery: "Descubrimiento",
     account: "Cuenta",
     playbook: "Guía de roles",
+    // "Guías" sidenav section (openspec/changes/contact-status-guide) —
+    // reference/manual pages for every BD, no live counts, not admin-gated.
+    // Holds "Guía de roles" (moved out of sidenav-footer, bd-playbook) and
+    // "Estados de contacto" (new). Grows here instead of sidenav-footer now
+    // that there are two reference items instead of one.
+    guidesSection: "Guías",
+    contactStatusGuide: "Estados de contacto",
     // Admin-only sidenav section (admin-conversation-access mockup, screen 1:
     // admin-conversation.html:57-61), now holding both "Reportes"
     // (owner-reporting decision 1/5) and "Registro de auditoría" —
