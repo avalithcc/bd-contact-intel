@@ -774,12 +774,23 @@ export const es: typeof en = {
     adminAuditAlertTitle: "Está viendo la conversación de otro BD",
     adminNoConversationContent: "Sin contenido de conversación registrado.",
     adminOpenAsPage: "Abrir en una página",
+    adminViewDialogTitlePrefix: "¿Ver la conversación de",
+    adminViewDialogBodyPrefix: "Vas a ver la conversación de",
+    adminViewDialogBodyWith: "con",
+    adminAuditConfirmTitle: "Esta visualización queda registrada",
+    adminAuditConfirmBody:
+      "Se guarda en el registro de auditoría con tu nombre, la fecha y a quién pertenece la conversación. El registro es visible únicamente para administradores; no se notifica a nadie ni puede verse que la visualizaste.",
     stageBadgePrefix: "Etapa:",
     conversationHistoryTitle: "Historial de conversaciones",
     conversationHistoryIntroPrefix: "Existe historial de conversaciones con:",
     conversationHistoryPrivateFooter: "El contenido es privado para cada BD.",
     conversationHistoryAdminFooter:
       "Los administradores pueden abrir cualquier conversación; cada visualización queda registrada en el registro de auditoría.",
+    // Right-rail card's own "Ver" link (admin-conversation.html:141-142) —
+    // shorter than the per-row `viewConversationLink` ("Ver conversación")
+    // since this button already sits under a card titled "Historial de
+    // conversaciones", naming the BD right next to it.
+    conversationHistoryViewAction: "Ver",
     tasksCardTitle: "Tareas",
     addTaskAction: "Agregar tarea",
     changeCompanyAria: "Cambiar empresa",
@@ -838,6 +849,11 @@ export const es: typeof en = {
     hiringBadge: (count: number) => `Contratando · ${count} puestos de IT`,
     companyContactCount: (count: number) => `${count} contactos en esta empresa`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} mensajes · último ${dateLabel}`,
+    // Right-rail card, admin-only (admin-conversation-access mockup,
+    // admin-conversation.html:141-142: "1 hilo de correo"). Composed
+    // server-side (page.tsx) — the card itself is a client component and
+    // can't hold a function template (ClientStrings).
+    lockedConversationThreadCount: (count: number) => (count === 1 ? "1 hilo de correo" : `${count} hilos de correo`),
     lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
     touchpointsFoot: (linkedin: number, email: number, notes: number) =>
       `${linkedin} LinkedIn · ${email} correos · ${notes} notas`,

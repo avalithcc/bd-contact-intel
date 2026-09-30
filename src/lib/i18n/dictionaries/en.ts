@@ -851,12 +851,29 @@ export const en = {
     adminAuditAlertTitle: "You are viewing another BD's conversation",
     adminNoConversationContent: "No conversation content on file.",
     adminOpenAsPage: "Open as a page",
+    // --- admin "Ver conversación" confirmation dialog (admin-conversation-
+    // access mockup, screen 1) — plain strings only (Timeline.tsx is a client
+    // component, see ClientStrings): the dialog composes
+    // `${adminViewDialogTitlePrefix} ${bdName}?` / `${adminViewDialogBodyPrefix}
+    // ${bdName} ${adminViewDialogBodyWith} ${personName}.` in code, the same
+    // "prefix + interpolated name" pattern timelineLockedThreadBelongsTo above
+    // already uses.
+    adminViewDialogTitlePrefix: "View the conversation of",
+    adminViewDialogBodyPrefix: "You're about to view the conversation of",
+    adminViewDialogBodyWith: "with",
+    // Owner decision (2026-09-30): the conversation's owner is never notified
+    // and has no way to see this view — this copy states that plainly instead
+    // of the earlier "they'll be able to see you viewed it" wording.
+    adminAuditConfirmTitle: "This view is recorded",
+    adminAuditConfirmBody:
+      "It's saved to the audit log with your name, the date, and whose conversation it is. The log is visible to admins only; they are never notified and cannot see that you viewed it.",
     stageBadgePrefix: "Stage:",
     conversationHistoryTitle: "Conversation history",
     conversationHistoryIntroPrefix: "Conversation history exists with:",
     conversationHistoryPrivateFooter: "Content is private to each BD.",
     conversationHistoryAdminFooter:
       "Admins can open any conversation; every view is recorded in the audit log.",
+    conversationHistoryViewAction: "View",
     tasksCardTitle: "Tasks",
     addTaskAction: "Add task",
     changeCompanyAria: "Change company",
@@ -909,6 +926,7 @@ export const en = {
     hiringBadge: (count: number) => `Hiring · ${count} IT roles`,
     companyContactCount: (count: number) => `${count} contacts at this company`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} messages · last ${dateLabel}`,
+    lockedConversationThreadCount: (count: number) => (count === 1 ? "1 email thread" : `${count} email threads`),
     lastActivityFoot: (channelLabel: string, actorName: string) => `${channelLabel} · ${actorName}`,
     touchpointsFoot: (linkedin: number, email: number, notes: number) =>
       `${linkedin} LinkedIn · ${email} emails · ${notes} notes`,

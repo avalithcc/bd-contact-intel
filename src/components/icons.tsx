@@ -154,6 +154,18 @@ export function LockIcon({ className }: { className?: string }) {
   );
 }
 
+// admin-conversation-access mockup's "Ver conversación" action / "Registro de
+// auditoría" nav item / audit banner icon (admin-conversation.html:60,115,208
+// — one path reused across all three, same as the mockup).
+export function EyeIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}
+
 export function ChevronRightIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>

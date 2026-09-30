@@ -36,6 +36,7 @@ import {
   ChevronDownIcon,
   DiscardIcon,
   ExternalLinkIcon,
+  EyeIcon,
   HistoryIcon,
   LockIcon,
   MailIcon,
@@ -47,6 +48,8 @@ import {
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
+import { AdminViewConversationDialog } from "./AdminViewConversationDialog";
+import { canShowAdminConversationAction } from "@/lib/activity/adminConversationAccess";
 import { getTimelinePillEntriesAction } from "../actions";
 import { getThreadBodiesAction } from "./threadActions";
 import type { ThreadMessageBody } from "@/lib/gmail/threadMessages";
@@ -295,6 +298,12 @@ export function Timeline({
   const [threadBodies, setThreadBodies] = useState<Record<string, Record<string, ThreadMessageBody>>>({});
   const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
   const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
+  // Admin's "Ver conversación (queda registrado)" action (admin-conversation-
+  // access mockup, screen 1) — one dialog instance shared by every locked row,
+  // rather than one per BD like the mockup's own `#confirm-view-juan`/`-ana`
+  // anchors, since the set of BDs a contact has locked content from isn't
+  // known ahead of render time here the way the mockup's fixed sample is.
+  const [pendingAdminView, setPendingAdminView] = useState<{ bdId: string; bdName: string } | null>(null);
 
   function toggleQuoted(messageId: string) {
     setExpandedQuotedIds((prev) => {
@@ -687,6 +696,29 @@ export function Timeline({
   }
 
   /**
+   * The admin-only action row under a locked card (admin-conversation-access
+   * mockup, `.locked-actions`). `canShowAdminConversationAction` (pure;
+   * src/lib/activity/adminConversationAccess.ts) is the single source of
+   * truth for "does this admin get the button" — `isAdmin` is server-computed
+   * (page.tsx, from `me.role`), never a client-side guess.
+   */
+  function renderAdminViewAction(bdId: string | null, bdName: string | null) {
+    if (!canShowAdminConversationAction({ isAdmin, locked: true, targetBdId: bdId })) return null;
+    return (
+      <div className="locked-actions row">
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setPendingAdminView({ bdId: bdId!, bdName: bdName ?? l.timelineSystemActor })}
+        >
+          <EyeIcon className="icon" />
+          {l.viewConversationLink} ({l.viewConversationAuditHint})
+        </button>
+      </div>
+    );
+  }
+
+  /**
    * One `task_updated`/`task_completed`/`task_reopened` entry inside the
    * Tareas pill's own view — the EXACT SAME system/status-change entry
    * layout the main "Todo" list already uses for these types (owner spec),
@@ -882,6 +914,11 @@ export function Timeline({
               </span>
             </div>
           )}
+          {!group.visible &&
+            renderAdminViewAction(
+              group.messages.find((m) => m.actorBdId)?.actorBdId ?? null,
+              group.messages.find((m) => m.actorName)?.actorName ?? null,
+            )}
         </div>
       </div>
     );
@@ -1073,6 +1110,8 @@ export function Timeline({
                           entryBody(timelineEntry, l)
                         )}
                       </div>
+                      {!timelineEntry.visible &&
+                        renderAdminViewAction(timelineEntry.actorBdId, timelineEntry.actorName)}
                     </div>
                   </div>
                 );
@@ -1082,6 +1121,18 @@ export function Timeline({
         ))
           )}
         </>
+      )}
+
+      {pendingAdminView && (
+        <AdminViewConversationDialog
+          open
+          onClose={() => setPendingAdminView(null)}
+          personId={personId}
+          personName={personName}
+          bdId={pendingAdminView.bdId}
+          bdName={pendingAdminView.bdName}
+          labels={l}
+        />
       )}
 
       {editingTask && (
