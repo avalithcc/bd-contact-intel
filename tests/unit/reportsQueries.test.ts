@@ -66,9 +66,18 @@ test("buildReportAggregatesQuery: discard reasons filter type='discarded', join 
 
 test("buildReportAggregatesQuery: pipeline groups by relationship_stage and does NOT filter by period (decision 7)", () => {
   const { sql } = renderAgg();
-  const pipelineSection = sql.slice(sql.indexOf("rpt_pipeline"), sql.indexOf("rpt_pipeline") + 400);
+  const pipelineSection = sql.slice(sql.indexOf("rpt_pipeline"), sql.indexOf("rpt_pipeline") + 600);
   assert.match(pipelineSection, /group by company\.relationship_stage/i);
   assert.doesNotMatch(pipelineSection, /created_at/i);
+});
+
+test("buildReportAggregatesQuery: pipeline's BD filter rolls up through owned people too (prod bug: real won companies have no company.owner_bd_id)", () => {
+  const { sql } = renderAgg({ ...AGG_PARAMS, bdId: "00000000-0000-0000-0000-000000000001" });
+  const pipelineSection = sql.slice(sql.indexOf("rpt_pipeline"), sql.indexOf("rpt_pipeline") + 600);
+  assert.match(pipelineSection, /\$\d+::uuid is null or company\.owner_bd_id = \$\d+::uuid or exists \(/i);
+  assert.match(pipelineSection, /person\.company_key = company\.company_key/i);
+  assert.match(pipelineSection, /person\.merged_into_id is null/i);
+  assert.match(pipelineSection, /person\.owner_bd_id = \$\d+::uuid/i);
 });
 
 test("buildReportAggregatesQuery: source_status groups by source_key and status (bucketing stays in JS, decision 8)", () => {
@@ -170,6 +179,21 @@ test("buildWonCompaniesDrilldownQuery: the won_at activity scan is a correlated 
 test("buildWonCompaniesDrilldownQuery: bounded with a LIMIT", () => {
   const { sql } = renderWon({ bdId: null });
   assert.match(sql, /limit \$\d+/i);
+});
+
+test("buildWonCompaniesDrilldownQuery: the BD filter rolls up through owned people too (prod bug: Almería Sports Destination / Datapar S.A. have no company.owner_bd_id)", () => {
+  const { sql } = renderWon({ bdId: "00000000-0000-0000-0000-000000000001" });
+  assert.match(sql, /\$\d+::uuid is null or company\.owner_bd_id = \$\d+::uuid or exists \(/i);
+  assert.match(sql, /person\.company_key = company\.company_key/i);
+  assert.match(sql, /person\.merged_into_id is null/i);
+});
+
+test("buildWonCompaniesDrilldownQuery: owner_bd_id/owner_bd_name fall back to the company's most-recently-updated owned person (Datapar case)", () => {
+  const { sql } = renderWon({ bdId: null });
+  assert.match(sql, /distinct on \(person\.company_key\)/i);
+  assert.match(sql, /person\.owner_bd_id is not null/i);
+  assert.match(sql, /order by person\.company_key, person\.updated_at desc, person\.id/i);
+  assert.match(sql, /coalesce\(rpt_won_companies\.pbc_owner_bd_id, rpt_won_company_person_owner\.pbc_owner_bd_id\) as owner_bd_id/i);
 });
 
 function renderMeetings(params: MeetingsDrilldownParams) {

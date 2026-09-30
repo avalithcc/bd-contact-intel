@@ -16,6 +16,13 @@
  * 7, pipeline.ts) — a drilldown that dropped rows outside the selected
  * period would show fewer companies than the KPI number above it, which is
  * the exact class of "the numbers don't match" bug this change fixes.
+ *
+ * `ownerBdId`/`ownerBdName` (prod bug fix 2026-09-30): prefer the company's
+ * own owner, falling back to its most-recently-updated owned, non-merged
+ * person's owner (companyBdAttribution.ts) — both real won companies in
+ * prod (Almería Sports Destination, Datapar S.A.) have no company-level
+ * owner, so scoping/display by `company.owner_bd_id` alone made this KPI
+ * read 0 for every BD.
  */
 
 export interface WonCompanyDrilldownRawRow {

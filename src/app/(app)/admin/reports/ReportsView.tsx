@@ -184,7 +184,7 @@ export function ReportsView({
             different question ("how far did MY contacts progress"). */}
         <MeetingsKpiCard
           value={activityTotal.meetings}
-          foot={dict.kpiMeetingsFoot}
+          foot={activityTotal.meetings === 0 ? dict.kpiMeetingsEmptyFoot : dict.kpiMeetingsFoot}
           fromIso={range.fromIso}
           toIso={range.toIso}
           bdId={bdId}
@@ -329,6 +329,12 @@ export function ReportsView({
               ))}
             </div>
             <p className="meta mt-md">{dict.pipelineFoot(pipelineRows.reduce((s, r) => s + r.count, 0))}</p>
+            {/* Prod bug fix (2026-09-30): filtered by BD, this card now
+                rolls up through owned people too (companyBelongsToBdSql,
+                queries.ts) — same rule "Empresas ganadas"'s own drilldown
+                documents, spelled out here since it changes which companies
+                count once a BD is selected. */}
+            {bdId && <p className="meta">{dict.wonCompaniesDialogFootnote}</p>}
           </div>
         </div>
       </div>

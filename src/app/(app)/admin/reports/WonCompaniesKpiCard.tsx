@@ -38,6 +38,7 @@ export function WonCompaniesKpiCard({
       value={value}
       foot={foot}
       dialogTitle={dict.wonCompaniesDialogTitle}
+      dialogSubtitle={dict.wonCompaniesDialogSubtitle}
       closeLabel={dict.dialogClose}
       loadingLabel={dict.dialogLoading}
       errorLabel={dict.dialogError}
@@ -67,7 +68,7 @@ export function WonCompaniesKpiCard({
                 ))}
               </tbody>
             </table>
-            {bdId && <p className="meta mt-md">{dict.wonCompaniesDialogFootnote}</p>}
+            <p className="meta mt-md">{dict.wonCompaniesDialogFootnote}</p>
           </>
         )
       }

@@ -24,6 +24,7 @@ export function KpiDrilldownCard<T>({
   value,
   foot,
   dialogTitle,
+  dialogSubtitle,
   closeLabel,
   loadingLabel,
   errorLabel,
@@ -35,6 +36,10 @@ export function KpiDrilldownCard<T>({
   value: number;
   foot: React.ReactNode;
   dialogTitle: string;
+  /** Rendered right under the title, before the loading/error/list state —
+   * page-level context (e.g. "current snapshot, not period data") that
+   * must show even while the list is still loading. */
+  dialogSubtitle?: React.ReactNode;
   closeLabel: string;
   loadingLabel: string;
   errorLabel: string;
@@ -83,6 +88,7 @@ export function KpiDrilldownCard<T>({
             </button>
           }
         >
+          {dialogSubtitle && <p className="meta mb-md">{dialogSubtitle}</p>}
           {state.status === "loading" && <p className="meta">{loadingLabel}</p>}
           {state.status === "error" && <p className="meta">{errorLabel}</p>}
           {state.status === "ready" && renderList(state.rows)}

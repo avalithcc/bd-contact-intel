@@ -42,6 +42,25 @@ import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 
+/**
+ * SQL twin of companyBdAttribution.ts#companyBelongsToBd — see that file's
+ * doc comment for the "why" (prod: both real won companies have no
+ * company.owner_bd_id). References the bare `company`/`person` table names
+ * (never aliased, rule 4), so every call site must FROM `${company}`
+ * un-aliased, same convention `effectiveActivityAtSql()` requires of
+ * `activity`. Shared by rpt_pipeline (buildReportAggregatesQuery) and
+ * rpt_won_companies (buildWonCompaniesDrilldownQuery) so "Empresas ganadas"
+ * and "Pipeline de empresas" can never disagree.
+ */
+function companyBelongsToBdSql(bdId: string | null) {
+  return sql`(${bdId}::uuid is null or company.owner_bd_id = ${bdId}::uuid or exists (
+    select 1 from person
+    where person.company_key = company.company_key
+      and person.merged_into_id is null
+      and person.owner_bd_id = ${bdId}::uuid
+  ))`;
+}
+
 const ACTIVITY_BY_BD_TYPES = ["note", "call", "meeting_logged", "email_sent", "reply_received"] as const;
 
 /** Literal-text twin of queueSelection.ts#workedTodayAtSql(), generalized from "today" to an arbitrary ART calendar date — see this file's doc comment for why it can't reuse that helper via interpolation here. */
@@ -98,10 +117,13 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
         and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
       group by coalesce(activity.metadata->>'reason', '')
     ),
+    -- "Empresas ganadas" KPI reuses THIS count (pbc_stage = 'won'); the
+    -- rollup below (companyBelongsToBdSql) is why both that KPI and this
+    -- card can never disagree when filtered by BD.
     rpt_pipeline as (
       select company.relationship_stage as pbc_stage, count(*)::int as pbc_count
       from ${company}
-      where (${bdId}::uuid is null or company.owner_bd_id = ${bdId}::uuid)
+      where ${companyBelongsToBdSql(bdId)}
       group by company.relationship_stage
     ),
     rpt_bd_options as (
@@ -264,10 +286,18 @@ const WON_COMPANIES_DRILLDOWN_LIMIT = 500;
  * "Empresas ganadas" KPI drilldown (reports-bd-filter-drilldown). BD-filtered
  * only, deliberately NOT period-filtered — see wonCompaniesDrilldown.ts's
  * doc comment for why (must stay consistent with the KPI's own decision-7
- * snapshot count). `rpt_won_at` scans `activity` scoped down to only the
- * companies already selected by `rpt_won_companies` (a correlated EXISTS,
- * rule 7), reusing the existing `activity_company_idx`/`activity_type_idx`
+ * snapshot count, and the same rpt_pipeline count via companyBelongsToBdSql).
+ * `rpt_won_at`/`rpt_won_company_person_owner` both scan their own table
+ * scoped down to only the companies already selected by `rpt_won_companies`
+ * (a correlated EXISTS, rule 7), reusing the existing
+ * `activity_company_idx`/`activity_type_idx`/`contact_bd_company_idx`-style
  * indexes rather than a full-table scan.
+ *
+ * `owner_bd_id`/`owner_bd_name` prefer the company's own owner, falling
+ * back to its MOST RECENTLY updated owned, non-merged person (prod: Datapar
+ * S.A. has no company owner but one owned contact — `distinct on` picks
+ * that single row deterministically even if a future company somehow has
+ * more than one owned contact under different BDs).
  */
 export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownParams) {
   return sql`
@@ -279,7 +309,17 @@ export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownP
         company.updated_at as pbc_updated_at
       from ${company}
       where company.relationship_stage = 'won'
-        and (${bdId}::uuid is null or company.owner_bd_id = ${bdId}::uuid)
+        and ${companyBelongsToBdSql(bdId)}
+    ),
+    rpt_won_company_person_owner as (
+      select distinct on (person.company_key)
+        person.company_key as pbc_company_key,
+        person.owner_bd_id as pbc_owner_bd_id
+      from ${person}
+      where person.merged_into_id is null
+        and person.owner_bd_id is not null
+        and exists (select 1 from rpt_won_companies where rpt_won_companies.pbc_company_key = person.company_key)
+      order by person.company_key, person.updated_at desc, person.id
     ),
     rpt_won_at as (
       select distinct on (activity.company_key)
@@ -295,13 +335,14 @@ export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownP
     select
       rpt_won_companies.pbc_company_key as company_key,
       rpt_won_companies.pbc_display_name as display_name,
-      rpt_won_companies.pbc_owner_bd_id as owner_bd_id,
+      coalesce(rpt_won_companies.pbc_owner_bd_id, rpt_won_company_person_owner.pbc_owner_bd_id) as owner_bd_id,
       bd.name as owner_bd_name,
       coalesce(rpt_won_at.pbc_won_at, rpt_won_companies.pbc_updated_at) as won_at,
       (rpt_won_at.pbc_won_at is not null) as won_at_exact
     from rpt_won_companies
+    left join rpt_won_company_person_owner on rpt_won_company_person_owner.pbc_company_key = rpt_won_companies.pbc_company_key
     left join rpt_won_at on rpt_won_at.pbc_company_key = rpt_won_companies.pbc_company_key
-    left join ${bd} on bd.id = rpt_won_companies.pbc_owner_bd_id
+    left join ${bd} on bd.id = coalesce(rpt_won_companies.pbc_owner_bd_id, rpt_won_company_person_owner.pbc_owner_bd_id)
     order by won_at desc
     limit ${WON_COMPANIES_DRILLDOWN_LIMIT}
   `;
