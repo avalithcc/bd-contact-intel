@@ -84,6 +84,89 @@ export interface MergeDuplicateCandidateRow {
   status: string; // 'open' | 'merged' | 'not_duplicate'
 }
 
+/**
+ * Bugfix (merge data-loss, same bug class as PR #243's LinkedIn conversation
+ * fix): `email_message_person` is the ONLY authoritative "which persons does
+ * this synced Gmail message belong to" source (see its doc comment in
+ * schema.ts) and both read paths
+ * (getConversationForAdmin.ts/threadMessages.ts) filter `person_id = :personId`
+ * directly — no chain-resolve, unlike `conversation`. A merge that doesn't
+ * repoint these rows silently hides the merged-away person's synced emails
+ * forever. Fixed by repointing at merge time (not a read-time chain walk,
+ * per the coordinator's brief): production has zero merged persons today, so
+ * there is no historical backlog a read-time fix would need to rescue.
+ */
+export interface EmailMessagePersonRow {
+  id: string;
+  emailMessageId: string;
+  personId: string;
+  matchedEmail: string;
+  matchConfidence: string; // 'exact' | 'inferred'
+}
+
+/** The one key builder for the survivor-rows-by-message lookup below — mergeDb.ts's query and this file's own tests must both build this key through here, never by hand. */
+export function emailMessagePersonKey(row: Pick<EmailMessagePersonRow, "emailMessageId">): string {
+  return row.emailMessageId;
+}
+
+/**
+ * Bugfix companion (latent today — 0 of 353 open duplicate pairs have a live
+ * row, per the verification query): `follow_up_queue_item` was never
+ * repointed either, and both its write path (ensureTodayFollowUpQueue) and
+ * read path filter `isNull(person.mergedIntoId)`, so a merged-away person's
+ * queue row for that day would vanish from both identities the day this
+ * bug's first live case appears.
+ */
+export interface FollowUpQueueItemRow {
+  id: string;
+  bdId: string;
+  queueDate: string;
+  personId: string;
+  position: number;
+  dueStatus: string;
+  lastTouchAt: Date;
+  state: string; // 'pending' | 'postponed' | 'skipped'
+  snoozedUntil: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** The one key builder for the survivor-rows-by-(bd,date) lookup below — mergeDb.ts's query and this file's own tests must both build this key through here, never by hand. */
+export function followUpQueueItemKey(row: Pick<FollowUpQueueItemRow, "bdId" | "queueDate">): string {
+  return `${row.bdId}:${row.queueDate}`;
+}
+
+/**
+ * A collision on `email_message_person`'s unique (email_message_id,
+ * person_id): both survivor and merged were already linked to the SAME
+ * message. `winner` is what gets written onto `survivorOriginal.id` (the row
+ * id that survives either way) — matchedEmail and matchConfidence always
+ * move together, never a confidence label paired with the other side's
+ * address.
+ */
+export interface EmailMessagePersonCollision {
+  emailMessageId: string;
+  survivorOriginal: EmailMessagePersonRow;
+  mergedOriginal: EmailMessagePersonRow;
+  winner: Pick<EmailMessagePersonRow, "matchedEmail" | "matchConfidence">;
+}
+
+/**
+ * A collision on `follow_up_queue_item`'s unique (bd_id, queue_date,
+ * person_id): both survivor and merged already had a row for the same BD on
+ * the same day. `winner` is what gets written onto `survivorOriginal.id`
+ * (the row id that survives either way) — only state/snoozedUntil can move;
+ * position/dueStatus/lastTouchAt stay survivor's own (they describe how
+ * survivor's queue selected this row, not merged's).
+ */
+export interface FollowUpQueueItemCollision {
+  bdId: string;
+  queueDate: string;
+  survivorOriginal: FollowUpQueueItemRow;
+  mergedOriginal: FollowUpQueueItemRow;
+  winner: Pick<FollowUpQueueItemRow, "state" | "snoozedUntil">;
+}
+
 export interface PlanMergeInput {
   survivor: MergePersonFields;
   merged: MergePersonFields;
@@ -98,6 +181,14 @@ export interface PlanMergeInput {
   // pair that would collide with an existing survivor pair instead of
   // violating the unique (person_a_id, person_b_id) constraint.
   survivorPairedPersonIds: readonly string[];
+  emailMessagePersonRowsOnMerged: readonly EmailMessagePersonRow[];
+  // Survivor's email_message_person rows sharing an emailMessageId with one
+  // of the above — the only rows that can collide (see mergeDb.ts's query).
+  survivorEmailMessagePersonRows: readonly EmailMessagePersonRow[];
+  queueItemRowsOnMerged: readonly FollowUpQueueItemRow[];
+  // Survivor's follow_up_queue_item rows sharing a (bdId, queueDate) with one
+  // of the above — the only rows that can collide (see mergeDb.ts's query).
+  survivorQueueItemRows: readonly FollowUpQueueItemRow[];
 }
 
 /** One survivor field the merge changed: the value before, and the value written. */
@@ -131,6 +222,12 @@ export interface MergeSnapshot {
   droppedDuplicateCandidates: readonly MergeDuplicateCandidateRow[];
   mergedPairCandidate: { id: string; originalStatus: string } | null;
   propertyLosses: readonly PropertyLoss[];
+  // email_message_person ids repointed onto survivor by id (no collision).
+  movedEmailMessagePersonIds: readonly string[];
+  emailMessagePersonCollisions: readonly EmailMessagePersonCollision[];
+  // follow_up_queue_item ids repointed onto survivor by id (no collision).
+  movedQueueItemIds: readonly string[];
+  queueItemCollisions: readonly FollowUpQueueItemCollision[];
 }
 
 export interface RepointedPair {
@@ -149,6 +246,10 @@ export interface MergePlan {
   duplicateCandidatesToRepoint: readonly RepointedPair[];
   duplicateCandidatesToDrop: readonly string[];
   duplicateCandidateToMarkMerged: string | null;
+  emailMessagePersonRowsToRepoint: readonly { id: string }[];
+  emailMessagePersonCollisions: readonly EmailMessagePersonCollision[];
+  queueItemRowsToRepoint: readonly { id: string }[];
+  queueItemCollisions: readonly FollowUpQueueItemCollision[];
   snapshot: MergeSnapshot;
 }
 
@@ -281,6 +382,89 @@ function connectionValuesEqual(a: MergeConnection, b: MergeConnection): boolean 
   );
 }
 
+const MATCH_CONFIDENCE_RANK: Record<string, number> = { inferred: 0, exact: 1 };
+
+/**
+ * email_message_person collision rule: the unique (email_message_id,
+ * person_id) constraint means repointing merged's row verbatim would
+ * collide whenever BOTH persons were already linked to the SAME message.
+ * Keep the survivor's row id (nothing needs to change which id this
+ * message/person pair lives at) and take over merged's matchedEmail +
+ * matchConfidence TOGETHER only when merged's confidence outranks
+ * survivor's (exact > inferred) — matchConfidence describes matchedEmail,
+ * so the two must move together or not at all, never a confidence label
+ * paired with the other side's address. A tie (both exact or both
+ * inferred) keeps survivor's row untouched.
+ */
+function planEmailMessagePersonRepoints(
+  mergedRows: readonly EmailMessagePersonRow[],
+  survivorRows: readonly EmailMessagePersonRow[],
+): { repoints: readonly { id: string }[]; collisions: readonly EmailMessagePersonCollision[] } {
+  const survivorByMessage = new Map(survivorRows.map((r) => [emailMessagePersonKey(r), r]));
+  const repoints: { id: string }[] = [];
+  const collisions: EmailMessagePersonCollision[] = [];
+  for (const mergedRow of mergedRows) {
+    const survivorRow = survivorByMessage.get(emailMessagePersonKey(mergedRow));
+    if (!survivorRow) {
+      repoints.push({ id: mergedRow.id });
+      continue;
+    }
+    const mergedWins = (MATCH_CONFIDENCE_RANK[mergedRow.matchConfidence] ?? 0) > (MATCH_CONFIDENCE_RANK[survivorRow.matchConfidence] ?? 0);
+    collisions.push({
+      emailMessageId: mergedRow.emailMessageId,
+      survivorOriginal: survivorRow,
+      mergedOriginal: mergedRow,
+      winner: mergedWins
+        ? { matchedEmail: mergedRow.matchedEmail, matchConfidence: mergedRow.matchConfidence }
+        : { matchedEmail: survivorRow.matchedEmail, matchConfidence: survivorRow.matchConfidence },
+    });
+  }
+  return { repoints, collisions };
+}
+
+/**
+ * follow_up_queue_item collision rule: the unique (bd_id, queue_date,
+ * person_id) constraint means repointing merged's row verbatim would
+ * collide whenever BOTH persons already had a row for the same BD on the
+ * same day. Keep the survivor's row id and its own
+ * position/dueStatus/lastTouchAt (those describe how the row was selected
+ * into SURVIVOR's queue that day, not merged's); only state/snoozedUntil
+ * can move, and only when merged's is a DECIDED state ('postponed' /
+ * 'skipped') while survivor's is still 'pending' — a decision the BD
+ * already made must never be silently resurrected as pending by a merge.
+ * If both rows are already decided, survivor's own decision wins (arbitrary
+ * but documented tie-break: the surviving identity's own choice for that
+ * day).
+ */
+function planQueueItemRepoints(
+  mergedRows: readonly FollowUpQueueItemRow[],
+  survivorRows: readonly FollowUpQueueItemRow[],
+): { repoints: readonly { id: string }[]; collisions: readonly FollowUpQueueItemCollision[] } {
+  const survivorByKey = new Map(survivorRows.map((r) => [followUpQueueItemKey(r), r]));
+  const repoints: { id: string }[] = [];
+  const collisions: FollowUpQueueItemCollision[] = [];
+  for (const mergedRow of mergedRows) {
+    const survivorRow = survivorByKey.get(followUpQueueItemKey(mergedRow));
+    if (!survivorRow) {
+      repoints.push({ id: mergedRow.id });
+      continue;
+    }
+    const mergedDecided = mergedRow.state !== "pending";
+    const survivorDecided = survivorRow.state !== "pending";
+    const mergedWins = mergedDecided && !survivorDecided;
+    collisions.push({
+      bdId: mergedRow.bdId,
+      queueDate: mergedRow.queueDate,
+      survivorOriginal: survivorRow,
+      mergedOriginal: mergedRow,
+      winner: mergedWins
+        ? { state: mergedRow.state, snoozedUntil: mergedRow.snoozedUntil }
+        : { state: survivorRow.state, snoozedUntil: survivorRow.snoozedUntil },
+    });
+  }
+  return { repoints, collisions };
+}
+
 /**
  * Plans folding `merged` into `survivor` in one pass. Reversible: every
  * survivor field the merge changes is recorded as a before/after pair, every
@@ -392,6 +576,15 @@ export function planMerge(input: PlanMergeInput): MergePlan {
 
   const movedConnectionOriginals = input.mergedConnections.filter((c) => !survivorConnectionByBdId.get(c.bdId));
 
+  const { repoints: emailMessagePersonRowsToRepoint, collisions: emailMessagePersonCollisions } = planEmailMessagePersonRepoints(
+    input.emailMessagePersonRowsOnMerged,
+    input.survivorEmailMessagePersonRows,
+  );
+  const { repoints: queueItemRowsToRepoint, collisions: queueItemCollisions } = planQueueItemRepoints(
+    input.queueItemRowsOnMerged,
+    input.survivorQueueItemRows,
+  );
+
   const snapshot: MergeSnapshot = {
     merged,
     survivorFieldChanges,
@@ -404,6 +597,10 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     droppedDuplicateCandidates: droppedForSnapshot,
     mergedPairCandidate,
     propertyLosses,
+    movedEmailMessagePersonIds: emailMessagePersonRowsToRepoint.map((r) => r.id),
+    emailMessagePersonCollisions,
+    movedQueueItemIds: queueItemRowsToRepoint.map((r) => r.id),
+    queueItemCollisions,
   };
 
   return {
@@ -416,6 +613,10 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     duplicateCandidatesToRepoint,
     duplicateCandidatesToDrop,
     duplicateCandidateToMarkMerged: mergedPairCandidate?.id ?? null,
+    emailMessagePersonRowsToRepoint,
+    emailMessagePersonCollisions,
+    queueItemRowsToRepoint,
+    queueItemCollisions,
     snapshot,
   };
 }
@@ -454,6 +655,34 @@ export interface UnmergeContext {
   // merge. The mergeDb caller resolves this by querying later merge_events.
   // Default: [] (no chained conflict — normal move-back-by-value applies).
   laterConflictBdIds?: readonly string[];
+  // The survivor's CURRENT email_message_person rows for the ids this
+  // merge's collisions touched (keyed by row id below) — used for the same
+  // safe-revert check as connection conflicts: only undo a collision write
+  // if nothing has changed it since (no chain-tracking needed here, unlike
+  // connections, because there is no aggregation to "belong" to a later
+  // merge — an unrelated later change simply means "kept_changed").
+  // Default: [].
+  currentSurvivorEmailMessagePersonRows?: readonly EmailMessagePersonRow[];
+  // Same idea for follow_up_queue_item collisions. Default: [].
+  currentSurvivorQueueItemRows?: readonly FollowUpQueueItemRow[];
+}
+
+/** A single email_message_person collision's post-merge outcome. */
+export interface EmailMessagePersonRestore {
+  // Always re-inserted onto `merged` (it was deleted at merge time to resolve the unique-constraint collision).
+  mergedOriginal: EmailMessagePersonRow;
+  // Set only if the merge actually changed survivor's row AND nothing has
+  // touched it since — the pre-merge matchedEmail/matchConfidence to write back.
+  survivorRevert: { id: string; matchedEmail: string; matchConfidence: string } | null;
+}
+
+/** A single follow_up_queue_item collision's post-merge outcome. */
+export interface FollowUpQueueItemRestore {
+  // Always re-inserted onto `merged` (it was deleted at merge time to resolve the unique-constraint collision).
+  mergedOriginal: FollowUpQueueItemRow;
+  // Set only if the merge actually changed survivor's row AND nothing has
+  // touched it since — the pre-merge state/snoozedUntil to write back.
+  survivorRevert: { id: string; state: string; snoozedUntil: string | null } | null;
 }
 
 /** A moved (no-conflict-at-merge-time) connection whose bdId was aggregated by a LATER merge on the survivor. */
@@ -479,6 +708,12 @@ export interface UnmergePlan {
   idMapRowsToRepointBack: readonly MergeIdMapRow[];
   duplicateCandidatesToRestore: readonly MergeDuplicateCandidateRow[];
   mergedPairCandidateToReopen: { id: string; originalStatus: string } | null;
+  // ids to repoint personId back onto merged (no collision at merge time).
+  emailMessagePersonIdsToRepointBack: readonly string[];
+  emailMessagePersonRestores: readonly EmailMessagePersonRestore[];
+  // ids to repoint personId back onto merged (no collision at merge time).
+  queueItemIdsToRepointBack: readonly string[];
+  queueItemRestores: readonly FollowUpQueueItemRestore[];
 }
 
 /**
@@ -526,6 +761,42 @@ export function planUnmerge(snapshot: MergeSnapshot, context: UnmergeContext): U
     }
   }
 
+  // Same safe-revert shape as connectionConflictRestores above: only undo the
+  // collision's write onto survivor if it actually changed something AND the
+  // current value still equals what THIS merge wrote — merged's original row
+  // is always re-inserted either way (it was deleted to resolve the
+  // collision, so there is nothing else that could have touched it).
+  const currentEmailMessagePersonById = new Map((context.currentSurvivorEmailMessagePersonRows ?? []).map((r) => [r.id, r]));
+  const emailMessagePersonRestores: EmailMessagePersonRestore[] = snapshot.emailMessagePersonCollisions.map((collision) => {
+    const changedByMerge =
+      collision.winner.matchedEmail !== collision.survivorOriginal.matchedEmail ||
+      collision.winner.matchConfidence !== collision.survivorOriginal.matchConfidence;
+    if (!changedByMerge) return { mergedOriginal: collision.mergedOriginal, survivorRevert: null };
+    const current = currentEmailMessagePersonById.get(collision.survivorOriginal.id);
+    const stillWinner =
+      current !== undefined && current.matchedEmail === collision.winner.matchedEmail && current.matchConfidence === collision.winner.matchConfidence;
+    return {
+      mergedOriginal: collision.mergedOriginal,
+      survivorRevert: stillWinner
+        ? { id: collision.survivorOriginal.id, matchedEmail: collision.survivorOriginal.matchedEmail, matchConfidence: collision.survivorOriginal.matchConfidence }
+        : null,
+    };
+  });
+
+  const currentQueueItemById = new Map((context.currentSurvivorQueueItemRows ?? []).map((r) => [r.id, r]));
+  const queueItemRestores: FollowUpQueueItemRestore[] = snapshot.queueItemCollisions.map((collision) => {
+    const changedByMerge = collision.winner.state !== collision.survivorOriginal.state || collision.winner.snoozedUntil !== collision.survivorOriginal.snoozedUntil;
+    if (!changedByMerge) return { mergedOriginal: collision.mergedOriginal, survivorRevert: null };
+    const current = currentQueueItemById.get(collision.survivorOriginal.id);
+    const stillWinner = current !== undefined && current.state === collision.winner.state && current.snoozedUntil === collision.winner.snoozedUntil;
+    return {
+      mergedOriginal: collision.mergedOriginal,
+      survivorRevert: stillWinner
+        ? { id: collision.survivorOriginal.id, state: collision.survivorOriginal.state, snoozedUntil: collision.survivorOriginal.snoozedUntil }
+        : null,
+    };
+  });
+
   return {
     survivorFieldReverts,
     survivorFieldsKept,
@@ -537,6 +808,10 @@ export function planUnmerge(snapshot: MergeSnapshot, context: UnmergeContext): U
     idMapRowsToRepointBack: snapshot.movedIdMapRows,
     duplicateCandidatesToRestore: [...snapshot.repointedDuplicateCandidates, ...snapshot.droppedDuplicateCandidates],
     mergedPairCandidateToReopen: snapshot.mergedPairCandidate,
+    emailMessagePersonIdsToRepointBack: snapshot.movedEmailMessagePersonIds,
+    emailMessagePersonRestores,
+    queueItemIdsToRepointBack: snapshot.movedQueueItemIds,
+    queueItemRestores,
   };
 }
 
@@ -602,6 +877,90 @@ function parseConnectionConflict(value: unknown, path: string): ConnectionConfli
   };
 }
 
+function reviveDate(value: unknown, path: string): Date {
+  const revived = reviveNullableDate(value, path);
+  if (revived === null) throw new Error(`Invalid merge snapshot: expected a date at ${path}, got null`);
+  return revived;
+}
+
+function parseEmailMessagePersonRow(value: unknown, path: string): EmailMessagePersonRow {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Invalid merge snapshot: expected an email_message_person row at ${path}`);
+  }
+  const row = value as Record<string, unknown>;
+  for (const key of ["id", "emailMessageId", "personId", "matchedEmail", "matchConfidence"] as const) {
+    if (typeof row[key] !== "string") throw new Error(`Invalid merge snapshot: ${path}.${key} must be a string`);
+  }
+  return {
+    id: row.id as string,
+    emailMessageId: row.emailMessageId as string,
+    personId: row.personId as string,
+    matchedEmail: row.matchedEmail as string,
+    matchConfidence: row.matchConfidence as string,
+  };
+}
+
+function parseEmailMessagePersonCollision(value: unknown, path: string): EmailMessagePersonCollision {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Invalid merge snapshot: expected an email_message_person collision at ${path}`);
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row.emailMessageId !== "string") throw new Error(`Invalid merge snapshot: ${path} is missing emailMessageId`);
+  const winner = row.winner as Record<string, unknown> | undefined;
+  if (!winner || typeof winner.matchedEmail !== "string" || typeof winner.matchConfidence !== "string") {
+    throw new Error(`Invalid merge snapshot: ${path}.winner is invalid`);
+  }
+  return {
+    emailMessageId: row.emailMessageId,
+    survivorOriginal: parseEmailMessagePersonRow(row.survivorOriginal, `${path}.survivorOriginal`),
+    mergedOriginal: parseEmailMessagePersonRow(row.mergedOriginal, `${path}.mergedOriginal`),
+    winner: { matchedEmail: winner.matchedEmail, matchConfidence: winner.matchConfidence },
+  };
+}
+
+function parseFollowUpQueueItemRow(value: unknown, path: string): FollowUpQueueItemRow {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Invalid merge snapshot: expected a follow_up_queue_item row at ${path}`);
+  }
+  const row = value as Record<string, unknown>;
+  for (const key of ["id", "bdId", "queueDate", "personId", "dueStatus", "state"] as const) {
+    if (typeof row[key] !== "string") throw new Error(`Invalid merge snapshot: ${path}.${key} must be a string`);
+  }
+  if (typeof row.position !== "number") throw new Error(`Invalid merge snapshot: ${path}.position must be a number`);
+  return {
+    id: row.id as string,
+    bdId: row.bdId as string,
+    queueDate: row.queueDate as string,
+    personId: row.personId as string,
+    position: row.position,
+    dueStatus: row.dueStatus as string,
+    lastTouchAt: reviveDate(row.lastTouchAt, `${path}.lastTouchAt`),
+    state: row.state as string,
+    snoozedUntil: typeof row.snoozedUntil === "string" ? row.snoozedUntil : null,
+    createdAt: reviveDate(row.createdAt, `${path}.createdAt`),
+    updatedAt: reviveDate(row.updatedAt, `${path}.updatedAt`),
+  };
+}
+
+function parseFollowUpQueueItemCollision(value: unknown, path: string): FollowUpQueueItemCollision {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Invalid merge snapshot: expected a follow_up_queue_item collision at ${path}`);
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row.bdId !== "string" || typeof row.queueDate !== "string") {
+    throw new Error(`Invalid merge snapshot: ${path} is missing bdId/queueDate`);
+  }
+  const winner = row.winner as Record<string, unknown> | undefined;
+  if (!winner || typeof winner.state !== "string") throw new Error(`Invalid merge snapshot: ${path}.winner is invalid`);
+  return {
+    bdId: row.bdId,
+    queueDate: row.queueDate,
+    survivorOriginal: parseFollowUpQueueItemRow(row.survivorOriginal, `${path}.survivorOriginal`),
+    mergedOriginal: parseFollowUpQueueItemRow(row.mergedOriginal, `${path}.mergedOriginal`),
+    winner: { state: winner.state, snoozedUntil: typeof winner.snoozedUntil === "string" ? winner.snoozedUntil : null },
+  };
+}
+
 function asArray(value: unknown, path: string): unknown[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error(`Invalid merge snapshot: expected an array at ${path}`);
@@ -655,5 +1014,13 @@ export function parseMergeSnapshot(value: unknown): MergeSnapshot {
     droppedDuplicateCandidates: asArray(obj.droppedDuplicateCandidates, "droppedDuplicateCandidates") as MergeDuplicateCandidateRow[],
     mergedPairCandidate,
     propertyLosses: asArray(obj.propertyLosses, "propertyLosses") as PropertyLoss[],
+    movedEmailMessagePersonIds: asStringArray(obj.movedEmailMessagePersonIds, "movedEmailMessagePersonIds"),
+    emailMessagePersonCollisions: asArray(obj.emailMessagePersonCollisions, "emailMessagePersonCollisions").map((v, i) =>
+      parseEmailMessagePersonCollision(v, `emailMessagePersonCollisions[${i}]`),
+    ),
+    movedQueueItemIds: asStringArray(obj.movedQueueItemIds, "movedQueueItemIds"),
+    queueItemCollisions: asArray(obj.queueItemCollisions, "queueItemCollisions").map((v, i) =>
+      parseFollowUpQueueItemCollision(v, `queueItemCollisions[${i}]`),
+    ),
   };
 }

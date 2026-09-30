@@ -8,9 +8,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  emailMessagePersonKey,
+  followUpQueueItemKey,
   parseMergeSnapshot,
   planMerge,
   planUnmerge,
+  type EmailMessagePersonRow,
+  type FollowUpQueueItemRow,
   type MergeConnection,
   type MergeDuplicateCandidateRow,
   type MergeIdMapRow,
@@ -64,6 +68,31 @@ function connection(overrides: Partial<MergeConnection> & { personId: string; bd
   };
 }
 
+const DEFAULT_LAST_TOUCH_AT = new Date("2023-02-01T00:00:00.000Z");
+const DEFAULT_CREATED_AT = new Date("2023-01-15T00:00:00.000Z");
+const DEFAULT_UPDATED_AT = new Date("2023-01-16T00:00:00.000Z");
+
+function emailMessagePersonRow(overrides: Partial<EmailMessagePersonRow> & { id: string; emailMessageId: string; personId: string }): EmailMessagePersonRow {
+  return {
+    matchedEmail: "a@x.com",
+    matchConfidence: "inferred",
+    ...overrides,
+  };
+}
+
+function queueItemRow(overrides: Partial<FollowUpQueueItemRow> & { id: string; bdId: string; queueDate: string; personId: string }): FollowUpQueueItemRow {
+  return {
+    position: 1,
+    dueStatus: "contacted",
+    lastTouchAt: DEFAULT_LAST_TOUCH_AT,
+    state: "pending",
+    snoozedUntil: null,
+    createdAt: DEFAULT_CREATED_AT,
+    updatedAt: DEFAULT_UPDATED_AT,
+    ...overrides,
+  };
+}
+
 function baseInput(overrides: Partial<PlanMergeInput> = {}): PlanMergeInput {
   return {
     survivor: person({ id: "survivor" }),
@@ -74,6 +103,10 @@ function baseInput(overrides: Partial<PlanMergeInput> = {}): PlanMergeInput {
     idMapRowsOnMerged: [],
     duplicateCandidatesInvolvingMerged: [],
     survivorPairedPersonIds: [],
+    emailMessagePersonRowsOnMerged: [],
+    survivorEmailMessagePersonRows: [],
+    queueItemRowsOnMerged: [],
+    survivorQueueItemRows: [],
     ...overrides,
   };
 }
@@ -403,4 +436,195 @@ test("safe unmerge: same-BD conflict aggregation — changed survivor row is kep
   assert.equal(restore.kind, "kept_changed");
   assert.equal(restore.survivorRestore, null);
   assert.deepEqual(restore.mergedRestore, mergedConnections[0]);
+});
+
+// --- Bugfix: merge repointing gap for email_message_person / follow_up_queue_item ---
+
+test("key builders: emailMessagePersonKey/followUpQueueItemKey are the single source of truth for their maps' keys", () => {
+  assert.equal(emailMessagePersonKey({ emailMessageId: "msg-1" }), "msg-1");
+  assert.equal(followUpQueueItemKey({ bdId: "bd-1", queueDate: "2026-01-05" }), "bd-1:2026-01-05");
+});
+
+test("planMerge: email_message_person rows unique to merged are repointed, survivor's are left alone", () => {
+  const rows = [emailMessagePersonRow({ id: "emp-1", emailMessageId: "msg-1", personId: "merged" })];
+  const plan = planMerge(baseInput({ emailMessagePersonRowsOnMerged: rows }));
+  assert.deepEqual(plan.emailMessagePersonRowsToRepoint, [{ id: "emp-1" }]);
+  assert.equal(plan.emailMessagePersonCollisions.length, 0);
+  assert.deepEqual(plan.snapshot.movedEmailMessagePersonIds, ["emp-1"]);
+});
+
+test("planMerge: email_message_person collision — merged's exact confidence beats survivor's inferred, moves together with its own address", () => {
+  const mergedRow = emailMessagePersonRow({ id: "emp-merged", emailMessageId: "msg-1", personId: "merged", matchedEmail: "exact@x.com", matchConfidence: "exact" });
+  const survivorRow = emailMessagePersonRow({ id: "emp-survivor", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "guess@x.com", matchConfidence: "inferred" });
+  const plan = planMerge(
+    baseInput({ emailMessagePersonRowsOnMerged: [mergedRow], survivorEmailMessagePersonRows: [survivorRow] }),
+  );
+  assert.equal(plan.emailMessagePersonRowsToRepoint.length, 0);
+  assert.equal(plan.emailMessagePersonCollisions.length, 1);
+  const collision = plan.emailMessagePersonCollisions[0];
+  assert.deepEqual(collision.winner, { matchedEmail: "exact@x.com", matchConfidence: "exact" });
+  assert.deepEqual(collision.survivorOriginal, survivorRow);
+  assert.deepEqual(collision.mergedOriginal, mergedRow);
+});
+
+test("planMerge: email_message_person collision — both inferred (tie) keeps survivor's own row untouched", () => {
+  const mergedRow = emailMessagePersonRow({ id: "emp-merged", emailMessageId: "msg-1", personId: "merged", matchedEmail: "other@x.com", matchConfidence: "inferred" });
+  const survivorRow = emailMessagePersonRow({ id: "emp-survivor", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "guess@x.com", matchConfidence: "inferred" });
+  const plan = planMerge(
+    baseInput({ emailMessagePersonRowsOnMerged: [mergedRow], survivorEmailMessagePersonRows: [survivorRow] }),
+  );
+  const collision = plan.emailMessagePersonCollisions[0];
+  assert.deepEqual(collision.winner, { matchedEmail: "guess@x.com", matchConfidence: "inferred" });
+});
+
+test("planMerge: follow_up_queue_item rows unique to merged are repointed", () => {
+  const rows = [queueItemRow({ id: "q-1", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged" })];
+  const plan = planMerge(baseInput({ queueItemRowsOnMerged: rows }));
+  assert.deepEqual(plan.queueItemRowsToRepoint, [{ id: "q-1" }]);
+  assert.equal(plan.queueItemCollisions.length, 0);
+  assert.deepEqual(plan.snapshot.movedQueueItemIds, ["q-1"]);
+});
+
+test("planMerge: follow_up_queue_item collision — merged's decided state wins over survivor's still-pending row", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "skipped", snoozedUntil: "2026-01-06" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor", state: "pending", snoozedUntil: null });
+  const plan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+  assert.equal(plan.queueItemRowsToRepoint.length, 0);
+  const collision = plan.queueItemCollisions[0];
+  assert.deepEqual(collision.winner, { state: "skipped", snoozedUntil: "2026-01-06" });
+  assert.deepEqual(collision.survivorOriginal, survivorRow);
+  assert.deepEqual(collision.mergedOriginal, mergedRow);
+});
+
+test("planMerge: follow_up_queue_item collision — a decided state is never resurrected as pending", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "pending" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor", state: "postponed", snoozedUntil: "2026-01-06" });
+  const plan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+  const collision = plan.queueItemCollisions[0];
+  assert.deepEqual(collision.winner, { state: "postponed", snoozedUntil: "2026-01-06" });
+});
+
+test("planMerge: follow_up_queue_item collision — both already decided keeps survivor's own decision", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "skipped", snoozedUntil: "2026-01-06" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor", state: "postponed", snoozedUntil: "2026-01-06" });
+  const plan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+  const collision = plan.queueItemCollisions[0];
+  assert.deepEqual(collision.winner, { state: "postponed", snoozedUntil: "2026-01-06" });
+});
+
+test("planMerge: pure — never mutates its inputs, same input twice gives the same result", () => {
+  const input = baseInput({
+    survivorConnections: [connection({ personId: "survivor", bdId: "bd-1", messageCount: 3 })],
+    mergedConnections: [connection({ personId: "merged", bdId: "bd-1", messageCount: 5 }), connection({ personId: "merged", bdId: "bd-2" })],
+    emailMessagePersonRowsOnMerged: [emailMessagePersonRow({ id: "emp-1", emailMessageId: "msg-1", personId: "merged", matchConfidence: "exact" })],
+    survivorEmailMessagePersonRows: [emailMessagePersonRow({ id: "emp-2", emailMessageId: "msg-1", personId: "survivor" })],
+    queueItemRowsOnMerged: [queueItemRow({ id: "q-1", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "skipped" })],
+    survivorQueueItemRows: [queueItemRow({ id: "q-2", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor" })],
+  });
+  const snapshotBefore = JSON.stringify(input);
+  const first = planMerge(input);
+  const second = planMerge(input);
+  assert.deepEqual(first, second);
+  assert.equal(JSON.stringify(input), snapshotBefore, "planMerge must never mutate its input");
+});
+
+test("safe unmerge: email_message_person collision unchanged since merge — reverts survivor's row and re-inserts merged's dropped row", () => {
+  const mergedRow = emailMessagePersonRow({ id: "emp-merged", emailMessageId: "msg-1", personId: "merged", matchedEmail: "exact@x.com", matchConfidence: "exact" });
+  const survivorRow = emailMessagePersonRow({ id: "emp-survivor", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "guess@x.com", matchConfidence: "inferred" });
+  const mergePlan = planMerge(baseInput({ emailMessagePersonRowsOnMerged: [mergedRow], survivorEmailMessagePersonRows: [survivorRow] }));
+
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [],
+    // Nothing touched survivor's row since the merge: it still shows the winner (exact) values.
+    currentSurvivorEmailMessagePersonRows: [{ ...survivorRow, id: "emp-survivor", matchedEmail: "exact@x.com", matchConfidence: "exact" }],
+  });
+
+  assert.equal(unmergePlan.emailMessagePersonRestores.length, 1);
+  const restore = unmergePlan.emailMessagePersonRestores[0];
+  assert.deepEqual(restore.mergedOriginal, mergedRow);
+  assert.deepEqual(restore.survivorRevert, { id: "emp-survivor", matchedEmail: "guess@x.com", matchConfidence: "inferred" });
+});
+
+test("safe unmerge: email_message_person collision changed since merge (e.g. a later merge) — survivor's row is kept, merged's is still restored", () => {
+  const mergedRow = emailMessagePersonRow({ id: "emp-merged", emailMessageId: "msg-1", personId: "merged", matchedEmail: "exact@x.com", matchConfidence: "exact" });
+  const survivorRow = emailMessagePersonRow({ id: "emp-survivor", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "guess@x.com", matchConfidence: "inferred" });
+  const mergePlan = planMerge(baseInput({ emailMessagePersonRowsOnMerged: [mergedRow], survivorEmailMessagePersonRows: [survivorRow] }));
+
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [],
+    // A later merge changed it again since.
+    currentSurvivorEmailMessagePersonRows: [{ id: "emp-survivor", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "third@x.com", matchConfidence: "exact" }],
+  });
+
+  const restore = unmergePlan.emailMessagePersonRestores[0];
+  assert.deepEqual(restore.mergedOriginal, mergedRow);
+  assert.equal(restore.survivorRevert, null);
+});
+
+test("safe unmerge: email_message_person — no collision at merge time needs no revert, just repoint-back by id", () => {
+  const rows = [emailMessagePersonRow({ id: "emp-1", emailMessageId: "msg-1", personId: "merged" })];
+  const mergePlan = planMerge(baseInput({ emailMessagePersonRowsOnMerged: rows }));
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [],
+  });
+  assert.deepEqual(unmergePlan.emailMessagePersonIdsToRepointBack, ["emp-1"]);
+  assert.deepEqual(unmergePlan.emailMessagePersonRestores, []);
+});
+
+test("safe unmerge: follow_up_queue_item collision unchanged since merge — reverts survivor's row and re-inserts merged's dropped row", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "skipped", snoozedUntil: "2026-01-06" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor", state: "pending", snoozedUntil: null });
+  const mergePlan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [],
+    currentSurvivorQueueItemRows: [{ ...survivorRow, state: "skipped", snoozedUntil: "2026-01-06" }],
+  });
+
+  assert.equal(unmergePlan.queueItemRestores.length, 1);
+  const restore = unmergePlan.queueItemRestores[0];
+  assert.deepEqual(restore.mergedOriginal, mergedRow);
+  assert.deepEqual(restore.survivorRevert, { id: "q-survivor", state: "pending", snoozedUntil: null });
+});
+
+test("safe unmerge: follow_up_queue_item collision changed since merge (BD skipped again after) — kept, merged's original still restored", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "skipped", snoozedUntil: "2026-01-06" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor", state: "pending", snoozedUntil: null });
+  const mergePlan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+
+  const snapshot = parseMergeSnapshot(JSON.parse(JSON.stringify(mergePlan.snapshot)));
+  const unmergePlan = planUnmerge(snapshot, {
+    currentSurvivor: { id: "survivor", ...mergePlan.survivorUpdate },
+    currentSurvivorConnections: [],
+    // The BD postponed it again after the merge -- not the same value the merge wrote.
+    currentSurvivorQueueItemRows: [{ ...survivorRow, state: "postponed", snoozedUntil: "2026-01-07" }],
+  });
+
+  const restore = unmergePlan.queueItemRestores[0];
+  assert.deepEqual(restore.mergedOriginal, mergedRow);
+  assert.equal(restore.survivorRevert, null);
+});
+
+test("parseMergeSnapshot: round-trips follow_up_queue_item collisions, reviving lastTouchAt/createdAt/updatedAt as Dates", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-01-05", personId: "merged", state: "skipped", snoozedUntil: "2026-01-06" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-01-05", personId: "survivor", state: "pending", snoozedUntil: null });
+  const mergePlan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+
+  const roundTripped = JSON.parse(JSON.stringify(mergePlan.snapshot));
+  assert.equal(typeof roundTripped.queueItemCollisions[0].mergedOriginal.lastTouchAt, "string");
+
+  const parsed = parseMergeSnapshot(roundTripped);
+  const collision = parsed.queueItemCollisions[0];
+  assert.ok(collision.mergedOriginal.lastTouchAt instanceof Date);
+  assert.ok(collision.mergedOriginal.createdAt instanceof Date);
+  assert.ok(collision.mergedOriginal.updatedAt instanceof Date);
+  assert.equal(collision.mergedOriginal.lastTouchAt.getTime(), DEFAULT_LAST_TOUCH_AT.getTime());
 });
