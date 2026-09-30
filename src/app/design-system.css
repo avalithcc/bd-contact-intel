@@ -40,6 +40,25 @@ h4 { font-size: var(--text-base); font-weight: 600; }
 .small { font-size: var(--text-sm); }
 .num { font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
+
+/* Turns a real <button> into plain inline text that still looks exactly
+   like the surrounding non-interactive text (task-edit change: a task
+   title becomes a real, keyboard-accessible click target in three
+   different surfaces — /tasks rows, the Tareas card, the timeline's task
+   cards — without looking like a button). Same reset NewTaskButton.module.css's
+   `.resultItem` already applies locally, generalized here since several
+   unrelated pages need the identical treatment. */
+.btn-text-reset {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.btn-text-reset:hover { text-decoration: underline; }
 .right { text-align: right; }
 .icon { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
 .icon-lg { width: 20px; height: 20px; }

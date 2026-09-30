@@ -21,13 +21,23 @@ export function Dialog({
   children,
   footer,
   wide = false,
+  closeDisabled = false,
 }: {
   open: boolean;
   onClose: () => void;
-  title: string;
+  // ReactNode (not `string`): the "Editar tarea" dialog (task-edit change)
+  // renders a `badge-success` "Completada" chip next to its title
+  // (mockup decision 5) — every other caller keeps passing a plain string,
+  // which is itself a valid ReactNode.
+  title: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   wide?: boolean;
+  // Disables the "×" close button, Escape and the overlay-backdrop click
+  // (task-edit change, review fix WARNING #4; mockup's "Guardando…" swatch
+  // shows the close button disabled) — every other caller omits this and
+  // keeps today's always-closable behavior.
+  closeDisabled?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -40,6 +50,11 @@ export function Dialog({
   // owner could not type in "Nueva tarea": each key sent the caret to the ×.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // Same "ref, not a dependency" reasoning as onCloseRef above: closeDisabled
+  // flips true/false during the dialog's lifetime (e.g. while saving), and
+  // must not re-run the keydown effect (which would re-trap/re-focus).
+  const closeDisabledRef = useRef(closeDisabled);
+  closeDisabledRef.current = closeDisabled;
   const titleId = `dialog-title-${useId()}`;
 
   // Body scroll lock: while the dialog is open, the page behind it
@@ -65,6 +80,7 @@ export function Dialog({
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        if (closeDisabledRef.current) return;
         e.preventDefault();
         onCloseRef.current();
         return;
@@ -102,6 +118,7 @@ export function Dialog({
     <div
       className="overlay open"
       onMouseDown={(e) => {
+        if (closeDisabled) return;
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -120,6 +137,7 @@ export function Dialog({
             className="btn btn-ghost btn-icon btn-sm close"
             aria-label="Cerrar"
             onClick={onClose}
+            disabled={closeDisabled}
           >
             ×
           </button>

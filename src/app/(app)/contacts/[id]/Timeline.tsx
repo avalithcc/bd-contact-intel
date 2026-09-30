@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import { EditTaskDialog, type EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import type { TimelineActivityType, TimelineEntry } from "@/lib/activity/queries";
 import {
   TIMELINE_PILL_KEYS,
+  TASK_ACTIVITY_TYPES,
   sumPillCount,
+  sumTaskActivityCount,
   resolveScopeEntries,
   type TimelinePillKey,
 } from "@/lib/activity/timelinePills";
@@ -39,11 +43,16 @@ import styles from "./page.module.css";
 export interface TimelineTask {
   id: string;
   title: string;
+  description: string | null;
   status: "open" | "done";
   dueAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  assignedToBdId: string | null;
   assignedToName: string | null;
+  /** Precomputed "Name · Company" text for the edit dialog's read-only
+   * "Asociado con" field — see EditTaskDialog.tsx's EditableTask. */
+  associationLabel: string;
 }
 
 // NOTE: LinkedIn is hidden here on purpose — the owner turned LinkedIn
@@ -86,6 +95,12 @@ export interface TimelineProps {
   // "Todo"'s total that accounts for tasks (getTasksForPerson's
   // openCount+doneCount).
   taskTotalCount: number;
+  // Feed the "Editar tarea" dialog (task-edit change) opened from a task
+  // card's title or its "Reprogramar" button — see `editingTask` state
+  // below. Same shape NewTaskButton/TaskTitleLink already take.
+  assigneeOptions: { id: string; name: string }[];
+  meId: string;
+  taskLabels: EditTaskLabels;
   isAdmin: boolean;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
@@ -116,6 +131,9 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   call: "timelineFilterCall",
   discarded: "timelineFilterDiscarded",
   status_backfill: "timelineFilterStatusBackfill",
+  task_updated: "timelineFilterTaskUpdated",
+  task_completed: "timelineFilterTaskCompleted",
+  task_reopened: "timelineFilterTaskReopened",
 };
 
 // contact-record.html's `.tl-icon`/`.tl-icon.{modifier}` per activity type
@@ -130,6 +148,11 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   call: CallIcon,
   discarded: DiscardIcon,
   status_backfill: HistoryIcon,
+  // Uses the existing system/status-change entry layout (owner spec) — same
+  // icon family as every other internal/system-generated entry.
+  task_updated: TasksIcon,
+  task_completed: TasksIcon,
+  task_reopened: TasksIcon,
 };
 
 const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
@@ -139,6 +162,9 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   call: "call",
   discarded: "discard",
   status_backfill: "system",
+  task_updated: "system",
+  task_completed: "system",
+  task_reopened: "system",
 };
 
 // contact-record.html:97-106's 6 pills (Todo/Notas/Llamadas/Correos/
@@ -219,10 +245,15 @@ export function Timeline({
   activePill,
   tasks,
   taskTotalCount,
+  assigneeOptions,
+  meId,
+  taskLabels,
   isAdmin,
   mergeInfo,
 }: TimelineProps) {
+  const router = useRouter();
   const { showToast } = useToast();
+  const [editingTask, setEditingTask] = useState<TimelineTask | null>(null);
   // "task" (the Tareas pill) is never a real activity scope for the
   // cache/fetch engine below — it's tracked entirely by `isTasksActive`
   // instead, since its data (`tasks`) is always fully loaded already, never
@@ -518,6 +549,17 @@ export function Timeline({
   const sortedTasksForPill = sortTasksForTimelinePill(tasks);
   const openTasksForPill = sortedTasksForPill.filter((t) => t.status === "open");
   const doneTasksForPill = sortedTasksForPill.filter((t) => t.status === "done");
+  // task_updated/task_completed/task_reopened activity (task-edit change) —
+  // grouped under the Tareas pill, not "Sistema" (see TASK_ACTIVITY_TYPES,
+  // timelinePills.ts). Read from the "Todo" pool (usually complete per
+  // isPillSelectionComplete's own contract — see that function's doc
+  // comment); the badge itself uses `taskActivityCount`, the record's TRUE
+  // total, so a busier contact's badge stays exact even if this list can't.
+  const taskActivityPool = cache[ALL_SCOPE] ?? entries;
+  const taskActivityEntries = taskActivityPool.filter((e) =>
+    (TASK_ACTIVITY_TYPES as readonly string[]).includes(e.type),
+  );
+  const taskActivityCount = sumTaskActivityCount(countsByType);
   // Pills that group `activity` rows, minus "Sistema" — rendered before the
   // Tareas pill so Tareas can sit right where contact-record.html:104 puts
   // it: after Reuniones, before Sistema.
@@ -537,7 +579,9 @@ export function Timeline({
         </div>
         <div className="tl-card">
           <div className="tl-head">
-            <span className="what">{t.title}</span>
+            <button type="button" className="btn-text-reset what" onClick={() => setEditingTask(t)}>
+              {t.title}
+            </button>
             {t.dueAt && (
               <span className="badge badge-warn no-dot">
                 {l.taskDueBadgePrefix} {formatTaskDueDate(t.dueAt)}
@@ -556,13 +600,39 @@ export function Timeline({
               label={l.taskMarkDone}
               errorLabel={l.genericError}
             />
-            {/* Mockup itself has no wired destination for "Reprogramar"
-                (contact-record.html:111) — kept inert rather than inventing
-                an unspec'd reschedule flow. */}
-            <button type="button" className="btn btn-ghost btn-sm" disabled>
+            {/* task-edit change: "Reprogramar" now opens the same "Editar
+                tarea" dialog the title opens — previously inert
+                (contact-record.html:111 has no wired destination for it). */}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingTask(t)}>
               {l.taskReschedule}
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * One `task_updated`/`task_completed`/`task_reopened` entry inside the
+   * Tareas pill's own view — the EXACT SAME system/status-change entry
+   * layout the main "Todo" list already uses for these types (owner spec),
+   * just grouped here instead of interleaved by month.
+   */
+  function renderTaskActivityEntry(entry: TimelineEntry) {
+    const Icon = TYPE_ICON[entry.type as TimelineActivityType] ?? TasksIcon;
+    return (
+      <div key={entry.id} className="tl-item">
+        <div className="tl-icon system">
+          <Icon className="icon" />
+        </div>
+        <div className="tl-card system">
+          <div className="tl-head">
+            <span className="what">
+              {l[FILTER_LABEL_KEY[entry.type as TimelineActivityType]] as string} · {entry.actorName ?? l.timelineSystemActor}
+            </span>
+            <span className="when">{formatWhen(entry.at)}</span>
+          </div>
+          <div className="tl-body">{entryBody(entry, l)}</div>
         </div>
       </div>
     );
@@ -605,7 +675,7 @@ export function Timeline({
           aria-current={isTasksActive ? "true" : undefined}
         >
           <TasksIcon className="icon" />
-          {l.timelinePillTasks} <span className="n">{taskTotalCount}</span>
+          {l.timelinePillTasks} <span className="n">{taskTotalCount + taskActivityCount}</span>
         </Link>
         {renderActivityPill("system")}
         <span className="grow" />
@@ -621,7 +691,7 @@ export function Timeline({
 
       {isTasksActive ? (
         <>
-          {openTasksForPill.length === 0 && doneTasksForPill.length === 0 ? (
+          {openTasksForPill.length === 0 && doneTasksForPill.length === 0 && taskActivityEntries.length === 0 ? (
             <div className={styles.placeholder}>{l.timelineTasksEmpty}</div>
           ) : (
             <>
@@ -642,7 +712,9 @@ export function Timeline({
                         </div>
                         <div className="tl-card">
                           <div className="tl-head">
-                            <span className="what">{t.title}</span>
+                            <button type="button" className="btn-text-reset what" onClick={() => setEditingTask(t)}>
+                              {t.title}
+                            </button>
                             <span className="badge badge-neutral no-dot">{l.taskStatusDone}</span>
                             {t.assignedToName && (
                               <span className="when">
@@ -662,6 +734,12 @@ export function Timeline({
                       </div>
                     ))}
                   </div>
+                </>
+              )}
+              {taskActivityEntries.length > 0 && (
+                <>
+                  <div className="tl-group">{l.timelinePillTasks}</div>
+                  <div className="tl">{taskActivityEntries.map(renderTaskActivityEntry)}</div>
                 </>
               )}
             </>
@@ -788,6 +866,27 @@ export function Timeline({
         ))
           )}
         </>
+      )}
+
+      {editingTask && (
+        <EditTaskDialog
+          task={{
+            id: editingTask.id,
+            title: editingTask.title,
+            description: editingTask.description,
+            dueAt: editingTask.dueAt,
+            assignedToBdId: editingTask.assignedToBdId,
+            status: editingTask.status,
+            personId,
+            companyKey: null,
+            associationLabel: editingTask.associationLabel,
+          }}
+          assigneeOptions={assigneeOptions}
+          meId={meId}
+          labels={taskLabels}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => router.refresh()}
+        />
       )}
     </div>
   );

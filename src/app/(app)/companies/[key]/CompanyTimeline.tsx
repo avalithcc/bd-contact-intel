@@ -9,7 +9,7 @@ import { resolveCompanyScopeRows, type CompanyTimelineFilterCounts } from "@/lib
 import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import type { CompanyTimelineViewRow } from "@/lib/companies/timelineView";
 import { groupTimelineEntries } from "@/lib/contacts/timelineGrouping";
-import { MailIcon, HistoryIcon, NoteIcon, MeetingIcon } from "@/components/icons";
+import { MailIcon, HistoryIcon, NoteIcon, MeetingIcon, TasksIcon } from "@/components/icons";
 import { useToast } from "@/components/ToastProvider";
 import { getCompanyTimelineFilterEntriesAction } from "../actions";
 
@@ -48,6 +48,9 @@ const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactEl
   status_change: HistoryIcon,
   status_backfill: HistoryIcon,
   meeting_logged: MeetingIcon,
+  task_updated: TasksIcon,
+  task_completed: TasksIcon,
+  task_reopened: TasksIcon,
 };
 
 function formatWhen(at: Date): string {

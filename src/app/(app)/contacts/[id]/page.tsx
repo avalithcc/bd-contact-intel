@@ -27,7 +27,36 @@ import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
+import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
+import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
 import styles from "./page.module.css";
+
+/** Maps this page's ContactRecordLabels into EditTaskDialog's shape — see
+ * that component's doc comment for why each page builds its own copy. */
+function pickEditTaskLabels(l: ReturnType<typeof pickContactRecordLabels>): EditTaskLabels {
+  return {
+    dialogTitle: l.taskEditDialogTitle,
+    fieldTitle: l.taskTitleLabel,
+    fieldDue: l.taskDueLabel,
+    fieldAssignee: l.taskAssigneeLabel,
+    fieldDescription: l.taskDescriptionLabel,
+    fieldAssociation: l.taskAssociationLabel,
+    associationHelp: l.taskAssociationHelp,
+    titleRequiredError: l.taskTitleRequiredError,
+    markComplete: l.taskMarkComplete,
+    reopenTask: l.taskReopenDialogAction,
+    cancel: l.cancel,
+    saveChanges: l.taskSaveChanges,
+    saving: l.taskSaving,
+    saveError: l.taskSaveError,
+    genericError: l.genericError,
+    completedBadge: l.taskCompletedBadge,
+    completedCaptionPrefix: l.taskCompletedCaptionPrefix,
+    toastUpdated: l.toastTaskUpdated,
+    toastCompleted: l.toastTaskCompleted,
+    toastReopened: l.toastTaskReopened,
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -288,13 +317,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     tasks={personTasks.map((t) => ({
                       id: t.id,
                       title: t.title,
+                      description: t.description,
                       status: t.status as "open" | "done",
                       dueAt: t.dueAt,
                       createdAt: t.createdAt,
                       updatedAt: t.updatedAt,
+                      assignedToBdId: t.assignedToBdId,
                       assignedToName: t.assignedToName ?? null,
+                      associationLabel: companyDisplayName ? `${name} · ${companyDisplayName}` : name,
                     }))}
                     taskTotalCount={tasksForPerson.openCount + tasksForPerson.doneCount}
+                    assigneeOptions={ownerOptions}
+                    meId={me.id}
+                    taskLabels={pickEditTaskLabels(l)}
                     isAdmin={isAdmin}
                     mergeInfo={
                       record.merge.unifiedFromCount > 1
@@ -471,7 +506,23 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       errorLabel={l.genericError}
                     />
                     <div className="grow">
-                      <div className="n">{t.title}</div>
+                      <TaskTitleLink
+                        task={{
+                          id: t.id,
+                          title: t.title,
+                          description: t.description,
+                          dueAt: t.dueAt,
+                          assignedToBdId: t.assignedToBdId,
+                          status: t.status as "open" | "done" | "cancelled",
+                          personId: t.personId,
+                          companyKey: t.companyKey,
+                          associationLabel: companyDisplayName ? `${name} · ${companyDisplayName}` : name,
+                        }}
+                        className="n"
+                        assigneeOptions={ownerOptions}
+                        meId={me.id}
+                        labels={pickEditTaskLabels(l)}
+                      />
                       <div className="s">
                         {t.dueAt ? `${l.taskDueBadgePrefix} ${formatTaskDueDate(t.dueAt)}` : l.emptyValue}
                         {t.assignedToName ? ` · ${t.assignedToName}` : ""}
