@@ -1514,6 +1514,15 @@ main {
 .dialog-footer .left {
   margin-right: auto;
 }
+/* Shared conversation modal (src/components/ConversationDialog.tsx, owner
+   decision 2026-09-30) — scoped to this one wrapper class, not the base
+   `.dialog-body` rule above, so every other dialog keeps sizing to its own
+   content. Caps the body at ~60vh and scrolls INTERNALLY instead of letting
+   a long thread stretch (or the page behind the dialog scroll). */
+.dialog-body-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+}
 
 /* ---- toast (src/components/Toast.tsx, ToastProvider.tsx) ---- */
 .toast-region {

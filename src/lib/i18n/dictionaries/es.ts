@@ -779,9 +779,26 @@ export const es: typeof en = {
     linkedinRepliedPrefix: "Respuesta de LinkedIn recibida",
     linkedinSentPrefix: "Mensaje de LinkedIn enviado",
     linkedinConversationOfPrefix: "conversación de",
-    adminAuditAlertTitle: "Está viendo la conversación de otro BD",
     adminNoConversationContent: "Sin contenido de conversación registrado.",
-    adminOpenAsPage: "Abrir en una página",
+    // Título del ConversationDialog compartido (decisión del owner
+    // 2026-09-30) — tanto el historial propio como el bypass de admin
+    // componen `${conversationDialogTitlePrefix} ${nombreDeLaContraparte}`.
+    conversationDialogTitlePrefix: "Conversación con",
+    // Banner de auditoría del modal de admin (decisión del owner
+    // 2026-09-30) — se compone como `${adminAuditBannerPrefix} ${bdName}
+    // ${adminAuditBannerSuffix}`, del lado del cliente (ConversationDialog/
+    // AdminConversationFlow son client components, ver ClientStrings), mismo
+    // patrón "prefijo + nombre interpolado" que ya usa el diálogo de
+    // confirmación de abajo.
+    adminAuditBannerPrefix: "Estás viendo la conversación de",
+    adminAuditBannerSuffix: "como administrador — este acceso quedó registrado",
+    // Tres secciones del modal de admin (portadas desde la página standalone
+    // eliminada `/contacts/[id]/conversation/[bdId]` — mismo texto).
+    adminSyncedEmailSectionTitle: "Correos sincronizados",
+    adminNoSyncedEmailContent: "No hay correo sincronizado con este BD.",
+    adminLegacyEmailSectionTitle: "Correos (registro manual)",
+    adminLinkedinSectionTitle: "Conversación de LinkedIn",
+    adminNoLinkedinContent: "No hay conversación de LinkedIn con este BD.",
     adminViewDialogTitlePrefix: "¿Ver la conversación de",
     adminViewDialogBodyPrefix: "Vas a ver la conversación de",
     adminViewDialogBodyWith: "con",
@@ -853,7 +870,6 @@ export const es: typeof en = {
       `${statusLabel} porque ${sourceDescription} el ${dateLabel}.`,
     timelineLockedOwnedBy: (bdName: string) =>
       `Esta conversación pertenece a ${bdName}. Se puede ver que existe y cuándo ocurrió; su contenido es privado para ${bdName} (y los administradores).`,
-    adminAuditAlertBody: (bdName: string) => `Esta visualización quedó registrada en el registro de auditoría (conversación de ${bdName}).`,
     hiringBadge: (count: number) => `Contratando · ${count} puestos de IT`,
     companyContactCount: (count: number) => `${count} contactos en esta empresa`,
     conversationHistorySummary: (count: number, dateLabel: string) => `${count} mensajes · último ${dateLabel}`,
@@ -883,21 +899,6 @@ export const es: typeof en = {
     assocViewAll: (n: number) => `Ver los ${n} en Contactos`,
     vacantesFooter: (total: number, latam: number, us: number) =>
       `${total} vacantes de IT abiertas · ${latam} LATAM · ${us} US`,
-  },
-
-  adminConversation: {
-    backLink: "Volver a la ficha",
-    title: "Conversación con",
-    syncedEmailSectionTitle: "Correos sincronizados",
-    noSyncedEmailContent: "No hay correo sincronizado con este BD.",
-    legacyEmailSectionTitle: "Correos (registro manual)",
-    linkedinSectionTitle: "Conversación de LinkedIn",
-    noEmailContent: "Este BD no envió correos.",
-    noLinkedinContent: "No hay conversación de LinkedIn con este BD.",
-    auditBannerTitle: (bdName: string) =>
-      `Estás viendo la conversación de ${bdName} como administrador — este acceso quedó registrado`,
-    auditBannerBody: (actorName: string, bdName: string, personName: string, dateLabel: string) =>
-      `Registro de auditoría: ${actorName} · conversación de ${bdName} con ${personName} · ${dateLabel}.`,
   },
 
   login: {

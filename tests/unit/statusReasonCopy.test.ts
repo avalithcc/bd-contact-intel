@@ -26,7 +26,6 @@ const serverStrings: Dictionary["contactRecordServer"] = {
   statusReasonSourceConnectionSent: (bdName) => `se envió un mensaje de LinkedIn en la conversación de ${bdName}`,
   statusReasonSentence: (a, b, c) => `${a} porque ${b} el ${c}.`,
   timelineLockedOwnedBy: (bdName) => `Esta conversación pertenece a ${bdName}.`,
-  adminAuditAlertBody: (bdName) => `Auditado (${bdName}).`,
   hiringBadge: (count) => `Contratando · ${count} puestos de IT`,
   companyContactCount: (count) => `${count} contactos en esta empresa`,
   conversationHistorySummary: (count, dateLabel) => `${count} mensajes · último ${dateLabel}`,

@@ -1,0 +1,75 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { Dialog } from "@/components/Dialog";
+
+/**
+ * Shared conversation viewer modal (owner decision 2026-09-30) — the ONE
+ * dialog both the viewing BD's own LinkedIn history
+ * (OwnConversationHistory.tsx) and the admin bypass (AdminConversationFlow.tsx)
+ * render into, replacing the old inline sidebar expansion and the standalone
+ * `/contacts/[id]/conversation/[bdId]` page respectively.
+ *
+ * `.dialog-body-scroll` (globals.css) caps the body at ~60vh and scrolls
+ * INTERNALLY — the page behind the dialog never scrolls (Dialog's own body-
+ * scroll lock already covers that). Scoped to this one wrapper class, not a
+ * change to the base `.dialog-body` rule every other dialog also uses, since
+ * every other dialog should stay exactly as tall as its own content.
+ *
+ * Once `loading` turns false with real content ready, the scroll container
+ * is scrolled to its own bottom — chat convention: land on the most recent
+ * message, not the top of the thread.
+ */
+export function ConversationDialog({
+  open,
+  onClose,
+  title,
+  loading,
+  error,
+  errorLabel,
+  banner,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: React.ReactNode;
+  loading: boolean;
+  error: boolean;
+  errorLabel: string;
+  banner?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (loading || error) return;
+    const el = bodyRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [loading, error]);
+
+  return (
+    <Dialog open={open} onClose={onClose} title={title} wide>
+      <div ref={bodyRef} className="dialog-body-scroll">
+        {loading ? (
+          <div className="thread-msg">
+            <span className="avatar avatar-sm" aria-hidden="true" />
+            <div>
+              <div className="skeleton" style={{ width: "90%" }} />
+              <div className="skeleton mt-2xs" style={{ width: "60%" }} />
+            </div>
+          </div>
+        ) : error ? (
+          <span className="error-text" role="alert">
+            {errorLabel}
+          </span>
+        ) : (
+          <>
+            {banner}
+            {children}
+          </>
+        )}
+      </div>
+    </Dialog>
+  );
+}

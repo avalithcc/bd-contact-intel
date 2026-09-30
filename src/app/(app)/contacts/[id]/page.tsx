@@ -7,6 +7,8 @@ import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
 import { getLockedConversationSummaries } from "@/lib/activity/lockedConversationSummaries";
+import { resolveLockedConnectionCardRows } from "@/lib/contacts/conversationHistoryAccess";
+import { resolveConversationDialogParam } from "@/lib/contacts/conversationDialogParam";
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
@@ -31,6 +33,7 @@ import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
 import { ConversationHistoryCard } from "./ConversationHistoryCard";
+import { AdminConversationAutoOpen } from "./AdminConversationAutoOpen";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
 import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
@@ -67,7 +70,12 @@ export const dynamic = "force-dynamic";
 
 interface ContactRecordPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ activityType?: string; openAction?: string }>;
+  // `conversation` — Administración → Registro de auditoría's "Abrir" link
+  // (owner decision 2026-09-30: the standalone `/contacts/[id]/conversation/
+  // [bdId]` page is deleted; this param + AdminConversationAutoOpen replace
+  // it). Validated below (resolveConversationDialogParam) and admin-gated
+  // server-side before it ever reaches a client component.
+  searchParams: Promise<{ activityType?: string; openAction?: string; conversation?: string }>;
 }
 
 // Board drag/keyboard-menu targets (task 10.5, 14.1) plus the follow-up
@@ -91,7 +99,7 @@ function isOpenActionParam(value: string | undefined): value is OpenActionParam 
  */
 export default async function ContactRecordPage({ params, searchParams }: ContactRecordPageProps) {
   const { id } = await params;
-  const { activityType: rawActivityType, openAction: rawOpenAction } = await searchParams;
+  const { activityType: rawActivityType, openAction: rawOpenAction, conversation: rawConversation } = await searchParams;
   const openAction = isOpenActionParam(rawOpenAction) ? rawOpenAction : null;
   const result = await getContactRecord(id);
 
@@ -132,6 +140,11 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const lockedConversationSummaries = isAdmin
     ? await getLockedConversationSummaries(record.person.id, me.id)
     : [];
+  // Audit log's "Abrir" link (?conversation=<bdId>) — admin-gated here,
+  // server-side, BEFORE the param ever reaches a client component: a
+  // non-admin never gets AdminConversationAutoOpen rendered at all, so no
+  // modal and no data, no matter what the query string says.
+  const autoOpenAdminBdId = isAdmin ? resolveConversationDialogParam(rawConversation) : null;
   // R3 (design.md): reassignment is only allowed while the person has no
   // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
   // enforces server-side for updateContactOwnerAction (task 13.3).
@@ -370,6 +383,21 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     .map((r) => ({ bdId: r.bdId, bdName: r.bdName, summaryText: r.parts.join(" · ") }))
     .sort((a, b) => a.bdName.localeCompare(b.bdName));
 
+  // Non-admin locked rows (bugfix 2026-09-30 — see resolveLockedConnectionCardRows's
+  // own doc comment): every OTHER BD's LinkedIn connection with real message
+  // history, name + count/date only, no content, no action. Only computed
+  // (and only rendered) for a non-admin — an admin already gets the fuller
+  // `lockedConversationRows` above, with the "Ver" action.
+  const nonAdminLockedConversationRows = !isAdmin
+    ? resolveLockedConnectionCardRows(record.connections, me.id)
+        .map((r) => ({
+          bdId: r.bdId,
+          bdName: r.bdName ?? l.emptyValue,
+          summaryText: linkedinSummaryByBdId[r.bdId] ?? l.emptyValue,
+        }))
+        .sort((a, b) => a.bdName.localeCompare(b.bdName))
+    : [];
+
   return (
     <main>
       <div className="record">
@@ -588,6 +616,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
             personName={name}
             ownRow={ownConversationRow}
             summaries={lockedConversationRows}
+            lockedRows={nonAdminLockedConversationRows}
             labels={l}
           />
 
@@ -642,6 +671,15 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           </div>
         </aside>
       </div>
+
+      {autoOpenAdminBdId && (
+        <AdminConversationAutoOpen
+          bdId={autoOpenAdminBdId}
+          personId={record.person.id}
+          personName={name}
+          labels={l}
+        />
+      )}
     </main>
   );
 }

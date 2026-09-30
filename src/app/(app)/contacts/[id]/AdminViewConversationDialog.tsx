@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Dialog } from "@/components/Dialog";
 import { EyeIcon, WarningIcon } from "@/components/icons";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
@@ -13,10 +12,11 @@ import type { ContactRecordLabels } from "@/lib/contacts/labels";
  * mockup's raw `.overlay`/`:target` markup — every other confirm dialog in
  * this app already works this way.
  *
- * Confirming NAVIGATES to `/contacts/[personId]/conversation/[bdId]`
- * (a plain `<Link>`, not a server action) — the audited read itself still
- * only happens once, inside `getConversationForAdmin` on that destination
- * page (task instruction: "audit BEFORE reading ... keep it"). This dialog
+ * Confirming used to NAVIGATE to `/contacts/[personId]/conversation/[bdId]`.
+ * Owner decision 2026-09-30: that route is gone — confirming now calls
+ * `onConfirm`, which the caller (AdminConversationFlow.tsx) turns into the
+ * SAME audited `getConversationForAdmin` read, rendered into the shared
+ * `ConversationDialog` instead of a separate page. This dialog itself still
  * never touches the DB.
  *
  * Owner decision (2026-09-30): the target BD is never notified and has no
@@ -26,17 +26,17 @@ import type { ContactRecordLabels } from "@/lib/contacts/labels";
 export function AdminViewConversationDialog({
   open,
   onClose,
-  personId,
+  onConfirm,
+  busy,
   personName,
-  bdId,
   bdName,
   labels: l,
 }: {
   open: boolean;
   onClose: () => void;
-  personId: string;
+  onConfirm: () => void;
+  busy: boolean;
   personName: string;
-  bdId: string;
   bdName: string;
   labels: ContactRecordLabels;
 }) {
@@ -45,20 +45,17 @@ export function AdminViewConversationDialog({
       open={open}
       onClose={onClose}
       title={`${l.adminViewDialogTitlePrefix} ${bdName}?`}
+      closeDisabled={busy}
       footer={
         <>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>
             {l.cancel}
           </button>
-          <Link
-            href={`/contacts/${personId}/conversation/${bdId}`}
-            prefetch={false}
-            className="btn btn-primary"
-            onClick={onClose}
-          >
+          <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
             <EyeIcon className="icon" />
             {l.viewConversationLink}
-          </Link>
+            {busy && <span className="spinner" aria-hidden="true" />}
+          </button>
         </>
       }
     >
