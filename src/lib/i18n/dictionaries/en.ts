@@ -701,6 +701,9 @@ export const en = {
     timelineFilterAll: "All",
     timelineFilterNote: "Note",
     timelineFilterEmail: "Email",
+    // Synced Gmail reply (email-sync brief) — grouped under the "Emails"
+    // pill with email_sent (timelinePills.ts), own label for its headline.
+    timelineFilterReplyReceived: "Reply received",
     timelineFilterHunter: "Email lookup",
     timelineFilterStatusChange: "Status change",
     timelineFilterMeeting: "Meeting",
@@ -720,6 +723,10 @@ export const en = {
     timelineLockedContent: "Private to the BD who logged it (and admins).",
     timelineSystemActor: "System",
     timelineEmailSentPrefix: "Email sent to",
+    // Fallback body when a synced reply has neither subject nor sender
+    // address available (should be rare — every synced message carries at
+    // least the sender).
+    timelineReplyReceivedDefault: "Reply received.",
     timelineHunterPrefix: "Email found by Hunter",
     timelineStatusChangedPrefix: "Status changed to",
     timelineStatusBackfillPrefix: "Status recorded before the migration:",
@@ -1147,6 +1154,9 @@ export const en = {
     meetingLogged: "Meeting logged",
     atNote: "Note",
     atEmailSent: "Email sent",
+    // Synced Gmail reply (email-sync brief), company timeline headline.
+    atReplyReceived: "Reply received",
+    atReplyReceivedDefault: "Reply received.",
     atStatusChange: "Stage changed",
     atMeetingLogged: "Meeting logged",
     atCall: "Call logged",

@@ -11,6 +11,11 @@ export interface CompanyTimelineViewLabels {
   meetingLogged: string;
   atNote: string;
   atEmailSent: string;
+  // Synced Gmail reply (email-sync brief) — same entry layout email_sent
+  // uses today; full-thread UI is a later slice. `atReplyReceivedDefault`
+  // is the body fallback when neither subject nor sender is available.
+  atReplyReceived: string;
+  atReplyReceivedDefault: string;
   atStatusChange: string;
   atMeetingLogged: string;
   atCall: string;
@@ -43,6 +48,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atNote;
     case "email_sent":
       return l.atEmailSent;
+    case "reply_received":
+      return l.atReplyReceived;
     case "status_change":
       return l.atStatusChange;
     case "status_backfill":
@@ -67,6 +74,18 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
 }
 
 const TASK_ACTIVITY_TYPES_SET = new Set(["task_updated", "task_completed", "task_reopened"]);
+
+/**
+ * Same content shape as the Contact record's `entryBody` `reply_received`
+ * case (src/lib/contacts/timelineEntryBody.ts) — subject and sender
+ * address, never the body (full-thread UI is a later slice).
+ */
+function replyReceivedBody(metadata: Record<string, unknown>, l: CompanyTimelineViewLabels): string {
+  const subject = typeof metadata.subject === "string" ? metadata.subject : null;
+  const from = typeof metadata.from === "string" ? metadata.from : null;
+  const parts = [subject, from].filter((v): v is string => Boolean(v));
+  return parts.length > 0 ? parts.join(" · ") : l.atReplyReceivedDefault;
+}
 
 function taskActivityViewBody(
   type: string,
@@ -125,9 +144,11 @@ export function buildCompanyTimelineViewRows(
     const body =
       row.type === "note" && typeof metadata.note === "string"
         ? metadata.note
-        : TASK_ACTIVITY_TYPES_SET.has(row.type)
-          ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
-          : null;
+        : row.type === "reply_received"
+          ? replyReceivedBody(metadata, labels)
+          : TASK_ACTIVITY_TYPES_SET.has(row.type)
+            ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
+            : null;
     return { ...row, what, body };
   });
 }

@@ -125,6 +125,9 @@ const MERGE_UNIFIED_TYPE = "merge_unified" as const;
 const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> = {
   note: "timelineFilterNote",
   email_sent: "timelineFilterEmail",
+  // Synced Gmail reply (email-sync brief) — own headline label, but grouped
+  // under the same "Correos" pill as email_sent (TIMELINE_PILL_GROUPS).
+  reply_received: "timelineFilterReplyReceived",
   hunter_lookup: "timelineFilterHunter",
   status_change: "timelineFilterStatusChange",
   meeting_logged: "timelineFilterMeeting",
@@ -142,6 +145,8 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
 const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) => React.ReactElement> = {
   note: NoteIcon,
   email_sent: MailIcon,
+  // Same icon as email_sent — no new visual design for this entry type yet.
+  reply_received: MailIcon,
   hunter_lookup: SearchIcon,
   status_change: HistoryIcon,
   meeting_logged: MeetingIcon,
@@ -157,6 +162,7 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
 
 const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   email_sent: "email",
+  reply_received: "email",
   status_change: "system",
   meeting_logged: "meeting",
   call: "call",

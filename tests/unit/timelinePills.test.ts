@@ -26,6 +26,32 @@ test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the 4 interna
   );
 });
 
+test("TIMELINE_PILL_GROUPS.email_sent includes reply_received (synced Gmail reply), grouped with email_sent not its own pill", () => {
+  assert.deepEqual([...TIMELINE_PILL_GROUPS.email_sent], ["email_sent", "reply_received"]);
+  assert.equal(isTimelinePillKey("reply_received"), false);
+});
+
+test("resolveTimelinePillKey maps the raw reply_received type to the email_sent pill", () => {
+  assert.equal(resolveTimelinePillKey("reply_received"), "email_sent");
+});
+
+test("sumPillCount for email_sent includes reply_received's count, added to email_sent's own", () => {
+  const countsByType = { email_sent: 2, reply_received: 3, note: 1 };
+  assert.equal(sumPillCount(countsByType, "email_sent"), 5);
+});
+
+test("filterEntriesForPill('email_sent') keeps both email_sent and reply_received entries", () => {
+  const entries = [
+    { id: "1", type: "email_sent" },
+    { id: "2", type: "reply_received" },
+    { id: "3", type: "note" },
+  ];
+  assert.deepEqual(
+    filterEntriesForPill(entries, "email_sent").map((e) => e.id),
+    ["1", "2"],
+  );
+});
+
 test("resolveTimelinePillKey accepts a pill key directly", () => {
   assert.equal(resolveTimelinePillKey("note"), "note");
   assert.equal(resolveTimelinePillKey("system"), "system");

@@ -20,6 +20,8 @@ const labels = {
   meetingLogged: "Reunión registrada",
   atNote: "Nota",
   atEmailSent: "Correo",
+  atReplyReceived: "Respuesta recibida",
+  atReplyReceivedDefault: "Respuesta recibida.",
   atStatusChange: "Cambio de etapa",
   atMeetingLogged: "Reunión",
   atCall: "Llamada",
@@ -102,6 +104,46 @@ test("buildCompanyTimelineViewRows: a task_updated row's body names the actor, n
   const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
   assert.equal(view.what, "Tarea editada · Bruno Diaz");
   assert.equal(view.body, "Macarena editó la tarea «Enviar propuesta»: Vencimiento 12 oct → 20 oct");
+});
+
+// --- reply_received (email-sync brief follow-up review) --------------------
+
+test("buildCompanyTimelineViewRows: a reply_received row (always contact-scoped) headlines 'Respuesta recibida · {person}'", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "reply_received",
+      metadata: { subject: "Re: intro", from: "jane@prospect.com" },
+      scope: "contact" as const,
+      personId: "p1",
+      personName: "Bruno Diaz",
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
+  assert.equal(view.what, "Respuesta recibida · Bruno Diaz");
+});
+
+test("buildCompanyTimelineViewRows: a reply_received row's body shows subject and sender, same layout email_sent uses", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "reply_received",
+      metadata: { subject: "Re: intro", from: "jane@prospect.com" },
+      scope: "contact" as const,
+      personId: "p1",
+      personName: "Bruno Diaz",
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
+  assert.equal(view.body, "Re: intro · jane@prospect.com");
+});
+
+test("buildCompanyTimelineViewRows: a reply_received row with no subject/sender falls back to the default copy", () => {
+  const rows = [
+    { ...baseRow, type: "reply_received", metadata: {}, scope: "contact" as const, personId: "p1", personName: "Bruno Diaz" },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf);
+  assert.equal(view.body, "Respuesta recibida.");
 });
 
 test("buildCompanyTimelineViewRows: a task_completed row's body falls back to the unknown-actor label when actorName is null", () => {

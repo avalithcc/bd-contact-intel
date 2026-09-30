@@ -607,6 +607,9 @@ export const es: typeof en = {
     timelineFilterAll: "Todo",
     timelineFilterNote: "Nota",
     timelineFilterEmail: "Correo",
+    // Synced Gmail reply (email-sync brief) — grouped under the "Correos"
+    // pill with email_sent (timelinePills.ts), own label for its headline.
+    timelineFilterReplyReceived: "Respuesta recibida",
     timelineFilterHunter: "Búsqueda de correo",
     timelineFilterStatusChange: "Cambio de estado",
     timelineFilterMeeting: "Reunión",
@@ -626,6 +629,10 @@ export const es: typeof en = {
     timelineLockedContent: "Contenido privado para el BD que lo registró (y los administradores).",
     timelineSystemActor: "Sistema",
     timelineEmailSentPrefix: "Correo enviado a",
+    // Fallback body when a synced reply has neither subject nor sender
+    // address available (should be rare — every synced message carries at
+    // least the sender).
+    timelineReplyReceivedDefault: "Respuesta recibida.",
     timelineHunterPrefix: "Correo encontrado por Hunter",
     timelineStatusChangedPrefix: "Estado cambiado a",
     timelineStatusBackfillPrefix: "Estado registrado antes de la migración:",
@@ -1049,6 +1056,9 @@ export const es: typeof en = {
     meetingLogged: "Reunión registrada",
     atNote: "Nota",
     atEmailSent: "Correo enviado",
+    // Synced Gmail reply (email-sync brief), company timeline headline.
+    atReplyReceived: "Respuesta recibida",
+    atReplyReceivedDefault: "Respuesta recibida.",
     atStatusChange: "Cambio de etapa",
     atMeetingLogged: "Reunión registrada",
     atCall: "Llamada registrada",

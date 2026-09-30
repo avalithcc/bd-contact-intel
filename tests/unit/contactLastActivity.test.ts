@@ -16,6 +16,20 @@ test("formatLastActivityLabel: email_sent -> 'Correo enviado'", () => {
   assert.equal(formatLastActivityLabel({ type: "email_sent", metadata: {} }, dict), dict.contactList.lastActivityEmailSent);
 });
 
+test("formatLastActivityLabel: reply_received (synced Gmail reply) -> 'Respuesta recibida', same label status_change-to-replied uses", () => {
+  assert.equal(
+    formatLastActivityLabel({ type: "reply_received", metadata: { gmailThreadId: "t1", from: "jane@prospect.com" } }, dict),
+    dict.contactList.lastActivityReplyReceived,
+  );
+});
+
+test("formatLastActivityLabel: a synced email_sent (metadata.source = 'gmail_sync') still gets the existing email label", () => {
+  assert.equal(
+    formatLastActivityLabel({ type: "email_sent", metadata: { to: "jane@prospect.com", source: "gmail_sync", occurredAt: "2026-09-30T00:00:00.000Z" } }, dict),
+    dict.contactList.lastActivityEmailSent,
+  );
+});
+
 test("formatLastActivityLabel: meeting_logged -> 'Reunión registrada'", () => {
   assert.equal(
     formatLastActivityLabel({ type: "meeting_logged", metadata: {} }, dict),

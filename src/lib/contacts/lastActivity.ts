@@ -67,6 +67,11 @@ export function formatLastActivityLabel(
   switch (row.type) {
     case "email_sent":
       return l.lastActivityEmailSent;
+    // Synced Gmail reply (email-sync brief) — reuses the SAME "Respuesta
+    // recibida" label a status_change/status_backfill to 'replied' already
+    // uses below, since both mean the same thing to a BD scanning the list.
+    case "reply_received":
+      return l.lastActivityReplyReceived;
     case "meeting_logged":
       return l.lastActivityMeetingLogged;
     case "discarded":

@@ -77,6 +77,16 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
       return typeof metadata.note === "string" ? metadata.note : "";
     case "email_sent":
       return typeof metadata.to === "string" ? `${l.timelineEmailSentPrefix} ${metadata.to}` : l.timelineEmailSentPrefix;
+    // Synced Gmail reply (email-sync brief) — same entry layout email_sent
+    // uses, showing the subject and the sender address (metadata.from) from
+    // src/lib/gmail/buildSyncedActivities.ts's metadata shape, never the
+    // body (full-thread UI is a later slice, behind its own mockup).
+    case "reply_received": {
+      const subject = typeof metadata.subject === "string" ? metadata.subject : null;
+      const from = typeof metadata.from === "string" ? metadata.from : null;
+      const parts = [subject, from].filter((v): v is string => Boolean(v));
+      return parts.length > 0 ? parts.join(" · ") : l.timelineReplyReceivedDefault;
+    }
     case "hunter_lookup":
       return typeof metadata.hunterScore === "number"
         ? `${l.timelineHunterPrefix} · ${metadata.hunterScore}`
