@@ -48,7 +48,13 @@ interface Triangle {
   expectedEmail: string;
 }
 
-const TRIANGLES: readonly Triangle[] = [
+/**
+ * Named batches. A batch is run once; the guard below refuses to re-run one,
+ * because these definitions are specific person ids, not a query.
+ */
+const BATCHES: Record<string, readonly Triangle[]> = {
+  // Run 2026-09-30. Owner confirmed each correct address by hand.
+  "a": [
   {
     label: "Diego Corubolo",
     survivorId: "31f1a679-caaf-45ef-8feb-11f4bf11f578", // profile_key + 1 conversation
@@ -76,28 +82,93 @@ const TRIANGLES: readonly Triangle[] = [
     ],
     expectedEmail: "jorge.blanco@nubiral.com",
   },
-];
+  ],
+  // Run 2026-09-30, second batch. These five are the `classic_split_no_conflict`
+  // bucket of the open queue: one side is a HubSpot import row carrying the
+  // email, another is a LinkedIn row carrying the profile_key and the owner,
+  // and a third has only a job title. The bulk CLI reports them as `safe` but
+  // then skips every one as a transitive chain, because each person also
+  // appears in the triangle's other two pairs.
+  //
+  // Survivor is the profile_key side in all five, per the rule established
+  // with batch "a": profileKey is not in TRACKED_FIELDS so a merge never
+  // copies it onto the survivor, while email IS tracked and moves to whichever
+  // side has one. Only one row per triangle has an email here, so there is no
+  // rank tie to break — the order below just keeps the convention.
+  "b": [
+    {
+      label: "Alan Brande",
+      survivorId: "787a3a8f-9598-48d5-ab05-efaa3ff6cd4f", // profile_key + owner
+      mergeInOrder: [
+        "c7c6d8b9-a013-4b99-8abf-b645660a5bdf", // alanbrande@lightit.com.uy
+        "dd6913cc-0762-44a4-99dd-8e66429dc206", // title only
+      ],
+      expectedEmail: "alanbrande@lightit.com.uy",
+    },
+    {
+      label: "Ewan Begue",
+      survivorId: "ec7f7cf9-7cd9-4872-9357-dc75fa5544ca",
+      mergeInOrder: [
+        "978637f6-f7fa-4c42-9e37-09488f49be91", // ebegue@zafirus.tech
+        "6708662e-0adb-4d76-b77b-7d015d06a6c1", // title only
+      ],
+      expectedEmail: "ebegue@zafirus.tech",
+    },
+    {
+      label: "Andres Gonzalez",
+      survivorId: "719db294-65e7-47b8-b6c8-b2f2ca7027fb",
+      mergeInOrder: [
+        "8e3b9abf-aefe-4c8f-a2c9-f25598d7ccbd", // andres@aulasneo.com
+        "ef15207b-c251-4169-a09e-2e1f0525cd67", // title only
+      ],
+      expectedEmail: "andres@aulasneo.com",
+    },
+    {
+      label: "Diego Revello",
+      survivorId: "c0f81d9d-cee1-4ddd-9665-560c8c9d351c",
+      mergeInOrder: [
+        "71af83bb-8f79-4359-8691-fed290a85758", // diego.revello@bancogalicia.com.ar
+        "9a56792a-ae9e-4fd2-89fb-a84741b582b3", // title only
+      ],
+      expectedEmail: "diego.revello@bancogalicia.com.ar",
+    },
+    {
+      label: "Matias Mutchinick",
+      survivorId: "d41b4c24-c8f4-4bd2-910b-778ebda6da10",
+      mergeInOrder: [
+        "a9659ea5-fe01-4859-8ab7-f0690530c884", // matias.m@wizeline.com
+        "9398b203-f7d8-4c94-86c8-fede02c41890", // title only
+      ],
+      expectedEmail: "matias.m@wizeline.com",
+    },
+  ],
+};
 
 const REASON = "confirmed_triangle_2026_09";
 
 function parseArgs(argv: readonly string[]) {
   let execute = false;
   let actorBdId: string | null = null;
+  let batch: string | null = null;
   for (const arg of argv) {
     if (arg === "--execute") execute = true;
     else if (arg.startsWith("--actor=")) actorBdId = arg.slice("--actor=".length);
+    else if (arg.startsWith("--batch=")) batch = arg.slice("--batch=".length);
     else throw new Error(`Unknown argument: ${arg}`);
   }
+  if (!batch) throw new Error(`--batch=<name> is required. Known batches: ${Object.keys(BATCHES).join(", ")}`);
+  if (!(batch in BATCHES)) throw new Error(`Unknown batch "${batch}". Known: ${Object.keys(BATCHES).join(", ")}`);
   if (execute && !actorBdId) throw new Error("--execute needs --actor=<bd id>");
-  return { execute, actorBdId };
+  return { execute, actorBdId, triangles: BATCHES[batch], batch };
 }
 
 async function main(): Promise<void> {
-  const { execute, actorBdId } = parseArgs(process.argv.slice(2));
+  const { execute, actorBdId, triangles, batch } = parseArgs(process.argv.slice(2));
+  console.log(`batch ${batch}: ${triangles.length} triangle(s)`);
 
   // Refuse to run against anything but the expected starting state: every row
   // still present, none already merged away.
-  const allIds = TRIANGLES.flatMap((t) => [t.survivorId, ...t.mergeInOrder]);
+  const allIds = triangles.flatMap((t) => [t.survivorId, ...t.mergeInOrder]);
   const rows = await db
     .select({ id: person.id, email: person.email, mergedIntoId: person.mergedIntoId })
     .from(person)
@@ -115,7 +186,7 @@ async function main(): Promise<void> {
     );
   }
 
-  for (const t of TRIANGLES) {
+  for (const t of triangles) {
     console.log(`\n${t.label} — survivor ${t.survivorId}`);
     for (const mergedId of t.mergeInOrder) {
       const from = rows.find((r) => r.id === mergedId)!;
