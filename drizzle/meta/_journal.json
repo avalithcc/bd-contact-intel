@@ -169,6 +169,13 @@
       "when": 1791491071556,
       "tag": "0023_follow_up_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791577471556,
+      "tag": "0024_email_sync_scope",
+      "breakpoints": true
     }
   ]
 }

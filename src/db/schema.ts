@@ -1214,6 +1214,23 @@ export const emailAccount = pgTable(
     status: text("status").notNull().default("connected"),
     // Last error message from Gmail API, for debugging reconnection issues.
     lastErrorMessage: text("last_error_message"),
+    // Space-separated scopes Google actually granted at the OAuth callback
+    // (the token response's `scope` field), NOT what we asked for — a user
+    // can uncheck scopes in Google's consent screen. Read by
+    // needsReconnectForSync() (src/lib/gmail/needsReconnectForSync.ts) to
+    // tell a pre-readonly connection (gmail.send only) apart from one that
+    // can sync. Null for every connection made before this column existed —
+    // treated as "no readonly scope" (needs reconnect).
+    grantedScopes: text("granted_scopes"),
+    // Gmail's opaque `historyId` cursor (users.history.list), stored as text
+    // since Gmail returns it as a big numeric string, not a number we should
+    // ever do arithmetic on. Null until the first sync baseline completes.
+    historyId: text("history_id"),
+    lastSyncedAt: timestamp("last_synced_at"),
+    // Last /api/gmail/sync failure for this account, for the same
+    // debugging purpose as lastErrorMessage but scoped to sync rather than
+    // send (a send failure and a sync failure are unrelated conditions).
+    syncError: text("sync_error"),
     connectedAt: timestamp("connected_at").notNull().defaultNow(),
     disconnectedAt: timestamp("disconnected_at"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
