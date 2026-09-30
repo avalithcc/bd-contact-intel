@@ -20,7 +20,7 @@ export const bd = pgTable("bd", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   // 'bd' | 'admin' (design D5, R5). The owner is seeded as the first admin
   // by drizzle/0013_unified_person.sql. Gated via
   // src/lib/auth/requireAdmin.ts, never checked ad hoc.
@@ -128,7 +128,7 @@ export const companyCategory = pgTable("company_category", {
   // Normalized company key (see src/lib/companyCategories.ts#normalizeCompanyKey).
   key: text("key").primaryKey(),
   category: text("category").notNull(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type CompanyCategoryRow = typeof companyCategory.$inferSelect;
@@ -160,7 +160,7 @@ export const targetCompany = pgTable("target_company", {
   // per-company feature is built on top of the market column.
   countryFilter: text("country_filter"),
   active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   // Startup classification for the /outreach "Startups only" filter — is
   // this a venture-backed or founder-led tech company in growth stage,
   // rather than a large public incumbent, a consultancy/agency, or a
@@ -174,7 +174,7 @@ export const targetCompany = pgTable("target_company", {
   // than at company-seed time, since it costs an AI Gateway call per
   // company.
   isStartup: boolean("is_startup"),
-  startupClassifiedAt: timestamp("startup_classified_at"),
+  startupClassifiedAt: timestamp("startup_classified_at", { withTimezone: true }),
   // Short, human-readable justification from the model — shown as a
   // tooltip on the "Startup" badge (see outreachReasons in
   // src/lib/outreach/queries.ts) so the classification is inspectable
@@ -200,7 +200,7 @@ export const companyAlias = pgTable(
     companyKey: text("company_key")
       .notNull()
       .references(() => targetCompany.companyKey, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byCompanyKey: index("company_alias_company_key_idx").on(t.companyKey),
@@ -312,8 +312,8 @@ export const syncRun = pgTable("sync_run", {
   companyKey: text("company_key")
     .notNull()
     .references(() => targetCompany.companyKey, { onDelete: "cascade" }),
-  startedAt: timestamp("started_at").notNull().defaultNow(),
-  finishedAt: timestamp("finished_at"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
   status: text("status").notNull(), // 'ok' | 'error'
   fetched: integer("fetched").notNull().default(0),
   created: integer("created").notNull().default(0),
@@ -445,8 +445,8 @@ export const boardCandidate = pgTable(
     evidence: jsonb("evidence").notNull().default({}),
     // Aggregate across ALL BDs — see table comment above.
     contactCount: integer("contact_count").notNull().default(0),
-    discoveredAt: timestamp("discovered_at").notNull().defaultNow(),
-    decidedAt: timestamp("decided_at"),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
     // The bd's email, or "system:auto_approve" for the auto-approve rule.
     // Not a foreign key: kept as a plain denormalized string so a bd row
     // being renamed/removed later doesn't retroactively rewrite history.
@@ -469,8 +469,8 @@ export type NewBoardCandidate = typeof boardCandidate.$inferInsert;
 // via `status`/`error` rather than just... not showing up.
 export const discoveryRun = pgTable("discovery_run", {
   id: uuid("id").primaryKey().defaultRandom(),
-  startedAt: timestamp("started_at").notNull().defaultNow(),
-  finishedAt: timestamp("finished_at"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
   companiesProbed: integer("companies_probed").notNull().default(0),
   hits: integer("hits").notNull().default(0),
   status: text("status").notNull(), // 'ok' | 'error'
@@ -493,7 +493,7 @@ export type NewDiscoveryRun = typeof discoveryRun.$inferInsert;
 // with the real `(ats, slug)` unique constraint used for actual hits.
 export const companyProbe = pgTable("company_probe", {
   companyKey: text("company_key").primaryKey(),
-  lastProbedAt: timestamp("last_probed_at").notNull().defaultNow(),
+  lastProbedAt: timestamp("last_probed_at", { withTimezone: true }).notNull().defaultNow(),
   attempts: integer("attempts").notNull().default(1),
   // Whether the most recent probe found at least one board_candidate.
   hit: boolean("hit").notNull().default(false),
@@ -517,7 +517,7 @@ export const emailDomainCheck = pgTable("email_domain_check", {
   // enum) so adding a new provider matcher never needs a migration.
   provider: text("provider").notNull(),
   mxHosts: jsonb("mx_hosts").notNull().default([]),
-  checkedAt: timestamp("checked_at").notNull().defaultNow(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type EmailDomainCheck = typeof emailDomainCheck.$inferSelect;
@@ -531,7 +531,7 @@ export type NewEmailDomainCheck = typeof emailDomainCheck.$inferInsert;
 export const leadSource = pgTable("lead_source", {
   key: text("key").primaryKey(),
   displayName: text("display_name").notNull(),
-  importedAt: timestamp("imported_at").notNull().defaultNow(),
+  importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type LeadSource = typeof leadSource.$inferSelect;
@@ -790,7 +790,7 @@ export const personPropertyHistory = pgTable(
     }),
     // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration'
     source: text("source").notNull(),
-    at: timestamp("at").notNull().defaultNow(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byPerson: index("person_property_history_person_idx").on(t.personId),
@@ -816,7 +816,7 @@ export const personIdMap = pgTable(
     // 'profile_key' | 'verified_email' | 'review' | 'new' | 'skipped_own_company'
     method: text("method").notNull(),
     migrationRunId: uuid("migration_run_id"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.legacyTable, t.legacyId] }),
@@ -847,11 +847,11 @@ export const mergeEvent = pgTable(
       onDelete: "set null",
     }),
     snapshot: jsonb("snapshot").notNull().default({}),
-    undoneAt: timestamp("undone_at"),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
     undoneBy: uuid("undone_by").references(() => bd.id, {
       onDelete: "set null",
     }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     bySurvivor: index("merge_event_survivor_idx").on(t.survivorId),
@@ -881,8 +881,8 @@ export const duplicateCandidate = pgTable(
     decidedByBdId: uuid("decided_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    decidedAt: timestamp("decided_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // person_a_id < person_b_id is enforced at the application level
@@ -923,7 +923,7 @@ export const auditLog = pgTable(
     }),
     // e.g. { mergeEventId } linking merge/unmerge rows to merge_event above.
     metadata: jsonb("metadata").notNull().default({}),
-    at: timestamp("at").notNull().defaultNow(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byActor: index("audit_log_actor_idx").on(t.actorBdId),
@@ -952,9 +952,9 @@ export const migrationRun = pgTable(
     approvedByBdId: uuid("approved_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    approvedAt: timestamp("approved_at"),
-    executedAt: timestamp("executed_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byKind: index("migration_run_kind_idx").on(t.kind),
@@ -978,8 +978,8 @@ export const savedView = pgTable(
     columns: jsonb("columns").notNull().default([]),
     sort: jsonb("sort").notNull().default({}),
     position: integer("position").notNull().default(0),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byOwner: index("saved_view_owner_idx").on(t.ownerBdId),
@@ -1082,7 +1082,7 @@ export const companyPropertyHistory = pgTable(
     // rows have no merge/unmerge concept yet, so those two source values
     // never appear here.
     source: text("source").notNull(),
-    at: timestamp("at").notNull().defaultNow(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byCompany: index("company_property_history_company_idx").on(t.companyKey),
@@ -1367,7 +1367,7 @@ export const emailNeverLog = pgTable(
     // 'address' | 'domain'
     kind: text("kind").notNull(),
     value: text("value").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     bdKindValueUnique: unique("email_never_log_bd_kind_value_unique").on(t.bdId, t.kind, t.value),
@@ -1409,8 +1409,8 @@ export const taskDigestSend = pgTable(
     // Send-failure text, deliberately never the raw SMTP error object (which
     // can echo back connection details) — see markDigestFailed's doc comment.
     error: text("error"),
-    sentAt: timestamp("sent_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     bdDateUnique: unique("task_digest_send_bd_date_unique").on(t.bdId, t.sendDate),
@@ -1449,7 +1449,7 @@ export const signal = pgTable(
     // for linkedin_apify; { text, pastedAt } for manual_paste; { title, url, snippet,
     // publishedAt } for web_research.
     data: jsonb("data").notNull().default({}),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byLead: index("signal_lead_idx").on(t.leadId),
@@ -1488,9 +1488,9 @@ export const linkedinScrapeJob = pgTable(
     profilesScraped: integer("profiles_scraped").default(0),
     // Last error or cause if status = 'failed'.
     errorMessage: text("error_message"),
-    requestedAt: timestamp("requested_at").notNull().defaultNow(),
-    startedAt: timestamp("started_at"),
-    finishedAt: timestamp("finished_at"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
   (t) => ({
     byContact: index("linkedin_scrape_job_contact_idx").on(t.contactId),
