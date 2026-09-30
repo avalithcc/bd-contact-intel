@@ -1368,6 +1368,8 @@ export const es: typeof en = {
     filterIndustryAny: "Cualquiera",
     filterOwnerLabel: "Responsable:",
     filterOwnerAny: "Cualquiera",
+    filterAccountTypeLabel: "Tipo de cuenta:",
+    filterAccountTypeAny: "Cualquiera",
     stageProspect: "Prospecto",
     stageQualified: "Calificada",
     stageProposalSent: "Propuesta enviada",

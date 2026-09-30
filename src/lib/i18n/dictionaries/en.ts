@@ -1478,6 +1478,8 @@ export const en = {
     filterIndustryAny: "Any",
     filterOwnerLabel: "Owner:",
     filterOwnerAny: "Any",
+    filterAccountTypeLabel: "Account type:",
+    filterAccountTypeAny: "Any",
     stageProspect: "Prospect",
     stageQualified: "Qualified",
     stageProposalSent: "Proposal sent",
