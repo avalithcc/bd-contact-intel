@@ -33,6 +33,8 @@ import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/c
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { mapInlineDerivedColumns, type InlineDerivedRawRow } from "@/lib/contacts/inlineDerivedColumns";
+import { roleGroupVisibilityCondition } from "@/lib/contacts/roleVisibility";
+import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -72,8 +74,18 @@ async function baseContactFilterConditions(
   filters: ContactFilters,
   meBdId: string,
   hiringKeys?: Set<string>,
+  // "Ocultar grupos No priorizar por defecto" (owner decision 2026-09-30,
+  // "opción A") — resolved ONCE per request (roleVisibility.ts) and threaded
+  // through here so the page query, the count query and every system-view
+  // badge share the exact same hidden set. Empty by default: every existing
+  // caller (bulk actions' own "select all N filtered" reads, which
+  // deliberately keep their pre-existing behavior — task brief scope is the
+  // list default only) is unaffected unless it explicitly opts in.
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ) {
   const where = [sql`${person.mergedIntoId} is null`];
+  const roleVisibility = roleGroupVisibilityCondition(hiddenRoleGroups);
+  if (roleVisibility) where.push(roleVisibility);
   if (filters.owner) where.push(ownerFilterCondition(filters.owner, meBdId));
   if (filters.emailStatus) where.push(eq(person.emailStatus, filters.emailStatus));
   else if (filters.emailVerified) where.push(eq(person.emailStatus, "verified"));
@@ -353,8 +365,9 @@ export async function getContactListPage(
   dict: Dict,
   sort: ContactSortKey = "lastActivity",
   hiringKeys?: Set<string>,
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ): Promise<ContactListPage> {
-  const where = await baseContactFilterConditions(filters, meBdId, hiringKeys);
+  const where = await baseContactFilterConditions(filters, meBdId, hiringKeys, hiddenRoleGroups);
   if (filters.status?.length) where.push(inArray(person.status, filters.status));
   if (q) {
     const condition = searchCondition(q);
@@ -492,8 +505,9 @@ export async function getContactIdsForFilters(
   dict: Dict,
   cap: number,
   hiringKeys?: Set<string>,
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ): Promise<ContactIdsForFiltersResult> {
-  const page = await getContactListPage(filters, meBdId, q, 1, cap, dict, sort, hiringKeys);
+  const page = await getContactListPage(filters, meBdId, q, 1, cap, dict, sort, hiringKeys, hiddenRoleGroups);
   return idsFromContactListPage(page);
 }
 
@@ -527,8 +541,9 @@ export async function getContactBoardColumns(
   q: string | undefined,
   dict: Dict,
   hiringKeys?: Set<string>,
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ): Promise<ContactBoardColumn[]> {
-  const base = await baseContactFilterConditions(filters, meBdId, hiringKeys);
+  const base = await baseContactFilterConditions(filters, meBdId, hiringKeys, hiddenRoleGroups);
   if (q) {
     const condition = searchCondition(q);
     if (condition) base.push(condition);
@@ -623,8 +638,9 @@ export async function getContactCountForFilters(
   filters: ContactFilters,
   meBdId: string,
   hiringKeys?: Set<string>,
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ): Promise<number> {
-  const where = await baseContactFilterConditions(filters, meBdId, hiringKeys);
+  const where = await baseContactFilterConditions(filters, meBdId, hiringKeys, hiddenRoleGroups);
   if (filters.status?.length) where.push(inArray(person.status, filters.status));
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -655,10 +671,11 @@ export async function getContactCountForFilters(
 export async function getSystemViewCounts(
   meBdId: string,
   hiringKeys?: Set<string>,
+  hiddenRoleGroups: readonly RoleGroupKey[] = [],
 ): Promise<number[]> {
   const conditionsByView = await Promise.all(
     SYSTEM_VIEWS.map(async (view) => {
-      const where = await baseContactFilterConditions(view.filters, meBdId, hiringKeys);
+      const where = await baseContactFilterConditions(view.filters, meBdId, hiringKeys, hiddenRoleGroups);
       if (view.filters.status?.length) where.push(inArray(person.status, view.filters.status));
       return where;
     }),

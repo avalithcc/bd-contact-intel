@@ -1515,6 +1515,10 @@ export const es: typeof en = {
     filtersClearAll: "Borrar todo",
     filterChipActiveNoValue: "Activo",
     filterRemoveLabel: "Quitar filtro",
+    // "Ocultar grupos No priorizar por defecto" chip (owner decision
+    // 2026-09-30, "opción A") — roleVisibility.ts.
+    hiddenRolesChipLabel: "Ocultos",
+    showAllRolesLabel: "Mostrar todos",
     filterCompanyLabel: "Empresa",
     filterHiringLabel: "Empresa con vacantes abiertas",
     filterStartupLabel: "Startup",

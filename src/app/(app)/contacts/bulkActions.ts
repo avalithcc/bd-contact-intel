@@ -26,6 +26,7 @@ import { resolveTaskAssignee } from "@/lib/tasks/assignee";
 import { getContactIdsForFilters } from "@/lib/contacts/listQueries";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
 import { parseContactSort } from "@/lib/contacts/sort";
+import { resolveBulkRoleVisibility } from "@/lib/contacts/bulkTargetIds";
 import { getDictionary } from "@/lib/i18n/server";
 
 function backTo(formData: FormData, extra: Record<string, string>): string {
@@ -67,7 +68,20 @@ async function resolveBulkTargetIds(formData: FormData, meBdId: string, idCap: n
     const q = String(formData.get("q") ?? "") || undefined;
     const sort = parseContactSort(String(formData.get("sort") ?? "") || undefined);
     const dict = await getDictionary();
-    const { ids, total } = await getContactIdsForFilters(filters, meBdId, q, sort, dict, idCap);
+    // "Seleccionar los N" MUST act on exactly what the list shows — same
+    // roleVisibility.ts resolution as the table (BulkActionsBar.tsx forwards
+    // the `roles` hidden field alongside filtersQuery/sort).
+    const roleVisibility = resolveBulkRoleVisibility(String(formData.get("roles") ?? "") || undefined, filters);
+    const { ids, total } = await getContactIdsForFilters(
+      filters,
+      meBdId,
+      q,
+      sort,
+      dict,
+      idCap,
+      undefined,
+      roleVisibility.hiddenRoleGroups,
+    );
     return { ids, wasLimited: total > ids.length, mode: "filter", filtersQuery };
   }
   const rawIds = formData.getAll("personId");
