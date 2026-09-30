@@ -59,6 +59,10 @@ The timeline rendering in slice 5 needs a mockup before code.
 
 ## Owner decisions
 
+**Decided 2026-09-29 — logging model.** Log automatically every thread with a CRM-known address, with no per-email "Log" checkbox (HubSpot requires one, via its Chrome extension or a BCC address), **plus a per-BD "never log" list** of addresses and domains, as in HubSpot. The owner's aim is to improve on HubSpot, not only match it.
+
+Still open:
+
 1. **Trigger:** `pg_cron` every 15 minutes (free, recommended) or Vercel Pro.
 2. **Content kept:** the snippet only (about 200 characters) or the full body. The full body is what HubSpot shows, but it means storing email content (retention, deletion on request).
 3. **First-sync window:** how far back to pull on connect (recommended: 90 days).
