@@ -1,5 +1,7 @@
 # bd-playbook — mockup
 
+> **Owner review 2026-09-29:** the per-role-group priority scale (Alta / Media / Baja / No priorizar / Revisar) in `playbook-content.md` is **approved** as written. The UI placement decisions below are still pending.
+
 Design-only proposal, plus content. No application code changed. Static HTML
 at `bd-playbook.html`, built on the approved `crm-hubspot-ux` mockups
 (`../../crm-hubspot-ux/mockups/styles.css`, same app shell, same accordion
