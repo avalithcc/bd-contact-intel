@@ -67,6 +67,7 @@ import { mergeProperty } from "../src/lib/identity/matcher";
 import { loadOpenDuplicatePairsForTiering } from "../src/lib/identity/duplicateBulkQueries";
 import {
   planDuplicateTierRun,
+  pickEmailWinnerSide,
   type DuplicatePairPlanInput,
   type DuplicateTierPlan,
 } from "../src/lib/identity/duplicateTiering";
@@ -159,9 +160,33 @@ function printReport(plan: DuplicateTierPlan, pairs: readonly DuplicatePairPlanI
     const merged = entry.mergedId === pair.personA.id ? pair.personA : pair.personB;
     console.log(`    WOULD MERGE: survivor=${displayName(survivor)} (${survivor.id}), merged=${displayName(merged)} (${merged.id})`);
     const titleOutcome = mergeProperty({ value: survivor.jobTitle }, { value: merged.jobTitle });
-    if (titleOutcome.loser?.value) {
-      console.log(`    would lose jobTitle "${titleOutcome.loser.value}" from the merged side.`);
-    } else {
+    const titleLoss = titleOutcome.loser?.value ?? null;
+
+    // Mirrors planMerge's mergeEmailFields winner rule via pickEmailWinnerSide
+    // (duplicateTiering.ts) so this dry-run line can never disagree with what
+    // the merge actually writes. An email loss can happen whenever the two
+    // sides' emails differ (always true for two_emails_same_mailbox, but not
+    // special-cased to that bucket — the same computation applies to any
+    // bucket where both sides happen to carry a differing email).
+    let emailLoss: string | null = null;
+    if (survivor.email && merged.email && survivor.email !== merged.email) {
+      const winnerSide = pickEmailWinnerSide(
+        { email: survivor.email, emailStatus: survivor.emailStatus },
+        { email: merged.email, emailStatus: merged.emailStatus },
+      );
+      emailLoss = winnerSide === "survivor" ? merged.email : survivor.email;
+    }
+
+    if (titleLoss) {
+      console.log(`    would lose jobTitle "${titleLoss}" from the merged side.`);
+    }
+    if (emailLoss) {
+      const keptEmail = emailLoss === survivor.email ? merged.email : survivor.email;
+      console.log(
+        `    would discard email "${emailLoss}" (survivor keeps "${keptEmail}") — recorded in the merge snapshot, restorable via unmerge.`,
+      );
+    }
+    if (!titleLoss && !emailLoss) {
       console.log(`    no property loss expected (email/profile_key/title agree or fill in cleanly).`);
     }
   }
