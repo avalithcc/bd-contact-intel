@@ -1243,6 +1243,121 @@ export const emailAccount = pgTable(
 export type EmailAccount = typeof emailAccount.$inferSelect;
 export type NewEmailAccount = typeof emailAccount.$inferInsert;
 
+// One row per Gmail message synced from a BD's mailbox that matches at
+// least one CRM-known address (email-sync brief; never the whole mailbox).
+// `unique(bd_id, gmail_message_id)` makes both the incremental
+// `history.list` poll and a history re-baseline idempotent via
+// `ON CONFLICT DO NOTHING` (src/app/api/gmail/sync/route.ts).
+//
+// Multi-match decision (see src/lib/gmail/classify.ts's doc comment for the
+// full rationale): the unique constraint forces exactly one row per Gmail
+// message, so a message matching several CRM persons cannot be one row per
+// person. `personId` holds the FIRST match as a convenience column for the
+// common single-match case; `email_message_person` below holds EVERY match
+// (always at least one row, including the single-match case) and is the
+// only table the write path (status recompute, admin view) should treat as
+// authoritative for "which persons does this message belong to".
+//
+// Content: stores the full body (text/plain preferred; sanitized HTML if
+// present — src/lib/gmail/parseMessage.ts#sanitizeHtml), per the owner
+// decision to match HubSpot. Visible only to the owning BD
+// (src/lib/activity/timelineVisibility.ts's CONVERSATION_CONTENT_TYPES) or
+// an admin through the audited getConversationForAdmin path — no timeline
+// UI reads this table yet (that ships after the mockup, slice 5).
+export const emailMessage = pgTable(
+  "email_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    gmailMessageId: text("gmail_message_id").notNull(),
+    gmailThreadId: text("gmail_thread_id").notNull(),
+    // 'inbound' | 'outbound' — inbound is what can flip status to `replied`
+    // (deriveStatus.ts's `reply_received` mapping).
+    direction: text("direction").notNull(),
+    personId: uuid("person_id").references(() => person.id, { onDelete: "set null" }),
+    fromAddress: text("from_address").notNull(),
+    toAddresses: jsonb("to_addresses").notNull().default([]),
+    ccAddresses: jsonb("cc_addresses").notNull().default([]),
+    subject: text("subject"),
+    bodyText: text("body_text"),
+    bodyHtml: text("body_html"),
+    sentAt: timestamp("sent_at").notNull(),
+    // The single address that produced `personId`'s match (mirrors that
+    // person's row in email_message_person).
+    matchedEmail: text("matched_email").notNull(),
+    // 'exact' | 'inferred' — 'inferred' when matchedEmail came from a
+    // pattern-deduced person email (`person.email_source = 'pattern_inferred'`).
+    matchConfidence: text("match_confidence").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    bdGmailMessageUnique: unique("email_message_bd_gmail_message_unique").on(t.bdId, t.gmailMessageId),
+    byBdThread: index("email_message_bd_thread_idx").on(t.bdId, t.gmailThreadId),
+    byBdPerson: index("email_message_bd_person_idx").on(t.bdId, t.personId),
+  }),
+);
+
+export type EmailMessage = typeof emailMessage.$inferSelect;
+export type NewEmailMessage = typeof emailMessage.$inferInsert;
+
+// The authoritative, complete set of CRM persons one `email_message`
+// matches (see that table's doc comment for why this exists alongside its
+// `person_id` convenience column). Always at least one row per stored
+// message — including the common single-match case — so every read path
+// can treat "join to this table" as the one way to find a message's
+// matched persons, rather than special-casing single vs. multi-match.
+export const emailMessagePerson = pgTable(
+  "email_message_person",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    emailMessageId: uuid("email_message_id")
+      .notNull()
+      .references(() => emailMessage.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    matchedEmail: text("matched_email").notNull(),
+    matchConfidence: text("match_confidence").notNull(),
+  },
+  (t) => ({
+    messagePersonUnique: unique("email_message_person_unique").on(t.emailMessageId, t.personId),
+    byPerson: index("email_message_person_person_idx").on(t.personId),
+  }),
+);
+
+export type EmailMessagePerson = typeof emailMessagePerson.$inferSelect;
+export type NewEmailMessagePerson = typeof emailMessagePerson.$inferInsert;
+
+// A per-BD "never log" rule (owner decision, 2026-09-30 email-sync brief:
+// "the owner's aim is to improve on HubSpot, not only match it" — HubSpot
+// has this per-user). `value` is always normalized lowercase (an address or
+// a bare domain). Enforced in the matcher (src/lib/gmail/classify.ts); its
+// settings UI ships later (needs a mockup first) — this slice only provides
+// the table and the query/action functions a future UI can call
+// (src/lib/gmail/neverLog.ts).
+export const emailNeverLog = pgTable(
+  "email_never_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    // 'address' | 'domain'
+    kind: text("kind").notNull(),
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    bdKindValueUnique: unique("email_never_log_bd_kind_value_unique").on(t.bdId, t.kind, t.value),
+    byBd: index("email_never_log_bd_idx").on(t.bdId),
+  }),
+);
+
+export type EmailNeverLog = typeof emailNeverLog.$inferSelect;
+export type NewEmailNeverLog = typeof emailNeverLog.$inferInsert;
+
 // One row per (bd, Argentina calendar date) — the idempotency claim for the
 // 08:30 ART daily task-reminder digest (task-reminders backlog). The cron
 // inserts a 'pending' row with `on conflict (bd_id, send_date) do nothing`

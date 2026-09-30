@@ -176,6 +176,13 @@
       "when": 1791577471556,
       "tag": "0024_email_sync_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791663871556,
+      "tag": "0025_email_message_tables",
+      "breakpoints": true
     }
   ]
 }
