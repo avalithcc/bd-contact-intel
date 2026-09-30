@@ -343,6 +343,48 @@ keys people by normalized `profile_key` (`src/lib/csv.ts`,
 person already exist?" half needs almost no new code. It is only the "fill in
 someone new" half that has no legal, free, self-hosted answer.
 
+**Recommendation, in order — held is not the same as nothing to do.**
+
+1. **Build the free half now, before deciding anything about the paid half.**
+   The "does this person already exist?" path costs almost nothing: an
+   extension or bookmarklet that carries only the URL, the matcher on
+   `profile_key`, and `NewContactDialog` opening prefilled. Zero ToS surface,
+   about a day of work. It is also the half that protects the thing that
+   actually costs money — 98 duplicate pairs were merged by hand on
+   2026-09-30 and 244 remain, and an uncontrolled capture path is exactly how
+   that queue refills. Ship this whatever happens to the rest.
+
+2. **Fix the export lag instead of routing around it.** The objection to the
+   connections export was that a weekly cadence leaves the CRM stale when BDs
+   connect and write the same day. That is an objection to the *cadence*, not
+   to the source. LinkedIn's connections archive is requested on demand and
+   arrives in minutes, not the days the full archive takes. A BD running it at
+   the end of the day closes the gap to hours, and the CRM can prompt it:
+   "you added 6 contacts by URL today — run your export to fill them in."
+   That is free, sanctioned, self-hosted, and it was dismissed too quickly.
+
+3. **Measure the friction before paying to remove it.** Nobody has counted how
+   many new LinkedIn contacts a BD actually adds in a week. At 5–10 a day
+   across three BDs, typing name and company is roughly 25–50 minutes a month
+   for the whole team — and the BD is looking at the profile they just chose,
+   so it is not blind data entry. Run step 1 for a month and count. If typing
+   turns out to be the real bottleneck, that is a decision with numbers behind
+   it instead of an impression.
+
+4. **The constraint is worth stating precisely, because the current wording
+   rules out more than it probably means.** This CRM already depends on
+   external platforms — Vercel, Supabase, the Gmail API, the Vercel AI
+   Gateway. The line the owner is drawing is almost certainly narrower:
+   *our contacts' data must not be handed to a third-party data broker.* That
+   is a legitimate and defensible line, and it is not the same as "no external
+   platforms". Worth noting that an enrichment lookup sends a **public
+   LinkedIn URL** and receives **public professional data** — it does not
+   upload the CRM. Whether that crosses the line is the owner's call, but it
+   should be decided on the narrow question rather than the broad one, because
+   the broad phrasing also rules out things nobody intends to rule out.
+
+None of the above needs a decision today. Step 1 stands on its own.
+
 Superseded: `openspec/decisions/2026-09-30-linkedin-extension-research.md`
 (no-go) and `2026-09-30-linkedin-extension-brief.md` (conditional go). Both
 kept; this entry records where the decision actually landed and why.
