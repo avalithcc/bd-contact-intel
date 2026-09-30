@@ -15,13 +15,22 @@ activity per BD over time, and follow-up-queue adherence. Deliberately not a
 BI tool — one date range, one BD filter, applied to every card at once (with
 one flagged exception, decision 7).
 
-Open `reports.html` in a browser. Two cards ("Descartes por motivo", "Pipeline
-de empresas") render their **true current state first** — both are
-effectively empty today, for reasons explained in each card — with a
-collapsed `<details>` "Referencia: así se vería con datos (ilustrativo, no
-real)" underneath, same convention `follow-up-queue.html` used for its empty
-and partially-worked states. Every other card's numbers are illustrative,
-same as `migration-dry-run.html`.
+Open `reports.html` in a browser. Two cards render their **true current state**,
+not invented data:
+- **"Descartes por motivo"** is still near-empty — exactly 1 discard exists in
+  production as of today, so it renders that count honestly (not a bucketed
+  bar, since attributing a single case to one of the 6 reason codes without a
+  live read would be guessing) with a collapsed `<details>` "Referencia: así
+  se vería con datos (ilustrativo, no real)" underneath, same empty-state
+  convention `follow-up-queue.html` used for its own empty/partial states.
+- **"Pipeline de empresas"** is the opposite case: `company.relationship_stage`
+  was backfilled in #205 (2026-09-29), so this card shows the **real**
+  distribution today (Prospecto 13,423 · Calificada 831 · Ganada 2 ·
+  Propuesta enviada 0 · Perdida 0, out of 14,256 companies with 0 null) — no
+  illustrative reference needed, the real state already demonstrates the
+  shape.
+
+Every other card's numbers are illustrative, same as `migration-dry-run.html`.
 
 **Desktop only, by owner direction.** No mobile state was built or
 screenshotted.
@@ -94,13 +103,19 @@ screenshotted.
 7. **"Pipeline de empresas" ignores the date-range filter — it's a current
    snapshot, not a period metric,** captioned "Instantánea actual, no
    cambia con el período" on the card itself. `company.relationship_stage`
-   has no reliable "when did this company first reach stage X" signal for
-   the bulk-imported 14,255 rows (nothing backfilled them — see decision 7
-   context below), so a period-scoped version of this card isn't honestly
-   computable yet. `company_property_history` does log stage changes made
-   through the record page's edit control going forward, so a period-scoped
-   "stage changes this period" card becomes possible once real usage
-   accumulates — out of scope for this mockup.
+   is populated for every company today (the #205 default-stage backfill,
+   2026-09-29: Prospecto 13,423 · Calificada 831 · Ganada 2 · Propuesta
+   enviada 0 · Perdida 0, 14,256 total with 0 null — includes Smart Gen,
+   added today directly as Prospecto), but it still has no reliable "when
+   did this company first reach stage X" signal, since the backfill set a
+   point-in-time value rather than a dated transition. So a period-scoped
+   version of this card ("stage changes this period") isn't honestly
+   computable from `company.relationship_stage` alone — `company_property_
+   history` does log stage changes made through the record page's edit
+   control going forward, so that period-scoped card becomes possible once
+   real usage accumulates (today: the manual control has produced zero of
+   those changes — the whole distribution above is what the backfill left,
+   not what a BD moved) — out of scope for this mockup.
 
 8. **Source bucketing:** the backlog names 3 sources (`hubspot_import`,
    `linkedin`, `manual`); `person.sourceKey` actually carries 5 values in
@@ -134,16 +149,20 @@ a date range, so they need `GROUP BY` on an already-indexed column
   AND created_at BETWEEN :from AND :to GROUP BY metadata->>'reason'`. Needs a
   new index-friendly path: `metadata->>'reason'` is JSONB, not a column —
   `activity_type_idx` narrows to `type = 'discarded'` first, so the JSONB
-  extraction only runs over that (today: zero) row set. Computable today
-  with existing columns; real answer is 0 for every period.
+  extraction only runs over a handful of rows (today: exactly 1). Computable
+  today with existing columns; real total is 1 as of today, not 0 — the
+  reason on that one row is real (the discard flow requires one of the 6
+  codes on every write) but isn't named in this mockup, since a single
+  production row wasn't queried live to confirm which code it is.
 
 - **Embudo de contactos** — `count(*) FROM person WHERE owner_bd_id = :bd
   (or any) AND created_at <= :to GROUP BY status`, using `person_status_idx`.
   Computable today; `person.status` is exactly the cache this needs.
 
 - **Pipeline de empresas** — `count(*) FROM company GROUP BY
-  relationship_stage` (no date filter, decision 7). Computable today; will
-  show ~14,255 nulls until `company-pipeline-adoption`'s backfill ships.
+  relationship_stage` (no date filter, decision 7). Computable today and
+  already backfilled (#205, 2026-09-29) — 0 nulls, real distribution shown
+  in the card.
 
 - **Conversión por origen** — same query as the funnel, `GROUP BY
   source_key, status`, `source_key` bucketed per decision 8 in application
@@ -159,7 +178,11 @@ a date range, so they need `GROUP BY` on an already-indexed column
   composite index if this ships, per `PERFORMANCE.md`. Tasks completed:
   `count(*) FROM task WHERE assigned_to_bd_id = :bd AND status = 'done' AND
   updated_at BETWEEN :from AND :to` — `task_assignee_status_due_idx` doesn't
-  cover `updated_at`, so this is a small new index too.
+  cover `updated_at`, so this is a small new index too. `reply_received` rows
+  written by email-sync carry `metadata.source = 'gmail_sync'` — as of
+  2026-09-30 this is a real, non-test source (6 contacts moved to Respondió
+  from a synced Gmail reply), not just the one self-test email the backlog's
+  2026-09-28 inventory recorded.
 
 - **Adherencia a la cola de seguimientos** — `count(*) FROM
   follow_up_queue_item WHERE queue_date BETWEEN :from AND :to GROUP BY
