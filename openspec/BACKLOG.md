@@ -158,6 +158,27 @@ no schema change) is done (#221). Slices 1–6 — small tables, imported tables
 lead/person, company, activity/task, email/follow-up tables — are pending.
 Until they land, run local checks with `TZ=UTC`.
 
+### free-ai-for-simple-tasks — research first
+Owner request (2026-09-30): use other AI models for simple, low-stakes
+("dummy") tasks, preferring **free** options, possibly choosing a different
+model per task. Nothing is decided yet; this is a research item.
+
+- Today every AI call goes through the Vercel AI Gateway (`ai` +
+  `@ai-sdk/gateway`): outreach message generation
+  (`src/lib/outreach/generateMessage.ts`, a Sonnet-class model) and the
+  startup classifier (`src/lib/hiring/startupClassification.ts`, a cheap model).
+  The gateway already routes to many providers by model string, so switching
+  a task to another model is usually a one-line change.
+- Research questions:
+  - which tasks count as simple (classification, name or title
+    normalization, short summaries, tagging)
+  - which models are free or near-free for each, and at what quality
+  - rate limits and data-retention terms (contact data must not be used for
+    training)
+  - whether the gateway's own free tier or credits already cover it
+- Output: a short decision brief in `openspec/decisions/` with a per-task
+  model recommendation, cost, and the privacy terms.
+
 ## Known defects
 
 ### contact-names
