@@ -214,18 +214,33 @@ export interface ActivityRowForStatus {
 }
 
 /**
+ * Activity types whose real-world time lives in `metadata.occurredAt`, not
+ * `created_at` (when the row was logged/synced) — a `call` (migration 0016)
+ * is logged after the fact, and `email_sent`/`reply_received` written by
+ * the Gmail sync (email-sync brief) are inserted at sync/backfill
+ * processing time, which can be days after the message was actually sent
+ * or received. Shared by `activityRowToStatusEvent` (this file) and its SQL
+ * twin `effectiveActivityAtSql()` (src/lib/contacts/effectiveActivityTime.ts)
+ * so the two can never drift on which types get this treatment.
+ */
+export const OCCURRED_AT_ACTIVITY_TYPES = ["call", "email_sent", "reply_received"] as const;
+
+/**
  * Builds one activity row's status event (task 5.2) — the type/metadata
  * mapping deriveStatus() itself doesn't need to know about, kept separate so
  * it stays pure and unit-testable without a DB row. `status_backfill` rows
  * use `metadata.originalAt` (the historical time the migration reconstructed)
- * as the event's effective time, not `createdAt` (when the migration ran),
- * falling back to `createdAt` when it's missing or unparseable.
+ * as the event's effective time, not `createdAt` (when the migration ran).
+ * `OCCURRED_AT_ACTIVITY_TYPES` rows use `metadata.occurredAt` the same way.
+ * Both fall back to `createdAt` when the field is missing or unparseable —
+ * e.g. a platform-sent `email_sent` (src/lib/gmail/send.ts) has no
+ * `occurredAt` at all, and `created_at` already IS its real send time.
  */
 export function activityRowToStatusEvent(row: ActivityRowForStatus): ActivityStatusEvent {
   const at =
     row.type === "status_backfill"
       ? (readMetadataOriginalAt(row.metadata) ?? row.createdAt)
-      : row.type === "call"
+      : (OCCURRED_AT_ACTIVITY_TYPES as readonly string[]).includes(row.type)
         ? (readMetadataOccurredAt(row.metadata) ?? row.createdAt)
         : row.createdAt;
   const status =

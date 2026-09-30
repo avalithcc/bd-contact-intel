@@ -294,3 +294,54 @@ test("activityRowToStatusEvent falls back to createdAt when a call's occurredAt 
   });
   assert.equal(event.at.getTime(), createdAt.getTime());
 });
+
+// --- email_sent/reply_received (email-sync brief; feat/follow-up-queue
+// dependency) — a synced Gmail message's real send/receive time lives in
+// metadata.occurredAt, not created_at (the sync/backfill's processing
+// time), same convention as `call`. -------------------------------------
+
+test("activityRowToStatusEvent uses reply_received's metadata.occurredAt, not createdAt, as the event time", () => {
+  const occurredAt = new Date("2026-07-01T09:00:00.000Z");
+  const createdAt = new Date("2026-09-30T00:00:00.000Z");
+  const event = activityRowToStatusEvent({
+    id: "a1",
+    type: "reply_received",
+    createdAt,
+    metadata: { gmailThreadId: "t1", occurredAt: occurredAt.toISOString() },
+  });
+  assert.equal(event.at.getTime(), occurredAt.getTime());
+});
+
+test("activityRowToStatusEvent uses email_sent's metadata.occurredAt, not createdAt, as the event time", () => {
+  const occurredAt = new Date("2026-09-30T08:00:00.000Z");
+  const createdAt = new Date("2026-09-30T09:15:00.000Z");
+  const event = activityRowToStatusEvent({
+    id: "a1",
+    type: "email_sent",
+    createdAt,
+    metadata: { gmailThreadId: "t1", occurredAt: occurredAt.toISOString() },
+  });
+  assert.equal(event.at.getTime(), occurredAt.getTime());
+});
+
+test("activityRowToStatusEvent falls back to createdAt for email_sent when occurredAt is missing (platform-sent, no sync)", () => {
+  const createdAt = new Date("2026-09-30T09:15:00.000Z");
+  const event = activityRowToStatusEvent({
+    id: "a1",
+    type: "email_sent",
+    createdAt,
+    metadata: { to: "jane@prospect.com", subject: "hi", gmailMessageId: "m1", gmailThreadId: "t1" },
+  });
+  assert.equal(event.at.getTime(), createdAt.getTime());
+});
+
+test("activityRowToStatusEvent falls back to createdAt for reply_received when occurredAt is missing/invalid", () => {
+  const createdAt = new Date("2026-09-30T09:15:00.000Z");
+  const event = activityRowToStatusEvent({
+    id: "a1",
+    type: "reply_received",
+    createdAt,
+    metadata: { gmailThreadId: "t1", occurredAt: "not-a-date" },
+  });
+  assert.equal(event.at.getTime(), createdAt.getTime());
+});

@@ -27,12 +27,22 @@
  * 0016) uses `metadata.occurredAt` the same way — a call is logged after
  * the fact, so its effective time is when it happened, not when the
  * dialog was saved — mirroring `activityRowToStatusEvent`'s `call` branch
- * exactly. This module's tests pin the JS-side rule every SQL site must
- * match.
+ * exactly. `email_sent`/`reply_received` rows written by the Gmail sync
+ * (email-sync brief) use `metadata.occurredAt` for the same reason: the
+ * sync/backfill can insert a row days after the message was actually sent
+ * or received (a 90-day backfill's oldest reply is inserted "now" but
+ * happened months ago) — `OCCURRED_AT_ACTIVITY_TYPES`
+ * (src/lib/status/deriveStatus.ts) is the ONE shared list both twins read,
+ * so a future type added to it never needs updating in two places. This
+ * module's tests pin the JS-side rule every SQL site must match.
  */
 import { sql } from "drizzle-orm";
 import { activity } from "@/db/schema";
-import { activityRowToStatusEvent, type ActivityRowForStatus } from "@/lib/status/deriveStatus";
+import {
+  activityRowToStatusEvent,
+  OCCURRED_AT_ACTIVITY_TYPES,
+  type ActivityRowForStatus,
+} from "@/lib/status/deriveStatus";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -85,7 +95,10 @@ export function effectiveActivityAtSql() {
       sql`, `,
     )}) then null
     when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz
-    when ${activity.type} = 'call' and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
+    when ${activity.type} in (${sql.join(
+      OCCURRED_AT_ACTIVITY_TYPES.map((t) => sql`${t}`),
+      sql`, `,
+    )}) and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
     else ${activity.createdAt} end)`;
 }
 
