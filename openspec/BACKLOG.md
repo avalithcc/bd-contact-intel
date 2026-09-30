@@ -158,6 +158,29 @@ no schema change) is done (#221). Slices 1–6 — small tables, imported tables
 lead/person, company, activity/task, email/follow-up tables — are pending.
 Until they land, run local checks with `TZ=UTC`.
 
+### linkedin-chrome-extension — not started
+Owner request (2026-09-30): a Chrome extension so that, when a BD connects
+with someone on LinkedIn, that person can be pushed into this CRM from the
+LinkedIn page itself.
+
+- Why it matters: LinkedIn is where the BDs actually prospect, and CSV
+  imports are off (`9f428dd`). Today a new LinkedIn contact only reaches the
+  CRM by hand. This is the missing capture path, and it is the one place a BD
+  would naturally create a Contact.
+- Shape to investigate: a content script on `linkedin.com/in/*` adding an
+  "Agregar al CRM" control that posts name, headline, company and profile URL
+  to an authenticated endpoint here; the server resolves or creates the
+  Company, runs the existing identity matcher (`src/lib/identity/matcher.ts`)
+  to avoid duplicates, and sets `profile_key` so the imported conversation
+  history (`conversation.peer_profile_key`) links up.
+- Open questions for the brief: how the extension authenticates (a Supabase
+  session cookie only works on our own domain, so this likely needs a
+  per-BD token), what LinkedIn's terms allow (reading the page a user is
+  already viewing vs. scraping), Chrome Web Store publication vs. an internal
+  unpacked extension for 3 people, and how it behaves for a person who is
+  already in the CRM.
+- Output: a decision brief in `openspec/decisions/` before any code.
+
 ### free-ai-for-simple-tasks — research first
 Owner request (2026-09-30): use other AI models for simple, low-stakes
 ("dummy") tasks, preferring **free** options, possibly choosing a different
