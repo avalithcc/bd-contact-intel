@@ -21,6 +21,9 @@
  * `FOLLOW_UP_DAILY_CAP` (candidateQuery.ts's default `cap` parameter) and
  * `WORKED_ACTIVITY_TYPES` (queueQueries.ts's "worked today" `IN` list).
  */
+import { sql } from "drizzle-orm";
+import { activity } from "@/db/schema";
+import { activityRowToStatusEvent, type ActivityRowForStatus } from "@/lib/status/deriveStatus";
 
 export const FOLLOW_UP_DAILY_CAP = 10;
 
@@ -36,3 +39,40 @@ export const WORKED_ACTIVITY_TYPES: ReadonlySet<string> = new Set([
   "email_sent",
   "discarded",
 ]);
+
+/**
+ * "Worked today" (queueQueries.ts#workedTodayExists,
+ * appShellBadgeCountsQuery.ts's `follow_up_count` subquery) asks "did the
+ * BD do something on this contact today" — deliberately the raw log time
+ * for most types (a `call` logged today about an event from yesterday
+ * still counts: LOGGING it is the BD's action today).
+ *
+ * `email_sent`/`reply_received` rows written by the Gmail sync (email-sync
+ * brief) break that assumption: their `created_at` is just when the
+ * automated sync/backfill happened to run, unrelated to BD engagement
+ * timing. A message synced TODAY that was actually sent/received 60 days
+ * ago must NOT count as worked today; a message actually sent from Gmail
+ * TODAY must. `metadata.occurredAt` carries the real time — reusing
+ * `activityRowToStatusEvent` (src/lib/status/deriveStatus.ts) gets exactly
+ * that substitution for free (it already redirects `email_sent`/
+ * `reply_received`/`call` to `occurredAt` when present), so `call` is
+ * explicitly carved back out here to preserve its existing "logged-at
+ * counts" semantics.
+ */
+export function resolveWorkedTodayAt(row: ActivityRowForStatus): Date {
+  if (row.type === "call") return row.createdAt;
+  return activityRowToStatusEvent(row).at;
+}
+
+const WORKED_TODAY_OCCURRED_AT_TYPES = ["email_sent", "reply_received"] as const;
+
+/** SQL-side twin of `resolveWorkedTodayAt` — same `call` carve-out, same ISO-datetime guard before casting. */
+export function workedTodayAtSql() {
+  return sql`(case
+    when ${activity.type} = 'call' then ${activity.createdAt}
+    when ${activity.type} in (${sql.join(
+      WORKED_TODAY_OCCURRED_AT_TYPES.map((t) => sql`${t}`),
+      sql`, `,
+    )}) and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
+    else ${activity.createdAt} end)`;
+}
