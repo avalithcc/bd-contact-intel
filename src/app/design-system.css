@@ -405,10 +405,65 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .table-footer { display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--color-border); font-size: var(--text-sm); color: var(--color-ink-subtle); background: var(--color-surface-1); }
 
 /* ---------------------------------------------------------------- board */
-.board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: var(--space-md); overflow-x: auto; align-items: start; }
-.board-col { background: var(--color-surface-sunken); border-radius: var(--radius-md); padding: var(--space-sm); min-height: 420px; }
+/* Horizontal-scroll fix (fix/board-horizontal-scroll): the board never
+   lacked a scrollbar — `.board`'s 5 fixed-min-width (220px) columns always
+   overflowed and `overflow-x: auto` always caught it (verified with
+   Playwright at 1280x720/1366x768/1280x600: `.board` scrollWidth >
+   clientWidth in every case, while `.page`/`.main`/`.app`/`html` never
+   overflowed — the page itself never scrolled sideways). The real bug: a
+   board with more than a couple of cards per column grows taller than the
+   viewport, which pushes `.board`'s own horizontal scrollbar below the
+   fold — at Macarena's reported 1920x1080-at-150% setup (effective
+   ~1280x600 viewport) even a 3-card-per-column board already needed page
+   scroll before that scrollbar was reachable at all, and a realistic
+   20-card column makes it far worse.
+   First attempt capped the whole PAGE (`<main>`) to the viewport so the
+   board could flex to fill whatever was left — fresh review rejected that:
+   the remaining space after the page header/view-tabs/toolbar/hint text is
+   only ~219px at Macarena's viewport (unusable, and it re-introduced a
+   *second*, nested vertical scrollbar inside an already-short `.board`),
+   and it silently broke if `ReconnectBanner` was showing (not accounted
+   for in the calc, reproducing the original bug).
+   Fix instead: leave the page alone — it scrolls vertically exactly like
+   every other page, `ReconnectBanner` included, and no page-level height
+   depends on it. `.board` sizes ITSELF to (nearly) the full viewport via
+   `calc(100dvh - var(--topbar-height) - <gap>)` (100vh first, as a
+   fallback for browsers without dvh support). Scrolling the page down to
+   the board reveals a board that fills the screen, whose own horizontal
+   scrollbar sits right at the bottom of the viewport — never below the
+   fold, regardless of card count or banner. Each `.board-col` still scrolls
+   its own cards on the Y axis so a long column never pushes `.board`
+   itself taller than that fixed height. */
+.board {
+  display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: var(--space-md);
+  overflow-x: auto; align-items: stretch;
+  height: calc(100vh - var(--topbar-height) - var(--space-2xl));
+  height: calc(100dvh - var(--topbar-height) - var(--space-2xl));
+  scrollbar-width: thin; scrollbar-color: var(--color-border-strong) transparent;
+}
+/* macOS overlay scrollbars hide themselves entirely outside of an active
+   scroll gesture — with the board's own scrollbar now load-bearing (it's
+   how a BD reaches the last column or the rest of a long one), it needs to
+   stay visible. `scrollbar-width`/`scrollbar-color` above cover Firefox;
+   these cover Chromium/Safari. */
+.board::-webkit-scrollbar, .board-col::-webkit-scrollbar { width: 8px; height: 8px; }
+.board::-webkit-scrollbar-track, .board-col::-webkit-scrollbar-track { background: transparent; }
+.board::-webkit-scrollbar-thumb, .board-col::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: var(--radius-pill); }
+.board-col {
+  background: var(--color-surface-sunken); border-radius: var(--radius-md); padding: var(--space-sm);
+  max-height: 100%; display: flex; flex-direction: column; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--color-border-strong) transparent;
+}
 .board-col.drop-target { box-shadow: inset 0 0 0 2px var(--color-accent-strong); background: var(--color-accent-soft); }
-.col-header { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-2xs) var(--space-2xs) var(--space-sm); }
+.col-header {
+  display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-2xs) var(--space-2xs) var(--space-sm);
+  /* `top: calc(var(--space-sm) * -1)` cancels out `.board-col`'s own
+     top padding (also `--space-sm`): verified with Playwright that plain
+     `top: 0` here left an ~8px gap between the column's clip edge and the
+     sticky header's stuck position, wide enough to still show a sliver of
+     the card scrolled up behind it. */
+  position: sticky; top: calc(var(--space-sm) * -1); background: var(--color-surface-sunken); z-index: 1;
+}
 .col-header .n { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-ink-subtle); }
 .board-card { display: block; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); cursor: grab; }
 .board-card + .board-card { margin-top: var(--space-sm); }
