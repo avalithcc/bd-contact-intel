@@ -4,6 +4,7 @@ import { company, contact, conversation, message, person, personBdConnection, pe
 import { isDormant } from "@/lib/queries";
 import { getHiringMatchIndex, type HiringMatch } from "@/lib/hiring/queries";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { OutreachHistoryMessage } from "./messagePrompt";
 import {
@@ -221,8 +222,11 @@ export async function listOutreachCandidates(
   const rows = await query;
 
   const scored: OutreachRow[] = rows.map((r) => {
-    // A raw-SQL aggregate comes back from the driver as a string, not a Date.
-    const lastMessageAt = r.lastMessageAt == null ? null : new Date(r.lastMessageAt);
+    // A raw-SQL aggregate comes back from the driver as a possibly
+    // offset-less string, not a Date — parseDbTimestamp pins it to UTC
+    // (src/lib/db/timestamp.ts), the same rule every other raw DB timestamp
+    // call site uses.
+    const lastMessageAt = r.lastMessageAt == null ? null : parseDbTimestamp(r.lastMessageAt);
     const dormant = isDormant(r.reciprocal, lastMessageAt);
     const hiring: HiringMatch | undefined = r.companyKey
       ? hiringIndex.get(r.companyKey)

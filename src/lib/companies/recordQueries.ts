@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type {
   CompanyActivityFilter,
   CompanyPropertyHistoryRow,
@@ -117,8 +118,9 @@ export async function getCompanyTimeline(
     .select({
       id: activity.id,
       type: activity.type,
-      // Raw computed timestamptz — postgres-js returns a string at runtime,
-      // normalized to Date below (same class of bug effectiveActivityTime.ts
+      // Raw computed timestamptz — postgres-js returns a possibly
+      // offset-less string at runtime, pinned to UTC below via
+      // parseDbTimestamp (same class of bug effectiveActivityTime.ts
       // documents).
       at: sql<Date | string>`${effectiveActivityAtSql()}`,
       metadata: activity.metadata,
@@ -146,7 +148,7 @@ export async function getCompanyTimeline(
   return rows.map((r) => ({
     id: r.id,
     type: r.type,
-    createdAt: new Date(r.at),
+    createdAt: parseDbTimestamp(r.at),
     metadata: r.metadata as Record<string, unknown> | null,
     actorName: r.actorBdId ? (actorNameById.get(r.actorBdId) ?? null) : null,
     personId: r.personId,

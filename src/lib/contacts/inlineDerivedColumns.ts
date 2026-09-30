@@ -22,6 +22,7 @@ import {
 } from "@/lib/contacts/bdConnections";
 import { formatLastActivityLabel, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactListRow, ContactListRowBase } from "@/lib/contacts/listQueries";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { getDictionary } from "@/lib/i18n/server";
 
 type Dict = Awaited<ReturnType<typeof getDictionary>>;
@@ -44,8 +45,6 @@ export interface InlineDerivedRawRow extends ContactListRowBase {
   lastActivityRaw: InlineLastActivityRaw | null;
 }
 
-const HAS_ZONE_SUFFIX_RE = /(?:[zZ]|[+-]\d{2}:?\d{2})$/;
-
 /**
  * Bug found writing this module's tests: Postgres's `to_json` rendering of
  * a `timestamptz` value normally carries a UTC offset (e.g. `...+00`), but
@@ -59,10 +58,13 @@ const HAS_ZONE_SUFFIX_RE = /(?:[zZ]|[+-]\d{2}:?\d{2})$/;
  * silently shifting the displayed last-activity time by the server's UTC
  * offset. `effectiveActivityAtSql()`'s own contract is "always UTC", so an
  * offset-less string is treated as UTC here explicitly rather than trusting
- * `new Date` to guess the same thing the DB meant.
+ * `new Date` to guess the same thing the DB meant. Delegates to the ONE
+ * shared helper (src/lib/db/timestamp.ts#parseDbTimestamp) every other raw
+ * DB timestamp call site now uses, so this rule can never drift from
+ * theirs.
  */
 function parseEffectiveActivityAt(value: string): Date {
-  return new Date(HAS_ZONE_SUFFIX_RE.test(value) ? value : `${value}Z`);
+  return parseDbTimestamp(value);
 }
 
 /**

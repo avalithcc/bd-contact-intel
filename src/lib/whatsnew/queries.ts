@@ -4,6 +4,7 @@ import { companyAlias, contact, jobPosting, syncRun, targetCompany } from "@/db/
 import { resolveHiringCompanies } from "@/lib/hiring/queries";
 import type { MarketKey } from "@/lib/hiring/markets";
 import { isDormant } from "@/lib/queries";
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import {
   compareOutreachRows,
   isLeadershipRoleGroup,
@@ -95,8 +96,10 @@ interface SyncStatus {
  */
 async function getSyncStatus(): Promise<SyncStatus> {
   // Raw `db.execute` skips drizzle's column mappers, so a timestamp comes
-  // back as a string (or a Date, depending on the driver) — it must be
-  // normalized here, or Intl formatting throws "Invalid time value".
+  // back as a possibly offset-less string (or a Date, depending on the
+  // driver) — parseDbTimestamp below pins it to UTC before use, or Intl
+  // formatting would throw "Invalid time value" (or worse, silently render
+  // the wrong instant on a non-UTC runtime).
   const rows = await db.execute<{
     monitoredCompanyCount: number;
     totalSyncRuns: number;
@@ -109,7 +112,7 @@ async function getSyncStatus(): Promise<SyncStatus> {
   `);
   const row = rows[0];
   const lastSync = row?.lastSuccessfulSyncAt ?? null;
-  const lastSyncDate = lastSync ? new Date(lastSync) : null;
+  const lastSyncDate = lastSync ? parseDbTimestamp(lastSync) : null;
   return {
     hasAnySyncRun: (row?.totalSyncRuns ?? 0) > 0,
     lastSuccessfulSyncAt:
