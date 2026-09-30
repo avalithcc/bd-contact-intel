@@ -1596,6 +1596,10 @@ export const en = {
     filtersClearAll: "Clear all",
     filterChipActiveNoValue: "Active",
     filterRemoveLabel: "Remove filter",
+    // "Hide No-priorizar role groups by default" chip (owner decision
+    // 2026-09-30, "opción A") — roleVisibility.ts.
+    hiddenRolesChipLabel: "Hidden",
+    showAllRolesLabel: "Show all",
     filterCompanyLabel: "Company",
     filterHiringLabel: "Hiring for open roles",
     filterStartupLabel: "Startup",

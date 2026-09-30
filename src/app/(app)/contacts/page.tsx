@@ -35,6 +35,8 @@ import {
 import { parseContactSort, type ContactSortKey } from "@/lib/contacts/sort";
 import { buildActiveFilterChips } from "@/lib/contacts/filterChips";
 import { splitViewTabs, type ViewTabItem } from "@/lib/contacts/viewTabs";
+import { resolveRoleVisibility, SHOW_ALL_ROLES_PARAM_VALUE } from "@/lib/contacts/roleVisibility";
+import { ROLE_GROUP_PLAYBOOK, PRIORITY_BADGE_CLASS } from "@/lib/roleGroupPlaybook";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { LinkPendingDot } from "./LinkPendingDot";
 import { FilterMenu } from "./FilterMenu";
@@ -60,7 +62,7 @@ import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { generateOutreachMessage } from "../outreach/actions";
-import { TableIcon, BoardIcon } from "@/components/icons";
+import { TableIcon, BoardIcon, InfoIcon } from "@/components/icons";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +110,9 @@ interface ContactsPageProps {
     startupsOnly?: string;
     name?: string;
     sort?: string;
+    // "Ocultar grupos No priorizar por defecto" (owner decision 2026-09-30,
+    // "opción A") — the only escape hatch, `?roles=all` (roleVisibility.ts).
+    roles?: string;
   }>;
 }
 
@@ -342,6 +347,18 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     lastActivityDays: sp.lastActivityDays,
   });
 
+  // "Ocultar grupos No priorizar por defecto" (owner decision 2026-09-30,
+  // "opción A") — resolved once, off the FINAL effective filters (so picking
+  // "Grupo de rol: Desarrolladores" from the ad-hoc panel always overrides
+  // the default, regardless of view/system-view/saved-view origin), then
+  // threaded through every read below (page query, count query, view-tab
+  // badges) and the "Exportar"/CSV href, so none of them can disagree on
+  // which rows are hidden. Never applied to the Outreach view (a separate
+  // hiring-crossover read, outreachViewDb.ts) or to bulk "select all N
+  // filtered" actions (bulkActions.ts/bulkMessageActions.ts) — task brief
+  // scope is the list default only.
+  const roleVisibility = resolveRoleVisibility(sp.roles, effectiveFilters.roleGroup);
+
   // Column picker (task 13.1): a `?columns=` query override wins (used by
   // system views, which have no DB row to persist onto); otherwise a saved
   // view's persisted `columns` (design D7); otherwise the default set.
@@ -389,9 +406,21 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const [listPage, systemViewCounts, boardColumns, outreachPage] = await Promise.all([
     isOutreachView || isBoard
       ? null
-      : getContactListPage(effectiveFilters, me.id, sp.q, page, PAGE_SIZE, dict, sort, hiringKeys),
-    getSystemViewCounts(me.id, hiringKeys),
-    isBoard ? getContactBoardColumns(effectiveFilters, me.id, sp.q, dict, hiringKeys) : null,
+      : getContactListPage(
+          effectiveFilters,
+          me.id,
+          sp.q,
+          page,
+          PAGE_SIZE,
+          dict,
+          sort,
+          hiringKeys,
+          roleVisibility.hiddenRoleGroups,
+        ),
+    getSystemViewCounts(me.id, hiringKeys, roleVisibility.hiddenRoleGroups),
+    isBoard
+      ? getContactBoardColumns(effectiveFilters, me.id, sp.q, dict, hiringKeys, roleVisibility.hiddenRoleGroups)
+      : null,
     isOutreachView
       ? getOutreachContactsPage(me.id, outreachFilters, page, PAGE_SIZE, relTime, dict)
       : null,
@@ -428,7 +457,21 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     if (sp.bdConnected !== undefined) params.set("bdConnected", sp.bdConnected);
     if (sp.lastActivityDays !== undefined) params.set("lastActivityDays", sp.lastActivityDays);
     if (sp.sort !== undefined) params.set("sort", sp.sort);
+    if (sp.roles !== undefined) params.set("roles", sp.roles);
     return params;
+  }
+
+  // "Mostrar todos" (roleVisibility.ts) — sets the one escape-hatch param,
+  // on top of every other currently-active ad-hoc filter/sort/layout, same
+  // "preserve everything else" convention as pageHref/layoutHref below.
+  function showAllRolesHref(): string {
+    const params = withAdHocFilterParams(new URLSearchParams());
+    params.set("view", activeView.viewKey);
+    if (sp.q) params.set("q", sp.q);
+    if (sp.layout) params.set("layout", sp.layout);
+    if (sp.columns) params.set("columns", sp.columns);
+    params.set("roles", SHOW_ALL_ROLES_PARAM_VALUE);
+    return `/contacts?${params.toString()}`;
   }
 
   // FilterMenu.tsx builds its own per-field "remove" hrefs from
@@ -489,6 +532,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     if (sp.q) params.set("q", sp.q);
     params.set("sort", sort);
     if (visibleColumns.length) params.set("columns", visibleColumns.join(","));
+    // CSV export must respect exactly what the list shows (task brief) — the
+    // "Ocultos"/"Mostrar todos" state is the one filter `ContactFilters`
+    // itself doesn't carry (roleVisibility.ts is deliberately NOT part of
+    // the saved-view-persisted shape), so it rides along explicitly here.
+    if (sp.roles !== undefined) params.set("roles", sp.roles);
     return `/contacts/export?${params.toString()}`;
   }
 
@@ -752,6 +800,50 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             <Link href={clearAllFiltersHref()} className="btn btn-ghost btn-sm">
               {l.filtersClearAll}
             </Link>
+          )}
+          {roleVisibility.isDefaultActive && (
+            <>
+              <span className="dropdown">
+                <span className="chip">
+                  <span className="chip-target">
+                    <span className="k">{l.hiddenRolesChipLabel}:</span>{" "}
+                    {roleVisibility.hiddenRoleGroups
+                      .map((key) => dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key)
+                      .join(", ")}
+                  </span>
+                </span>
+                <details className="dropdown">
+                  <summary
+                    className="btn btn-ghost btn-sm btn-icon"
+                    aria-label={dict.common.roleGroupFilterHintLabel}
+                    title={dict.common.roleGroupFilterHintLabel}
+                  >
+                    <InfoIcon className="icon" />
+                  </summary>
+                  <div className="menu left" style={{ width: 280 }}>
+                    <div className="menu-label">{dict.common.roleGroupFilterHintMenuLabel}</div>
+                    {roleVisibility.hiddenRoleGroups.map((key) => {
+                      const entry = ROLE_GROUP_PLAYBOOK[key];
+                      return (
+                        <a key={key} className="menu-item" href={`/playbook#${key}`}>
+                          <span className={`${PRIORITY_BADGE_CLASS[entry.priority]} no-dot`}>
+                            {entry.priorityLabel}
+                          </span>
+                          {dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key}
+                        </a>
+                      );
+                    })}
+                    <div className="menu-sep" />
+                    <a className="menu-item" href="/playbook">
+                      {dict.common.roleGroupFilterGuideLink}
+                    </a>
+                  </div>
+                </details>
+              </span>
+              <Link href={showAllRolesHref()} className="btn btn-ghost btn-sm">
+                {l.showAllRolesLabel}
+              </Link>
+            </>
           )}
           {!isBoard && (
             <>

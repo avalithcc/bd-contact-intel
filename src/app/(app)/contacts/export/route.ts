@@ -23,6 +23,7 @@ import { sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { sanitizeColumnKeys } from "@/lib/contacts/columns";
 import { parseContactFilters } from "@/lib/contacts/viewFilters";
 import { parseContactSort } from "@/lib/contacts/sort";
+import { resolveRoleVisibility } from "@/lib/contacts/roleVisibility";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { buildContactsCsv, CSV_BOM, mapContactRowToExportRow, type ContactCsvHeaders } from "@/lib/contacts/csvExport";
 import { getDictionary } from "@/lib/i18n/server";
@@ -65,7 +66,22 @@ export async function GET(request: Request): Promise<Response> {
     const q = searchParams.get("q") ?? undefined;
     const sort = parseContactSort(searchParams.get("sort") ?? undefined);
     const hiringKeys = await getHiringCompanyKeys();
-    const page = await getContactListPage(filters, me.id, q, 1, MAX_VIEW_EXPORT_ROWS, dict, sort, hiringKeys);
+    // Same "Ocultos"/"Mostrar todos" resolution as the list page (task
+    // brief: "The CSV export must respect the current filter exactly as the
+    // list shows it") — the toolbar's "Exportar" link forwards `?roles=`
+    // straight through (page.tsx toolbarExportHref).
+    const roleVisibility = resolveRoleVisibility(searchParams.get("roles") ?? undefined, filters.roleGroup);
+    const page = await getContactListPage(
+      filters,
+      me.id,
+      q,
+      1,
+      MAX_VIEW_EXPORT_ROWS,
+      dict,
+      sort,
+      hiringKeys,
+      roleVisibility.hiddenRoleGroups,
+    );
     truncated = page.total > MAX_VIEW_EXPORT_ROWS;
     return page.rows;
   })();
