@@ -13,7 +13,7 @@
 import { and, asc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, company, followUpQueueItem, person } from "@/db/schema";
-import { addDaysToDateString, argentinaCalendarDate, argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
+import { addDaysToDateString, argentinaCalendarDate, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import { WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 import { buildFollowUpInsertQuery } from "@/lib/followUp/candidateQuery";
 
@@ -53,9 +53,20 @@ export interface FollowUpQueueRow {
  * as every other "worked" signal in this app is contact-scoped, not
  * actor-scoped. `WORKED_ACTIVITY_TYPES` (queueSelection.ts) still gates
  * which activity types count.
+ *
+ * Bug fixed here (2026-09-30, launch-readiness audit): this used to bound
+ * `workedAt` — a REAL instant — against `argentinaDayBoundaries(now)`'s
+ * `todayStartUtc`/`tomorrowStartUtc`, which are the naive 00:00-UTC scheme
+ * built only for `due_at` (see argentinaDate.ts's module doc comment). ART
+ * is UTC-3, so an activity logged between ~21:00 and 24:00 ART landed AFTER
+ * `tomorrowStartUtc` (tomorrow's date at 00:00 UTC is only 21:00 ART) and
+ * failed this window entirely — the BD's own just-logged activity still
+ * showed as "not worked today". Fixed by switching to
+ * `argentinaInstantDayWindow`, the shared real-instant window helper also
+ * used by `appShellBadgeCounts.ts`'s follow-up badge subquery.
  */
 function workedTodayExists(now: Date) {
-  const { todayStartUtc, tomorrowStartUtc } = argentinaDayBoundaries(now);
+  const { fromUtc, toUtc } = argentinaInstantDayWindow(now);
   const workedAt = workedTodayAtSql();
   return exists(
     db
@@ -65,8 +76,8 @@ function workedTodayExists(now: Date) {
         and(
           eq(activity.personId, followUpQueueItem.personId),
           inArray(activity.type, [...WORKED_ACTIVITY_TYPES]),
-          sql`${workedAt} >= ${todayStartUtc.toISOString()}::timestamptz`,
-          sql`${workedAt} < ${tomorrowStartUtc.toISOString()}::timestamptz`,
+          sql`${workedAt} >= ${fromUtc.toISOString()}::timestamptz`,
+          sql`${workedAt} < ${toUtc.toISOString()}::timestamptz`,
         ),
       ),
   );

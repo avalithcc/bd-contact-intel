@@ -17,7 +17,11 @@
  *   `isNull(person.mergedIntoId)` join filter — without this, a merged
  *   person could inflate the badge past what the page itself shows). Never
  *   materializes an un-materialized day (reads 0 rows -> 0 for free),
- *   matching the original function's contract.
+ *   matching the original function's contract. Its "worked today" window
+ *   uses `workedTodayFromIso`/`workedTodayToIso` (real-instant
+ *   `argentinaInstantBoundary` bounds), a DIFFERENT pair from
+ *   `tomorrowStartUtcIso` (naive `due_at` bound) — see each param's own
+ *   comment; this split IS the fix for the 2026-09-30 day-boundary bug.
  *
  * Schema-only import (no `@/db` client) so this stays importable — and this
  * file's own test stays runnable — without a live DATABASE_URL, same
@@ -52,17 +56,33 @@ export interface AppShellBadgeCountsQueryParams {
   bdId: string;
   /** ART calendar date (`YYYY-MM-DD`) for the follow-up queue lookup. */
   queueDate: string;
-  /** `getTaskBadgeCount`'s `before` boundary — tomorrow's ART calendar date at 00:00 UTC. */
+  /**
+   * `getTaskBadgeCount`'s `before` boundary — tomorrow's ART calendar date at
+   * 00:00 UTC (naive `due_at` scheme, `argentinaDayBoundaries`). Bounds
+   * `task.due_at` ONLY — never reuse this for the "worked today" instant
+   * window below (see that param's own comment and
+   * src/lib/tasks/argentinaDate.ts's module doc comment).
+   */
   tomorrowStartUtcIso: string;
-  /** ART calendar-day boundaries for "worked today" (queueQueries.ts#workedTodayExists). */
-  todayStartUtcIso: string;
+  /**
+   * Real-instant "worked today" window (queueQueries.ts#workedTodayExists),
+   * from `argentinaInstantBoundary` — the actual UTC instant ART midnight
+   * falls on. Bounds `activity`'s real timestamp expression, NOT
+   * `task.due_at`. Deliberately separate from `tomorrowStartUtcIso` above:
+   * that one is the naive 00:00-UTC `due_at` boundary and is >=3h off from
+   * ART midnight, which is exactly the bug this pair of params fixes (an
+   * activity logged 21:00-24:00 ART used to fail this window).
+   */
+  workedTodayFromIso: string;
+  workedTodayToIso: string;
 }
 
 export function buildAppShellBadgeCountsQuery({
   bdId,
   queueDate,
   tomorrowStartUtcIso,
-  todayStartUtcIso,
+  workedTodayFromIso,
+  workedTodayToIso,
 }: AppShellBadgeCountsQueryParams) {
   const workedTypes = sql.join(
     [...WORKED_ACTIVITY_TYPES].map((t) => sql`${t}`),
@@ -99,8 +119,8 @@ export function buildAppShellBadgeCountsQuery({
             select 1 from ${activity}
             where activity.person_id = follow_up_queue_item.person_id
               and activity.type in (${workedTypes})
-              and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} >= ${todayStartUtcIso}::timestamptz
-              and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} < ${tomorrowStartUtcIso}::timestamptz
+              and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} >= ${workedTodayFromIso}::timestamptz
+              and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} < ${workedTodayToIso}::timestamptz
           )
       ) as follow_up_count,
       (

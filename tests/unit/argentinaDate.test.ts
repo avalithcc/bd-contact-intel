@@ -11,6 +11,7 @@ import {
   argentinaCalendarDate,
   argentinaDayBoundaries,
   argentinaInstantBoundary,
+  argentinaInstantDayWindow,
   formatTaskDueDate,
   taskDueDate,
 } from "@/lib/tasks/argentinaDate";
@@ -122,4 +123,51 @@ test("production values: due today/yesterday/tomorrow classify correctly across 
   const bAfterRollover = argentinaDayBoundaries(nowJustAfterMidnight);
   assert.equal(bAfterRollover.today, "2026-09-30");
   assert.equal(taskDueDate(dueTomorrow), bAfterRollover.today);
+});
+
+/**
+ * Pins the exact production bug (launch-readiness audit, 2026-09-30):
+ * `workedTodayExists` (queueQueries.ts) and the follow-up badge subquery
+ * (appShellBadgeCountsQuery.ts) bound a REAL instant against
+ * `argentinaDayBoundaries`'s naive 00:00-UTC scheme instead of
+ * `argentinaInstantDayWindow`'s real ART-midnight instants. A BD logging an
+ * activity between ~21:00 and 24:00 ART had it wrongly excluded from
+ * "today". These tests must pass under BOTH `TZ=UTC` and
+ * `TZ=America/Argentina/Buenos_Aires` — every instant below is constructed
+ * from an explicit ISO UTC string, and every boundary function is
+ * documented to use UTC getters only, so the calling process's own
+ * timezone must never change the result.
+ */
+test("argentinaInstantDayWindow: a real instant at 22:00 ART counts inside that ART day's window", () => {
+  // "now" is 23:00 ART on 2026-09-29 (page load / badge read time).
+  const now = new Date("2026-09-30T02:00:00Z");
+  // The activity itself was logged at 22:00 ART on 2026-09-29.
+  const activityAt = new Date("2026-09-30T01:00:00Z");
+  const { fromUtc, toUtc } = argentinaInstantDayWindow(now);
+  assert.ok(activityAt >= fromUtc && activityAt < toUtc, "22:00 ART activity must count as worked today");
+});
+
+test("argentinaInstantDayWindow: a real instant at 22:00 ART YESTERDAY does not count as today", () => {
+  // "now" is 10:00 ART on 2026-09-30 — the calendar day has rolled over.
+  const now = new Date("2026-09-30T13:00:00Z");
+  // The activity was logged at 22:00 ART on 2026-09-29 (yesterday).
+  const activityAt = new Date("2026-09-30T01:00:00Z");
+  const { fromUtc, toUtc } = argentinaInstantDayWindow(now);
+  assert.ok(
+    !(activityAt >= fromUtc && activityAt < toUtc),
+    "yesterday's 22:00 ART activity must NOT count as today's",
+  );
+});
+
+test("regression guard: the naive due_at boundary (argentinaDayBoundaries) misclassifies the same 22:00 ART instant that argentinaInstantDayWindow gets right", () => {
+  const now = new Date("2026-09-30T02:00:00Z"); // 23:00 ART, still the 29th
+  const activityAt = new Date("2026-09-30T01:00:00Z"); // 22:00 ART, the 29th
+
+  const naive = argentinaDayBoundaries(now);
+  const naiveCounts = activityAt >= naive.todayStartUtc && activityAt < naive.tomorrowStartUtc;
+  assert.equal(naiveCounts, false, "documents the bug: the naive due_at boundary excludes this instant");
+
+  const { fromUtc, toUtc } = argentinaInstantDayWindow(now);
+  const instantCounts = activityAt >= fromUtc && activityAt < toUtc;
+  assert.equal(instantCounts, true, "the real-instant window correctly includes this instant");
 });

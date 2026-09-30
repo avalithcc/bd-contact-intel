@@ -6,7 +6,7 @@
  * queueQueries.ts).
  */
 import { db } from "@/db";
-import { argentinaCalendarDate, argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
+import { argentinaCalendarDate, argentinaDayBoundaries, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import { buildAppShellBadgeCountsQuery } from "@/lib/shell/appShellBadgeCountsQuery";
 import { shouldShowReconnectBanner } from "@/lib/gmail/reconnectBannerState";
 
@@ -32,13 +32,22 @@ interface EmailAccountBannerState {
  */
 export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<AppShellBadgeCounts> {
   const queueDate = argentinaCalendarDate(now);
-  const { todayStartUtc, tomorrowStartUtc } = argentinaDayBoundaries(now);
+  // `due_at` bound (task_count) — naive 00:00-UTC scheme, unrelated to real
+  // instants.
+  const { tomorrowStartUtc } = argentinaDayBoundaries(now);
+  // "Worked today" bound (follow_up_count) — real-instant ART midnight,
+  // the SAME shared helper queueQueries.ts#workedTodayExists uses, and
+  // deliberately a separate computation from the one above (fix for the
+  // 2026-09-30 day-boundary bug: reusing the naive due_at boundary here
+  // failed a 21:00-24:00 ART activity's own "worked today" window).
+  const { fromUtc: workedTodayFrom, toUtc: workedTodayTo } = argentinaInstantDayWindow(now);
   const [row] = (await db.execute(
     buildAppShellBadgeCountsQuery({
       bdId,
       queueDate,
       tomorrowStartUtcIso: tomorrowStartUtc.toISOString(),
-      todayStartUtcIso: todayStartUtc.toISOString(),
+      workedTodayFromIso: workedTodayFrom.toISOString(),
+      workedTodayToIso: workedTodayTo.toISOString(),
     }),
   )) as unknown as {
     task_count: number;
