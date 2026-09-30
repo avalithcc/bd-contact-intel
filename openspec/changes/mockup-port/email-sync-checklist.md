@@ -25,7 +25,8 @@ Columns: element | mockup ref | status | evidence | notes
 | "truncated" note | brief (`body_truncated`) | done | Timeline.tsx | Shown when `bodyTruncated` true on a message. |
 | Bodies loaded on demand (no initial round trip) | task brief §1 | done | src/app/(app)/contacts/[id]/actions.ts `getThreadBodiesAction`, Timeline.tsx (fetch on expand) | See "New DB reads" in the report. |
 | Collapsed thread, "Deducido" badge | email-sync.html:178-181 | done | Timeline.tsx | Reuses existing `inferredBadge` label + `.badge-probable` class (decision 1, already used for "Probable" match confidence). |
-| Locked thread (another BD's) | email-sync.html:184-187 | done | Timeline.tsx (pre-existing `.locked` branch) | Unchanged privacy gate, now also covers `reply_received`. |
+| Locked thread (another BD's), names the owner | email-sync.html:184-187 | done | Timeline.tsx (`renderEmailThreadCard`'s locked branch) | Owner feedback (2026-10-01): now reads the owning BD's name off the thread's own (unredacted) `actorName` and renders "Este hilo pertenece a {name}. ... privado para {name} (y los administradores)." — matches the mockup verbatim instead of the generic locked copy. |
+| Company timeline locked rows also name the owner | (consistency, not in this mockup) | done | src/lib/companies/timelineView.ts, tests/unit/companyTimelineView.test.ts | Owner feedback (2026-10-01): a company-scoped locked `email_sent` row's headline now reads "{type} · {actorName}" instead of the bare type label, matching the contact record's own locked-row identity. |
 | Record note describing the 3 threads | email-sync.html:115 | deviation | — | Mockup-only annotation text about the demo dataset; not real product copy, intentionally not built. |
 | Right pane "Historial de conversaciones" card | email-sync.html:192-198 | done (pre-existing) | src/app/(app)/contacts/[id]/page.tsx (assoc card) | Unchanged by this task. |
 
@@ -52,6 +53,7 @@ Columns: element | mockup ref | status | evidence | notes
 | Chip list (address/domain, with remove ×) | email-sync.html:309-313 | done | page.tsx, src/app/(app)/account/email/never-log/actions.ts (`removeNeverLogEntryAction`, pre-existing in neverLogActions.ts) | |
 | Add form (Tipo select + Valor input) | email-sync.html:315-319 | done | page.tsx | |
 | Help text re: exact-domain matching | README.md (neverLogRules.ts TODO) | done | page.tsx copy + src/lib/gmail/neverLogRules.ts validation | Copy states domains match exactly, no subdomains. |
+| Subtitle states the whole-message exclusion rule | owner feedback 2026-10-01 | done | src/lib/i18n/dictionaries/es.ts/en.ts `accountEmailNeverLog.subtitle` | "Si un correo incluye alguna de estas direcciones o dominios, no se registra en el CRM." The matching backend change (any participant match suppresses the WHOLE message, not just its own side) ships on a separate branch (`classify.ts`) — not touched here. |
 | Help text re: own-domain default | email-sync.html:320 | deviation | page.tsx (omitted) | The app has no code path that auto-excludes `avalith.net` by default (verified: `classify.ts` has no such rule) — this looks like flavor copy for the mockup's own example data, not a real default. Flagged for the owner: either (a) approve seeding each BD's list with their own email domain at account-connect time, or (b) drop this line. Not built either way to avoid inventing an unapproved business rule. |
 | Empty state (icon + copy + inline form) | email-sync.html:323-332 | done | page.tsx | |
 | Input validation (empty / malformed address / malformed domain) | brief | done | src/lib/gmail/neverLogRules.ts (`validateNeverLogInput`) | Unit tested. |
@@ -66,3 +68,27 @@ Columns: element | mockup ref | status | evidence | notes
 | Close (×) button | email-sync.html:372 | done | ReconnectBanner.tsx, src/app/(app)/account/email/connectionActions.ts (`dismissReconnectBannerAction`) | Persisted server-side (decision 5) via `email_account.reconnect_banner_dismissed_at`, not `localStorage` — survives across devices, one nullable timestamp column, no new table. |
 | Shown once per BD until reconnect/dismiss | README.md decision 5 | done | src/lib/gmail/reconnectBannerState.ts (pure), src/lib/shell/appShellBadgeCountsQuery.ts (piggybacked) | Derived from the SAME single round-trip query the shell already runs for the task/follow-up badges — no added round trip (see report). |
 | Shown above any shell page | email-sync.html:374 (screen note) | done | src/app/(app)/layout.tsx | |
+
+## Deviations needing an owner decision
+
+1. **Thread default state.** The mockup shows thread 1 fully expanded by
+   default; the task brief explicitly requires bodies to load on demand
+   only when a thread is expanded (no round trip on page load). Every
+   thread (including a "Deducido" one) is therefore collapsed by default
+   with a "Ver mensajes"/"Ocultar mensajes" toggle not drawn in the static
+   mockup — required by the brief's own performance rule, not a silent
+   omission.
+2. **"Nunca registrar" own-domain default help line** — see the row above.
+3. **First-sync progress bar** — see the "c) First-sync-in-progress" row
+   above; the brief's own text explicitly authorizes falling back to
+   indeterminate copy when a real percentage isn't knowable.
+
+## Screenshots
+
+`src/app/login-email-sync-probe/` (deleted before this branch was done) —
+static, hand-copied markup for all 4 screens using the SAME classes/
+components the real pages render, so a screenshot is pixel-equivalent
+without a live `DATABASE_URL`. Compared against the pre-existing
+`screenshoots/email-sync-{1..4}-*.png` mockup reference shots; saved as
+`screenshoots/email-sync-impl-*.png` (full page + one crop per screen/
+state).
