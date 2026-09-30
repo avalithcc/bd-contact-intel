@@ -8,10 +8,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import {
+  buildMeetingsDrilldownQuery,
   buildReportAggregatesQuery,
   buildReportPerBdQuery,
+  buildWonCompaniesDrilldownQuery,
+  type MeetingsDrilldownParams,
   type ReportAggregatesParams,
   type ReportPerBdParams,
+  type WonCompaniesDrilldownParams,
 } from "@/lib/reports/queries";
 
 const dialect = new PgDialect();
@@ -131,4 +135,68 @@ test("buildReportPerBdQuery: nullable bd filter applies to actor_bd_id, assigned
 test("buildReportPerBdQuery params round-trip with a real bd id (not always null)", () => {
   const { params } = renderPerBd({ ...PER_BD_PARAMS, bdId: "00000000-0000-0000-0000-000000000001" });
   assert.ok(params.includes("00000000-0000-0000-0000-000000000001"));
+});
+
+test("buildReportAggregatesQuery: bd_options is an UNFILTERED json_agg of every bd (bug fix — the dropdown must never lose the other BDs once one is selected)", () => {
+  const { sql } = renderAgg({ ...AGG_PARAMS, bdId: "00000000-0000-0000-0000-000000000001" });
+  const optionsSection = sql.slice(sql.indexOf("rpt_bd_options"), sql.indexOf("rpt_bd_options") + 200);
+  assert.match(optionsSection, /select bd\.id as pbc_id, bd\.name as pbc_name/i);
+  assert.doesNotMatch(optionsSection, /\$\d+::uuid/i, "bd_options must not filter by bdId");
+  assert.match(sql, /as bd_options/i);
+});
+
+function renderWon(params: WonCompaniesDrilldownParams) {
+  return dialect.sqlToQuery(buildWonCompaniesDrilldownQuery(params));
+}
+
+test("buildWonCompaniesDrilldownQuery: filters relationship_stage='won' and the nullable bd filter applies to company.owner_bd_id", () => {
+  const { sql } = renderWon({ bdId: null });
+  assert.match(sql, /company\.relationship_stage = 'won'/i);
+  assert.match(sql, /\$\d+::uuid is null or company\.owner_bd_id = \$\d+::uuid/i);
+});
+
+test("buildWonCompaniesDrilldownQuery: never filters by period (decision 7 consistency — see wonCompaniesDrilldown.ts)", () => {
+  const { sql } = renderWon({ bdId: null });
+  assert.doesNotMatch(sql, /created_at >= /i);
+});
+
+test("buildWonCompaniesDrilldownQuery: the won_at activity scan is a correlated EXISTS against rpt_won_companies, not an unbounded activity scan", () => {
+  const { sql } = renderWon({ bdId: null });
+  assert.match(sql, /exists \(select 1 from rpt_won_companies where rpt_won_companies\.pbc_company_key = activity\.company_key\)/i);
+  assert.match(sql, /activity\.type = 'status_change'/i);
+  assert.match(sql, /activity\.metadata->>'status' = 'won'/i);
+});
+
+test("buildWonCompaniesDrilldownQuery: bounded with a LIMIT", () => {
+  const { sql } = renderWon({ bdId: null });
+  assert.match(sql, /limit \$\d+/i);
+});
+
+function renderMeetings(params: MeetingsDrilldownParams) {
+  return dialect.sqlToQuery(buildMeetingsDrilldownQuery(params));
+}
+
+const MEETINGS_PARAMS: MeetingsDrilldownParams = {
+  fromIso: "2026-09-01T03:00:00.000Z",
+  toIso: "2026-09-30T14:00:00.000Z",
+  bdId: null,
+};
+
+test("buildMeetingsDrilldownQuery: filters type='meeting_logged', excludes merged persons, and the nullable bd filter applies to activity.actor_bd_id", () => {
+  const { sql } = renderMeetings(MEETINGS_PARAMS);
+  assert.match(sql, /activity\.type = 'meeting_logged'/i);
+  assert.match(sql, /person\.merged_into_id is null/i);
+  assert.match(sql, /\$\d+::uuid is null or activity\.actor_bd_id = \$\d+::uuid/i);
+});
+
+test("buildMeetingsDrilldownQuery: scopes by effectiveActivityAtSql (status_backfill honored) for the period bounds", () => {
+  const { sql } = renderMeetings(MEETINGS_PARAMS);
+  assert.match(sql, /when "activity"\."type" = .status_backfill./i);
+  assert.match(sql, /end\) >= \$\d+::timestamptz/i);
+  assert.match(sql, /end\) < \$\d+::timestamptz/i);
+});
+
+test("buildMeetingsDrilldownQuery: bounded with a LIMIT", () => {
+  const { sql } = renderMeetings(MEETINGS_PARAMS);
+  assert.match(sql, /limit \$\d+/i);
 });

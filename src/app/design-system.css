@@ -622,6 +622,11 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .stat.warn { border-top: 3px solid var(--color-warn); }
 .stat.info { border-top: 3px solid var(--color-info); }
 .stat.neutral { border-top: 3px solid var(--color-ink-muted); }
+/* Clickable KPI drilldown (reports-bd-filter-drilldown): a `<button>` reusing
+   the exact `.stat` look, reset to remove native button chrome so it stays
+   visually identical to every other (non-clickable) stat tile until hovered. */
+.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; }
+.stat-clickable:hover, .stat-clickable:focus-visible { border-color: var(--color-accent-strong); }
 .bar-track { height: 8px; border-radius: var(--radius-pill); background: var(--color-surface-sunken); overflow: hidden; display: flex; }
 .bar-track span { display: block; height: 100%; }
 .bar-success { background: var(--color-success); } .bar-warn { background: var(--color-warn); } .bar-info { background: var(--color-info); } .bar-neutral { background: var(--color-ink-muted); }

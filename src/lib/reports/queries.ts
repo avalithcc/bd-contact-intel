@@ -81,6 +81,12 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
       from rpt_person_scope
       group by rpt_person_scope.source_key, rpt_person_scope.status
     ),
+    -- BD filter semantics, documented per the reports-bd-filter-drilldown
+    -- audit: "Descartes por motivo" is scoped by the discarded PERSON's
+    -- owner (person.owner_bd_id), the same convention rpt_person_scope
+    -- above and rpt_funnel's own pbc_discarded use -- never the activity's
+    -- actor -- so this card's total always matches "Embudo de contactos"'s
+    -- own discarded count for the identical BD filter.
     rpt_discard_reasons as (
       select coalesce(activity.metadata->>'reason', '') as pbc_reason, count(*)::int as pbc_count
       from ${activity}
@@ -97,6 +103,10 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
       from ${company}
       where (${bdId}::uuid is null or company.owner_bd_id = ${bdId}::uuid)
       group by company.relationship_stage
+    ),
+    rpt_bd_options as (
+      select bd.id as pbc_id, bd.name as pbc_name
+      from ${bd}
     )
     select
       (select json_build_object(
@@ -108,7 +118,8 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
       ) from rpt_funnel) as funnel,
       coalesce((select json_agg(json_build_object('sourceKey', pbc_source_key, 'status', pbc_status, 'count', pbc_count)) from rpt_source_status), '[]'::json) as source_status,
       coalesce((select json_agg(json_build_object('reason', pbc_reason, 'count', pbc_count)) from rpt_discard_reasons), '[]'::json) as discard_reasons,
-      coalesce((select json_agg(json_build_object('stage', pbc_stage, 'count', pbc_count)) from rpt_pipeline), '[]'::json) as pipeline
+      coalesce((select json_agg(json_build_object('stage', pbc_stage, 'count', pbc_count)) from rpt_pipeline), '[]'::json) as pipeline,
+      coalesce((select json_agg(json_build_object('id', pbc_id, 'name', pbc_name) order by pbc_name) from rpt_bd_options), '[]'::json) as bd_options
   `;
 }
 
@@ -217,6 +228,15 @@ export interface ReportAggregatesResult {
   sourceStatus: { sourceKey: string | null; status: string; count: number }[];
   discardReasons: { reason: string; count: number }[];
   pipeline: { stage: string | null; count: number }[];
+  /**
+   * EVERY bd row (bug fix, reports-bd-filter-drilldown): the "Filtrar por
+   * BD" `<select>`'s options must never come from `perBd` (buildReportPerBdQuery's
+   * OWN rows are filtered by the SAME `bdId` this query is filtered by — once
+   * a BD is selected, every other BD used to disappear from the dropdown).
+   * Folded into this query's own json_agg (PERFORMANCE.md: no added round
+   * trip) rather than a 3rd statement.
+   */
+  bdOptions: { id: string; name: string }[];
 }
 
 export interface ReportPerBdRow {
@@ -232,4 +252,118 @@ export interface ReportPerBdRow {
   queuePostponed: number;
   queueSkipped: number;
   queueStillPending: number;
+}
+
+export interface WonCompaniesDrilldownParams {
+  bdId: string | null;
+}
+
+const WON_COMPANIES_DRILLDOWN_LIMIT = 500;
+
+/**
+ * "Empresas ganadas" KPI drilldown (reports-bd-filter-drilldown). BD-filtered
+ * only, deliberately NOT period-filtered — see wonCompaniesDrilldown.ts's
+ * doc comment for why (must stay consistent with the KPI's own decision-7
+ * snapshot count). `rpt_won_at` scans `activity` scoped down to only the
+ * companies already selected by `rpt_won_companies` (a correlated EXISTS,
+ * rule 7), reusing the existing `activity_company_idx`/`activity_type_idx`
+ * indexes rather than a full-table scan.
+ */
+export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownParams) {
+  return sql`
+    with rpt_won_companies as (
+      select
+        company.company_key as pbc_company_key,
+        company.display_name as pbc_display_name,
+        company.owner_bd_id as pbc_owner_bd_id,
+        company.updated_at as pbc_updated_at
+      from ${company}
+      where company.relationship_stage = 'won'
+        and (${bdId}::uuid is null or company.owner_bd_id = ${bdId}::uuid)
+    ),
+    rpt_won_at as (
+      select distinct on (activity.company_key)
+        activity.company_key as pbc_company_key,
+        activity.created_at as pbc_won_at
+      from ${activity}
+      where activity.type = 'status_change'
+        and activity.person_id is null
+        and activity.metadata->>'status' = 'won'
+        and exists (select 1 from rpt_won_companies where rpt_won_companies.pbc_company_key = activity.company_key)
+      order by activity.company_key, activity.created_at desc
+    )
+    select
+      rpt_won_companies.pbc_company_key as company_key,
+      rpt_won_companies.pbc_display_name as display_name,
+      rpt_won_companies.pbc_owner_bd_id as owner_bd_id,
+      bd.name as owner_bd_name,
+      coalesce(rpt_won_at.pbc_won_at, rpt_won_companies.pbc_updated_at) as won_at,
+      (rpt_won_at.pbc_won_at is not null) as won_at_exact
+    from rpt_won_companies
+    left join rpt_won_at on rpt_won_at.pbc_company_key = rpt_won_companies.pbc_company_key
+    left join ${bd} on bd.id = rpt_won_companies.pbc_owner_bd_id
+    order by won_at desc
+    limit ${WON_COMPANIES_DRILLDOWN_LIMIT}
+  `;
+}
+
+export type WonCompanyDrilldownRawResultRow = {
+  company_key: string;
+  display_name: string;
+  owner_bd_id: string | null;
+  owner_bd_name: string | null;
+  won_at: Date | string;
+  won_at_exact: boolean;
+}
+
+export interface MeetingsDrilldownParams {
+  fromIso: string;
+  toIso: string;
+  bdId: string | null;
+}
+
+const MEETINGS_DRILLDOWN_LIMIT = 500;
+
+/**
+ * "Reuniones agendadas" KPI drilldown (reports-bd-filter-drilldown).
+ * Actor-scoped (`activity.actor_bd_id`) and period-scoped
+ * (`effectiveActivityAtSql()`), matching this KPI's own definition exactly —
+ * see meetingsDrilldown.ts's doc comment for why this is actor-, not
+ * owner-, scoped.
+ */
+export function buildMeetingsDrilldownQuery({ fromIso, toIso, bdId }: MeetingsDrilldownParams) {
+  return sql`
+    select
+      activity.id as activity_id,
+      person.id as person_id,
+      person.first_name as person_first_name,
+      person.last_name as person_last_name,
+      person.company_key as company_key,
+      company.display_name as company_name,
+      activity.actor_bd_id as bd_id,
+      bd.name as bd_name,
+      ${effectiveActivityAtSql()} as meeting_at
+    from ${activity}
+    join ${person} on person.id = activity.person_id and person.merged_into_id is null
+    left join ${company} on company.company_key = person.company_key
+    left join ${bd} on bd.id = activity.actor_bd_id
+    where activity.type = 'meeting_logged'
+      and (${bdId}::uuid is null or activity.actor_bd_id = ${bdId}::uuid)
+      and ${effectiveActivityAtSql()} >= ${fromIso}::timestamptz
+      and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
+    order by meeting_at desc
+    limit ${MEETINGS_DRILLDOWN_LIMIT}
+  `;
+}
+
+export type MeetingDrilldownRawResultRow = {
+  activity_id: string;
+  person_id: string;
+  person_first_name: string | null;
+  person_last_name: string | null;
+  company_key: string | null;
+  company_name: string | null;
+  bd_id: string | null;
+  bd_name: string | null;
+  meeting_at: Date | string;
 }
