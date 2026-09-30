@@ -1,12 +1,12 @@
 /**
  * Timeline filter pills (mockup-port fix; contact-record.html:97-106's 8
  * pills). The product's filter grouping — NOT the raw `activity.type` DB
- * enum — is what the BD sees: `TIMELINE_ACTIVITY_TYPES` (queries.ts) has 13
- * values, 5 of which (`hunter_lookup`, `status_change`, `discarded`,
- * `status_backfill`, `event_attendance`) are internal/migration/bulk-import
- * evidence, never a team member's real-time action. Those 5 collapse behind
- * ONE "Sistema" pill so the migration artifact (`status_backfill` alone:
- * 3,517 rows in prod) never outranks real BD activity in the UI.
+ * enum — is what the BD sees: `TIMELINE_ACTIVITY_TYPES` (queries.ts) has 8
+ * values, 4 of which (`hunter_lookup`, `status_change`, `discarded`,
+ * `status_backfill`) are internal/migration evidence, never a team member's
+ * real-time action. Those 4 collapse behind ONE "Sistema" pill so the
+ * migration artifact (`status_backfill` alone: 3,517 rows in prod) never
+ * outranks real BD activity in the UI.
  *
  * No LinkedIn pill: LinkedIn ingestion is off (see chore/hide-linkedin-
  * imports) and this module doesn't reintroduce it.
@@ -53,9 +53,7 @@ export const TIMELINE_PILL_GROUPS: Record<TimelinePillKey, readonly string[]> = 
   // to a BD reading the timeline.
   email_sent: ["email_sent", "reply_received"],
   meeting_logged: ["meeting_logged"],
-  // `event_attendance` (DFF-2026 import) joined "system" here too — bulk-
-  // recorded event attendance, never a team member's real-time action.
-  system: ["hunter_lookup", "status_change", "discarded", "status_backfill", "event_attendance"],
+  system: ["hunter_lookup", "status_change", "discarded", "status_backfill"],
 };
 
 export function isTimelinePillKey(value: string): value is TimelinePillKey {

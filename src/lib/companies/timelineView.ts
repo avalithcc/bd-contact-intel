@@ -26,10 +26,6 @@ export interface CompanyTimelineViewLabels {
   atTaskUpdated: string;
   atTaskCompleted: string;
   atTaskReopened: string;
-  // DFF-2026 import (src/lib/dff2026/planImport.ts) — "what" headline and
-  // body prefix; event name always comes from the row's own metadata.
-  atEventAttendance: string;
-  eventAttendancePrefix: string;
   taskChangeFieldTitle: string;
   taskChangeFieldDue: string;
   taskChangeFieldAssignee: string;
@@ -87,8 +83,6 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atTaskCompleted;
     case "task_reopened":
       return l.atTaskReopened;
-    case "event_attendance":
-      return l.atEventAttendance;
     default:
       return type;
   }
@@ -106,14 +100,6 @@ function replyReceivedBody(metadata: Record<string, unknown>, l: CompanyTimeline
   const from = typeof metadata.from === "string" ? metadata.from : null;
   const parts = [subject, from].filter((v): v is string => Boolean(v));
   return parts.length > 0 ? parts.join(" · ") : l.atReplyReceivedDefault;
-}
-
-/** Same shape as the contact record's `event_attendance` case
- * (src/lib/contacts/timelineEntryBody.ts) — event name from metadata,
- * never hardcoded. */
-function eventAttendanceBody(metadata: Record<string, unknown>, l: CompanyTimelineViewLabels): string {
-  const eventName = typeof metadata.eventName === "string" ? metadata.eventName : null;
-  return eventName ? `${l.eventAttendancePrefix} ${eventName}` : l.eventAttendancePrefix;
 }
 
 function taskActivityViewBody(
@@ -205,11 +191,9 @@ export function buildCompanyTimelineViewRows(
         ? metadata.note
         : row.type === "reply_received"
           ? replyReceivedBody(metadata, labels)
-          : row.type === "event_attendance"
-            ? eventAttendanceBody(metadata, labels)
-            : TASK_ACTIVITY_TYPES_SET.has(row.type)
-              ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
-              : null;
+          : TASK_ACTIVITY_TYPES_SET.has(row.type)
+            ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
+            : null;
     return { ...row, what, body, visible, metadata: visible ? row.metadata : null };
   });
 }

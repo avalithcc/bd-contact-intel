@@ -200,7 +200,6 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   task_updated: "timelineFilterTaskUpdated",
   task_completed: "timelineFilterTaskCompleted",
   task_reopened: "timelineFilterTaskReopened",
-  event_attendance: "timelineFilterEventAttendance",
 };
 
 // contact-record.html's `.tl-icon`/`.tl-icon.{modifier}` per activity type
@@ -222,9 +221,6 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   task_updated: TasksIcon,
   task_completed: TasksIcon,
   task_reopened: TasksIcon,
-  // Same icon family as every other internal/system-generated entry
-  // (status_change/status_backfill) — no new icon for a bulk event import.
-  event_attendance: HistoryIcon,
 };
 
 const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
@@ -238,7 +234,6 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   task_updated: "system",
   task_completed: "system",
   task_reopened: "system",
-  event_attendance: "system",
 };
 
 // contact-record.html:97-106's 6 pills (Todo/Notas/Llamadas/Correos/

@@ -8,21 +8,18 @@
  */
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, auditLog, bd, company, companyAlias, person, personPropertyHistory } from "@/db/schema";
+import { auditLog, bd, company, companyAlias, person, personPropertyHistory } from "@/db/schema";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import type { AttendeeRecord } from "./buildAttendeeRecords";
 import {
   buildImportPlan,
-  DFF_2026_ATTENDANCE_ACTIVITY_TYPE,
-  DFF_2026_EVENT_NAME,
   DFF_2026_SOURCE_KEY,
   type DffAuditMetadata,
   type DffAuditRow,
   type DffImportPlan,
   type ExistingPersonForImport,
   type ImportContext,
-  type ImportScope,
 } from "./planImport";
 
 const MARIEL_EMAIL = "mariel.meza@avalith.net";
@@ -85,32 +82,17 @@ async function buildImportContext(tx: DbTransaction, records: readonly AttendeeR
     : [];
   const existingCompaniesByKey = new Map(companyRows.map((r) => [r.companyKey, r]));
 
-  const existingPersonIds = existingPersonsRows.map((r) => r.id);
-  const attendanceRows = existingPersonIds.length
-    ? await tx
-        .select({ personId: activity.personId })
-        .from(activity)
-        .where(
-          and(
-            eq(activity.type, DFF_2026_ATTENDANCE_ACTIVITY_TYPE),
-            sql`${activity.metadata} ->> 'source' = ${DFF_2026_SOURCE_KEY}`,
-            inArray(activity.personId, existingPersonIds),
-          ),
-        )
-    : [];
-  const existingAttendancePersonIds = new Set(attendanceRows.map((r) => r.personId).filter((id): id is string => !!id));
-
-  return { marielBdId, bdNamesById, existingPersonsByEmail, companyAliasByKey, existingCompaniesByKey, existingAttendancePersonIds };
+  return { marielBdId, bdNamesById, existingPersonsByEmail, companyAliasByKey, existingCompaniesByKey };
 }
 
 /** Read-only — the dry-run path. Wrapped in a transaction for the same
  * reason src/lib/hubspot/importQueries.ts#readExistingPersonsForHubSpotImport
  * is: it's the only way to hand `prefetchIdentityIndex`-style helpers a
  * `DbTransaction`, and reading inside a transaction is a no-op commit. */
-export async function dryRunDffImport(records: readonly AttendeeRecord[], scope: ImportScope): Promise<DffImportPlan> {
+export async function dryRunDffImport(records: readonly AttendeeRecord[]): Promise<DffImportPlan> {
   return db.transaction(async (tx) => {
     const ctx = await buildImportContext(tx, records);
-    return buildImportPlan(records, scope, ctx);
+    return buildImportPlan(records, ctx);
   });
 }
 
@@ -134,17 +116,16 @@ const TEXT_COLUMN_BY_PROPERTY: Record<string, string> = {
  * plan object from a separate dry-run invocation), then writes it all in
  * ONE transaction, batched (rule: "never row by row"): companies, then new
  * persons, then one batched `UPDATE ... FROM (VALUES ...)` for existing
- * persons, then person_property_history, then attendance activities, then a
- * checked postcondition, then one audit_log row.
+ * persons, then person_property_history, then a checked postcondition, then
+ * one audit_log row.
  */
 export async function executeDffImport(
   records: readonly AttendeeRecord[],
-  scope: ImportScope,
   actorBdId: string,
 ): Promise<ExecuteDffImportResult> {
   return db.transaction(async (tx) => {
     const ctx = await buildImportContext(tx, records);
-    const plan = buildImportPlan(records, scope, ctx);
+    const plan = buildImportPlan(records, ctx);
 
     for (const batch of chunk(plan.companiesToCreate, WRITE_BATCH_SIZE)) {
       if (batch.length) {
@@ -188,24 +169,6 @@ export async function executeDffImport(
       if (batch.length) await tx.insert(personPropertyHistory).values(batch);
     }
 
-    // The source file carries no per-attendee attendance date — `importedAt`
-    // is labeled as exactly that (when THIS script ran), never a stand-in
-    // for when the event actually happened, per owner instruction.
-    const importedAt = new Date().toISOString();
-    const attendanceRowsToInsert = plan.attendance.map((a) => ({
-      personId: a.personId,
-      actorBdId,
-      type: DFF_2026_ATTENDANCE_ACTIVITY_TYPE,
-      metadata: { source: DFF_2026_SOURCE_KEY, eventName: DFF_2026_EVENT_NAME, attended: true, importedAt },
-    }));
-    const attendanceActivityIds: string[] = [];
-    for (const batch of chunk(attendanceRowsToInsert, WRITE_BATCH_SIZE)) {
-      if (batch.length) {
-        const inserted = await tx.insert(activity).values(batch).returning({ id: activity.id });
-        attendanceActivityIds.push(...inserted.map((r) => r.id));
-      }
-    }
-
     // Owner reconfirmation (2026-09-30), checked postcondition, not assumed.
     const [{ count: badSourceKeyCount }] = (await tx.execute(sql`
       select count(*)::int as count from person
@@ -227,11 +190,9 @@ export async function executeDffImport(
 
     const metadata: DffAuditMetadata = {
       sourceKey: DFF_2026_SOURCE_KEY,
-      scope,
       createdPersonIds: plan.creates.map((c) => c.id!),
       updatedHistoryRows: historyRows,
       companiesCreated: plan.companiesToCreate.map((c) => c.companyKey),
-      attendanceActivityIds,
     };
     const [auditRow] = await tx.insert(auditLog).values({ actorBdId, action: DFF_2026_AUDIT_ACTION, metadata }).returning({ id: auditLog.id });
 
@@ -249,22 +210,16 @@ export interface ExecuteDffRevertResult {
   skippedByProperty: Record<string, number>;
   deletedPersonIds: string[];
   deletedCompanyKeys: string[];
-  deletedAttendanceActivityIds: string[];
 }
 
-/** Reverts exactly one audit row: deletes the activities/persons/companies
- * this run created, and restores every field it filled/reassigned on
- * pre-existing persons — re-checking, per batched field, that the current
- * value still equals what THIS run wrote before restoring it (a field a BD
- * has since edited again is left alone, not clobbered back). */
+/** Reverts exactly one audit row: deletes the persons/companies this run
+ * created, and restores every field it filled/reassigned on pre-existing
+ * persons — re-checking, per batched field, that the current value still
+ * equals what THIS run wrote before restoring it (a field a BD has since
+ * edited again is left alone, not clobbered back). */
 export async function executeDffRevert(auditRow: DffAuditRow, actorBdId: string): Promise<ExecuteDffRevertResult> {
   const m = auditRow.metadata;
   return db.transaction(async (tx) => {
-    const deletedAttendanceActivityIds = [...m.attendanceActivityIds];
-    for (const batch of chunk(m.attendanceActivityIds, WRITE_BATCH_SIZE)) {
-      if (batch.length) await tx.delete(activity).where(inArray(activity.id, batch));
-    }
-
     const byProperty = new Map<string, typeof m.updatedHistoryRows>();
     for (const h of m.updatedHistoryRows) {
       const list = byProperty.get(h.property) ?? [];
@@ -328,9 +283,9 @@ export async function executeDffRevert(auditRow: DffAuditRow, actorBdId: string)
     await tx.insert(auditLog).values({
       actorBdId,
       action: DFF_2026_AUDIT_REVERT_ACTION,
-      metadata: { revertedAuditLogId: auditRow.id, deletedPersonIds, deletedCompanyKeys, deletedAttendanceActivityIds, revertedByProperty, skippedByProperty },
+      metadata: { revertedAuditLogId: auditRow.id, deletedPersonIds, deletedCompanyKeys, revertedByProperty, skippedByProperty },
     });
 
-    return { revertedByProperty, skippedByProperty, deletedPersonIds, deletedCompanyKeys, deletedAttendanceActivityIds };
+    return { revertedByProperty, skippedByProperty, deletedPersonIds, deletedCompanyKeys };
   });
 }

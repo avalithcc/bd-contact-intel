@@ -28,34 +28,6 @@ import { classifyPosition } from "@/lib/roleGroups";
 import type { AttendeeRecord } from "./buildAttendeeRecords";
 
 export const DFF_2026_SOURCE_KEY = "dff-2026";
-export const DFF_2026_EVENT_NAME = "Digital Finance Forum 2026";
-/**
- * New activity type (justified, per task brief): none of the existing
- * types fit "this person registered for / attended one specific event" —
- * `note` is a WORKED_ACTIVITY_TYPES entry and would wrongly count a bulk
- * historical import as "worked today"; `status_backfill` is reserved for
- * status-cache reconstructions and carries `metadata.status` semantics this
- * import has no use for.
- *
- * Included in `NON_TOUCH_ACTIVITY_TYPES` (src/lib/contacts/
- * effectiveActivityTime.ts) so it never makes 700+ contacts look "active
- * today" in the last-activity column/sort/filter; simply never added to
- * `WORKED_ACTIVITY_TYPES` (src/lib/followUp/queueSelection.ts), so it
- * cannot count as "worked today" either (both pinned by
- * tests/unit/effectiveActivityTime.test.ts and tests/unit/
- * queueSelection.test.ts). `deriveStatus.ts` only recognizes types it
- * explicitly lists, so this contributes no stage/discard there either.
- *
- * VISIBLE on the contact and company record timelines (owner correction,
- * 2026-09-30 — the first cut left it un-renderable): listed in
- * `TIMELINE_ACTIVITY_TYPES` (src/lib/activity/queries.ts) and grouped under
- * the existing "Sistema" pill (`TIMELINE_PILL_GROUPS`, timelinePills.ts) —
- * a bulk-imported historical fact, not a BD's real-time action, same
- * bucket as `status_backfill`/`hunter_lookup`.
- */
-export const DFF_2026_ATTENDANCE_ACTIVITY_TYPE = "event_attendance";
-
-export type ImportScope = "all" | "attended";
 
 type HistoryRow = Omit<NewPersonPropertyHistory, "id" | "at">;
 
@@ -88,9 +60,6 @@ export interface ImportContext {
   /** `company_alias.alias_key` -> canonical `company_key`. */
   companyAliasByKey: ReadonlyMap<string, string>;
   existingCompaniesByKey: ReadonlyMap<string, ExistingCompanyForImport>;
-  /** person ids that already have an `event_attendance` row for this
-   * source_key — re-running the import must not duplicate it. */
-  existingAttendancePersonIds: ReadonlySet<string>;
 }
 
 export interface ExistingPersonUpdatePlan {
@@ -122,12 +91,10 @@ export interface SampleRow {
   email: string;
   company: string | null;
   jobTitle: string | null;
-  attended: boolean;
 }
 
 export interface ImportReport {
-  rowsInScope: number;
-  rowsExcludedByScope: number;
+  rowsProcessed: number;
   created: number;
   existingMatched: number;
   existingNewlyOwned: number;
@@ -138,8 +105,6 @@ export interface ImportReport {
   phonesWritten: number;
   phonesRejected: PhoneRejection[];
   phoneDigitLengthHistogram: Record<number, number>;
-  attendanceToRecord: number;
-  attendanceAlreadyRecorded: number;
   sample: SampleRow[];
 }
 
@@ -147,7 +112,6 @@ export interface DffImportPlan {
   creates: NewPerson[];
   updates: ExistingPersonUpdatePlan[];
   companiesToCreate: CompanyToCreate[];
-  attendance: { personId: string }[];
   report: ImportReport;
 }
 
@@ -269,7 +233,18 @@ function buildExistingUpdate(
   now: () => Date,
 ): ExistingPersonUpdatePlan {
   const mobilePhone = resolvePhone(record.mobilePhoneRaw, record.email, report);
-  const companyKey = record.companyRaw ? resolveCompanyKey(record.companyRaw, ctx, companiesToCreate, matchedCompanyKeys) : null;
+  // Review fix (orphan company rows): only resolve/queue a company for an
+  // EXISTING person when their companyKey is actually empty — mirrors the
+  // same fill-only-empty guard every other field here already applies.
+  // Resolving unconditionally would register a brand-new company in
+  // `companiesToCreate` (and count it in the dry-run report) even when
+  // `planHubSpotRefill`'s fillField was always going to decline to write it
+  // (existing.companyKey already has a value), leaving a permanent
+  // 0-contact "ghost" company row nobody ever links to.
+  const companyKey =
+    !existing.companyKey && record.companyRaw
+      ? resolveCompanyKey(record.companyRaw, ctx, companiesToCreate, matchedCompanyKeys)
+      : null;
 
   const refill = planHubSpotRefill(
     { ...existing, industry: null, city: null, country: null },
@@ -339,8 +314,7 @@ function buildExistingUpdate(
 
 function emptyReport(): ImportReport {
   return {
-    rowsInScope: 0,
-    rowsExcludedByScope: 0,
+    rowsProcessed: 0,
     created: 0,
     existingMatched: 0,
     existingNewlyOwned: 0,
@@ -351,54 +325,46 @@ function emptyReport(): ImportReport {
     phonesWritten: 0,
     phonesRejected: [],
     phoneDigitLengthHistogram: {},
-    attendanceToRecord: 0,
-    attendanceAlreadyRecorded: 0,
     sample: [],
   };
 }
 
+/**
+ * All rows are imported unconditionally (owner decision, 2026-09-30) — there
+ * is no scope/attendance concept here at all; see buildAttendeeRecords.ts
+ * for why the source file's ASISTIÓ column is never even read.
+ */
 export function buildImportPlan(
   records: readonly AttendeeRecord[],
-  scope: ImportScope,
   ctx: ImportContext,
   genId: () => string = randomUUID,
   now: () => Date = () => new Date(),
 ): DffImportPlan {
-  const inScope = scope === "attended" ? records.filter((r) => r.attended) : records;
   const companiesToCreate = new Map<string, CompanyToCreate>();
   const matchedCompanyKeys = new Set<string>();
   const report = emptyReport();
-  report.rowsInScope = inScope.length;
-  report.rowsExcludedByScope = records.length - inScope.length;
+  report.rowsProcessed = records.length;
 
   const creates: NewPerson[] = [];
   const updates: ExistingPersonUpdatePlan[] = [];
-  const attendance: { personId: string }[] = [];
 
-  for (const record of inScope) {
+  for (const record of records) {
     const existing = ctx.existingPersonsByEmail.get(record.emailNormalized);
     const effectiveJobTitle = existing ? existing.jobTitle || record.jobTitle : record.jobTitle;
     const roleGroup = classifyPosition(effectiveJobTitle);
     report.roleGroupDistribution[roleGroup] = (report.roleGroupDistribution[roleGroup] ?? 0) + 1;
 
-    let personId: string;
     if (existing) {
       const update = buildExistingUpdate(record, existing, ctx, companiesToCreate, matchedCompanyKeys, report, now);
       updates.push(update);
-      personId = existing.id;
       if (update.reassignedFromBdId) {
         report.existingReassignedFromOtherBd.push({ personId: existing.id, previousOwnerName: update.reassignedFromName! });
       } else if (!existing.ownerBdId) {
         report.existingNewlyOwned++;
       }
     } else {
-      personId = genId();
+      const personId = genId();
       creates.push(buildNewPerson(record, personId, ctx, companiesToCreate, matchedCompanyKeys, report));
-    }
-
-    if (record.attended) {
-      if (ctx.existingAttendancePersonIds.has(personId)) report.attendanceAlreadyRecorded++;
-      else attendance.push({ personId });
     }
 
     if (report.sample.length < SAMPLE_SIZE) {
@@ -409,29 +375,25 @@ export function buildImportPlan(
         email: record.email,
         company: record.companyRaw,
         jobTitle: effectiveJobTitle,
-        attended: record.attended,
       });
     }
   }
 
   report.created = creates.length;
   report.existingMatched = updates.length;
-  report.attendanceToRecord = attendance.length;
   report.companiesMatched = matchedCompanyKeys.size;
   report.companiesCreated = companiesToCreate.size;
 
-  return { creates, updates, companiesToCreate: [...companiesToCreate.values()], attendance, report };
+  return { creates, updates, companiesToCreate: [...companiesToCreate.values()], report };
 }
 
 // --- Revert audit-row selection (pure; src/lib/dff2026/db.ts wires it) -----
 
 export interface DffAuditMetadata {
   sourceKey: string;
-  scope: ImportScope;
   createdPersonIds: string[];
   updatedHistoryRows: HistoryRow[];
   companiesCreated: string[];
-  attendanceActivityIds: string[];
 }
 
 export interface DffAuditRow {

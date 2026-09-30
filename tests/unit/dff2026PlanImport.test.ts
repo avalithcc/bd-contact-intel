@@ -26,7 +26,6 @@ function record(overrides: Partial<AttendeeRecord> = {}): AttendeeRecord {
     companyRaw: "Acme Corp",
     email: "juan.perez@example.com",
     emailNormalized: "juan.perez@example.com",
-    attended: true,
     ...overrides,
   };
 }
@@ -38,7 +37,6 @@ function ctx(overrides: Partial<ImportContext> = {}): ImportContext {
     existingPersonsByEmail: new Map(),
     companyAliasByKey: new Map(),
     existingCompaniesByKey: new Map(),
-    existingAttendancePersonIds: new Set(),
     ...overrides,
   };
 }
@@ -68,7 +66,7 @@ function genIdSeq(prefix = "id"): () => string {
 }
 
 test("creates a new person owned by Mariel, status new, sourceKey dff-2026", () => {
-  const plan = buildImportPlan([record()], "all", ctx(), genIdSeq());
+  const plan = buildImportPlan([record()], ctx(), genIdSeq());
   assert.equal(plan.creates.length, 1);
   assert.deepEqual(plan.creates[0], {
     id: "id-0",
@@ -88,7 +86,6 @@ test("creates a new person owned by Mariel, status new, sourceKey dff-2026", () 
     sourceKey: "dff-2026",
   });
   assert.equal(plan.updates.length, 0);
-  assert.deepEqual(plan.attendance, [{ personId: "id-0" }]);
   assert.equal(plan.report.created, 1);
 });
 
@@ -96,7 +93,6 @@ test("existing person: fills only currently-empty fields, never overwrites a non
   const existing = existingPerson({ lastName: "Perez" }); // non-empty already
   const plan = buildImportPlan(
     [record({ firstName: "Juan", lastName: "Gomez" /* would collide, must be ignored */ })],
-    "all",
     ctx({ existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]) }),
   );
   const update = plan.updates[0]!;
@@ -115,7 +111,6 @@ test("reassigns an already-owned person's owner to Mariel and names the previous
   const existing = existingPerson({ ownerBdId: "bd-cristian" });
   const plan = buildImportPlan(
     [record()],
-    "all",
     ctx({
       existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]),
       bdNamesById: new Map([["bd-cristian", "Cristian Civita"]]),
@@ -131,7 +126,7 @@ test("reassigns an already-owned person's owner to Mariel and names the previous
 
 test("no owner change when the existing owner is already Mariel", () => {
   const existing = existingPerson({ ownerBdId: MARIEL });
-  const plan = buildImportPlan([record()], "all", ctx({ existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]) }));
+  const plan = buildImportPlan([record()], ctx({ existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]) }));
   const update = plan.updates[0]!;
   assert.equal(update.personUpdate.ownerBdId, undefined);
   assert.equal(update.reassignedFromBdId, null);
@@ -141,7 +136,6 @@ test("company: an alias redirects to its canonical existing company (matched, no
   const canonicalKey = "acme";
   const plan = buildImportPlan(
     [record({ companyRaw: "Acme Corp" })],
-    "all",
     ctx({
       companyAliasByKey: new Map([[normalizeCompanyKey("Acme Corp"), canonicalKey]]),
       existingCompaniesByKey: new Map([[canonicalKey, { companyKey: canonicalKey, displayName: "Acme Inc" }]]),
@@ -161,7 +155,6 @@ test("company: an ALL-CAPS raw name still matches an existing company by key (ca
       record({ companyRaw: "ACCENTURE", email: "a@x.com", emailNormalized: "a@x.com" }),
       record({ companyRaw: "360 ENERGY SA", email: "b@x.com", emailNormalized: "b@x.com" }),
     ],
-    "all",
     ctx({ existingCompaniesByKey: new Map([[canonicalKey, { companyKey: canonicalKey, displayName: "Accenture" }]]) }),
   );
   const accenturePerson = plan.creates.find((c) => c.email === "a@x.com")!;
@@ -174,11 +167,29 @@ test("company: an ALL-CAPS raw name still matches an existing company by key (ca
 test("company: no match queues one new company row, deduped across rows", () => {
   const plan = buildImportPlan(
     [record({ companyRaw: "Brand New Co", email: "a@x.com", emailNormalized: "a@x.com" }), record({ companyRaw: "Brand New Co", email: "b@x.com", emailNormalized: "b@x.com" })],
-    "all",
     ctx(),
   );
   assert.deepEqual(plan.companiesToCreate, [{ companyKey: normalizeCompanyKey("Brand New Co"), displayName: "Brand New Co" }]);
   assert.equal(plan.report.companiesCreated, 1);
+  assert.equal(plan.report.companiesMatched, 0);
+});
+
+// Review fix (orphan company rows, 2026-09-30): an existing person whose
+// companyKey is already set can never have it filled (planHubSpotRefill's
+// fillField only ever fills an empty field) — resolving/queuing a company
+// for them anyway would create a permanent 0-contact "ghost" row nobody
+// links to, and would overstate `companiesCreated` in the dry-run report.
+test("existing person with an already-set companyKey: no company is queued for a different EMPRESA, and companyKey is left untouched", () => {
+  const existing = existingPerson({ companyKey: "already-linked-co", company: "Already Linked Co" });
+  const plan = buildImportPlan(
+    [record({ companyRaw: "Some Brand New Company" })],
+    ctx({ existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]) }),
+  );
+  const update = plan.updates[0]!;
+  assert.equal(update.personUpdate.companyKey, undefined);
+  assert.equal(update.personUpdate.company, undefined);
+  assert.equal(plan.companiesToCreate.length, 0);
+  assert.equal(plan.report.companiesCreated, 0);
   assert.equal(plan.report.companiesMatched, 0);
 });
 
@@ -188,7 +199,6 @@ test("phone: rejects a too-short value, writes a valid one raw/unformatted, trac
       record({ mobilePhoneRaw: "123", email: "a@x.com", emailNormalized: "a@x.com" }),
       record({ mobilePhoneRaw: "1122334455", email: "b@x.com", emailNormalized: "b@x.com" }),
     ],
-    "all",
     ctx(),
   );
   assert.equal(plan.report.phonesWritten, 1);
@@ -201,32 +211,15 @@ test("phone: rejects a too-short value, writes a valid one raw/unformatted, trac
   assert.equal(accepted.mobilePhone, "1122334455"); // stored raw, never reformatted
 });
 
-test("scope=attended drops registrants who did not attend; scope=all keeps them", () => {
-  const records = [record({ attended: true, email: "a@x.com", emailNormalized: "a@x.com" }), record({ attended: false, email: "b@x.com", emailNormalized: "b@x.com" })];
-  const attendedOnly = buildImportPlan(records, "attended", ctx());
-  assert.equal(attendedOnly.creates.length, 1);
-  assert.equal(attendedOnly.report.rowsInScope, 1);
-  assert.equal(attendedOnly.report.rowsExcludedByScope, 1);
-
-  const all = buildImportPlan(records, "all", ctx());
-  assert.equal(all.creates.length, 2);
-  assert.equal(all.attendance.length, 1); // only the attended row
-});
-
-test("idempotent: a person who already has the attendance activity is not re-queued", () => {
-  const existing = existingPerson();
-  const plan = buildImportPlan(
-    [record()],
-    "all",
-    ctx({ existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]), existingAttendancePersonIds: new Set(["p1"]) }),
-  );
-  assert.equal(plan.attendance.length, 0);
-  assert.equal(plan.report.attendanceAlreadyRecorded, 1);
-  assert.equal(plan.report.attendanceToRecord, 0);
+test("every record is imported unconditionally — no scope/attendance filtering", () => {
+  const records = [record({ email: "a@x.com", emailNormalized: "a@x.com" }), record({ email: "b@x.com", emailNormalized: "b@x.com" })];
+  const plan = buildImportPlan(records, ctx());
+  assert.equal(plan.creates.length, 2);
+  assert.equal(plan.report.rowsProcessed, 2);
 });
 
 test("pure planner: never mutates its inputs, and calling it twice with the same input gives the same result", () => {
-  const records = [record({ email: "a@x.com", emailNormalized: "a@x.com" }), record({ email: "b@x.com", emailNormalized: "b@x.com", attended: false })];
+  const records = [record({ email: "a@x.com", emailNormalized: "a@x.com" }), record({ email: "b@x.com", emailNormalized: "b@x.com" })];
   const existing = existingPerson({ email: "b@x.com", emailNormalized: "b@x.com", ownerBdId: "bd-other" });
   const context = ctx({ existingPersonsByEmail: new Map([["b@x.com", existing]]), bdNamesById: new Map([["bd-other", "Other BD"]]) });
 
@@ -237,8 +230,8 @@ test("pure planner: never mutates its inputs, and calling it twice with the same
   // fill is otherwise wall-clock-dependent, which would make this exact
   // "call it twice" comparison flaky by a few milliseconds.
   const fixedNow = () => new Date("2026-09-30T12:00:00.000Z");
-  const planA = buildImportPlan(records, "all", context, genIdSeq(), fixedNow);
-  const planB = buildImportPlan(records, "all", context, genIdSeq(), fixedNow);
+  const planA = buildImportPlan(records, context, genIdSeq(), fixedNow);
+  const planB = buildImportPlan(records, context, genIdSeq(), fixedNow);
 
   assert.deepEqual(planA, planB);
   assert.deepEqual(JSON.parse(JSON.stringify(records)), recordsSnapshot);
@@ -252,7 +245,7 @@ function auditRow(overrides: Partial<DffAuditRow> = {}): DffAuditRow {
     id: "audit-1",
     at: new Date("2026-09-30T00:00:00.000Z"),
     actorBdId: "actor-1",
-    metadata: { sourceKey: "dff-2026", scope: "all", createdPersonIds: [], updatedHistoryRows: [], companiesCreated: [], attendanceActivityIds: [] },
+    metadata: { sourceKey: "dff-2026", createdPersonIds: [], updatedHistoryRows: [], companiesCreated: [] },
     ...overrides,
   };
 }

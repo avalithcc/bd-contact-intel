@@ -30,8 +30,6 @@ export interface AttendeeRecord {
   companyRaw: string | null;
   email: string;
   emailNormalized: string;
-  /** ASISTIÓ === "1". The remaining rows registered but did not attend. */
-  attended: boolean;
 }
 
 export interface DuplicateEmailCollision {
@@ -41,7 +39,7 @@ export interface DuplicateEmailCollision {
 
 export interface BuildAttendeeRecordsResult {
   /** One row per unique, valid email — in-file duplicates already merged
-   * (most-complete-row wins; attended is OR'd across duplicates). */
+   * (most-complete-row wins). */
   records: AttendeeRecord[];
   rowsParsed: number;
   skippedNoEmail: number;
@@ -88,7 +86,11 @@ export function buildAttendeeRecords(rawCsvText: string): BuildAttendeeRecordsRe
   const byEmail = new Map<string, AttendeeRecord[]>();
 
   for (const row of dataRows) {
-    const asistio = cleanField(row[1]);
+    // row[1] (ASISTIÓ) is deliberately never read — owner decision
+    // 2026-09-30: attendance is not Mariel's signal (this list is an
+    // inherited database, not something she attended herself) and every
+    // row imports unconditionally. The raw value is still sitting in the
+    // source CSV under backups/ if it's ever wanted later.
     const lastName = cleanField(row[2]);
     const firstName = cleanField(row[3]);
     const companyRaw = cleanField(row[4]);
@@ -110,7 +112,6 @@ export function buildAttendeeRecords(rawCsvText: string): BuildAttendeeRecordsRe
       companyRaw,
       email: emailRaw,
       emailNormalized,
-      attended: asistio === "1",
     };
     const list = byEmail.get(emailNormalized) ?? [];
     list.push(record);
@@ -124,7 +125,7 @@ export function buildAttendeeRecords(rawCsvText: string): BuildAttendeeRecordsRe
     // Array.prototype.sort is stable (ES2019+): a tie keeps the
     // first-encountered row, so this is deterministic across runs.
     const best = [...list].sort((a, b) => completenessScore(b) - completenessScore(a))[0]!;
-    records.push({ ...best, attended: list.some((r) => r.attended) });
+    records.push(best);
   }
 
   return { records, rowsParsed: dataRows.length, skippedNoEmail, duplicateEmailCollisions };

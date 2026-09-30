@@ -61,13 +61,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * timelineGrouping.ts), so this list is defined ONCE here and both twins
  * reference it — no second definition to drift.
  */
-// `event_attendance` (dff-2026 import, src/lib/dff2026/planImport.ts) is a
-// bulk-imported historical fact ("this person attended/registered for the
-// Digital Finance Forum 2026"), not a BD touching the Contact — without
-// this, importing it for 738+ people would make every one of them read as
-// "active today" the day the import ran, the exact bug this module's own
-// header doc describes for status_backfill.
-export const NON_TOUCH_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened", "event_attendance"] as const;
+export const NON_TOUCH_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened"] as const;
 
 function isNonTouchActivityType(type: string): boolean {
   return (NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes(type);

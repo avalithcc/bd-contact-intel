@@ -133,13 +133,6 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
     }
     case "discarded":
       return discardBody(metadata, l);
-    // DFF-2026 import (src/lib/dff2026/planImport.ts) — event name comes
-    // from the activity's own metadata, never hardcoded here, so a future
-    // event import (a different eventName) renders through this same case.
-    case "event_attendance": {
-      const eventName = typeof metadata.eventName === "string" ? metadata.eventName : null;
-      return eventName ? `${l.timelineEventAttendancePrefix} ${eventName}` : l.timelineEventAttendancePrefix;
-    }
     case "task_updated":
     case "task_completed":
     case "task_reopened":

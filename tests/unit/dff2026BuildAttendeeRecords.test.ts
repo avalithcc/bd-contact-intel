@@ -36,8 +36,16 @@ test("parses the header's duplicate blank columns by position, not by name", () 
     companyRaw: "Acme Corp",
     email: "juan.perez@example.com",
     emailNormalized: "juan.perez@example.com",
-    attended: true,
   });
+});
+
+test("ASISTIÓ (column 1) is never read — attendance is not tracked (owner decision 2026-09-30)", () => {
+  const result = buildAttendeeRecords(
+    csv([",1,Attended,Person,Co,Dev,,,attended@example.com,", ",,NotAttended,Person,Co,Dev,,,notattended@example.com,"]),
+  );
+  for (const record of result.records) {
+    assert.ok(!("attended" in record), `unexpected 'attended' field on ${record.email}`);
+  }
 });
 
 test("rows with no valid EMAIL are skipped, not imported", () => {
@@ -49,11 +57,11 @@ test("rows with no valid EMAIL are skipped, not imported", () => {
   assert.equal(result.rowsParsed, 2);
 });
 
-test("in-file duplicate emails collapse to the most complete row; attended is OR'd across duplicates", () => {
+test("in-file duplicate emails collapse to the most complete row", () => {
   const result = buildAttendeeRecords(
     csv([
-      ",,Diaz,,Gamma,,,,dup@example.com,", // less complete, did not attend
-      ",1,Diaz,Carlos,Gamma Inc,Director,,5555555555,dup@example.com,", // more complete, attended
+      ",,Diaz,,Gamma,,,,dup@example.com,", // less complete
+      ",1,Diaz,Carlos,Gamma Inc,Director,,5555555555,dup@example.com,", // more complete
     ]),
   );
   assert.equal(result.records.length, 1);
@@ -62,7 +70,6 @@ test("in-file duplicate emails collapse to the most complete row; attended is OR
   const record = result.records[0]!;
   assert.equal(record.firstName, "Carlos");
   assert.equal(record.companyRaw, "Gamma Inc");
-  assert.equal(record.attended, true); // OR'd, even though the more-complete row alone already attended
 });
 
 test("strips NUL bytes and other control characters embedded in a field", () => {

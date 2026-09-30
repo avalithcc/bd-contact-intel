@@ -31,11 +31,6 @@ test("TIMELINE_ACTIVITY_TYPES includes reply_received (synced Gmail reply)", () 
   assert.ok(types.includes("reply_received"), `expected reply_received among ${types.join(", ")}`);
 });
 
-test("TIMELINE_ACTIVITY_TYPES includes event_attendance (DFF-2026 import) — otherwise those rows are invisible on the timeline", () => {
-  const types = extractTimelineActivityTypes();
-  assert.ok(types.includes("event_attendance"), `expected event_attendance among ${types.join(", ")}`);
-});
-
 test("TIMELINE_ACTIVITY_TYPES still includes every pre-existing type (no accidental removal)", () => {
   const types = extractTimelineActivityTypes();
   for (const type of [
