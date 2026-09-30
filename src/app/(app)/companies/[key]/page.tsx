@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
+import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { getCompanyByKey } from "@/lib/companies/queries";
 import {
   getCompanyOpenTasks,
@@ -240,7 +239,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                             <td>
                               <span className="badge badge-neutral no-dot">{dict.markets[p.market]}</span>
                             </td>
-                            <td className="meta">{format(p.firstSeen, "d MMM", { locale: es })}</td>
+                            <td className="meta">{formatArgentinaDayMonth(p.firstSeen)}</td>
                           </tr>
                         ))}
                       </tbody>

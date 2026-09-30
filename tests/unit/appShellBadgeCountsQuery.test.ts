@@ -25,7 +25,8 @@ function render() {
       bdId: "00000000-0000-0000-0000-000000000001",
       queueDate: "2026-09-29",
       tomorrowStartUtcIso: "2026-09-30T00:00:00.000Z",
-      todayStartUtcIso: "2026-09-29T00:00:00.000Z",
+      workedTodayFromIso: "2026-09-29T03:00:00.000Z",
+      workedTodayToIso: "2026-09-30T03:00:00.000Z",
     }),
   );
 }

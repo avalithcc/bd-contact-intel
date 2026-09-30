@@ -33,14 +33,23 @@ test("an unrecognized outcome is rejected", () => {
   assert.throws(() => planCall("levitated", "outbound", "2026-09-26", "14:30", "", ""), CallOutcomeRequiredError);
 });
 
-test("date + time combine into one ISO instant, used as occurredAt", () => {
+/**
+ * 14:30 ART = 17:30 UTC (fixed UTC-3 offset). Hardcoded (not computed via
+ * `argentinaWallClockToUtc` itself, which would make this tautological) so
+ * this test actually pins the bug fix: `planCall` used to build
+ * `new Date(\`${date}T${time}:00\`)` directly, which the JS spec parses as
+ * LOCAL time in the CALLING PROCESS's timezone — passing on a dev laptop
+ * set to ART, silently 3h wrong on a UTC server. Must pass under both
+ * `TZ=UTC` and `TZ=America/Argentina/Buenos_Aires`.
+ */
+test("date + time combine into one ISO instant, used as occurredAt, interpreted as Argentina wall-clock time", () => {
   const plan = planCall("connected", "outbound", "2026-09-26", "14:30", "", "");
-  assert.equal(plan.occurredAt, new Date("2026-09-26T14:30:00").toISOString());
+  assert.equal(plan.occurredAt, "2026-09-26T17:30:00.000Z");
 });
 
-test("a missing time defaults to midnight", () => {
+test("a missing time defaults to midnight ART (03:00 UTC)", () => {
   const plan = planCall("connected", "outbound", "2026-09-26", "", "", "");
-  assert.equal(plan.occurredAt, new Date("2026-09-26T00:00:00").toISOString());
+  assert.equal(plan.occurredAt, "2026-09-26T03:00:00.000Z");
 });
 
 test("a missing date defaults to now", () => {
@@ -73,9 +82,11 @@ test("notes are trimmed, blank collapses to null", () => {
 });
 
 // --- occurredAt must not be in the future (fresh-review WARNING fix) -------
+// `now` fixtures are explicit UTC instants (Z-suffixed) so these tests never
+// depend on the runner's own timezone either.
 
 test("an occurredAt more than 5 minutes in the future is rejected", () => {
-  const now = new Date("2026-09-26T12:00:00");
+  const now = new Date("2026-09-26T15:00:00.000Z"); // 12:00 ART
   assert.throws(
     () => planCall("connected", "outbound", "2026-09-26", "12:06", "", "", now),
     CallOccurredAtInFutureError,
@@ -87,19 +98,19 @@ test("an occurredAt more than 5 minutes in the future is rejected", () => {
 });
 
 test("an occurredAt within the 5-minute clock-skew tolerance is accepted", () => {
-  const now = new Date("2026-09-26T12:00:00");
+  const now = new Date("2026-09-26T15:00:00.000Z"); // 12:00 ART
   const plan = planCall("connected", "outbound", "2026-09-26", "12:05", "", "", now);
-  assert.equal(plan.occurredAt, new Date("2026-09-26T12:05:00").toISOString());
+  assert.equal(plan.occurredAt, "2026-09-26T15:05:00.000Z"); // 12:05 ART
 });
 
 test("an occurredAt in the past is always accepted", () => {
-  const now = new Date("2026-09-26T12:00:00");
+  const now = new Date("2026-09-26T15:00:00.000Z"); // 12:00 ART
   const plan = planCall("connected", "outbound", "2020-01-01", "00:00", "", "", now);
-  assert.equal(plan.occurredAt, new Date("2020-01-01T00:00:00").toISOString());
+  assert.equal(plan.occurredAt, "2020-01-01T03:00:00.000Z"); // 00:00 ART
 });
 
 test("a blank date (defaults to `now`) never trips the future guard", () => {
-  const now = new Date("2026-09-26T12:00:00");
+  const now = new Date("2026-09-26T15:00:00.000Z");
   const plan = planCall("connected", "outbound", "", "", "", "", now);
   assert.equal(plan.occurredAt, now.toISOString());
 });

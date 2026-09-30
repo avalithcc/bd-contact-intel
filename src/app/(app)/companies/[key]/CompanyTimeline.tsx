@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import Link from "next/link";
+import { formatArgentinaDayMonthTime, formatArgentinaMonthYear } from "@/lib/i18n/format";
 import type { CompanyActivityFilter } from "@/lib/companies/recordMappers";
 import { resolveCompanyScopeRows, type CompanyTimelineFilterCounts } from "@/lib/companies/recordMappers";
 import { isRequestCurrent } from "@/lib/activity/requestGeneration";
@@ -57,7 +56,7 @@ const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactEl
 };
 
 function formatWhen(at: Date): string {
-  return format(at, "d MMM, HH:mm", { locale: es });
+  return formatArgentinaDayMonthTime(at);
 }
 
 /**
@@ -251,7 +250,7 @@ export function CompanyTimeline({
             <div className="tl-group">
               {group.kind === "pre-migration"
                 ? l.timelineFilterAll
-                : format(group.items[0].at, "MMMM yyyy", { locale: es })}
+                : formatArgentinaMonthYear(group.items[0].at)}
             </div>
             <div className="tl">
               {group.items.map(({ entry, at }) => {

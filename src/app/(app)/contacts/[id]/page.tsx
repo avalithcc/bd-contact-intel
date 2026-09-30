@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
+import { formatArgentinaDayMonth, formatArgentinaDayMonthYear } from "@/lib/i18n/format";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
@@ -158,7 +159,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     label: l[`prop${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}` as keyof typeof l] as string,
     value: p.value,
     lastUpdatedLabel: p.lastEdit
-      ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${format(p.lastEdit.at, "d MMM", { locale: es })}`
+      ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${formatArgentinaDayMonth(p.lastEdit.at)}`
       : null,
   });
 
@@ -205,7 +206,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
         l.emptyValue,
         l.statusNextStepReplied,
         record.statusReason,
-        format(record.statusReason.at, "d MMM", { locale: es }),
+        formatArgentinaDayMonth(record.statusReason.at),
       )
     : null;
 
@@ -223,7 +224,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
       ? dict.contactRecordServer.hunterHint(
           record.person.emailConfidence,
           emailHistory.bdName ?? l.emptyValue,
-          format(emailHistory.at, "d MMM", { locale: es }),
+          formatArgentinaDayMonth(emailHistory.at),
         )
       : null;
 
@@ -242,7 +243,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // "Creado" row (contact-record.html:86 "6 oct 2026 · unificado por
   // migración") — the migration suffix only applies to rows the collapse/
   // fold-leads migration actually created (`migrationRunId` set).
-  const createdText = `${format(record.person.createdAt, "d MMM yyyy", { locale: es })}${
+  const createdText = `${formatArgentinaDayMonthYear(record.person.createdAt)}${
     record.person.migrationRunId ? ` · ${l.createdViaMigration}` : ""
   }`;
 
@@ -327,7 +328,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           summaryText: dict.contactRecordServer.conversationHistorySummary(
             ownConnectionHistory.count,
             ownConnectionHistory.lastMessageAt
-              ? format(ownConnectionHistory.lastMessageAt, "d MMM", { locale: es })
+              ? formatArgentinaDayMonth(ownConnectionHistory.lastMessageAt)
               : l.emptyValue,
           ),
         }
@@ -348,7 +349,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     if (history.kind !== "some") continue;
     linkedinSummaryByBdId[c.bdId] = dict.contactRecordServer.conversationHistorySummary(
       history.count,
-      history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue,
+      history.lastMessageAt ? formatArgentinaDayMonth(history.lastMessageAt) : l.emptyValue,
     );
   }
   // Admin-only locked summaries (ConversationHistoryCard's `summaries` prop):
@@ -372,7 +373,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
       if (history.kind !== "some") continue;
       const summaryText = dict.contactRecordServer.conversationHistorySummary(
         history.count,
-        history.lastMessageAt ? format(history.lastMessageAt, "d MMM", { locale: es }) : l.emptyValue,
+        history.lastMessageAt ? formatArgentinaDayMonth(history.lastMessageAt) : l.emptyValue,
       );
       const existing = lockedConversationRowsByBd.get(c.bdId);
       if (existing) existing.parts.push(summaryText);
