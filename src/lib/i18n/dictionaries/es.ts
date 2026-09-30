@@ -113,6 +113,7 @@ export const es: typeof en = {
     leads: "Contactos",
     companies: "Empresas",
     tasks: "Tareas",
+    followUps: "Seguimientos",
     outreach: "Outreach",
     hiring: "Vacantes abiertas",
     whatsNew: "Novedades",
@@ -899,6 +900,27 @@ export const es: typeof en = {
     taskCreateError: "No se pudo crear la tarea. Probá de nuevo.",
     cancel: "Cancelar",
     // --- end tasks: new task dialog ---
+  },
+
+  // Follow-up queue (openspec/changes/follow-up-queue) — per-BD daily list
+  // of due contacts (decision brief "1. Follow-up cadence").
+  followUpsPage: {
+    eyebrow: "Seguimientos",
+    title: "seguimientos de hoy.",
+    subtitle:
+      "Contactos propios, tocados por última vez hace menos de 12 meses, que están vencidos para un seguimiento: Respondió con 3 o más días desde el último toque, o Contactado con 7 o más días. Hasta 10 por día, respondidos primero y, dentro de cada estado, el toque más reciente primero.",
+    pendingSuffix: (total: number) => `de ${total} pendientes hoy`,
+    progressAriaLabel: (done: number, total: number) => `${done} de ${total} completados hoy`,
+    openRecord: "Abrir ficha",
+    ariaActionsFor: (name: string) => `Acciones rápidas para ${name}`,
+    personHeadline: (jobTitle: string, companyName: string) => `${jobTitle} en ${companyName}`,
+    emptyTitle: "Estás al día",
+    emptyBody: "No hay seguimientos pendientes para hoy. Volvé mañana o revisá tus contactos sin contactar.",
+    emptyCta: "Ver contactos sin contactar",
+    postponeMenuLabel: "Posponer",
+    postponeTomorrow: "Posponer a mañana",
+    skipToday: "Omitir hoy",
+    postponeError: "No se pudo posponer. Probá de nuevo.",
   },
 
   companiesPage: {

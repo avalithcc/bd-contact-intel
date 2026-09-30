@@ -1350,3 +1350,64 @@ export const linkedinScrapeJob = pgTable(
 
 export type LinkedinScrapeJob = typeof linkedinScrapeJob.$inferSelect;
 export type NewLinkedinScrapeJob = typeof linkedinScrapeJob.$inferInsert;
+
+// Per-BD daily follow-up queue (openspec/changes/follow-up-queue; decision
+// brief "1. Follow-up cadence — decided", 2026-09-29). One row per contact
+// selected into a BD's queue for a given Argentina calendar day
+// (`src/lib/tasks/argentinaDate.ts#argentinaCalendarDate`). The day's rows
+// are materialized ONCE, lazily, on first view (see
+// src/lib/followUp/queueQueries.ts#ensureTodayFollowUpQueue) and never
+// refill — a contact "worked" today (any note/call/meeting/email/discard
+// activity logged today, derived at read time, never stored here) simply
+// leaves the active view without changing this row.
+//
+// `dueStatus`/`lastTouchAt` are captured AT SELECTION TIME so the read page
+// never has to re-aggregate `activity`/`person_bd_connection` just to
+// render a "hace N d" line — only `person`/`company` are joined for the
+// read (name/job title/company display name).
+//
+// `state` records "Posponer a mañana"/"Omitir hoy" (neither logs an
+// activity nor needs a reason, per the approved mockup README decision 5):
+// both leave the active list without being counted as worked, distinguished
+// only for display/analytics. `snoozedUntil` is the ART calendar date this
+// row becomes selectable again — defensive only: because a day's set never
+// refills, a single materialization run never actually re-considers a
+// snoozed row the same day; kept so the pure eligibility function
+// (queueSelection.ts) can express and test the rule directly.
+export const followUpQueueItem = pgTable(
+  "follow_up_queue_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    queueDate: date("queue_date").notNull(),
+    // 1-based display order within (bdId, queueDate) — replied first, then
+    // most-recent-last-touch first, tie-broken by company name ascending.
+    position: integer("position").notNull(),
+    // 'replied' | 'contacted' — whichever due rule selected this row.
+    dueStatus: text("due_status").notNull(),
+    lastTouchAt: timestamp("last_touch_at").notNull(),
+    // 'pending' | 'postponed' | 'skipped'
+    state: text("state").notNull().default("pending"),
+    snoozedUntil: date("snoozed_until"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // Idempotent-insert target (race safety: concurrent first-loads for the
+    // same BD/day converge on the same 10 rows via `ON CONFLICT ... DO
+    // NOTHING` against this key — see ensureTodayFollowUpQueue's
+    // pg_advisory_xact_lock, the primary race guard; this unique index is
+    // the belt-and-suspenders backstop).
+    byBdDatePerson: unique("follow_up_queue_item_bd_date_person_unique").on(t.bdId, t.queueDate, t.personId),
+    // Serves the daily-list read and the sidebar badge count.
+    byBdDate: index("follow_up_queue_item_bd_date_idx").on(t.bdId, t.queueDate),
+  }),
+);
+
+export type FollowUpQueueItem = typeof followUpQueueItem.$inferSelect;
+export type NewFollowUpQueueItem = typeof followUpQueueItem.$inferInsert;
