@@ -120,8 +120,14 @@ the same journal. Rules:
 
 - Generate migrations with `npm run db:generate` and commit the SQL file
   together with the updated `drizzle/meta/` files.
-- Check that the new entry's `when` is greater than every previous one (the
-  older entries carry hand-set, future-dated timestamps); bump it if not.
+- **Hand-set the new entry's `when`.** The journal chain is future-dated
+  (ends ~2026-10-19) and production's latest `created_at` equals its last
+  `when`, so `npm run db:generate` (real clock, lower) produces an entry that
+  `migrate` silently skips. Set it to the previous entry's `when` + 86,400,000.
+  `tests/unit/drizzleJournal.test.ts` prints the exact value. Never rewrite
+  older entries: the ledger rows keep their old `created_at`, so lowering them
+  would make every new real-clock migration skip. Once the clock passes the
+  chain (after 2026-10-19), `db:generate` works unaided again.
 - Vercel does not run migrations. Apply them by hand with
   `node --env-file=.env.local node_modules/.bin/drizzle-kit migrate`.
 - Never trust the success message: verify the objects exist afterwards, e.g.
