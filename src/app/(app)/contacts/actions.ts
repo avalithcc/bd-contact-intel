@@ -13,6 +13,7 @@ import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
 import { sendGmailMessage } from "@/lib/gmail/send";
+import { composeEmailBody } from "@/lib/signature/compose";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
 import { planDiscard } from "@/lib/contacts/discard";
@@ -361,7 +362,9 @@ export async function sendContactEmailAction(
   try {
     await assertContactEditableById(personId);
     const me = await getCurrentBd();
-    await sendGmailMessage({ bdId: me.id, to, subject, body, personId });
+    // BD with a signature sends HTML (body + signature); without one the
+    // message is the same single-part plain text as before (composeEmailBody).
+    await sendGmailMessage({ bdId: me.id, to, subject, ...composeEmailBody(body, me.signatureHtml), personId });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

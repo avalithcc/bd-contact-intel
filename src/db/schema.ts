@@ -25,6 +25,10 @@ export const bd = pgTable("bd", {
   // by drizzle/0013_unified_person.sql. Gated via
   // src/lib/auth/requireAdmin.ts, never checked ad hoc.
   role: text("role").notNull().default("bd"),
+  // The BD's own complete HTML email signature, already sanitized at save
+  // (src/lib/signature/sanitize.ts) and re-sanitized when appended at send.
+  // NULL = no signature: the BD keeps sending plain text.
+  signatureHtml: text("signature_html"),
 });
 
 // A contact, private to exactly one BD.
@@ -925,7 +929,8 @@ export const auditLog = pgTable(
       .references(() => bd.id, { onDelete: "cascade" }),
     // 'view_conversation' | 'merge' | 'unmerge' | 'not_duplicate' |
     // 'migration_approve' | 'migration_execute' | 'bd_password_reset' |
-    // 'bulk_merge_duplicates_run' | 'bulk_merge_duplicates_revert'
+    // 'bulk_merge_duplicates_run' | 'bulk_merge_duplicates_revert' |
+    // 'bd_signature_update' (a BD saved/cleared their own email signature)
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {

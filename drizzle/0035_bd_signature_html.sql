@@ -1,0 +1,1 @@
+ALTER TABLE "bd" ADD COLUMN "signature_html" text;
