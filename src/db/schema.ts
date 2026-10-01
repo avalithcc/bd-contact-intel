@@ -601,11 +601,15 @@ export const lead = pgTable(
     updatedByBdId: uuid("updated_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    updatedAt: timestamp("updated_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     // Bumped on every (re-)import pass that touches this row, so "still in
     // the latest export vs. stale" is inspectable without deleting rows.
-    lastImportedAt: timestamp("last_imported_at").notNull().defaultNow(),
+    lastImportedAt: timestamp("last_imported_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => ({
     // one row per (event, attendee) — re-imports upsert instead of duplicating
@@ -691,8 +695,12 @@ export const person = pgTable(
     // The migration_run that created this row via the collapse/fold-leads
     // migration; null for rows created after the migration.
     migrationRunId: uuid("migration_run_id"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     updatedByBdId: uuid("updated_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
