@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   EDITABLE_PERSON_PROPERTIES,
+  InvalidContactTypeError,
   InvalidEmailError,
   InvalidPhoneError,
   isEditablePersonProperty,
@@ -27,6 +28,7 @@ const BASE_PERSON = {
   emailSource: "fi-arg-2026-mails-hunter",
   jobTitle: "Engineer",
   roleGroup: null,
+  contactType: null,
   seniority: null,
   city: null,
   region: null,
@@ -278,4 +280,53 @@ test("planLocationEdit: all three changed fields each get their own history row"
     plan.historyRows.map((r) => r.property).sort(),
     ["city", "country", "region"],
   );
+});
+
+// --- contactType (contact-type-ui): editable closed-set property -----------
+
+test("contactType is editable and sits right after roleGroup", () => {
+  assert.equal(isEditablePersonProperty("contactType"), true);
+  assert.equal(
+    EDITABLE_PERSON_PROPERTIES[EDITABLE_PERSON_PROPERTIES.indexOf("roleGroup") + 1],
+    "contactType",
+  );
+});
+
+test("setting contactType writes the stored value and a history row naming the actor", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "contactType", "BUYER-CHAMPION", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.contactType, "BUYER-CHAMPION");
+  assert.equal(plan.personUpdate?.updatedByBdId, "bd-1");
+  assert.deepEqual(plan.historyRows, [
+    {
+      personId: BASE_PERSON.id,
+      property: "contactType",
+      oldValue: null,
+      newValue: "BUYER-CHAMPION",
+      changedByBdId: "bd-1",
+      source: "edit",
+    },
+  ]);
+});
+
+test("changing contactType records old and new value; clearing it is allowed", () => {
+  const typed = { ...BASE_PERSON, contactType: "INFLUENCER" };
+  const changed = planPropertyEdit(typed, "contactType", "BUYER-CHAMPION", "bd-2");
+  assert.equal(changed.historyRows[0]?.oldValue, "INFLUENCER");
+  assert.equal(changed.historyRows[0]?.newValue, "BUYER-CHAMPION");
+  const cleared = planPropertyEdit(typed, "contactType", "  ", "bd-2");
+  assert.equal(cleared.changed, true);
+  assert.equal(cleared.personUpdate?.contactType, null);
+  assert.equal(cleared.historyRows[0]?.newValue, null);
+});
+
+test("contactType outside the vocabulary is rejected before any plan is built", () => {
+  assert.throws(() => planPropertyEdit(BASE_PERSON, "contactType", "DECISION-MAKER", "bd-1"), InvalidContactTypeError);
+  assert.throws(() => planPropertyEdit(BASE_PERSON, "contactType", "buyer-champion", "bd-1"), InvalidContactTypeError);
+});
+
+test("re-saving the same contactType is a no-op with no history row", () => {
+  const plan = planPropertyEdit({ ...BASE_PERSON, contactType: "INFLUENCER" }, "contactType", "INFLUENCER", "bd-1");
+  assert.equal(plan.changed, false);
+  assert.deepEqual(plan.historyRows, []);
 });

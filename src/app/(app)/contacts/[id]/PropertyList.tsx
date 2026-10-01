@@ -14,6 +14,7 @@ import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon } from "@/components/icons";
 import { toTelHref } from "@/lib/phone";
+import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 
 export interface AboutPaneProperty {
@@ -328,15 +329,36 @@ function PropertyRow({
       <div className="prop">
         <dt id={`${inputId}-label`}>{prop.label}</dt>
         <dd>
-          <input
-            id={inputId}
-            aria-labelledby={`${inputId}-label`}
-            className="input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={busy}
-            autoFocus
-          />
+          {prop.key === "contactType" ? (
+            // Closed set: a select (stored values, Spanish labels) instead
+            // of free text, plus an empty option to clear the property.
+            <select
+              id={inputId}
+              aria-labelledby={`${inputId}-label`}
+              className="input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={busy}
+              autoFocus
+            >
+              <option value="">{l.contactTypeNoneOption}</option>
+              {CONTACT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {CONTACT_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              id={inputId}
+              aria-labelledby={`${inputId}-label`}
+              className="input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={busy}
+              autoFocus
+            />
+          )}
         </dd>
         {error && (
           <dd className="error-text" role="alert">
@@ -359,7 +381,13 @@ function PropertyRow({
     <div className="prop">
       <dt>{prop.label}</dt>
       <dd>
-        {telHref ? <a href={telHref}>{prop.value}</a> : (prop.value ?? l.emptyValue)}
+        {telHref ? (
+          <a href={telHref}>{prop.value}</a>
+        ) : prop.key === "contactType" ? (
+          contactTypeLabel(prop.value, l.emptyValue)
+        ) : (
+          (prop.value ?? l.emptyValue)
+        )}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
         {emailInferred && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
         {roleGroupHint && (

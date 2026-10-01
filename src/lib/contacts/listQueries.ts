@@ -33,6 +33,7 @@ import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/c
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { mapInlineDerivedColumns, type InlineDerivedRawRow } from "@/lib/contacts/inlineDerivedColumns";
+import { contactTypeFilterCondition } from "@/lib/contacts/contactTypeCondition";
 import { roleGroupVisibilityCondition } from "@/lib/contacts/roleVisibility";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { getDictionary } from "@/lib/i18n/server";
@@ -110,6 +111,8 @@ async function baseContactFilterConditions(
   if (filters.company) where.push(companyNameMatchCondition(`%${escapeLikeWildcards(filters.company)}%`));
   // "Grupo de rol" ad-hoc filter.
   if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
+  // "Tipo de contacto" ad-hoc filter — equality only, never matches NULL.
+  if (filters.contactType) where.push(contactTypeFilterCondition(filters.contactType));
   // "Tiene teléfono" ad-hoc filter (migration 0016) — either phone column set.
   if (filters.hasPhone) {
     where.push(sql`(${person.phone} is not null or ${person.mobilePhone} is not null)`);
@@ -227,6 +230,9 @@ export interface ContactListRow {
   // Column-picker (task 13.1) additions — projected always, rendered only
   // when the resolved column set includes them (src/lib/contacts/columns.ts).
   roleGroup: string | null;
+  // "Tipo de contacto" column (contact-type-ui) — stored value, label via
+  // contactTypeLabel.
+  contactType: string | null;
   industry: string | null;
   country: string | null;
   sourceKey: string | null;

@@ -13,6 +13,7 @@ export type ContactColumnKey =
   | "company"
   | "owner"
   | "status"
+  | "contactType"
   | "email"
   | "phone"
   | "bdConnections"
@@ -30,6 +31,9 @@ export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "company",
   "owner",
   "status",
+  // contact-type-ui: off by default, placed next to "Estado" (not last) so it
+  // is not pushed past the fold of the horizontally scrolling table.
+  "contactType",
   "email",
   // Migration 0016 — "Teléfono" column (contacts.html "Columnas" picker).
   "phone",

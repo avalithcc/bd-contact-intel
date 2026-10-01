@@ -15,6 +15,7 @@
  * is left as a documented gap for a later phase.
  */
 import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
+import { isContactType } from "@/lib/contacts/contactType";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
 
@@ -49,6 +50,17 @@ export class InvalidPhoneError extends Error {
   }
 }
 
+/**
+ * Thrown by planPropertyEdit when `contactType` is set to something outside
+ * the closed vocabulary (contactType.ts). Clearing (blank) is always allowed.
+ */
+export class InvalidContactTypeError extends Error {
+  constructor() {
+    super("Invalid contact type: not in the vocabulary");
+    this.name = "InvalidContactTypeError";
+  }
+}
+
 /** Same "local@domain-with-a-dot" bar as splitEmail, plus a literal dot in the domain. */
 function isValidEmailFormat(value: string): boolean {
   const split = splitEmail(value);
@@ -61,6 +73,7 @@ export const EDITABLE_PERSON_PROPERTIES = [
   "mobilePhone",
   "jobTitle",
   "roleGroup",
+  "contactType",
   "seniority",
   "city",
   "region",
@@ -137,6 +150,10 @@ export function planPropertyEdit(
 
   if (PHONE_PROPERTIES.has(property) && newValue !== null && !isValidPhoneFormat(newValue)) {
     throw new InvalidPhoneError("invalid_format");
+  }
+
+  if (property === "contactType" && newValue !== null && !isContactType(newValue)) {
+    throw new InvalidContactTypeError();
   }
 
   const personUpdate: Partial<NewPerson> = {

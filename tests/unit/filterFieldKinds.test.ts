@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EXTRA_FILTER_MENU_ORDER, FILTER_FIELD_KIND, FILTER_MENU_ORDER } from "@/lib/contacts/filterFieldKinds";
 
-test("FILTER_MENU_ORDER lists exactly the mockup's 11 'Agregar filtro' options (migration 0016 added 'Tiene teléfono'), in menu order", () => {
+test("FILTER_MENU_ORDER lists exactly the mockup's 12 'Agregar filtro' options (migration 0016 added 'Tiene teléfono', contact-type-ui added 'Tipo de contacto'), in menu order", () => {
   assert.deepEqual(FILTER_MENU_ORDER, [
     "owner",
     "status",
@@ -18,6 +18,7 @@ test("FILTER_MENU_ORDER lists exactly the mockup's 11 'Agregar filtro' options (
     "hiring",
     "market",
     "roleGroup",
+    "contactType",
     "startupsOnly",
     "bdConnected",
     "lastActivityDays",
@@ -36,6 +37,23 @@ test("FILTER_FIELD_KIND assigns the right control type to each of the 11 mockup 
   assert.equal(FILTER_FIELD_KIND.startupsOnly, "checkbox");
   assert.equal(FILTER_FIELD_KIND.bdConnected, "select");
   assert.equal(FILTER_FIELD_KIND.lastActivityDays, "select");
+});
+
+test("select-kind fields are exactly the ones FilterMenu must supply options for (SelectFilterField is derived from this map)", () => {
+  const selects = (Object.keys(FILTER_FIELD_KIND) as (keyof typeof FILTER_FIELD_KIND)[]).filter(
+    (f) => FILTER_FIELD_KIND[f] === "select",
+  );
+  assert.deepEqual(selects.sort(), [
+    "bdConnected",
+    "contactType",
+    "emailStatus",
+    "industryGroup",
+    "lastActivityDays",
+    "market",
+    "owner",
+    "roleGroup",
+    "seniority",
+  ]);
 });
 
 test("every field in FILTER_MENU_ORDER has a FILTER_FIELD_KIND entry", () => {

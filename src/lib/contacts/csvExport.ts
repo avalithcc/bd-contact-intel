@@ -15,6 +15,7 @@
  * (rare) false positive.
  */
 import type { ContactColumnKey } from "@/lib/contacts/columns";
+import { contactTypeLabel } from "@/lib/contacts/contactType";
 // Type-only import (erased at build time, no `@/db` runtime dependency) —
 // keeps this module's "pure, no DB" guarantee intact.
 import type { ContactListRow } from "@/lib/contacts/listQueries";
@@ -48,6 +49,8 @@ export interface ContactExportRow {
   // to `mobilePhone` (mapContactRowToExportRow below).
   phone: string | null;
   roleGroup: string | null;
+  // Stored value; cellValue exports its Spanish label.
+  contactType: string | null;
   industry: string | null;
   country: string | null;
   sourceKey: string | null;
@@ -79,6 +82,8 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.phone ?? "";
     case "roleGroup":
       return row.roleGroup ?? "";
+    case "contactType":
+      return contactTypeLabel(row.contactType, "");
     case "industry":
       return row.industry ?? "";
     case "country":
@@ -120,6 +125,7 @@ export function mapContactRowToExportRow(row: ContactListRow, statusLabel: strin
       ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`
       : "",
     roleGroup: row.roleGroup,
+    contactType: row.contactType,
     industry: row.industry,
     country: row.country,
     sourceKey: row.sourceKey,
