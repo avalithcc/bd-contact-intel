@@ -32,8 +32,14 @@ export interface GmailClient {
   historyList(startHistoryId: string, pageToken?: string): Promise<GmailHistoryResult>;
   /** `users.messages.list` — used only for the first-sync/re-baseline bounded pull (slice 4). */
   listMessages(query: string, pageToken?: string): Promise<GmailMessagesListPage>;
-  /** `users.messages.get?format=full`. */
-  getMessage(id: string): Promise<GmailApiMessage>;
+  /**
+   * `users.messages.get?format=full`. Returns `null` on a 404 — the message
+   * was deleted or expunged between `history.list` naming it and this fetch,
+   * which is normal and must NOT fail the run. Mirrors `historyList`'s own
+   * 404 handling. Any other non-ok status still throws: a 401 needs reauth
+   * and a 429 needs backoff, and swallowing those would hide a real outage.
+   */
+  getMessage(id: string): Promise<GmailApiMessage | null>;
   /** `users.getProfile` — the mailbox's current historyId, used to seed a fresh baseline. */
   getCurrentHistoryId(): Promise<string>;
 }
@@ -71,6 +77,7 @@ export function createGmailClient(accessToken: string): GmailClient {
     },
     async getMessage(id) {
       const res = await apiGet(`/messages/${id}?format=full`);
+      if (res.status === 404) return null;
       if (!res.ok) throw new Error(`Gmail messages.get failed: ${res.status} ${await res.text()}`);
       return res.json();
     },
