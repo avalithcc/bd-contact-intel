@@ -25,6 +25,16 @@
  */
 export const SYNC_STALE_AFTER_MS = 60 * 60_000;
 
+/**
+ * Grace period before an unclassified (`other`) error counts as failing.
+ * `last_synced_at` is the last success and a success clears `sync_error`,
+ * so "error set and no success for > 30 min" means at least two runs in a
+ * row failed. A single Gmail 5xx therefore never raises the non-dismissible
+ * every-page banner to BDs who can do nothing about it. Auth and config
+ * errors are not transient and skip the grace.
+ */
+export const FAILING_GRACE_MS = 30 * 60_000;
+
 export type SyncHealthState =
   /** Syncing normally (or a fresh connection still waiting for its first run). */
   | "ok"
@@ -75,12 +85,15 @@ export function deriveSyncHealth(input: SyncHealthInput): SyncHealth {
 
   const sinceMs = input.lastSyncedAt ? Math.max(0, input.now.getTime() - input.lastSyncedAt.getTime()) : null;
 
-  const errorKind = classifySyncError(input.syncError);
-  if (errorKind) return { state: "failing", errorKind, sinceMs };
-
   // A never-synced account is judged from when it connected, so a brand-new
   // connection waiting for its first cron tick is not flagged.
   const reference = input.lastSyncedAt ?? input.connectedAt ?? null;
   const gapMs = reference ? input.now.getTime() - reference.getTime() : 0;
+
+  const errorKind = classifySyncError(input.syncError);
+  if (errorKind && (errorKind !== "other" || gapMs > FAILING_GRACE_MS)) return { state: "failing", errorKind, sinceMs };
+  // Inside the grace period an unclassified error is treated as transient.
+  if (errorKind) return { state: "ok", errorKind: null, sinceMs };
+
   return { state: gapMs > SYNC_STALE_AFTER_MS ? "stale" : "ok", errorKind: null, sinceMs };
 }

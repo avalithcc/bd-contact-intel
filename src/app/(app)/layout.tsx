@@ -7,6 +7,7 @@ import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { SyncHealthBanner } from "@/components/SyncHealthBanner";
+import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { Sidebar } from "../contacts/Sidebar";
 import { TopBar } from "../contacts/TopBar";
 
@@ -65,7 +66,8 @@ export default async function AppLayout({
             me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
           />
           {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
-          {syncBanner && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
+          {/* Without server OAuth config /account/email renders no card, so the link would land on nothing. */}
+          {syncBanner && getGmailOAuthConfig().ok && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
           {children}
         </div>
       </div>

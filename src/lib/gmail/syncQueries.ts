@@ -131,11 +131,11 @@ export async function getPlatformSentGmailMessageIds(bdId: string, gmailMessageI
 
 export async function updateAccountAfterSync(
   bdId: string,
-  patch: { historyId?: string | null; syncError?: string | null; backfillPageToken?: string | null },
+  patch: AfterSyncPatch,
 ): Promise<void> {
   await db
     .update(emailAccount)
-    .set({ ...patch, lastSyncedAt: new Date(), updatedAt: new Date() })
+    .set(buildAfterSyncSet(patch, new Date()))
     .where(eq(emailAccount.bdId, bdId));
 }
 

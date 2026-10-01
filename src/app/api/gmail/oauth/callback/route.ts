@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { encryptToken } from "@/lib/gmail/crypto";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
+import { buildReconnectSyncReset } from "@/lib/gmail/reconnectPatch";
 import {
   GMAIL_OAUTH_STATE_COOKIE,
   GMAIL_OAUTH_STATE_COOKIE_PATH,
@@ -102,6 +103,8 @@ export async function GET(req: NextRequest) {
           status: "connected",
           lastErrorMessage: null,
           grantedScopes,
+          // A new grant invalidates the previous sync verdict (reconnectPatch.ts).
+          ...buildReconnectSyncReset(new Date()),
         },
       });
 
