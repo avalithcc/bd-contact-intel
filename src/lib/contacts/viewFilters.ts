@@ -109,6 +109,12 @@ export function serializeContactFilters(filters: ContactFilters): URLSearchParam
   return params;
 }
 
+/**
+ * Strict parser for serialized filters (serializeContactFilters emits "1"):
+ * used by the bulk-generate action. NOT the live `/contacts` URL path, which
+ * goes through applyAdHocContactFilterOverrides and is laxer (checkboxes
+ * submit "on"). Keep the two in sync when adding a filter.
+ */
 export function parseContactFilters(params: URLSearchParams): ContactFilters {
   const filters: ContactFilters = {};
 
@@ -216,6 +222,7 @@ export interface AdHocContactFilterInput {
   bdConnected?: string;
   lastActivityDays?: string;
   hasPhone?: string;
+  emailVerified?: string;
 }
 
 /**
@@ -298,6 +305,11 @@ export function applyAdHocContactFilterOverrides(
   if (raw.hasPhone !== undefined) {
     if (raw.hasPhone === "" || raw.hasPhone === "0") delete result.hasPhone;
     else result.hasPhone = true;
+  }
+
+  if (raw.emailVerified !== undefined) {
+    if (raw.emailVerified === "" || raw.emailVerified === "0") delete result.emailVerified;
+    else result.emailVerified = true;
   }
 
   return result;
