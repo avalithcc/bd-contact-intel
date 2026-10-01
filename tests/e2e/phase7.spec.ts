@@ -6,12 +6,11 @@ skipWithoutCredentials();
 /**
  * Phase 7 task 7.3 (duplicate-review spec: admin-only queue, merge path).
  *
- * NOT EXECUTED by this batch — both tests need real authenticated sessions
- * this environment cannot provide (no DATABASE_URL/live server here), and
- * the non-admin case additionally needs a second, non-admin account that
- * the current single-session `tests/e2e/auth.setup.ts` does not set up.
- * Written to the repo's existing e2e conventions (gotoAuthed, test.skip with
- * a stated reason) for a maintainer to run against a real environment.
+ * The suite RUNS now (a test account exists). Both tests still skip by
+ * default: the non-admin case needs E2E_NON_ADMIN_EMAIL, and the merge case
+ * is DESTRUCTIVE and gated behind E2E_ALLOW_DESTRUCTIVE — see its own
+ * comment. Everything else in this suite is strictly read-only, because it
+ * runs against PRODUCTION.
  */
 test.describe('Phase 7: Duplicate review admin page', () => {
   test('non-admin gets a 404 on /admin/duplicates', async ({ page }) => {
@@ -28,7 +27,30 @@ test.describe('Phase 7: Duplicate review admin page', () => {
     await expect(page.locator('text=/404/')).toBeVisible();
   });
 
+  /**
+   * THIS TEST MERGES TWO REAL CONTACTS. It is the only write in the suite.
+   *
+   * It picks the FIRST pair in the live `/admin/duplicates` queue and merges
+   * it, with no human judgement about whether they are the same person.
+   * Production currently holds 244 open pairs, and 155 of them have no email
+   * on either side — the namesake bucket where the heuristic has already been
+   * measured wrong 7 times out of 9. Merging one blindly is data loss.
+   *
+   * It does NOT skip today because the queue is empty. It skips because the
+   * e2e account is role `bd`, so /admin/duplicates serves it the 404 that the
+   * test above asserts, and the queue locator finds nothing. Grant that
+   * account admin, or run the suite as a real admin, and this fires.
+   *
+   * So it is gated explicitly. Set E2E_ALLOW_DESTRUCTIVE=1 ONLY against a
+   * disposable database you are willing to lose.
+   */
   test('admin merging a pair resolves it and records one merge-history row', async ({ page }) => {
+    test.skip(
+      process.env.E2E_ALLOW_DESTRUCTIVE !== '1',
+      'DESTRUCTIVE: this test MERGES TWO REAL CONTACTS from the live duplicate queue. ' +
+        'It is skipped unless E2E_ALLOW_DESTRUCTIVE=1. Never set that against production.',
+    );
+
     await gotoAuthed(page, '/admin/duplicates');
 
     const firstPair = page.locator('.duplicates-queue-item').first();
