@@ -9,19 +9,29 @@ import { db } from "@/db";
 import { argentinaCalendarDate, argentinaDayBoundaries, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import { buildAppShellBadgeCountsQuery } from "@/lib/shell/appShellBadgeCountsQuery";
 import { shouldShowReconnectBanner } from "@/lib/gmail/reconnectBannerState";
+import { needsReconnectForSync } from "@/lib/gmail/needsReconnectForSync";
+import { deriveSyncHealth } from "@/lib/gmail/syncHealth";
 
 export interface AppShellBadgeCounts {
   taskCount: number;
   followUpCount: number;
   /** email-sync.html screen 4 — see reconnectBannerState.ts. */
   needsReconnectBanner: boolean;
+  /** Connected and readonly-scoped, but not syncing (syncHealth.ts); null when healthy or not applicable. */
+  syncBanner: "failing" | "stale" | null;
 }
 
 interface EmailAccountBannerState {
   status: string | null;
   grantedScopes: string | null;
   dismissedAt: string | null;
+  syncError: string | null;
+  // json_build_object serializes timestamptz as ISO text, never a Date.
+  lastSyncedAt: string | null;
+  connectedAt: string | null;
 }
+
+const toDate = (iso: string | null | undefined): Date | null => (iso ? new Date(iso) : null);
 
 /**
  * ONE round trip for the sidebar badges AND the reconnect banner flag
@@ -55,6 +65,18 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
     email_account_banner_state: EmailAccountBannerState | null;
   }[];
   const bannerState = row?.email_account_banner_state ?? null;
+  // A pre-readonly connection is skipped by the cron entirely, so its
+  // timestamp is old by design: the reconnect banner covers it, not this.
+  const syncable = bannerState !== null && !needsReconnectForSync(bannerState.grantedScopes);
+  const health = syncable
+    ? deriveSyncHealth({
+        status: bannerState.status,
+        syncError: bannerState.syncError,
+        lastSyncedAt: toDate(bannerState.lastSyncedAt),
+        connectedAt: toDate(bannerState.connectedAt),
+        now,
+      })
+    : null;
   return {
     taskCount: Number(row?.task_count ?? 0),
     followUpCount: Number(row?.follow_up_count ?? 0),
@@ -63,5 +85,6 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
       grantedScopes: bannerState?.grantedScopes ?? null,
       reconnectBannerDismissedAt: bannerState?.dismissedAt ?? null,
     }),
+    syncBanner: health?.state === "failing" || health?.state === "stale" ? health.state : null,
   };
 }

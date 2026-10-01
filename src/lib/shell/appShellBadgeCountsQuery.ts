@@ -133,7 +133,11 @@ export function buildAppShellBadgeCountsQuery({
         select json_build_object(
           'status', email_account.status,
           'grantedScopes', email_account.granted_scopes,
-          'dismissedAt', email_account.reconnect_banner_dismissed_at
+          'dismissedAt', email_account.reconnect_banner_dismissed_at,
+          -- Sync-health banner (syncHealth.ts): same row, same round trip.
+          'syncError', email_account.sync_error,
+          'lastSyncedAt', email_account.last_synced_at,
+          'connectedAt', email_account.connected_at
         )
         from ${emailAccount}
         where email_account.bd_id = ${bdId}::uuid

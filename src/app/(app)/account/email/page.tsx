@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { deriveEmailConnectionScreenState } from "@/lib/gmail/connectionScreenState";
 import { needsReconnectForSync } from "@/lib/gmail/needsReconnectForSync";
+import { deriveSyncHealth } from "@/lib/gmail/syncHealth";
 import { InfoIcon, LinkIcon, MailIcon, WarningIcon } from "@/components/icons";
 import { ConnectSuccessToast } from "./ConnectSuccessToast";
 import { DisconnectButton, SyncNowButton } from "./AccountEmailActions";
@@ -51,11 +52,31 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
       serverConfigured: getGmailOAuthConfig().ok,
       accountStatus: account?.status ?? null,
       grantedScopes: account?.grantedScopes ?? null,
-      syncError: account?.syncError ?? null,
       backfillPageToken: account?.backfillPageToken ?? null,
     },
     needsReconnectForSync,
   );
+
+  // Orthogonal to the screen state: a connection can be perfectly connected
+  // and still sync nothing (syncHealth.ts).
+  const health = deriveSyncHealth({
+    status: account?.status ?? null,
+    syncError: account?.syncError ?? null,
+    lastSyncedAt: account?.lastSyncedAt ?? null,
+    connectedAt: account?.connectedAt ?? null,
+    now: new Date(),
+  });
+  const showHealthAlert =
+    screenState !== "needs_reconnect" && (health.state === "failing" || health.state === "stale");
+  // Reconnecting fixes an auth failure only; for anything else it is noise.
+  const showReconnect = showHealthAlert && health.errorKind === "auth";
+  const isAdmin = me.role === "admin";
+  const failingBody =
+    health.errorKind === "auth"
+      ? l.syncFailingBodyAuth
+      : health.errorKind === "config"
+        ? l.syncFailingBodyConfig
+        : l.syncFailingBodyOther;
 
   const errorMessage = error
     ? error === "not_configured"
@@ -179,7 +200,7 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
         </div>
       )}
 
-      {(screenState === "sync_error" || screenState === "backfilling" || screenState === "synced") && account && (
+      {(screenState === "backfilling" || screenState === "synced") && account && (
         <div className="card mt-lg">
           <div className="card-header">
             <MailIcon className="icon" />
@@ -210,17 +231,23 @@ export default async function EmailPage({ searchParams }: EmailPageProps) {
               )}
             </dl>
 
-            {screenState === "sync_error" && (
-              <div className="alert alert-danger">
+            {showHealthAlert && (
+              <div className={`alert ${health.state === "failing" ? "alert-danger" : "alert-warn"}`}>
                 <WarningIcon className="icon" />
                 <div>
-                  <div className="title">{l.errorAlertTitle}</div>
-                  {account.syncError} {l.errorAlertBodySuffix}
+                  <div className="title">{health.state === "failing" ? l.syncFailingTitle : l.syncStaleTitle}</div>
+                  {health.state === "failing" ? failingBody : l.syncStaleBody}
+                  {isAdmin && account.syncError && (
+                    <details className="mt-md">
+                      <summary>{l.syncErrorDetailSummary}</summary>
+                      <code className="mono">{account.syncError.slice(0, 500)}</code>
+                    </details>
+                  )}
                 </div>
               </div>
             )}
 
-            {screenState === "sync_error" && (
+            {showReconnect && (
               <form action="/api/gmail/oauth/start" method="GET">
                 <button type="submit" className="btn btn-primary">
                   <LinkIcon className="icon" />

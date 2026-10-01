@@ -8,6 +8,10 @@
  * SAME row `getSyncableAccountForBd` already fetched, no extra round trip.
  */
 export const SYNC_COOLDOWN_MS = 60_000;
+// Deliberate: `lastSyncedAt` is the last SUCCESS (afterSyncPatch.ts), so a
+// failing account is never throttled by this cooldown. A retry is the useful
+// action for a BD looking at a sync error, and each press is one bounded
+// 20s sync turn, so the missing cooldown after a failure is accepted.
 
 export interface SyncCooldownInput {
   lastSyncedAt: Date | null;

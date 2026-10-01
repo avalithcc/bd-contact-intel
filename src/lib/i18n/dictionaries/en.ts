@@ -1165,10 +1165,18 @@ export const en = {
     reconnectAlertTitle: "Your connection only allows sending email.",
     reconnectAlertBody:
       "To sync replies into contacts' timelines, reconnect Gmail and accept the new read permission. Nothing in your inbox is read until you reconnect.",
-    lastSyncedLabel: "Last synced",
+    lastSyncedLabel: "Last successful sync",
     lastSyncedNever: "Never synced yet",
-    errorAlertTitle: "Couldn't sync Gmail.",
-    errorAlertBodySuffix: "Reconnect to resume syncing; the rest of the account keeps working normally.",
+    syncFailingTitle: "Your Gmail is not syncing.",
+    syncFailingBodyAuth: "Google revoked or expired access to your account. Reconnect Gmail to resume syncing.",
+    syncFailingBodyConfig:
+      "The server's Google credentials are misconfigured. Reconnecting will not fix it: tell an administrator.",
+    syncFailingBodyOther:
+      "New emails are not reaching the CRM. Your connection is still active, so reconnecting will not fix it. Try “Sync now”; if it persists, tell an administrator.",
+    syncStaleTitle: "Your Gmail has not synced for a while.",
+    syncStaleBody:
+      "No error is recorded, but a sync has not completed in over an hour. Try “Sync now”; if it persists, tell an administrator.",
+    syncErrorDetailSummary: "Technical detail (administrators only)",
     backfillTitle: "Syncing the last 90 days…",
     backfillBody:
       "This can take several minutes the first time. Contacts who replied in this window will move to Replied once it finishes. You can close this page; it keeps running in the background.",
@@ -1190,6 +1198,12 @@ export const en = {
       "Reconnect Gmail to turn on automatic email sync: we'll log your contacts' replies without you having to do anything.",
     cta: "Reconnect Gmail",
     closeAria: "Close notice",
+  },
+
+  syncHealthBanner: {
+    failing: "Gmail is not syncing: new emails are not reaching the CRM.",
+    stale: "Gmail has not synced for over an hour.",
+    cta: "View details",
   },
 
   accountEmailNeverLog: {
