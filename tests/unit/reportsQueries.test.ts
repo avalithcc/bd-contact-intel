@@ -131,7 +131,16 @@ test("buildReportPerBdQuery: queue pivot's worked-check is a correlated EXISTS a
   const { sql } = renderPerBd();
   assert.match(sql, /exists\s*\(\s*select 1 from "activity"/i);
   assert.match(sql, /activity\.person_id = follow_up_queue_item\.person_id/i);
-  assert.match(sql, /follow_up_queue_item\.queue_date::timestamptz \+ interval '3 hours'/i);
+  assert.match(sql, /follow_up_queue_item\.queue_date::timestamp at time zone 'UTC'\) \+ interval '3 hours'/i);
+});
+
+test("buildReportPerBdQuery: queue-day window does not depend on the session TimeZone (no bare date::timestamptz cast)", () => {
+  // `date::timestamptz` is midnight in the SESSION zone, so the ART window
+  // [queue_date + 3h, queue_date + 1d 3h) silently moved with it. Naive
+  // `::timestamp` + `AT TIME ZONE 'UTC'` pins midnight UTC explicitly.
+  const { sql } = renderPerBd();
+  assert.doesNotMatch(sql, /queue_date::timestamptz/i);
+  assert.equal(sql.match(/queue_date::timestamp at time zone 'UTC'\) \+ interval '(?:1 day )?3 hours'/gi)?.length, 4);
 });
 
 test("buildReportPerBdQuery: nullable bd filter applies to actor_bd_id, assigned_to_bd_id, and follow_up_queue_item.bd_id independently", () => {
