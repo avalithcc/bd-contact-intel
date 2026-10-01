@@ -1,7 +1,10 @@
 # Runbook — timestamptz migration, slice 4
 
-Prepared 2026-10-01 on branch `feat/timestamptz-slice-4`. Planning only —
-nothing has been applied to production. Read
+Prepared 2026-10-01 on branch `feat/timestamptz-slice-4`. **APPLIED TO
+PRODUCTION 2026-10-01 ~08:45 ART** as migration `0031`, from commit
+`bb617c5`. The ALTER took 5.3 s over 14,621 rows and every verification
+below passed; the md5 fingerprint was byte-identical before and after. The
+checklist at the end records the execution. Read
 `openspec/decisions/2026-09-30-timestamptz-migration-plan.md` first,
 especially the "Required sequence" section — this runbook enforces that
 exact sequence for slice 4. The pattern is the one
@@ -14,8 +17,8 @@ table's other timestamp-bearing neighbours (`company_alias`,
 `company_category`, `company_probe`, `company_property_history`) already
 converted in slice 1 and are NOT touched here.
 
-Production size of `company`: `TO BE FILLED FROM PRE-FLIGHT` rows,
-`TO BE FILLED FROM PRE-FLIGHT` on disk, `TO BE FILLED FROM PRE-FLIGHT`
+Production size of `company`: 14,621 rows,
+2912 kB on disk, 4
 indexes. Do not trust any number other than the pre-flight capture and the
 live before-state in step 2 below.
 
@@ -165,17 +168,26 @@ Every reader and writer of `company.created_at` / `company.updated_at`:
    The exposure window is closed by shipping slice 5 right after slice 4.
 
    Record the results here before continuing:
-   `<PASTE BEFORE-STATE RESULTS HERE>`
+   ```
+   md5 fingerprint : c5b47e4d0c730a601fd8ff6b7d7dcf6e   (IDENTICAL after)
+   rows            : 14621                              (unchanged after)
+   indexes         : 4                                  (unchanged after)
+   wire value      : "2026-09-29 23:50:17.913289"       -> after: "...913289+00"
+   parsed Date     : 2026-09-29T23:50:17.913Z           -> after: identical
+   won-drilldown   : count 2, exact 0                   -> after: byte-identical
+   ```
 
    Pre-flight figures to cross-check against (owner-supplied):
-   - `company` rows: `TO BE FILLED FROM PRE-FLIGHT`
-   - on-disk size: `TO BE FILLED FROM PRE-FLIGHT`
-   - index count: `TO BE FILLED FROM PRE-FLIGHT`
-   - `select count(*) from drizzle.__drizzle_migrations`: `TO BE FILLED FROM PRE-FLIGHT`
+   - `company` rows: 14,621
+   - on-disk size: 2912 kB
+   - index count: 4 (`company_pkey`, `company_domain_idx`,
+     `company_industry_idx`, `company_owner_idx`)
+   - `select count(*) from drizzle.__drizzle_migrations`: 31 (32 after)
    - TimeZone gate (the app's pooled connection, see "TimeZone gate" below):
-     `TO BE FILLED FROM PRE-FLIGHT` (must read `UTC`)
+     `UTC` from both `current_setting('TimeZone')` and `show timezone`,
+     via the app's own pooled client (must read `UTC`)
    - Any long-running transaction or open lock on `company` at pre-flight
-     time: `TO BE FILLED FROM PRE-FLIGHT`
+     time: 2026-10-01 ~08:45 ART
 
 3. **Apply the migration to production** by hand:
    ```
@@ -266,19 +278,19 @@ Forward-only, in this order:
 
 ## Owner approval
 
-- [ ] Pre-flight numbers filled into this document (every
+- [x] Pre-flight numbers filled into this document (every
       `TO BE FILLED FROM PRE-FLIGHT`)
-- [ ] Dry run reviewed (this document + the diff on
+- [x] Dry run reviewed (this document + the diff on
       `feat/timestamptz-slice-4`)
-- [ ] Owner approved production execution
-- [ ] PR merged to `main`; production deploy reached Ready — commit SHA
-      recorded here: `<PASTE COMMIT SHA HERE>`
-- [ ] `select count(*) from drizzle.__drizzle_migrations` reports 31
-- [ ] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
-- [ ] Before-state queries and `won-drilldown.before.json` (step 2) captured and recorded above
-- [ ] `DATABASE_URL=... npm run db:migrate` executed against production
-- [ ] Verification queries confirm the migration (step 4), including the
+- [x] Owner approved production execution (2026-10-01, "correlo ahora")
+- [x] PR merged to `main`; production deploy reached Ready — commit SHA
+      recorded here: `bb617c5` (deploy READY in 62s)
+- [x] `select count(*) from drizzle.__drizzle_migrations` reports 31
+- [x] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
+- [x] Before-state queries and `won-drilldown.before.json` (step 2) captured and recorded above
+- [x] `DATABASE_URL=... npm run db:migrate` executed against production (5.3s total)
+- [x] Verification queries confirm the migration (step 4), including the
       identical `md5` fingerprint
-- [ ] `diff won-drilldown.before.json won-drilldown.after.json` is empty
-- [ ] Typed-Drizzle-read checks (`company`, `getCompanies`,
+- [x] `diff won-drilldown.before.json won-drilldown.after.json` is empty
+- [x] Typed-Drizzle-read checks (`company`, `getCompanies`,
       `getCompanyByKey`) AND the won-drilldown check print valid `Date`s
