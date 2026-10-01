@@ -389,7 +389,15 @@ details.card:not([open]) > summary { border-bottom: 0; }
   box-shadow: var(--shadow-dropdown); padding: var(--space-2xs);
 }
 .menu.left { right: auto; left: 0; }
-.menu-item { display: flex; align-items: center; gap: var(--space-sm); padding: 0.4rem var(--space-sm); border-radius: var(--radius-sm); color: var(--color-ink); font-size: var(--text-base); }
+/* `background` and `font-weight` are reset explicitly because `:where(button)`
+   (globals.css) gives every bare button the ACCENT fill at zero specificity.
+   `.menu-item` set no background, so a `<button class="menu-item">` rendered as
+   a red box with dark ink, while the `:disabled` rule below DID set
+   `background: transparent` — so the control looked correct when disabled and
+   wrong when enabled. Measured on `follow-ups/PostponeMenu.tsx` markup:
+   enabled was rgb(213,37,47), disabled was transparent. Same class on an
+   `<a>` was always correct, which is what isolated it to the button base. */
+.menu-item { display: flex; align-items: center; gap: var(--space-sm); padding: 0.4rem var(--space-sm); border-radius: var(--radius-sm); color: var(--color-ink); font-size: var(--text-base); background: transparent; font-weight: 400; }
 .menu-item:hover { background: var(--color-row-hover); text-decoration: none; }
 .menu-item:disabled, .menu-item:disabled:hover { color: var(--color-ink-subtle); background: transparent; cursor: not-allowed; }
 .menu-label { font-size: var(--text-xs); color: var(--color-ink-subtle); padding: var(--space-2xs) var(--space-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
