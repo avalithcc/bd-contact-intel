@@ -1,4 +1,16 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { skipReason } from './credentials';
+
+/**
+ * Call at the top of a spec file. Without E2E credentials, outside CI, every
+ * test in the file is reported as skipped (with the reason) instead of
+ * failing on a missing session. In CI it is a no-op, so a missing credential
+ * still fails (auth.setup.ts throws).
+ */
+export function skipWithoutCredentials() {
+  const reason = skipReason();
+  test.skip(reason !== null, reason ?? '');
+}
 
 /**
  * Every route is auth-gated. A silent redirect to /login is what previously
@@ -9,7 +21,9 @@ export async function gotoAuthed(page: Page, url: string) {
   await page.waitForLoadState('networkidle');
   await expect(
     page,
-    `Redirected to /login while opening ${url} — the test session is not authenticated.`,
+    `Redirected to /login while opening ${url}: the saved session (tests/.auth/state.json) ` +
+      'is missing or STALE (its Supabase refresh token expired). Re-run the setup project: ' +
+      '`npx playwright test --project=setup` (needs E2E_EMAIL/E2E_PASSWORD, see tests/e2e/README.md).',
   ).not.toHaveURL(/\/login/);
 }
 

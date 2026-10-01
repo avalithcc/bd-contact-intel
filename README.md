@@ -21,6 +21,8 @@ Also set `CRON_SECRET` (a random string) as an env var in the deployment
 environment (e.g. Vercel project settings) — it authenticates the
 `/api/hiring/sync` cron endpoint. That route fails closed if it's unset.
 
+Browser tests (Playwright) need a test BD account: see `tests/e2e/README.md`.
+
 ### One-time Supabase Storage setup (messages.csv import)
 
 LinkedIn's `messages.csv` export runs ~6.5MB, too big for a server action's

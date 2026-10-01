@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { gotoAuthed } from './helpers';
+import { gotoAuthed, skipWithoutCredentials } from './helpers';
+
+skipWithoutCredentials();
 
 /**
  * Phase 14 task 14.3: full flow — import a CSV, see the dedup outcome, then

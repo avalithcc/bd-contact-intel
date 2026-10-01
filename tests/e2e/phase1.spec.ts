@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { gotoAuthed, openFirstOrSkip } from './helpers';
+import { gotoAuthed, openFirstOrSkip, skipWithoutCredentials } from './helpers';
+
+skipWithoutCredentials();
 
 test.describe('Phase 1: Core CRM Tracking', () => {
   test('Tasks page lists tasks with a complete control', async ({ page }) => {
