@@ -41,7 +41,7 @@ async function totalOf(page: Page): Promise<number> {
 
 /** Opens "Agregar filtro" and picks one entry; returns that filter's editor form. */
 async function openEditorFromMenu(page: Page, field: string) {
-  await page.getByRole('button', { name: 'Agregar filtro', exact: true }).click();
+  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
   await page.getByRole('button', { name: field, exact: true }).click();
   const editor = page.locator('form.menu').filter({ hasText: field });
   await expect(editor).toBeVisible();
@@ -54,7 +54,7 @@ async function applyEditor(page: Page, editor: ReturnType<Page['locator']>) {
   const from = page.url();
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/contacts' && url.href !== from),
-    editor.getByRole('button', { name: 'Aplicar', exact: true }).click(),
+    editor.getByRole('button', { name: 'Aplicar filtros', exact: true }).click(),
   ]);
   await page.waitForLoadState('networkidle');
 }
@@ -106,7 +106,7 @@ test.describe('Contacts: "Agregar filtro" regressions', () => {
     const before = await totalOf(page);
     expect(before, 'Needs at least one contact in the list').toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: 'Agregar filtro', exact: true }).click();
+    await page.getByRole('button', { name: 'Filtros', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Tipo de contacto', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Tipo de contacto', exact: true }).click();
 
