@@ -21,6 +21,8 @@ function person(overrides: Partial<MergePersonFields> & { id: string }): MergePe
     emailStatus: "none",
     emailConfidence: null,
     emailSource: null,
+    phone: null,
+    mobilePhone: null,
     company: "Acme",
     companyKey: "acme",
     companyCategory: null,

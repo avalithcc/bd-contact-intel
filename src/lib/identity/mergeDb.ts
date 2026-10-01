@@ -51,6 +51,8 @@ export function toMergeFields(row: typeof person.$inferSelect): MergePersonField
     emailStatus: row.emailStatus as MergePersonFields["emailStatus"],
     emailConfidence: row.emailConfidence,
     emailSource: row.emailSource,
+    phone: row.phone,
+    mobilePhone: row.mobilePhone,
     company: row.company,
     companyKey: row.companyKey,
     companyCategory: row.companyCategory,
