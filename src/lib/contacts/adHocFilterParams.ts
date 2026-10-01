@@ -36,11 +36,37 @@ function statusQuery(sp: RawSearchParams): string | undefined {
   return Array.isArray(status) ? status.join(",") : status;
 }
 
+/**
+ * Checkbox-kind params. An unchecked checkbox submits nothing, so "the user
+ * unchecked it" is indistinguishable from "the editor was never submitted" and
+ * a value inherited from a saved/system view would survive. Each checkbox
+ * editor therefore also submits `<field>__set=1` (a different name, so the
+ * field itself never repeats and stays a single string).
+ */
+export const CHECKBOX_FILTER_PARAM_KEYS = [
+  "hiring",
+  "startupsOnly",
+  "hasPhone",
+  "emailVerified",
+] as const satisfies readonly (typeof AD_HOC_FILTER_PARAM_KEYS)[number][];
+
+export function isCheckboxFilterKey(name: string): name is (typeof CHECKBOX_FILTER_PARAM_KEYS)[number] {
+  return (CHECKBOX_FILTER_PARAM_KEYS as readonly string[]).includes(name);
+}
+
+export function checkboxSubmitMarker(field: (typeof CHECKBOX_FILTER_PARAM_KEYS)[number]): string {
+  return `${field}__set`;
+}
+
 export function contactFilterParamsFromSearchParams(sp: RawSearchParams): AdHocContactFilterInput {
   const input: AdHocContactFilterInput = { status: statusQuery(sp) };
   for (const key of AD_HOC_FILTER_PARAM_KEYS) {
     const value = sp[key];
     if (typeof value === "string") input[key] = value;
+  }
+  // Marker present but no usable value: the box was unchecked -> explicit clear.
+  for (const key of CHECKBOX_FILTER_PARAM_KEYS) {
+    if (input[key] === undefined && sp[checkboxSubmitMarker(key)] !== undefined) input[key] = "";
   }
   return input;
 }
