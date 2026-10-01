@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildRawMessage, generateBoundary, wrapBase64 } from "@/lib/gmail/rawMessage";
 import { htmlToOutboundText } from "@/lib/gmail/outboundText";
+import { GmailSendError } from "@/lib/gmail/errors";
 
 interface DecodedPart {
   headers: Record<string, string>;
@@ -163,6 +164,50 @@ test("building twice with the same input is deterministic apart from the boundar
   const b = decode(buildRawMessage(FROM, TO, "S", input, () => "fixed"));
   assert.equal(a.message, b.message);
   assert.deepEqual(input, { bodyHtml: "<p>same</p>" });
+});
+
+// ---- Header-injection guard (To / From are interpolated raw) ----
+
+const CONTENTS = [{ body: "x" }, { bodyHtml: "<p>x</p>" }] as const;
+const BAD_VALUES: [string, string][] = [
+  ["CR", "a@x.com\rb"],
+  ["LF", "a@x.com\nb"],
+  ["CRLF", "a@x.com\r\nb"],
+  ["NUL", "a@x.com\0b"],
+  ["Bcc payload", "victim@x.com\r\nBcc: evil@x.com"],
+];
+
+for (const [name, bad] of BAD_VALUES) {
+  for (const field of ["to", "from"] as const) {
+    test(`header guard: ${name} in ${field} throws invalid_header and produces no message`, () => {
+      for (const content of CONTENTS) {
+        let produced: string | undefined;
+        assert.throws(
+          () => {
+            produced = buildRawMessage(field === "from" ? bad : FROM, field === "to" ? bad : TO, "S", content);
+          },
+          (err: unknown) => err instanceof GmailSendError && err.kind === "invalid_header",
+        );
+        assert.equal(produced, undefined);
+      }
+    });
+  }
+}
+
+test("header guard: a normal address, and a display-name form, still work", () => {
+  for (const addr of ["lead@example.com", '"Doe, Jane" <jane@example.com>']) {
+    const d = decode(buildRawMessage(addr, addr, "S", { body: "x" }));
+    assert.equal(d.top.headers.to, addr);
+    assert.equal(d.top.headers.from, addr);
+  }
+});
+
+test("header guard: a subject with CRLF is neutralised by base64, not rejected", () => {
+  const subject = "Hi\r\nBcc: evil@x.com";
+  const d = decode(buildRawMessage(FROM, TO, subject, { body: "x" }));
+  assert.equal(decodeSubject(d.top.headers.subject), subject);
+  assert.equal(d.top.headers.bcc, undefined);
+  assert.match(d.top.headers.subject, /^=\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=$/);
 });
 
 const textCases: [string, string, string][] = [

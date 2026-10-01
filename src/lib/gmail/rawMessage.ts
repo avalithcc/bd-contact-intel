@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { GmailSendError } from "@/lib/gmail/errors";
 import { htmlToOutboundText } from "@/lib/gmail/outboundText";
 
 /**
@@ -44,6 +45,18 @@ export function generateBoundary(
   throw new Error("Could not generate a MIME boundary that does not collide with the content");
 }
 
+/**
+ * Throws for a header value containing CR, LF or NUL. Reject, don't strip:
+ * silently dropping part of a recipient is worse than refusing to send.
+ * Every value interpolated into a header WITHOUT encoding must pass this
+ * (To, From). Subject is exempt: RFC 2047 base64 neutralises it.
+ */
+export function assertSafeHeaderValue(name: string, value: string): void {
+  if (/[\r\n\0]/.test(value)) {
+    throw new GmailSendError("invalid_header", `The ${name} address contains a control character (CR, LF or NUL)`);
+  }
+}
+
 export function buildRawMessage(
   from: string,
   to: string,
@@ -51,6 +64,8 @@ export function buildRawMessage(
   content: MessageContent,
   boundaryRandom?: () => string,
 ): string {
+  assertSafeHeaderValue("From", from);
+  assertSafeHeaderValue("To", to);
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
   const envelope = [`From: ${from}`, `To: ${to}`, `Subject: ${encodedSubject}`, "MIME-Version: 1.0"];
 

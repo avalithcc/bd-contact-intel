@@ -62,6 +62,10 @@ test("maps GmailSendError('not_configured'|'temporary'|'send_failed') to 'gmail_
   assert.equal(contactActionErrorReason(new GmailSendError("send_failed", "x")), "gmail_unavailable");
 });
 
+test("maps GmailSendError('invalid_header') to 'invalid_email'", () => {
+  assert.equal(contactActionErrorReason(new GmailSendError("invalid_header", "x")), "invalid_email");
+});
+
 test("contactActionErrorHref points reconnect reasons at /account/email", () => {
   assert.equal(contactActionErrorHref("gmail_not_connected"), "/account/email");
   assert.equal(contactActionErrorHref("gmail_reauth"), "/account/email");
