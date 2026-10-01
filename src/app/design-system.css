@@ -174,10 +174,12 @@ kbd, .kbd {
    recipe is a flat sunken fill + hairline border + subtle ink (4.5:1, AA). The fill is what makes
    it read as inert at a glance: every enabled variant is either accent, white or transparent, so
    a grey flat box is unique to disabled. Ghost therefore gets the box too (enabled it has no
-   surface), instead of differing only by ink and cursor. `pointer-events: none` suppresses hover. */
+   surface), instead of differing only by ink and cursor. No `pointer-events: none`: the control must
+   stay hoverable so `cursor: not-allowed` and a `title` explaining WHY it is disabled can show. The
+   hover rules above are declared earlier at equal specificity, so this block overrides them. */
 .btn:disabled, .btn.is-disabled {
   background: var(--color-surface-sunken); color: var(--color-ink-subtle); border-color: var(--color-border);
-  cursor: not-allowed; pointer-events: none;
+  cursor: not-allowed;
 }
 .btn-sm { height: var(--control-height-sm); padding: 0 var(--space-sm); font-size: var(--text-sm); }
 .btn-icon { width: var(--control-height); padding: 0; }
@@ -300,6 +302,8 @@ kbd, .kbd {
    button-like child of `.chip` can collide with it again. */
 .chip .chip-remove { border: 0; background: transparent; color: var(--color-ink-subtle); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; display: inline-grid; place-items: center; padding: 0; flex: none; }
 .chip .chip-remove:hover { background: var(--color-surface-sunken); color: var(--color-ink); }
+/* Enabled and disabled share ink, so disabled needs its own signal: the sunken fill, no hover. */
+.chip .chip-remove:disabled, .chip .chip-remove:disabled:hover { background: var(--color-surface-sunken); color: var(--color-ink-subtle); cursor: not-allowed; }
 .chip-add { border-style: dashed; color: var(--color-ink-soft); padding-right: 0.6rem; background: transparent; cursor: pointer; font: inherit; font-size: var(--text-sm); }
 
 /* -------------------------------------------------------------- avatars
@@ -387,6 +391,7 @@ details.card:not([open]) > summary { border-bottom: 0; }
 .menu.left { right: auto; left: 0; }
 .menu-item { display: flex; align-items: center; gap: var(--space-sm); padding: 0.4rem var(--space-sm); border-radius: var(--radius-sm); color: var(--color-ink); font-size: var(--text-base); }
 .menu-item:hover { background: var(--color-row-hover); text-decoration: none; }
+.menu-item:disabled, .menu-item:disabled:hover { color: var(--color-ink-subtle); background: transparent; cursor: not-allowed; }
 .menu-label { font-size: var(--text-xs); color: var(--color-ink-subtle); padding: var(--space-2xs) var(--space-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .menu-sep { height: 1px; background: var(--color-border); margin: var(--space-2xs) 0; }
 .menu .check { width: 100%; padding: 0.3rem var(--space-sm); border-radius: var(--radius-sm); }
@@ -507,6 +512,12 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .qa:hover { text-decoration: none; color: var(--color-ink); }
 .qa:hover .qa-icon { border-color: var(--color-accent-strong); background: var(--color-accent-soft); color: var(--color-accent-strong); }
 .qa.danger:hover .qa-icon { border-color: var(--color-danger); background: var(--color-danger-bg); color: var(--color-danger-text); }
+/* The icon circle sets its own colour, fill and border, so the button's `color` never reaches it:
+   the disabled skin must be restated on the child, and again for every hover rule above. */
+.qa:disabled, .qa:disabled:hover { color: var(--color-ink-subtle); cursor: not-allowed; }
+.qa:disabled .qa-icon, .qa:disabled:hover .qa-icon, .qa.danger:disabled:hover .qa-icon {
+  border-color: var(--color-border); background: var(--color-surface-sunken); color: var(--color-ink-subtle);
+}
 .section-title { display: flex; align-items: center; gap: var(--space-sm); margin: var(--space-lg) 0 var(--space-sm); font-size: var(--text-sm); font-weight: 700; color: var(--color-ink); }
 .section-title .actions { margin-left: auto; }
 .props { margin: 0; }

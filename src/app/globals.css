@@ -525,8 +525,12 @@ button:disabled:where(:not([class]), .secondary, .ghost) {
   cursor: not-allowed;
 }
 /* Any other classed button that is not a `.btn` (chip-remove, list result rows, ...) keeps its own
-   layout and skin; disabled only lowers its ink to the AA-safe subtle token and shows the cursor. */
-button[class]:disabled:not(.btn) {
+   layout and skin; disabled only lowers its ink to the AA-safe subtle token and shows the cursor.
+   Caveat: this only reaches the button's own `color`. A child that sets its own colour, fill or
+   border (`.qa .qa-icon`) needs an explicit disabled rule of its own. */
+/* Zero specificity on purpose: a component's own disabled rule (or a skin such as a red-filled
+   `.danger`) must win; this is only the fallback for classed buttons nobody styled. */
+:where(button[class]:disabled:not(.btn)) {
   color: var(--color-ink-subtle);
   cursor: not-allowed;
 }
@@ -698,7 +702,6 @@ th {
 .rowlink.disabled {
   color: var(--color-ink-subtle);
   cursor: not-allowed;
-  pointer-events: none;
 }
 tbody tr:hover td {
   background: var(--color-row-hover);
@@ -746,7 +749,6 @@ a:hover {
   color: var(--color-ink-subtle);
   border-color: var(--color-border);
   cursor: not-allowed;
-  pointer-events: none;
 }
 
 /* ---- back button (header, icon-only "go back") ---- */

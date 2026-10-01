@@ -49,7 +49,12 @@
   border: none;
 }
 
-.resultItem:hover {
+.resultItem:disabled {
+  color: var(--color-ink-subtle);
+  cursor: not-allowed;
+}
+
+.resultItem:hover:not(:disabled) {
   background: var(--color-row-hover);
 }
 
