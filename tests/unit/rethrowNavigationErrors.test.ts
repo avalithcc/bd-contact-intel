@@ -269,11 +269,17 @@ test("fixture proof: a swallowing catch in a fixture 'use server' file is detect
   );
 
   try {
-    const { violations } = scan(fixtureDir);
-    const fixtureViolations = violations.filter((v) => v.file === fixturePath);
+    const { violations, scannedFiles } = scan(fixtureDir);
+    // Assert the fixture was actually in scope: a scan that skipped it would
+    // report zero violations and pass vacuously.
     assert.equal(
-      fixtureViolations.length,
+      scannedFiles,
       1,
+      "the fixture must be the single in-scope file scanned under the tmp root",
+    );
+    assert.deepEqual(
+      violations.map((v) => v.file),
+      [fixturePath],
       "the fixture's swallowing catch must be reported as exactly one violation",
     );
   } finally {
