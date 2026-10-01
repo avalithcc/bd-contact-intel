@@ -44,3 +44,24 @@ test("buildWonCompanyDrilldownRows preserves a null owner (unowned won company)"
   assert.equal(row!.ownerBdId, null);
   assert.equal(row!.ownerBdName, null);
 });
+
+// Slice 4 (timestamptz): `coalesce(activity.created_at, company.updated_at)` is a
+// naive timestamp before the migration and a timestamptz after it, so the raw
+// wire string is offset-less in one state and "+00"-suffixed in the other. Both
+// must resolve to the same UTC instant on any process timezone.
+for (const [label, wire] of [
+  ["offset-less (pre-migration, naive)", "2026-09-15 12:00:00.123456"],
+  ["postgres-js +00 offset (post-migration, timestamptz)", "2026-09-15 12:00:00.123456+00"],
+] as const) {
+  test(`buildWonCompanyDrilldownRows parses a ${label} wire string as UTC on a non-UTC runtime`, () => {
+    const prev = process.env.TZ;
+    process.env.TZ = "America/Argentina/Buenos_Aires";
+    try {
+      const [row] = buildWonCompanyDrilldownRows([{ ...BASE, wonAt: wire }]);
+      assert.equal(row!.wonAt.toISOString(), "2026-09-15T12:00:00.123Z");
+    } finally {
+      if (prev === undefined) delete process.env.TZ;
+      else process.env.TZ = prev;
+    }
+  });
+}
