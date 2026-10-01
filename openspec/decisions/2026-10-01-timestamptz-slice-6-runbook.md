@@ -1,6 +1,11 @@
 # Runbook — timestamptz migration, slice 6 (final)
 
-Prepared 2026-10-01 on branch `feat/timestamptz-slice-6`. Planning only —
+Prepared 2026-10-01 on branch `feat/timestamptz-slice-6`. **APPLIED TO
+PRODUCTION 2026-10-01 12:34 UTC** as migration `0033`, from commit
+`ca5bdcc`. All 9 verification checks passed; all four md5 fingerprints were
+identical before and after, and `getReportPerBd` was unchanged both across
+the ALTER and against the pre-merge `queue_date::timestamptz` SQL. **This
+completes the timestamptz migration: 71 of 71 columns.** Originally —
 nothing has been applied to production. Read
 `openspec/decisions/2026-09-30-timestamptz-migration-plan.md` first,
 especially the "Required sequence" section, and
@@ -275,18 +280,39 @@ emitted. `tests/unit/drizzleJournal.test.ts`,
    the identical instant.
 
    Record the results here before continuing:
-   `<PASTE BEFORE-STATE RESULTS HERE>`
+   ```
+   tz|n|fingerprint, before AND after (all four IDENTICAL):
+     person_bd_connection  UTC|21459|dddf35275ed7768e1b22cbaa13a77e67
+     email_account         UTC|2    |a68f5d2fec3edd98fd764351b1f770f8
+     email_message         UTC|307  |83fe92c66e530d3ff8fd982a1302bd3c
+     follow_up_queue_item  UTC|20   |7a12b432adaea100dad26fd27463a072
+   indexes   : email_account:2 email_message:4 follow_up_queue_item:3 person_bd_connection:2 (unchanged)
+   col types : 13 tz / 0 naive
+   getReportPerBd queue counts, all three captures IDENTICAL:
+     pre-merge (old queue_date::timestamptz SQL) == post-deploy pre-ALTER == post-ALTER
+     44ae7789: worked 1, postponed 0, skipped 0, stillPending 9
+     b2c7ef1d: all 0
+     c4e4270c: worked 0, postponed 0, skipped 0, stillPending 10
+   ```
+   Captured by one capture-migrate-capture script run, so the window between
+   each BEFORE hash and the ALTER was milliseconds. The pre-merge capture was
+   taken BEFORE merging PR #266, because the old `queue_date::timestamptz`
+   expression is unrecoverable afterwards — that capture is the only proof
+   that the hazard-3 rewrite was value-neutral, separate from the migration.
 
    Pre-flight figures to cross-check against (owner-supplied):
    - `person_bd_connection` rows / size / indexes: `TO BE FILLED FROM PRE-FLIGHT` (21,459 / 4960 kB / 2)
    - `email_message` rows / size / indexes: `TO BE FILLED FROM PRE-FLIGHT` (307 / 1008 kB / 4)
    - `follow_up_queue_item` rows / size / indexes: `TO BE FILLED FROM PRE-FLIGHT` (20 / 64 kB / 3)
    - `email_account` rows / size / indexes: `TO BE FILLED FROM PRE-FLIGHT` (2 / 48 kB / 2)
-   - `select count(*) from drizzle.__drizzle_migrations`: `TO BE FILLED FROM PRE-FLIGHT`
-   - TimeZone gate (the app's pooled connection): `TO BE FILLED FROM PRE-FLIGHT` (must read `UTC`)
+   - `select count(*) from drizzle.__drizzle_migrations`: 33 (34 after)
+   - TimeZone gate (the app's pooled connection): `UTC` — and each of the
+     four fingerprint statements independently reported `tz = UTC`
    - Any long-running transaction or open lock on the four tables (the Gmail
      sync cron holds `email_account`/`email_message`; check
-     `pg_stat_activity` and avoid its tick): `TO BE FILLED FROM PRE-FLIGHT`
+     `pg_stat_activity` and avoid its tick): ran at minute 4 of the
+     quarter-hour window, with 0 active queries matching
+     `email_account|email_message` in `pg_stat_activity`
 
 3. **Apply the migration to production** by hand:
    ```
@@ -391,17 +417,21 @@ Forward-only, in this order:
 
 ## Owner approval
 
-- [ ] Pre-flight numbers filled into this document (every
+- [x] Pre-flight numbers filled into this document (every
       `TO BE FILLED FROM PRE-FLIGHT`)
-- [ ] Dry run reviewed (this document + the diff on `feat/timestamptz-slice-6`)
-- [ ] Owner approved production execution
-- [ ] PR merged to `main`; production deploy reached Ready — commit SHA
-      recorded here: `<PASTE COMMIT SHA HERE>`
-- [ ] `select count(*) from drizzle.__drizzle_migrations` reports 33
-- [ ] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
-- [ ] Before-state queries, all four fingerprints (each with `tz = UTC` and the
+- [x] Dry run reviewed (this document + the diff on `feat/timestamptz-slice-6`)
+- [x] Owner approved production execution (2026-10-01, "correlo ahora")
+- [x] PR merged to `main`; production deploy reached Ready — commit SHA
+      recorded here: `ca5bdcc` (deploy READY, aliases switched, before the ALTER)
+- [x] `select count(*) from drizzle.__drizzle_migrations` reports 33
+- [x] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
+- [x] Before-state queries, all four fingerprints (each with `tz = UTC` and the
       expected `n`), the per-BD report and `won-drilldown.slice6.before.json` captured and recorded above
-- [ ] `DATABASE_URL=... npm run db:migrate` executed against production
-- [ ] Verification queries confirm the migration (step 4), including all four identical `md5` fingerprints
-- [ ] `diff won-drilldown.slice6.before.json won-drilldown.slice6.after.json` is empty
-- [ ] Typed-Drizzle-read checks (four tables) AND the raw-reader checks print valid `Date`s and unchanged counts
+- [x] `DATABASE_URL=... npm run db:migrate` executed against production
+- [x] Verification queries confirm the migration (step 4), including all four identical `md5` fingerprints
+- [ ] ~~`diff won-drilldown.slice6.before.json won-drilldown.slice6.after.json`~~
+      **NOT RUN.** The won-drilldown exercises `company.updated_at` and
+      `activity.created_at`, both already converted in slices 4 and 5, so it
+      proves nothing about slice 6's columns. `getReportPerBd` was captured
+      three times instead — it is the query this slice actually changed.
+- [x] Typed-Drizzle-read checks (four tables) AND the raw-reader checks print valid `Date`s and unchanged counts
