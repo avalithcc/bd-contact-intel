@@ -235,10 +235,10 @@ type TaskWindowRow = {
   statusCount: number;
 };
 
-/** Every task timestamp column is `timestamp without time zone` holding UTC,
- * and raw `db.execute` returns it as an offset-less string. `new Date()`
- * would read that in the process's local timezone, so an offset-less value is
- * pinned to UTC explicitly, matching drizzle's own column mapper. Delegates
+/** Every task timestamp column is `timestamptz` (slice 5) and raw
+ * `db.execute` returns it as a string carrying a `+00` offset. An offset-less
+ * value (a pre-migration row set, or a rollback) is still pinned to UTC
+ * explicitly, matching drizzle's own column mapper. Delegates
  * to the ONE shared helper (src/lib/db/timestamp.ts#parseDbTimestamp) every
  * other raw DB timestamp call site now uses, so this rule can never drift
  * from theirs. */
@@ -378,9 +378,7 @@ export async function getTasksForPerson(personId: string): Promise<TasksForPerso
  * is a stored calendar date, never a real instant, see argentinaDate.ts).
  * Bug fixed here: this used to compare `now() > due_at` as real instants,
  * which flagged a task due today as overdue almost immediately (Postgres
- * `now()`, naive-compared against a UTC-session `timestamp without time
- * zone` column, crosses midnight UTC hours before the ART calendar day
- * ends).
+ * `now()` crosses midnight UTC hours before the ART calendar day ends).
  */
 export async function getOverdueTasks(bdId: string): Promise<TaskRow[]> {
   const { todayStartUtc } = argentinaDayBoundaries(new Date());

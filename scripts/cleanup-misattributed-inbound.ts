@@ -62,7 +62,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog } from "../src/db/schema";
-import { buildPersonStatusUpdates, type ActivityRowForStatus, type ConnectionRowForStatus } from "../src/lib/status/deriveStatus";
+import { buildPersonStatusUpdates } from "../src/lib/status/deriveStatus";
+import { mapRawActivityRow, mapRawConnectionRow } from "../src/lib/status/rawStatusRows";
 import { recomputePersonStatuses } from "../src/lib/status/recompute";
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -214,21 +215,8 @@ async function computeRecomputedStatuses(
     where person_id in (${idList(personIds)})
   `);
 
-  const normalizedActivityRows: (ActivityRowForStatus & { personId: string })[] = activityRows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    createdAt: r.created_at instanceof Date ? r.created_at : new Date(r.created_at),
-    metadata: r.metadata,
-    personId: r.person_id,
-  }));
-
-  const normalizedConnectionRows: (ConnectionRowForStatus & { personId: string })[] = connectionRows.map((r) => ({
-    bdId: r.bd_id,
-    sentCount: Number(r.sent_count),
-    receivedCount: Number(r.received_count),
-    lastMessageAt: r.last_message_at === null ? null : r.last_message_at instanceof Date ? r.last_message_at : new Date(r.last_message_at),
-    personId: r.person_id,
-  }));
+  const normalizedActivityRows = activityRows.map(mapRawActivityRow);
+  const normalizedConnectionRows = connectionRows.map(mapRawConnectionRow);
 
   const updates = buildPersonStatusUpdates(personIds, normalizedActivityRows, normalizedConnectionRows);
   return new Map(updates.map((u) => [u.personId, u.status]));

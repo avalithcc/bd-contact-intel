@@ -1135,8 +1135,8 @@ export const activity = pgTable(
     // Metadata keyed by type: { gmailMessageId, gmailThreadId } for email_sent,
     // { hunterScore, hunterVerified } for hunter_lookup, etc.
     metadata: jsonb("metadata").notNull().default({}),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // Exactly one subject FK is set — checked at application level, not DB constraint,
@@ -1178,9 +1178,9 @@ export const task = pgTable(
     description: text("description"),
     // 'open' | 'done' | 'cancelled'
     status: text("status").notNull().default("open"),
-    dueAt: timestamp("due_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byLead: index("task_lead_idx").on(t.leadId),

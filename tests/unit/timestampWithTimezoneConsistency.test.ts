@@ -28,8 +28,8 @@ import * as schema from "@/db/schema";
  * `{ withTimezone: true }` in schema.ts, in step with an applied
  * `ALTER COLUMN ... TYPE timestamptz` migration (plan's "Slices" section).
  * Slice 1 (small, low-traffic tables), slice 2 (imported tables:
- * job_posting, contact, conversation, message), slice 3 (lead, person) and
- * slice 4 (company) have been converted.
+ * job_posting, contact, conversation, message), slice 3 (lead, person),
+ * slice 4 (company) and slice 5 (activity, task) have been converted.
  */
 const CONVERTED_TABLES: readonly string[] = [
   "bd",
@@ -61,6 +61,8 @@ const CONVERTED_TABLES: readonly string[] = [
   "lead",
   "person",
   "company",
+  "activity",
+  "task",
 ];
 
 function withTimezoneFlagsByTable(): Map<string, boolean[]> {
@@ -96,4 +98,21 @@ test("CONVERTED_TABLES matches the tables whose columns are ALL withTimezone: tr
     [...CONVERTED_TABLES].sort(),
     "update CONVERTED_TABLES in this test when a slice flips a table's timestamp columns to withTimezone: true",
   );
+});
+
+test("task.due_at is a timestamptz column, NOT a date column (slice 5 scope)", () => {
+  // The plan keeps `due_at` a timestamp: moving it to a `date` column is a
+  // separate follow-up and must not be bundled into the activity/task slice.
+  assert.ok(is(schema.task.dueAt, PgTimestamp), "task.dueAt must stay a timestamp column");
+  assert.equal((schema.task.dueAt as unknown as { withTimezone: boolean }).withTimezone, true);
+});
+
+test("won-drilldown coalesce operands are both timestamptz (no session-TimeZone cast)", () => {
+  // src/lib/reports/queries.ts: coalesce(rpt_won_at.pbc_won_at, rpt_won_companies.pbc_updated_at),
+  // i.e. activity.created_at against company.updated_at. While activity.created_at
+  // was naive, Postgres cast it with the session TimeZone; once both are
+  // timestamptz that dependency disappears.
+  assert.equal(schema.activity.createdAt.columnType, "PgTimestamp");
+  assert.equal((schema.activity.createdAt as unknown as { withTimezone: boolean }).withTimezone, true);
+  assert.equal((schema.company.updatedAt as unknown as { withTimezone: boolean }).withTimezone, true);
 });

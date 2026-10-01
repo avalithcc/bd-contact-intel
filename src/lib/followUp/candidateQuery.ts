@@ -26,9 +26,10 @@
  * every CTE's own output column is prefixed `fuq_` (rule 4) so it can never
  * collide with a joined table's own column. The 3-day/7-day/12-month
  * thresholds are computed with Postgres's own `now()` and `interval`, never
- * a JS `Date` interpolated into the template (rule 1) — `person`/`activity`/
- * `person_bd_connection` timestamps are naive `timestamp without time zone`
- * in UTC, so this arithmetic in JS would risk a timezone skew that
+ * a JS `Date` interpolated into the template (rule 1) — `activity`/`person`
+ * timestamps are `timestamptz` (slices 3 and 5) while `person_bd_connection`
+ * stays naive `timestamp without time zone` in UTC until slice 6, so this
+ * arithmetic in JS would risk a timezone skew that
  * `now() - interval '...'` avoids by construction.
  *
  * Shared by two callers: `buildFollowUpInsertQuery` (one BD, capped at 10,
