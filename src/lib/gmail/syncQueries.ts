@@ -175,6 +175,8 @@ export async function writeSyncedMessages(
       bodyText: c.bodyText,
       bodyTruncated: c.bodyTruncated,
       sentAt: c.sentAt,
+      rfcMessageId: c.rfcMessageId,
+      rfcReferences: c.references,
       matchedEmail: c.matches[0]!.matchedEmail,
       matchConfidence: c.matches[0]!.matchConfidence,
     }));
