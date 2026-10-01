@@ -293,8 +293,13 @@ emitted. `tests/unit/drizzleJournal.test.ts`,
    DATABASE_URL="<prod connection string>" npm run db:migrate
    ```
    `SET LOCAL lock_timeout = '2s'` is the first statement of
-   `0033_timestamptz_slice_6.sql`, so a blocked `ALTER` aborts the
-   transaction within 2 seconds instead of starving the 3-connection pool.
+   `0033_timestamptz_slice_6.sql`. Be precise about what that buys: a blocked
+   `ALTER` does NOT step aside — it waits in the lock queue for up to 2
+   seconds, and new reads and writes on that table queue BEHIND it for that
+   long. After 2 seconds it aborts the transaction cleanly and nothing
+   changed. `lock_timeout` applies per lock acquisition, so the locks already
+   taken on earlier tables stay held while it waits on a later one: a stall
+   of several seconds across the 4 tables is possible, bounded but real.
    If it aborts on the lock, nothing changed; retry at a quieter moment.
    The four tables are locked together until commit, so do it off-peak and
    away from the Gmail sync cron.

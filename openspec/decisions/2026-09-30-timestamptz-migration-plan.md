@@ -67,7 +67,7 @@ as the old-code-against-new-column case — the preview-and-promote dance
 is the correct approach there, not this shortcut. Re-verify the asymmetry
 above against the target runtime before reusing this sequence anywhere else.
 
-`drizzle-kit migrate` applies every pending file inside **one transaction** (`drizzle-orm/pg-core/dialect.js:44-69`), so the locks accumulate until commit. Never let several slices be pending at once. Add `SET LOCAL lock_timeout = '2s'` so that a blocked ALTER aborts instead of exhausting the 3-connection production pool.
+`drizzle-kit migrate` applies every pending file inside **one transaction** (`drizzle-orm/pg-core/dialect.js:44-69`), so the locks accumulate until commit. Never let several slices be pending at once. Add `SET LOCAL lock_timeout = '2s'`: a blocked ALTER then stalls new queries on that table for at most 2s and aborts cleanly, rather than waiting indefinitely and exhausting the 3-connection production pool. It does not step aside — work on that table queues behind it for those 2s, and locks already taken on earlier tables stay held while it waits on a later one.
 
 ## Code impact
 

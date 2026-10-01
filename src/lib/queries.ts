@@ -171,16 +171,16 @@ function relationshipFilterCondition(key: RelationshipFilterKey) {
       cutoff.setMonth(cutoff.getMonth() - DORMANT_MONTHS);
       // Composed as one SQL fragment: `and()` is typed as possibly
       // undefined, which does not fit the non-optional filter list.
-      // `last_message_at` is naive UTC (query rule 2/6): interpolating the
-      // raw `cutoff` Date here (query rule 1) left it an implicitly-typed
-      // naive literal. Cast the literal to `::timestamptz` and leave the
-      // column bare (do NOT wrap it in `at time zone 'UTC'`) — Postgres
-      // implicit-casts the naive column via session TimeZone (= UTC), the
-      // same comparison every other `::timestamptz` literal in this app
-      // relies on, and this form stays correct with no edit once
-      // `contact.last_message_at` itself becomes `timestamptz` (wrapping it
-      // in `at time zone 'UTC'` would flip from naive->timestamptz today to
-      // timestamptz->naive after that migration, a silent trap).
+      // Interpolating the raw `cutoff` Date here (query rule 1) would leave
+      // an implicitly-typed literal, so the literal is cast to
+      // `::timestamptz` and the column is left bare. `contact.last_message_at`
+      // became `timestamptz` in slice 2 of the timestamptz migration, so both
+      // sides are now timestamptz and no implicit cast happens at all.
+      // Do NOT wrap the column in `at time zone 'UTC'`: on a timestamptz
+      // input that operator returns NAIVE, which would silently reintroduce
+      // the session-TimeZone dependency this form exists to avoid. That
+      // direction-flip is why the bare-column form was chosen before the
+      // migration and why it needed no edit after it.
       return sql`${contact.reciprocal} = true and ${contact.lastMessageAt} < ${cutoff.toISOString()}::timestamptz`;
     }
   }
