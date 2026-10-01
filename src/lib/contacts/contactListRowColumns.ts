@@ -27,6 +27,7 @@ export const CONTACT_LIST_ROW_COLUMNS = {
   email: person.email,
   emailStatus: person.emailStatus,
   roleGroup: person.roleGroup,
+  contactType: person.contactType,
   industry: person.industry,
   country: person.country,
   sourceKey: person.sourceKey,

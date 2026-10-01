@@ -21,6 +21,7 @@ const FIXTURE_SOURCE = {
   email: "ada@example.com",
   emailStatus: "verified",
   roleGroup: "engineering",
+  contactType: "INFLUENCER",
   industry: "tech",
   country: "US",
   sourceKey: "linkedin",
@@ -41,6 +42,7 @@ test("projectContactListRowColumns picks exactly the CONTACT_LIST_ROW_COLUMNS ke
     keys,
     [
       "companyKey",
+      "contactType",
       "companyCanonicalName",
       "company",
       "country",

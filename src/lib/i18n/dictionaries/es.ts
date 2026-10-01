@@ -1733,6 +1733,7 @@ export const es: typeof en = {
     colSource: "Origen",
     colCreated: "Creado",
     colSeniority: "Seniority",
+    colContactType: "Tipo de contacto",
     colBdConnections: "BDs conectados",
     colLastActivity: "Última actividad",
     sortedByPrefix: "Ordenado por",

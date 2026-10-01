@@ -69,3 +69,9 @@ test("lastActivity (mockup 'Última actividad') is a selectable column, not visi
   assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("lastActivity"));
   assert.deepEqual(resolveVisibleColumns(["lastActivity"]), ["lastActivity"]);
 });
+
+test("contactType is a selectable column, OFF by default, right after status", () => {
+  assert.ok(!DEFAULT_CONTACT_COLUMNS.includes("contactType"));
+  assert.equal(ALL_CONTACT_COLUMNS[ALL_CONTACT_COLUMNS.indexOf("status") + 1], "contactType");
+  assert.deepEqual(resolveVisibleColumns(["contactType"]), ["contactType"]);
+});

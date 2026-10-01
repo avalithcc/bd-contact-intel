@@ -58,7 +58,7 @@ import {
   type OutreachViewSearchParams,
 } from "@/lib/contacts/outreachViewParams";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
-import { CONTACT_TYPES, CONTACT_TYPE_LABELS } from "@/lib/contacts/contactType";
+import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
 import { COMPANY_CATEGORIES } from "@/lib/companyCategories";
 import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
@@ -152,6 +152,8 @@ function columnLabel(
       return l.colOwner;
     case "status":
       return l.colStatus;
+    case "contactType":
+      return l.colContactType;
     case "email":
       return l.colEmail;
     case "phone":
@@ -254,6 +256,10 @@ function columnCell(
       return row.lastActivity ? `${row.lastActivity.label} · ${relTime(row.lastActivity.createdAt)}` : "—";
     case "roleGroup":
       return row.roleGroup ?? l.ownerNone;
+    case "contactType":
+      // Plain text, em dash when empty — a classification like roleGroup, not
+      // a workflow state, so no badge and no "sin dato" pill.
+      return contactTypeLabel(row.contactType, l.ownerNone);
     case "industry":
       return row.industry ?? l.ownerNone;
     case "country":

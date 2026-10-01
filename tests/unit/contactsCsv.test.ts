@@ -20,6 +20,7 @@ const HEADERS = {
   bdConnections: "BDs conectados",
   lastActivity: "Última actividad",
   roleGroup: "Grupo de rol",
+  contactType: "Tipo de contacto",
   industry: "Industria",
   country: "País",
   source: "Origen",
@@ -37,6 +38,7 @@ function row(overrides: Partial<ContactExportRow> = {}): ContactExportRow {
     email: "ana@acme.com",
     phone: null,
     roleGroup: null,
+    contactType: null,
     industry: null,
     country: null,
     sourceKey: null,
@@ -124,6 +126,7 @@ function contactListRow(overrides: Partial<ContactListRow> = {}): ContactListRow
     phone: null,
     mobilePhone: null,
     roleGroup: null,
+    contactType: null,
     industry: null,
     country: null,
     sourceKey: null,
@@ -161,4 +164,22 @@ test("mapContactRowToExportRow: phone prefers `phone`, falls back to `mobilePhon
     "+54 9 11 4123-4567",
   );
   assert.equal(mapContactRowToExportRow(contactListRow(), "Nuevo").phone, null);
+});
+
+test("contact type exports as its Spanish label, empty as an empty cell", () => {
+  const csv = buildContactsCsv(
+    [row({ contactType: "BUYER-CHAMPION" }), row({ contactType: "INFLUENCER" }), row({ contactType: null })],
+    ["contactType"],
+    HEADERS,
+  );
+  assert.deepEqual(csv.split("\r\n"), [
+    "Nombre,Tipo de contacto",
+    "Ana Gomez,Comprador / promotor",
+    "Ana Gomez,Influenciador",
+    "Ana Gomez,",
+  ]);
+});
+
+test("mapContactRowToExportRow carries the stored contact type through", () => {
+  assert.equal(mapContactRowToExportRow(contactListRow({ contactType: "INFLUENCER" }), "Nuevo").contactType, "INFLUENCER");
 });

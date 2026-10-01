@@ -1770,6 +1770,7 @@ export const en = {
     colSource: "Source",
     colCreated: "Created",
     colSeniority: "Seniority",
+    colContactType: "Contact type",
     colBdConnections: "Connected BDs",
     colLastActivity: "Last activity",
     sortedByPrefix: "Sorted by",
