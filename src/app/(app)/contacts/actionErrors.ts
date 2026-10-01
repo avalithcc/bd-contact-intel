@@ -37,6 +37,9 @@ export type ContactActionErrorReason =
   | "gmail_not_connected"
   | "gmail_reauth"
   | "gmail_unavailable"
+  // The thread cannot be answered as a real reply (no stored Message-ID, no
+  // recipient): see planThreadReply. Never "send it as a new email" instead.
+  | "reply_unavailable"
   | "discard_reason_required"
   | "discard_note_required"
   | "meeting_date_required"

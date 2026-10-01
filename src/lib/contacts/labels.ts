@@ -98,6 +98,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorGmailReauth;
     case "gmail_unavailable":
       return l.errorGmailUnavailable;
+    case "reply_unavailable":
+      return l.errorReplyUnavailable;
     case "discard_reason_required":
       return l.errorDiscardReasonRequired;
     case "discard_note_required":

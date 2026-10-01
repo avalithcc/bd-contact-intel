@@ -10,7 +10,7 @@ import { test } from "node:test";
 import { buildRawMessage, buildSendPayload } from "@/lib/gmail/rawMessage";
 import { composeEmailBody } from "@/lib/signature/compose";
 import { GmailSendError } from "@/lib/gmail/errors";
-import { planThreadReply, replySubject, type ReplySourceMessage } from "@/lib/gmail/replyThread";
+import { planThreadReply, replySubject, replyView, type ReplySourceMessage } from "@/lib/gmail/replyThread";
 
 const FROM = "bd@avalith.net";
 const TO = "jane@prospect.com";
@@ -196,4 +196,10 @@ test("planThreadReply is pure: the same input twice gives the same plan and the 
   assert.deepEqual(first, second);
   assert.equal(JSON.stringify(input), snapshot);
   assert.equal(input[0].rfcMessageId, "<m2@x>"); // not re-sorted in place
+});
+
+test("replyView exposes only recipient and subject to the client, never the threading headers", () => {
+  const view = replyView(planThreadReply([msg({ n: 1 })]));
+  assert.deepEqual(view, { ok: true, to: TO, subject: "Re: Hello" });
+  assert.deepEqual(replyView({ ok: false, reason: "no_message_id" }), { ok: false, reason: "no_message_id" });
 });

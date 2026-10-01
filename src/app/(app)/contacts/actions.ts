@@ -14,6 +14,8 @@ import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { composeEmailBody } from "@/lib/signature/compose";
+import { planThreadReply } from "@/lib/gmail/replyThread";
+import { getThreadReplySource } from "@/lib/gmail/threadMessages";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
 import { planDiscard } from "@/lib/contacts/discard";
@@ -365,6 +367,39 @@ export async function sendContactEmailAction(
     // BD with a signature sends HTML (body + signature); without one the
     // message is the same single-part plain text as before (composeEmailBody).
     await sendGmailMessage({ bdId: me.id, to, subject, ...composeEmailBody(body, me.signatureHtml), personId });
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * "Responder" on a synced thread. The client sends ONLY the thread id and the
+ * typed text: recipient, subject and the threading headers are re-derived here
+ * from the stored messages (planThreadReply), so a tampered request cannot
+ * redirect the reply or inject a header, and what the BD saw in the dialog is
+ * what goes out. The signature composes exactly as on a new message.
+ */
+export async function sendThreadReplyAction(
+  personId: string,
+  gmailThreadId: string,
+  body: string,
+): Promise<SendContactEmailResult> {
+  try {
+    if (!isUuid(personId) || !gmailThreadId || !body.trim()) return { ok: false, reason: "not_found" };
+    await assertContactEditableById(personId);
+    const me = await getCurrentBd();
+    const plan = planThreadReply(await getThreadReplySource(me.id, personId, gmailThreadId));
+    if (!plan.ok) return { ok: false, reason: "reply_unavailable" };
+    await sendGmailMessage({
+      bdId: me.id,
+      to: plan.to,
+      subject: plan.subject,
+      ...composeEmailBody(body.trim(), me.signatureHtml),
+      personId,
+      reply: { threadId: plan.threadId, inReplyTo: plan.inReplyTo, references: plan.references },
+    });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

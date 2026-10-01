@@ -85,3 +85,12 @@ export function planThreadReply(messages: readonly ReplySourceMessage[]): ReplyP
     references: referenceChain(latest.rfcReferences, parentId),
   };
 }
+
+/** What the client may see of a plan: never the headers, only what the dialog shows. */
+export type ReplyView =
+  | { ok: true; to: string; subject: string }
+  | { ok: false; reason: Extract<ReplyPlan, { ok: false }>["reason"] };
+
+export function replyView(plan: ReplyPlan): ReplyView {
+  return plan.ok ? { ok: true, to: plan.to, subject: plan.subject } : plan;
+}
