@@ -3,10 +3,16 @@
  * migrate` compares each entry's `when` with the latest applied `created_at`
  * and silently skips any entry whose `when` is earlier. That skipped 0012 and
  * 0013 in production once; this test makes the mistake fail CI instead.
+ *
+ * The chain is future-dated (hand-set, one day per timestamptz slice) and that
+ * is load-bearing: production's latest created_at is the chain's last `when`,
+ * so a new entry must exceed it. Until the real clock passes the chain, every
+ * new migration needs a hand-set `when`; see src/lib/migration/journalWhen.ts.
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { checkJournalWhen } from "../../src/lib/migration/journalWhen";
 
 interface JournalEntry {
   idx: number;
@@ -19,14 +25,8 @@ const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) a
 };
 
 test("drizzle journal entries have strictly increasing `when` timestamps", () => {
-  for (let i = 1; i < journal.entries.length; i++) {
-    const prev = journal.entries[i - 1];
-    const cur = journal.entries[i];
-    assert.ok(
-      cur.when > prev.when,
-      `${cur.tag} (when=${cur.when}) must be later than ${prev.tag} (when=${prev.when}); bump it or drizzle-kit migrate will skip it`,
-    );
-  }
+  // Fix recipe lives in the failure message (src/lib/migration/journalWhen.ts).
+  assert.deepEqual(checkJournalWhen(journal.entries, Date.now()), []);
 });
 
 test("drizzle journal idx values are sequential", () => {
