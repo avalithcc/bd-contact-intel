@@ -545,10 +545,13 @@ export async function getCompanyPostingsForKey(
         location: r.location,
         market: r.market,
         url: r.url,
-        // `job_posting.posted_at`/`first_seen` are `timestamp without time
-        // zone` columns; raw `db.execute` returns them as possibly
-        // offset-less strings, pinned to UTC via parseDbTimestamp (same
-        // class of bug src/lib/db/timestamp.ts documents).
+        // `job_posting.posted_at`/`first_seen` are `timestamptz` columns as
+        // of the slice-2 migration (openspec/decisions/2026-09-30-timestamptz-
+        // migration-plan.md), but raw `db.execute` still returns them as
+        // wire strings rather than typed `Date`s, so they still need
+        // parseDbTimestamp — it trusts an already offset-bearing string as-is
+        // (see src/lib/db/timestamp.ts), so this stays correct both before
+        // and after that migration.
         postedAt: r.postedAt ? parseDbTimestamp(r.postedAt) : null,
         firstSeen: parseDbTimestamp(r.firstSeen),
       }),

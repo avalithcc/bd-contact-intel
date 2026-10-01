@@ -204,6 +204,13 @@
       "when": 1791923071556,
       "tag": "0028_timestamptz_slice_1",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792009471556,
+      "tag": "0029_timestamptz_slice_2",
+      "breakpoints": true
     }
   ]
 }

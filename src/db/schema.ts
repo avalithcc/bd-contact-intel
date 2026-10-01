@@ -69,8 +69,8 @@ export const contact = pgTable(
     messageCount: integer("message_count").notNull().default(0),
     sentCount: integer("sent_count").notNull().default(0),
     receivedCount: integer("received_count").notNull().default(0),
-    firstMessageAt: timestamp("first_message_at"),
-    lastMessageAt: timestamp("last_message_at"),
+    firstMessageAt: timestamp("first_message_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     // Email lookup results — persisted from live Hunter.io queries or contact
     // creation/enrichment. Follows lead.email_status naming: 'verified' | 'probable' | 'none'.
     emailStatus: text("email_status").notNull().default("none"),
@@ -83,7 +83,7 @@ export const contact = pgTable(
     initiatedByMe: boolean("initiated_by_me"),
     // True once both sides have sent at least one (non-draft) message.
     reciprocal: boolean("reciprocal").notNull().default(false),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // one row per (owner, profile) — re-uploads upsert instead of duplicating
@@ -226,7 +226,7 @@ export const jobPosting = pgTable(
     location: text("location").notNull(),
     url: text("url").notNull(),
     department: text("department"),
-    postedAt: timestamp("posted_at"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
     // Computed from `title` via classifyPosition (see
     // src/lib/hiring/classify.ts).
     isIt: boolean("is_it").notNull(),
@@ -257,9 +257,9 @@ export const jobPosting = pgTable(
     // scripts/backfill-posting-offshore.ts. Not nullable, same rationale as
     // `isMiami` above: false is already the correct default for new rows.
     isOffshoreHub: boolean("is_offshore_hub").notNull().default(false),
-    firstSeen: timestamp("first_seen").notNull().defaultNow(),
-    lastSeen: timestamp("last_seen").notNull().defaultNow(),
-    closedAt: timestamp("closed_at"),
+    firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
+    lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
   },
   (t) => ({
     companyExternalUnique: unique("job_posting_company_external_unique").on(
@@ -346,9 +346,9 @@ export const conversation = pgTable(
     messageCount: integer("message_count").notNull().default(0),
     sentCount: integer("sent_count").notNull().default(0),
     receivedCount: integer("received_count").notNull().default(0),
-    firstMessageAt: timestamp("first_message_at"),
-    lastMessageAt: timestamp("last_message_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    firstMessageAt: timestamp("first_message_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // one row per (owner, LinkedIn conversation) — re-imports upsert
@@ -385,7 +385,7 @@ export const message = pgTable(
     // Null for InMail/company senders with no profile URL in the export.
     senderProfileKey: text("sender_profile_key"),
     senderName: text("sender_name"),
-    sentAt: timestamp("sent_at").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
     subject: text("subject"),
     content: text("content").notNull(),
     folder: text("folder"),
@@ -394,7 +394,7 @@ export const message = pgTable(
     // src/lib/messagesCsv.ts for the rationale.
     isDraft: boolean("is_draft").notNull().default(false),
     contentHash: text("content_hash").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     bdContentHashUnique: unique("message_bd_content_hash_unique").on(
