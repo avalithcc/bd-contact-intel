@@ -54,7 +54,12 @@ async function totalOf(page: Page): Promise<number> {
 async function openEditorFromMenu(page: Page, field: string) {
   await page.getByRole('button', { name: L.filtersPanelLabel, exact: true }).click();
   await page.getByRole('button', { name: field, exact: true }).click();
-  const editor = page.locator('form.menu').filter({ hasText: field });
+  // `form.menu` alone is ambiguous: the column picker is also a `.menu` form
+  // and lists column names that collide with filter names ("Responsable",
+  // "Estado", "Empresa", "Industria"...). The filter editors are the GET
+  // forms; the picker posts. Without this the helper hits a strict-mode
+  // violation for any field that is also a column.
+  const editor = page.locator('form.menu[method="get"]').filter({ hasText: field });
   await expect(editor).toBeVisible();
   return editor;
 }
@@ -127,5 +132,48 @@ test.describe('Contacts: filter menu regressions', () => {
 
     await expect(chip(page, FILTER_FIELD_LABEL.contactType)).toBeVisible();
     expect(await totalOf(page)).toBeLessThan(before);
+  });
+
+  /**
+   * The owner's ACTUAL report was the combination, not the filter alone:
+   * "filtrar contactos x responsable y a su vez, que tengan telefono... pero
+   * trae gente sin telefono". The two filters are ANDed in
+   * `baseContactFilterConditions`; this guards that they still compose.
+   *
+   * The BD is picked by uuid-shaped value rather than by name, so a staffing
+   * change cannot rot this spec. The e2e bot account is skipped: it owns
+   * nothing, so it would make the assertion pass trivially.
+   */
+  test('responsable + "Tiene teléfono" compose: the combination narrows further', async ({ page }) => {
+    await gotoAuthed(page, LIST_URL);
+
+    const ownerEditor = await openEditorFromMenu(page, FILTER_FIELD_LABEL.owner);
+    const select = ownerEditor.locator('select');
+    const realBdValue = await select.evaluate((el) => {
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const opt = [...(el as HTMLSelectElement).options].find(
+        (o) => uuid.test(o.value) && !/ZZ E2E/i.test(o.label),
+      );
+      return opt?.value ?? null;
+    });
+    test.skip(!realBdValue, 'No real BD in the Responsable options to filter by.');
+    await select.selectOption(realBdValue!);
+    await applyEditor(page, ownerEditor);
+
+    const ownerOnly = await totalOf(page);
+    expect(ownerOnly, 'That BD needs at least one contact for this to mean anything').toBeGreaterThan(0);
+
+    const phoneEditor = await openEditorFromMenu(page, FILTER_FIELD_LABEL.hasPhone);
+    await phoneEditor.getByRole('checkbox', { name: FILTER_FIELD_LABEL.hasPhone }).check();
+    await applyEditor(page, phoneEditor);
+
+    // Both chips survive the second submit — the bug was one filter dropping
+    // the other on the way through the query string.
+    await expect(chip(page, FILTER_FIELD_LABEL.owner)).toBeVisible();
+    await expect(chip(page, FILTER_FIELD_LABEL.hasPhone)).toBeVisible();
+
+    const both = await totalOf(page);
+    expect(both).toBeLessThan(ownerOnly);
+    await expect(page.locator('tbody .badge-none', { hasText: L.phoneNone })).toHaveCount(0);
   });
 });
