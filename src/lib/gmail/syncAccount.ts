@@ -69,9 +69,21 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
 
   const ids = [...messageIds];
   const rawMessages: ParsedGmailMessage[] = [];
+  // Ids we actually ASKED Gmail about. Distinct from `rawMessages.length`,
+  // which counts only the ones that came back — see the cursor rule below.
+  let attempted = 0;
   for (const id of ids) {
     if (Date.now() >= deps.deadlineAt) break;
-    rawMessages.push(parseGmailMessage(await deps.client.getMessage(id)));
+    attempted += 1;
+    // `null` = gone from the mailbox between history.list and this fetch.
+    // Skipping it is the whole point: before this, ONE such message threw and
+    // aborted the entire run for that BD, every 15 minutes, while
+    // `last_synced_at` still advanced and the account still read "connected" —
+    // so the sync looked healthy and stored nothing. (Observed in production
+    // 2026-10-01: all three BDs, every tick, `messages.get failed: 404`.)
+    const raw = await deps.client.getMessage(id);
+    if (raw === null) continue;
+    rawMessages.push(parseGmailMessage(raw));
   }
 
   const candidateAddresses = [
@@ -100,14 +112,22 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
 
   return {
     status: "ok",
-    // Only advance the cursor once every page was drained AND every message
-    // the history reported was actually fetched — otherwise the next run
-    // must resume from the SAME startHistoryId so a message that ran out of
-    // budget is never silently skipped. Reprocessing already-fetched ids is
-    // safe: `email_message`'s own `unique(bd_id, gmail_message_id)`
+    // Only advance the cursor once every page was drained AND every id the
+    // history reported was ATTEMPTED — otherwise the next run must resume
+    // from the SAME startHistoryId so a message that ran out of budget is
+    // never silently skipped. Reprocessing already-fetched ids is safe:
+    // `email_message`'s own `unique(bd_id, gmail_message_id)`
     // (`ON CONFLICT DO NOTHING`) makes the whole write, including its
     // activity rows, idempotent (see buildSyncedActivities.ts).
-    newHistoryId: exhausted && rawMessages.length === ids.length ? latestHistoryId : null,
+    //
+    // The test is `attempted`, NOT `rawMessages.length`: a 404 means that
+    // message is GONE and will never come back, so it must not pin the
+    // cursor forever. Only the deadline break — ids we never asked about —
+    // may hold it. Using `rawMessages.length` here would trade the crash
+    // this file just fixed for a cursor stuck against a deleted message,
+    // re-reading the same window every 15 minutes until Gmail expires the
+    // history and forces a full re-baseline.
+    newHistoryId: exhausted && attempted === ids.length ? latestHistoryId : null,
     messagesFetched: rawMessages.length,
     messagesStored: writeResult.inserted,
   };

@@ -64,7 +64,11 @@ export async function backfillAccountFirstSync(deps: BackfillAccountDeps): Promi
       fullyFetched = false;
       break;
     }
-    rawMessages.push(parseGmailMessage(await deps.client.getMessage(id)));
+    // See syncAccount.ts: a 404 means the message is gone, not that the run
+    // failed. Skip it rather than aborting the whole backfill page.
+    const raw = await deps.client.getMessage(id);
+    if (raw === null) continue;
+    rawMessages.push(parseGmailMessage(raw));
   }
 
   const candidateAddresses = [

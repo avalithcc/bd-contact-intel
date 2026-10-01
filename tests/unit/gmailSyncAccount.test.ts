@@ -35,6 +35,8 @@ function fixtureRawMessage(id: string, from: string, to: string): GmailApiMessag
 interface FakeClientOptions {
   historyPages?: GmailHistoryResult[];
   messagesById?: Record<string, GmailApiMessage>;
+  /** Ids Gmail answers 404 for — deleted/expunged between list and get. */
+  goneMessageIds?: string[];
 }
 
 function fakeClient(opts: FakeClientOptions): GmailClient & { getMessageCalls: string[] } {
@@ -53,6 +55,9 @@ function fakeClient(opts: FakeClientOptions): GmailClient & { getMessageCalls: s
     },
     async getMessage(id: string) {
       getMessageCalls.push(id);
+      // `goneMessageIds` models Gmail answering 404: the real client returns
+      // null for those (src/lib/gmail/client.ts), it does not throw.
+      if (opts.goneMessageIds?.includes(id)) return null;
       const message = opts.messagesById?.[id];
       if (!message) throw new Error(`no fixture for message ${id}`);
       return message;
@@ -250,4 +255,56 @@ test("platformSentGmailMessageIds flows through to the classifier via getPlatfor
   );
 
   assert.equal(writeCalls[0]?.[0]?.isPlatformSent, true);
+});
+
+/**
+ * Production outage, 2026-10-01: `messages.get` returned 404 for one message
+ * and the thrown error aborted the ENTIRE run, for all three BDs, every 15
+ * minutes — while `last_synced_at` still advanced and the account still read
+ * "connected". The sync looked healthy and stored nothing for hours.
+ *
+ * A message can always vanish between `history.list` naming it and the fetch.
+ * That must cost exactly that one message, never the run.
+ */
+test("a message that 404s is skipped and the rest of the batch still syncs", async () => {
+  const good = fixtureRawMessage("msg-ok", "jane@prospect.com", "cristian@avalith.net");
+  const client = fakeClient({
+    historyPages: [
+      {
+        ok: true,
+        page: {
+          historyRecords: [
+            { messagesAdded: [{ message: { id: "msg-gone", threadId: "thread-gone" } }] },
+            { messagesAdded: [{ message: { id: "msg-ok", threadId: "thread-msg-ok" } }] },
+          ],
+          historyId: "301",
+        },
+      },
+    ],
+    messagesById: { "msg-ok": good },
+    goneMessageIds: ["msg-gone"],
+  });
+
+  const writeCalls: ClassifiedMessage[][] = [];
+  const result = await syncAccountIncremental(
+    baseDeps({
+      client,
+      getKnownPersons: async () => [
+        { personId: "person-1", emailNormalized: "jane@prospect.com", confidence: "exact" } as KnownPersonEmail,
+      ],
+      writeMessages: async (classified) => {
+        writeCalls.push(classified);
+        return { inserted: classified.length };
+      },
+    }),
+  );
+
+  // The run completes rather than throwing, and the surviving message is stored.
+  assert.equal(result.status, "ok");
+  assert.deepEqual(client.getMessageCalls, ["msg-gone", "msg-ok"]);
+  assert.equal(writeCalls.length, 1);
+  assert.equal(writeCalls[0]!.length, 1);
+  assert.equal(writeCalls[0]![0]!.gmailMessageId, "msg-ok");
+  // The cursor still advances: the vanished message is never coming back.
+  assert.equal(result.newHistoryId, "301");
 });
