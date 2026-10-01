@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- Disabled-state matrix: every button-like control, enabled (row 1) and disabled (row 2).
+     Loads the real stylesheets, so it always measures what ships. Run: node btn.mjs <label> -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Disabled states harness</title>
+<link rel="stylesheet" href="../../../src/app/globals.css">
+<link rel="stylesheet" href="../../../src/app/design-system.css">
+<link rel="stylesheet" href="../../../src/app/(app)/tasks/NewTaskButton.module.css">
+</head>
+<body>
+<div id="root"></div>
+<script>
+const variants = [
+  ["btn-primary", (d) => `<button class="btn btn-primary"${d}>Guardar</button>`],
+  ["btn-secondary", (d) => `<button class="btn btn-secondary"${d}>Cancelar</button>`],
+  ["btn-ghost", (d) => `<button class="btn btn-ghost"${d}>Descartar</button>`],
+  ["btn-danger", (d) => `<button class="btn btn-danger"${d}>Eliminar</button>`],
+  ["unclassed", (d) => `<button${d}>Subir</button>`],
+  ["secondary-btn(button)", (d) => `<button class="secondary-btn"${d}>Idioma</button>`],
+  ["secondary-btn(span)", (d) => `<span class="secondary-btn${d ? " disabled" : ""}">Anterior</span>`],
+  ["rowlink(span)", (d) => `<span class="rowlink${d ? " disabled" : ""}">Siguiente</span>`],
+  ["qa", (d) => `<button type="button" class="qa"${d} title="Próximamente"><span class="qa-icon">⋯</span>Más</button>`],
+  ["menu-item", (d) => `<button type="button" class="menu-item"${d}>Mañana</button>`],
+  ["result-row", (d) => `<button type="button" class="resultItem"${d}>Empresa: Acme</button>`],
+  ["chip-remove", (d) => `<span class="chip"><button class="chip-remove" aria-label="x"${d}>×</button></span>`],
+  ["input", (d) => `<input class="input" type="text" value="Valor"${d}>`],
+  ["input(unclassed)", (d) => `<input type="text" value="Valor"${d}>`],
+];
+const row = (id, dis) => `<div id="${id}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">` +
+  variants.map(([n, f]) => `<span data-v="${n}">${f(dis ? " disabled" : "")}</span>`).join("") + `</div>`;
+document.getElementById("root").innerHTML =
+  `<div style="padding:24px;display:grid;gap:16px;background:var(--color-surface-2)">${row("enabled", false)}${row("disabled", true)}</div>`;
+</script>
+</body>
+</html>
