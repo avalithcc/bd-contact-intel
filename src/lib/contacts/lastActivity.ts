@@ -24,10 +24,10 @@ export interface LastActivityRawRow {
   // a plain column reference, so this comes back as a string at runtime
   // (e.g. "2026-09-25 13:30:00+00") even though it's typed `Date` at the
   // call site. Same class of bug src/lib/outreach/queries.ts already
-  // normalizes `lastMessageAt` for. When it IS a string, it can also be
-  // offset-less (`effectiveActivityAtSql()`'s `else` branch is a bare
-  // `timestamp without time zone` column before Postgres's CASE-expression
-  // type unification promotes it) — `buildLastActivityEntries` below is the
+  // normalizes `lastMessageAt` for. When it IS a string it carries an
+  // offset (every branch of `effectiveActivityAtSql()` is `timestamptz` since
+  // slice 5; before, its `else` branch was a naive column that Postgres's
+  // CASE-expression type unification promoted) — `buildLastActivityEntries` below is the
   // single place this gets coerced to a real UTC `Date` (via the shared
   // src/lib/db/timestamp.ts#parseDbTimestamp helper) — every consumer
   // (relative-time render, CSV export) reads the already-normalized

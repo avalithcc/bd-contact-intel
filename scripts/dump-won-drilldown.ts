@@ -5,8 +5,9 @@
  * That query coalesces `activity.created_at` (naive until slice 5) with
  * `company.updated_at` (timestamptz after slice 4), so Postgres casts the
  * naive side with the session TimeZone. Run this before and after the slice 4
- * ALTER and diff the output: the two dumps must be IDENTICAL, including the
- * rows with `wonAtExact === true`.
+ * ALTER (and again around slice 5, which makes both sides timestamptz) and
+ * diff the output: the dumps must be IDENTICAL, including the rows with
+ * `wonAtExact === true`.
  *
  * Output is deterministic JSON: rows sorted by companyKey (the SQL orders by
  * won_at, which can tie), `wonAt` as ISO-8601 UTC. Only SELECTs run.

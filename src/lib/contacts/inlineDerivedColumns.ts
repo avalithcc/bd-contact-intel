@@ -50,12 +50,12 @@ export interface InlineDerivedRawRow extends ContactListRowBase {
 
 /**
  * Bug found writing this module's tests: Postgres's `to_json` rendering of
- * a `timestamptz` value normally carries a UTC offset (e.g. `...+00`), but
- * `effectiveActivityAtSql()`'s `else` branch is a bare `timestamp without
- * time zone` column (`activity.created_at` — see db/schema.ts) before
- * Postgres's implicit cast unifies the `CASE` expression's type; relying on
- * that unification alone for every future caller/Postgres version is
- * fragile. If an offset-less string like `"2026-09-29T00:00:00"` ever
+ * a `timestamptz` value carries a UTC offset (e.g. `...+00`). Before slice 5
+ * `effectiveActivityAtSql()`'s `else` branch was a bare `timestamp without
+ * time zone` column (`activity.created_at`) that Postgres's implicit cast
+ * unified into the `CASE` expression's type; that reliance is gone now that
+ * the column is `timestamptz`, and the guard below stays as defense in
+ * depth. If an offset-less string like `"2026-09-29T00:00:00"` ever
  * reaches here, the JS spec parses a date-time string with no trailing
  * `Z`/offset in the *process's local* timezone (`new Date(...)`), not UTC —
  * silently shifting the displayed last-activity time by the server's UTC
