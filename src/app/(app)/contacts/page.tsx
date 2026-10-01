@@ -39,6 +39,7 @@ import { resolveRoleVisibility, SHOW_ALL_ROLES_PARAM_VALUE } from "@/lib/contact
 import { ROLE_GROUP_PLAYBOOK, PRIORITY_BADGE_CLASS } from "@/lib/roleGroupPlaybook";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { LinkPendingDot } from "./LinkPendingDot";
+import { appendAdHocFilterParams, contactFilterParamsFromSearchParams } from "@/lib/contacts/adHocFilterParams";
 import { FilterMenu } from "./FilterMenu";
 import { deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
@@ -98,6 +99,8 @@ interface ContactsPageProps {
     hiring?: string;
     bdConnected?: string;
     lastActivityDays?: string;
+    hasPhone?: string;
+    emailVerified?: string;
     // "Outreach" system view filters (task 15a-2; owner decision
     // 2026-09-26): same param names/semantics as `/outreach`'s own
     // searchParams — see src/lib/contacts/outreachViewParams.ts.
@@ -332,20 +335,10 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   // deferred "Agregar filtro" scope). Layers on top of the active view's
   // filters field-by-field; an explicit empty selection clears the
   // inherited value instead of being ignored.
-  const effectiveFilters: ContactFilters = applyAdHocContactFilterOverrides(activeView.filters, {
-    owner: sp.owner,
-    industryGroup: sp.industryGroup,
-    seniority: sp.seniority,
-    emailStatus: sp.emailStatus,
-    status: statusQuery,
-    company: sp.company,
-    hiring: sp.hiring,
-    market: sp.market,
-    roleGroup: sp.roleGroup,
-    startupsOnly: sp.startupsOnly,
-    bdConnected: sp.bdConnected,
-    lastActivityDays: sp.lastActivityDays,
-  });
+  const effectiveFilters: ContactFilters = applyAdHocContactFilterOverrides(
+    activeView.filters,
+    contactFilterParamsFromSearchParams({ ...sp, status: statusQuery }),
+  );
 
   // "Ocultar grupos No priorizar por defecto" (owner decision 2026-09-30,
   // "opción A") — resolved once, off the FINAL effective filters (so picking
@@ -444,18 +437,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   // page generates (pagination, layout toggle) so they never silently
   // reset when a BD navigates within the same view.
   function withAdHocFilterParams(params: URLSearchParams): URLSearchParams {
-    if (sp.owner !== undefined) params.set("owner", sp.owner);
-    if (sp.industryGroup !== undefined) params.set("industryGroup", sp.industryGroup);
-    if (sp.seniority !== undefined) params.set("seniority", sp.seniority);
-    if (sp.emailStatus !== undefined) params.set("emailStatus", sp.emailStatus);
-    if (statusQuery !== undefined) params.set("status", statusQuery);
-    if (sp.company !== undefined) params.set("company", sp.company);
-    if (sp.hiring !== undefined) params.set("hiring", sp.hiring);
-    if (sp.market !== undefined) params.set("market", sp.market);
-    if (sp.roleGroup !== undefined) params.set("roleGroup", sp.roleGroup);
-    if (sp.startupsOnly !== undefined) params.set("startupsOnly", sp.startupsOnly);
-    if (sp.bdConnected !== undefined) params.set("bdConnected", sp.bdConnected);
-    if (sp.lastActivityDays !== undefined) params.set("lastActivityDays", sp.lastActivityDays);
+    appendAdHocFilterParams(sp, params);
     if (sp.sort !== undefined) params.set("sort", sp.sort);
     if (sp.roles !== undefined) params.set("roles", sp.roles);
     return params;
