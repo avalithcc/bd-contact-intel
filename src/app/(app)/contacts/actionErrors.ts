@@ -13,6 +13,7 @@ import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
 import { CompanyNotFoundError } from "@/lib/companies/errors";
 import {
+  InvalidContactTypeError,
   InvalidEmailError,
   InvalidPhoneError,
   PropertyBatchEditError,
@@ -31,6 +32,7 @@ export type ContactActionErrorReason =
   | "merged"
   | "invalid_email"
   | "invalid_phone"
+  | "invalid_contact_type"
   | "not_editable"
   | "gmail_not_connected"
   | "gmail_reauth"
@@ -97,6 +99,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof TaskNotFoundError) return "not_found";
   if (err instanceof InvalidEmailError) return "invalid_email";
   if (err instanceof InvalidPhoneError) return "invalid_phone";
+  if (err instanceof InvalidContactTypeError) return "invalid_contact_type";
   if (err instanceof PropertyNotEditableError) return "not_editable";
   if (err instanceof GmailSendError) {
     if (err.kind === "not_connected") return "gmail_not_connected";
