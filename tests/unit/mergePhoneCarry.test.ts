@@ -32,6 +32,7 @@ function p(id: string, o: Partial<MergePersonFields> = {}): MergePersonFields {
     country: null,
     ownerBdId: null,
     sourceKey: null,
+    contactType: null,
     ...o,
   };
 }

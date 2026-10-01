@@ -51,6 +51,7 @@ function person(overrides: Partial<MergePersonFields> & { id: string }): MergePe
     country: null,
     ownerBdId: null,
     sourceKey: "csv",
+    contactType: null,
     ...overrides,
   };
 }
