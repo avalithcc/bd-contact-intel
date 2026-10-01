@@ -25,6 +25,8 @@
  * read 0 for every BD.
  */
 
+import { parseDbTimestamp } from "@/lib/db/timestamp";
+
 export interface WonCompanyDrilldownRawRow {
   companyKey: string;
   displayName: string;
@@ -46,6 +48,6 @@ export interface WonCompanyDrilldownRow {
 export function buildWonCompanyDrilldownRows(rows: readonly WonCompanyDrilldownRawRow[]): WonCompanyDrilldownRow[] {
   return rows.map((r) => ({
     ...r,
-    wonAt: r.wonAt instanceof Date ? r.wonAt : new Date(r.wonAt),
+    wonAt: parseDbTimestamp(r.wonAt),
   }));
 }

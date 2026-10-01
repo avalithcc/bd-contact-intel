@@ -88,6 +88,8 @@ above against the target runtime before reusing this sequence anywhere else.
 5. activity, task.
 6. email_account, email_message, follow_up_queue_item, person_bd_connection.
 
+**Generator gotchas for slices 5-6 (found in slice 4):** `npm run db:generate` (1) stamps a journal `when` below the hand-set future-dated chain, so `drizzle-kit migrate` would skip the entry; set `when` above the previous entry by hand (`tests/unit/drizzleJournal.test.ts` enforces it), and (2) emits plain `ALTER COLUMN ... TYPE timestamp with time zone`, omitting the `USING ... AT TIME ZONE 'UTC'` clause and the `SET LOCAL lock_timeout`. Hand-write the migration to match `0030`'s shape and keep the generator's snapshot.
+
 **Rollback (per slice, forward-only; never edit an applied migration):** redeploy the previous code first, then apply `ALTER COLUMN c TYPE timestamp USING c AT TIME ZONE 'UTC'`.
 
 ## Verification (read-only, before and after each slice)

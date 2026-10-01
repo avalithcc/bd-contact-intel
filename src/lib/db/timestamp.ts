@@ -1,12 +1,12 @@
 /**
  * Every timestamp column in this schema holds UTC (CLAUDE.md query rule 2 /
- * PERFORMANCE.md). The column TYPE is mid-migration: slices 1-3 of
- * openspec/decisions/2026-09-30-timestamptz-migration-plan.md converted 51
- * columns to `timestamptz`, while the tables still queued in slices 4-6
- * (company; activity, task; email_account, email_message,
- * follow_up_queue_item, person_bd_connection) remain `timestamp without
- * time zone`. Drizzle's typed column mapper parses both kinds correctly,
- * because its `withTimezone` flag tracks the column — but any raw
+ * PERFORMANCE.md). The column TYPE is mid-migration: slices 1-4 of
+ * openspec/decisions/2026-09-30-timestamptz-migration-plan.md converted 53
+ * columns to `timestamptz`, while the tables still queued in slices 5-6
+ * (activity, task; email_account, email_message, follow_up_queue_item,
+ * person_bd_connection) remain `timestamp without time zone`. Drizzle's
+ * typed column mapper parses both kinds correctly, because its
+ * `withTimezone` flag tracks the column — but any raw
  * `db.execute(sql...)` row, and any computed `sql` expression (an aggregate
  * like `max(...)`, or a `CASE` expression like
  * `effectiveActivityAtSql()`, src/lib/contacts/effectiveActivityTime.ts),
