@@ -169,19 +169,16 @@ kbd, .kbd {
 .btn-danger-solid { background: var(--color-danger-text); color: var(--color-accent-fg); }
 .btn-danger-solid:hover { background: var(--color-danger-press); }
 .btn.is-focus { box-shadow: var(--focus-ring); }
-/* Disabled: an explicit muted treatment instead of a blanket opacity. Fading the whole
-   button also faded the label, so a disabled .btn-primary became pale pink with near-white
-   text (2.3:1). Sunken surface + subtle ink keeps the label readable and still reads as
-   inert. `opacity: 1` is required: globals.css has a zero-specificity legacy
-   `:where(button:disabled)` at 0.55 that would otherwise fade this treatment too. The border
-   resets so no variant keeps its accent or strong outline. */
+/* Disabled: ONE recipe for every button variant, never opacity. Fading the whole button also
+   faded the label (a disabled .btn-primary was pale pink with near-white text, 2.3:1). The
+   recipe is a flat sunken fill + hairline border + subtle ink (4.5:1, AA). The fill is what makes
+   it read as inert at a glance: every enabled variant is either accent, white or transparent, so
+   a grey flat box is unique to disabled. Ghost therefore gets the box too (enabled it has no
+   surface), instead of differing only by ink and cursor. `pointer-events: none` suppresses hover. */
 .btn:disabled, .btn.is-disabled {
   background: var(--color-surface-sunken); color: var(--color-ink-subtle); border-color: var(--color-border);
-  opacity: 1; cursor: not-allowed; pointer-events: none;
+  cursor: not-allowed; pointer-events: none;
 }
-/* Ghost has no surface when enabled; keep it borderless and transparent so it does not
-   grow a grey box, and let the lighter ink carry the disabled state. */
-.btn-ghost:disabled, .btn-ghost.is-disabled { background: transparent; border-color: transparent; }
 .btn-sm { height: var(--control-height-sm); padding: 0 var(--space-sm); font-size: var(--text-sm); }
 .btn-icon { width: var(--control-height); padding: 0; }
 .btn-sm.btn-icon { width: var(--control-height-sm); }
@@ -221,7 +218,9 @@ kbd, .kbd {
 .input:hover, .select:hover, .textarea:hover { border-color: var(--color-ink-muted); }
 .input:focus, .select:focus, .textarea:focus, .input.is-focus { outline: none; border-color: var(--color-accent-strong); box-shadow: var(--focus-ring); }
 .input.is-invalid { border-color: var(--color-danger); }
-.input:disabled, .input.is-disabled { background: var(--color-surface-sunken); color: var(--color-ink-muted); cursor: not-allowed; }
+.input:disabled, .select:disabled, .textarea:disabled, .input.is-disabled {
+  background-color: var(--color-surface-sunken); color: var(--color-ink-subtle); cursor: not-allowed;
+}
 .select {
   appearance: none; padding-right: 1.9rem; cursor: pointer;
   background-image: var(--icon-select-chevron);
