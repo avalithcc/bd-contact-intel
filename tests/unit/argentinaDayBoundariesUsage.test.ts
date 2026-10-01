@@ -22,8 +22,9 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { join, sep } from "node:path";
+import { readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const SRC = "src";
 
@@ -43,10 +44,10 @@ const ALLOWED_DUE_AT_FILES = new Set([
 
 const IMPORT_RE = /import\s*\{[^}]*\bargentinaDayBoundaries\b[^}]*\}\s*from\s*["']@\/lib\/tasks\/argentinaDate["']/;
 
-function scan(): string[] {
-  const allFiles = (readdirSync(SRC, { recursive: true }) as string[])
+function scan(root: string = SRC): string[] {
+  const allFiles = (readdirSync(root, { recursive: true }) as string[])
     .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
-    .map((f) => join(SRC, f));
+    .map((f) => join(root, f));
 
   const offenders: string[] = [];
   for (const file of allFiles) {
@@ -71,9 +72,12 @@ test("argentinaDayBoundaries is imported only by files that bound task.due_at, n
 });
 
 test("fixture proof: a new, unlisted importer of argentinaDayBoundaries is actually caught", () => {
-  const fixtureDir = join(SRC, "__argentina_day_boundaries_fixture_tmp__");
-  const fixturePath = join(fixtureDir, "offender.ts");
-  mkdirSync(fixtureDir, { recursive: true });
+  // The fixture lives in a unique os.tmpdir() directory, never under `src/`:
+  // `npm run test:unit` runs test files in parallel processes, and other
+  // tests walk `src/` (readdir then readFile), so a temp file written there
+  // can vanish between their readdir and readFile (ENOENT) and fail them at random.
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "argentina-day-boundaries-"));
+  const fixturePath = join(fixtureRoot, "offender.ts");
   writeFileSync(
     fixturePath,
     [
@@ -87,12 +91,13 @@ test("fixture proof: a new, unlisted importer of argentinaDayBoundaries is actua
   );
 
   try {
-    const offenders = scan();
-    assert.ok(
-      offenders.includes(fixturePath),
+    const offenders = scan(fixtureRoot);
+    assert.deepEqual(
+      offenders,
+      [fixturePath],
       "the fixture's unlisted argentinaDayBoundaries import must be reported as an offender",
     );
   } finally {
-    rmSync(fixtureDir, { recursive: true, force: true });
+    rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });

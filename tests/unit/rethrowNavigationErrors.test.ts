@@ -28,7 +28,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, unlinkSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 
 const SRC_APP = join("src", "app");
@@ -189,10 +190,10 @@ function classifyCatch(param: string | null, block: string): { ok: boolean; reas
   };
 }
 
-function scan(): { violations: CatchViolation[]; totalCatchBlocks: number; scannedFiles: number } {
-  const allFiles = (readdirSync(SRC_APP, { recursive: true }) as string[])
+function scan(root: string = SRC_APP): { violations: CatchViolation[]; totalCatchBlocks: number; scannedFiles: number } {
+  const allFiles = (readdirSync(root, { recursive: true }) as string[])
     .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
-    .map((f) => join(SRC_APP, f));
+    .map((f) => join(root, f));
 
   const violations: CatchViolation[] = [];
   let totalCatchBlocks = 0;
@@ -246,9 +247,10 @@ test("every catch in a server action / route handler rethrows Next navigation er
 });
 
 test("fixture proof: a swallowing catch in a fixture 'use server' file is detected", () => {
-  const fixtureDir = join(SRC_APP, "__rethrow_fixture_tmp__");
+  // Unique os.tmpdir() directory, never under src/: parallel test processes
+  // walk src/ (readdir then readFile) and would hit ENOENT on a vanishing file.
+  const fixtureDir = mkdtempSync(join(tmpdir(), "rethrow-fixture-"));
   const fixturePath = join(fixtureDir, "actions.ts");
-  mkdirSync(fixtureDir, { recursive: true });
   writeFileSync(
     fixturePath,
     [
@@ -267,7 +269,7 @@ test("fixture proof: a swallowing catch in a fixture 'use server' file is detect
   );
 
   try {
-    const { violations } = scan();
+    const { violations } = scan(fixtureDir);
     const fixtureViolations = violations.filter((v) => v.file === fixturePath);
     assert.equal(
       fixtureViolations.length,
