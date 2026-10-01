@@ -130,3 +130,44 @@
 .signOutRow {
   margin-top: var(--space-xl);
 }
+
+.signatureForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.signatureHelp {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.signatureInput {
+  min-height: 9rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.signaturePreview {
+  width: 100%;
+  height: 12rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.signatureEmpty {
+  margin: 0;
+  padding: var(--space-lg);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.signatureError {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--text-sm);
+}

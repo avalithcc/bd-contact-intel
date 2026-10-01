@@ -9,6 +9,7 @@ import { MailIcon, LockIcon, ChevronRightIcon } from "@/components/icons";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { gmailConnectionState } from "@/lib/gmail/connectionState";
 import { SignOutButton } from "../../SignOutButton";
+import { SignatureEditor } from "./SignatureEditor";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,31 @@ export default async function AccountPage() {
             <span className={styles.segmentedOn}>{l.languageValue}</span>
           </span>
         </div>
+      </div>
+
+      <div className={styles.card}>
+        <h3 className={styles.cardHeader}>{l.signatureTitle}</h3>
+        <SignatureEditor
+          initialHtml={me.signatureHtml}
+          labels={{
+            title: l.signatureTitle,
+            help: l.signatureHelp,
+            inputLabel: l.signatureInputLabel,
+            placeholder: l.signaturePlaceholder,
+            policy: l.signaturePolicy,
+            previewLabel: l.signaturePreviewLabel,
+            previewTitle: l.signaturePreviewTitle,
+            previewEmpty: l.signaturePreviewEmpty,
+            save: l.signatureSave,
+            saving: l.signatureSaving,
+            clear: l.signatureClear,
+            saved: l.signatureSaved,
+            cleared: l.signatureCleared,
+            errorTooLong: l.signatureErrorTooLong,
+            errorNothingLeft: l.signatureErrorNothingLeft,
+            errorUnexpected: l.signatureErrorUnexpected,
+          }}
+        />
       </div>
 
       <div className={styles.card}>

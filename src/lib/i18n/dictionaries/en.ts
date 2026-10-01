@@ -1113,6 +1113,24 @@ export const en = {
     badgeConnected: "Connected",
     passwordRowTitle: "Password",
     passwordRowMeta: "Update your sign-in password",
+    signatureTitle: "Firma de correo",
+    signatureHelp:
+      "Pega el HTML completo de tu firma. Se añade al final de cada correo que envías desde el CRM; sin firma, tus correos se envían como texto plano.",
+    signatureInputLabel: "HTML de la firma",
+    signaturePlaceholder: "<table>…</table>",
+    signaturePolicy:
+      "Por seguridad se eliminan scripts, formularios, bloques de estilo y manejadores de eventos. Los enlaces solo pueden ser http, https, mailto o tel, y las imágenes solo https.",
+    signaturePreviewLabel: "Vista previa de lo que recibirá el destinatario",
+    signaturePreviewTitle: "Vista previa de la firma",
+    signaturePreviewEmpty: "Sin firma: tus correos se envían como texto plano.",
+    signatureSave: "Guardar firma",
+    signatureSaving: "Guardando…",
+    signatureClear: "Quitar firma",
+    signatureSaved: "Firma guardada",
+    signatureCleared: "Firma eliminada",
+    signatureErrorTooLong: "La firma es demasiado larga (máximo 50 000 caracteres).",
+    signatureErrorNothingLeft: "Tras la limpieza no queda contenido válido. Revisa que el HTML tenga texto, enlaces o imágenes https.",
+    signatureErrorUnexpected: "No se pudo guardar la firma. Inténtalo de nuevo.",
   },
 
   accountEmail: {
