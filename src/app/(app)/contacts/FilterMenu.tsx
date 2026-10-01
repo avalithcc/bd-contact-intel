@@ -25,6 +25,10 @@ import {
   FILTER_FIELD_KIND,
   FILTER_MENU_ORDER,
 } from "@/lib/contacts/filterFieldKinds";
+import {
+  checkboxSubmitMarker,
+  isCheckboxFilterKey,
+} from "@/lib/contacts/adHocFilterParams";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
 import { PRIORITY_BADGE_CLASS, ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { InfoIcon } from "@/components/icons";
@@ -191,6 +195,7 @@ export function FilterMenu({
       const name = FIELD_PARAM_NAMES[field][0];
       return (
         <label className="check">
+          {isCheckboxFilterKey(name) && <input type="hidden" name={checkboxSubmitMarker(name)} value="1" />}
           <input type="checkbox" name={name} value={name === "hiring" ? "1" : "on"} defaultChecked={!!current.get(name)} />{" "}
           {FILTER_FIELD_LABEL[field]}
         </label>
