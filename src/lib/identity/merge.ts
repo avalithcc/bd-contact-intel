@@ -50,6 +50,7 @@ export interface MergePersonFields {
   country: string | null;
   ownerBdId: string | null;
   sourceKey: string | null;
+  contactType: string | null;
 }
 
 type PersonField = keyof Omit<MergePersonFields, "id">;
@@ -282,6 +283,7 @@ export const MERGE_TRACKED_FIELDS: readonly PersonField[] = [
   "country",
   "ownerBdId",
   "sourceKey",
+  "contactType",
 ];
 
 function candidate(value: string | null, specificity?: number) {
@@ -330,12 +332,14 @@ function mergeEmailFields(a: MergePersonFields, b: MergePersonFields) {
 }
 
 /**
- * Phones are FILL-BLANK ONLY: a non-empty survivor number always stays; the
- * merged side only fills a blank. Deliberately not `mergeProperty`, whose
- * "longer value wins" rule could replace the number a BD actually entered.
- * A differing merged-side number is returned as `loss` so the snapshot keeps it.
+ * Phones and contactType are FILL-BLANK ONLY: a non-empty survivor value always
+ * stays; the merged side only fills a blank. Deliberately not `mergeProperty`,
+ * whose "longer value wins" rule could replace a number a BD actually entered,
+ * and for contactType (a closed two-value set) would always pick BUYER-CHAMPION
+ * over INFLUENCER by length alone, which is arbitrary.
+ * A differing merged-side value is returned as `loss` so the snapshot keeps it.
  */
-function fillBlankPhone(survivorValue: string | null, mergedValue: string | null): { value: string | null; loss: string | null } {
+function fillBlank(survivorValue: string | null, mergedValue: string | null): { value: string | null; loss: string | null } {
   const survivorHas = survivorValue != null && survivorValue.trim() !== "";
   const mergedHas = mergedValue != null && mergedValue.trim() !== "";
   if (survivorHas) {
@@ -549,10 +553,12 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     propertyLosses.push({ property: "jobTitle", value: jobTitleResult.loser.value });
   }
   if (emailResult.loss) propertyLosses.push(emailResult.loss);
-  const phoneResult = fillBlankPhone(survivor.phone, merged.phone);
-  const mobileResult = fillBlankPhone(survivor.mobilePhone, merged.mobilePhone);
+  const phoneResult = fillBlank(survivor.phone, merged.phone);
+  const mobileResult = fillBlank(survivor.mobilePhone, merged.mobilePhone);
   if (phoneResult.loss) propertyLosses.push({ property: "phone", value: phoneResult.loss });
   if (mobileResult.loss) propertyLosses.push({ property: "mobilePhone", value: mobileResult.loss });
+  const contactTypeResult = fillBlank(survivor.contactType, merged.contactType);
+  if (contactTypeResult.loss) propertyLosses.push({ property: "contactType", value: contactTypeResult.loss });
 
   const survivorUpdate: Omit<MergePersonFields, "id"> = {
     firstName: (mergedFields.firstName as string | null) ?? null,
@@ -575,6 +581,7 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     emailSource: emailResult.emailSource,
     phone: phoneResult.value,
     mobilePhone: mobileResult.value,
+    contactType: contactTypeResult.value,
     ownerBdId: pickOwner(survivor, merged, [...input.survivorConnections, ...input.mergedConnections]),
   };
 
