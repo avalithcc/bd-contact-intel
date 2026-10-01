@@ -19,7 +19,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { FilterChip, FilterChipField } from "@/lib/contacts/filterChips";
 import { FILTER_FIELD_LABEL } from "@/lib/contacts/filterChips";
-import { EXTRA_FILTER_MENU_ORDER, FILTER_FIELD_KIND, FILTER_MENU_ORDER } from "@/lib/contacts/filterFieldKinds";
+import {
+  EXTRA_FILTER_MENU_ORDER,
+  FIELD_PARAM_NAMES,
+  FILTER_FIELD_KIND,
+  FILTER_MENU_ORDER,
+} from "@/lib/contacts/filterFieldKinds";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
 import { PRIORITY_BADGE_CLASS, ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { InfoIcon } from "@/components/icons";
@@ -62,25 +67,6 @@ export interface FilterMenuProps {
   seniorityOptions: SelectOption[];
   labels: FilterMenuLabels;
 }
-
-/** Field name(s) this editor's control uses in the form — `status` posts
- * one entry per checked box under the same key. */
-const FIELD_PARAM_NAMES: Record<FilterChipField, string[]> = {
-  owner: ["owner"],
-  status: ["status"],
-  emailStatus: ["emailStatus"],
-  hasPhone: ["hasPhone"],
-  company: ["company"],
-  hiring: ["hiring"],
-  market: ["market"],
-  roleGroup: ["roleGroup"],
-  startupsOnly: ["startupsOnly"],
-  bdConnected: ["bdConnected"],
-  lastActivityDays: ["lastActivityDays"],
-  industryGroup: ["industryGroup"],
-  seniority: ["seniority"],
-  emailVerified: ["emailVerified"],
-};
 
 /**
  * For a chip's "×" removal link: explicit empty string, not `.delete()` —

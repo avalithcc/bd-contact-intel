@@ -46,3 +46,23 @@ export const FILTER_FIELD_KIND: Record<FilterChipField, FilterFieldKind> = {
   seniority: "select",
   emailVerified: "checkbox",
 };
+
+/** Field name(s) this editor's control uses in the form — `status` posts
+ * one entry per checked box under the same key. */
+export const FIELD_PARAM_NAMES: Record<FilterChipField, string[]> = {
+  owner: ["owner"],
+  status: ["status"],
+  emailStatus: ["emailStatus"],
+  hasPhone: ["hasPhone"],
+  company: ["company"],
+  hiring: ["hiring"],
+  market: ["market"],
+  roleGroup: ["roleGroup"],
+  startupsOnly: ["startupsOnly"],
+  bdConnected: ["bdConnected"],
+  lastActivityDays: ["lastActivityDays"],
+  industryGroup: ["industryGroup"],
+  seniority: ["seniority"],
+  emailVerified: ["emailVerified"],
+};
+
