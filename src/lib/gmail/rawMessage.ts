@@ -53,8 +53,41 @@ export function generateBoundary(
  */
 export function assertSafeHeaderValue(name: string, value: string): void {
   if (/[\r\n\0]/.test(value)) {
-    throw new GmailSendError("invalid_header", `The ${name} address contains a control character (CR, LF or NUL)`);
+    throw new GmailSendError("invalid_header", `The ${name} header contains a control character (CR, LF or NUL)`);
   }
+}
+
+/**
+ * Threading headers of a reply. Both values come from mail someone else sent
+ * (a Message-ID is chosen by the sender), so they are attacker-influenced and
+ * pass the same guard as To/From.
+ */
+export interface ThreadingHeaders {
+  inReplyTo: string;
+  references: string;
+}
+
+/** What `sendGmailMessage` needs to continue an existing Gmail thread. */
+export interface ReplyTarget extends ThreadingHeaders {
+  threadId: string;
+}
+
+const FOLD_AT = 76;
+
+/** RFC 5322 folding: break a long id list only at the spaces that already separate ids. */
+function foldIdList(name: string, value: string): string {
+  const lines: string[] = [];
+  let line = `${name}:`;
+  for (const id of value.split(/\s+/).filter(Boolean)) {
+    if (line.length + 1 + id.length > FOLD_AT && line.trim() !== `${name}:`) {
+      lines.push(line);
+      line = ` ${id}`;
+    } else {
+      line += ` ${id}`;
+    }
+  }
+  lines.push(line);
+  return lines.join(CRLF);
 }
 
 export function buildRawMessage(
@@ -63,11 +96,19 @@ export function buildRawMessage(
   subject: string,
   content: MessageContent,
   boundaryRandom?: () => string,
+  reply?: ThreadingHeaders,
 ): string {
   assertSafeHeaderValue("From", from);
   assertSafeHeaderValue("To", to);
+  if (reply) {
+    assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
+    assertSafeHeaderValue("References", reply.references);
+  }
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
-  const envelope = [`From: ${from}`, `To: ${to}`, `Subject: ${encodedSubject}`, "MIME-Version: 1.0"];
+  const threading = reply
+    ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
+    : [];
+  const envelope = [`From: ${from}`, `To: ${to}`, `Subject: ${encodedSubject}`, ...threading, "MIME-Version: 1.0"];
 
   let message: string;
   if (content.bodyHtml === undefined) {
@@ -92,4 +133,22 @@ export function buildRawMessage(
     ].join(CRLF);
   }
   return Buffer.from(message, "utf8").toString("base64url");
+}
+
+/**
+ * The JSON body of Gmail's `messages.send`. `threadId` is added ONLY for a
+ * reply: without it Gmail files the message in a new thread even when the
+ * headers match; with it, Gmail still requires the subject and References to
+ * line up, which the reply planner guarantees. A new email serialises to
+ * `{"raw":"..."}` exactly as before.
+ */
+export function buildSendPayload(
+  from: string,
+  to: string,
+  subject: string,
+  content: MessageContent,
+  reply?: ReplyTarget,
+): string {
+  const raw = buildRawMessage(from, to, subject, content, undefined, reply);
+  return JSON.stringify(reply ? { raw, threadId: reply.threadId } : { raw });
 }

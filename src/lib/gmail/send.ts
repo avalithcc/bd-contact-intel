@@ -5,7 +5,7 @@ import { decryptToken } from "@/lib/gmail/crypto";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { createActivityAction } from "@/app/activity/actions";
-import { assertSafeHeaderValue, buildRawMessage, type MessageContent } from "@/lib/gmail/rawMessage";
+import { assertSafeHeaderValue, buildSendPayload, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
 
 // Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
 // `bodyHtml` (the text/plain alternative is derived from it). The union makes
@@ -19,12 +19,18 @@ type SendGmailInput = {
   companyKey?: string;
   // Unified-Contact subject (design D1); record page's "Correo" action (9.2).
   personId?: string;
+  // Present only when continuing an existing thread (see replyThread.ts).
+  reply?: ReplyTarget;
 } & MessageContent;
 
 export async function sendGmailMessage(input: SendGmailInput) {
-  const { bdId, to, subject, leadId, companyKey, personId } = input;
+  const { bdId, to, subject, leadId, companyKey, personId, reply } = input;
   // Fail fast on the untrusted recipient, before any DB read or token refresh.
   assertSafeHeaderValue("To", to);
+  if (reply) {
+    assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
+    assertSafeHeaderValue("References", reply.references);
+  }
   const content: MessageContent =
     input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
   const [account] = await db
@@ -107,9 +113,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
         Authorization: `Bearer ${access_token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        raw: buildRawMessage(account.emailAddress, to, subject, content),
-      }),
+      body: buildSendPayload(account.emailAddress, to, subject, content, reply),
     },
   );
 
