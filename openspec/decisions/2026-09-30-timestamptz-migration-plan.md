@@ -90,6 +90,8 @@ above against the target runtime before reusing this sequence anywhere else.
 
 **Generator gotchas for slices 5-6 (found in slice 4):** `npm run db:generate` (1) stamps a journal `when` below the hand-set future-dated chain, so `drizzle-kit migrate` would skip the entry; set `when` above the previous entry by hand (`tests/unit/drizzleJournal.test.ts` enforces it), and (2) emits plain `ALTER COLUMN ... TYPE timestamp with time zone`, omitting the `USING ... AT TIME ZONE 'UTC'` clause and the `SET LOCAL lock_timeout`. Hand-write the migration to match `0030`'s shape and keep the generator's snapshot.
 
+**Journal `when` is future-dated on purpose (do not "fix" it):** drizzle runs an entry only if `Number(max(created_at) in drizzle.__drizzle_migrations) < entry.when` (`drizzle-orm/pg-core/dialect.js` `migrate`; hash and tag are never compared). Production's max `created_at` is the last hand-set `when` (0034: 1792441471556, about 2026-10-19), so lowering journal values cannot change the ledger and would make new real-clock migrations skip. Until the clock passes the chain, hand-set every new `when` to previous + 86,400,000 ms; `tests/unit/drizzleJournal.test.ts` states the value on failure (logic in `src/lib/migration/journalWhen.ts`).
+
 **Rollback (per slice, forward-only; never edit an applied migration):** redeploy the previous code first, then apply `ALTER COLUMN c TYPE timestamp USING c AT TIME ZONE 'UTC'`.
 
 ## Verification (read-only, before and after each slice)
