@@ -1774,6 +1774,10 @@ export const es: typeof en = {
     // "Ocultar grupos No priorizar por defecto" chip (owner decision
     // 2026-09-30, "opción A") — roleVisibility.ts.
     hiddenRolesChipLabel: "Ocultos",
+    // Appended to the chip: BUYER-CHAMPION contacts are never hidden.
+    hiddenRolesExceptionLabel: "salvo compradores",
+    hiddenRolesExceptionHint:
+      "Los contactos marcados como Comprador / promotor siempre se muestran, aunque su rol esté en estos grupos.",
     showAllRolesLabel: "Mostrar todos",
     filterCompanyLabel: "Empresa",
     filterHiringLabel: "Empresa con vacantes abiertas",

@@ -795,12 +795,13 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           {roleVisibility.isDefaultActive && (
             <>
               <span className="dropdown">
-                <span className="chip">
+                <span className="chip" title={l.hiddenRolesExceptionHint}>
                   <span className="chip-target">
                     <span className="k">{l.hiddenRolesChipLabel}:</span>{" "}
                     {roleVisibility.hiddenRoleGroups
                       .map((key) => dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key)
-                      .join(", ")}
+                      .join(", ")}{" "}
+                    ({l.hiddenRolesExceptionLabel})
                   </span>
                 </span>
                 <details className="dropdown">

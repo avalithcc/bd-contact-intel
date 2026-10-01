@@ -16,8 +16,9 @@
  * query, view-tab badges, CSV export), so none of them can disagree on
  * which rows are hidden.
  */
-import { isNull, notInArray, or, type SQL } from "drizzle-orm";
+import { eq, isNull, notInArray, or, type SQL } from "drizzle-orm";
 import { person } from "@/db/schema";
+import { BUYER_CHAMPION_CONTACT_TYPE } from "@/lib/contacts/contactType";
 import { NOT_WORTH_PRIORITIZING } from "@/lib/roleGroupPlaybook";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 
@@ -62,8 +63,20 @@ export function resolveRoleVisibility(
  * a WHERE clause treats as false. Task brief: "null or unknown role groups
  * stay VISIBLE" — the explicit `IS NULL` branch guards that instead of
  * relying on it.
+ *
+ * Exception: an explicit `contact_type = 'BUYER-CHAMPION'` is never hidden. The
+ * hide rule infers "not my buyer" from a job title; an explicit "this person
+ * buys" (e.g. a hotel's Director comercial) beats that inference. Only
+ * BUYER-CHAMPION — an INFLUENCER salesperson is still hidden. It is a
+ * positive equality OR-ed in, so a NULL contact_type evaluates to NULL for
+ * this branch and the row is decided by the other two branches exactly as
+ * before (no negation on contact_type, so no NULL trap here).
  */
 export function roleGroupVisibilityCondition(hiddenRoleGroups: readonly RoleGroupKey[]): SQL | undefined {
   if (!hiddenRoleGroups.length) return undefined;
-  return or(isNull(person.roleGroup), notInArray(person.roleGroup, [...hiddenRoleGroups]));
+  return or(
+    isNull(person.roleGroup),
+    notInArray(person.roleGroup, [...hiddenRoleGroups]),
+    eq(person.contactType, BUYER_CHAMPION_CONTACT_TYPE),
+  );
 }

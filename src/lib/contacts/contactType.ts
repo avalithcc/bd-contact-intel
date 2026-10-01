@@ -8,6 +8,9 @@
  */
 export const CONTACT_TYPES = ["BUYER-CHAMPION", "INFLUENCER"] as const;
 
+/** The explicit "this person buys" value; exempt from the role-group hide default (roleVisibility.ts). */
+export const BUYER_CHAMPION_CONTACT_TYPE = "BUYER-CHAMPION" satisfies (typeof CONTACT_TYPES)[number];
+
 export type ContactType = (typeof CONTACT_TYPES)[number];
 
 /** Display labels (Spanish) — the single place the UI reads them from: list
