@@ -6,6 +6,7 @@ import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
+import { SyncHealthBanner } from "@/components/SyncHealthBanner";
 import { Sidebar } from "../contacts/Sidebar";
 import { TopBar } from "../contacts/TopBar";
 
@@ -45,7 +46,7 @@ export default async function AppLayout({
   const searchLabels = pickTopBarSearchLabels(dict);
   const me = await getCurrentBd();
   const now = new Date();
-  const { taskCount, followUpCount, needsReconnectBanner } = await getAppShellBadgeCounts(me.id, now);
+  const { taskCount, followUpCount, needsReconnectBanner, syncBanner } = await getAppShellBadgeCounts(me.id, now);
 
   return (
     <ToastProvider>
@@ -64,6 +65,7 @@ export default async function AppLayout({
             me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
           />
           {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
+          {syncBanner && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
           {children}
         </div>
       </div>
