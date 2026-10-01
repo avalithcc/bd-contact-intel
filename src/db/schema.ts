@@ -1023,8 +1023,8 @@ export const company = pgTable(
     // These are denormalized (not FKs) to preserve history if the BD is removed.
     createdByBdId: uuid("created_by_bd_id"),
     updatedByBdId: uuid("updated_by_bd_id"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     // Normalized domain (lowercase, no protocol/www./path), used by the
     // HubSpot import to match a HubSpot company to an existing one before
     // falling back to the normalized-name key. Nullable — most existing
