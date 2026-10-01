@@ -63,6 +63,14 @@ function companyBelongsToBdSql(bdId: string | null) {
 
 const ACTIVITY_BY_BD_TYPES = ["note", "call", "meeting_logged", "email_sent", "reply_received"] as const;
 
+/**
+ * Midnight UTC of a queue day, as a `timestamptz`. `queue_date` is a `date`,
+ * and `date::timestamptz` is midnight in the SESSION TimeZone, so the ART
+ * worked-window below would move with it; `::timestamp AT TIME ZONE 'UTC'`
+ * pins it explicitly (identical value while the session is UTC).
+ */
+const QUEUE_DAY_START_UTC_SQL_TEXT = `(follow_up_queue_item.queue_date::timestamp at time zone 'UTC')`;
+
 /** Literal-text twin of queueSelection.ts#workedTodayAtSql(), generalized from "today" to an arbitrary ART calendar date — see this file's doc comment for why it can't reuse that helper via interpolation here. */
 const WORKED_AT_SQL_TEXT = `(case
             when activity.type = 'call' then activity.created_at
@@ -207,15 +215,15 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
           select 1 from ${activity}
           where activity.person_id = follow_up_queue_item.person_id
             and activity.type in (${workedTypes})
-            and ${sql.raw(WORKED_AT_SQL_TEXT)} >= (follow_up_queue_item.queue_date::timestamptz + interval '3 hours')
-            and ${sql.raw(WORKED_AT_SQL_TEXT)} < (follow_up_queue_item.queue_date::timestamptz + interval '1 day 3 hours')
+            and ${sql.raw(WORKED_AT_SQL_TEXT)} >= (${sql.raw(QUEUE_DAY_START_UTC_SQL_TEXT)} + interval '3 hours')
+            and ${sql.raw(WORKED_AT_SQL_TEXT)} < (${sql.raw(QUEUE_DAY_START_UTC_SQL_TEXT)} + interval '1 day 3 hours')
         ))::int as pbc_worked,
         count(*) filter (where follow_up_queue_item.state = 'pending' and not exists (
           select 1 from ${activity}
           where activity.person_id = follow_up_queue_item.person_id
             and activity.type in (${workedTypes})
-            and ${sql.raw(WORKED_AT_SQL_TEXT)} >= (follow_up_queue_item.queue_date::timestamptz + interval '3 hours')
-            and ${sql.raw(WORKED_AT_SQL_TEXT)} < (follow_up_queue_item.queue_date::timestamptz + interval '1 day 3 hours')
+            and ${sql.raw(WORKED_AT_SQL_TEXT)} >= (${sql.raw(QUEUE_DAY_START_UTC_SQL_TEXT)} + interval '3 hours')
+            and ${sql.raw(WORKED_AT_SQL_TEXT)} < (${sql.raw(QUEUE_DAY_START_UTC_SQL_TEXT)} + interval '1 day 3 hours')
         ))::int as pbc_still_pending
       from ${followUpQueueItem}
       where follow_up_queue_item.queue_date >= ${fromDate}::date

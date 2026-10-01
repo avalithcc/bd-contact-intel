@@ -18,6 +18,8 @@
  * partial flip visible in review, not just in this file's own diff.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { getTableColumns, getTableName, is } from "drizzle-orm";
 import { PgTable, PgTimestamp } from "drizzle-orm/pg-core";
@@ -29,7 +31,9 @@ import * as schema from "@/db/schema";
  * `ALTER COLUMN ... TYPE timestamptz` migration (plan's "Slices" section).
  * Slice 1 (small, low-traffic tables), slice 2 (imported tables:
  * job_posting, contact, conversation, message), slice 3 (lead, person),
- * slice 4 (company) and slice 5 (activity, task) have been converted.
+ * slice 4 (company), slice 5 (activity, task) and slice 6
+ * (person_bd_connection, email_account, email_message,
+ * follow_up_queue_item) have been converted — the migration is complete.
  */
 const CONVERTED_TABLES: readonly string[] = [
   "bd",
@@ -63,6 +67,10 @@ const CONVERTED_TABLES: readonly string[] = [
   "company",
   "activity",
   "task",
+  "person_bd_connection",
+  "email_account",
+  "email_message",
+  "follow_up_queue_item",
 ];
 
 function withTimezoneFlagsByTable(): Map<string, boolean[]> {
@@ -115,4 +123,18 @@ test("won-drilldown coalesce operands are both timestamptz (no session-TimeZone 
   assert.equal(schema.activity.createdAt.columnType, "PgTimestamp");
   assert.equal((schema.activity.createdAt as unknown as { withTimezone: boolean }).withTimezone, true);
   assert.equal((schema.company.updatedAt as unknown as { withTimezone: boolean }).withTimezone, true);
+});
+
+test("the migration is finished: no naive timestamp(...) column remains in schema.ts", () => {
+  // Every timestamp column became timestamptz in slices 1-6. A new column
+  // declared as a bare `timestamp("x")` (or `{ withTimezone: false }`) would
+  // silently reintroduce the session-TimeZone and deploy-order hazards.
+  const source = readFileSync(join(process.cwd(), "src/db/schema.ts"), "utf8");
+  const naive = [...source.matchAll(/\btimestamp\(\s*"([^"]+)"\s*(?:,\s*\{([^}]*)\})?\s*\)/g)]
+    .filter((m) => !/withTimezone:\s*true/.test(m[2] ?? ""))
+    .map((m) => m[1]);
+  assert.deepEqual(naive, [], "every timestamp column must be declared { withTimezone: true }");
+  for (const [tableName, flags] of withTimezoneFlagsByTable()) {
+    assert.ok(flags.every((f) => f === true), `${tableName} still has a naive timestamp column`);
+  }
 });

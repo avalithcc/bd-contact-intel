@@ -27,10 +27,11 @@
  * collide with a joined table's own column. The 3-day/7-day/12-month
  * thresholds are computed with Postgres's own `now()` and `interval`, never
  * a JS `Date` interpolated into the template (rule 1) — `activity`/`person`
- * timestamps are `timestamptz` (slices 3 and 5) while `person_bd_connection`
- * stays naive `timestamp without time zone` in UTC until slice 6, so this
- * arithmetic in JS would risk a timezone skew that
- * `now() - interval '...'` avoids by construction.
+ * and `person_bd_connection` timestamps are all `timestamptz` (slices 3, 5
+ * and 6), so the `greatest(coalesce(...))` below has no session-TimeZone
+ * cast, and `follow_up_queue_item.last_touch_at` (slice 6) receives a
+ * `timestamptz` as-is. Doing this arithmetic in JS would still risk a
+ * timezone skew that `now() - interval '...'` avoids by construction.
  *
  * Shared by two callers: `buildFollowUpInsertQuery` (one BD, capped at 10,
  * used by the lazy once-a-day materialization) and

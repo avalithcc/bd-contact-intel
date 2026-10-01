@@ -1,6 +1,6 @@
 # Plan — convert every naive `timestamp` column to `timestamptz`
 
-Prepared 2026-09-30. Planning only; nothing applied. This is the durable fix for the timezone skew noted in `openspec/BACKLOG.md` (task-essentials).
+Prepared 2026-09-30. **Status 2026-10-01: complete once slice 6 is applied** (slices 1-5 are applied and verified in production; slice 6 is prepared in `2026-10-01-timestamptz-slice-6-runbook.md`). See "Completion record" at the end. This is the durable fix for the timezone skew noted in `openspec/BACKLOG.md` (task-essentials).
 
 ## Summary
 
@@ -86,7 +86,7 @@ above against the target runtime before reusing this sequence anywhere else.
 3. lead, person.
 4. company.
 5. activity, task.
-6. email_account, email_message, follow_up_queue_item, person_bd_connection.
+6. email_account, email_message, follow_up_queue_item, person_bd_connection (13 columns; runbook `2026-10-01-timestamptz-slice-6-runbook.md`).
 
 **Generator gotchas for slices 5-6 (found in slice 4):** `npm run db:generate` (1) stamps a journal `when` below the hand-set future-dated chain, so `drizzle-kit migrate` would skip the entry; set `when` above the previous entry by hand (`tests/unit/drizzleJournal.test.ts` enforces it), and (2) emits plain `ALTER COLUMN ... TYPE timestamp with time zone`, omitting the `USING ... AT TIME ZONE 'UTC'` clause and the `SET LOCAL lock_timeout`. Hand-write the migration to match `0030`'s shape and keep the generator's snapshot.
 
@@ -100,3 +100,13 @@ select count(*) from <table>;
 select id, created_at from <table> order by created_at desc nulls last limit 20;  -- same instants before and after
 select indexname from pg_indexes where tablename = '<table>';
 ```
+
+## Completion record (slice 6)
+
+After slice 6 every timestamp column is `timestamptz`: 71 of 71 (`rg -c 'withTimezone: true' src/db/schema.ts`), and `tests/unit/timestampWithTimezoneConsistency.test.ts` fails if a naive `timestamp(...)` is ever added again. `parseDbTimestamp`'s offset-less branch is dead for DB-sourced strings; the helper stays as the single place the rule is stated and for non-DB callers.
+
+Session-TimeZone dependencies that closed with the final slice: `recomputeMessageSignalsInTx` / `backfill-connection-signals` (`conversation`/`contact` timestamptz assigned into `person_bd_connection`), the `coalesce(person_bd_connection.last_message_at, timestamptz '-infinity')` in `candidateQuery.ts` and `defaultPipelineStageQuery.ts`, and `follow_up_queue_item.last_touch_at` receiving a `timestamptz` from the queue insert.
+
+**Dependency that did NOT close with a migration:** `follow_up_queue_item.queue_date::timestamptz + interval '3 hours'` in `reports/queries.ts`. `queue_date` is a `date` column, so no column conversion applies to it, and `date::timestamptz` is midnight in the session TimeZone. It was fixed in code instead, in the slice 6 PR (`queue_date::timestamp at time zone 'UTC'`, value-identical under UTC). Only `date` columns (`queue_date`, `snoozed_until`) remain outside the timestamptz scheme, by design.
+
+Still open and unrelated to this plan: `task.due_at` stays a timestamp (now `timestamptz`) holding a bare calendar date at 00:00 UTC; moving it to a `date` column is a separate follow-up.
