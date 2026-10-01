@@ -1,0 +1,42 @@
+{"label":"before-w1w2","state":"enabled","variant":"btn-primary","opacity":1,"bg":"213,37,47","fg":"255,255,255","border":"rgba(0, 0, 0, 0) 1px","cursor":"pointer","ratio":5.08}
+{"label":"before-w1w2","state":"enabled","variant":"btn-secondary","opacity":1,"bg":"255,255,255","fg":"23,21,28","border":"rgba(0, 0, 0, 0.16) 1px","cursor":"pointer","ratio":18.1}
+{"label":"before-w1w2","state":"enabled","variant":"btn-ghost","opacity":1,"bg":"255,255,255","fg":"91,88,101","border":"rgba(0, 0, 0, 0) 1px","cursor":"pointer","ratio":6.93}
+{"label":"before-w1w2","state":"enabled","variant":"btn-danger","opacity":1,"bg":"255,255,255","fg":"185,28,28","border":"rgb(220, 38, 38) 1px","cursor":"pointer","ratio":6.47}
+{"label":"before-w1w2","state":"enabled","variant":"unclassed","opacity":1,"bg":"213,37,47","fg":"255,255,255","border":"rgb(255, 255, 255) 0px","cursor":"pointer","ratio":5.08}
+{"label":"before-w1w2","state":"enabled","variant":"secondary-btn(button)","opacity":1,"bg":"251,250,252","fg":"91,88,101","border":"rgba(0, 0, 0, 0.16) 1px","cursor":"pointer","ratio":6.66}
+{"label":"before-w1w2","state":"enabled","variant":"secondary-btn(span)","opacity":1,"bg":"251,250,252","fg":"91,88,101","border":"rgba(0, 0, 0, 0.16) 1px","cursor":"pointer","ratio":6.66}
+{"label":"before-w1w2","state":"enabled","variant":"rowlink(span)","opacity":1,"bg":"255,255,255","fg":"23,21,28","border":"rgb(23, 21, 28) 0px","cursor":"auto","ratio":18.1}
+{"label":"before-w1w2","state":"enabled","variant":"qa","opacity":1,"bg":"255,255,255","fg":"91,88,101","border":"rgb(91, 88, 101) 0px","cursor":"pointer","icon":"rgb(255, 255, 255) | rgb(23, 21, 28) | rgba(0, 0, 0, 0.16)","ratio":6.93}
+{"label":"before-w1w2","state":"enabled","variant":"menu-item","opacity":1,"bg":"213,37,47","fg":"23,21,28","border":"rgb(23, 21, 28) 0px","cursor":"pointer","ratio":3.56}
+{"label":"before-w1w2","state":"enabled","variant":"result-row","opacity":1,"bg":"255,255,255","fg":"23,21,28","border":"rgb(23, 21, 28) 0px","cursor":"pointer","ratio":18.1}
+{"label":"before-w1w2","state":"enabled","variant":"chip-remove","opacity":1,"bg":"255,255,255","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"pointer","ratio":5.2}
+{"label":"before-w1w2","state":"enabled","variant":"input","opacity":1,"bg":"255,255,255","fg":"23,21,28","border":"rgba(0, 0, 0, 0.16) 1px","cursor":"text","ratio":18.1}
+{"label":"before-w1w2","state":"enabled","variant":"input(unclassed)","opacity":1,"bg":"245,244,247","fg":"23,21,28","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"text","ratio":16.52}
+{"label":"before-w1w2","state":"disabled","variant":"btn-primary","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"btn-secondary","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"btn-ghost","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"btn-danger","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"unclassed","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"secondary-btn(button)","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"secondary-btn(span)","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"rowlink(span)","opacity":1,"bg":"255,255,255","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"not-allowed","ratio":5.2}
+{"label":"before-w1w2","state":"disabled","variant":"qa","opacity":1,"bg":"255,255,255","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"not-allowed","icon":"rgb(255, 255, 255) | rgb(23, 21, 28) | rgba(0, 0, 0, 0.16)","ratio":5.2}
+{"label":"before-w1w2","state":"disabled","variant":"menu-item","opacity":1,"bg":"213,37,47","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"not-allowed","ratio":1.02}
+{"label":"before-w1w2","state":"disabled","variant":"result-row","opacity":1,"bg":"255,255,255","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"not-allowed","ratio":5.2}
+{"label":"before-w1w2","state":"disabled","variant":"chip-remove","opacity":1,"bg":"255,255,255","fg":"110,107,120","border":"rgb(110, 107, 120) 0px","cursor":"not-allowed","ratio":5.2}
+{"label":"before-w1w2","state":"disabled","variant":"input","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.16) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","state":"disabled","variant":"input(unclassed)","opacity":1,"bg":"239,238,242","fg":"110,107,120","border":"rgba(0, 0, 0, 0.08) 1px","cursor":"not-allowed","ratio":4.5}
+{"label":"before-w1w2","hover":"btn-primary","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":false}
+{"label":"before-w1w2","hover":"btn-secondary","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":false}
+{"label":"before-w1w2","hover":"btn-ghost","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":false}
+{"label":"before-w1w2","hover":"btn-danger","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":false}
+{"label":"before-w1w2","hover":"unclassed","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgb(110, 107, 120)","reach":true}
+{"label":"before-w1w2","hover":"secondary-btn(button)","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":false}
+{"label":"before-w1w2","hover":"secondary-btn(span)","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":false}
+{"label":"before-w1w2","hover":"rowlink(span)","hoverBg":"rgba(0, 0, 0, 0)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgb(110, 107, 120)","reach":false}
+{"label":"before-w1w2","hover":"qa","hoverBg":"rgba(0, 0, 0, 0)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgb(110, 107, 120)","hoverIcon":"rgb(255, 255, 255) | rgb(184, 31, 39)","reach":true}
+{"label":"before-w1w2","hover":"menu-item","hoverBg":"rgb(213, 37, 47)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgb(110, 107, 120)","reach":true}
+{"label":"before-w1w2","hover":"result-row","hoverBg":"rgba(0, 0, 0, 0)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgb(110, 107, 120)","reach":true}
+{"label":"before-w1w2","hover":"chip-remove","hoverBg":"rgba(0, 0, 0, 0)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgb(110, 107, 120)","reach":true}
+{"label":"before-w1w2","hover":"input","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.16)","reach":true}
+{"label":"before-w1w2","hover":"input(unclassed)","hoverBg":"rgb(239, 238, 242)","hoverColor":"rgb(110, 107, 120)","hoverBorder":"rgba(0, 0, 0, 0.08)","reach":true}
