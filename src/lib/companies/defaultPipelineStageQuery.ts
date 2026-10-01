@@ -37,10 +37,13 @@
  * `dps_connection`, `dps_touch`, `dps_qualifying_company` are themselves
  * the qualifiers used afterward. The 12-month cutoff is computed with
  * Postgres's own `now()`, never a JS `Date` interpolated into the template
- * (rule 1) — `person`, `activity`, and `person_bd_connection`'s timestamp
- * columns are all naive `timestamp without time zone` in UTC, so doing
- * this arithmetic in JS would risk a timezone skew that
- * `now() - interval '12 months'` avoids by construction.
+ * (rule 1) — `activity`'s effective-activity-time expression and
+ * `person_bd_connection.last_message_at` (the two timestamps actually
+ * compared here) are still naive `timestamp without time zone` in UTC as of
+ * slice 3 (`person`'s own `created_at`/`updated_at` are now `timestamptz`,
+ * but neither is read by this query), so doing this arithmetic in JS would
+ * risk a timezone skew that `now() - interval '12 months'` avoids by
+ * construction.
  */
 import { sql } from "drizzle-orm";
 import { activity, company, person, personBdConnection } from "@/db/schema";
