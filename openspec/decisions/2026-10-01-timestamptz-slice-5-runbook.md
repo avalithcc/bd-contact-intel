@@ -1,7 +1,10 @@
 # Runbook — timestamptz migration, slice 5
 
-Prepared 2026-10-01 on branch `feat/timestamptz-slice-5`. Planning only —
-nothing has been applied to production. Read
+Prepared 2026-10-01 on branch `feat/timestamptz-slice-5`. **APPLIED TO
+PRODUCTION 2026-10-01 ~12:00 UTC** as migration `0032`, from commit
+`fbdf958`. All 12 verification checks passed; both md5 fingerprints were
+identical before and after. The checklist at the end records the execution.
+Read
 `openspec/decisions/2026-09-30-timestamptz-migration-plan.md` first,
 especially the "Required sequence" section, and
 `openspec/decisions/2026-10-01-timestamptz-slice-4-runbook.md`, whose
@@ -204,13 +207,27 @@ emitted. `tests/unit/drizzleJournal.test.ts` and
    the identical instant.
 
    Record the results here before continuing:
-   `<PASTE BEFORE-STATE RESULTS HERE>`
+   ```
+   fingerprint session TZ : UTC in both snapshots
+   activity fingerprint   : db31da95dd7b3737a5c4854bb34f1981   (IDENTICAL after)
+   task fingerprint       : 31d81d9835c186a58ddf18f8a985ec1b   (IDENTICAL after)
+   activity rows / idx    : 4235 / 7                           (unchanged after)
+   task rows / idx        : 7 / 9                               (unchanged after)
+   activity max/min       : 2026-09-30 19:45:07.012161+00 / 2026-09-24 12:45:21.598732+00
+   task due max/min       : 2026-10-07 00:00:00+00 / 2026-09-28 00:00:00+00
+   won-drilldown          : byte-identical before/after
+   ```
+   Captured by a single capture-migrate-capture script run, so the window
+   between the BEFORE hash and the ALTER was milliseconds. `activity` is a
+   live table: on a fingerprint mismatch, check that table's row count first
+   — a changed count means new data arrived mid-window, not corruption.`
 
    Pre-flight figures to cross-check against (owner-supplied):
-   - `activity` rows / on-disk size / index count: `TO BE FILLED FROM PRE-FLIGHT`
-   - `task` rows / on-disk size / index count: `TO BE FILLED FROM PRE-FLIGHT`
-   - `select count(*) from drizzle.__drizzle_migrations`: `TO BE FILLED FROM PRE-FLIGHT`
-   - TimeZone gate (the app's pooled connection): `TO BE FILLED FROM PRE-FLIGHT` (must read `UTC`)
+   - `activity` rows / on-disk size / index count: 4,235 / 1944 kB / 7
+   - `task` rows / on-disk size / index count: 7 / 160 kB / 9
+   - `select count(*) from drizzle.__drizzle_migrations`: 32 (33 after)
+   - TimeZone gate (the app's pooled connection): `UTC` from both
+     `current_setting('TimeZone')` and `show timezone` (must read `UTC`)
    - Any long-running transaction or open lock on `activity` or `task`:
      `TO BE FILLED FROM PRE-FLIGHT`
 
@@ -299,16 +316,16 @@ Forward-only, in this order:
 
 ## Owner approval
 
-- [ ] Pre-flight numbers filled into this document (every
+- [x] Pre-flight numbers filled into this document (every
       `TO BE FILLED FROM PRE-FLIGHT`)
-- [ ] Dry run reviewed (this document + the diff on `feat/timestamptz-slice-5`)
-- [ ] Owner approved production execution
-- [ ] PR merged to `main`; production deploy reached Ready — commit SHA
-      recorded here: `<PASTE COMMIT SHA HERE>`
-- [ ] `select count(*) from drizzle.__drizzle_migrations` reports 32
-- [ ] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
-- [ ] Before-state queries, both fingerprints and `won-drilldown.slice5.before.json` captured and recorded above
-- [ ] `DATABASE_URL=... npm run db:migrate` executed against production
-- [ ] Verification queries confirm the migration (step 4), including both identical `md5` fingerprints
-- [ ] `diff won-drilldown.slice5.before.json won-drilldown.slice5.after.json` is empty
-- [ ] Typed-Drizzle-read checks (`activity`, `task`) AND the raw-reader checks print valid `Date`s and unchanged counts
+- [x] Dry run reviewed (this document + the diff on `feat/timestamptz-slice-5`)
+- [x] Owner approved production execution (2026-10-01, "correlo ahora")
+- [x] PR merged to `main`; production deploy reached Ready — commit SHA
+      recorded here: `fbdf958` (deploy READY before the ALTER)
+- [x] `select count(*) from drizzle.__drizzle_migrations` reports 32
+- [x] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
+- [x] Before-state queries, both fingerprints and `won-drilldown.slice5.before.json` captured and recorded above
+- [x] `DATABASE_URL=... npm run db:migrate` executed against production
+- [x] Verification queries confirm the migration (step 4), including both identical `md5` fingerprints
+- [x] `diff won-drilldown.slice5.before.json won-drilldown.slice5.after.json` is empty
+- [x] Typed-Drizzle-read checks (`activity`, `task`) AND the raw-reader checks print valid `Date`s and unchanged counts
