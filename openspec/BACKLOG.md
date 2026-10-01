@@ -578,6 +578,14 @@ Two pieces of work, and they are independent:
 **Note for the 244 still-open duplicate pairs:** merging any of them today
 still loses the phone. Fix item 2 before working the queue further.
 
+**Status (fix/merge-carries-phone):** both pieces are built. `person.phone` and
+`person.mobile_phone` are carried by `MERGE_TRACKED_FIELDS` (fill-blank only),
+and `tests/unit/mergePersonColumnCoverage.test.ts` forces a decision for every
+`person` column. `profile_key` stays deliberately NOT carried (unique
+constraint; conversations resolve through the `merged_into_id` chain). The
+recovery is `scripts/restore-merged-phones.ts` (dry run by default); it is
+pending an owner-approved run.
+
 ### pickEmailWinnerSide is a hand-copy, not a shared function
 `pickEmailWinnerSide` in `src/lib/identity/duplicateTiering.ts` duplicates the
 private `mergeEmailFields` rule in `src/lib/identity/merge.ts` by hand,
