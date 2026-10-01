@@ -49,3 +49,23 @@ export async function openFirstOrSkip(page: Page, hrefFragment: string, label: s
   await page.waitForLoadState('networkidle');
   return { opened: true as const };
 }
+
+/**
+ * Opens the first contact RECORD of a /contacts list (default: every contact), or reports why it
+ * could not. openFirstOrSkip cannot be used here: `/contacts/` also prefixes
+ * the CSV export link (`/contacts/export?...`, which starts a download instead
+ * of navigating) and `/contacts/import`, so only hrefs ending in a uuid count
+ * as a record.
+ */
+export async function openFirstContactOrSkip(page: Page, listUrl = '/contacts?view=all') {
+  await gotoAuthed(page, listUrl);
+  const hrefs = await page
+    .locator('a[href^="/contacts/"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('href') ?? ''));
+  const href = hrefs.find((h) => /^\/contacts\/[0-9a-f-]{36}$/.test(h));
+  if (!href) return { opened: false as const, reason: 'No contacts in the database to open.' };
+  await page.locator(`a[href="${href}"]`).first().click();
+  await page.waitForURL(`**${href}`, { timeout: 15_000 });
+  await page.waitForLoadState('networkidle');
+  return { opened: true as const };
+}
