@@ -1,16 +1,24 @@
 /**
- * Every timestamp column in this schema is `timestamp without time zone`
- * holding UTC (CLAUDE.md query rule 2 / PERFORMANCE.md). Drizzle's typed
- * column mapper parses those columns as UTC automatically — but any raw
+ * Every timestamp column in this schema holds UTC (CLAUDE.md query rule 2 /
+ * PERFORMANCE.md). The column TYPE is mid-migration: slices 1-3 of
+ * openspec/decisions/2026-09-30-timestamptz-migration-plan.md converted 51
+ * columns to `timestamptz`, while the tables still queued in slices 4-6
+ * (company; activity, task; email_account, email_message,
+ * follow_up_queue_item, person_bd_connection) remain `timestamp without
+ * time zone`. Drizzle's typed column mapper parses both kinds correctly,
+ * because its `withTimezone` flag tracks the column — but any raw
  * `db.execute(sql...)` row, and any computed `sql` expression (an aggregate
  * like `max(...)`, or a `CASE` expression like
  * `effectiveActivityAtSql()`, src/lib/contacts/effectiveActivityTime.ts),
- * arrives from the postgres-js driver as an OFFSET-LESS STRING at runtime —
- * even when typed `Date` at the call site. `new Date(str)` on an
- * offset-less string is parsed in the *process's local* timezone, not UTC,
- * silently shifting the value by the server's UTC offset on any runtime
- * that isn't UTC (Vercel prod happens to run UTC; a contributor's laptop —
- * or a future Vercel region/runtime change — does not).
+ * arrives from the postgres-js driver as a plain STRING at runtime — even
+ * when typed `Date` at the call site. From a still-naive column that string
+ * carries NO OFFSET, and `new Date(str)` on an offset-less string is parsed
+ * in the *process's local* timezone, not UTC, silently shifting the value by
+ * the server's UTC offset on any runtime that isn't UTC (Vercel prod happens
+ * to run UTC; a contributor's laptop — or a future Vercel region/runtime
+ * change — does not). Once slice 6 lands every raw string will carry an
+ * offset and the `Z`-appending branch below becomes dead, but this helper
+ * stays as the single place the rule is stated.
  *
  * `parseDbTimestamp` is the ONE shared place every such call site coerces
  * its raw value back into a real `Date`, so this rule is defined exactly
@@ -27,7 +35,8 @@
  *     e.g. "2026-09-25T13:30:00+00:00".
  *
  * A string with EITHER shape's offset (or a bare `Z`) is trusted as-is —
- * appended nor rewritten — and passed to `new Date(...)` UNCHANGED,
+ * neither appended to nor rewritten — and passed to `new Date(...)`
+ * UNCHANGED,
  * including its original separator: V8's `Date` parser accepts a bare,
  * colon-less two-digit offset (`+00`) only through its lenient/legacy
  * (space-separated) path, and rejects it as Invalid Date on the strict ISO
