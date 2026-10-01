@@ -27,7 +27,8 @@ import * as schema from "@/db/schema";
  * Tables whose `timestamp(...)` columns have ALL been flipped to
  * `{ withTimezone: true }` in schema.ts, in step with an applied
  * `ALTER COLUMN ... TYPE timestamptz` migration (plan's "Slices" section).
- * Slice 1 (small, low-traffic tables) has been converted.
+ * Slice 1 (small, low-traffic tables) and slice 2 (imported tables:
+ * job_posting, contact, conversation, message) have been converted.
  */
 const CONVERTED_TABLES: readonly string[] = [
   "bd",
@@ -52,6 +53,10 @@ const CONVERTED_TABLES: readonly string[] = [
   "linkedin_scrape_job",
   "email_never_log",
   "task_digest_send",
+  "job_posting",
+  "contact",
+  "conversation",
+  "message",
 ];
 
 function withTimezoneFlagsByTable(): Map<string, boolean[]> {
