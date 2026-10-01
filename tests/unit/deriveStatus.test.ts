@@ -6,6 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { MANUAL_CALL_DIRECTION, planCall } from "@/lib/contacts/call";
 import {
   activityRowToStatusEvent,
   buildPersonStatusUpdates,
@@ -271,6 +272,24 @@ test("an outbound call with any outcome is contact evidence: advances stage to c
   ]);
   assert.equal(result.status, "contacted");
   assert.deepEqual(result.because, { source: "activity", activityId: "a1" });
+});
+
+// Regression guard for the trimmed "Registrar llamada" form: the direction
+// control is hidden and MANUAL_CALL_DIRECTION ("outbound") is written instead.
+// `outbound` is the ONLY path to `contacted` for a call that did not connect,
+// so dropping the value would leave a contact `new` after any number of
+// voicemail/no-answer calls.
+test("a manually logged call that never connects still moves the contact to contacted", () => {
+  for (const outcome of ["busy", "no_answer", "voicemail", "wrong_number"] as const) {
+    const metadata = { ...planCall(outcome, MANUAL_CALL_DIRECTION, "2026-09-26", "14:30", "") };
+    const event = activityRowToStatusEvent({
+      id: "a1",
+      type: "call",
+      createdAt: new Date("2026-09-26T18:00:00.000Z"),
+      metadata,
+    });
+    assert.equal(deriveStatus([event]).status, "contacted", outcome);
+  }
 });
 
 test("an outcome of 'connected' in either direction is a reply: advances stage to replied", () => {

@@ -267,12 +267,11 @@ export async function logCallAction(
   direction: string,
   date: string,
   time: string,
-  durationMinutes: string,
   notes: string,
 ): Promise<ContactActionResult> {
   try {
     await assertContactEditableById(personId);
-    const metadata = planCall(outcome, direction, date, time, durationMinutes, notes);
+    const metadata = planCall(outcome, direction, date, time, notes);
     await createActivityAction({ type: "call", personId, metadata: { ...metadata } });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };

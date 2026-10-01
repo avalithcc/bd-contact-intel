@@ -700,16 +700,12 @@ export const es: typeof en = {
     callOutcomeNoAnswer: "Sin respuesta",
     callOutcomeVoicemail: "Dejó mensaje de voz",
     callOutcomeWrongNumber: "Número equivocado",
-    callDirectionLabel: "Dirección",
-    callDirectionOutbound: "Saliente",
-    callDirectionInbound: "Entrante",
     // Fecha/Hora as two separate fields (approved mockup contact-record.html
     // #call's second `.form-grid` row) — previously one field held both
     // inputs under a single label, which the fix for the dialog markup
     // sweep split apart.
     callDateLabel: "Fecha",
     callTimeLabel: "Hora",
-    callDurationLabel: "Duración (minutos)",
     callNotesLabel: "Notas",
     callSubmit: "Registrar llamada",
     callHelp: "Al guardar, el estado derivado pasa a Contactado (o a Respondió si el resultado es Conectado).",
