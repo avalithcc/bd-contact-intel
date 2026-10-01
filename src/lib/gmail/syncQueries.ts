@@ -12,6 +12,7 @@ import { needsReconnectForSync } from "./needsReconnectForSync";
 import { getNeverLogRules } from "./neverLog";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import { buildSyncedActivityRows } from "./buildSyncedActivities";
+import { buildAfterSyncSet, type AfterSyncPatch } from "./afterSyncPatch";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "./classify";
 
 export { getNeverLogRules };
