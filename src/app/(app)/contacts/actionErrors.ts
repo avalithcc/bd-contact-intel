@@ -101,6 +101,9 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof GmailSendError) {
     if (err.kind === "not_connected") return "gmail_not_connected";
     if (err.kind === "reauth_required") return "gmail_reauth";
+    // A recipient with control characters is a bad stored address: reuse the
+    // existing "invalid email" message rather than a generic outage.
+    if (err.kind === "invalid_header") return "invalid_email";
     return "gmail_unavailable";
   }
   if (err instanceof DiscardReasonRequiredError) return "discard_reason_required";

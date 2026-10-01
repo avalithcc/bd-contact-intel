@@ -5,42 +5,28 @@ import { decryptToken } from "@/lib/gmail/crypto";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { createActivityAction } from "@/app/activity/actions";
+import { assertSafeHeaderValue, buildRawMessage, type MessageContent } from "@/lib/gmail/rawMessage";
 
-interface SendGmailInput {
+// Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
+// `bodyHtml` (the text/plain alternative is derived from it). The union makes
+// "both" and "neither" unrepresentable, so nobody writes the body twice or
+// lets the two parts drift apart.
+type SendGmailInput = {
   bdId: string;
   to: string;
   subject: string;
-  body: string;
   leadId?: string;
   companyKey?: string;
   // Unified-Contact subject (design D1); record page's "Correo" action (9.2).
   personId?: string;
-}
+} & MessageContent;
 
-function buildRawMessage(from: string, to: string, subject: string, body: string) {
-  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
-  const headers = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${encodedSubject}`,
-    "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-  ].join("\r\n");
-
-  const encodedBody = Buffer.from(body, "utf8").toString("base64");
-  return Buffer.from(`${headers}\r\n\r\n${encodedBody}`, "utf8").toString("base64url");
-}
-
-export async function sendGmailMessage({
-  bdId,
-  to,
-  subject,
-  body,
-  leadId,
-  companyKey,
-  personId,
-}: SendGmailInput) {
+export async function sendGmailMessage(input: SendGmailInput) {
+  const { bdId, to, subject, leadId, companyKey, personId } = input;
+  // Fail fast on the untrusted recipient, before any DB read or token refresh.
+  assertSafeHeaderValue("To", to);
+  const content: MessageContent =
+    input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
   const [account] = await db
     .select()
     .from(emailAccount)
@@ -122,7 +108,7 @@ export async function sendGmailMessage({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        raw: buildRawMessage(account.emailAddress, to, subject, body),
+        raw: buildRawMessage(account.emailAddress, to, subject, content),
       }),
     },
   );
