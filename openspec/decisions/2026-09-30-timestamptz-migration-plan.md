@@ -19,11 +19,53 @@ Prepared 2026-09-30. Planning only; nothing applied. This is the durable fix for
 - If a column becomes `timestamptz` while the deployed schema still says `withTimezone: false`, Drizzle appends `+0000` to a string that already ends in `+00`. The result is **`Invalid Date` on every typed read of that table**.
 - The opposite mismatch (new code, old column) parses offset-less strings in the process timezone. That is wrong on any non-UTC runtime.
 
-**Required sequence for each slice:**
-1. Deploy the code with `withTimezone: true` for that slice's columns to a **preview** only.
+**Required sequence for each slice, revised after slice 1 (2026-09-30):**
+
+Slice 1 shipped with the preview-then-promote sequence below, and two things
+turned out to be wrong about it. First, `vercel promote <preview-url>` does
+NOT swap an already-built deployment instantly — it builds a new production
+deployment, which took ~90 seconds in practice, so the real code/schema
+mismatch window was ~100 seconds, not the "few seconds" this plan assumed.
+It was harmless only because it ran at low-traffic hours. Second, and more
+importantly, the "opposite mismatch" this plan already flagged below (new
+code, old column) was measured directly against production rather than just
+reasoned about:
+
+```
+columna real:          timestamp without time zone
+valor crudo:           2026-09-30 09:42:27.365516
+withTimezone: false -> 2026-09-30T09:42:27.365Z
+withTimezone: true  -> 2026-09-30T09:42:27.365Z   (identical)
+```
+
+On Vercel prod (`TZ=UTC`), `PgTimestamp.mapFromDriverValue`'s "parse the
+offset-less string in the process timezone" branch is a no-op, because the
+process timezone already IS UTC. So new-code-against-old-column is
+**harmless** on this platform; only old-code-against-new-column (appending
+`+0000` to a string that already has an offset) breaks.
+
+**That asymmetry means the correct sequence has NO broken window at all, and
+needs no preview/promote dance:**
+
+1. Merge the code with `withTimezone: true` for that slice's columns to
+   `main`. The production deploy builds from it. Wait for the deployment to
+   reach **Ready**.
 2. Apply the slice's migration to production by hand.
-3. Immediately **promote that same preview** build to production, without rebuilding.
-4. Run the verification queries below.
+3. Run the verification queries below.
+
+This order is deliberately **inverted from the original plan**: code ships
+first, migration second — never the other way around, and never with a
+preview build that has to be promoted. This holds starting with slice 2; see
+`openspec/decisions/2026-09-30-timestamptz-slice-2-runbook.md` for the full
+worked example.
+
+**This sequence, and the asymmetry it relies on, is specific to a UTC
+runtime.** On any non-UTC runtime, new-code-against-old-column would parse
+offset-less strings in the wrong local timezone, which is exactly as broken
+as the old-code-against-new-column case — the preview-and-promote dance
+(deploy under test first, migrate, then atomically swap to the tested build)
+is the correct approach there, not this shortcut. Re-verify the asymmetry
+above against the target runtime before reusing this sequence anywhere else.
 
 `drizzle-kit migrate` applies every pending file inside **one transaction** (`drizzle-orm/pg-core/dialect.js:44-69`), so the locks accumulate until commit. Never let several slices be pending at once. Add `SET LOCAL lock_timeout = '2s'` so that a blocked ALTER aborts instead of exhausting the 3-connection production pool.
 
