@@ -25,6 +25,10 @@ export const bd = pgTable("bd", {
   // by drizzle/0013_unified_person.sql. Gated via
   // src/lib/auth/requireAdmin.ts, never checked ad hoc.
   role: text("role").notNull().default("bd"),
+  // The BD's own complete HTML email signature, already sanitized at save
+  // (src/lib/signature/sanitize.ts) and re-sanitized when appended at send.
+  // NULL = no signature: the BD keeps sending plain text.
+  signatureHtml: text("signature_html"),
 });
 
 // A contact, private to exactly one BD.
