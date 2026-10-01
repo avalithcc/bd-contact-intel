@@ -1479,6 +1479,14 @@ main {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-dialog);
   border: 1px solid var(--color-border);
+  /* Viewport cap: the overlay offsets the dialog by 10vh, so the dialog may
+     use at most the remaining 90vh minus a bottom gutter. Without a cap a
+     tall form grew past the viewport and its footer (Save) was unreachable,
+     because Dialog.tsx locks body scroll while open. Column flex so only
+     `.dialog-body` scrolls; header and footer stay pinned. */
+  max-height: calc(90vh - var(--space-xl));
+  display: flex;
+  flex-direction: column;
 }
 .dialog.wide {
   width: min(720px, 94vw);
@@ -1489,6 +1497,7 @@ main {
   gap: var(--space-sm);
   padding: var(--space-lg) var(--space-xl);
   border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
 }
 .dialog-header h2 {
   font-size: var(--text-lg);
@@ -1498,6 +1507,11 @@ main {
 }
 .dialog-body {
   padding: var(--space-xl);
+  /* `min-height: 0` is required: a flex item defaults to `min-height: auto`
+     (its content height) and would refuse to shrink, so it would never scroll. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .dialog-body > * + * {
   margin-top: var(--space-lg);
@@ -1510,17 +1524,27 @@ main {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-1);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  flex: 0 0 auto;
 }
 .dialog-footer .left {
   margin-right: auto;
 }
-/* Shared conversation modal (src/components/ConversationDialog.tsx, owner
-   decision 2026-09-30) — scoped to this one wrapper class, not the base
-   `.dialog-body` rule above, so every other dialog keeps sizing to its own
-   content. Caps the body at ~60vh and scrolls INTERNALLY instead of letting
-   a long thread stretch (or the page behind the dialog scroll). */
+/* Shared conversation modal (src/components/ConversationDialog.tsx). Its
+   thread wrapper is the element the component scrolls to the bottom
+   programmatically (scrollTop = scrollHeight, so the newest message shows),
+   so it must itself be the scroll container, not the outer `.dialog-body`.
+   The base `.dialog` cap above already bounds the height, so this rule no
+   longer carries its own 60vh cap (two caps would nest two scrollbars): the
+   body becomes a flex column and the wrapper fills it and scrolls. Scoped via
+   `:has()` so every other dialog keeps the plain scrolling body. */
+.dialog-body:has(> .dialog-body-scroll) {
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+}
 .dialog-body-scroll {
-  max-height: 60vh;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 

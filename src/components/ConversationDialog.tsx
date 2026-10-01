@@ -10,11 +10,10 @@ import { Dialog } from "@/components/Dialog";
  * render into, replacing the old inline sidebar expansion and the standalone
  * `/contacts/[id]/conversation/[bdId]` page respectively.
  *
- * `.dialog-body-scroll` (globals.css) caps the body at ~60vh and scrolls
- * INTERNALLY — the page behind the dialog never scrolls (Dialog's own body-
- * scroll lock already covers that). Scoped to this one wrapper class, not a
- * change to the base `.dialog-body` rule every other dialog also uses, since
- * every other dialog should stay exactly as tall as its own content.
+ * The base `.dialog` caps its own height to the viewport and scrolls
+ * `.dialog-body` (globals.css). `.dialog-body-scroll` makes THIS wrapper the
+ * scroll container instead (via `.dialog-body:has(> .dialog-body-scroll)`),
+ * because the effect below scrolls it to the bottom programmatically.
  *
  * Once `loading` turns false with real content ready, the scroll container
  * is scrolled to its own bottom — chat convention: land on the most recent

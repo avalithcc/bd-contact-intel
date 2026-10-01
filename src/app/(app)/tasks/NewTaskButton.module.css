@@ -24,6 +24,17 @@
   list-style: none;
 }
 
+.resultsInline {
+  /* In-flow variant for dialogs whose body is shorter than the list (Change
+     company: only two fields). `.dialog-body` now scrolls, so an absolutely
+     positioned list taller than the body would be clipped behind a scrollbar
+     instead of hanging over the footer as it used to. */
+  position: static;
+  margin-top: var(--space-2xs);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: none;
+}
+
 .resultItem {
   display: flex;
   width: 100%;
