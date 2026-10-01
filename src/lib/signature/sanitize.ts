@@ -19,16 +19,25 @@ import sanitizeHtml from "sanitize-html";
  *   script/style/head/title/textarea content is dropped with the tag.
  * - Attributes: an explicit per-tag list. Every `on*` handler, `class`,
  *   `id`, `target` is gone because it is not listed.
- * - Links: http, https, mailto, tel. Images: https ONLY (a `data:` image is
- *   stripped by Gmail anyway; `http:` triggers mixed-content warnings).
- * - An image whose src was rejected is dropped. 1x1 / 0x0 images are dropped: that is a tracking pixel, never a logo.
- *   Other remote https images stay: a logo is the whole point, and the
- *   signature is the BD's own mail. Limit: a pixel sized with CSS only, or
- *   a 2x2 one, is not caught.
+ * - Links: http, https, mailto, tel, plus relative hrefs (`/x`, `#frag`),
+ *   which are harmless in mail (a dead link).
+ * - Images: an `<img>` is kept ONLY when its src is an absolute `https:`
+ *   URL; anything else (`http:`, `data:`, `cid:`, relative, protocol-
+ *   relative) removes the whole image.
+ * - Remote https images stay, and that is a known trade-off, not a
+ *   protection: any remote image tells its host when the mail is opened.
+ *   There is deliberately NO tracking-pixel heuristic: an attribute check
+ *   cannot stop one (CSS sizing, 2x2) and it deleted real 600x1 dividers.
  * - Inline `style` is filtered per property AND per value, not allowed
  *   wholesale (see STYLE_VALUE).
  */
 export const SIGNATURE_MAX_CHARS = 50_000;
+/**
+ * Cap on the sanitized OUTPUT. Escaping can quadruple the input (`<` becomes
+ * `&lt;`), and Gmail clips messages past ~102 KB, so an oversized signature
+ * would be cut mid-message for the recipient.
+ */
+export const SIGNATURE_MAX_OUTPUT_CHARS = 40_000;
 
 const ALLOWED_TAGS = [
   "a", "img", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "colgroup", "col", "caption",
@@ -63,15 +72,6 @@ const ALLOWED_STYLES = Object.fromEntries(STYLE_PROPERTIES.map((p) => [p, [STYLE
 /** Browsers ignore tab/CR/LF inside URLs; strip them so no control char survives. */
 const URL_CONTROL = /[\u0000-\u001f\u007f]/g;
 
-function isTrackingPixel(attribs: Record<string, string>): boolean {
-  return ["width", "height"].some((name) => {
-    const raw = attribs[name];
-    if (raw === undefined) return false;
-    const n = Number.parseFloat(raw);
-    return Number.isFinite(n) && n <= 1;
-  });
-}
-
 export function sanitizeSignatureHtml(input: string): string {
   const out = sanitizeHtml(input, {
     allowedTags: ALLOWED_TAGS,
@@ -97,7 +97,7 @@ export function sanitizeSignatureHtml(input: string): string {
       a: (tagName, attribs) => ({ tagName, attribs: cleanUrls(attribs) }),
       img: (tagName, attribs) => ({ tagName, attribs: cleanUrls(attribs) }),
     },
-    exclusiveFilter: (frame) => frame.tag === "img" && (!frame.attribs.src || isTrackingPixel(frame.attribs)),
+    exclusiveFilter: (frame) => frame.tag === "img" && !/^https:\/\//i.test(frame.attribs.src ?? ""),
   });
   return out.trim();
 }

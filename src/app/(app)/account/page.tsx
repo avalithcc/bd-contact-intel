@@ -91,6 +91,7 @@ export default async function AccountPage() {
             saved: l.signatureSaved,
             cleared: l.signatureCleared,
             errorTooLong: l.signatureErrorTooLong,
+            errorOutputTooLong: l.signatureErrorOutputTooLong,
             errorNothingLeft: l.signatureErrorNothingLeft,
             errorUnexpected: l.signatureErrorUnexpected,
           }}

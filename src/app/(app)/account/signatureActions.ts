@@ -35,10 +35,12 @@ export async function saveSignatureAction(raw: string): Promise<SaveSignatureRes
 /**
  * Live preview: runs the SAME sanitizer as the save, so the BD sees what
  * recipients get, not what they typed. Touches no data (pure function of the
- * input, capped at SIGNATURE_MAX_CHARS before parsing); the middleware has
- * already required a session for this route.
+ * input, capped at SIGNATURE_MAX_CHARS before parsing). It checks the session
+ * itself (getCurrentBd, already cached per request) instead of relying only
+ * on the middleware matcher.
  */
 export async function previewSignatureAction(raw: string): Promise<string> {
+  await getCurrentBd(); // explicit session check, like every neighbouring action
   if (typeof raw !== "string" || raw.length > SIGNATURE_MAX_CHARS) return "";
   return sanitizeSignatureHtml(raw);
 }

@@ -1129,6 +1129,8 @@ export const en = {
     signatureSaved: "Firma guardada",
     signatureCleared: "Firma eliminada",
     signatureErrorTooLong: "La firma es demasiado larga (máximo 50 000 caracteres).",
+    signatureErrorOutputTooLong:
+      "La firma es demasiado grande tras la limpieza (máximo 40 000 caracteres). Simplifica el HTML o reduce el texto.",
     signatureErrorNothingLeft: "Tras la limpieza no queda contenido válido. Revisa que el HTML tenga texto, enlaces o imágenes https.",
     signatureErrorUnexpected: "No se pudo guardar la firma. Inténtalo de nuevo.",
   },

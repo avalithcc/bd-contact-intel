@@ -20,6 +20,7 @@ export interface SignatureLabels {
   saved: string;
   cleared: string;
   errorTooLong: string;
+  errorOutputTooLong: string;
   errorNothingLeft: string;
   errorUnexpected: string;
 }
@@ -46,11 +47,13 @@ export function SignatureEditor({ initialHtml, labels: l }: { initialHtml: strin
   const seq = useRef(0);
 
   useEffect(() => {
+    // Bump BEFORE the blank check so a response still in flight for earlier
+    // text cannot repaint the preview of a box the user just emptied.
+    const mine = ++seq.current;
     if (value.trim() === "") {
       setPreview("");
       return;
     }
-    const mine = ++seq.current;
     const timer = setTimeout(async () => {
       const html = await previewSignatureAction(value);
       if (mine === seq.current) setPreview(html);
@@ -72,7 +75,9 @@ export function SignatureEditor({ initialHtml, labels: l }: { initialHtml: strin
         const message =
           result.error === "too_long"
             ? l.errorTooLong
-            : result.error === "nothing_left"
+            : result.error === "output_too_long"
+              ? l.errorOutputTooLong
+              : result.error === "nothing_left"
               ? l.errorNothingLeft
               : l.errorUnexpected;
         setError(message);

@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { prepareSignatureForSave, SIGNATURE_MAX_CHARS } from "../../src/lib/signature/validate";
+import { prepareSignatureForSave, SIGNATURE_MAX_CHARS, SIGNATURE_MAX_OUTPUT_CHARS } from "../../src/lib/signature/validate";
+
+test("caps the sanitized OUTPUT: 20,000 '<' escape to 80,000 chars and are rejected", () => {
+  assert.deepEqual(prepareSignatureForSave("<".repeat(20_000)), { ok: false, error: "output_too_long" });
+});
+
+test("accepts output right at the cap boundary", () => {
+  assert.equal(prepareSignatureForSave("a".repeat(SIGNATURE_MAX_OUTPUT_CHARS)).ok, true);
+});
 
 test("blank input means 'clear the signature'", () => {
   assert.deepEqual(prepareSignatureForSave(""), { ok: true, html: null });

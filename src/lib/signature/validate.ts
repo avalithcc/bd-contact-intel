@@ -1,10 +1,10 @@
-import { sanitizeSignatureHtml, SIGNATURE_MAX_CHARS } from "@/lib/signature/sanitize";
+import { sanitizeSignatureHtml, SIGNATURE_MAX_CHARS, SIGNATURE_MAX_OUTPUT_CHARS } from "@/lib/signature/sanitize";
 
-export { SIGNATURE_MAX_CHARS };
+export { SIGNATURE_MAX_CHARS, SIGNATURE_MAX_OUTPUT_CHARS };
 
 export type SignatureSaveResult =
   | { ok: true; html: string | null }
-  | { ok: false; error: "invalid" | "too_long" | "nothing_left" };
+  | { ok: false; error: "invalid" | "too_long" | "output_too_long" | "nothing_left" };
 
 /**
  * Decides what a "save signature" request stores. Pure, so the rules are
@@ -20,5 +20,6 @@ export function prepareSignatureForSave(raw: unknown): SignatureSaveResult {
   if (raw.length > SIGNATURE_MAX_CHARS) return { ok: false, error: "too_long" };
   const html = sanitizeSignatureHtml(raw);
   if (html === "") return { ok: false, error: "nothing_left" };
+  if (html.length > SIGNATURE_MAX_OUTPUT_CHARS) return { ok: false, error: "output_too_long" };
   return { ok: true, html };
 }

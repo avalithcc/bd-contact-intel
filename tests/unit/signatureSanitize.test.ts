@@ -149,11 +149,16 @@ test("inline style: a safe property with an unsafe value is dropped, not the who
   assert.equal(s('<span style="font-family:Arial;color:expression(1)">t</span>'), '<span style="font-family:Arial">t</span>');
 });
 
-test("drops 1x1 and 0x0 tracking pixels", () => {
-  assert.equal(s('<img src="https://t.test/p.gif" width="1" height="1">'), "");
-  assert.equal(s('<img src="https://t.test/p.gif" width="0" height="0">'), "");
-  assert.equal(s('<img src="https://t.test/p.gif" height="1">'), "");
-  assert.match(s('<img src="https://t.test/logo.png" width="120" height="40">'), /<img/);
+test("keeps thin divider images: 600x1, 1px height only, and a percentage height", () => {
+  for (const attrs of ['width="600" height="1"', 'height="1"', 'width="100%" height="1%"']) {
+    assert.match(s(`<img src="https://t.test/line.png" ${attrs}>`), /<img src="https:\/\/t\.test\/line\.png"/, attrs);
+  }
+});
+
+test("drops relative and protocol-relative image sources: only absolute https survives", () => {
+  for (const src of ["x.png", "/x.png", "//evil.test/x.png", "#frag", "cid:logo"]) {
+    assert.equal(s(`<img src="${src}">`), "", src);
+  }
 });
 
 test("is idempotent: sanitizing the output changes nothing", () => {
@@ -161,6 +166,30 @@ test("is idempotent: sanitizing the output changes nothing", () => {
     '<table><tr><td><a href="https://a.test/?x=1&amp;y=2" style="color:#000">a &amp; b</a><img src="https://a.test/l.png" alt="l"></td></tr></table>';
   const once = s(html);
   assert.equal(s(once), once);
+});
+
+const CORPUS = [
+  "ok<script>alert(1)</script>done",
+  "<SCRIPT>alert(1)</SCRIPT>",
+  "<scr<script>ipt>alert(1)</scr</script>ipt>",
+  '<img src="https://x.test/a.png" onerror="alert(1)">',
+  '<div onload="x()" ONCLICK="y()"><span OnFocus="q()">t</span></div>',
+  '<a href="   javascript:alert(1)">c</a>',
+  '<a href="jav&#x09;ascript:alert(1)">c</a>',
+  '<a href="data:text/html,<script>alert(1)</script>">x</a>',
+  "<style>body{display:none}</style><p>hi</p>",
+  "<div><p>text",
+  '<b>bold <a href="https://x.test',
+  '<a href="https://x.test/\r\nBcc: v@x.test">x</a>',
+  '<div style="color:#333;position:fixed;background-image:url(https://x.test/p.gif);width:expression(alert(1))">t</div>',
+  "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+  "<svg><script>alert(1)</script></svg>",
+  "<<<<<<<<>>>>>>>> & &amp;amp; &lt;b&gt;",
+  "<html><head><title>T</title></head><body><p>sig</p></body></html>",
+];
+
+test("idempotent over the whole bypass corpus", () => {
+  for (const x of CORPUS) assert.equal(s(s(x)), s(x), x);
 });
 
 test("empty / whitespace-only input yields an empty string", () => {
