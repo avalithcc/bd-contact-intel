@@ -132,12 +132,38 @@ Every reader and writer of `company.created_at` / `company.updated_at`:
    ```
    Use exactly this fingerprint form in both the before and after captures.
 
-   Also capture the won-companies drilldown input (the one mixed
-   naive/timestamptz consumer):
-   ```sql
-   select company_key, updated_at from company
-   where relationship_stage = 'won' order by company_key;
+   Also run the **TimeZone gate** and capture the **full won-drilldown
+   dump** (the one mixed naive/timestamptz consumer), both through the app:
+
    ```
+   DATABASE_URL="<prod connection string>" npx tsx scripts/check-session-timezone.ts
+   DATABASE_URL="<prod connection string>" TZ=UTC npx tsx scripts/dump-won-drilldown.ts > won-drilldown.before.json
+   ```
+
+   **TimeZone gate.** The script must exit 0 and print `UTC` for both
+   `current_setting('TimeZone')` and `show timezone`. If it exits non-zero,
+   STOP and raise it before step 3. Why not just `show timezone` in psql: the
+   app sets no session TimeZone (`src/db/index.ts` passes no
+   `connection: { TimeZone }` and nothing runs `SET TIME ZONE`), so what the
+   app sees is the Supabase database/role default delivered through the
+   Supavisor session-mode pooler. An ad-hoc psql session can resolve a
+   different value (different role, connection string or pooler mode), so it
+   proves nothing about the app's connection. The script uses the app's own
+   `db` client, i.e. the same URL, driver and pool path. It also prints the
+   raw wire string and parsed `Date` of one `company.updated_at`; keep both
+   the before and after output to see the wire shape change (offset-less
+   before, `+00` after).
+
+   **Won-drilldown baseline.** `buildWonCompaniesDrilldownQuery` coalesces
+   `activity.created_at` (naive until slice 5) with `company.updated_at`
+   (timestamptz after this slice); Postgres unifies to `timestamptz` and
+   casts the naive side with the session TimeZone. Rows with
+   `wonAtExact === true` are the exposed ones, and a plain
+   `company.updated_at` capture gives them no baseline, hence the full dump.
+   The SQL expression is intentionally NOT hardened: `AT TIME ZONE` changes
+   meaning with its input type, so it would have to be undone at slice 5.
+   The exposure window is closed by shipping slice 5 right after slice 4.
+
    Record the results here before continuing:
    `<PASTE BEFORE-STATE RESULTS HERE>`
 
@@ -146,7 +172,8 @@ Every reader and writer of `company.created_at` / `company.updated_at`:
    - on-disk size: `TO BE FILLED FROM PRE-FLIGHT`
    - index count: `TO BE FILLED FROM PRE-FLIGHT`
    - `select count(*) from drizzle.__drizzle_migrations`: `TO BE FILLED FROM PRE-FLIGHT`
-   - session `show timezone` on the production connection: `TO BE FILLED FROM PRE-FLIGHT`
+   - TimeZone gate (the app's pooled connection, see "TimeZone gate" below):
+     `TO BE FILLED FROM PRE-FLIGHT` (must read `UTC`)
    - Any long-running transaction or open lock on `company` at pre-flight
      time: `TO BE FILLED FROM PRE-FLIGHT`
 
@@ -171,7 +198,16 @@ Re-run the step 2 queries and confirm:
 - The index count for `company` is unchanged.
 - `max`/`min` of both columns are the same instants (not shifted).
 - The `md5` fingerprint (UTC session form) is IDENTICAL to the before value.
-- The `won` companies' `updated_at` values are the same instants.
+- `check-session-timezone.ts` still exits 0 with `UTC`; record its raw wire
+  string and parsed `Date` next to the before capture.
+- Re-run the dump and diff it against the before capture:
+  ```
+  DATABASE_URL="<prod connection string>" TZ=UTC npx tsx scripts/dump-won-drilldown.ts > won-drilldown.after.json
+  diff won-drilldown.before.json won-drilldown.after.json
+  ```
+  Expected: **no output. The two dumps must be IDENTICAL**, including every
+  `wonAtExact: true` row. Any difference means the naive side was cast in a
+  non-UTC zone: STOP and roll back.
 
 **The check that matters is a typed Drizzle read returning a valid `Date`,
 plus the one mixed-type raw read** — the failure mode is `Invalid Date`,
@@ -208,9 +244,9 @@ column type.
 
 Note on the won drilldown: rows with `wonAtExact === true` carry
 `activity.created_at` (still naive until slice 5), which Postgres casts to
-`timestamptz` with the session TimeZone. The pre-flight `show timezone`
-value above must be `UTC` for those instants to be unchanged. If it is not
-`UTC`, STOP and raise it before step 3.
+`timestamptz` with the session TimeZone. The TimeZone gate in step 2 must
+pass (`UTC`) for those instants to be unchanged, and the dump diff above is
+the proof.
 
 ## If verification fails, or the deploy in step 1 needs to be undone
 
@@ -238,9 +274,11 @@ Forward-only, in this order:
 - [ ] PR merged to `main`; production deploy reached Ready — commit SHA
       recorded here: `<PASTE COMMIT SHA HERE>`
 - [ ] `select count(*) from drizzle.__drizzle_migrations` reports 31
-- [ ] Before-state queries (step 2) run and recorded above
+- [ ] `scripts/check-session-timezone.ts` exited 0 (`UTC`) and its output is recorded
+- [ ] Before-state queries and `won-drilldown.before.json` (step 2) captured and recorded above
 - [ ] `DATABASE_URL=... npm run db:migrate` executed against production
 - [ ] Verification queries confirm the migration (step 4), including the
       identical `md5` fingerprint
+- [ ] `diff won-drilldown.before.json won-drilldown.after.json` is empty
 - [ ] Typed-Drizzle-read checks (`company`, `getCompanies`,
       `getCompanyByKey`) AND the won-drilldown check print valid `Date`s
