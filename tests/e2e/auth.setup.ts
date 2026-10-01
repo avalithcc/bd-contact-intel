@@ -1,21 +1,20 @@
 import { test as setup, expect } from '@playwright/test';
 import path from 'path';
+import { missingCredentialsMessage, readE2eCredentials, skipReason } from './credentials';
 
 export const STORAGE_STATE = path.join(__dirname, '../.auth/state.json');
 
 // Every page in this app is auth-gated and redirects to /login. Without a real
 // session the whole suite silently exercises the login screen instead of the
-// feature under test, so this must hard-fail rather than skip.
+// feature under test. So: locally (no CI) a missing account SKIPS with a clear
+// reason; in CI it hard-fails. See credentials.ts and tests/e2e/README.md.
 setup('authenticate', async ({ page }) => {
-  const email = process.env.E2E_EMAIL;
-  const password = process.env.E2E_PASSWORD;
+  const reason = skipReason();
+  setup.skip(reason !== null, reason ?? '');
 
-  if (!email || !password) {
-    throw new Error(
-      'E2E_EMAIL and E2E_PASSWORD must be set. Without them the suite would ' +
-        'test the login page and report false passes.',
-    );
-  }
+  const creds = readE2eCredentials();
+  if (!creds) throw new Error(missingCredentialsMessage());
+  const { email, password } = creds;
 
   await page.goto('/login');
   await page.fill('#email', email);

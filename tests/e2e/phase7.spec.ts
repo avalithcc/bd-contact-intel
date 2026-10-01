@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { gotoAuthed } from './helpers';
+import { gotoAuthed, skipWithoutCredentials } from './helpers';
+
+skipWithoutCredentials();
 
 /**
  * Phase 7 task 7.3 (duplicate-review spec: admin-only queue, merge path).

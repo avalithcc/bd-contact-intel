@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { gotoAuthed, openFirstOrSkip } from './helpers';
+import { gotoAuthed, openFirstOrSkip, skipWithoutCredentials } from './helpers';
+
+skipWithoutCredentials();
 
 // Sending is deliberately never exercised end-to-end: a real send would deliver
 // a real email from a BD's mailbox. These cover the surface up to that point.
