@@ -32,7 +32,7 @@ export const FILTER_MENU_ORDER: readonly FilterChipField[] = [
  * removing that would be a real feature loss, not a mockup-fidelity fix). */
 export const EXTRA_FILTER_MENU_ORDER: readonly FilterChipField[] = ["industryGroup", "seniority"];
 
-export const FILTER_FIELD_KIND: Record<FilterChipField, FilterFieldKind> = {
+export const FILTER_FIELD_KIND = {
   owner: "select",
   status: "multiselect",
   emailStatus: "select",
@@ -48,7 +48,16 @@ export const FILTER_FIELD_KIND: Record<FilterChipField, FilterFieldKind> = {
   industryGroup: "select",
   seniority: "select",
   emailVerified: "checkbox",
-};
+} as const satisfies Record<FilterChipField, FilterFieldKind>;
+
+/** Every field whose editor is a `<select>` fed by an options list. Derived
+ * from the kind map above (kept literal via `as const`), so FilterMenu's
+ * options map is required to cover exactly these keys: a new select-kind
+ * filter without options, or options for a non-select field, fails `tsc`.
+ * ("multiselect" is only `status`, which has its own `statusOptions` prop.) */
+export type SelectFilterField = {
+  [K in FilterChipField]: (typeof FILTER_FIELD_KIND)[K] extends "select" ? K : never;
+}[FilterChipField];
 
 /** Field name(s) this editor's control uses in the form — `status` posts
  * one entry per checked box under the same key. */

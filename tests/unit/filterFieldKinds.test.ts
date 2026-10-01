@@ -39,6 +39,23 @@ test("FILTER_FIELD_KIND assigns the right control type to each of the 11 mockup 
   assert.equal(FILTER_FIELD_KIND.lastActivityDays, "select");
 });
 
+test("select-kind fields are exactly the ones FilterMenu must supply options for (SelectFilterField is derived from this map)", () => {
+  const selects = (Object.keys(FILTER_FIELD_KIND) as (keyof typeof FILTER_FIELD_KIND)[]).filter(
+    (f) => FILTER_FIELD_KIND[f] === "select",
+  );
+  assert.deepEqual(selects.sort(), [
+    "bdConnected",
+    "contactType",
+    "emailStatus",
+    "industryGroup",
+    "lastActivityDays",
+    "market",
+    "owner",
+    "roleGroup",
+    "seniority",
+  ]);
+});
+
 test("every field in FILTER_MENU_ORDER has a FILTER_FIELD_KIND entry", () => {
   for (const field of FILTER_MENU_ORDER) {
     assert.ok(FILTER_FIELD_KIND[field], `missing kind for ${field}`);

@@ -24,6 +24,7 @@ import {
   FIELD_PARAM_NAMES,
   FILTER_FIELD_KIND,
   FILTER_MENU_ORDER,
+  type SelectFilterField,
 } from "@/lib/contacts/filterFieldKinds";
 import {
   checkboxSubmitMarker,
@@ -158,7 +159,8 @@ export function FilterMenu({
   function renderEditorFields(field: FilterChipField) {
     const kind = FILTER_FIELD_KIND[field];
     if (kind === "select") {
-      const optionsByField: Partial<Record<FilterChipField, SelectOption[]>> = {
+      // Required (not Partial) for every select-kind field — see SelectFilterField.
+      const optionsByField: Record<SelectFilterField, SelectOption[]> = {
         owner: ownerSelectOptions,
         bdConnected: bdConnectedOptions,
         emailStatus: emailStatusOptions,
@@ -169,7 +171,7 @@ export function FilterMenu({
         industryGroup: industryGroupOptions,
         seniority: seniorityOptions,
       };
-      const options = optionsByField[field] ?? [];
+      const options = optionsByField[field as SelectFilterField];
       return (
         <select name={FIELD_PARAM_NAMES[field][0]} defaultValue={current.get(FIELD_PARAM_NAMES[field][0]) ?? ""}>
           <option value="">{l.anyLabel}</option>
