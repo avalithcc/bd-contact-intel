@@ -21,10 +21,19 @@ const NAMED_ENTITIES: Record<string, string> = {
   nbsp: " ",
 };
 
+// `String.fromCodePoint` throws RangeError above U+10FFFF, and lone surrogates
+// (U+D800-U+DFFF) are not valid scalar values. Like the HTML spec, an invalid
+// numeric reference (including NUL) becomes U+FFFD rather than throwing or
+// being silently dropped. Shared by the inbound and outbound converters.
+function codePointToString(n: number): string {
+  if (!Number.isFinite(n) || n <= 0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff)) return "�";
+  return String.fromCodePoint(n);
+}
+
 export function decodeEntities(text: string): string {
   return text
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => codePointToString(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => codePointToString(Number(dec)))
     .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, name: string) => NAMED_ENTITIES[name] ?? `&${name};`);
 }
 

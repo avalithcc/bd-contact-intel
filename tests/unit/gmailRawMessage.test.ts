@@ -210,6 +210,69 @@ test("header guard: a subject with CRLF is neutralised by base64, not rejected",
   assert.match(d.top.headers.subject, /^=\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=$/);
 });
 
+// ---- Hidden content must not leak into the text/plain alternative ----
+
+const hiddenCases: [string, string, string][] = [
+  ["display:none span", '<span style="display:none">SECRET</span>visible', "visible"],
+  ["display: none with spaces and caps", '<span style="color:red; DISPLAY : NONE ;">SECRET</span>visible', "visible"],
+  ["visibility:hidden", "<span style='visibility:hidden'>SECRET</span>visible", "visible"],
+  ["hidden div", '<div style="display:none">SECRET</div><div>visible</div>', "visible"],
+  ["hidden attribute", "<p hidden>SECRET</p><p>visible</p>", "visible"],
+  ["hidden attribute with value", '<span hidden="until-found">SECRET</span>visible', "visible"],
+  ["unquoted style", "<div style=display:none>SECRET</div>visible", "visible"],
+  [
+    "nested visible child inside a hidden parent stays hidden",
+    '<div style="display:none"><p>SECRET</p><span style="display:block">ALSO SECRET</span></div>visible',
+    "visible",
+  ],
+  [
+    "nested same-name elements: only the matching close ends the hidden block",
+    '<div style="display:none"><div>a</div><div>b</div>SECRET</div>visible',
+    "visible",
+  ],
+  ["hidden void element is dropped without swallowing what follows", '<img hidden src=x>visible', "visible"],
+  ["visible siblings and children are kept", '<div><span style="display:none">S</span><b>kept</b></div>', "kept"],
+  ["data-hidden attribute does not hide", '<span data-hidden="1">shown</span>', "shown"],
+  ["the word display:none in visible text is not a style", "<p>use display:none to hide</p>", "use display:none to hide"],
+  ["style value containing 'hidden' elsewhere does not hide", '<span style="color:hidden-ish">shown</span>', "shown"],
+];
+for (const [name, html, expected] of hiddenCases) {
+  test(`hidden content: ${name}`, () => {
+    assert.equal(htmlToOutboundText(html), expected);
+  });
+}
+
+test("hidden content: the plain part of a built message omits it while the HTML part keeps it", () => {
+  const html = '<span style="display:none">SECRET preheader</span><p>Hello</p>';
+  const d = decode(buildRawMessage(FROM, TO, "S", { bodyHtml: html }));
+  assert.equal(d.parts[0].text, "Hello");
+  assert.equal(d.parts[1].text, html);
+});
+
+// ---- Entities must never throw on author HTML ----
+
+const entityCases: [string, string, string][] = [
+  ["above U+10FFFF (hex)", "a&#x110000;b", "a�b"],
+  ["above U+10FFFF (decimal)", "a&#1114112;b", "a�b"],
+  ["absurdly long numeric entity", "a&#x" + "F".repeat(400) + ";b", "a�b"],
+  ["high surrogate", "a&#xD800;b", "a�b"],
+  ["low surrogate", "a&#xDFFF;b", "a�b"],
+  ["NUL", "a&#0;b", "a�b"],
+  ["valid astral character still decodes", "&#x1F600;", "😀"],
+  ["last valid code point", "&#x10FFFF;", "\u{10FFFF}"],
+  ["just below the surrogate range", "&#xD7FF;", "퟿"],
+];
+for (const [name, html, expected] of entityCases) {
+  test(`entities: ${name}`, () => {
+    assert.equal(htmlToOutboundText(html), expected);
+  });
+}
+
+test("entities: an out-of-range entity does not break building a message", () => {
+  const d = decode(buildRawMessage(FROM, TO, "S", { bodyHtml: "<p>x&#x110000;y</p>" }));
+  assert.equal(d.parts[0].text, "x�y");
+});
+
 const textCases: [string, string, string][] = [
   ["links become text <url>", '<a href="https://a.com/x">Site</a>', "Site <https://a.com/x>"],
   ["link whose label is the url is not duplicated", '<a href="https://a.com">https://a.com</a>', "https://a.com"],

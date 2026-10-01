@@ -42,6 +42,11 @@ test("an <svg onload=...> payload is stripped along with every other tag", () =>
   assert.doesNotMatch(htmlToPlainText(html), /onload|alert/);
 });
 
+test("out-of-range and surrogate numeric entities become U+FFFD instead of throwing (shared decodeEntities)", () => {
+  assert.equal(htmlToPlainText("a&#x110000;b&#xD800;c"), "a�b�c");
+  assert.equal(htmlToPlainText("&#x1F600;"), "😀");
+});
+
 test("collapses runs of blank lines and trims surrounding whitespace", () => {
   assert.equal(htmlToPlainText("<p>one</p>\n\n\n<p>two</p>   "), "one\n\ntwo");
 });
