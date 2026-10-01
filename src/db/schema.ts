@@ -766,11 +766,11 @@ export const personBdConnection = pgTable(
     messageCount: integer("message_count").notNull().default(0),
     sentCount: integer("sent_count").notNull().default(0),
     receivedCount: integer("received_count").notNull().default(0),
-    firstMessageAt: timestamp("first_message_at"),
-    lastMessageAt: timestamp("last_message_at"),
+    firstMessageAt: timestamp("first_message_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     initiatedByMe: boolean("initiated_by_me"),
     reciprocal: boolean("reciprocal").notNull().default(false),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.personId, t.bdId] }),
@@ -1236,7 +1236,7 @@ export const emailAccount = pgTable(
     // since Gmail returns it as a big numeric string, not a number we should
     // ever do arithmetic on. Null until the first sync baseline completes.
     historyId: text("history_id"),
-    lastSyncedAt: timestamp("last_synced_at"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // Last /api/gmail/sync failure for this account, for the same
     // debugging purpose as lastErrorMessage but scoped to sync rather than
     // send (a send failure and a sync failure are unrelated conditions).
@@ -1255,10 +1255,10 @@ export const emailAccount = pgTable(
     // (grantedScopes gains gmail.readonly) makes the banner's OWN visibility
     // rule false again regardless of this column (reconnectBannerState.ts),
     // so this never needs to be cleared back to null on reconnect.
-    reconnectBannerDismissedAt: timestamp("reconnect_banner_dismissed_at"),
-    connectedAt: timestamp("connected_at").notNull().defaultNow(),
-    disconnectedAt: timestamp("disconnected_at"),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    reconnectBannerDismissedAt: timestamp("reconnect_banner_dismissed_at", { withTimezone: true }),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+    disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byStatus: index("email_account_status_idx").on(t.status),
@@ -1311,14 +1311,14 @@ export const emailMessage = pgTable(
     subject: text("subject"),
     bodyText: text("body_text"),
     bodyTruncated: boolean("body_truncated").notNull().default(false),
-    sentAt: timestamp("sent_at").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
     // The single address that produced `personId`'s match (mirrors that
     // person's row in email_message_person).
     matchedEmail: text("matched_email").notNull(),
     // 'exact' | 'inferred' — 'inferred' when matchedEmail came from a
     // pattern-deduced person email (`person.email_source = 'pattern_inferred'`).
     matchConfidence: text("match_confidence").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     bdGmailMessageUnique: unique("email_message_bd_gmail_message_unique").on(t.bdId, t.gmailMessageId),
@@ -1550,12 +1550,12 @@ export const followUpQueueItem = pgTable(
     position: integer("position").notNull(),
     // 'replied' | 'contacted' — whichever due rule selected this row.
     dueStatus: text("due_status").notNull(),
-    lastTouchAt: timestamp("last_touch_at").notNull(),
+    lastTouchAt: timestamp("last_touch_at", { withTimezone: true }).notNull(),
     // 'pending' | 'postponed' | 'skipped'
     state: text("state").notNull().default("pending"),
     snoozedUntil: date("snoozed_until"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // Idempotent-insert target (race safety: concurrent first-loads for the

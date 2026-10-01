@@ -18,7 +18,8 @@ export interface RawConnectionRow {
 }
 
 // Raw `sql` rows deliver timestamps as strings; parseDbTimestamp is correct for
-// naive (pre-slice-6) and offset-bearing strings alike.
+// offset-bearing strings (every column is timestamptz since slice 6) and
+// any offset-less string alike.
 export function mapRawActivityRow(r: RawActivityRow): ActivityRowForStatus & { personId: string } {
   return {
     id: r.id,

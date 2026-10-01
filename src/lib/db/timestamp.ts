@@ -1,24 +1,24 @@
 /**
  * Every timestamp column in this schema holds UTC (CLAUDE.md query rule 2 /
- * PERFORMANCE.md). The column TYPE is mid-migration: slices 1-5 of
- * openspec/decisions/2026-09-30-timestamptz-migration-plan.md converted 58
- * columns to `timestamptz`, while the tables still queued in slice 6
- * (email_account, email_message, follow_up_queue_item,
- * person_bd_connection) remain `timestamp without time zone`. Drizzle's
- * typed column mapper parses both kinds correctly, because its
- * `withTimezone` flag tracks the column — but any raw
+ * PERFORMANCE.md) and, since slice 6 of
+ * openspec/decisions/2026-09-30-timestamptz-migration-plan.md, every one of
+ * them is `timestamptz` (71 columns; none left as `timestamp without time
+ * zone`). Drizzle's typed column mapper parses them correctly, but any raw
  * `db.execute(sql...)` row, and any computed `sql` expression (an aggregate
  * like `max(...)`, or a `CASE` expression like
  * `effectiveActivityAtSql()`, src/lib/contacts/effectiveActivityTime.ts),
  * arrives from the postgres-js driver as a plain STRING at runtime — even
- * when typed `Date` at the call site. From a still-naive column that string
- * carries NO OFFSET, and `new Date(str)` on an offset-less string is parsed
- * in the *process's local* timezone, not UTC, silently shifting the value by
- * the server's UTC offset on any runtime that isn't UTC (Vercel prod happens
- * to run UTC; a contributor's laptop — or a future Vercel region/runtime
- * change — does not). Once slice 6 lands every raw string will carry an
- * offset and the `Z`-appending branch below becomes dead, but this helper
- * stays as the single place the rule is stated.
+ * when typed `Date` at the call site.
+ *
+ * For a DB-sourced string that string now ALWAYS carries an offset, so the
+ * offset-less (`Z`-appending) branch below is dead for DB values: it fires
+ * only for non-DB callers (CSV/import parsing, fixtures, hand-built
+ * strings). It is kept anyway because this helper is the single place the
+ * rule is stated: an offset-less string is pinned to UTC explicitly, never
+ * left to `new Date(str)`, which parses it in the *process's local* timezone
+ * and silently shifts the value by the server's UTC offset on any runtime
+ * that isn't UTC (Vercel prod happens to run UTC; a contributor's laptop —
+ * or a future runtime change — does not).
  *
  * `parseDbTimestamp` is the ONE shared place every such call site coerces
  * its raw value back into a real `Date`, so this rule is defined exactly
