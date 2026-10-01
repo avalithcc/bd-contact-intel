@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
@@ -72,6 +72,15 @@ export function NewTaskButton({
   const [subject, setSubject] = useState<TaskSubjectSearchResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // `.dialog-body` scrolls (overflow-y: auto), which clips the absolutely
+  // positioned results list at the body edge: on a short viewport the bottom of
+  // the list sat behind the footer until the user scrolled. Scroll the minimum
+  // needed to reveal it (`nearest` is a no-op when it already fits).
+  useEffect(() => {
+    if (results.length > 0) listRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [results]);
 
   useEffect(() => {
     if (subject || query.trim().length < 2) {
@@ -222,7 +231,7 @@ export function NewTaskButton({
                   <p className="hint">{l.taskSubjectNoResults}</p>
                 )}
                 {results.length > 0 && (
-                  <ul className={styles.results} role="listbox">
+                  <ul ref={listRef} className={styles.results} role="listbox">
                     {results.map((result) => (
                       <li key={`${result.type}:${result.id}`}>
                         <button

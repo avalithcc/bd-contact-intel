@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- "Nueva tarea" dialog (NewTaskButton.tsx) with the subject-search results open.
+     ?css=old loads globals.css as it was before #276 (no scrolling .dialog-body).
+     ?mode=inline adds `.resultsInline` to the list; default is the real overlay `.results`.
+     ?btn=1 renders the button-state matrix instead (disabled-contrast check). -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Dialog clipping harness</title>
+<script>
+const q = new URLSearchParams(location.search);
+const css = q.get("css") === "old" ? "./globals.pre276.css" : "../../../src/app/globals.css";
+document.write(`<link rel="stylesheet" href="${css}">`);
+</script>
+<link rel="stylesheet" href="../../../src/app/design-system.css">
+<link rel="stylesheet" href="../../../src/app/(app)/tasks/NewTaskButton.module.css">
+</head>
+<body>
+<div id="root"></div>
+<script>
+const mode = q.get("mode") || "overlay";
+if (q.get("btn")) {
+  const variants = ["btn-primary", "btn-secondary", "btn-ghost"];
+  const row = (dis) => variants.map((v) => `<button class="btn ${v}"${dis ? " disabled" : ""}>Guardar nota</button>`).join(" ");
+  document.getElementById("root").innerHTML =
+    `<div style="padding:24px;display:grid;gap:16px;background:var(--color-surface-2)"><div id="enabled">${row(false)}</div><div id="disabled">${row(true)}</div></div>`;
+} else {
+  const items = Array.from({ length: 8 }, (_, i) =>
+    `<li><button type="button" class="resultItem">${i % 2 ? "Empresa" : "Contacto"}: Resultado ${i + 1}</button></li>`).join("");
+  const cls = mode === "inline" ? "results resultsInline" : "results";
+  document.getElementById("root").innerHTML = `
+<div class="overlay open">
+  <div class="dialog" role="dialog" aria-modal="true">
+    <div class="dialog-header"><h2>Nueva tarea</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+    <div class="dialog-body">
+      <div class="field"><label class="label">Título</label><input class="input"></div>
+      <div class="field"><label class="label">Asunto</label>
+        <div class="searchWrap" id="wrap"><input class="input" value="ab"><ul class="${cls}" role="listbox" id="list">${items}</ul></div>
+        <p class="hint">Elige un contacto o una empresa.</p></div>
+      <div class="form-grid">
+        <div class="field"><label class="label">Vence</label><input class="input" type="date"></div>
+        <div class="field"><label class="label">Asignado a</label><select class="select"><option>Yo</option></select></div></div>
+      <div class="field"><label class="label">Descripción</label><textarea class="textarea"></textarea></div>
+    </div>
+    <div class="dialog-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" id="save">Crear tarea</button></div>
+  </div>
+</div>`;
+  document.body.style.overflow = "hidden";
+}
+</script>
+</body>
+</html>
