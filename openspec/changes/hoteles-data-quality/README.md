@@ -62,7 +62,7 @@ Respuesta: **(b) hay una brecha de vocabulario que vale la pena cerrar, y (c) un
 
 ### Visibilidad (verificada en el código)
 
-La vista por defecto de Contactos ejecuta `resolveRoleVisibility` (`src/lib/contacts/roleVisibility.ts`), que oculta `NOT_WORTH_PRIORITIZING.noPriorizar.keys`, es decir `developers` y `sales_bd`. `other` y `no_position` están en "Revisar" y se muestran.
+La vista por defecto de Contactos ejecuta `resolveRoleVisibility` (`src/lib/contacts/roleVisibility.ts`), que oculta `NOT_WORTH_PRIORITIZING.noPriorizar.keys`, es decir `developers` y `sales_bd`. `other` y `no_position` están en "Revisar" y se muestran. Excepción: un contacto con `contact_type = BUYER-CHAMPION` nunca se oculta, sea cual sea su grupo de rol.
 
 | Grupo | Contactos de Mariel | ¿Oculto por defecto? |
 |---|---|---|
