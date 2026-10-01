@@ -169,7 +169,19 @@ kbd, .kbd {
 .btn-danger-solid { background: var(--color-danger-text); color: var(--color-accent-fg); }
 .btn-danger-solid:hover { background: var(--color-danger-press); }
 .btn.is-focus { box-shadow: var(--focus-ring); }
-.btn:disabled, .btn.is-disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+/* Disabled: an explicit muted treatment instead of a blanket opacity. Fading the whole
+   button also faded the label, so a disabled .btn-primary became pale pink with near-white
+   text (2.3:1). Sunken surface + subtle ink keeps the label readable and still reads as
+   inert. `opacity: 1` is required: globals.css has a zero-specificity legacy
+   `:where(button:disabled)` at 0.55 that would otherwise fade this treatment too. The border
+   resets so no variant keeps its accent or strong outline. */
+.btn:disabled, .btn.is-disabled {
+  background: var(--color-surface-sunken); color: var(--color-ink-subtle); border-color: var(--color-border);
+  opacity: 1; cursor: not-allowed; pointer-events: none;
+}
+/* Ghost has no surface when enabled; keep it borderless and transparent so it does not
+   grow a grey box, and let the lighter ink carry the disabled state. */
+.btn-ghost:disabled, .btn-ghost.is-disabled { background: transparent; border-color: transparent; }
 .btn-sm { height: var(--control-height-sm); padding: 0 var(--space-sm); font-size: var(--text-sm); }
 .btn-icon { width: var(--control-height); padding: 0; }
 .btn-sm.btn-icon { width: var(--control-height-sm); }
