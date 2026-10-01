@@ -58,6 +58,7 @@ import {
   type OutreachViewSearchParams,
 } from "@/lib/contacts/outreachViewParams";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
+import { CONTACT_TYPES, CONTACT_TYPE_LABELS } from "@/lib/contacts/contactType";
 import { COMPANY_CATEGORIES } from "@/lib/companyCategories";
 import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
@@ -100,6 +101,7 @@ interface ContactsPageProps {
     bdConnected?: string;
     lastActivityDays?: string;
     hasPhone?: string;
+    contactType?: string;
     emailVerified?: string;
     // "Outreach" system view filters (task 15a-2; owner decision
     // 2026-09-26): same param names/semantics as `/outreach`'s own
@@ -760,6 +762,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             ]}
             marketOptions={MARKETS.map((m) => ({ value: m, label: dict.markets[m] }))}
             roleGroupOptions={ROLE_GROUPS.map((g) => ({ value: g.key, label: dict.roleGroups[g.key] }))}
+            contactTypeOptions={CONTACT_TYPES.map((t) => ({ value: t, label: CONTACT_TYPE_LABELS[t] }))}
             lastActivityOptions={[
               { value: "7", label: l.filterLastActivity7d },
               { value: "30", label: l.filterLastActivity30d },

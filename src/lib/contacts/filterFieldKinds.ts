@@ -7,8 +7,9 @@ import type { FilterChipField } from "@/lib/contacts/filterChips";
 
 export type FilterFieldKind = "select" | "multiselect" | "checkbox" | "text";
 
-/** Exactly the mockup's 11 "Agregar filtro" options (migration 0016 added
- * "Tiene teléfono"), in menu order. */
+/** The mockup's 12 "Agregar filtro" options (migration 0016 added "Tiene
+ * teléfono"; contact-type-ui added "Tipo de contacto" after "Grupo de rol"),
+ * in menu order. */
 export const FILTER_MENU_ORDER: readonly FilterChipField[] = [
   "owner",
   "status",
@@ -18,6 +19,7 @@ export const FILTER_MENU_ORDER: readonly FilterChipField[] = [
   "hiring",
   "market",
   "roleGroup",
+  "contactType",
   "startupsOnly",
   "bdConnected",
   "lastActivityDays",
@@ -39,6 +41,7 @@ export const FILTER_FIELD_KIND: Record<FilterChipField, FilterFieldKind> = {
   hiring: "checkbox",
   market: "select",
   roleGroup: "select",
+  contactType: "select",
   startupsOnly: "checkbox",
   bdConnected: "select",
   lastActivityDays: "select",
@@ -58,6 +61,7 @@ export const FIELD_PARAM_NAMES: Record<FilterChipField, string[]> = {
   hiring: ["hiring"],
   market: ["market"],
   roleGroup: ["roleGroup"],
+  contactType: ["contactType"],
   startupsOnly: ["startupsOnly"],
   bdConnected: ["bdConnected"],
   lastActivityDays: ["lastActivityDays"],

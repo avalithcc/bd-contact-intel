@@ -5,6 +5,7 @@
  * clears exactly that field's ad-hoc query param (see
  * AdHocContactFilterInput in viewFilters.ts).
  */
+import { CONTACT_TYPE_FIELD_LABEL, contactTypeLabel } from "@/lib/contacts/contactType";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
 
 export type FilterChipField = keyof ContactFilters;
@@ -37,6 +38,7 @@ export const FILTER_FIELD_LABEL: Record<FilterChipField, string> = {
   hiring: "Empresa con vacantes abiertas",
   market: "Mercado de contratación",
   roleGroup: "Grupo de rol",
+  contactType: CONTACT_TYPE_FIELD_LABEL,
   startupsOnly: "Startup",
   bdConnected: "BD conectado",
   lastActivityDays: "Última actividad",
@@ -66,6 +68,9 @@ export function buildActiveFilterChips(filters: ContactFilters, ctx: FilterChipC
   if (filters.hiring) chips.push({ field: "hiring", label: L.hiring, valueText: null });
   if (filters.market) chips.push({ field: "market", label: L.market, valueText: ctx.marketLabel(filters.market) });
   if (filters.roleGroup) chips.push({ field: "roleGroup", label: L.roleGroup, valueText: ctx.roleGroupLabel(filters.roleGroup) });
+  if (filters.contactType) {
+    chips.push({ field: "contactType", label: L.contactType, valueText: contactTypeLabel(filters.contactType) });
+  }
   if (filters.startupsOnly) chips.push({ field: "startupsOnly", label: L.startupsOnly, valueText: null });
   if (filters.bdConnected) chips.push({ field: "bdConnected", label: L.bdConnected, valueText: ctx.bdName(filters.bdConnected) });
   if (filters.lastActivityDays) {

@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EXTRA_FILTER_MENU_ORDER, FILTER_FIELD_KIND, FILTER_MENU_ORDER } from "@/lib/contacts/filterFieldKinds";
 
-test("FILTER_MENU_ORDER lists exactly the mockup's 11 'Agregar filtro' options (migration 0016 added 'Tiene teléfono'), in menu order", () => {
+test("FILTER_MENU_ORDER lists exactly the mockup's 12 'Agregar filtro' options (migration 0016 added 'Tiene teléfono', contact-type-ui added 'Tipo de contacto'), in menu order", () => {
   assert.deepEqual(FILTER_MENU_ORDER, [
     "owner",
     "status",
@@ -18,6 +18,7 @@ test("FILTER_MENU_ORDER lists exactly the mockup's 11 'Agregar filtro' options (
     "hiring",
     "market",
     "roleGroup",
+    "contactType",
     "startupsOnly",
     "bdConnected",
     "lastActivityDays",

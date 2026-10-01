@@ -11,6 +11,7 @@
  * this, never the other way around.
  */
 import { isUuid } from "@/lib/uuid";
+import { isContactType, type ContactType } from "@/lib/contacts/contactType";
 import { MARKETS, type MarketKey } from "@/lib/hiring/markets";
 
 export type PersonStatus = "new" | "contacted" | "replied" | "meeting" | "discarded";
@@ -79,6 +80,8 @@ export interface ContactFilters {
   /** "Startup" filter — same getHiringMatchIndex crossover as `market`. */
   startupsOnly?: boolean;
   roleGroup?: string;
+  /** "Tipo de contacto" — closed set (contactType.ts); never matches NULL rows. */
+  contactType?: ContactType;
   /** "BD conectado" — a specific BD's uuid; filters to persons with a
    * `person_bd_connection` row for that BD. */
   bdConnected?: string;
@@ -103,6 +106,7 @@ export function serializeContactFilters(filters: ContactFilters): URLSearchParam
   if (filters.market) params.set("market", filters.market);
   if (filters.startupsOnly) params.set("startupsOnly", "1");
   if (filters.roleGroup) params.set("roleGroup", filters.roleGroup);
+  if (filters.contactType) params.set("contactType", filters.contactType);
   if (filters.bdConnected) params.set("bdConnected", filters.bdConnected);
   if (filters.lastActivityDays) params.set("lastActivityDays", String(filters.lastActivityDays));
   if (filters.hasPhone) params.set("hasPhone", "1");
@@ -150,6 +154,9 @@ export function parseContactFilters(params: URLSearchParams): ContactFilters {
   const roleGroup = params.get("roleGroup");
   if (roleGroup) filters.roleGroup = roleGroup;
 
+  const contactType = params.get("contactType");
+  if (isContactType(contactType)) filters.contactType = contactType;
+
   const bdConnected = params.get("bdConnected");
   if (bdConnected && isUuid(bdConnected)) filters.bdConnected = bdConnected;
 
@@ -190,6 +197,7 @@ export function sanitizeContactFilters(value: unknown): ContactFilters {
   if (isMarketKey(raw.market)) filters.market = raw.market;
   if (raw.startupsOnly === true) filters.startupsOnly = true;
   if (typeof raw.roleGroup === "string" && raw.roleGroup) filters.roleGroup = raw.roleGroup;
+  if (isContactType(raw.contactType)) filters.contactType = raw.contactType;
   if (typeof raw.bdConnected === "string" && isUuid(raw.bdConnected)) filters.bdConnected = raw.bdConnected;
   if (typeof raw.lastActivityDays === "number" && raw.lastActivityDays > 0) {
     filters.lastActivityDays = raw.lastActivityDays;
@@ -219,6 +227,7 @@ export interface AdHocContactFilterInput {
   market?: string;
   startupsOnly?: string;
   roleGroup?: string;
+  contactType?: string;
   bdConnected?: string;
   lastActivityDays?: string;
   hasPhone?: string;
@@ -287,6 +296,11 @@ export function applyAdHocContactFilterOverrides(
   if (raw.roleGroup !== undefined) {
     if (raw.roleGroup === "") delete result.roleGroup;
     else result.roleGroup = raw.roleGroup;
+  }
+
+  if (raw.contactType !== undefined) {
+    if (raw.contactType === "") delete result.contactType;
+    else if (isContactType(raw.contactType)) result.contactType = raw.contactType;
   }
 
   if (raw.bdConnected !== undefined) {

@@ -27,6 +27,7 @@ const SUBMITTED: Record<FilterChipField, string> = {
   hiring: "1",
   market: "us",
   roleGroup: "eng_leadership",
+  contactType: "BUYER-CHAMPION",
   startupsOnly: "on",
   bdConnected: UUID,
   lastActivityDays: "30",

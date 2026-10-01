@@ -66,6 +66,7 @@ export interface FilterMenuProps {
   emailStatusOptions: SelectOption[];
   marketOptions: SelectOption[];
   roleGroupOptions: SelectOption[];
+  contactTypeOptions: SelectOption[];
   lastActivityOptions: SelectOption[];
   industryGroupOptions: SelectOption[];
   seniorityOptions: SelectOption[];
@@ -105,6 +106,7 @@ export function FilterMenu({
   emailStatusOptions,
   marketOptions,
   roleGroupOptions,
+  contactTypeOptions,
   lastActivityOptions,
   industryGroupOptions,
   seniorityOptions,
@@ -162,6 +164,7 @@ export function FilterMenu({
         emailStatus: emailStatusOptions,
         market: marketOptions,
         roleGroup: roleGroupOptions,
+        contactType: contactTypeOptions,
         lastActivityDays: lastActivityOptions,
         industryGroup: industryGroupOptions,
         seniority: seniorityOptions,

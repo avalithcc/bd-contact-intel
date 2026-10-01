@@ -15,6 +15,7 @@ export const AD_HOC_FILTER_PARAM_KEYS = [
   "hiring",
   "market",
   "roleGroup",
+  "contactType",
   "startupsOnly",
   "bdConnected",
   "lastActivityDays",
