@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Static reproduction of Dialog.tsx markup (.overlay.open > .dialog > header/body/footer)
+     using the app's real stylesheets, in the same order layout.tsx imports them.
+     ?v=call      tall form (the old "Registrar llamada" field set + extra rows to overflow)
+     ?v=thread    conversation dialog: wide + .dialog-body-scroll wrapper with a long thread -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Dialog scroll harness</title>
+<link rel="stylesheet" href="../../../src/app/globals.css">
+<link rel="stylesheet" href="../../../src/app/design-system.css">
+</head>
+<body>
+<div id="root"></div>
+<script>
+const v = new URLSearchParams(location.search).get("v") || "call";
+const field = (label, ctl) => `<div class="field"><label class="label">${label}</label>${ctl}</div>`;
+const input = (t) => `<input class="input" type="${t}">`;
+let body;
+if (v === "thread") {
+  const msgs = Array.from({length: 40}, (_, i) => `<p>Mensaje ${i + 1}: texto de la conversación.</p>`).join("");
+  body = `<div class="dialog-body-scroll" id="thread">${msgs}</div>`;
+} else {
+  body = field("Resultado", `<select class="select"><option>Seleccionar…</option></select>`)
+    + `<div class="form-grid">${field("Dirección", `<select class="select"><option>Saliente</option></select>`)}${field("Duración (minutos)", input("number"))}</div>`
+    + `<div class="form-grid">${field("Fecha", input("date"))}${field("Hora", input("time"))}</div>`
+    + field("Notas", `<textarea class="textarea" rows="6"></textarea>`)
+    + field("Extra A", `<textarea class="textarea" rows="4"></textarea>`)
+    + field("Extra B", `<textarea class="textarea" rows="4"></textarea>`);
+}
+document.getElementById("root").innerHTML = `
+<div class="overlay open">
+  <div class="dialog${v === "thread" ? " wide" : ""}" role="dialog" aria-modal="true">
+    <div class="dialog-header"><h2>Registrar llamada</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+    <div class="dialog-body">${body}</div>
+    <div class="dialog-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" id="save">Registrar llamada</button></div>
+  </div>
+</div>`;
+document.body.style.overflow = "hidden"; // Dialog.tsx scroll lock
+</script>
+</body>
+</html>

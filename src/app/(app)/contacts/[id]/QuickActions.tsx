@@ -13,7 +13,7 @@ import {
   logContactMeetingAction,
   sendContactEmailAction,
 } from "../actions";
-import { CALL_DIRECTIONS, CALL_OUTCOME_CODES, type CallDirection, type CallOutcomeCode } from "@/lib/contacts/call";
+import { CALL_OUTCOME_CODES, MANUAL_CALL_DIRECTION, type CallOutcomeCode } from "@/lib/contacts/call";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
@@ -71,11 +71,6 @@ const CALL_OUTCOME_LABEL_KEY: Record<CallOutcomeCode, keyof ContactRecordLabels>
   no_answer: "callOutcomeNoAnswer",
   voicemail: "callOutcomeVoicemail",
   wrong_number: "callOutcomeWrongNumber",
-};
-
-const CALL_DIRECTION_LABEL_KEY: Record<CallDirection, keyof ContactRecordLabels> = {
-  outbound: "callDirectionOutbound",
-  inbound: "callDirectionInbound",
 };
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
@@ -259,10 +254,12 @@ export function QuickActions({
           busy={busy}
           error={error}
           onCancel={closeQuickAction}
-          onSubmit={async (outcome, direction, date, time, durationMinutes, notes) => {
+          onSubmit={async (outcome, date, time, notes) => {
             setBusy(true);
             setError(null);
-            const result = await logCallAction(personId, outcome, direction, date, time, durationMinutes, notes);
+            // Direction has no control on purpose: a hand-logged call is outbound,
+            // and `outbound` is what makes a no-answer call count as `contacted`.
+            const result = await logCallAction(personId, outcome, MANUAL_CALL_DIRECTION, date, time, notes);
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -647,21 +644,12 @@ export function CallForm({
   onCancel,
   onSubmit,
 }: ComposerProps & {
-  onSubmit: (
-    outcome: string,
-    direction: string,
-    date: string,
-    time: string,
-    durationMinutes: string,
-    notes: string,
-  ) => void;
+  onSubmit: (outcome: string, date: string, time: string, notes: string) => void;
 }) {
   const ids = useId();
   const [outcome, setOutcome] = useState("");
-  const [direction, setDirection] = useState<CallDirection>("outbound");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
 
   // Client-side "no future call" guard (fresh-review WARNING fix) —
@@ -689,7 +677,7 @@ export function CallForm({
             type="button"
             className="btn btn-primary"
             disabled={busy || !outcome}
-            onClick={() => outcome && onSubmit(outcome, direction, date, time, durationMinutes, notes)}
+            onClick={() => outcome && onSubmit(outcome, date, time, notes)}
           >
             {l.callSubmit}
           </button>
@@ -715,42 +703,6 @@ export function CallForm({
             </option>
           ))}
         </select>
-      </div>
-      {/* Dirección + Duración, then Fecha + Hora (approved mockup
-          contact-record.html #call's two `.form-grid` rows). */}
-      <div className="form-grid">
-        <div className="field">
-          <label className="label" htmlFor={`${ids}-direction`}>
-            {l.callDirectionLabel}
-          </label>
-          <select
-            id={`${ids}-direction`}
-            className="select"
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as CallDirection)}
-            disabled={busy}
-          >
-            {CALL_DIRECTIONS.map((code) => (
-              <option key={code} value={code}>
-                {l[CALL_DIRECTION_LABEL_KEY[code]] as string}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${ids}-duration`}>
-            {l.callDurationLabel}
-          </label>
-          <input
-            id={`${ids}-duration`}
-            className="input"
-            type="number"
-            min={0}
-            value={durationMinutes}
-            onChange={(e) => setDurationMinutes(e.target.value)}
-            disabled={busy}
-          />
-        </div>
       </div>
       <div className="form-grid">
         <div className="field">

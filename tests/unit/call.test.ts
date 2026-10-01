@@ -1,7 +1,7 @@
 /**
  * Unit tests for src/lib/contacts/call.ts — pure planner behind the
  * "Registrar llamada" quick action (contact-record mockup: outcome required,
- * direction, optional duration, notes). Mirrors meeting.test.ts.
+ * direction, notes). Mirrors meeting.test.ts.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -12,6 +12,7 @@ import {
   CallOutcomeRequiredError,
   isCallOutcomeCode,
   isCallDirection,
+  MANUAL_CALL_DIRECTION,
   planCall,
 } from "@/lib/contacts/call";
 
@@ -26,11 +27,11 @@ test("every direction is recognized", () => {
 });
 
 test("a missing outcome is rejected", () => {
-  assert.throws(() => planCall("", "outbound", "2026-09-26", "14:30", "", ""), CallOutcomeRequiredError);
+  assert.throws(() => planCall("", "outbound", "2026-09-26", "14:30", ""), CallOutcomeRequiredError);
 });
 
 test("an unrecognized outcome is rejected", () => {
-  assert.throws(() => planCall("levitated", "outbound", "2026-09-26", "14:30", "", ""), CallOutcomeRequiredError);
+  assert.throws(() => planCall("levitated", "outbound", "2026-09-26", "14:30", ""), CallOutcomeRequiredError);
 });
 
 /**
@@ -43,42 +44,35 @@ test("an unrecognized outcome is rejected", () => {
  * `TZ=UTC` and `TZ=America/Argentina/Buenos_Aires`.
  */
 test("date + time combine into one ISO instant, used as occurredAt, interpreted as Argentina wall-clock time", () => {
-  const plan = planCall("connected", "outbound", "2026-09-26", "14:30", "", "");
+  const plan = planCall("connected", "outbound", "2026-09-26", "14:30", "");
   assert.equal(plan.occurredAt, "2026-09-26T17:30:00.000Z");
 });
 
 test("a missing time defaults to midnight ART (03:00 UTC)", () => {
-  const plan = planCall("connected", "outbound", "2026-09-26", "", "", "");
+  const plan = planCall("connected", "outbound", "2026-09-26", "", "");
   assert.equal(plan.occurredAt, "2026-09-26T03:00:00.000Z");
 });
 
 test("a missing date defaults to now", () => {
   const before = Date.now();
-  const plan = planCall("connected", "outbound", "", "", "", "");
+  const plan = planCall("connected", "outbound", "", "", "");
   const at = new Date(plan.occurredAt).getTime();
   assert.ok(at >= before);
 });
 
 test("direction defaults to outbound when blank", () => {
-  const plan = planCall("connected", "", "2026-09-26", "14:30", "", "");
+  const plan = planCall("connected", "", "2026-09-26", "14:30", "");
   assert.equal(plan.direction, "outbound");
 });
 
 test("an unrecognized direction is treated as outbound (defensive default, same as blank)", () => {
-  const plan = planCall("connected", "sideways", "2026-09-26", "14:30", "", "");
+  const plan = planCall("connected", "sideways", "2026-09-26", "14:30", "");
   assert.equal(plan.direction, "outbound");
 });
 
-test("duration is parsed as a non-negative integer of minutes, optional", () => {
-  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "8", "").durationMinutes, 8);
-  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "", "").durationMinutes, null);
-  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "-5", "").durationMinutes, null);
-  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "not a number", "").durationMinutes, null);
-});
-
 test("notes are trimmed, blank collapses to null", () => {
-  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "", "  Great talk  ").notes, "Great talk");
-  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "", "   ").notes, null);
+  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "  Great talk  ").notes, "Great talk");
+  assert.equal(planCall("connected", "outbound", "2026-09-26", "14:30", "   ").notes, null);
 });
 
 // --- occurredAt must not be in the future (fresh-review WARNING fix) -------
@@ -88,29 +82,36 @@ test("notes are trimmed, blank collapses to null", () => {
 test("an occurredAt more than 5 minutes in the future is rejected", () => {
   const now = new Date("2026-09-26T15:00:00.000Z"); // 12:00 ART
   assert.throws(
-    () => planCall("connected", "outbound", "2026-09-26", "12:06", "", "", now),
+    () => planCall("connected", "outbound", "2026-09-26", "12:06", "", now),
     CallOccurredAtInFutureError,
   );
   assert.throws(
-    () => planCall("connected", "outbound", "2026-09-27", "00:00", "", "", now),
+    () => planCall("connected", "outbound", "2026-09-27", "00:00", "", now),
     CallOccurredAtInFutureError,
   );
 });
 
 test("an occurredAt within the 5-minute clock-skew tolerance is accepted", () => {
   const now = new Date("2026-09-26T15:00:00.000Z"); // 12:00 ART
-  const plan = planCall("connected", "outbound", "2026-09-26", "12:05", "", "", now);
+  const plan = planCall("connected", "outbound", "2026-09-26", "12:05", "", now);
   assert.equal(plan.occurredAt, "2026-09-26T15:05:00.000Z"); // 12:05 ART
 });
 
 test("an occurredAt in the past is always accepted", () => {
   const now = new Date("2026-09-26T15:00:00.000Z"); // 12:00 ART
-  const plan = planCall("connected", "outbound", "2020-01-01", "00:00", "", "", now);
+  const plan = planCall("connected", "outbound", "2020-01-01", "00:00", "", now);
   assert.equal(plan.occurredAt, "2020-01-01T03:00:00.000Z"); // 00:00 ART
 });
 
 test("a blank date (defaults to `now`) never trips the future guard", () => {
   const now = new Date("2026-09-26T15:00:00.000Z");
-  const plan = planCall("connected", "outbound", "", "", "", "", now);
+  const plan = planCall("connected", "outbound", "", "", "", now);
   assert.equal(plan.occurredAt, now.toISOString());
+});
+
+test("a manually logged call is always outbound, and the planner never writes a duration", () => {
+  assert.equal(MANUAL_CALL_DIRECTION, "outbound");
+  const plan = planCall("no_answer", MANUAL_CALL_DIRECTION, "2026-09-26", "14:30", "");
+  assert.equal(plan.direction, "outbound");
+  assert.equal("durationMinutes" in plan, false);
 });

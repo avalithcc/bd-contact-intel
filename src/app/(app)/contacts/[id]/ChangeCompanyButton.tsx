@@ -168,7 +168,7 @@ export function ChangeCompanyButton({
                 </p>
               )}
               {results.length > 0 && (
-                <ul className={styles.results} role="listbox">
+                <ul className={`${styles.results} ${styles.resultsInline}`} role="listbox">
                   {results.map((result) => (
                     <li key={result.id}>
                       <button

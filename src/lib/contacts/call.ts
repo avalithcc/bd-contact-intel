@@ -1,6 +1,6 @@
 /**
  * Pure planner for the "Registrar llamada" quick action (contact-record
- * mockup: outcome required, direction, optional duration, notes). No I/O —
+ * mockup: outcome required, date/time, notes; direction is assumed outbound). No I/O —
  * the caller writes a `call` activity with this metadata;
  * `src/lib/status/deriveStatus.ts` derives the stage contribution from
  * `direction`/`outcome` (owner rule: an outbound call with any outcome is
@@ -27,6 +27,17 @@ export function isCallOutcomeCode(value: string): value is CallOutcomeCode {
 export const CALL_DIRECTIONS = ["outbound", "inbound"] as const;
 
 export type CallDirection = (typeof CALL_DIRECTIONS)[number];
+
+/**
+ * Direction written for every call a BD logs by hand (the form has no
+ * direction control: a BD logging a call made it; inbound calls arrive by
+ * other paths). DO NOT drop or "clean up" this value: `callStage` in
+ * src/lib/status/deriveStatus.ts maps `outbound` to `contacted` for ANY
+ * outcome, and that is the only path to `contacted` for busy/no_answer/
+ * voicemail/wrong_number. Without it, repeated unanswered calls would leave
+ * the contact `new` (owner rule 2026-09-26, mirrors HubSpot).
+ */
+export const MANUAL_CALL_DIRECTION: CallDirection = "outbound";
 
 export function isCallDirection(value: string): value is CallDirection {
   return (CALL_DIRECTIONS as readonly string[]).includes(value);
@@ -57,23 +68,14 @@ export class CallOccurredAtInFutureError extends Error {
  * for "logging a call slightly ahead of time". */
 const FUTURE_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
 
+/** Calls logged before the duration field was removed may carry an extra
+ * `durationMinutes` in their stored metadata; timelineEntryBody.ts still
+ * renders it, but nothing writes it any more. */
 export interface CallActivityMetadata {
   outcome: CallOutcomeCode;
   direction: CallDirection;
-  durationMinutes: number | null;
   occurredAt: string;
   notes: string | null;
-}
-
-/** `rawDurationMinutes` is a free-text `<input type="number">` value; only a
- * non-negative integer is kept, anything else (blank, negative, NaN) is
- * dropped to `null` rather than rejecting the whole call log. */
-function parseDurationMinutes(rawDurationMinutes: string): number | null {
-  const trimmed = rawDurationMinutes.trim();
-  if (trimmed === "") return null;
-  const n = Number(trimmed);
-  if (!Number.isInteger(n) || n < 0) return null;
-  return n;
 }
 
 /**
@@ -100,7 +102,6 @@ export function planCall(
   rawDirection: string,
   rawDate: string,
   rawTime: string,
-  rawDurationMinutes: string,
   rawNotes: string,
   now: Date = new Date(),
 ): CallActivityMetadata {
@@ -116,8 +117,7 @@ export function planCall(
     throw new CallOccurredAtInFutureError();
   }
 
-  const durationMinutes = parseDurationMinutes(rawDurationMinutes);
   const notes = rawNotes.trim() || null;
 
-  return { outcome, direction, durationMinutes, occurredAt: occurredAtDate.toISOString(), notes };
+  return { outcome, direction, occurredAt: occurredAtDate.toISOString(), notes };
 }
