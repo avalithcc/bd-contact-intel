@@ -1112,10 +1112,21 @@ export const es: typeof en = {
     reconnectAlertBody:
       "Para sincronizar respuestas en la cronología de los contactos, reconectá Gmail y aceptá el nuevo permiso de lectura. No se lee nada de tu bandeja hasta que reconectes.",
     // --- connected + syncing / error / backfilling (screen 2b, 2b·error, 2c) ---
-    lastSyncedLabel: "Última sincronización",
+    lastSyncedLabel: "Última sincronización exitosa",
     lastSyncedNever: "Todavía no sincronizó",
-    errorAlertTitle: "No se pudo sincronizar Gmail.",
-    errorAlertBodySuffix: "Reconectá para reanudar la sincronización; el resto de la cuenta sigue funcionando con normalidad.",
+    // Sync health (syncHealth.ts). The title is shared by the in-page alert
+    // and mirrors the shell banner; bodies are per error kind because
+    // reconnecting only fixes an auth failure.
+    syncFailingTitle: "Tu Gmail no se está sincronizando.",
+    syncFailingBodyAuth: "Google revocó o venció el acceso a tu cuenta. Reconectá Gmail para reanudar la sincronización.",
+    syncFailingBodyConfig:
+      "El servidor no tiene bien configuradas las credenciales de Google. Reconectar no lo soluciona: avisá a un administrador.",
+    syncFailingBodyOther:
+      "Los correos nuevos no están llegando al CRM. Tu conexión sigue activa, así que reconectar no lo soluciona. Probá «Sincronizar ahora»; si sigue igual, avisá a un administrador.",
+    syncStaleTitle: "Hace tiempo que no se sincroniza tu Gmail.",
+    syncStaleBody:
+      "No hay ningún error registrado, pero hace más de una hora que no se completa una sincronización. Probá «Sincronizar ahora»; si sigue igual, avisá a un administrador.",
+    syncErrorDetailSummary: "Detalle técnico (solo administradores)",
     // No percentage/ETA (owner brief override of README decision 4): the
     // history/messages-list APIs never expose a total up front, so a real
     // progress bar can't be computed — see the checklist for the full note.
@@ -1141,6 +1152,14 @@ export const es: typeof en = {
       "Reconectá Gmail para activar la sincronización automática de correos: vamos a registrar las respuestas de tus contactos sin que tengas que hacer nada.",
     cta: "Reconectar Gmail",
     closeAria: "Cerrar aviso",
+  },
+
+  // Shell banner while Gmail is connected but not syncing (syncHealth.ts).
+  // Not dismissible on purpose: hiding an outage is how it went unnoticed.
+  syncHealthBanner: {
+    failing: "Gmail no se está sincronizando: los correos nuevos no llegan al CRM.",
+    stale: "Hace más de una hora que Gmail no se sincroniza.",
+    cta: "Ver detalle",
   },
 
   accountEmailNeverLog: {
