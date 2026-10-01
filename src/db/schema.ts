@@ -669,6 +669,11 @@ export const person = pgTable(
     companyCategory: text("company_category"),
     jobTitle: text("job_title"),
     roleGroup: text("role_group"),
+    // Migration 0034: the buying role a sales sheet assigns to this person
+    // ('BUYER-CHAMPION' | 'INFLUENCER' today). Free text in the DB,
+    // validated at the write boundary (src/lib/contacts/contactType.ts) —
+    // same convention as relationship_stage/account_type; no CHECK.
+    contactType: text("contact_type"),
     seniority: text("seniority"),
     industry: text("industry"),
     city: text("city"),
