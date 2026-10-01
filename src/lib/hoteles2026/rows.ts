@@ -22,7 +22,7 @@ const USED_HEADERS = [
 
 // ITU dial codes for the countries in this sheet; a number whose code
 // disagrees with the row's Country is flagged, never rewritten.
-const DIAL_CODE: Record<string, string> = {
+export const DIAL_CODE: Record<string, string> = {
   spain: "34", italy: "39", mexico: "52", "costa rica": "506", argentina: "54", colombia: "57",
 };
 
