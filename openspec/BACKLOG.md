@@ -197,6 +197,52 @@ Still open:
 - Admins now reach another BD's conversation through the audited modal (#232,
   #237); the standalone page was removed.
 
+### email-outbound — owner request 2026-10-01
+Owner asked for three things: send mail from the CRM, a per-BD HTML signature
+on outgoing mail, and open/engagement notifications "like HubSpot". All three
+turned out to share one root blocker, and the first one is already built.
+
+**What already exists.** `src/lib/gmail/send.ts#sendGmailMessage({ bdId, to,
+subject, body, personId })` sends through the BD's own connected Gmail account
+and is already wired to the record page's "Correo" action
+(`src/app/(app)/contacts/actions.ts:365`). `gmail.send` has been in the
+requested OAuth scope from the start — `gmail.readonly` was the later addition,
+for sync. It logs an activity via `createActivityAction`.
+
+**The blocker all three share.** `buildRawMessage` (`send.ts:20-32`) hardcodes
+`Content-Type: text/plain; charset="UTF-8"`. There is no HTML part, so there is
+nowhere to put a styled signature and nowhere to put a tracking pixel. Fixing
+this is the prerequisite for the two items below: build the message as
+`multipart/alternative` with a `text/plain` and a `text/html` part.
+
+Other gaps in the current send path, found while reading it:
+- No `In-Reply-To`/`References` headers, so a reply from the CRM starts a NEW
+  Gmail thread instead of continuing the conversation the BD is answering.
+  This also means the sync side can log it as an unrelated message.
+- Single `to` only — no CC, no BCC, no attachments.
+
+Open:
+- **HTML send.** `multipart/alternative`, with the plain-text part generated
+  from the HTML rather than hand-written twice.
+- **Per-BD signature.** The owner has an HTML signature already defined and
+  wants it appended by default, with a fallback field in the BD's own profile
+  to paste one. There is no column for it today — `bd` is only
+  (`id`, `name`, `email`, `role`). Needs a `bd.signature_html` column, a
+  profile editor, and injection into the HTML part at send time. Sanitize on
+  the way in: it is operator-supplied HTML that goes out over the BD's name.
+- **Threading.** Capture the Gmail `Message-ID` of the message being replied
+  to (the sync store already has `email_message`) and set the reply headers.
+- **Open and click tracking.** Needs the HTML part plus a public,
+  unauthenticated pixel endpoint and link rewriting. Be honest about the
+  ceiling before building it: Gmail proxies remote images through
+  `googleusercontent.com`, so it PREFETCHES them — an "open" can fire without
+  a human reading anything, and a recipient who blocks images never fires one.
+  HubSpot lives with the same imprecision. Decide up front whether an
+  approximate signal is worth a tracking pixel on mail sent over a BD's own
+  address, and what it does to deliverability.
+- **Notifications.** Where does an open surface — the contact timeline, a
+  badge, the daily digest that already exists? Not specified yet.
+
 ## Layer 3 — the pipeline nobody is using yet
 
 ### owner-reporting — shipped
@@ -494,6 +540,43 @@ a `--batch=` name.
 Merging preserves activities,
 tasks, connections and conversations, and is reversible with no time limit
 via `--revert=<runId>`.
+
+### merges dropped phone numbers — 35 contacts, data is recoverable (2026-10-01)
+Found while investigating the owner's report that the contacts list showed
+people with no phone. The filter bug was separate (see
+`fix/contacts-hasphone-filter-dropped`); this is the other half, and it is
+worse, because it is silent data loss.
+
+`person.phone` and `person.mobile_phone` are evidently NOT in `TRACKED_FIELDS`
+(`src/lib/identity/merge.ts`), so a merge never copies them onto the survivor.
+Same class as the `profileKey` finding already recorded for survivor choice.
+
+Measured against production on 2026-10-01:
+- 98 rows have `merged_into_id` set.
+- **35 survivors have no phone at all while the row merged INTO them does.**
+  Over a third of every merge performed.
+
+Examples (survivor → the number stranded on the merged-away row):
+- Tito Picón → `+54 (11) 4118 8080` / `+54 (911) 6213 0024` (owner: Cristian)
+- Mariano Ortega → `+54 9 11 4590-2294` (owner: Cristian)
+- Roberto Arón Uauy Zirinsky → `994489460` (owner: Mariel)
+- Nicolas Finelli → `+1 (954) 837-6436` (owner: Macarena)
+- Andrés Kemeny → `+56 2 2938 0805` (owner: Cristian)
+
+Two pieces of work, and they are independent:
+1. **Recover the 35.** The data is still there on the merged-away rows, so a
+   one-off backfill can restore it: for each survivor with an empty phone,
+   take the merged-away row's value. Low risk — it only ever fills a blank.
+   Needs an owner decision on precedence when several merged rows disagree.
+2. **Stop it recurring.** Add both phone columns to `TRACKED_FIELDS` so a
+   merge carries them. Then audit the REST of `person`'s columns the same way:
+   this bug was found by accident, and `profileKey` was found by accident, so
+   the real defect is that nothing asserts which columns a merge must carry.
+   A test that enumerates `person`'s columns and forces an explicit
+   carry/do-not-carry decision for each would have caught both.
+
+**Note for the 244 still-open duplicate pairs:** merging any of them today
+still loses the phone. Fix item 2 before working the queue further.
 
 ### pickEmailWinnerSide is a hand-copy, not a shared function
 `pickEmailWinnerSide` in `src/lib/identity/duplicateTiering.ts` duplicates the
