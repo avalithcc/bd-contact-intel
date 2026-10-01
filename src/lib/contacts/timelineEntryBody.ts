@@ -94,9 +94,18 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
   switch (entry.type as TimelineActivityType) {
     case "note":
       return typeof metadata.note === "string" ? metadata.note : "";
+    // Shows the subject next to the recipient, the same `subject · who` shape
+    // `reply_received` below already uses. `send.ts` has always written
+    // `metadata.subject`; it simply was not rendered, so an email a BD SENT
+    // showed strictly less than one they received. The body is not here by
+    // design — it lives in `email_message.body_text` once the Gmail sync picks
+    // the message up and backfills `metadata.emailMessageId` onto this row
+    // (src/lib/gmail/syncQueries.ts#writeSyncedMessages).
     case "email_sent": {
       const to = emailRecipientText(metadata);
-      return to ? `${l.timelineEmailSentPrefix} ${to}` : l.timelineEmailSentPrefix;
+      const subject = typeof metadata.subject === "string" && metadata.subject ? metadata.subject : null;
+      const sentTo = to ? `${l.timelineEmailSentPrefix} ${to}` : l.timelineEmailSentPrefix;
+      return subject ? `${sentTo} · ${subject}` : sentTo;
     }
     // Synced Gmail reply (email-sync brief) — same entry layout email_sent
     // uses, showing the subject and the sender address (metadata.from) from

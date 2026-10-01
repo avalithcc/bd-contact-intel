@@ -108,6 +108,37 @@ test("entryBody for 'email_sent' with metadata.to as a string[] (synced thread m
   assert.equal(body, "Email sent to jane@prospect.com, john@prospect.com");
 });
 
+// The owner sent the first real email through the CRM (2026-10-01) and the
+// timeline showed only "Correo enviado a <address>" — no subject — while a
+// RECEIVED email already showed one. `send.ts` had always written
+// `metadata.subject`; it just was not rendered.
+
+test("entryBody for 'email_sent' appends the subject after the recipient", () => {
+  const body = entryBody(
+    entry({ type: "email_sent", metadata: { to: "jane@prospect.com", subject: "Propuesta Q4" } }),
+    labels(),
+  );
+  assert.equal(body, "Email sent to jane@prospect.com · Propuesta Q4");
+});
+
+test("entryBody for 'email_sent' omits the separator when there is no subject", () => {
+  const body = entryBody(entry({ type: "email_sent", metadata: { to: "jane@prospect.com" } }), labels());
+  assert.equal(body, "Email sent to jane@prospect.com");
+});
+
+test("entryBody for 'email_sent' treats an empty-string subject as absent", () => {
+  const body = entryBody(
+    entry({ type: "email_sent", metadata: { to: "jane@prospect.com", subject: "" } }),
+    labels(),
+  );
+  assert.equal(body, "Email sent to jane@prospect.com");
+});
+
+test("entryBody for 'email_sent' renders the subject even with no recipient at all", () => {
+  const body = entryBody(entry({ type: "email_sent", metadata: { subject: "Propuesta Q4" } }), labels());
+  assert.equal(body, "Email sent to · Propuesta Q4");
+});
+
 test("entryBody for 'email_sent' with a single-address array still renders that one address", () => {
   const body = entryBody(entry({ type: "email_sent", metadata: { to: ["jane@prospect.com"] } }), labels());
   assert.equal(body, "Email sent to jane@prospect.com");
