@@ -37,17 +37,23 @@ function aliasMatchCondition(pattern: string): SQL {
   )`;
 }
 
+function textMatchCondition(text: string): SQL {
+  const pattern = `%${escapeLikeWildcards(text)}%`;
+  return or(ilike(company.displayName, pattern), ilike(company.domain, pattern), aliasMatchCondition(pattern))!;
+}
+
 function tokenCondition(token: string): SQL {
-  const pattern = `%${escapeLikeWildcards(token)}%`;
-  const textMatch = or(ilike(company.displayName, pattern), ilike(company.domain, pattern), aliasMatchCondition(pattern))!;
+  const textMatch = textMatchCondition(token);
 
   // LinkedIn routing (linkedinUrl.ts owns what a LinkedIn URL is): a URL-shaped
-  // token is normalised to the stored form and compared by equality; a bare
-  // word also matches as a slug substring. `linkedin.com/%/%slug%` keeps the
+  // token is normalised to the stored form and compared by equality OR its
+  // slug is matched by name/domain/alias (the column is empty for most
+  // companies, so a pasted URL must still find them); a bare word also
+  // matches as a slug substring. `linkedin.com/%/%slug%` keeps the
   // slug match off the `company`/`school` segment. Anything else keeps the
   // plain text search.
   const linkedin = companyLinkedinSearchTerm(token);
-  if (linkedin?.kind === "exact") return eq(company.linkedinUrl, linkedin.value);
+  if (linkedin?.kind === "exact") return or(eq(company.linkedinUrl, linkedin.value), textMatchCondition(linkedin.slug))!;
   if (linkedin?.kind === "slug") {
     return or(textMatch, ilike(company.linkedinUrl, `linkedin.com/%/%${escapeLikeWildcards(linkedin.slug)}%`))!;
   }

@@ -21,6 +21,7 @@ test("search term: a pasted full URL routes to an exact match on the normalised 
   assert.deepEqual(companyLinkedinSearchTerm("https://www.linkedin.com/company/Acme/?x=1"), {
     kind: "exact",
     value: "linkedin.com/company/acme",
+    slug: "acme",
   });
 });
 
@@ -28,7 +29,11 @@ test("search term: the routed value is exactly what the column normaliser stores
   for (const raw of ["https://es.linkedin.com/company/acme/about/", "linkedin.com/school/mit", "company/acme"]) {
     const stored = normalizeCompanyLinkedinUrl(raw);
     assert.ok(stored.ok && stored.value);
-    assert.deepEqual(companyLinkedinSearchTerm(raw), { kind: "exact", value: stored.value });
+    assert.deepEqual(companyLinkedinSearchTerm(raw), {
+      kind: "exact",
+      value: stored.value,
+      slug: stored.value.split("/")[2],
+    });
   }
 });
 
@@ -42,15 +47,28 @@ test("search term: personal profiles, other hosts, other schemes and junk are no
   }
 });
 
-test("search: a pasted full URL matches the stored value by equality, nothing else", () => {
+test("search: a pasted URL matches the column OR the slug by name/domain/alias", () => {
   const { sql: text, params } = render("https://www.linkedin.com/company/acme/?x=1");
   assert.match(text, /"linkedin_url" = \$1/);
-  assert.doesNotMatch(text, /ilike/i);
-  assert.deepEqual(params, ["linkedin.com/company/acme"]);
+  assert.deepEqual(params, ["linkedin.com/company/acme", "%acme%", "%acme%", "%acme%"]);
+});
+
+test("search: a pasted URL finds a company by name while linkedin_url is null (name branch survives)", () => {
+  const { sql: text, params } = render("https://www.linkedin.com/company/globant/about");
+  assert.match(text, /"linkedin_url" = \$1 or \("company"\."display_name" ilike \$2/i);
+  assert.match(text, /"domain" ilike \$3/i);
+  assert.match(text, /"alias_key" ilike \$4/i);
+  assert.deepEqual(params, ["linkedin.com/company/globant", "%globant%", "%globant%", "%globant%"]);
+});
+
+test("search: a pasted URL finds a company by the column when it is set (equality branch present, no ilike on the column)", () => {
+  const { sql: text } = render("https://www.linkedin.com/company/globant/about");
+  assert.match(text, /"linkedin_url" = \$1/);
+  assert.doesNotMatch(text, /"linkedin_url" ilike/i);
 });
 
 test("search: a school URL and a regional subdomain collapse to the stored form", () => {
-  assert.deepEqual(render("https://ar.linkedin.com/school/uba/").params, ["linkedin.com/school/uba"]);
+  assert.equal(render("https://ar.linkedin.com/school/uba/").params[0], "linkedin.com/school/uba");
 });
 
 test("search: a bare word still searches name/domain/alias AND the LinkedIn slug", () => {
@@ -68,7 +86,7 @@ test("search: LIKE wildcards in a slug are escaped", () => {
   assert.equal(render("a_b").params[3], "linkedin.com/%/%a\\_b%");
 });
 
-test("search: a /in/ URL falls back to the existing behaviour for that term", () => {
+test("search: a /in/ profile URL never touches the column and matches no company (whole URL as text)", () => {
   const { sql: text, params } = render("https://linkedin.com/in/jane");
   assert.doesNotMatch(text, /linkedin_url/);
   assert.deepEqual(params, Array(3).fill("%https://linkedin.com/in/jane%"));
@@ -92,6 +110,9 @@ test("search: tokens are routed independently and ANDed", () => {
     "%globant%",
     "linkedin.com/%/%globant%",
     "linkedin.com/company/globant-ar",
+    "%globant-ar%",
+    "%globant-ar%",
+    "%globant-ar%",
   ]);
 });
 

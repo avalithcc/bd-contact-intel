@@ -347,7 +347,11 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
       </div>
 
       {rows.length === 0 ? (
-        <p className="muted">{l.noResults}</p>
+        <p className="muted">
+          {linkedin === "with" && !q && !stage && !industry && !owner && !accountType && !clientStatus && view === "all"
+            ? l.noLinkedinYet
+            : l.noResults}
+        </p>
       ) : (
         <div className="table-wrap">
           <table className="data">
