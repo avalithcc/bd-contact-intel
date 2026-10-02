@@ -8,6 +8,7 @@ import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDial
 import { CompanyQuickActions, type CompanyQuickActionsLabels, type TaskAssigneeOption } from "./CompanyQuickActions";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { CLIENT_STATUSES, clientStatusLabel } from "@/lib/companies/clientStatus";
 
 const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 type Stage = (typeof STAGES)[number];
@@ -42,6 +43,10 @@ export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
       | "propCountry"
       | "propStartup"
       | "propAccountType"
+      | "propClientStatus"
+      | "clientStatusActive"
+      | "clientStatusInactive"
+      | "clientStatusNone"
       | "emptyValue"
       | "edit"
       | "ownerUnassignedOption"
@@ -83,6 +88,8 @@ export interface CompanyAboutPaneProps {
   /** Already localized ("Partner"/"Cliente"/"Organización estratégica"/"—")
    * — see `accountTypeLabel` (listMappers.ts) for the mapping. */
   accountTypeText: string;
+  /** Raw `company.client_status` (null = not stated). */
+  clientStatus: string | null;
   labels: CompanyAboutPaneLabels;
   newContactLabels: NewContactDialogLabels;
 }
@@ -144,6 +151,7 @@ export function CompanyAboutPane({
   lastEditByProperty,
   startupText,
   accountTypeText,
+  clientStatus,
   labels: l,
   newContactLabels,
 }: CompanyAboutPaneProps) {
@@ -396,6 +404,30 @@ export function CompanyAboutPane({
           <dd>{accountTypeText}</dd>
         </div>
 
+        {/* Client status — the BD's manual "this is a client, and this is how
+            it stands" statement, independent of Tipo de cuenta above (which
+            stays script-maintained and display-only). Same select-row +
+            "last updated by" hint as Responsable, so a stale claim shows
+            who set it and when. */}
+        <ClientStatusPropertyRow
+          label={l.propClientStatus}
+          value={clientStatus}
+          editing={editingProperty === "clientStatus"}
+          busy={busy}
+          error={editingProperty === "clientStatus" ? error : null}
+          hint={formatLastEdit(l, lastEditByProperty.clientStatus)}
+          labels={l}
+          onStartEdit={() => {
+            setError(null);
+            setEditingProperty("clientStatus");
+          }}
+          onCancel={() => {
+            setError(null);
+            setEditingProperty(null);
+          }}
+          onSave={(value) => saveProperty("clientStatus", value)}
+        />
+
         {error && !editingProperty && (
           <p className="error-text" role="alert">
             {error}
@@ -533,6 +565,80 @@ function OwnerPropertyRow({
       <dt>{label}</dt>
       <dd>
         {ownerName ?? l.emptyValue}
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
+          <EditPencilIcon className="icon" />
+        </button>
+      </dd>
+      {hint && <dd className="hint">{hint}</dd>}
+    </div>
+  );
+}
+
+interface ClientStatusPropertyRowProps {
+  label: string;
+  value: string | null;
+  editing: boolean;
+  busy: boolean;
+  error: string | null;
+  hint: string | null;
+  labels: CompanyAboutPaneLabels;
+  onStartEdit: () => void;
+  onCancel: () => void;
+  onSave: (value: string) => void;
+}
+
+/** Estado de cliente row — a fixed-vocabulary `<select>` (blank = not a
+ * client / not stated), same shape as `OwnerPropertyRow`. */
+function ClientStatusPropertyRow({
+  label,
+  value,
+  editing,
+  busy,
+  error,
+  hint,
+  labels: l,
+  onStartEdit,
+  onCancel,
+  onSave,
+}: ClientStatusPropertyRowProps) {
+  const [draft, setDraft] = useState(value ?? "");
+
+  if (editing) {
+    return (
+      <div className="prop">
+        <dt>{label}</dt>
+        <dd>
+          <select className="input" value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} autoFocus>
+            <option value="">{l.clientStatusNone}</option>
+            {CLIENT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {clientStatusLabel(s, l)}
+              </option>
+            ))}
+          </select>
+        </dd>
+        {error && (
+          <dd className="error-text" role="alert">
+            {error}
+          </dd>
+        )}
+        <dd className="row">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onSave(draft)} disabled={busy}>
+            {l.save}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+        </dd>
+      </div>
+    );
+  }
+
+  return (
+    <div className="prop">
+      <dt>{label}</dt>
+      <dd>
+        {clientStatusLabel(value, l)}
         <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>

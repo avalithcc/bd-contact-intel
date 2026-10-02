@@ -1064,6 +1064,18 @@ export const company = pgTable(
     // scripts/backfill-company-account-type.ts. Nullable — most companies
     // have no tracked account type yet.
     accountType: text("account_type"),
+    // Migration 0037 (company-client-status): 'active' | 'inactive' — the
+    // BD's manual statement "this company is a client, and this is how it
+    // stands today". Setting either value IS the statement that it is a
+    // client; NULL means "not stated" / not a client, and is never
+    // backfilled or derived from activity. Deliberately INDEPENDENT of
+    // `accountType` (script-maintained, not editable by hand) and of
+    // `relationshipStage` (pipeline; `won` is a historical fact that must not
+    // be overwritten): none of the three is read or written on behalf of
+    // another. Validated at the write boundary
+    // (src/lib/companies/clientStatus.ts); no CHECK, same convention as
+    // relationshipStage/accountType.
+    clientStatus: text("client_status"),
   },
   (t) => ({
     domainIdx: uniqueIndex("company_domain_idx")
