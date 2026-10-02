@@ -183,3 +183,22 @@ test("contact type exports as its Spanish label, empty as an empty cell", () => 
 test("mapContactRowToExportRow carries the stored contact type through", () => {
   assert.equal(mapContactRowToExportRow(contactListRow({ contactType: "INFLUENCER" }), "Nuevo").contactType, "INFLUENCER");
 });
+
+test("mapContactRowToExportRow: a blank phone never shadows the mobile, and the value is trimmed", () => {
+  assert.equal(
+    mapContactRowToExportRow(contactListRow({ phone: "  ", mobilePhone: " +54 9 11 4123-4567 " }), "Nuevo").phone,
+    "+54 9 11 4123-4567",
+  );
+});
+
+test("phone cells survive a spreadsheet: separators stay, bare digits are forced to text", () => {
+  const cell = (phone: string) =>
+    buildContactsCsv([row({ phone })], ["phone"], HEADERS).split("\r\n")[1]!.slice("Ana Gomez,".length);
+  // Display form (not digits-only) is exported: stripping separators would
+  // hand Excel a number. A leading `+` keeps the formula guard apostrophe
+  // because "+54-11-4123-4567" would otherwise be evaluated as arithmetic.
+  assert.equal(cell("(011) 4123-4567"), "(011) 4123-4567");
+  assert.equal(cell("+54 11 4123-4567"), "'+54 11 4123-4567");
+  // Bare digits would lose the leading zero / go scientific as a number.
+  assert.equal(cell("01141234567"), "'01141234567");
+});

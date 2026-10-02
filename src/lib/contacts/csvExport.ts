@@ -16,6 +16,7 @@
  */
 import type { ContactColumnKey } from "@/lib/contacts/columns";
 import { contactTypeLabel } from "@/lib/contacts/contactType";
+import { pickListPhone } from "@/lib/phone";
 // Type-only import (erased at build time, no `@/db` runtime dependency) —
 // keeps this module's "pure, no DB" guarantee intact.
 import type { ContactListRow } from "@/lib/contacts/listQueries";
@@ -68,6 +69,15 @@ export interface ContactExportRow {
 
 export type ContactCsvHeaders = Record<"name" | ContactColumnKey, string>;
 
+/** Exports the display form (trimmed, separators kept) — the same text the
+ * list shows. A bare-digits value would be read by Excel as a number (leading
+ * zero dropped, long values in scientific notation), so it is forced to text
+ * with the same apostrophe the formula guard uses. */
+function phoneCell(phone: string | null): string {
+  if (!phone) return "";
+  return /^[0-9]+$/.test(phone) ? `'${phone}` : phone;
+}
+
 function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
   switch (key) {
     case "company":
@@ -79,7 +89,7 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
     case "email":
       return row.email ?? "";
     case "phone":
-      return row.phone ?? "";
+      return phoneCell(row.phone);
     case "roleGroup":
       return row.roleGroup ?? "";
     case "contactType":
@@ -119,7 +129,7 @@ export function mapContactRowToExportRow(row: ContactListRow, statusLabel: strin
     ownerName: row.ownerName,
     statusLabel,
     email: row.email,
-    phone: row.phone ?? row.mobilePhone,
+    phone: pickListPhone(row.phone, row.mobilePhone),
     bdConnectionNames: row.bdConnections.title,
     lastActivityText: row.lastActivity
       ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`
