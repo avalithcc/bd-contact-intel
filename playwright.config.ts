@@ -20,7 +20,17 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // Local runs get ONE retry, not zero. `npm run dev` compiles each route on
+  // its first visit, so the first navigation to a route can outlast the
+  // spec's own navigation budget and fail a test that is perfectly healthy.
+  // Observed 2026-10-01: three consecutive runs of phase1.spec.ts, a
+  // DIFFERENT test failing each time, every failure a navigation timeout
+  // (one passing test measured 12.9s against a 15s budget), and all 11 green
+  // once the server was warm. That noise is worse than useless — it nearly
+  // got a non-existent regression reported against a just-merged PR. A
+  // single retry absorbs the cold compile without hiding anything: a real
+  // failure is deterministic and still fails both attempts.
+  retries: process.env.CI ? 2 : 1,
   workers: 1,
   reporter: 'list',
   use: {
