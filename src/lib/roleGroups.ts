@@ -129,6 +129,18 @@ const RULES: Rule[] = [
       "amministratore (?:delegato|unico)",
       "(?:miembro|vocal) del consejo de administraci[oó]n",
       "(?:membro|membra) del consiglio di amministrazione",
+      // Director-level finance = the CFO of a smaller company. Controllers
+      // ("financial controller") are intentionally NOT listed: not C-level.
+      "directora? financier[oa]",
+      "directora? de finanzas",
+      "directora? de administraci[oó]n y finanzas",
+      "(?:finance|financial) director",
+      "director of finance",
+      "direttore finanziario",
+      "direttrice finanziaria",
+      "finanzdirektor\\w*",
+      "directeur financier",
+      "directrice financi[eè]re",
     ),
   ],
   [
