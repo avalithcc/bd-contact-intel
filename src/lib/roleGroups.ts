@@ -141,12 +141,15 @@ const RULES: Rule[] = [
       "head of (?:engineering|technology|software|tech|development|it|platform|data|infrastructure)",
       // The comma form ("Director, Software Engineering") is how LinkedIn
       // renders many US titles, and without it these fall through to developers.
-      "(?:director|directora),?(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
+      "(?:director|directora),?(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|ti|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
       "engineering director",
       "technical director",
       "it director",
       "gerente de (?:tecnolog[ií]a|sistemas|desarrollo|it|ingenier[ií]a)",
       "jefe de (?:sistemas|tecnolog[ií]a|desarrollo|it)",
+      // "TI" (tecnologias de la informacion) only inside a leadership title:
+      // a bare "ti" would also match the pronoun and "Ti"-named companies.
+      "(?:gerente|jefe|jefa)(?: de)? ti",
       "it manager",
       "tech manager",
       "technology manager",
