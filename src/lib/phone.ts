@@ -49,3 +49,21 @@ export function toTelHref(raw: string): string | null {
   const digits = trimmed.replace(/[^0-9]/g, "");
   return `tel:${plus}${digits}`;
 }
+
+/**
+ * The single number the contacts list (and its CSV export) shows: `phone`
+ * first, then `mobilePhone`. The order is a PRODUCT DECISION, not an
+ * accident: it matches the record page's Teléfono-then-Móvil order, and
+ * preferring mobile is a one-line flip of the array below.
+ *
+ * Blank strings are skipped so a stray "" never shadows a real number.
+ * Malformed values are kept (shown as plain text) because the "Tiene
+ * teléfono" filter counts any non-null value — the cell must never be empty
+ * for a row that filter keeps.
+ */
+export function pickListPhone(phone: string | null, mobilePhone: string | null): string | null {
+  for (const candidate of [phone, mobilePhone]) {
+    if (candidate && candidate.trim() !== "") return formatPhoneForDisplay(candidate);
+  }
+  return null;
+}

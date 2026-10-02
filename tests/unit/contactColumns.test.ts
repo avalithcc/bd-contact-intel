@@ -75,3 +75,7 @@ test("contactType is a selectable column, OFF by default, right after status", (
   assert.equal(ALL_CONTACT_COLUMNS[ALL_CONTACT_COLUMNS.indexOf("status") + 1], "contactType");
   assert.deepEqual(resolveVisibleColumns(["contactType"]), ["contactType"]);
 });
+
+test("DEFAULT_CONTACT_COLUMNS is Empresa, Responsable, Estado, Correo, Teléfono in that order", () => {
+  assert.deepEqual([...DEFAULT_CONTACT_COLUMNS], ["company", "owner", "status", "email", "phone"]);
+});
