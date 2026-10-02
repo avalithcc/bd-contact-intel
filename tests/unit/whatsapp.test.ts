@@ -52,8 +52,25 @@ test("a glued extension makes the number invalid, so no link", () => {
   assert.deepEqual(whatsappLink("+54 11 4123-4567 214"), { url: null, reason: "unsupported" });
 });
 
-test("a doubled country code is rejected", () => {
+test("a full number with a doubled country code is rejected by length", () => {
   assert.deepEqual(whatsappLink("+54 54 11 4123-4567"), { url: null, reason: "unsupported" });
+  assert.equal(whatsappLinkFor("+54 54 9 11 5555-0142"), null);
+  assert.equal(whatsappLinkFor("+54 54 351 415 1234"), null);
+});
+
+test("KNOWN LIMIT: a doubled country code on a short number has a possible length and links", () => {
+  // Length is the only signal left once the prefix check is gone (isPossible,
+  // not isValid); "+54 54 4123 4567" reads as an Argentine number of 10 digits.
+  assert.equal(whatsappLinkFor("+54 54 4123 4567"), "https://wa.me/545441234567");
+});
+
+test("right length but a prefix outside the bundled assigned ranges still links (wa.me validates nothing)", () => {
+  assert.equal(whatsappLinkFor("+54 1 234 567 890"), "https://wa.me/541234567890");
+  assert.equal(whatsappLinkFor("+506 555 555 5555"), "https://wa.me/5065555555555");
+});
+
+test("(0) after the country code is dropped by the parser, UK and France", () => {
+  assert.equal(whatsappLinkFor("+33 (0)1 23 45 67 89"), "https://wa.me/33123456789");
 });
 
 test("too short or too long to be a real number", () => {

@@ -8,7 +8,7 @@ import { isValidPhoneFormat, type WhatsappLink } from "@/lib/phone";
  *
  * libphonenumber-js owns what a number IS: trunk prefixes (dropped where the
  * country drops them, kept in Italy), the Argentine mobile "15" -> "9"
- * conversion, length limits, extensions and a doubled country code all come
+ * conversion, length limits and extensions all come
  * from its per-country metadata, not from rules in this file. The link is
  * built from the parsed E.164 digits.
  *
@@ -17,7 +17,8 @@ import { isValidPhoneFormat, type WhatsappLink } from "@/lib/phone";
  * default country is passed to the parser: stored numbers come from Spain,
  * Italy, Mexico, the Emirates and Argentina, and guessing one would produce
  * confident wrong links.
- * `unsupported`: carries a country code but is not a valid number for it.
+ * `unsupported`: carries a country code but cannot be a number of that
+ * country (wrong length, or a doubled/garbled country code).
  *
  * Runs on the server only (the library's metadata is ~80 kB): client
  * components receive the result as a prop and re-check the URL with
@@ -35,7 +36,11 @@ export function whatsappLink(raw: string | null | undefined): WhatsappLink {
   const international = trimmed.startsWith("+") ? trimmed : trimmed.replace(/^00\s*/, "+");
   if (!international.startsWith("+")) return { url: null, reason: "no_country_code" };
   const parsed = parsePhoneNumberFromString(international);
-  if (!parsed || !parsed.isValid()) return { url: null, reason: "unsupported" };
+  // isPossible (country-specific length), NOT isValid (assigned ranges):
+  // wa.me validates nothing, and isValid refuses real numbers whose prefix is
+  // newer than the bundled metadata. The fixes (trunk 0, extension, E.164)
+  // all happen in the parse above, before any predicate runs.
+  if (!parsed || !parsed.isPossible()) return { url: null, reason: "unsupported" };
   return { url: `https://wa.me/${parsed.number.slice(1)}` };
 }
 
