@@ -1357,6 +1357,7 @@ export const es: typeof en = {
     propClientStatus: "Estado de cliente",
     clientStatusActive: "Activo",
     clientStatusInactive: "Inactivo",
+    clientStatusNone: "No es cliente",
     tabActivity: "Actividad",
     tabHiring: "Señales de contratación",
     timelineFilterAll: "Todas",

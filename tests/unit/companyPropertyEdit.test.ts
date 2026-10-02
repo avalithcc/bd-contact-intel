@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   EDITABLE_COMPANY_PROPERTIES,
+  InvalidClientStatusError,
   InvalidOwnerError,
   isEditableCompanyProperty,
   planCompanyPropertyEdit,
@@ -24,6 +25,7 @@ const BASE_COMPANY = {
   ownerBdId: null,
   city: null,
   country: null,
+  clientStatus: null,
 };
 
 test("isEditableCompanyProperty accepts only the allow-listed columns", () => {
@@ -115,5 +117,72 @@ test("planCompanyPropertyEdit is a pure function: same input twice yields the sa
     ownerBdId: null,
     city: null,
     country: null,
+    clientStatus: null,
   });
+});
+
+test("clientStatus is an editable property", () => {
+  assert.equal(isEditableCompanyProperty("clientStatus"), true);
+});
+
+test("planCompanyPropertyEdit sets clientStatus and writes a history row", () => {
+  const plan = planCompanyPropertyEdit(BASE_COMPANY, "clientStatus", " inactive ", BD_1);
+  assert.equal(plan.changed, true);
+  assert.equal(plan.companyUpdate!.clientStatus, "inactive");
+  assert.deepEqual(plan.historyRows, [
+    {
+      companyKey: "acme",
+      property: "clientStatus",
+      oldValue: null,
+      newValue: "inactive",
+      changedByBdId: BD_1,
+      source: "edit",
+    },
+  ]);
+});
+
+test("planCompanyPropertyEdit moves clientStatus between active and inactive with old and new in history", () => {
+  const plan = planCompanyPropertyEdit({ ...BASE_COMPANY, clientStatus: "active" }, "clientStatus", "inactive", BD_2);
+  assert.equal(plan.historyRows[0]!.oldValue, "active");
+  assert.equal(plan.historyRows[0]!.newValue, "inactive");
+  assert.equal(plan.historyRows[0]!.changedByBdId, BD_2);
+});
+
+test("planCompanyPropertyEdit clears clientStatus to null on a blank value (not a client)", () => {
+  const plan = planCompanyPropertyEdit({ ...BASE_COMPANY, clientStatus: "active" }, "clientStatus", "", BD_1);
+  assert.equal(plan.changed, true);
+  assert.equal(plan.companyUpdate!.clientStatus, null);
+  assert.equal(plan.historyRows[0]!.newValue, null);
+});
+
+test("planCompanyPropertyEdit reports no change when clientStatus is already that value", () => {
+  const plan = planCompanyPropertyEdit({ ...BASE_COMPANY, clientStatus: "active" }, "clientStatus", "active", BD_1);
+  assert.equal(plan.changed, false);
+  assert.deepEqual(plan.historyRows, []);
+});
+
+test("planCompanyPropertyEdit rejects a clientStatus outside the vocabulary before building a plan", () => {
+  assert.throws(
+    () => planCompanyPropertyEdit(BASE_COMPANY, "clientStatus", "dormant", BD_1),
+    InvalidClientStatusError,
+  );
+  assert.throws(
+    () => planCompanyPropertyEdit(BASE_COMPANY, "clientStatus", "Active", BD_1),
+    InvalidClientStatusError,
+  );
+});
+
+test("clientStatus edit never touches accountType or relationshipStage", () => {
+  const plan = planCompanyPropertyEdit(BASE_COMPANY, "clientStatus", "active", BD_1);
+  assert.deepEqual(Object.keys(plan.companyUpdate!).sort(), ["clientStatus", "updatedAt", "updatedByBdId"]);
+});
+
+test("planCompanyPropertyEdit does not mutate its input and is repeatable", () => {
+  const input = { ...BASE_COMPANY, clientStatus: "active" };
+  const snapshot = structuredClone(input);
+  const a = planCompanyPropertyEdit(input, "clientStatus", "inactive", BD_1);
+  const b = planCompanyPropertyEdit(input, "clientStatus", "inactive", BD_1);
+  assert.deepEqual(input, snapshot);
+  assert.deepEqual(a.historyRows, b.historyRows);
+  assert.equal(a.companyUpdate!.clientStatus, b.companyUpdate!.clientStatus);
 });

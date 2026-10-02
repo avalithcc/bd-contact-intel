@@ -13,8 +13,9 @@
  * check, since null is always a valid "no owner" state.
  */
 import type { Company, NewCompany, NewCompanyPropertyHistory } from "@/db/schema";
+import { isClientStatus } from "@/lib/companies/clientStatus";
 
-export const EDITABLE_COMPANY_PROPERTIES = ["industry", "ownerBdId", "city", "country"] as const;
+export const EDITABLE_COMPANY_PROPERTIES = ["industry", "ownerBdId", "city", "country", "clientStatus"] as const;
 
 export type EditableCompanyProperty = (typeof EDITABLE_COMPANY_PROPERTIES)[number];
 
@@ -32,6 +33,18 @@ export class InvalidOwnerError extends Error {
   constructor(public readonly reason: InvalidOwnerReason) {
     super(`Invalid owner: ${reason}`);
     this.name = "InvalidOwnerError";
+  }
+}
+
+/**
+ * Thrown by planCompanyPropertyEdit before building any plan: a client
+ * status outside the `active | inactive` vocabulary must never reach the DB
+ * (the column has no CHECK, so this is the only guard).
+ */
+export class InvalidClientStatusError extends Error {
+  constructor(public readonly value: string) {
+    super(`Invalid client status: ${value}`);
+    this.name = "InvalidClientStatusError";
   }
 }
 
@@ -86,6 +99,10 @@ export function planCompanyPropertyEdit(
 
   if (property === "ownerBdId" && newValue !== null && !context.ownerExists) {
     throw new InvalidOwnerError("unknown_bd");
+  }
+
+  if (property === "clientStatus" && newValue !== null && !isClientStatus(newValue)) {
+    throw new InvalidClientStatusError(newValue);
   }
 
   const companyUpdate: Partial<NewCompany> = {

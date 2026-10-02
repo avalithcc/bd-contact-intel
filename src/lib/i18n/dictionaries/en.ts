@@ -1399,6 +1399,7 @@ export const en = {
     propClientStatus: "Client status",
     clientStatusActive: "Active",
     clientStatusInactive: "Inactive",
+    clientStatusNone: "Not a client",
     tabActivity: "Activity",
     tabHiring: "Hiring signals",
     timelineFilterAll: "All",
