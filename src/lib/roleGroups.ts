@@ -292,7 +292,21 @@ const RULES: Rule[] = [
       "marketing",
     ),
   ],
-  ["operations", w("operations", "operaciones", "head of ops")],
+  [
+    "operations",
+    w(
+      "operations",
+      "operaciones",
+      "head of ops",
+      // Hotel guest / event operations. Qualified forms only: bare "event" or
+      // "guest" would sweep in photographers and speakers. This rule runs last,
+      // so marketing/sales/HR event managers keep their earlier group.
+      "guest (?:relations|experience|services)",
+      "directora? de (?:alojamiento|ocio|entretenimiento|eventos)",
+      "event (?:manager|director)",
+      "director of events?",
+    ),
+  ],
 ];
 
 /**

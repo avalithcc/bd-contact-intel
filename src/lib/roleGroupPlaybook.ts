@@ -165,7 +165,7 @@ export const ROLE_GROUP_PLAYBOOK: Record<RoleGroupKey, RoleGroupPlaybookEntry> =
       "Casi siempre — es el mismo tipo de rol que el propio equipo de BD de Avalith, no el cliente objetivo.",
   },
   operations: {
-    subtitle: "Operations, Head of Ops",
+    subtitle: "Operations, Head of Ops, Guest & Event Operations",
     priority: "baja",
     priorityLabel: "Baja",
     decides:
