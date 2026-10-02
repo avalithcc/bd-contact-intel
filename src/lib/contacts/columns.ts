@@ -56,6 +56,9 @@ export const DEFAULT_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "owner",
   "status",
   "email",
+  // Owner decision: BDs filter by phone, so it is visible without opening the
+  // picker. Saved views that store their own column list are unaffected.
+  "phone",
 ];
 
 function isContactColumnKey(value: unknown): value is ContactColumnKey {

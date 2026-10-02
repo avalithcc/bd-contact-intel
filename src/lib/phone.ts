@@ -51,7 +51,8 @@ export function toTelHref(raw: string): string | null {
 }
 
 /** The single number the contacts list shows: `phone` first, then
- * `mobilePhone`, skipping blank strings so a stray "" never shadows a real
+ * `mobilePhone` (PRODUCT DECISION, not an accident: it matches the record
+ * page's Teléfono-then-Móvil order; flip the array below to prefer mobile), skipping blank strings so a stray "" never shadows a real
  * number. Malformed values are kept (displayed as plain text) because the
  * "Tiene teléfono" filter counts any non-null value — the cell must never be
  * empty for a row that filter keeps. */
