@@ -23,15 +23,21 @@ const FINANCE_DIRECTOR_TITLES = [
   "Directeur financier",
 ];
 
-const CFO_TITLES = [
-  "CFO",
-  "cfo",
-  "Chief Financial Officer",
-  "CFO & Co-Founder",
-  "Interim CFO",
-  "Group CFO",
-  "CFO - Finance",
-  "Vice President and CFO",
+// Real production strings (titles only).
+const REAL_CFO_TITLES = [
+  "Gerente Financiero/a / Cfo", // x90
+  "CFO", // x27
+  "CFO - Director de Administración y Finanzas", // x3
+  "Co-Founder & CFO", // x3
+];
+
+const REAL_FINANCE_DIRECTOR_TITLES = [
+  "Director Financiero",
+  "Director of Finance",
+  "Finance Director South Cone",
+  "Directora de Administración y Finanzas",
+  "Director financiero adjunto",
+  "Sub Director de Administración y Finanzas",
 ];
 
 test("director-level finance titles classify as c_level_business", () => {
@@ -40,10 +46,30 @@ test("director-level finance titles classify as c_level_business", () => {
   }
 });
 
-test("CFO titles still classify as c_level_business", () => {
-  for (const t of CFO_TITLES) {
+test("real CFO titles still classify as c_level_business", () => {
+  for (const t of REAL_CFO_TITLES) {
     assert.equal(classifyPosition(t), "c_level_business", t);
   }
+});
+
+test("a CFO who is also CTO stays c_level_tech (earlier group wins)", () => {
+  assert.equal(classifyPosition("Co-Founder, CFO & CTO"), "c_level_tech");
+});
+
+test("real finance director titles classify as c_level_business", () => {
+  for (const t of REAL_FINANCE_DIRECTOR_TITLES) {
+    assert.equal(classifyPosition(t), "c_level_business", t);
+  }
+});
+
+test("finance + operations directors move from operations to c_level_business (intended)", () => {
+  for (const t of ["Director De Finanzas Y Operaciones", "Director Financiero Operaciones", "DIRECTOR DE FINANZAS & OPERACIONES"]) {
+    assert.equal(classifyPosition(t), "c_level_business", t);
+  }
+});
+
+test("pre-existing: VP of Finance lands in eng_leadership because the vp term matches first", () => {
+  assert.equal(classifyPosition("VP of Finance"), "eng_leadership");
 });
 
 test("controller titles are deliberately left in other", () => {

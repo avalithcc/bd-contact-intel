@@ -46,3 +46,11 @@ test("existing IT leadership terms are unchanged", () => {
   assert.equal(classifyPosition("Director of IT"), "eng_leadership");
   assert.equal(classifyPosition("Jefe de Sistemas"), "eng_leadership");
 });
+
+test("real mixed titles move into eng_leadership (from operations / project_delivery)", () => {
+  assert.equal(classifyPosition("Gerente TI & Operaciones"), "eng_leadership");
+  assert.equal(
+    classifyPosition("GERENTE DE PROYECTOS SAP, JEFE DE TI - JEFE DE PROYECTOS SAP - TRANSFORMACIÓN DIGITAL"),
+    "eng_leadership",
+  );
+});
