@@ -2,6 +2,8 @@
 
 Estado: análisis. No se modificó ningún contacto ni se tocó producción.
 
+> Corrección 2026-10-01 (revisión de `openspec/BACKLOG.md`): el hallazgo principal de abajo ("51 de 147 contactos no aparecen en la vista por defecto") quedó desactualizado por el PR #284, que hace que un contacto `BUYER-CHAMPION` nunca se oculte por su grupo de rol. De los 51 contactos `sales_bd` de hoteles, 46 son `BUYER-CHAMPION` y 5 son `INFLUENCER` (medido el 2026-10-01 en producción), así que hoy se ocultan 5, no 51. El script `report-hoteles-data-quality.ts` sigue contando solo por grupo de rol. Los demás números (15 teléfonos, 51 en `other`) se volvieron a medir y coinciden.
+
 Este documento no incluye nombres ni números de teléfono, porque el repositorio no debe guardar datos personales (misma regla que la importación). Cada fila se identifica por su número en la planilla `para_llamar_hoteles.csv` (fila 1 = primer contacto, sin contar el encabezado). Para ver nombres y números, ejecutar el script con `--detalle` (ver el final).
 
 ## Resumen para decidir
