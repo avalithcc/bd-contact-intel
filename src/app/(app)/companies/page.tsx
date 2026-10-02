@@ -13,6 +13,7 @@ import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { accountTypeLabel, industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
 import { ACCOUNT_TYPES, isAccountType, type AccountType } from "@/lib/companies/accountTypeFilter";
+import { CLIENT_STATUSES, clientStatusLabel, isClientStatus, type ClientStatus } from "@/lib/companies/clientStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ interface CompaniesPageProps {
     industry?: string;
     owner?: string;
     accountType?: string;
+    clientStatus?: string;
     q?: string;
   }>;
 }
@@ -60,6 +62,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const industry = sp.industry || undefined;
   const owner = sp.owner || undefined;
   const accountType: AccountType | undefined = isAccountType(sp.accountType) ? sp.accountType : undefined;
+  const clientStatus: ClientStatus | undefined = isClientStatus(sp.clientStatus) ? sp.clientStatus : undefined;
   // Text search (owner report 2026-09-30: "no tengo buscador de empresas") —
   // trimmed here once so every consumer below (the two list reads, every
   // href builder) agrees on what counts as "no search term".
@@ -71,7 +74,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const hiringIndex = await getHiringMatchIndex();
 
   const [{ rows, total, totalPages }, viewCounts, filterOptions, ownerOptions] = await Promise.all([
-    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType, q),
+    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType, q, clientStatus),
     getCompanyViewCounts(me.id, hiringIndex, q),
     getCompanyFilterOptions(),
     listOwnerOptions(),
@@ -86,6 +89,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     if (industry) params.set("industry", industry);
     if (owner) params.set("owner", owner);
     if (accountType) params.set("accountType", accountType);
+    if (clientStatus) params.set("clientStatus", clientStatus);
     if (q) params.set("q", q);
     return params;
   }
@@ -118,7 +122,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     }
   }
 
-  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType" | "q"): string {
+  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType" | "clientStatus" | "q"): string {
     const params = baseParams();
     params.delete(key);
     params.set("view", view);
@@ -131,6 +135,10 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
 
   function accountTypeLabelFor(value: AccountType): string {
     return accountTypeLabel(value, dict.companyRecord);
+  }
+
+  function clientStatusLabelFor(value: ClientStatus): string {
+    return clientStatusLabel(value, dict.companyRecord);
   }
 
   return (
@@ -224,6 +232,17 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
             </Link>
           </span>
         )}
+        {/* Estado de cliente chip — same conditional-chip pattern as Tipo de
+            cuenta above. Independent of it: usable with or without an
+            account-type or stage filter. */}
+        {clientStatus && (
+          <span className="chip">
+            <span className="k">{l.filterClientStatusLabel}</span> {clientStatusLabelFor(clientStatus)}
+            <Link href={clearFilterHref("clientStatus")} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          </span>
+        )}
         <details className="dropdown">
           <summary className="chip chip-add">{l.addFilter}</summary>
           <form method="get" action="/companies" className="menu">
@@ -269,6 +288,17 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                 {ACCOUNT_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {accountTypeLabelFor(t)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="menu-item">
+              {l.filterClientStatusLabel}
+              <select name="clientStatus" defaultValue={clientStatus ?? ""}>
+                <option value="">{l.filterClientStatusAny}</option>
+                {CLIENT_STATUSES.map((v) => (
+                  <option key={v} value={v}>
+                    {clientStatusLabelFor(v)}
                   </option>
                 ))}
               </select>

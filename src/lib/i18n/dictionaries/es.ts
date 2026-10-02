@@ -1969,6 +1969,8 @@ export const es: typeof en = {
     filterOwnerAny: "Cualquiera",
     filterAccountTypeLabel: "Tipo de cuenta:",
     filterAccountTypeAny: "Cualquiera",
+    filterClientStatusLabel: "Estado de cliente:",
+    filterClientStatusAny: "Cualquiera",
     stageProspect: "Prospecto",
     stageQualified: "Calificada",
     stageProposalSent: "Propuesta enviada",

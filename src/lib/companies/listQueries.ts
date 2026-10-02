@@ -2,7 +2,9 @@ import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, bd, company, person } from "@/db/schema";
-import { accountTypeCondition, type AccountType } from "@/lib/companies/accountTypeFilter";
+import type { AccountType } from "@/lib/companies/accountTypeFilter";
+import type { ClientStatus } from "@/lib/companies/clientStatus";
+import { companyListConditions } from "@/lib/companies/listConditions";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
@@ -76,6 +78,10 @@ export interface CompanyListPage {
  * added speculatively (PERFORMANCE.md: round trips are the budget, not
  * every column needing its own index).
  *
+ * `clientStatusFilter` is the same shape (equality on `company.client_status`,
+ * no index, folded into the same two queries). The conditions are assembled by
+ * `companyListConditions` (listConditions.ts) so their composition is tested.
+ *
  * `q` (owner report 2026-09-30: "no tengo buscador de empresas") is folded
  * into this SAME `conditions[]` array — the total count query and the page
  * query below therefore always agree on which rows match, same as every
@@ -95,16 +101,18 @@ export async function getCompanyListPage(
   ownerFilter?: string,
   accountTypeFilter?: AccountType,
   q?: string,
+  clientStatusFilter?: ClientStatus,
 ): Promise<CompanyListPage> {
-  const conditions: SQL[] = [];
-  if (stage) conditions.push(eq(company.relationshipStage, stage));
-  if (view === "mine") conditions.push(eq(company.ownerBdId, meBdId));
-  if (industryFilter) conditions.push(eq(company.industry, industryFilter));
-  if (ownerFilter) conditions.push(eq(company.ownerBdId, ownerFilter));
-  const accountTypeWhere = accountTypeCondition(accountTypeFilter);
-  if (accountTypeWhere) conditions.push(accountTypeWhere);
-  const searchWhere = companySearchCondition(q);
-  if (searchWhere) conditions.push(searchWhere);
+  const conditions = companyListConditions({
+    view,
+    meBdId,
+    stage,
+    industry: industryFilter,
+    owner: ownerFilter,
+    accountType: accountTypeFilter,
+    clientStatus: clientStatusFilter,
+    q,
+  });
 
   let hiringKeys: string[] | null = null;
   if (view === "hiring") {

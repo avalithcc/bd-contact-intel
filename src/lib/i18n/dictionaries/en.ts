@@ -2002,6 +2002,8 @@ export const en = {
     filterOwnerAny: "Any",
     filterAccountTypeLabel: "Account type:",
     filterAccountTypeAny: "Any",
+    filterClientStatusLabel: "Client status:",
+    filterClientStatusAny: "Any",
     stageProspect: "Prospect",
     stageQualified: "Qualified",
     stageProposalSent: "Proposal sent",
