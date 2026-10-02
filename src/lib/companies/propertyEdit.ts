@@ -14,8 +14,9 @@
  */
 import type { Company, NewCompany, NewCompanyPropertyHistory } from "@/db/schema";
 import { isClientStatus } from "@/lib/companies/clientStatus";
+import { InvalidCompanyLinkedinUrlError, normalizeCompanyLinkedinUrl } from "@/lib/companies/linkedinUrl";
 
-export const EDITABLE_COMPANY_PROPERTIES = ["industry", "ownerBdId", "city", "country", "clientStatus"] as const;
+export const EDITABLE_COMPANY_PROPERTIES = ["industry", "ownerBdId", "city", "country", "clientStatus", "linkedinUrl"] as const;
 
 export type EditableCompanyProperty = (typeof EDITABLE_COMPANY_PROPERTIES)[number];
 
@@ -90,7 +91,15 @@ export function planCompanyPropertyEdit(
   context: PlanCompanyPropertyEditContext = {},
 ): CompanyPropertyEditPlan {
   const trimmed = rawNewValue.trim();
-  const newValue = trimmed === "" ? null : trimmed;
+  let newValue = trimmed === "" ? null : trimmed;
+  // linkedinUrl is compared in its stored form, so re-pasting the same page
+  // in another shape (www, query string, trailing slash) is a no-op, and a
+  // rejected value throws before anything else can run.
+  if (property === "linkedinUrl" && newValue !== null) {
+    const result = normalizeCompanyLinkedinUrl(newValue);
+    if (!result.ok) throw new InvalidCompanyLinkedinUrlError(result.reason, newValue);
+    newValue = result.value;
+  }
   const oldValue = companyRow[property] ?? null;
 
   if (oldValue === newValue) {
