@@ -20,6 +20,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { emailMessage } from "@/db/schema";
+import type { ReplySourceMessage } from "@/lib/gmail/replyThread";
 
 export interface ThreadMessageBody {
   gmailMessageId: string;
@@ -27,34 +28,70 @@ export interface ThreadMessageBody {
   bodyTruncated: boolean;
 }
 
-export async function getThreadMessageBodies(
+/** Same scoping for every read of one thread (see the file doc comment). */
+function threadScope(bdId: string, personId: string, gmailThreadId: string) {
+  return and(
+    eq(emailMessage.bdId, bdId),
+    eq(emailMessage.gmailThreadId, gmailThreadId),
+    // Literal table-qualified SQL text, not `${emailMessage.id}`
+    // interpolation — PERFORMANCE.md's documented Drizzle 0.36.4 gotcha:
+    // `email_message` is already bare-interpolated once as this query's
+    // own `.from()` target, so reusing its `id` column via `${}`
+    // interpolation inside this NESTED correlated subquery would risk
+    // Drizzle silently re-emitting an earlier unqualified rendering.
+    sql`exists (
+      select 1 from email_message_person
+      where email_message_person.email_message_id = email_message.id
+        and email_message_person.person_id = ${personId}::uuid
+    )`,
+  );
+}
+
+const replySourceColumns = {
+  gmailThreadId: emailMessage.gmailThreadId,
+  direction: emailMessage.direction,
+  fromAddress: emailMessage.fromAddress,
+  toAddresses: emailMessage.toAddresses,
+  subject: emailMessage.subject,
+  sentAt: emailMessage.sentAt,
+  rfcMessageId: emailMessage.rfcMessageId,
+  rfcReferences: emailMessage.rfcReferences,
+};
+
+/**
+ * ONE read for an expanded thread: the bodies to render plus the fields the
+ * reply planner needs, so offering "Responder" costs no extra round trip.
+ */
+export async function getThreadForDisplay(
   bdId: string,
   personId: string,
   gmailThreadId: string,
-): Promise<ThreadMessageBody[]> {
-  return db
+): Promise<{ bodies: ThreadMessageBody[]; replySource: ReplySourceMessage[] }> {
+  const rows = await db
     .select({
       gmailMessageId: emailMessage.gmailMessageId,
       bodyText: emailMessage.bodyText,
       bodyTruncated: emailMessage.bodyTruncated,
+      ...replySourceColumns,
     })
     .from(emailMessage)
-    .where(
-      and(
-        eq(emailMessage.bdId, bdId),
-        eq(emailMessage.gmailThreadId, gmailThreadId),
-        // Literal table-qualified SQL text, not `${emailMessage.id}`
-        // interpolation — PERFORMANCE.md's documented Drizzle 0.36.4 gotcha:
-        // `email_message` is already bare-interpolated once as this query's
-        // own `.from()` target, so reusing its `id` column via `${}`
-        // interpolation inside this NESTED correlated subquery would risk
-        // Drizzle silently re-emitting an earlier unqualified rendering.
-        sql`exists (
-          select 1 from email_message_person
-          where email_message_person.email_message_id = email_message.id
-            and email_message_person.person_id = ${personId}::uuid
-        )`,
-      ),
-    )
+    .where(threadScope(bdId, personId, gmailThreadId))
+    .orderBy(emailMessage.sentAt);
+  return {
+    bodies: rows.map((r) => ({ gmailMessageId: r.gmailMessageId, bodyText: r.bodyText, bodyTruncated: r.bodyTruncated })),
+    replySource: rows,
+  };
+}
+
+/** The send-side read: no bodies, re-derives the reply from what is stored (never from the client). */
+export async function getThreadReplySource(
+  bdId: string,
+  personId: string,
+  gmailThreadId: string,
+): Promise<ReplySourceMessage[]> {
+  return db
+    .select(replySourceColumns)
+    .from(emailMessage)
+    .where(threadScope(bdId, personId, gmailThreadId))
     .orderBy(emailMessage.sentAt);
 }

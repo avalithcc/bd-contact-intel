@@ -16,7 +16,7 @@ import {
   type TimelinePillKey,
 } from "@/lib/activity/timelinePills";
 import { isRequestCurrent } from "@/lib/activity/requestGeneration";
-import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
 import {
@@ -57,7 +57,11 @@ import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
 import { AdminConversationFlow } from "./AdminConversationFlow";
 import { canShowAdminConversationAction } from "@/lib/activity/adminConversationAccess";
-import { getTimelinePillEntriesAction } from "../actions";
+import { getTimelinePillEntriesAction, sendThreadReplyAction } from "../actions";
+import { contactActionErrorHref } from "../actionErrors";
+import { ReplyDialog, type ReplyDialogError } from "./ReplyDialog";
+import type { ReplyView } from "@/lib/gmail/replyThread";
+import { replyUnavailableCopyKey } from "@/lib/gmail/replyCopy";
 import { getThreadBodiesAction } from "./threadActions";
 import type { ThreadMessageBody } from "@/lib/gmail/threadMessages";
 import styles from "./page.module.css";
@@ -346,6 +350,12 @@ export function Timeline({
   const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null);
   const [threadBodies, setThreadBodies] = useState<Record<string, Record<string, ThreadMessageBody>>>({});
   const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
+  // "Responder": what the server says about replying to each loaded thread
+  // (it rides on the same read as the bodies), and the open dialog's state.
+  const [threadReplies, setThreadReplies] = useState<Record<string, ReplyView>>({});
+  const [replyingThreadId, setReplyingThreadId] = useState<string | null>(null);
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [replyError, setReplyError] = useState<ReplyDialogError | null>(null);
   const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
   // Admin's "Ver conversación (queda registrado)" action (admin-conversation-
   // access mockup, screen 1) — one AdminConversationFlow instance shared by
@@ -366,6 +376,31 @@ export function Timeline({
     });
   }
 
+  function closeReply() {
+    setReplyingThreadId(null);
+    setReplyError(null);
+  }
+
+  async function submitReply(threadId: string, body: string) {
+    setReplyBusy(true);
+    setReplyError(null);
+    const result = await sendThreadReplyAction(personId, threadId, body);
+    setReplyBusy(false);
+    if (result.ok) {
+      closeReply();
+      // Drop the cached thread: it no longer includes the message just sent.
+      setExpandedThreadId(null);
+      setThreadBodies((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => id !== threadId)));
+      setThreadReplies((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => id !== threadId)));
+      showToast(l.toastReplySent);
+      router.refresh();
+      return;
+    }
+    const message = contactActionErrorMessage(l, result.reason);
+    setReplyError({ message, href: contactActionErrorHref(result.reason) });
+    showToast(message, "error");
+  }
+
   function toggleThread(threadId: string) {
     if (expandedThreadId === threadId) {
       setExpandedThreadId(null);
@@ -383,6 +418,7 @@ export function Timeline({
         }
         const byGmailMessageId = Object.fromEntries(result.messages.map((m) => [m.gmailMessageId, m]));
         setThreadBodies((prev) => ({ ...prev, [threadId]: byGmailMessageId }));
+        setThreadReplies((prev) => ({ ...prev, [threadId]: result.reply }));
       })
       .catch(() => {
         setLoadingThreadId(null);
@@ -882,6 +918,33 @@ export function Timeline({
   }
 
   /**
+   * "Responder" under an expanded thread. Honest about threads it cannot
+   * answer properly: one synced before Message-IDs were stored has nothing to
+   * put in In-Reply-To, and a "reply" without it would start a new thread in
+   * the recipient's mailbox, so the action is disabled with the reason rather
+   * than offered and sent wrong.
+   */
+  function renderReplyAction(threadId: string) {
+    const reply = threadReplies[threadId];
+    if (!reply) return null;
+    return (
+      <div className="mt-md">
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={!reply.ok}
+          title={reply.ok ? undefined : l[replyUnavailableCopyKey(reply.reason)]}
+          onClick={() => setReplyingThreadId(threadId)}
+        >
+          <MailIcon className="icon" />
+          {l.timelineReplyAction}
+        </button>
+        {!reply.ok && <p className="meta mt-2xs">{l[replyUnavailableCopyKey(reply.reason)]}</p>}
+      </div>
+    );
+  }
+
+  /**
    * The "Correos" pill's thread card (email-sync.html:151-187). Collapsed
    * by default — the intro line + "Ver en Gmail" are always visible, but
    * the per-message list (and its bodies) is only fetched once the BD
@@ -960,6 +1023,7 @@ export function Timeline({
                     const body = gmailMessageId ? bodiesForThread?.[gmailMessageId] : undefined;
                     return renderThreadMessage(m, body, isLoadingThread);
                   })}
+                  {!isLoadingThread && renderReplyAction(threadId)}
                 </div>
               )}
             </>
@@ -1243,6 +1307,17 @@ export function Timeline({
         </>
       )}
 
+      {replyingThreadId && threadReplies[replyingThreadId]?.ok === true && (
+        <ReplyDialog
+          labels={l}
+          to={(threadReplies[replyingThreadId] as Extract<ReplyView, { ok: true }>).to}
+          subject={(threadReplies[replyingThreadId] as Extract<ReplyView, { ok: true }>).subject}
+          busy={replyBusy}
+          error={replyError}
+          onCancel={closeReply}
+          onSubmit={(body) => submitReply(replyingThreadId, body)}
+        />
+      )}
       {pendingAdminView && (
         <AdminConversationFlow
           key={pendingAdminView.bdId}

@@ -1322,6 +1322,12 @@ export const emailMessage = pgTable(
     bodyText: text("body_text"),
     bodyTruncated: boolean("body_truncated").notNull().default(false),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+    // RFC 5322 `Message-ID` header (not the Gmail API id) and the raw
+    // `References` header. A reply needs both to thread in the recipient's
+    // mailbox (`In-Reply-To` / `References`). NULL on rows synced before
+    // 0036 and on the rare message with no Message-ID.
+    rfcMessageId: text("rfc_message_id"),
+    rfcReferences: text("rfc_references"),
     // The single address that produced `personId`'s match (mirrors that
     // person's row in email_message_person).
     matchedEmail: text("matched_email").notNull(),

@@ -8,17 +8,20 @@
  */
 import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
-import { getThreadMessageBodies, type ThreadMessageBody } from "@/lib/gmail/threadMessages";
+import { getThreadForDisplay, type ThreadMessageBody } from "@/lib/gmail/threadMessages";
+import { logUnsafeReplyHeader, planThreadReply, replyView, type ReplyView } from "@/lib/gmail/replyThread";
 import { isUuid } from "@/lib/uuid";
 
-export type GetThreadBodiesResult = { ok: true; messages: ThreadMessageBody[] } | { ok: false };
+export type GetThreadBodiesResult = { ok: true; messages: ThreadMessageBody[]; reply: ReplyView } | { ok: false };
 
 export async function getThreadBodiesAction(personId: string, gmailThreadId: string): Promise<GetThreadBodiesResult> {
   try {
     if (!isUuid(personId) || !gmailThreadId) return { ok: false };
     const me = await getCurrentBd();
-    const messages = await getThreadMessageBodies(me.id, personId, gmailThreadId);
-    return { ok: true, messages };
+    const { bodies, replySource } = await getThreadForDisplay(me.id, personId, gmailThreadId);
+    const plan = planThreadReply(replySource);
+    if (!plan.ok && plan.reason === "unsafe_header") logUnsafeReplyHeader(me.id, personId, gmailThreadId);
+    return { ok: true, messages: bodies, reply: replyView(plan) };
   } catch (err) {
     unstable_rethrow(err);
     console.error("[contacts] getThreadBodiesAction failed", err);

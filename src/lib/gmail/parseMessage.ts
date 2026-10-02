@@ -41,6 +41,11 @@ export interface ParsedGmailMessage {
   bodyText: string | null;
   bodyTruncated: boolean;
   sentAt: Date;
+  // RFC 5322 `Message-ID` (e.g. `<CA+abc@mail.gmail.com>`), NOT the Gmail API
+  // id. A reply's `In-Reply-To` needs it. Null when the message has none.
+  rfcMessageId: string | null;
+  // Raw `References` header (space-separated ids, oldest first); null when absent.
+  references: string | null;
 }
 
 function decodeBase64Url(data: string): string {
@@ -86,5 +91,7 @@ export function parseGmailMessage(message: GmailApiMessage): ParsedGmailMessage 
     bodyText,
     bodyTruncated,
     sentAt: new Date(Number(message.internalDate)),
+    rfcMessageId: findHeader(headers, "Message-ID").trim() || null,
+    references: findHeader(headers, "References").trim() || null,
   };
 }

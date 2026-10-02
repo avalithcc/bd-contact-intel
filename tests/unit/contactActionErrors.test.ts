@@ -5,6 +5,7 @@
  * client instead of a typed reason the UI can render in Spanish).
  */
 import assert from "node:assert/strict";
+import { assertSafeHeaderValue } from "@/lib/gmail/rawMessage";
 import { test } from "node:test";
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
@@ -68,6 +69,20 @@ test("maps GmailSendError('not_configured'|'temporary'|'send_failed') to 'gmail_
 
 test("maps GmailSendError('invalid_header') to 'invalid_email'", () => {
   assert.equal(contactActionErrorReason(new GmailSendError("invalid_header", "x")), "invalid_email");
+});
+
+test("invalid_header on a threading header maps to 'reply_unsafe_header', not to the email-address copy", () => {
+  assert.equal(contactActionErrorReason(new GmailSendError("invalid_header", "x", "In-Reply-To")), "reply_unsafe_header");
+  assert.equal(contactActionErrorReason(new GmailSendError("invalid_header", "x", "References")), "reply_unsafe_header");
+  assert.equal(contactActionErrorReason(new GmailSendError("invalid_header", "x", "To")), "invalid_email");
+  assert.equal(contactActionErrorReason(new GmailSendError("invalid_header", "x", "From")), "invalid_email");
+});
+
+test("assertSafeHeaderValue records WHICH header was rejected", () => {
+  assert.throws(
+    () => assertSafeHeaderValue("References", "<a@x>\r\n"),
+    (e: unknown) => e instanceof GmailSendError && e.header === "References",
+  );
 });
 
 test("contactActionErrorHref points reconnect reasons at /account/email", () => {

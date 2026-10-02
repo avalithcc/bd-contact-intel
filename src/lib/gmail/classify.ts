@@ -72,6 +72,10 @@ export interface ClassifiedMessage {
   bodyText: string | null;
   bodyTruncated: boolean;
   sentAt: Date;
+  /** RFC `Message-ID` header (not the Gmail API id); null when the message had none. */
+  rfcMessageId: string | null;
+  /** Raw `References` header; null when absent. */
+  references: string | null;
   /** Every CRM person this message matches, never-log already applied. Empty means "do not store". */
   matches: ClassifiedMatch[];
   /** True when this gmailMessageId already has an `email_sent` activity from src/lib/gmail/send.ts. */
@@ -188,6 +192,8 @@ export function classifyGmailMessage(input: ClassifyGmailMessageInput): Classifi
     bodyText: message.bodyText,
     bodyTruncated: message.bodyTruncated,
     sentAt: message.sentAt,
+    rfcMessageId: message.rfcMessageId,
+    references: message.references,
     matches,
     isPlatformSent: input.platformSentGmailMessageIds?.has(message.gmailMessageId) ?? false,
   };

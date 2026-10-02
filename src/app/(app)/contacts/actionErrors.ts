@@ -37,6 +37,13 @@ export type ContactActionErrorReason =
   | "gmail_not_connected"
   | "gmail_reauth"
   | "gmail_unavailable"
+  // The thread cannot be answered as a real reply (no stored Message-ID, no
+  // recipient): see planThreadReply. Never "send it as a new email" instead.
+  | "reply_unavailable"
+  // A stored Message-ID/References carries CR/LF/NUL: not a normal gap, a
+  // possible header-injection attempt or corrupt data. Logged; see
+  // logUnsafeReplyHeader.
+  | "reply_unsafe_header"
   | "discard_reason_required"
   | "discard_note_required"
   | "meeting_date_required"
@@ -104,9 +111,14 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof GmailSendError) {
     if (err.kind === "not_connected") return "gmail_not_connected";
     if (err.kind === "reauth_required") return "gmail_reauth";
-    // A recipient with control characters is a bad stored address: reuse the
-    // existing "invalid email" message rather than a generic outage.
-    if (err.kind === "invalid_header") return "invalid_email";
+    if (err.kind === "invalid_header") {
+      // A threading header is not an address: do not tell the BD their
+      // recipient's email is wrong.
+      if (err.header === "In-Reply-To" || err.header === "References") return "reply_unsafe_header";
+      // A recipient with control characters is a bad stored address: reuse
+      // the existing "invalid email" message rather than a generic outage.
+      return "invalid_email";
+    }
     return "gmail_unavailable";
   }
   if (err instanceof DiscardReasonRequiredError) return "discard_reason_required";
