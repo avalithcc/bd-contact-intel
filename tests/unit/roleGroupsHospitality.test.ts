@@ -72,3 +72,30 @@ test("existing general-management terms are unchanged", () => {
   assert.equal(classifyPosition("General Manager"), "c_level_business");
   assert.equal(classifyPosition("Gerente General"), "c_level_business");
 });
+
+// Interaction cases found in review. Each assertion pins CURRENT behavior so a
+// future vocabulary change is a conscious decision, not an accident.
+test("pinned: a qualified title that now contains 'director general' moves to c_level_business", () => {
+  // Was eng_leadership before the vocabulary change ("jefe de sistemas").
+  assert.equal(classifyPosition("Jefe de sistemas, director general"), "c_level_business");
+});
+
+test("pinned: sales titles around 'hotel' keep their group", () => {
+  assert.equal(classifyPosition("Hotel Sales Manager"), "sales_bd");
+});
+
+test("pinned: over-promotion of assistant/trainee hotel manager into a visible group", () => {
+  assert.equal(classifyPosition("Assistant Hotel Manager"), "c_level_business");
+  assert.equal(classifyPosition("Hotel Manager Trainee"), "c_level_business");
+});
+
+test("pinned: 'inhaber' as a prefix word promotes, compounds do not", () => {
+  assert.equal(classifyPosition("Inhaber Software Entwickler"), "c_level_business");
+  assert.equal(classifyPosition("Mitinhaber"), "other");
+  assert.equal(classifyPosition("Geschäftsinhaber"), "other");
+});
+
+test("pinned: conservative under-capture of bare 'direttore' with punctuation or qualifier", () => {
+  assert.equal(classifyPosition("Direttore."), "other");
+  assert.equal(classifyPosition("Direttore, Hotel"), "other");
+});
