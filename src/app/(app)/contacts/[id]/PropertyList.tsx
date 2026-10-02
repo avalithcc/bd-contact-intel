@@ -13,7 +13,8 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon } from "@/components/icons";
-import { toTelHref } from "@/lib/phone";
+import { toTelHref, whatsappLinkFor } from "@/lib/phone";
+import { PhoneValue } from "@/components/PhoneValue";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 
@@ -381,8 +382,8 @@ function PropertyRow({
     <div className="prop">
       <dt>{prop.label}</dt>
       <dd>
-        {telHref ? (
-          <a href={telHref}>{prop.value}</a>
+        {isPhoneProp && prop.value ? (
+          <PhoneValue value={prop.value} labels={l} />
         ) : prop.key === "contactType" ? (
           contactTypeLabel(prop.value, l.emptyValue)
         ) : (
@@ -427,6 +428,7 @@ function PropertyRow({
           <EditPencilIcon className="icon" />
         </button>
       </dd>
+      {telHref && !whatsappLinkFor(prop.value) && <dd className="hint">{l.whatsappNoCountryCodeHint}</dd>}
       {hunterHint ? (
         <dd className="hint">{hunterHint}</dd>
       ) : (

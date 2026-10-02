@@ -781,6 +781,10 @@ export const es: typeof en = {
     timelineCallDefault: "Llamada registrada.",
     timelineDiscardedDefault: "Contacto descartado.",
     verifiedBadge: "Verificado",
+    whatsappTitle: "Abrir WhatsApp con este número",
+    whatsappLabelPrefix: "Abrir WhatsApp con",
+    whatsappNoCountryCodeHint: "Sin código de país no se puede armar el enlace de WhatsApp.",
+    phoneUnrecognizedTitle: "Formato no reconocido: se muestra como texto",
     // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — never
     // shown alongside verifiedBadge, since email_status can only be one of
     // 'verified'/'probable'/'none' at a time.
@@ -1871,6 +1875,9 @@ export const es: typeof en = {
     emailProbable: "Probable",
     emailNone: "Sin correo",
     phoneNone: "Sin teléfono",
+    whatsappTitle: "Abrir WhatsApp con este número",
+    whatsappLabelPrefix: "Abrir WhatsApp con",
+    phoneUnrecognizedTitle: "Formato no reconocido: se muestra como texto",
     ownerNone: "—",
     noResults: "Ningún contacto coincide con esta vista.",
     showingRange: (from, to, total) => `Mostrando ${from}–${to} de ${total}`,
