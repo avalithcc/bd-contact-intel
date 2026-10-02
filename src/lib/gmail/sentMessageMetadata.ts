@@ -9,6 +9,7 @@
  * payload without a usable date) resolves to `null` and the caller writes a
  * row with null rfc columns for the sync to fill later.
  */
+import { needsReconnectForSync } from "./needsReconnectForSync";
 import { parseGmailMessage, type GmailApiMessage } from "./parseMessage";
 
 export interface SentMessageMetadata {
@@ -41,4 +42,22 @@ export async function fetchSentMessageMetadata(
   } catch {
     return null;
   }
+}
+
+/**
+ * `messages.get` needs `gmail.readonly`; an account that lacks it (the legacy
+ * send-only connection `needsReconnectForSync` detects) would get a 403 after
+ * paying the whole timeout on every send, and the sync skips such accounts, so
+ * nothing could ever fill the Message-ID. Skip the call without touching the
+ * network. The caller still stores the row (body and timeline entry), with a
+ * null Message-ID.
+ */
+export async function readSentMessageMetadata(input: {
+  grantedScopes: string | null | undefined;
+  accessToken: string;
+  gmailMessageId: string;
+  fetchImpl?: typeof fetch;
+}): Promise<SentMessageMetadata | null> {
+  if (needsReconnectForSync(input.grantedScopes)) return null;
+  return fetchSentMessageMetadata(input.accessToken, input.gmailMessageId, input.fetchImpl);
 }

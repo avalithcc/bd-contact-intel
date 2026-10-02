@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fetchSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
+import { fetchSentMessageMetadata, readSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
 
 function okFetch(body: unknown, capture?: { url?: string }): typeof fetch {
   return (async (url: string | URL | Request) => {
@@ -55,4 +55,24 @@ test("a payload without a Message-ID still returns the sentAt, with null rfc fie
 test("an unparseable internalDate resolves to null sentAt-less metadata (null overall)", async () => {
   const result = await fetchSentMessageMetadata("t", "gm-1", okFetch({ id: "gm-1", threadId: "gt-1", payload: { headers: [] } }));
   assert.equal(result, null);
+});
+
+const READONLY = "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly";
+const goodBody = { id: "gm-1", threadId: "gt-1", internalDate: "1790000000000", payload: { headers: [{ name: "Message-ID", value: "<a@x>" }] } };
+
+test("an account without gmail.readonly never calls Gmail for the read-back", async () => {
+  let calls = 0;
+  const f = (async () => {
+    calls++;
+    return new Response(JSON.stringify(goodBody), { status: 200 });
+  }) as typeof fetch;
+  for (const scopes of ["https://www.googleapis.com/auth/gmail.send", null, undefined, ""]) {
+    assert.equal(await readSentMessageMetadata({ grantedScopes: scopes, accessToken: "t", gmailMessageId: "gm-1", fetchImpl: f }), null);
+  }
+  assert.equal(calls, 0);
+});
+
+test("an account with gmail.readonly does the read-back", async () => {
+  const result = await readSentMessageMetadata({ grantedScopes: READONLY, accessToken: "t", gmailMessageId: "gm-1", fetchImpl: okFetch(goodBody) });
+  assert.equal(result?.rfcMessageId, "<a@x>");
 });

@@ -6,7 +6,7 @@ import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { revalidatePath } from "next/cache";
 import { recordSentEmail } from "@/lib/gmail/sentEmailQueries";
-import { fetchSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
+import { readSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
 import { assertSafeHeaderValue, buildSendPayload, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
 
 // Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
@@ -137,7 +137,11 @@ export async function sendGmailMessage(input: SendGmailInput) {
 
   // One metadata read for the Message-ID Gmail assigned (needed by "Responder").
   // Null on any failure — never fails the send; the sync fills the column later.
-  const metadata = await fetchSentMessageMetadata(access_token, sent.id);
+  const metadata = await readSentMessageMetadata({
+    grantedScopes: account.grantedScopes,
+    accessToken: access_token,
+    gmailMessageId: sent.id,
+  });
 
   await recordSentEmail({
     bdId,
