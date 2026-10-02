@@ -9,7 +9,8 @@ import { CompanyQuickActions, type CompanyQuickActionsLabels, type TaskAssigneeO
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { CLIENT_STATUSES, clientStatusLabel } from "@/lib/companies/clientStatus";
-import { companyLinkedinUrlHref, linkedinUrlErrorMessage } from "@/lib/companies/linkedinUrl";
+import { companyLinkedinUrlHref } from "@/lib/companies/linkedinUrl";
+import { propertyEditFailureMessage } from "@/lib/companies/propertyEditFailure";
 
 const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 type Stage = (typeof STAGES)[number];
@@ -55,6 +56,9 @@ export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
       | "linkedinErrorPersonalProfile"
       | "linkedinErrorInvalidPath"
       | "linkedinErrorUnparseable"
+      | "editErrorClientStatus"
+      | "editErrorOwner"
+      | "editErrorCompanyNotFound"
       | "emptyValue"
       | "edit"
       | "ownerUnassignedOption"
@@ -210,7 +214,7 @@ export function CompanyAboutPane({
     try {
       const result = await updateCompanyPropertyAction(companyKey, property, value);
       if (!result.ok) {
-        setError(linkedinUrlErrorMessage(result.reason, l));
+        setError(propertyEditFailureMessage(result.failure, l));
         return;
       }
       setEditingProperty(null);
@@ -714,6 +718,14 @@ function LinkedinPropertyRow({
 }: LinkedinPropertyRowProps) {
   const [draft, setDraft] = useState(value ?? "");
 
+  // The stored form differs from what was pasted, so seed the draft from the
+  // stored value every time editing starts (a cancelled edit leaves nothing
+  // behind, and a saved one reopens as the normalised value).
+  function startEdit() {
+    setDraft(value ?? "");
+    onStartEdit();
+  }
+
   if (editing) {
     return (
       <div className="prop">
@@ -758,7 +770,7 @@ function LinkedinPropertyRow({
         ) : (
           (value ?? l.emptyValue)
         )}
-        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={startEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
       </dd>

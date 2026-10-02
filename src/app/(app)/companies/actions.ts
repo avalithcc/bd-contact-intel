@@ -14,7 +14,7 @@ import {
   isEditableCompanyProperty,
   type EditableCompanyProperty,
 } from "@/lib/companies/propertyEdit";
-import { InvalidCompanyLinkedinUrlError, type LinkedinUrlRejection } from "@/lib/companies/linkedinUrl";
+import { propertyEditFailureOf, type PropertyEditFailure } from "@/lib/companies/propertyEditFailure";
 import { getCompanyTimeline } from "@/lib/companies/recordQueries";
 import { isCompanyActivityFilter } from "@/lib/companies/recordMappers";
 import { buildCompanyTimelineViewRows, type CompanyTimelineViewRow } from "@/lib/companies/timelineView";
@@ -71,15 +71,17 @@ export async function updateCompanyAction(
  * and `updateCompanyProperty` re-validates `ownerBdId` against real `bd`
  * rows before writing.
  *
- * A rejected LinkedIn URL is returned as `{ ok: false, reason }` rather than
+ * A typed, user-correctable failure (bad LinkedIn URL, client status, owner,
+ * company not found) is returned as `{ ok: false, failure }` rather than
  * thrown: Next.js replaces a thrown server-action message with a generic one
- * in production, which would hide the reason from the BD.
+ * in production, which would hide the reason from the BD. Anything else is
+ * rethrown so a real bug still fails loudly.
  */
 export async function updateCompanyPropertyAction(
   companyKey: string,
   property: string,
   rawNewValue: string,
-): Promise<{ ok: true; company: Company } | { ok: false; reason: LinkedinUrlRejection }> {
+): Promise<{ ok: true; company: Company } | { ok: false; failure: PropertyEditFailure }> {
   if (!isEditableCompanyProperty(property)) {
     throw new Error(`Property not editable: ${property}`);
   }
@@ -89,7 +91,8 @@ export async function updateCompanyPropertyAction(
   try {
     company = await updateCompanyProperty(companyKey, property as EditableCompanyProperty, rawNewValue, me.id);
   } catch (err) {
-    if (err instanceof InvalidCompanyLinkedinUrlError) return { ok: false, reason: err.reason };
+    const failure = propertyEditFailureOf(err);
+    if (failure) return { ok: false, failure };
     throw err;
   }
 
