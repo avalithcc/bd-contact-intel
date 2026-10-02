@@ -1785,6 +1785,39 @@ export const en = {
     showingRange: (from: number, to: number, total: number) => `Showing ${from}-${to} of ${total}`,
   },
 
+  rfcBackfill: {
+    eyebrow: "Admin · Gmail",
+    title: "message-id backfill",
+    subtitle: "Messages synced before reply-to-thread have no Message-ID, so Reply is disabled on their threads.",
+    pendingTitle: "Pending messages",
+    pendingTotal: (total: number) => `${total} message(s) without a Message-ID`,
+    nonePending: "No pending messages. Every synced message already has a Message-ID.",
+    permanentNote:
+      "Messages deleted from Gmail or without a Message-ID header stay pending permanently; a non-zero count is not a failure.",
+    colBd: "BD",
+    colPending: "Pending",
+    runTitle: "Run a batch",
+    runNote: (max: number) =>
+      `Reads the newest pending messages from Gmail (read-only, up to ${max} per run) and fills their Message-ID. Safe to repeat: filled messages are never touched again. If a run stops making progress, raise the limit.`,
+    limitLabel: "Messages per run",
+    runButton: "Run one batch",
+    resultTitle: "Last run",
+    resultCandidates: "Messages selected",
+    resultUpdated: "Updated",
+    resultNotFound: "Not found in Gmail",
+    resultNoHeader: "Without a Message-ID header",
+    resultSkippedRows: "Skipped (mailbox not processed)",
+    resultSkippedBds: "Skipped mailboxes",
+    resultRemaining: "Still pending",
+    skipReasons: {
+      no_account: "Gmail not connected",
+      account_lookup_failed: "Account lookup failed",
+      token_decrypt_failed: "Token could not be decrypted",
+      token_refresh_failed: "Token refresh failed",
+      fetch_failed: "Gmail read failed",
+    },
+  },
+
   // `/contacts` list (task 12.2-12.4; contact-list spec). System view labels
   // for src/lib/contacts/views.ts#SYSTEM_VIEWS — a BD-created saved view's
   // name is stored as free text in the DB and rendered as-is, not looked up
