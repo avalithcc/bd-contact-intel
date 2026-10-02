@@ -21,6 +21,8 @@
  * trusted only if it can only hold company pages.
  */
 
+import type { Dictionary } from "@/lib/i18n/dictionaries";
+
 export type LinkedinUrlRejection = "not_linkedin" | "personal_profile" | "invalid_path" | "unparseable";
 
 export type LinkedinUrlResult =
@@ -84,4 +86,26 @@ export class InvalidCompanyLinkedinUrlError extends Error {
  * is not in the stored form (never builds a link from arbitrary text). */
 export function companyLinkedinUrlHref(stored: string | null): string | null {
   return stored && STORED_FORM.test(stored) ? `https://${stored}` : null;
+}
+
+export type LinkedinUrlErrorLabels = Pick<
+  Dictionary["companyRecord"],
+  | "linkedinErrorNotLinkedin"
+  | "linkedinErrorPersonalProfile"
+  | "linkedinErrorInvalidPath"
+  | "linkedinErrorUnparseable"
+>;
+
+/** The user-facing message for a rejection reason. */
+export function linkedinUrlErrorMessage(reason: LinkedinUrlRejection, l: LinkedinUrlErrorLabels): string {
+  switch (reason) {
+    case "not_linkedin":
+      return l.linkedinErrorNotLinkedin;
+    case "personal_profile":
+      return l.linkedinErrorPersonalProfile;
+    case "invalid_path":
+      return l.linkedinErrorInvalidPath;
+    case "unparseable":
+      return l.linkedinErrorUnparseable;
+  }
 }

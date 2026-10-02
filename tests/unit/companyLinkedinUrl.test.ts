@@ -6,9 +6,12 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
 import { normalizeProfileKey } from "@/lib/csv";
 import {
   companyLinkedinUrlHref,
+  linkedinUrlErrorMessage,
   normalizeCompanyLinkedinUrl,
   type LinkedinUrlResult,
 } from "@/lib/companies/linkedinUrl";
@@ -126,4 +129,14 @@ test("companyLinkedinUrlHref rebuilds an https link from the stored form and ref
   assert.equal(companyLinkedinUrlHref(null), null);
   assert.equal(companyLinkedinUrlHref("javascript:alert(1)"), null);
   assert.equal(companyLinkedinUrlHref("https://evil.io/x"), null);
+});
+
+test("every rejection reason has its own message in both languages", () => {
+  const reasons = ["not_linkedin", "personal_profile", "invalid_path", "unparseable"] as const;
+  for (const dict of [es.companyRecord, en.companyRecord]) {
+    const messages = reasons.map((r) => linkedinUrlErrorMessage(r, dict));
+    assert.equal(new Set(messages).size, reasons.length);
+    for (const m of messages) assert.ok(m.length > 10);
+  }
+  assert.match(linkedinUrlErrorMessage("personal_profile", es.companyRecord), /perfil personal/);
 });
