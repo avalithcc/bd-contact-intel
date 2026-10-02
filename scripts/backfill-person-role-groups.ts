@@ -22,6 +22,18 @@
  * counts and the filter are what matters. `person.updated_at` is left alone
  * because role_group is a derived cache.
  *
+ * Human edits are respected: a person with a `person_property_history` row
+ * (property 'roleGroup', source 'edit') is never touched, in dry run or
+ * execute, and is counted. Derived sources (merge, migration, import) keep
+ * being recomputed.
+ *
+ * The dry run and the execute summary also report (a) rows NEWLY HIDDEN by
+ * the default contacts view (moving into a hidden group from a visible one,
+ * NULL counting as visible, BUYER-CHAMPION excluded), per owner BD, evaluated
+ * with the real roleGroupVisibilityCondition so it cannot drift from the rule;
+ * (b) the `(null) -> *` total: classifying a NULL row destroys the "never
+ * classified" marker and a revert cannot restore it; (c) the human-edit skips.
+ *
  * Idempotent: a second run finds no differing row and reports zero
  * transitions (and writes nothing, no audit row).
  *
@@ -37,8 +49,10 @@
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog } from "../src/db/schema";
+import { resolveRoleVisibility, roleGroupVisibilityCondition } from "../src/lib/contacts/roleVisibility";
 import {
   planRoleGroupPage,
+  type RoleGroupChange,
   summarizeTally,
   type PersonRoleGroupRow,
   type RoleGroupTally,
@@ -64,27 +78,73 @@ function parseArgs(argv: string[]) {
 
 type Executor = Pick<typeof db, "execute">;
 
+const UNASSIGNED = "(unassigned)";
+const HIDDEN_GROUPS = resolveRoleVisibility(undefined, undefined).hiddenRoleGroups;
+
+/**
+ * Rows moving into a default-hidden group from a visible state. Both states
+ * are evaluated by the production visibility condition: it is rendered inside
+ * a one-row subquery aliased `person`, so its column references resolve.
+ */
+async function newlyHiddenOwners(ex: Executor, changes: RoleGroupChange[]): Promise<Record<string, number>> {
+  const cond = roleGroupVisibilityCondition(HIDDEN_GROUPS);
+  const candidates = changes.filter((c) => (HIDDEN_GROUPS as readonly string[]).includes(c.roleGroup));
+  const out: Record<string, number> = {};
+  if (!cond || candidates.length === 0) return out;
+  const tuples = sql.join(
+    candidates.map((c) => sql`(${c.id}::uuid, ${c.from}::text, ${c.roleGroup}::text, ${c.contactType}::text, ${c.ownerBdId}::text)`),
+    sql`, `,
+  );
+  const rows = await ex.execute<{ owner: string | null }>(sql`
+    select v.owner as owner
+    from (values ${tuples}) as v(id, old_group, new_group, contact_type, owner)
+    where coalesce((select ${cond} from (select v.old_group as role_group, v.contact_type as contact_type) as person), false)
+      and not coalesce((select ${cond} from (select v.new_group as role_group, v.contact_type as contact_type) as person), false)
+  `);
+  for (const r of rows) out[r.owner ?? UNASSIGNED] = (out[r.owner ?? UNASSIGNED] ?? 0) + 1;
+  return out;
+}
+
 async function fetchPage(ex: Executor, lastId: string | null, sourceKey: string | null): Promise<PersonRoleGroupRow[]> {
   const conditions: SQL[] = [sql`merged_into_id is null`];
   if (lastId !== null) conditions.push(sql`id > ${lastId}::uuid`);
   if (sourceKey !== null) conditions.push(sql`source_key = ${sourceKey}`);
-  const rows = await ex.execute<{ id: string; job_title: string | null; role_group: string | null }>(sql`
-    select id::text as id, job_title, role_group
+  const rows = await ex.execute<{
+    id: string;
+    job_title: string | null;
+    role_group: string | null;
+    owner: string | null;
+    contact_type: string | null;
+    human_edited: boolean;
+  }>(sql`
+    select id::text as id, job_title, role_group, owner_bd_id::text as owner, contact_type,
+      exists (
+        select 1 from person_property_history h
+        where h.person_id = person.id and h.property = 'roleGroup' and h.source = 'edit'
+      ) as human_edited
     from person
     where ${sql.join(conditions, sql` and `)}
     order by id
     limit ${BATCH_SIZE}
   `);
-  return rows.map((r) => ({ id: r.id, jobTitle: r.job_title, roleGroup: r.role_group }));
+  return rows.map((r) => ({
+    id: r.id,
+    jobTitle: r.job_title,
+    roleGroup: r.role_group,
+    ownerBdId: r.owner,
+    contactType: r.contact_type,
+    humanEdited: r.human_edited === true,
+  }));
 }
 
 /** Walks the whole scope; `onChanges` receives the rows to update per page. */
 async function scan(
   ex: Executor,
   sourceKey: string | null,
-  onChanges: (changes: { id: string; roleGroup: string }[]) => Promise<void>,
-): Promise<{ tally: RoleGroupTally; total: number; changed: number }> {
-  const tally: RoleGroupTally = { before: {}, after: {}, transitions: {} };
+  onChanges: (changes: RoleGroupChange[]) => Promise<void>,
+): Promise<ScanResult> {
+  const tally: RoleGroupTally = { before: {}, after: {}, transitions: {}, skippedHumanEdits: 0 };
+  const newlyHidden: Record<string, number> = {};
   let lastId: string | null = null;
   let total = 0;
   let changed = 0;
@@ -92,15 +152,34 @@ async function scan(
     const page = await fetchPage(ex, lastId, sourceKey);
     if (page.length === 0) break;
     const changes = planRoleGroupPage(page, tally);
-    if (changes.length > 0) await onChanges(changes);
+    if (changes.length > 0) {
+      for (const [owner, n] of Object.entries(await newlyHiddenOwners(ex, changes))) newlyHidden[owner] = (newlyHidden[owner] ?? 0) + n;
+      await onChanges(changes);
+    }
     total += page.length;
     changed += changes.length;
     lastId = page[page.length - 1].id;
   }
-  return { tally, total, changed };
+  return { tally, total, changed, newlyHidden };
 }
 
-function print(label: string, scope: string, result: { tally: RoleGroupTally; total: number; changed: number }) {
+interface ScanResult {
+  tally: RoleGroupTally;
+  total: number;
+  changed: number;
+  newlyHidden: Record<string, number>;
+}
+
+async function ownerNames(ex: Executor, ids: string[]): Promise<Record<string, string>> {
+  const real = ids.filter((i) => i !== UNASSIGNED);
+  if (real.length === 0) return {};
+  const rows = await ex.execute<{ id: string; name: string }>(sql`
+    select id::text as id, name from bd where id::text in (${sql.join(real.map((i) => sql`${i}`), sql`, `)})
+  `);
+  return Object.fromEntries(rows.map((r) => [r.id, r.name]));
+}
+
+async function print(ex: Executor, label: string, scope: string, result: ScanResult) {
   const s = summarizeTally(result.tally);
   console.log(`\n=== ${label} (${scope}): ${result.total} persons, ${result.changed} would change ===`);
   console.log("Current distribution:");
@@ -110,6 +189,18 @@ function print(label: string, scope: string, result: { tally: RoleGroupTally; to
   console.log("Transitions:");
   if (s.transitions.length === 0) console.log("  (none)");
   for (const r of s.transitions) console.log(`  ${String(r.count).padStart(6)}  ${r.transition}`);
+
+  const hiddenTotal = Object.values(result.newlyHidden).reduce((a, b) => a + b, 0);
+  console.log(`\nNewly hidden by default (into ${HIDDEN_GROUPS.join("/")} from a visible group, BUYER-CHAMPION excluded): ${hiddenTotal}`);
+  const names = await ownerNames(ex, Object.keys(result.newlyHidden));
+  for (const [owner, n] of Object.entries(result.newlyHidden).sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${String(n).padStart(6)}  ${owner === UNASSIGNED ? UNASSIGNED : `${names[owner] ?? "?"} (${owner})`}`);
+  }
+  console.log(`\n(null) -> * total: ${s.nullClassified}`);
+  if (s.nullClassified > 0) {
+    console.log("  WARNING: classifying a NULL row destroys the 'never classified' marker; a revert cannot restore NULL.");
+  }
+  console.log(`\nSkipped, human-edited role group: ${s.skippedHumanEdits}`);
 }
 
 async function main() {
@@ -118,7 +209,7 @@ async function main() {
 
   if (!execute) {
     const result = await scan(db, sourceKey, async () => {});
-    print("DRY RUN", scope, result);
+    await print(db, "DRY RUN", scope, result);
     console.log("\nDry run: nothing written. Re-run with --execute --actor=<bd id> to apply.");
     return;
   }
@@ -137,12 +228,20 @@ async function main() {
       await tx.insert(auditLog).values({
         actorBdId: actor!,
         action: AUDIT_ACTION,
-        metadata: { filter: { sourceKey }, scanned: r.total, updated: r.changed, transitions: summarizeTally(r.tally).transitions },
+        metadata: {
+          filter: { sourceKey },
+          scanned: r.total,
+          updated: r.changed,
+          skippedHumanEdits: r.tally.skippedHumanEdits,
+          nullClassified: summarizeTally(r.tally).nullClassified,
+          newlyHiddenByOwner: r.newlyHidden,
+          transitions: summarizeTally(r.tally).transitions,
+        },
       });
     }
     return r;
   });
-  print("EXECUTED", scope, result);
+  await print(db, "EXECUTED", scope, result);
   console.log(result.changed > 0 ? `\nUpdated ${result.changed} person(s) and wrote 1 audit_log row.` : "\nNothing to update.");
 }
 
