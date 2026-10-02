@@ -271,7 +271,7 @@ export const en = {
     contactsLabel: "Search contacts",
     contactsPlaceholder: "Search contacts by name, company or email",
     companiesLabel: "Search companies",
-    companiesPlaceholder: "Search companies by name or domain",
+    companiesPlaceholder: "Search companies by name, domain or LinkedIn",
   },
 
   home: {
@@ -2022,6 +2022,11 @@ export const en = {
     filterAccountTypeAny: "Any",
     filterClientStatusLabel: "Client status:",
     filterClientStatusAny: "Any",
+    filterLinkedinLabel: "LinkedIn:",
+    filterLinkedinAny: "Any",
+    filterLinkedinWith: "With page",
+    filterLinkedinWithout: "Without page",
+    noLinkedinYet: "No company has a LinkedIn page yet.",
     stageProspect: "Prospect",
     stageQualified: "Qualified",
     stageProposalSent: "Proposal sent",

@@ -30,6 +30,9 @@ export type LinkedinUrlResult =
   | { ok: false; reason: LinkedinUrlRejection };
 
 const BARE_SLUG = /^[\p{L}\p{N}_%-]+$/u;
+/** The ONE definition of "this text is URL-shaped, not a bare word": a dot,
+ * slash or colon. Shared by the normaliser and the search routing. */
+const URL_SHAPED = /[./:]/;
 const SCHEME = /^([a-z][a-z0-9+.-]*):(?!\d)/i;
 const STORED_FORM = /^linkedin\.com\/(company|school)\/[^\s/]+$/;
 
@@ -49,7 +52,7 @@ export function normalizeCompanyLinkedinUrl(raw: string): LinkedinUrlResult {
   if (!scheme) {
     if (/^(company|school|in)\//i.test(text)) {
       candidate = `linkedin.com/${text}`;
-    } else if (!/[./:]/.test(text)) {
+    } else if (!URL_SHAPED.test(text)) {
       if (!BARE_SLUG.test(text)) return reject("unparseable");
       candidate = `linkedin.com/company/${text}`;
     }
@@ -69,6 +72,30 @@ export function normalizeCompanyLinkedinUrl(raw: string): LinkedinUrlResult {
   if (kind === "in") return reject("personal_profile");
   if ((kind !== "company" && kind !== "school") || !slug) return reject("invalid_path");
   return { ok: true, value: `linkedin.com/${kind}/${slug}` };
+}
+
+export type LinkedinSearchTerm =
+  | { kind: "exact"; value: string; slug: string }
+  | { kind: "slug"; slug: string }
+  | null;
+
+/**
+ * How one whitespace-free search token relates to the stored LinkedIn form.
+ * Goes through `normalizeCompanyLinkedinUrl`, so a pasted URL becomes exactly
+ * the value the column holds.
+ *  - `exact`: the token is URL-shaped and normalises to a company/school page
+ *    -> equality against the column; `slug` is carried too so the caller can
+ *    still match by name while the column is empty.
+ *  - `slug`: a bare word -> substring of the slug, alongside the normal
+ *    name/domain search.
+ *  - `null`: not a LinkedIn term (other host, `/in/` profile, junk, blank) ->
+ *    the caller keeps the existing search for that token.
+ */
+export function companyLinkedinSearchTerm(token: string): LinkedinSearchTerm {
+  const result = normalizeCompanyLinkedinUrl(token);
+  if (!result.ok || !result.value) return null;
+  const slug = result.value.split("/")[2];
+  return URL_SHAPED.test(token) ? { kind: "exact", value: result.value, slug } : { kind: "slug", slug };
 }
 
 /** Thrown by planCompanyPropertyEdit before building any plan. */

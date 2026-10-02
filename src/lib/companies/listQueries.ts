@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { activity, bd, company, person } from "@/db/schema";
 import type { AccountType } from "@/lib/companies/accountTypeFilter";
 import type { ClientStatus } from "@/lib/companies/clientStatus";
+import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { companyListConditions } from "@/lib/companies/listConditions";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
@@ -82,6 +83,9 @@ export interface CompanyListPage {
  * no index, folded into the same two queries). The conditions are assembled by
  * `companyListConditions` (listConditions.ts) so their composition is tested.
  *
+ * `linkedinFilter` (any / with / without) is `IS [NOT] NULL` on `linkedin_url`,
+ * same shape, same two queries, no index.
+ *
  * `q` (owner report 2026-09-30: "no tengo buscador de empresas") is folded
  * into this SAME `conditions[]` array — the total count query and the page
  * query below therefore always agree on which rows match, same as every
@@ -102,6 +106,7 @@ export async function getCompanyListPage(
   accountTypeFilter?: AccountType,
   q?: string,
   clientStatusFilter?: ClientStatus,
+  linkedinFilter?: LinkedinPresence,
 ): Promise<CompanyListPage> {
   const conditions = companyListConditions({
     view,
@@ -111,6 +116,7 @@ export async function getCompanyListPage(
     owner: ownerFilter,
     accountType: accountTypeFilter,
     clientStatus: clientStatusFilter,
+    linkedin: linkedinFilter,
     q,
   });
 

@@ -1,5 +1,6 @@
-import { and, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { company, companyAlias } from "@/db/schema";
+import { companyLinkedinSearchTerm } from "@/lib/companies/linkedinUrl";
 
 /**
  * `/companies` text search ("q") — owner report: "no tengo buscador de
@@ -36,9 +37,27 @@ function aliasMatchCondition(pattern: string): SQL {
   )`;
 }
 
-function tokenCondition(token: string): SQL {
-  const pattern = `%${escapeLikeWildcards(token)}%`;
+function textMatchCondition(text: string): SQL {
+  const pattern = `%${escapeLikeWildcards(text)}%`;
   return or(ilike(company.displayName, pattern), ilike(company.domain, pattern), aliasMatchCondition(pattern))!;
+}
+
+function tokenCondition(token: string): SQL {
+  const textMatch = textMatchCondition(token);
+
+  // LinkedIn routing (linkedinUrl.ts owns what a LinkedIn URL is): a URL-shaped
+  // token is normalised to the stored form and compared by equality OR its
+  // slug is matched by name/domain/alias (the column is empty for most
+  // companies, so a pasted URL must still find them); a bare word also
+  // matches as a slug substring. `linkedin.com/%/%slug%` keeps the
+  // slug match off the `company`/`school` segment. Anything else keeps the
+  // plain text search.
+  const linkedin = companyLinkedinSearchTerm(token);
+  if (linkedin?.kind === "exact") return or(eq(company.linkedinUrl, linkedin.value), textMatchCondition(linkedin.slug))!;
+  if (linkedin?.kind === "slug") {
+    return or(textMatch, ilike(company.linkedinUrl, `linkedin.com/%/%${escapeLikeWildcards(linkedin.slug)}%`))!;
+  }
+  return textMatch;
 }
 
 /** `undefined` in (nothing to filter on), `undefined` out (no condition to

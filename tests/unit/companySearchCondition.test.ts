@@ -32,7 +32,7 @@ test("companySearchCondition: a single token matches display_name, domain or a c
   // EXISTS, never a JOIN against company_alias — a company with several
   // matching aliases must still produce exactly one row.
   assert.doesNotMatch(text, /join "company_alias"/i);
-  assert.deepEqual(params, ["%nubiral%", "%nubiral%", "%nubiral%"]);
+  assert.deepEqual(params, ["%nubiral%", "%nubiral%", "%nubiral%", "linkedin.com/%/%nubiral%"]);
 });
 
 test("companySearchCondition: wildcard characters in the term are escaped before going into the LIKE pattern", () => {
@@ -45,12 +45,12 @@ test("companySearchCondition: multiple whitespace-separated tokens are ANDed tog
   const condition = companySearchCondition("acme corp");
   const { sql: text, params } = dialect.sqlToQuery(sql`select 1 from ${company} where ${condition}`);
   assert.match(text, /\$1.*and.*\$4/is);
-  assert.deepEqual(params, ["%acme%", "%acme%", "%acme%", "%corp%", "%corp%", "%corp%"]);
+  assert.deepEqual(params, ["%acme%", "%acme%", "%acme%", "linkedin.com/%/%acme%", "%corp%", "%corp%", "%corp%", "linkedin.com/%/%corp%"]);
 });
 
 test("companySearchCondition: caps at 5 tokens (MAX_SEARCH_TOKENS, matching the /contacts convention)", () => {
   const condition = companySearchCondition("a b c d e f g");
   const { params } = dialect.sqlToQuery(sql`select 1 from ${company} where ${condition}`);
-  // 6 params per token (3 fields x 2 uses... actually 3 params per token: displayName, domain, alias)
-  assert.equal(params.length, 5 * 3);
+  // 4 params per bare token: displayName, domain, alias, LinkedIn slug.
+  assert.equal(params.length, 5 * 4);
 });

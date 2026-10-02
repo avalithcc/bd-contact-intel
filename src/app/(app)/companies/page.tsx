@@ -13,6 +13,7 @@ import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { accountTypeLabel, industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
 import { ACCOUNT_TYPES, isAccountType, type AccountType } from "@/lib/companies/accountTypeFilter";
+import { LINKEDIN_PRESENCES, isLinkedinPresence, linkedinPresenceLabel, type LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { CLIENT_STATUSES, clientStatusLabel, isClientStatus, type ClientStatus } from "@/lib/companies/clientStatus";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ interface CompaniesPageProps {
     owner?: string;
     accountType?: string;
     clientStatus?: string;
+    linkedin?: string;
     q?: string;
   }>;
 }
@@ -63,6 +65,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const owner = sp.owner || undefined;
   const accountType: AccountType | undefined = isAccountType(sp.accountType) ? sp.accountType : undefined;
   const clientStatus: ClientStatus | undefined = isClientStatus(sp.clientStatus) ? sp.clientStatus : undefined;
+  const linkedin: LinkedinPresence | undefined = isLinkedinPresence(sp.linkedin) ? sp.linkedin : undefined;
   // Text search (owner report 2026-09-30: "no tengo buscador de empresas") —
   // trimmed here once so every consumer below (the two list reads, every
   // href builder) agrees on what counts as "no search term".
@@ -74,7 +77,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const hiringIndex = await getHiringMatchIndex();
 
   const [{ rows, total, totalPages }, viewCounts, filterOptions, ownerOptions] = await Promise.all([
-    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType, q, clientStatus),
+    getCompanyListPage(view, stage, me.id, hiringIndex, page, PAGE_SIZE, industry, owner, accountType, q, clientStatus, linkedin),
     getCompanyViewCounts(me.id, hiringIndex, q),
     getCompanyFilterOptions(),
     listOwnerOptions(),
@@ -90,6 +93,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     if (owner) params.set("owner", owner);
     if (accountType) params.set("accountType", accountType);
     if (clientStatus) params.set("clientStatus", clientStatus);
+    if (linkedin) params.set("linkedin", linkedin);
     if (q) params.set("q", q);
     return params;
   }
@@ -122,7 +126,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     }
   }
 
-  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType" | "clientStatus" | "q"): string {
+  function clearFilterHref(key: "stage" | "industry" | "owner" | "accountType" | "clientStatus" | "linkedin" | "q"): string {
     const params = baseParams();
     params.delete(key);
     params.set("view", view);
@@ -139,6 +143,10 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
 
   function clientStatusLabelFor(value: ClientStatus): string {
     return clientStatusLabel(value, dict.companyRecord);
+  }
+
+  function linkedinLabelFor(value: LinkedinPresence): string {
+    return linkedinPresenceLabel(value, l);
   }
 
   return (
@@ -243,6 +251,15 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
             </Link>
           </span>
         )}
+        {/* LinkedIn chip — same conditional-chip pattern as Estado de cliente. */}
+        {linkedin && (
+          <span className="chip">
+            <span className="k">{l.filterLinkedinLabel}</span> {linkedinLabelFor(linkedin)}
+            <Link href={clearFilterHref("linkedin")} aria-label={l.removeFilter}>
+              ×
+            </Link>
+          </span>
+        )}
         <details className="dropdown">
           <summary className="chip chip-add">{l.addFilter}</summary>
           <form method="get" action="/companies" className="menu">
@@ -303,6 +320,17 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                 ))}
               </select>
             </label>
+            <label className="menu-item">
+              {l.filterLinkedinLabel}
+              <select name="linkedin" defaultValue={linkedin ?? ""}>
+                <option value="">{l.filterLinkedinAny}</option>
+                {LINKEDIN_PRESENCES.map((v) => (
+                  <option key={v} value={v}>
+                    {linkedinLabelFor(v)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button type="submit" className="btn btn-primary btn-sm">
               {l.applyFilter}
             </button>
@@ -319,7 +347,11 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
       </div>
 
       {rows.length === 0 ? (
-        <p className="muted">{l.noResults}</p>
+        <p className="muted">
+          {linkedin === "with" && !q && !stage && !industry && !owner && !accountType && !clientStatus && view === "all"
+            ? l.noLinkedinYet
+            : l.noResults}
+        </p>
       ) : (
         <div className="table-wrap">
           <table className="data">

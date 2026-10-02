@@ -257,7 +257,7 @@ export const es: typeof en = {
     contactsLabel: "Buscar contactos",
     contactsPlaceholder: "Buscar contactos por nombre, empresa o correo electrónico",
     companiesLabel: "Buscar empresas",
-    companiesPlaceholder: "Buscar empresas por nombre o dominio",
+    companiesPlaceholder: "Buscar empresas por nombre, dominio o LinkedIn",
   },
 
   home: {
@@ -1989,6 +1989,11 @@ export const es: typeof en = {
     filterAccountTypeAny: "Cualquiera",
     filterClientStatusLabel: "Estado de cliente:",
     filterClientStatusAny: "Cualquiera",
+    filterLinkedinLabel: "LinkedIn:",
+    filterLinkedinAny: "Cualquiera",
+    filterLinkedinWith: "Con página",
+    filterLinkedinWithout: "Sin página",
+    noLinkedinYet: "Todavía ninguna empresa tiene página de LinkedIn.",
     stageProspect: "Prospecto",
     stageQualified: "Calificada",
     stageProposalSent: "Propuesta enviada",
