@@ -61,6 +61,32 @@ test("revenue assurance (telecom audit/finance) is not hotel revenue management"
   assert.equal(classifyPosition("Gerente de Revenue Assurance"), "other");
 });
 
+test("non-hotel 'revenue' leadership titles stay out of hospitality_revenue", () => {
+  // Comma and Ops forms: RevOps is a SaaS function, so it follows operations.
+  assert.equal(classifyPosition("Director of Revenue, Operations"), "operations");
+  assert.equal(classifyPosition("Head of Revenue Ops"), "other");
+  // SaaS / healthcare "revenue" functions fall to the group they had before.
+  assert.equal(classifyPosition("Head of Revenue Growth"), "other");
+  assert.equal(classifyPosition("Director of Revenue Cycle"), "other");
+  assert.equal(classifyPosition("Head of Revenue Enablement"), "other");
+  assert.equal(classifyPosition("Director of Revenue Marketing"), "sales_bd");
+});
+
+test("hotel 'revenue' leadership forms with a hotel qualifier or suffix still match", () => {
+  for (const t of [
+    "Head of Revenue",
+    "Head of Revenue - Hotel Maya",
+    "Director of Revenue | Resorts",
+    "Directora Revenue & Distribution",
+    "Director de Revenue y Reservas",
+    "Head of Revenue and Distribution",
+    "Director of Revenue at Hilton",
+    "Director de Revenue en Meliá",
+  ]) {
+    assert.equal(classifyPosition(t), "hospitality_revenue", t);
+  }
+});
+
 test("bare 'reservas' is deliberately NOT a term", () => {
   assert.equal(classifyPosition("Agente De Reservas"), "other");
   assert.equal(classifyPosition("Banco de Reservas"), "other");

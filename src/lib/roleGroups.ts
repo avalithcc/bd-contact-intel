@@ -268,9 +268,14 @@ const RULES: Rule[] = [
       // from the groups above. Bare "reservas" is deliberately NOT a term:
       // it hits front-line "Agente de Reservas" and finance names such as
       // "Banco de Reservas". Bare "distribution manager" (logistics) and
-      // "revenue operations" (a SaaS function) and "revenue assurance" (telecom audit) are left out for the same reason.
+      // "revenue operations" (SaaS) and "revenue assurance" (telecom audit)
+      // are left out for the same reason. The "<head|director> of revenue"
+      // form is an ALLOWLIST: it only matches at end of title, before a
+      // separator or employer ("at"/"en"), or before a hotel qualifier
+      // (distribution, reservations, channel, e-commerce). A denylist of SaaS
+      // words (growth, cycle, enablement, ...) would leak every new one.
       "revenue manag\\w*",
-      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de)? revenue(?! (?:operations|assurance))",
+      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de)? revenue(?=\\s*(?:$|[-–—|(@]|(?:&|y|and|/)\\s*(?:distribution|distribuci[oó]n|reservations?|reservas|channel|e-?commerce)|(?:at|en)\\s))",
       "channel manager",
       "(?:online|digital|hotel|channel) distribution manager",
       "yield manager",
