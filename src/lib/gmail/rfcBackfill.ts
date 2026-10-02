@@ -1,11 +1,11 @@
 /**
- * Pure planner for scripts/backfill-rfc-message-ids.ts. Messages synced
+ * Pure planner for src/lib/gmail/rfcBackfillRun.ts (shared by scripts/backfill-rfc-message-ids.ts and the admin page). Messages synced
  * before migration 0036 have no `rfc_message_id`, so they cannot be replied
- * to as a real thread reply. The script re-reads those messages from Gmail;
+ * to as a real thread reply. The runner re-reads those messages from Gmail;
  * this turns the result into the exact updates to write.
  *
  * `fetched` is keyed by `backfillKey(bdId, gmailMessageId)` — the ONE key
- * builder, used by the script that fills the map and by this planner that
+ * builder, used by the runner that fills the map and by this planner that
  * reads it (a Gmail message id is only unique within one mailbox).
  */
 import type { ParsedGmailMessage } from "./parseMessage";
@@ -52,4 +52,41 @@ export function planRfcBackfill(
     updates,
     counts: { candidates: candidates.length, update: updates.length, notFoundInGmail, noMessageIdHeader },
   };
+}
+
+/** Per-run bound for the admin action: ~one sequential Gmail read per row must fit well inside the function timeout. */
+export const ADMIN_BACKFILL_DEFAULT_LIMIT = 100;
+export const ADMIN_BACKFILL_MAX_LIMIT = 500;
+
+/** Server-side clamp for a client-sent limit: junk falls back to the default, anything above the maximum is capped. */
+export function clampRfcBackfillLimit(
+  raw: unknown,
+  fallback: number = ADMIN_BACKFILL_DEFAULT_LIMIT,
+  max: number = ADMIN_BACKFILL_MAX_LIMIT,
+): number {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  if (Number.isNaN(n)) return fallback;
+  const whole = Math.floor(n);
+  if (whole < 1) return fallback;
+  return Math.min(whole, max);
+}
+
+/** Groups candidates per BD, preserving input order. Builds new arrays; the input is never mutated. */
+export function groupCandidatesByBd(candidates: readonly BackfillCandidate[]): Map<string, BackfillCandidate[]> {
+  const perBd = new Map<string, BackfillCandidate[]>();
+  for (const c of candidates) {
+    const rows = perBd.get(c.bdId);
+    if (rows) rows.push(c);
+    else perBd.set(c.bdId, [c]);
+  }
+  return perBd;
+}
+
+/** Coarse, token-free reasons a BD's mailbox was skipped. */
+export type BdSkipReason = "no_account" | "token_refresh_failed" | "fetch_failed";
+
+export function tallySkipReasons(reasons: readonly BdSkipReason[]): Record<BdSkipReason, number> {
+  const tally: Record<BdSkipReason, number> = { no_account: 0, token_refresh_failed: 0, fetch_failed: 0 };
+  for (const r of reasons) tally[r]++;
+  return tally;
 }

@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { planRfcBackfill } from "@/lib/gmail/rfcBackfill";
+import { clampRfcBackfillLimit, groupCandidatesByBd, planRfcBackfill, tallySkipReasons } from "@/lib/gmail/rfcBackfill";
 import { parseGmailMessage, type GmailApiMessage } from "@/lib/gmail/parseMessage";
 
 function apiMessage(id: string, headers: { name: string; value: string }[]): GmailApiMessage {
@@ -52,4 +52,43 @@ test("planRfcBackfill is pure: same input twice, same output, input untouched", 
   assert.deepEqual(first, second);
   assert.equal(candidates.length, 1);
   assert.equal(fetched.size, 1);
+});
+
+test("clampRfcBackfillLimit defaults to 100, never exceeds 500 and ignores junk from the client", () => {
+  assert.equal(clampRfcBackfillLimit(undefined), 100);
+  assert.equal(clampRfcBackfillLimit(null), 100);
+  assert.equal(clampRfcBackfillLimit("abc"), 100);
+  assert.equal(clampRfcBackfillLimit("NaN"), 100);
+  assert.equal(clampRfcBackfillLimit(""), 100);
+  assert.equal(clampRfcBackfillLimit("0"), 100);
+  assert.equal(clampRfcBackfillLimit("-5"), 100);
+  assert.equal(clampRfcBackfillLimit("250"), 250);
+  assert.equal(clampRfcBackfillLimit(250.9), 250);
+  assert.equal(clampRfcBackfillLimit("501"), 500);
+  assert.equal(clampRfcBackfillLimit("999999"), 500);
+  assert.equal(clampRfcBackfillLimit(Infinity), 500);
+});
+
+test("groupCandidatesByBd keeps order, groups per BD and does not mutate its input", () => {
+  const candidates = [
+    { id: "1", bdId: "a", gmailMessageId: "g1" },
+    { id: "2", bdId: "b", gmailMessageId: "g2" },
+    { id: "3", bdId: "a", gmailMessageId: "g3" },
+  ];
+  const snapshot = JSON.parse(JSON.stringify(candidates));
+  const first = groupCandidatesByBd(candidates);
+  const second = groupCandidatesByBd(candidates);
+  assert.deepEqual([...first.keys()], ["a", "b"]);
+  assert.deepEqual(first.get("a")?.map((c) => c.id), ["1", "3"]);
+  assert.deepEqual([...second], [...first]);
+  assert.deepEqual(candidates, snapshot);
+});
+
+test("tallySkipReasons counts each coarse reason and always returns all keys", () => {
+  assert.deepEqual(tallySkipReasons([]), { no_account: 0, token_refresh_failed: 0, fetch_failed: 0 });
+  assert.deepEqual(tallySkipReasons(["fetch_failed", "no_account", "fetch_failed"]), {
+    no_account: 1,
+    token_refresh_failed: 0,
+    fetch_failed: 2,
+  });
 });
