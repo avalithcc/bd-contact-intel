@@ -143,6 +143,17 @@ export const ROLE_GROUP_PLAYBOOK: Record<RoleGroupKey, RoleGroupPlaybookEntry> =
     wrongPerson:
       "Cuando HR solo gestiona reclutamiento interno y no tiene mandato para evaluar proveedores externos de desarrollo.",
   },
+  hospitality_revenue: {
+    subtitle: "Revenue Manager, Reservations, Channel / Distribution Manager",
+    priority: "media",
+    priorityLabel: "Media",
+    decides:
+      "El stack de reservas y distribución del hotel (PMS, channel manager, motor de reservas, herramientas de revenue) y las integraciones entre ellos; suele evaluar y proponer proveedores de tecnología.",
+    painSolved:
+      "Integraciones y desarrollo a medida sobre el stack de reservas y canales que el equipo interno no alcanza a cubrir — Staff Augmentation para reforzar un equipo chico, o un proyecto acotado de integración.",
+    wrongPerson:
+      "Como decisor de presupuesto: es un interlocutor real que conoce el problema, pero la aprobación final de gasto suele estar en la Dirección General o de Finanzas.",
+  },
   sales_bd: {
     subtitle: "Sales, Account Manager, Marketing, Customer Success",
     priority: "no_priorizar",

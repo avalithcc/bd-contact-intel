@@ -17,6 +17,7 @@ const roleGroups: Record<RoleGroupKey, string> = {
   project_delivery: "Project & Delivery",
   developers: "Developers",
   hr_recruiting: "HR & Recruiting",
+  hospitality_revenue: "Revenue & Reservations",
   sales_bd: "Sales & BD",
   operations: "Operations",
   other: "Other",

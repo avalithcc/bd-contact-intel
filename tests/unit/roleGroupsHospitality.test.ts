@@ -56,9 +56,6 @@ test("bare words stay narrow: a qualified title is not swept into c_level_busine
 
 test("out-of-scope hotel titles are still left in other", () => {
   for (const title of [
-    "Revenue Manager",
-    "Director of Revenue Management",
-    "Reservations Manager",
     "Director financiero",
     "Guest Relations Specialist",
     "Vocal",

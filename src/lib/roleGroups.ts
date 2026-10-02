@@ -23,6 +23,7 @@ export type RoleGroupKey =
   | "project_delivery"
   | "developers"
   | "hr_recruiting"
+  | "hospitality_revenue"
   | "sales_bd"
   | "operations"
   | "other"
@@ -35,7 +36,7 @@ export interface RoleGroupDef {
 // Ordered for display; classification order is defined separately by RULES
 // below (must match: c_level_tech, c_level_business, eng_leadership,
 // engineering_manager, tech_lead_architect, product, project_delivery,
-// developers, hr_recruiting, sales_bd, operations, other; no_position is
+// developers, hr_recruiting, hospitality_revenue, sales_bd, operations, other; no_position is
 // the null/blank fallback and is checked before any rule).
 //
 // Display labels are localized — see src/lib/i18n/dictionaries/{en,es}.ts
@@ -51,6 +52,7 @@ export const ROLE_GROUPS: RoleGroupDef[] = [
   { key: "project_delivery" },
   { key: "developers" },
   { key: "hr_recruiting" },
+  { key: "hospitality_revenue" },
   { key: "sales_bd" },
   { key: "operations" },
   { key: "other" },
@@ -241,6 +243,24 @@ const RULES: Rule[] = [
       "people",
       "reclutador\\w*",
       "selecci[oó]n",
+    ),
+  ],
+  [
+    "hospitality_revenue",
+    w(
+      // Revenue / reservations / distribution owners at hotels. Sits right
+      // before sales_bd so it beats sales_bd and operations, but never steals
+      // from the groups above. Bare "reservas" is deliberately NOT a term:
+      // it hits front-line "Agente de Reservas" and finance names such as
+      // "Banco de Reservas". Bare "distribution manager" (logistics) and
+      // "revenue operations" (a SaaS function) are left out for the same reason.
+      "revenue manag\\w*",
+      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de)? revenue(?! operations)",
+      "channel manager",
+      "(?:online|digital|hotel|channel) distribution manager",
+      "yield manager",
+      "(?:booking|reservations?) manager",
+      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de) reserv(?:ations|as)",
     ),
   ],
   [
