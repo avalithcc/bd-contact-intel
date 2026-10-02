@@ -10,7 +10,7 @@ import type { RoleGroupKey } from "@/lib/roleGroups";
  * (openspec/changes/bd-playbook/mockups/bd-playbook.html), itself sourced
  * from `playbook-content.md` next to it, which cites `avalith/contexto/
  * empresa.md` for every Avalith fact. Every inferred/unconfirmed claim is
- * marked "" in the copy itself — visible to the BD reading it,
+ * marked "(?)" in the copy itself — visible to the BD reading it,
  * not buried in a footnote.
  *
  * Static and developer-edited on purpose (owner decision 2026-09-30): no
@@ -148,9 +148,9 @@ export const ROLE_GROUP_PLAYBOOK: Record<RoleGroupKey, RoleGroupPlaybookEntry> =
     priority: "media",
     priorityLabel: "Media",
     decides:
-      "El stack de reservas y distribución del hotel (PMS, channel manager, motor de reservas, herramientas de revenue) y las integraciones entre ellos; suele evaluar y proponer proveedores de tecnología.",
+      "El stack de reservas y distribución del hotel (PMS, channel manager, motor de reservas, herramientas de revenue) y las integraciones entre ellos; suele evaluar y proponer proveedores de tecnología (?).",
     painSolved:
-      "Integraciones y desarrollo a medida sobre el stack de reservas y canales que el equipo interno no alcanza a cubrir — Staff Augmentation para reforzar un equipo chico, o un proyecto acotado de integración.",
+      "Integraciones y desarrollo a medida sobre el stack de reservas y canales que el equipo interno no alcanza a cubrir — Staff Augmentation para reforzar un equipo chico, o un proyecto acotado de integración (?). Inferido del rol, sin evidencia de compra previa de Avalith en hoteles.",
     wrongPerson:
       "Como decisor de presupuesto: es un interlocutor real que conoce el problema, pero la aprobación final de gasto suele estar en la Dirección General o de Finanzas.",
   },
