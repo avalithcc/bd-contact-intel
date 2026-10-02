@@ -3,10 +3,9 @@
  * from the hotel import. The rule sits immediately BEFORE `sales_bd`, so it
  * wins over sales_bd and operations but never steals from the earlier groups.
  *
- * NOTE: REAL_REVENUE_TITLES holds representative titles of the production
- * set (revenue manager x12, director of revenue x2, revenue management x2,
- * channel manager x1, reservations manager x1). Replace/extend with the exact
- * distinct strings from the production query given in the PR description.
+ * REAL_REVENUE_TITLES are the production persons (verbatim titles, no names)
+ * the group was built from: 16 persons over 10 distinct titles, plus the one
+ * telecom "revenue assurance" title that is deliberately excluded.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -16,16 +15,16 @@ import { IT_ROLE_GROUPS } from "../../src/lib/hiring/classify";
 import { NOT_WORTH_PRIORITIZING, ROLE_GROUP_PLAYBOOK } from "../../src/lib/roleGroupPlaybook";
 
 const REAL_REVENUE_TITLES = [
-  "Revenue Manager",
-  "Revenue manager",
-  "Hotel Revenue Manager",
-  "Assistant Revenue Manager",
-  "Director of Revenue",
+  "Revenue Manager", // x6
+  "Head of Revenue", // x2
+  "Cluster Reservations & Revenue Manager",
+  "Reservations Manager | Supporting Revenue Management",
+  "Revenue Manager / Reservation Manager",
   "Director of Revenue Management",
-  "Revenue Management",
-  "Revenue Management Director",
-  "Channel Manager",
-  "Reservations Manager",
+  "Assistant Revenue Manager",
+  "Revenue - Channel Manager",
+  "Directora Revenue & Distribution",
+  "E-Commerce & Revenue Manager",
 ];
 
 const FUTURE_TITLES = [
@@ -55,6 +54,11 @@ test("mixed titles move out of the hidden sales_bd group into the visible one", 
 
 test("Revenue Operations (SaaS function) stays in operations", () => {
   assert.equal(classifyPosition("Director of Revenue Operations"), "operations");
+});
+
+test("revenue assurance (telecom audit/finance) is not hotel revenue management", () => {
+  assert.equal(classifyPosition("Sub Gerente Revenue Assurance y Modelos"), "other");
+  assert.equal(classifyPosition("Gerente de Revenue Assurance"), "other");
 });
 
 test("bare 'reservas' is deliberately NOT a term", () => {

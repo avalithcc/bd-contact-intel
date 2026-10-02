@@ -268,9 +268,9 @@ const RULES: Rule[] = [
       // from the groups above. Bare "reservas" is deliberately NOT a term:
       // it hits front-line "Agente de Reservas" and finance names such as
       // "Banco de Reservas". Bare "distribution manager" (logistics) and
-      // "revenue operations" (a SaaS function) are left out for the same reason.
+      // "revenue operations" (a SaaS function) and "revenue assurance" (telecom audit) are left out for the same reason.
       "revenue manag\\w*",
-      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de)? revenue(?! operations)",
+      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de)? revenue(?! (?:operations|assurance))",
       "channel manager",
       "(?:online|digital|hotel|channel) distribution manager",
       "yield manager",
