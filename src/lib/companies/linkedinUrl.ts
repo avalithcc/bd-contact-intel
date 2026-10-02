@@ -71,6 +71,26 @@ export function normalizeCompanyLinkedinUrl(raw: string): LinkedinUrlResult {
   return { ok: true, value: `linkedin.com/${kind}/${slug}` };
 }
 
+export type LinkedinSearchTerm = { kind: "exact"; value: string } | { kind: "slug"; slug: string } | null;
+
+/**
+ * How one whitespace-free search token relates to the stored LinkedIn form.
+ * Goes through `normalizeCompanyLinkedinUrl`, so a pasted URL becomes exactly
+ * the value the column holds.
+ *  - `exact`: the token is URL-shaped (has a `.`, `/` or `:`) and normalises
+ *    to a company/school page -> equality against the column.
+ *  - `slug`: a bare word -> substring of the slug, alongside the normal
+ *    name/domain search.
+ *  - `null`: not a LinkedIn term (other host, `/in/` profile, junk, blank) ->
+ *    the caller keeps the existing search for that token.
+ */
+export function companyLinkedinSearchTerm(token: string): LinkedinSearchTerm {
+  const result = normalizeCompanyLinkedinUrl(token);
+  if (!result.ok || !result.value) return null;
+  if (/[./:]/.test(token)) return { kind: "exact", value: result.value };
+  return { kind: "slug", slug: result.value.split("/")[2] };
+}
+
 /** Thrown by planCompanyPropertyEdit before building any plan. */
 export class InvalidCompanyLinkedinUrlError extends Error {
   constructor(
