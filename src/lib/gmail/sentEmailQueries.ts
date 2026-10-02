@@ -17,7 +17,7 @@ import { extractEmailAddresses, shouldStoreClassifiedMessage, type ClassifiedMes
 import { getKnownPersonsForAddresses } from "./syncQueries";
 import { getNeverLogRules } from "./neverLog";
 import { classifySentMessage, type SentMessageInput } from "./sentMessage";
-import { storeSentEmailMessage, type SentEmailStore } from "./storeSentEmail";
+import { shouldWriteSentActivity, storeSentEmailMessage, type SentEmailStore } from "./storeSentEmail";
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -76,6 +76,7 @@ export async function recordSentEmail(input: RecordSentEmailInput): Promise<void
     try {
       await db.transaction(async (tx) => {
         const stored = await storeSentEmailMessage(txStore(tx), input.bdId, classified!);
+        if (!shouldWriteSentActivity(stored, classified!.matches, input.activity.personId)) return;
         await createActivityInTx(tx, {
           ...input.activity,
           metadata: { ...(input.activity.metadata as Record<string, unknown>), emailMessageId: stored.emailMessageId },

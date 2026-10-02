@@ -14,6 +14,7 @@ import { MAX_BODY_TEXT_BYTES } from "@/lib/gmail/truncateBodyText";
 import { buildEmailMessagePersonRows, buildEmailMessageRow } from "@/lib/gmail/emailMessageRows";
 import { buildSentParsedMessage, classifySentMessage } from "@/lib/gmail/sentMessage";
 import {
+  shouldWriteSentActivity,
   storeSentEmailMessage,
   type SentEmailStore,
 } from "@/lib/gmail/storeSentEmail";
@@ -222,4 +223,12 @@ test("sync after send is a no-op: the sync's own row builder hits the same uniqu
   const syncRow = buildEmailMessageRow(BD_ID, syncClassified(content));
   assert.equal(await store.insertMessage(syncRow), null);
   assert.equal(messages.size, 1);
+});
+
+test("activity is skipped only when the sync won the race and already wrote one for this person", () => {
+  const matches = [{ personId: PERSON_ID }];
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: true }, matches, PERSON_ID), true);
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, PERSON_ID), false);
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, "other"), true);
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, undefined), true);
 });
