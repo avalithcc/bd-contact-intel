@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { ADMIN_BACKFILL_DEFAULT_LIMIT, parseRfcBackfillResultParams } from "@/lib/gmail/rfcBackfill";
+import {
+  ADMIN_BACKFILL_DEFAULT_LIMIT,
+  ADMIN_BACKFILL_MAX_LIMIT,
+  BD_SKIP_REASONS,
+  parseRfcBackfillResultParams,
+} from "@/lib/gmail/rfcBackfill";
 import { countPendingRfcBackfill } from "@/lib/gmail/rfcBackfillRun";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { runRfcBackfillAction } from "./actions";
@@ -50,6 +55,10 @@ export default async function RfcBackfillAdminPage({
             <table>
               <tbody>
                 <tr>
+                  <td>{dict.resultCandidates}</td>
+                  <td>{result.candidates}</td>
+                </tr>
+                <tr>
                   <td>{dict.resultUpdated}</td>
                   <td>{result.updated}</td>
                 </tr>
@@ -62,9 +71,19 @@ export default async function RfcBackfillAdminPage({
                   <td>{result.noMessageIdHeader}</td>
                 </tr>
                 <tr>
+                  <td>{dict.resultSkippedRows}</td>
+                  <td>{result.skippedBdRows}</td>
+                </tr>
+                <tr>
                   <td>{dict.resultSkippedBds}</td>
                   <td>{result.skippedBds}</td>
                 </tr>
+                {BD_SKIP_REASONS.filter((reason) => result.skipReasons[reason] > 0).map((reason) => (
+                  <tr key={reason}>
+                    <td>{dict.skipReasons[reason]}</td>
+                    <td>{result.skipReasons[reason]}</td>
+                  </tr>
+                ))}
                 <tr>
                   <td>{dict.resultRemaining}</td>
                   <td>{pending.total}</td>
@@ -82,6 +101,7 @@ export default async function RfcBackfillAdminPage({
         ) : (
           <>
             <p className="soft">{dict.pendingTotal(pending.total)}</p>
+            <p className="muted">{dict.permanentNote}</p>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -109,8 +129,20 @@ export default async function RfcBackfillAdminPage({
       {pending.total > 0 && (
         <section className="panel">
           <div className="eyebrow">{dict.runTitle}</div>
-          <p className="soft">{dict.runNote(ADMIN_BACKFILL_DEFAULT_LIMIT)}</p>
-          <form action={runRfcBackfillAction}>
+          <p className="soft">{dict.runNote(ADMIN_BACKFILL_MAX_LIMIT)}</p>
+          <form action={runRfcBackfillAction} className="filter-toolbar">
+            <div className="filter-field">
+              <label htmlFor="limit">{dict.limitLabel}</label>
+              <input
+                id="limit"
+                name="limit"
+                type="number"
+                min={1}
+                max={ADMIN_BACKFILL_MAX_LIMIT}
+                step={1}
+                defaultValue={ADMIN_BACKFILL_DEFAULT_LIMIT}
+              />
+            </div>
             <button type="submit" className="filter-submit">
               {dict.runButton}
             </button>

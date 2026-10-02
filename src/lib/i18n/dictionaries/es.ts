@@ -1764,18 +1764,30 @@ export const es: typeof en = {
     pendingTitle: "Mensajes pendientes",
     pendingTotal: (total: number) => `${total} mensaje(s) sin Message-ID`,
     nonePending: "No hay mensajes pendientes. Todos los mensajes sincronizados ya tienen Message-ID.",
+    permanentNote:
+      "Los mensajes borrados de Gmail o sin encabezado Message-ID quedan pendientes de forma permanente; un número distinto de cero no indica un error.",
     colBd: "BD",
     colPending: "Pendientes",
     runTitle: "Ejecutar un lote",
-    runNote: (limit: number) =>
-      `Lee desde Gmail (solo lectura) hasta ${limit} de los mensajes pendientes más recientes y completa su Message-ID. Se puede repetir sin riesgo: los mensajes ya completados no se vuelven a tocar.`,
+    runNote: (max: number) =>
+      `Lee desde Gmail (solo lectura) los mensajes pendientes más recientes, hasta ${max} por ejecución, y completa su Message-ID. Se puede repetir sin riesgo: los mensajes ya completados no se vuelven a tocar. Si una ejecución deja de avanzar, aumentar el límite.`,
+    limitLabel: "Mensajes por ejecución",
     runButton: "Ejecutar un lote",
     resultTitle: "Última ejecución",
+    resultCandidates: "Mensajes leídos",
     resultUpdated: "Actualizados",
     resultNotFound: "No encontrados en Gmail",
     resultNoHeader: "Sin encabezado Message-ID",
-    resultSkippedBds: "Casillas omitidas",
+    resultSkippedRows: "Omitidos (buzón no procesado)",
+    resultSkippedBds: "Buzones omitidos",
     resultRemaining: "Siguen pendientes",
+    skipReasons: {
+      no_account: "Gmail no conectado",
+      account_lookup_failed: "Falló la consulta de la cuenta",
+      token_decrypt_failed: "No se pudo descifrar el token",
+      token_refresh_failed: "Falló la renovación del token",
+      fetch_failed: "Falló la lectura en Gmail",
+    },
   },
 
   contactList: {
