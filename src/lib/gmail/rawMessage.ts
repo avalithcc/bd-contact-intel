@@ -20,6 +20,17 @@ function toCrlf(s: string): string {
   return s.replace(/\r\n|\r|\n/g, CRLF);
 }
 
+/**
+ * The text/plain part of a message exactly as Gmail will hold it (CRLF line
+ * endings, HTML converted by htmlToOutboundText). The ONE derivation of that
+ * text: the MIME builder encodes it and the send path stores it as
+ * `email_message.body_text`, so the stored body equals what the Gmail sync
+ * would later read back from the same message.
+ */
+export function plainTextPart(content: MessageContent): string {
+  return toCrlf(content.bodyHtml === undefined ? content.body : htmlToOutboundText(content.bodyHtml));
+}
+
 /** RFC 2045: encoded lines must not exceed 76 characters. */
 export function wrapBase64(b64: string): string {
   return b64.match(/.{1,76}/g)?.join(CRLF) ?? "";
@@ -112,9 +123,9 @@ export function buildRawMessage(
 
   let message: string;
   if (content.bodyHtml === undefined) {
-    message = [...envelope, ...partHeaders("text/plain"), "", encodeContent(content.body)].join(CRLF);
+    message = [...envelope, ...partHeaders("text/plain"), "", encodeContent(plainTextPart(content))].join(CRLF);
   } else {
-    const text = htmlToOutboundText(content.bodyHtml);
+    const text = plainTextPart(content);
     const boundary = generateBoundary([text, content.bodyHtml], boundaryRandom);
     message = [
       ...envelope,

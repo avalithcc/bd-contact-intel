@@ -77,7 +77,7 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
     attempted += 1;
     // `null` = gone from the mailbox between history.list and this fetch.
     // Skipping it is the whole point: before this, ONE such message threw and
-    // aborted the entire run for that BD, every 15 minutes, while
+    // aborted the entire run for that BD, every cron run (every 15 minutes at the time), while
     // `last_synced_at` still advanced and the account still read "connected" —
     // so the sync looked healthy and stored nothing. (Observed in production
     // 2026-10-01: all three BDs, every tick, `messages.get failed: 404`.)
@@ -125,7 +125,7 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
     // cursor forever. Only the deadline break — ids we never asked about —
     // may hold it. Using `rawMessages.length` here would trade the crash
     // this file just fixed for a cursor stuck against a deleted message,
-    // re-reading the same window every 15 minutes until Gmail expires the
+    // re-reading the same window every 2 minutes until Gmail expires the
     // history and forces a full re-baseline.
     newHistoryId: exhausted && attempted === ids.length ? latestHistoryId : null,
     messagesFetched: rawMessages.length,

@@ -2,7 +2,7 @@
  * A connection made before the email-sync feature shipped only granted
  * `gmail.send` — it cannot call `users.history.list`/`users.messages.list`,
  * so `/api/gmail/sync` (src/app/api/gmail/sync/route.ts) must skip it rather
- * than fail loudly on every 15-minute run. `grantedScopes` is the OAuth
+ * than fail loudly on every 2-minute run. `grantedScopes` is the OAuth
  * token response's own `scope` field, recorded at callback time
  * (src/app/api/gmail/oauth/callback/route.ts) — it reflects what Google
  * actually granted, not what the app asked for, since a user can uncheck

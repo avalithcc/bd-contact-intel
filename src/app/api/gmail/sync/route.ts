@@ -7,7 +7,7 @@ import { syncOneAccountNow } from "@/lib/gmail/syncOneAccountNow";
 /**
  * Polls every connected, readonly-scoped BD's Gmail inbox for CRM-matched
  * mail (email-sync brief). Triggered by Supabase `pg_cron` + `pg_net` every
- * 15 minutes (see scripts/gmail-sync-cron.sql, run once by the orchestrator
+ * 2 minutes (see scripts/gmail-sync-cron.sql, run once by the orchestrator
  * after owner approval) with the same bearer convention as
  * src/app/api/tasks/digest/route.ts, plus a daily Vercel cron safety net
  * (vercel.json) since the Hobby plan cannot schedule anything more frequent.

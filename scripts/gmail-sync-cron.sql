@@ -1,6 +1,7 @@
 -- Supabase pg_cron + pg_net setup for /api/gmail/sync (email-sync brief,
 -- owner decision 2026-09-30: "Supabase pg_cron + pg_net calls
--- /api/gmail/sync every 15 minutes"). This is a plain SQL script, NOT a
+-- /api/gmail/sync"; interval tightened from 15 to 2 minutes on 2026-10-02 so a
+-- reply shows up in the CRM within ~2 minutes). This is a plain SQL script, NOT a
 -- Drizzle migration, because it reads a secret from Supabase Vault — a
 -- migration file would either bake the secret in as plaintext or need a
 -- templating step Drizzle doesn't have. Run by the orchestrator, in the
@@ -27,14 +28,29 @@
 --               (src/lib/cronAuth.ts) — reusing it means no new secret to
 --               provision on the app side.
 --
--- Then run the two statements below (idempotent — safe to re-run).
+-- Then run the statements below (idempotent — safe to re-run). The first one
+-- retires the old 15-minute job (jobid 1 in production); without it BOTH jobs
+-- would keep firing.
 --
--- Revert:
---   select cron.unschedule('gmail-sync-every-15-min');
+-- Overlap check (2026-10-02): the route's maxDuration is 60 s and pg_net's
+-- timeout is 60 s, so one run can never outlive the 120 s interval; runs do
+-- not overlap each other. A manual "Sincronizar ahora" or the daily Vercel
+-- cron can still coincide with a run for the same account; that is safe
+-- because every write is `ON CONFLICT DO NOTHING` on
+-- unique(bd_id, gmail_message_id) and the worst case is a history cursor that
+-- moves back one window and re-reads already-stored messages.
+--
+-- Revert (back to every 15 minutes):
+--   select cron.unschedule('gmail-sync-every-2-min');
+--   then re-run this script with the name 'gmail-sync-every-15-min' and
+--   the schedule '*/15 * * * *'.
+
+select cron.unschedule('gmail-sync-every-15-min')
+where exists (select 1 from cron.job where jobname = 'gmail-sync-every-15-min');
 
 select cron.schedule(
-  'gmail-sync-every-15-min',
-  '*/15 * * * *',
+  'gmail-sync-every-2-min',
+  '*/2 * * * *',
   $$
   select net.http_get(
     url := 'https://bd-contact-intel.vercel.app/api/gmail/sync',
@@ -55,6 +71,6 @@ select cron.schedule(
 );
 
 -- Verify it's scheduled:
---   select jobid, schedule, command, active from cron.job where jobname = 'gmail-sync-every-15-min';
+--   select jobid, schedule, command, active from cron.job where jobname = 'gmail-sync-every-2-min';
 -- Inspect recent runs:
---   select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'gmail-sync-every-15-min') order by start_time desc limit 20;
+--   select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'gmail-sync-every-2-min') order by start_time desc limit 20;

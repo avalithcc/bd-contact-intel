@@ -11,7 +11,8 @@ import { activity, emailAccount, emailMessage, emailMessagePerson, person } from
 import { needsReconnectForSync } from "./needsReconnectForSync";
 import { getNeverLogRules } from "./neverLog";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
-import { buildSyncedActivityRows } from "./buildSyncedActivities";
+import { executeSyncedMessageWrite, type SyncWriteStore } from "./syncWriteCore";
+import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import { buildAfterSyncSet, type AfterSyncPatch } from "./afterSyncPatch";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "./classify";
 
@@ -161,57 +162,43 @@ export async function writeSyncedMessages(
   classified: readonly ClassifiedMessage[],
 ): Promise<WriteSyncedMessagesResult> {
   if (classified.length === 0) return { inserted: 0 };
+  return db.transaction((tx) => executeSyncedMessageWrite(txSyncStore(tx), bdId, classified));
+}
 
-  return db.transaction(async (tx) => {
-    const values = classified.map((c) => ({
-      bdId,
-      gmailMessageId: c.gmailMessageId,
-      gmailThreadId: c.gmailThreadId,
-      direction: c.direction,
-      personId: c.matches[0]!.personId,
-      fromAddress: c.fromAddress,
-      toAddresses: c.toAddresses,
-      ccAddresses: c.ccAddresses,
-      subject: c.subject,
-      bodyText: c.bodyText,
-      bodyTruncated: c.bodyTruncated,
-      sentAt: c.sentAt,
-      rfcMessageId: c.rfcMessageId,
-      rfcReferences: c.references,
-      matchedEmail: c.matches[0]!.matchedEmail,
-      matchConfidence: c.matches[0]!.matchConfidence,
-    }));
+type SyncTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-    const insertedRows = await tx
-      .insert(emailMessage)
-      .values(values)
-      .onConflictDoNothing()
-      .returning({
+function txSyncStore(tx: SyncTransaction): SyncWriteStore {
+  return {
+    insertMessages: (rows) =>
+      tx.insert(emailMessage).values(rows).onConflictDoNothing().returning({
         id: emailMessage.id,
         gmailMessageId: emailMessage.gmailMessageId,
         gmailThreadId: emailMessage.gmailThreadId,
         direction: emailMessage.direction,
         sentAt: emailMessage.sentAt,
-      });
-    if (insertedRows.length === 0) return { inserted: 0 };
-
-    const classifiedByGmailId = new Map(classified.map((c) => [c.gmailMessageId, c]));
-
-    const joinRows = insertedRows.flatMap((row) =>
-      classifiedByGmailId.get(row.gmailMessageId)!.matches.map((m) => ({
-        emailMessageId: row.id,
-        personId: m.personId,
-        matchedEmail: m.matchedEmail,
-        matchConfidence: m.matchConfidence,
-      })),
-    );
-    await tx.insert(emailMessagePerson).values(joinRows).onConflictDoNothing();
-
-    // Backfill: link a pre-existing platform `email_sent` activity to the
-    // email_message row now recorded for the same Gmail message, instead of
-    // writing a second activity for it (see buildSyncedActivityRows).
-    for (const row of insertedRows) {
-      if (!classifiedByGmailId.get(row.gmailMessageId)!.isPlatformSent) continue;
+      }),
+    async fillRfcIds(bdId, fills) {
+      let changed = 0;
+      for (const part of chunk(fills, WRITE_BATCH_SIZE)) {
+        const tuples = sql.join(
+          part.map((f) => sql`(${f.gmailMessageId}::text, ${f.rfcMessageId}::text, ${f.rfcReferences}::text)`),
+          sql`, `,
+        );
+        const rows = await tx.execute<{ id: string }>(sql`
+          update email_message em
+          set rfc_message_id = v.mid, rfc_references = v.refs
+          from (values ${tuples}) as v(gid, mid, refs)
+          where em.bd_id = ${bdId}::uuid and em.gmail_message_id = v.gid and em.rfc_message_id is null
+          returning em.id::text as id
+        `);
+        changed += rows.length;
+      }
+      return changed;
+    },
+    async insertPersonLinks(rows) {
+      await tx.insert(emailMessagePerson).values(rows).onConflictDoNothing();
+    },
+    async linkPlatformActivity(bdId, row) {
       await tx
         .update(activity)
         .set({ metadata: sql`${activity.metadata} || jsonb_build_object('emailMessageId', ${row.id}::text)` })
@@ -222,34 +209,13 @@ export async function writeSyncedMessages(
             sql`${activity.metadata}->>'gmailMessageId' = ${row.gmailMessageId}`,
           ),
         );
-    }
-
-    const activityRows = insertedRows.flatMap((row) => {
-      const c = classifiedByGmailId.get(row.gmailMessageId)!;
-      return buildSyncedActivityRows({
-        gmailMessageId: row.gmailMessageId,
-        gmailThreadId: row.gmailThreadId,
-        direction: c.direction,
-        fromAddress: c.fromAddress,
-        toAddresses: c.toAddresses,
-        subject: c.subject,
-        sentAt: row.sentAt,
-        isPlatformSent: c.isPlatformSent,
-        matches: c.matches,
-      });
-    });
-
-    if (activityRows.length > 0) {
-      const insertedActivities = await tx
+    },
+    async insertActivities(bdId, rows) {
+      const inserted = await tx
         .insert(activity)
-        .values(activityRows.map((r) => ({ personId: r.personId, type: r.type, actorBdId: bdId, metadata: r.metadata })))
+        .values(rows.map((r) => ({ personId: r.personId, type: r.type, actorBdId: bdId, metadata: r.metadata })))
         .returning({ personId: activity.personId });
-      await recomputePersonStatuses(
-        tx,
-        insertedActivities.map((r) => r.personId!),
-      );
-    }
-
-    return { inserted: insertedRows.length };
-  });
+      await recomputePersonStatuses(tx, inserted.map((r) => r.personId!));
+    },
+  };
 }
