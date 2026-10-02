@@ -2,6 +2,8 @@ import { eq, type SQL } from "drizzle-orm";
 import { company } from "@/db/schema";
 import { accountTypeCondition, type AccountType } from "@/lib/companies/accountTypeFilter";
 import { clientStatusCondition } from "@/lib/companies/clientStatusFilter";
+import { linkedinPresenceCondition } from "@/lib/companies/linkedinFilter";
+import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
 import type { ClientStatus } from "@/lib/companies/clientStatus";
 
@@ -13,6 +15,7 @@ export interface CompanyListFilters {
   owner?: string;
   accountType?: AccountType;
   clientStatus?: ClientStatus;
+  linkedin?: LinkedinPresence;
   q?: string;
 }
 
@@ -33,6 +36,8 @@ export function companyListConditions(f: CompanyListFilters): SQL[] {
   if (accountTypeWhere) conditions.push(accountTypeWhere);
   const clientStatusWhere = clientStatusCondition(f.clientStatus);
   if (clientStatusWhere) conditions.push(clientStatusWhere);
+  const linkedinWhere = linkedinPresenceCondition(f.linkedin);
+  if (linkedinWhere) conditions.push(linkedinWhere);
   const searchWhere = companySearchCondition(f.q);
   if (searchWhere) conditions.push(searchWhere);
   return conditions;
