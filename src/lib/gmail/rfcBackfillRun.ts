@@ -16,19 +16,13 @@ import { auditLog, bd, emailAccount, emailMessage } from "@/db/schema";
 import { decryptToken } from "./crypto";
 import { refreshGmailAccessToken } from "./accessToken";
 import { createGmailClient } from "./client";
-import { parseGmailMessage, type ParsedGmailMessage } from "./parseMessage";
-import {
-  backfillKey,
-  groupCandidatesByBd,
-  planRfcBackfill,
-  tallySkipReasons,
-  type BackfillCandidate,
-  type BackfillPlan,
-  type BdSkipReason,
-} from "./rfcBackfill";
+import { parseGmailMessage } from "./parseMessage";
+import type { BackfillCandidate } from "./rfcBackfill";
+import { executeRfcBackfill, type RfcBackfillDeps, type RfcBackfillResult } from "./rfcBackfillCore";
+
+export type { RfcBackfillResult };
 
 export const BACKFILL_AUDIT_ACTION = "backfill_rfc_message_ids";
-const BATCH = 200;
 
 export interface PendingRfcBackfill {
   total: number;
@@ -63,84 +57,54 @@ export async function selectRfcBackfillCandidates(limit: number): Promise<Backfi
     .limit(limit);
 }
 
-export interface RfcBackfillResult {
-  counts: BackfillPlan["counts"];
-  skippedBds: number;
-  skipReasons: Record<BdSkipReason, number>;
-  updated: number;
-}
-
-type BdFetch = { ok: true; fetched: Map<string, ParsedGmailMessage> } | { ok: false; reason: BdSkipReason };
-
-/**
- * One BD's token decrypt + refresh + Gmail reads. Any failure (including an
- * AES-GCM auth failure from decryptToken) becomes a coarse skip reason so one
- * broken account cannot abort the other BDs; nothing from the error is kept.
- * A BD is all-or-nothing: a partial fetch is discarded and retried next run.
- */
-async function fetchForBd(bdId: string, rows: readonly BackfillCandidate[]): Promise<BdFetch> {
-  let stage: BdSkipReason = "token_refresh_failed";
-  try {
-    const [account] = await db.select().from(emailAccount).where(eq(emailAccount.bdId, bdId));
-    if (!account || account.status !== "connected" || !account.refreshTokenEncrypted) {
-      return { ok: false, reason: "no_account" };
-    }
-    const token = await refreshGmailAccessToken(decryptToken(account.refreshTokenEncrypted));
-    if (!token.ok) return { ok: false, reason: "token_refresh_failed" };
-    stage = "fetch_failed";
-    const client = createGmailClient(token.accessToken);
-    const fetched = new Map<string, ParsedGmailMessage>();
-    for (const row of rows) {
-      const message = await client.getMessage(row.gmailMessageId);
-      if (message) fetched.set(backfillKey(row.bdId, row.gmailMessageId), parseGmailMessage(message));
-    }
-    return { ok: true, fetched };
-  } catch {
-    return { ok: false, reason: stage };
-  }
-}
-
 /**
  * Fills up to `limit` rows (newest first) and writes them in ONE transaction,
  * batched, each update guarded by `rfc_message_id IS NULL`, together with ONE
- * audit_log row. Idempotent: filled rows no longer match the candidate query.
+ * audit_log row. `updated` / `updatedIds` come from the rows the UPDATE
+ * returned. Idempotent: filled rows no longer match the candidate query.
  */
 export async function runRfcBackfill({ actorBdId, limit }: { actorBdId: string; limit: number }): Promise<RfcBackfillResult> {
-  const candidates = await selectRfcBackfillCandidates(limit);
-  const perBd = groupCandidatesByBd(candidates);
-
-  const fetched = new Map<string, ParsedGmailMessage>();
-  const skips: BdSkipReason[] = [];
-  for (const [bdId, rows] of perBd) {
-    const result = await fetchForBd(bdId, rows);
-    if (result.ok) for (const [k, v] of result.fetched) fetched.set(k, v);
-    else skips.push(result.reason);
-  }
-
-  const plan = planRfcBackfill(candidates, fetched);
-  const skippedBds = skips.length;
-  const skipReasons = tallySkipReasons(skips);
-  if (plan.updates.length === 0) return { counts: plan.counts, skippedBds, skipReasons, updated: 0 };
-
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < plan.updates.length; i += BATCH) {
-      const chunk = plan.updates.slice(i, i + BATCH);
-      const tuples = sql.join(
-        chunk.map((u) => sql`(${u.id}::uuid, ${u.rfcMessageId}::text, ${u.rfcReferences}::text)`),
-        sql`, `,
-      );
-      await tx.execute(sql`
-        update email_message em
-        set rfc_message_id = v.mid, rfc_references = v.refs
-        from (values ${tuples}) as v(id, mid, refs)
-        where em.id = v.id and em.rfc_message_id is null
-      `);
-    }
-    await tx.insert(auditLog).values({
-      actorBdId,
-      action: BACKFILL_AUDIT_ACTION,
-      metadata: { counts: plan.counts, skippedBds, updatedIds: plan.updates.map((u) => u.id) },
-    });
-  });
-  return { counts: plan.counts, skippedBds, skipReasons, updated: plan.updates.length };
+  const deps: RfcBackfillDeps = {
+    selectCandidates: selectRfcBackfillCandidates,
+    loadAccount: async (bdId) => {
+      const [account] = await db.select().from(emailAccount).where(eq(emailAccount.bdId, bdId));
+      return account ? { connected: account.status === "connected", refreshTokenEncrypted: account.refreshTokenEncrypted } : null;
+    },
+    decryptToken,
+    refreshAccessToken: async (refreshToken) => {
+      const token = await refreshGmailAccessToken(refreshToken);
+      return token.ok ? token : { ok: false, kind: token.classification.kind };
+    },
+    openMailbox: (accessToken) => {
+      const client = createGmailClient(accessToken);
+      return async (gmailMessageId) => {
+        const message = await client.getMessage(gmailMessageId);
+        return message ? parseGmailMessage(message) : null;
+      };
+    },
+    writeUpdates: (batches, buildAuditMetadata) =>
+      db.transaction(async (tx) => {
+        const updatedIds: string[] = [];
+        for (const chunk of batches) {
+          const tuples = sql.join(
+            chunk.map((u) => sql`(${u.id}::uuid, ${u.rfcMessageId}::text, ${u.rfcReferences}::text)`),
+            sql`, `,
+          );
+          const rows = await tx.execute<{ id: string }>(sql`
+            update email_message em
+            set rfc_message_id = v.mid, rfc_references = v.refs
+            from (values ${tuples}) as v(id, mid, refs)
+            where em.id = v.id and em.rfc_message_id is null
+            returning em.id::text as id
+          `);
+          for (const row of rows) updatedIds.push(row.id);
+        }
+        if (updatedIds.length > 0) {
+          await tx.insert(auditLog).values({ actorBdId, action: BACKFILL_AUDIT_ACTION, metadata: buildAuditMetadata(updatedIds) });
+        }
+        return updatedIds;
+      }),
+    logError: (line) => console.error(line),
+  };
+  return executeRfcBackfill(deps, { limit });
 }

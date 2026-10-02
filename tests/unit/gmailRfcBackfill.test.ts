@@ -92,26 +92,36 @@ test("groupCandidatesByBd keeps order, groups per BD and does not mutate its inp
 });
 
 test("tallySkipReasons counts each coarse reason and always returns all keys", () => {
-  assert.deepEqual(tallySkipReasons([]), { no_account: 0, token_refresh_failed: 0, fetch_failed: 0 });
-  assert.deepEqual(tallySkipReasons(["fetch_failed", "no_account", "fetch_failed"]), {
+  const zero = { no_account: 0, account_lookup_failed: 0, token_decrypt_failed: 0, token_refresh_failed: 0, fetch_failed: 0 };
+  assert.deepEqual(tallySkipReasons([]), zero);
+  assert.deepEqual(tallySkipReasons(["fetch_failed", "no_account", "fetch_failed", "token_decrypt_failed"]), {
+    ...zero,
     no_account: 1,
-    token_refresh_failed: 0,
+    token_decrypt_failed: 1,
     fetch_failed: 2,
   });
 });
 
 test("result params round-trip through the real producer and reject junk", () => {
+  const skipReasons = { ...tallySkipReasons([]), token_decrypt_failed: 1 };
   const params = rfcBackfillResultToParams({
-    counts: { candidates: 100, update: 90, notFoundInGmail: 4, noMessageIdHeader: 6 },
+    counts: { candidates: 100, update: 90, notFoundInGmail: 4, noMessageIdHeader: 3, skippedBdRows: 3 },
     skippedBds: 1,
-    updated: 90,
+    skipReasons,
+    updated: 89,
   });
-  assert.deepEqual(parseRfcBackfillResultParams(Object.fromEntries(params)), { updated: 90, notFoundInGmail: 4, noMessageIdHeader: 6, skippedBds: 1 });
+  assert.deepEqual(parseRfcBackfillResultParams(Object.fromEntries(params)), {
+    candidates: 100,
+    updated: 89,
+    notFoundInGmail: 4,
+    noMessageIdHeader: 3,
+    skippedBdRows: 3,
+    skippedBds: 1,
+    skipReasons,
+  });
   assert.equal(parseRfcBackfillResultParams({}), null);
-  assert.deepEqual(parseRfcBackfillResultParams({ ran: "1", updated: "-3", notFound: "x", noHeader: "2.5", skippedBds: ["1"] }), {
-    updated: 0,
-    notFoundInGmail: 0,
-    noMessageIdHeader: 0,
-    skippedBds: 0,
-  });
+  assert.deepEqual(
+    parseRfcBackfillResultParams({ ran: "1", updated: "-3", notFound: "x", noHeader: "2.5", skippedBds: ["1"], rDecrypt: "9999999" }),
+    { candidates: 0, updated: 0, notFoundInGmail: 0, noMessageIdHeader: 0, skippedBdRows: 0, skippedBds: 0, skipReasons: tallySkipReasons([]) },
+  );
 });

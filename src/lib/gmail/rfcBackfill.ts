@@ -1,8 +1,9 @@
 /**
- * Pure planner for src/lib/gmail/rfcBackfillRun.ts (shared by scripts/backfill-rfc-message-ids.ts and the admin page). Messages synced
- * before migration 0036 have no `rfc_message_id`, so they cannot be replied
- * to as a real thread reply. The runner re-reads those messages from Gmail;
- * this turns the result into the exact updates to write.
+ * Pure planner for src/lib/gmail/rfcBackfillRun.ts (shared by
+ * scripts/backfill-rfc-message-ids.ts and the admin page /admin/rfc-backfill).
+ * Messages synced before migration 0036 have no `rfc_message_id`, so they
+ * cannot be replied to as a real thread reply. The runner re-reads those
+ * messages from Gmail; this turns the result into the exact updates to write.
  *
  * `fetched` is keyed by `backfillKey(bdId, gmailMessageId)` — the ONE key
  * builder, used by the runner that fills the map and by this planner that
@@ -83,34 +84,72 @@ export function groupCandidatesByBd(candidates: readonly BackfillCandidate[]): M
 }
 
 /** Coarse, token-free reasons a BD's mailbox was skipped. */
-export type BdSkipReason = "no_account" | "token_refresh_failed" | "fetch_failed";
+export type BdSkipReason =
+  | "no_account"
+  | "account_lookup_failed"
+  | "token_decrypt_failed"
+  | "token_refresh_failed"
+  | "fetch_failed";
+
+export const BD_SKIP_REASONS: readonly BdSkipReason[] = [
+  "no_account",
+  "account_lookup_failed",
+  "token_decrypt_failed",
+  "token_refresh_failed",
+  "fetch_failed",
+];
 
 export function tallySkipReasons(reasons: readonly BdSkipReason[]): Record<BdSkipReason, number> {
-  const tally: Record<BdSkipReason, number> = { no_account: 0, token_refresh_failed: 0, fetch_failed: 0 };
+  const tally: Record<BdSkipReason, number> = {
+    no_account: 0,
+    account_lookup_failed: 0,
+    token_decrypt_failed: 0,
+    token_refresh_failed: 0,
+    fetch_failed: 0,
+  };
   for (const r of reasons) tally[r]++;
   return tally;
 }
 
+/** Planner counts plus the rows of skipped BDs; `update + notFoundInGmail + noMessageIdHeader + skippedBdRows === candidates`. */
+export type RfcBackfillCounts = BackfillPlan["counts"] & { skippedBdRows: number };
+
 export interface RfcBackfillSummary {
+  candidates: number;
   updated: number;
   notFoundInGmail: number;
   noMessageIdHeader: number;
+  skippedBdRows: number;
   skippedBds: number;
+  skipReasons: Record<BdSkipReason, number>;
 }
+
+const REASON_PARAM: Record<BdSkipReason, string> = {
+  no_account: "rNoAccount",
+  account_lookup_failed: "rLookup",
+  token_decrypt_failed: "rDecrypt",
+  token_refresh_failed: "rRefresh",
+  fetch_failed: "rFetch",
+};
 
 /** The admin action redirects with the run summary in the query string; this is the ONE producer of those keys. */
 export function rfcBackfillResultToParams(result: {
-  counts: BackfillPlan["counts"];
+  counts: RfcBackfillCounts;
   skippedBds: number;
+  skipReasons: Record<BdSkipReason, number>;
   updated: number;
 }): URLSearchParams {
-  return new URLSearchParams({
+  const params = new URLSearchParams({
     ran: "1",
+    candidates: String(result.counts.candidates),
     updated: String(result.updated),
     notFound: String(result.counts.notFoundInGmail),
     noHeader: String(result.counts.noMessageIdHeader),
+    skippedRows: String(result.counts.skippedBdRows),
     skippedBds: String(result.skippedBds),
   });
+  for (const reason of BD_SKIP_REASONS) params.set(REASON_PARAM[reason], String(result.skipReasons[reason]));
+  return params;
 }
 
 function count(v: string | string[] | undefined): number {
@@ -122,10 +161,15 @@ export function parseRfcBackfillResultParams(
   params: Record<string, string | string[] | undefined>,
 ): RfcBackfillSummary | null {
   if (params.ran !== "1") return null;
+  const skipReasons = tallySkipReasons([]);
+  for (const reason of BD_SKIP_REASONS) skipReasons[reason] = count(params[REASON_PARAM[reason]]);
   return {
+    candidates: count(params.candidates),
     updated: count(params.updated),
     notFoundInGmail: count(params.notFound),
     noMessageIdHeader: count(params.noHeader),
+    skippedBdRows: count(params.skippedRows),
     skippedBds: count(params.skippedBds),
+    skipReasons,
   };
 }

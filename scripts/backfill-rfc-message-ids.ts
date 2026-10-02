@@ -71,7 +71,7 @@ async function main() {
   }
 
   const result = await runRfcBackfill({ actorBdId: actor!, limit });
-  console.log(`Plan: ${JSON.stringify({ ...result.counts, skippedBds: result.skippedBds })}`);
+  console.log(`Plan: ${JSON.stringify({ ...result.counts, skippedBds: result.skippedBds, skipReasons: result.skipReasons })}`);
   if (result.updated === 0) return;
   console.log(`Updated ${result.updated} message(s) and wrote 1 audit_log row.`);
 }
