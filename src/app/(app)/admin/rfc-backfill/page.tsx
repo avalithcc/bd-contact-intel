@@ -135,6 +135,7 @@ export default async function RfcBackfillAdminPage({
               <label htmlFor="limit">{dict.limitLabel}</label>
               <input
                 id="limit"
+                className="input"
                 name="limit"
                 type="number"
                 min={1}

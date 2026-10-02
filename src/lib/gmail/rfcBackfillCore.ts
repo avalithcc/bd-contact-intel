@@ -47,9 +47,16 @@ export interface RfcBackfillResult {
 
 type BdFetch = { ok: true; fetched: Map<string, ParsedGmailMessage> } | { ok: false; reason: BdSkipReason };
 
-function describeError(err: unknown): string {
-  if (err instanceof Error) return `${err.constructor.name}: ${err.message.slice(0, 300)}`;
-  return "non-Error thrown";
+/**
+ * Gmail client errors read `<call> failed: <status> <response body>`. For the
+ * fetch stage only that status prefix is logged, never the body; an
+ * unrecognised message is withheld entirely.
+ */
+function describeError(err: unknown, stage: BdSkipReason): string {
+  if (!(err instanceof Error)) return "non-Error thrown";
+  const message =
+    stage === "fetch_failed" ? (err.message.match(/^[\w.]+(?: [\w.]+)*? failed: \d{3}/)?.[0] ?? "(message withheld)") : err.message.slice(0, 300);
+  return `${err.constructor.name}: ${message}`;
 }
 
 /**
@@ -81,7 +88,7 @@ async function fetchForBd(deps: RfcBackfillDeps, bdId: string, rows: readonly Ba
     }
     return { ok: true, fetched };
   } catch (err) {
-    deps.logError(`[rfc-backfill] bd=${bdId} stage=${stage} ${describeError(err)}`);
+    deps.logError(`[rfc-backfill] bd=${bdId} stage=${stage} ${describeError(err, stage)}`);
     return { ok: false, reason: stage };
   }
 }
@@ -117,6 +124,6 @@ export async function executeRfcBackfill(
 
   const batches: BackfillUpdate[][] = [];
   for (let i = 0; i < plan.updates.length; i += BACKFILL_BATCH_SIZE) batches.push(plan.updates.slice(i, i + BACKFILL_BATCH_SIZE));
-  const updatedIds = await deps.writeUpdates(batches, (ids) => ({ counts, skippedBds, skipReasons, updatedIds: ids }));
+  const updatedIds = await deps.writeUpdates(batches, (ids) => ({ counts, skippedBds, skipReasons, updated: ids.length, updatedIds: ids }));
   return { counts, skippedBds, skipReasons, updated: updatedIds.length };
 }

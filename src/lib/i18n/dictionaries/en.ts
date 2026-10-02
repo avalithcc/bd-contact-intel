@@ -1802,7 +1802,7 @@ export const en = {
     limitLabel: "Messages per run",
     runButton: "Run one batch",
     resultTitle: "Last run",
-    resultCandidates: "Messages read",
+    resultCandidates: "Messages selected",
     resultUpdated: "Updated",
     resultNotFound: "Not found in Gmail",
     resultNoHeader: "Without a Message-ID header",

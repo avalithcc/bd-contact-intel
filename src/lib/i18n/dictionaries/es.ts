@@ -1774,7 +1774,7 @@ export const es: typeof en = {
     limitLabel: "Mensajes por ejecución",
     runButton: "Ejecutar un lote",
     resultTitle: "Última ejecución",
-    resultCandidates: "Mensajes leídos",
+    resultCandidates: "Mensajes seleccionados",
     resultUpdated: "Actualizados",
     resultNotFound: "No encontrados en Gmail",
     resultNoHeader: "Sin encabezado Message-ID",

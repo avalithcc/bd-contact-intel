@@ -87,6 +87,29 @@ test("each stage is labelled with the step that actually failed", async () => {
   assert.equal(fetchThrows.skipReasons.fetch_failed, 1);
 });
 
+test("a fetch failure logs the status prefix but never the Gmail response body", async () => {
+  const h = harness([cand("1", "a")], {
+    openMailbox: () => async () => {
+      throw new Error('Gmail messages.get failed: 403 {"error":{"message":"SECRET-BODY"}}');
+    },
+  });
+  await executeRfcBackfill(h.deps, { limit: 10 });
+  assert.equal(h.logs.length, 1);
+  assert.match(h.logs[0], /stage=fetch_failed Error: Gmail messages\.get failed: 403$/);
+  assert.doesNotMatch(h.logs[0], /SECRET-BODY/);
+  const odd = harness([cand("1", "a")], { openMailbox: () => async () => { throw new Error("weird SECRET-BODY"); } });
+  await executeRfcBackfill(odd.deps, { limit: 10 });
+  assert.doesNotMatch(odd.logs[0], /SECRET-BODY/);
+});
+
+test("the audit metadata separates the written count from the planned one", async () => {
+  const h = harness([cand("1", "a"), cand("2", "a")], {}, (ids) => ids.slice(0, 1));
+  await executeRfcBackfill(h.deps, { limit: 10 });
+  const audit = h.written.audit as { updated: number; counts: { update: number } };
+  assert.equal(audit.updated, 1);
+  assert.equal(audit.counts.update, 2);
+});
+
 test("numbers are honest: skipped BD rows are their own figure and the parts sum to the candidates", async () => {
   const candidates = [cand("1", "ok"), cand("2", "ok"), cand("3", "ok"), cand("4", "skipped"), cand("5", "skipped")];
   const h = harness(candidates, {
@@ -110,7 +133,7 @@ test("updated and updatedIds come from the rows the UPDATE returned, not from th
 test("the audit metadata carries counts, skippedBds, skipReasons and updatedIds", async () => {
   const h = harness([cand("1", "a")]);
   await executeRfcBackfill(h.deps, { limit: 10 });
-  assert.deepEqual(Object.keys(h.written.audit!).sort(), ["counts", "skipReasons", "skippedBds", "updatedIds"]);
+  assert.deepEqual(Object.keys(h.written.audit!).sort(), ["counts", "skipReasons", "skippedBds", "updated", "updatedIds"]);
 });
 
 test("updates beyond 200 are written in batches of at most 200", async () => {
