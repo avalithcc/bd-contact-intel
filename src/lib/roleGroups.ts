@@ -108,6 +108,25 @@ const RULES: Rule[] = [
       "socio\\w*",
       "partner",
       "board member",
+      // General management / ownership / board in Spanish, Italian and German
+      // (same job as "general manager"; seen on the hotel import).
+      // Bare "direttore" and "amministratore" are whole-title only: qualified
+      // forms ("direttore commerciale", "amministratore di sistema") name a
+      // different job and must not be promoted.
+      "directora? general",
+      "consejer[oa] delegad[oa]",
+      "directora? de hotel",
+      "hotel manager",
+      "^direttore$",
+      "direttore generale",
+      "direttrice generale",
+      "proprietari[oa]",
+      "unternehmensinhaber\\w*",
+      "inhaber\\w*",
+      "^amministratore$",
+      "amministratore (?:delegato|unico)",
+      "(?:miembro|vocal) del consejo de administraci[oó]n",
+      "(?:membro|membra) del consiglio di amministrazione",
     ),
   ],
   [
