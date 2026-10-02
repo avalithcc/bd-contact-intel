@@ -230,7 +230,10 @@ test("activity is skipped only when the sync won the race and already wrote one 
   assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: true }, matches, PERSON_ID), true);
   assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, PERSON_ID), false);
   assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, "other"), true);
-  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, undefined), true);
+  // No personId (lead/company-only caller) that loses the race: still suppressed, no duplicate.
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, undefined), false);
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, null), false);
+  assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: true }, matches, undefined), true);
 });
 
 test("a legitimate second send to the same person is never suppressed: the key is the Gmail message id, not the person", async () => {

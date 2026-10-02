@@ -43,11 +43,17 @@ export async function storeSentEmailMessage(
 }
 
 /**
- * False only when the sync already stored this message (our insert conflicted)
- * AND that sync run wrote an `email_sent` activity for this very person — the
- * sync cannot know the message is platform-sent when it lands between the
- * Gmail send and our commit, so it writes its own activity, and writing ours
- * too would show the same email twice. Every other case writes the activity.
+ * False only when the sync already stored this message (our insert conflicted,
+ * so the key is the Gmail message id — a second send always has a new id and
+ * is never suppressed) AND the sync's own `email_sent` activity covers this
+ * activity's subject. The sync cannot know the message is platform-sent when
+ * it lands between the Gmail send and our commit, so it writes one activity
+ * per matched person; writing ours too would show the same email twice.
+ *
+ * Covered: an activity for a matched person, and an activity with no
+ * `personId` (a lead/company-only caller — its person is resolved from the
+ * lead, so it is the same email the sync just recorded). Not covered: an
+ * activity for a person the sync did not match, which the sync never wrote.
  */
 export function shouldWriteSentActivity(
   stored: StoredSentEmail,
@@ -55,5 +61,6 @@ export function shouldWriteSentActivity(
   activityPersonId: string | null | undefined,
 ): boolean {
   if (stored.inserted) return true;
-  return !(activityPersonId && matches.some((m) => m.personId === activityPersonId));
+  if (!activityPersonId) return false;
+  return !matches.some((m) => m.personId === activityPersonId);
 }
