@@ -1076,6 +1076,12 @@ export const company = pgTable(
     // (src/lib/companies/clientStatus.ts); no CHECK, same convention as
     // relationshipStage/accountType.
     clientStatus: text("client_status"),
+    // Migration 0038 (company-linkedin-url): the company's LinkedIn page, in
+    // the one stored form `linkedin.com/company/<slug>` (or `/school/<slug>`),
+    // normalised and validated at the write boundary
+    // (src/lib/companies/linkedinUrl.ts). Nullable, no CHECK, no index —
+    // never backfilled or guessed from the domain.
+    linkedinUrl: text("linkedin_url"),
   },
   (t) => ({
     domainIdx: uniqueIndex("company_domain_idx")
