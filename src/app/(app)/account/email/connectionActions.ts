@@ -44,7 +44,7 @@ export async function disconnectEmailAccountAction(): Promise<ConnectionActionRe
 
 /**
  * "Sincronizar ahora" (email-sync.html:249) — runs the exact per-account
- * sync turn the 15-minute cron runs, once, for this BD alone.
+ * sync turn the 2-minute cron runs, once, for this BD alone.
  *
  * Fresh-review fix (2026-10-01): the button's own client-side `busy` flag
  * is not a real guard — it only prevents a double-click on the SAME mounted

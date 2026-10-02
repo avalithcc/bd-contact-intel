@@ -17,8 +17,10 @@
  */
 
 /**
- * The cron fires every 15 minutes. One or two misses are ordinary (a cold
- * start, a Gmail 5xx, a 60s budget overrun); four in a row (60 minutes)
+ * The cron fires every 2 minutes (it was every 15 when this threshold was
+ * chosen; the 60 minutes is deliberately unchanged and is now ~30 missed
+ * runs, a conservative bound). One or two misses are ordinary (a cold
+ * start, a Gmail 5xx, a 60s budget overrun); an hour without a success
  * means something is wrong while still catching an outage within the hour
  * instead of after a working day. Strictly greater than: exactly 60 minutes
  * is still fine.

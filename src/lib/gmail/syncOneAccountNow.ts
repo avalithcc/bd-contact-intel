@@ -3,7 +3,7 @@
  * persist the outcome) — extracted from `/api/gmail/sync/route.ts`'s
  * per-account loop body so the "Sincronizar ahora" button
  * (email-sync.html:249; src/app/(app)/account/email/connectionActions.ts)
- * runs the EXACT SAME code the 15-minute cron does, instead of a second,
+ * runs the EXACT SAME code the 2-minute cron does, instead of a second,
  * possibly-drifting implementation. The route still owns iterating every
  * account and its own try/catch per BD; this only factors what happens
  * once inside one BD's turn — same behavior, same DB writes, callable for
