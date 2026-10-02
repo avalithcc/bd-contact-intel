@@ -1,4 +1,8 @@
 /**
+ * NOTE: this targets the legacy `contact` table only. The contacts list and
+ * role visibility read `person.role_group`; use
+ * scripts/backfill-person-role-groups.ts for that column.
+ *
  * Backfill (or re-backfill) `contact.role_group` for every existing row,
  * using the same classifier used at import time (src/lib/roleGroups.ts).
  *
