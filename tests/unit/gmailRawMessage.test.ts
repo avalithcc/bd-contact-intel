@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildRawMessage, generateBoundary, wrapBase64 } from "@/lib/gmail/rawMessage";
+import { buildRawMessage, generateBoundary, plainTextPart, wrapBase64 } from "@/lib/gmail/rawMessage";
 import { htmlToOutboundText } from "@/lib/gmail/outboundText";
 import { GmailSendError } from "@/lib/gmail/errors";
 
@@ -292,3 +292,8 @@ for (const [name, html, expected] of textCases) {
     assert.equal(htmlToOutboundText(html), expected);
   });
 }
+
+test("plainTextPart is CRLF-normalised text for plain content and the derived alternative for HTML", () => {
+  assert.equal(plainTextPart({ body: "a\nb\r\nc" }), "a\r\nb\r\nc");
+  assert.equal(plainTextPart({ bodyHtml: "<div>One</div><div>Two</div>" }), "One\r\nTwo");
+});
