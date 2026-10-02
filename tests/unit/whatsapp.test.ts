@@ -48,6 +48,19 @@ test("the 00 international prefix is read as +", () => {
   assert.equal(whatsappLinkFor("0054 11 4123-4567"), "https://wa.me/541141234567");
 });
 
+test("00 path: separators and parentheses after the exit code still link", () => {
+  assert.equal(whatsappLinkFor("00-54 11 4123-4567"), "https://wa.me/541141234567");
+  assert.equal(whatsappLinkFor("00 (54) 11 4123-4567"), "https://wa.me/541141234567");
+  assert.equal(whatsappLinkFor("001 305 555 0182"), "https://wa.me/13055550182");
+});
+
+test("0010/0011 is an exit code (Australia), never 00 + a calling code: refused, not misread as +1", () => {
+  assert.deepEqual(whatsappLink("0011 372 5123 456"), { url: null, reason: "unsupported" });
+  assert.deepEqual(whatsappLink("0011 44 20 7946 0958"), { url: null, reason: "unsupported" });
+  assert.deepEqual(whatsappLink("0010 54 11 4123 4567"), { url: null, reason: "unsupported" });
+  assert.equal(whatsappLinkFor("0054 11 4123-4567"), "https://wa.me/541141234567");
+});
+
 test("a glued extension makes the number invalid, so no link", () => {
   assert.deepEqual(whatsappLink("+54 11 4123-4567 214"), { url: null, reason: "unsupported" });
 });
@@ -61,6 +74,10 @@ test("a full number with a doubled country code is rejected by length", () => {
 test("KNOWN LIMIT: a doubled country code on a short number has a possible length and links", () => {
   // Length is the only signal left once the prefix check is gone (isPossible,
   // not isValid); "+54 54 4123 4567" reads as an Argentine number of 10 digits.
+  // The production measurement found ZERO such numbers (all 8 doubled +54
+  // values were full-length and refused), so no hand-written "+54 54" rule
+  // was added: each country rule is another place to be wrong. Whoever
+  // reconsiders this has that number.
   assert.equal(whatsappLinkFor("+54 54 4123 4567"), "https://wa.me/545441234567");
 });
 
