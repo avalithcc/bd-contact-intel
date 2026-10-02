@@ -28,6 +28,7 @@ import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { PlusIcon } from "@/components/icons";
+import { whatsappLink } from "@/lib/whatsapp";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
@@ -161,6 +162,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     lastUpdatedLabel: p.lastEdit
       ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${formatArgentinaDayMonth(p.lastEdit.at)}`
       : null,
+    ...(p.key === "phone" || p.key === "mobilePhone" ? { whatsapp: whatsappLink(p.value) } : {}),
   });
 
   // "Ubicación" (contact-record.html:86) is ONE row in the mockup, composed

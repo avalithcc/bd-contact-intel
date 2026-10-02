@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { pickListPhone, toTelHref } from "@/lib/phone";
+import { whatsappLinkFor } from "@/lib/whatsapp";
 import { PhoneValue } from "@/components/PhoneValue";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
@@ -244,7 +245,7 @@ function columnCell(
       if (!toTelHref(value)) return <PhoneValue value={value} labels={l} />;
       return (
         <div className="phone-cell">
-          <PhoneValue value={value} labels={l} />
+          <PhoneValue value={value} whatsappUrl={whatsappLinkFor(value)} labels={l} />
         </div>
       );
     }

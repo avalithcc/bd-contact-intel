@@ -13,7 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon } from "@/components/icons";
-import { toTelHref, whatsappLink } from "@/lib/phone";
+import { toTelHref, type WhatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
@@ -23,6 +23,9 @@ export interface AboutPaneProperty {
   label: string;
   value: string | null;
   lastUpdatedLabel: string | null;
+  // Phone rows only: the WhatsApp link, built on the server because the
+  // parsing library (src/lib/whatsapp.ts) must not ship to the browser.
+  whatsapp?: WhatsappLink;
 }
 
 export interface OwnerOption {
@@ -326,7 +329,7 @@ function PropertyRow({
   const telHref = isPhoneProp && prop.value ? toTelHref(prop.value) : null;
   // Why the WhatsApp shortcut is missing, from the helper's own reason: a
   // malformed number is already plain text and needs no explanation.
-  const whatsappReason = telHref && prop.value ? whatsappLink(prop.value).reason : undefined;
+  const whatsappReason = telHref && prop.value ? prop.whatsapp?.reason : undefined;
   const whatsappHint =
     whatsappReason === "no_country_code"
       ? l.whatsappNoCountryCodeHint
@@ -392,7 +395,7 @@ function PropertyRow({
       <dt>{prop.label}</dt>
       <dd>
         {isPhoneProp && prop.value ? (
-          <PhoneValue value={prop.value} labels={l} />
+          <PhoneValue value={prop.value} whatsappUrl={prop.whatsapp?.url} labels={l} />
         ) : prop.key === "contactType" ? (
           contactTypeLabel(prop.value, l.emptyValue)
         ) : (

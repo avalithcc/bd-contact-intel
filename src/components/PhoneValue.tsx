@@ -1,4 +1,4 @@
-import { toTelHref, whatsappLinkFor } from "@/lib/phone";
+import { safeWhatsappHref, toTelHref } from "@/lib/phone";
 import { WhatsAppIcon } from "@/components/icons";
 
 export interface PhoneValueLabels {
@@ -11,8 +11,8 @@ export interface PhoneValueLabels {
  * One stored phone number as the contacts list and the contact record show
  * it (contact-whatsapp-access mockup, variant A):
  *
- * - valid number: a `tel:` link, plus the WhatsApp shortcut when the number
- *   carries a country code (`whatsappLinkFor`);
+ * - valid number: a `tel:` link, plus the WhatsApp shortcut when the server
+ *   built one (`whatsappLinkFor`, src/lib/whatsapp.ts);
  * - valid without a country code: the call link alone;
  * - malformed: plain text, no `tel:` and no WhatsApp (as before).
  *
@@ -20,8 +20,21 @@ export interface PhoneValueLabels {
  * the list, the property row's `dd` on the record). The shortcut only opens
  * a chat: it logs nothing and claims nothing about the number being on
  * WhatsApp.
+ *
+ * `whatsappUrl` is computed on the server (the parsing library must not
+ * reach the browser bundle) and is re-checked here: it only becomes an
+ * `href` if the number passed `toTelHref` AND the URL passes
+ * `safeWhatsappHref`.
  */
-export function PhoneValue({ value, labels }: { value: string; labels: PhoneValueLabels }) {
+export function PhoneValue({
+  value,
+  whatsappUrl,
+  labels,
+}: {
+  value: string;
+  whatsappUrl?: string | null;
+  labels: PhoneValueLabels;
+}) {
   const telHref = toTelHref(value);
   if (!telHref) {
     return (
@@ -30,7 +43,7 @@ export function PhoneValue({ value, labels }: { value: string; labels: PhoneValu
       </span>
     );
   }
-  const waHref = whatsappLinkFor(value);
+  const waHref = safeWhatsappHref(whatsappUrl);
   return (
     <>
       <a className="num" href={telHref}>
