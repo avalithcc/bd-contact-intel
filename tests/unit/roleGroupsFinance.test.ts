@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { classifyPosition } from "../../src/lib/roleGroups";
 
+// Synthetic vocabulary variants (not measured production strings); the
+// production-backed ones are REAL_FINANCE_DIRECTOR_TITLES below.
 const FINANCE_DIRECTOR_TITLES = [
   "Director financiero",
   "Director Financiero",
@@ -86,4 +88,12 @@ test("the finance terms do not route anyone into a hidden group", () => {
   for (const t of FINANCE_DIRECTOR_TITLES) {
     assert.ok(!["developers", "sales_bd"].includes(classifyPosition(t)), t);
   }
+});
+
+test("accepted over-promotion: deputy and assistant finance directors land in c_level_business", () => {
+  // Consistent with "director general adjunto" (general-management vocabulary):
+  // the term has no seniority qualifier, so deputies match too. Do not change
+  // finance without changing general management.
+  assert.equal(classifyPosition("Assistant Finance Director"), "c_level_business");
+  assert.equal(classifyPosition("Deputy Finance Director"), "c_level_business");
 });

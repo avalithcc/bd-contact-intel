@@ -54,3 +54,9 @@ test("real mixed titles move into eng_leadership (from operations / project_deli
     "eng_leadership",
   );
 });
+
+test("accepted limitation: a surname 'Ti' after a leadership word matches", () => {
+  // `ti` is a word-boundary term, so "Director Ti Nguyen" reads as "Director TI".
+  // Documented, not a silent bug: production has zero such rows (measured).
+  assert.equal(classifyPosition("Director Ti Nguyen"), "eng_leadership");
+});
