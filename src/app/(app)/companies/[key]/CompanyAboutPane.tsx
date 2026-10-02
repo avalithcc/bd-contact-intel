@@ -9,6 +9,8 @@ import { CompanyQuickActions, type CompanyQuickActionsLabels, type TaskAssigneeO
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { CLIENT_STATUSES, clientStatusLabel } from "@/lib/companies/clientStatus";
+import { companyLinkedinUrlHref } from "@/lib/companies/linkedinUrl";
+import { propertyEditFailureMessage } from "@/lib/companies/propertyEditFailure";
 
 const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
 type Stage = (typeof STAGES)[number];
@@ -47,6 +49,16 @@ export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
       | "clientStatusActive"
       | "clientStatusInactive"
       | "clientStatusNone"
+      | "propLinkedinUrl"
+      | "linkedinUrlPlaceholder"
+      | "linkedinUrlHelp"
+      | "linkedinErrorNotLinkedin"
+      | "linkedinErrorPersonalProfile"
+      | "linkedinErrorInvalidPath"
+      | "linkedinErrorUnparseable"
+      | "editErrorClientStatus"
+      | "editErrorOwner"
+      | "editErrorCompanyNotFound"
       | "emptyValue"
       | "edit"
       | "ownerUnassignedOption"
@@ -90,6 +102,8 @@ export interface CompanyAboutPaneProps {
   accountTypeText: string;
   /** Raw `company.client_status` (null = not stated). */
   clientStatus: string | null;
+  /** Stored `company.linkedin_url` (`linkedin.com/company/<slug>`; null = not set). */
+  linkedinUrl: string | null;
   labels: CompanyAboutPaneLabels;
   newContactLabels: NewContactDialogLabels;
 }
@@ -152,6 +166,7 @@ export function CompanyAboutPane({
   startupText,
   accountTypeText,
   clientStatus,
+  linkedinUrl,
   labels: l,
   newContactLabels,
 }: CompanyAboutPaneProps) {
@@ -197,7 +212,11 @@ export function CompanyAboutPane({
     setBusy(true);
     setError(null);
     try {
-      await updateCompanyPropertyAction(companyKey, property, value);
+      const result = await updateCompanyPropertyAction(companyKey, property, value);
+      if (!result.ok) {
+        setError(propertyEditFailureMessage(result.failure, l));
+        return;
+      }
       setEditingProperty(null);
       router.refresh();
     } catch {
@@ -428,6 +447,27 @@ export function CompanyAboutPane({
           onSave={(value) => saveProperty("clientStatus", value)}
         />
 
+        {/* LinkedIn page — a link (new tab) when set; edited as free text that
+            is normalised and validated on the server (linkedinUrl.ts). */}
+        <LinkedinPropertyRow
+          label={l.propLinkedinUrl}
+          value={linkedinUrl}
+          editing={editingProperty === "linkedinUrl"}
+          busy={busy}
+          error={editingProperty === "linkedinUrl" ? error : null}
+          hint={formatLastEdit(l, lastEditByProperty.linkedinUrl)}
+          labels={l}
+          onStartEdit={() => {
+            setError(null);
+            setEditingProperty("linkedinUrl");
+          }}
+          onCancel={() => {
+            setError(null);
+            setEditingProperty(null);
+          }}
+          onSave={(value) => saveProperty("linkedinUrl", value)}
+        />
+
         {error && !editingProperty && (
           <p className="error-text" role="alert">
             {error}
@@ -640,6 +680,97 @@ function ClientStatusPropertyRow({
       <dd>
         {clientStatusLabel(value, l)}
         <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={onStartEdit} aria-label={l.edit}>
+          <EditPencilIcon className="icon" />
+        </button>
+      </dd>
+      {hint && <dd className="hint">{hint}</dd>}
+    </div>
+  );
+}
+
+interface LinkedinPropertyRowProps {
+  label: string;
+  value: string | null;
+  editing: boolean;
+  busy: boolean;
+  error: string | null;
+  hint: string | null;
+  labels: CompanyAboutPaneLabels;
+  onStartEdit: () => void;
+  onCancel: () => void;
+  onSave: (value: string) => void;
+}
+
+/** LinkedIn row — text input with placeholder + help while editing; the
+ * stored value renders as an external link (the stored form is already
+ * short and readable, so it is shown as-is). */
+function LinkedinPropertyRow({
+  label,
+  value,
+  editing,
+  busy,
+  error,
+  hint,
+  labels: l,
+  onStartEdit,
+  onCancel,
+  onSave,
+}: LinkedinPropertyRowProps) {
+  const [draft, setDraft] = useState(value ?? "");
+
+  // The stored form differs from what was pasted, so seed the draft from the
+  // stored value every time editing starts (a cancelled edit leaves nothing
+  // behind, and a saved one reopens as the normalised value).
+  function startEdit() {
+    setDraft(value ?? "");
+    onStartEdit();
+  }
+
+  if (editing) {
+    return (
+      <div className="prop">
+        <dt>{label}</dt>
+        <dd>
+          <input
+            className="input"
+            value={draft}
+            placeholder={l.linkedinUrlPlaceholder}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={busy}
+            autoFocus
+          />
+        </dd>
+        <dd className="help">{l.linkedinUrlHelp}</dd>
+        {error && (
+          <dd className="error-text" role="alert">
+            {error}
+          </dd>
+        )}
+        <dd className="row">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onSave(draft)} disabled={busy}>
+            {l.save}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
+            {l.cancel}
+          </button>
+        </dd>
+      </div>
+    );
+  }
+
+  const href = companyLinkedinUrlHref(value);
+  return (
+    <div className="prop">
+      <dt>{label}</dt>
+      <dd>
+        {value && href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {value}
+          </a>
+        ) : (
+          (value ?? l.emptyValue)
+        )}
+        <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={startEdit} aria-label={l.edit}>
           <EditPencilIcon className="icon" />
         </button>
       </dd>

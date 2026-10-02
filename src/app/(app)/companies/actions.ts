@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { createCompany, getCompanyByKey, updateCompany } from "@/lib/companies/queries";
 import { getCurrentBd } from "@/lib/queries";
-import type { NewCompany } from "@/db/schema";
+import type { Company, NewCompany } from "@/db/schema";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
@@ -14,6 +14,7 @@ import {
   isEditableCompanyProperty,
   type EditableCompanyProperty,
 } from "@/lib/companies/propertyEdit";
+import { propertyEditFailureOf, type PropertyEditFailure } from "@/lib/companies/propertyEditFailure";
 import { getCompanyTimeline } from "@/lib/companies/recordQueries";
 import { isCompanyActivityFilter } from "@/lib/companies/recordMappers";
 import { buildCompanyTimelineViewRows, type CompanyTimelineViewRow } from "@/lib/companies/timelineView";
@@ -69,28 +70,36 @@ export async function updateCompanyAction(
  * is validated against the allow-list here (not trusted from the client),
  * and `updateCompanyProperty` re-validates `ownerBdId` against real `bd`
  * rows before writing.
+ *
+ * A typed, user-correctable failure (bad LinkedIn URL, client status, owner,
+ * company not found) is returned as `{ ok: false, failure }` rather than
+ * thrown: Next.js replaces a thrown server-action message with a generic one
+ * in production, which would hide the reason from the BD. Anything else is
+ * rethrown so a real bug still fails loudly.
  */
 export async function updateCompanyPropertyAction(
   companyKey: string,
   property: string,
   rawNewValue: string,
-) {
+): Promise<{ ok: true; company: Company } | { ok: false; failure: PropertyEditFailure }> {
   if (!isEditableCompanyProperty(property)) {
     throw new Error(`Property not editable: ${property}`);
   }
   const me = await getCurrentBd();
 
-  const company = await updateCompanyProperty(
-    companyKey,
-    property as EditableCompanyProperty,
-    rawNewValue,
-    me.id,
-  );
+  let company: Company;
+  try {
+    company = await updateCompanyProperty(companyKey, property as EditableCompanyProperty, rawNewValue, me.id);
+  } catch (err) {
+    const failure = propertyEditFailureOf(err);
+    if (failure) return { ok: false, failure };
+    throw err;
+  }
 
   revalidatePath("/companies");
   revalidatePath(`/companies/${companyKey}`);
 
-  return company;
+  return { ok: true, company };
 }
 
 /**

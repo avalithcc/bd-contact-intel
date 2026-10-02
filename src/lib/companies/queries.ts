@@ -149,6 +149,7 @@ export async function getCompanyByKey(companyKey: string): Promise<CompanyWithOw
       country: company.country,
       accountType: company.accountType,
       clientStatus: company.clientStatus,
+      linkedinUrl: company.linkedinUrl,
     })
     .from(company)
     .leftJoin(owner, eq(company.ownerBdId, owner.id))

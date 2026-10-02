@@ -15,6 +15,7 @@ import {
   isEditableCompanyProperty,
   planCompanyPropertyEdit,
 } from "@/lib/companies/propertyEdit";
+import { InvalidCompanyLinkedinUrlError } from "@/lib/companies/linkedinUrl";
 
 const BD_1 = "11111111-1111-1111-1111-111111111111";
 const BD_2 = "22222222-2222-2222-2222-222222222222";
@@ -26,6 +27,7 @@ const BASE_COMPANY = {
   city: null,
   country: null,
   clientStatus: null,
+  linkedinUrl: null,
 };
 
 test("isEditableCompanyProperty accepts only the allow-listed columns", () => {
@@ -118,6 +120,7 @@ test("planCompanyPropertyEdit is a pure function: same input twice yields the sa
     city: null,
     country: null,
     clientStatus: null,
+    linkedinUrl: null,
   });
 });
 
@@ -185,4 +188,71 @@ test("planCompanyPropertyEdit does not mutate its input and is repeatable", () =
   assert.deepEqual(input, snapshot);
   assert.deepEqual(a.historyRows, b.historyRows);
   assert.equal(a.companyUpdate!.clientStatus, b.companyUpdate!.clientStatus);
+});
+
+test("linkedinUrl is an editable property", () => {
+  assert.equal(isEditableCompanyProperty("linkedinUrl"), true);
+});
+
+test("planCompanyPropertyEdit stores the normalised LinkedIn URL and writes one history row", () => {
+  const plan = planCompanyPropertyEdit(
+    BASE_COMPANY,
+    "linkedinUrl",
+    " https://www.linkedin.com/company/Avalith/?originalSubdomain=ar ",
+    BD_1,
+  );
+  assert.equal(plan.changed, true);
+  assert.equal(plan.companyUpdate!.linkedinUrl, "linkedin.com/company/avalith");
+  assert.deepEqual(plan.historyRows, [
+    {
+      companyKey: "acme",
+      property: "linkedinUrl",
+      oldValue: null,
+      newValue: "linkedin.com/company/avalith",
+      changedByBdId: BD_1,
+      source: "edit",
+    },
+  ]);
+});
+
+test("planCompanyPropertyEdit reports no change when the pasted URL normalises to the stored one", () => {
+  const stored = { ...BASE_COMPANY, linkedinUrl: "linkedin.com/company/avalith" };
+  const plan = planCompanyPropertyEdit(stored, "linkedinUrl", "https://www.linkedin.com/company/avalith/", BD_1);
+  assert.equal(plan.changed, false);
+  assert.deepEqual(plan.historyRows, []);
+});
+
+test("planCompanyPropertyEdit clears linkedinUrl to null on a blank value", () => {
+  const stored = { ...BASE_COMPANY, linkedinUrl: "linkedin.com/company/avalith" };
+  const plan = planCompanyPropertyEdit(stored, "linkedinUrl", "   ", BD_1);
+  assert.equal(plan.changed, true);
+  assert.equal(plan.companyUpdate!.linkedinUrl, null);
+  assert.equal(plan.historyRows[0]!.oldValue, "linkedin.com/company/avalith");
+  assert.equal(plan.historyRows[0]!.newValue, null);
+});
+
+test("planCompanyPropertyEdit rejects a personal profile and a foreign host before building a plan", () => {
+  assert.throws(
+    () => planCompanyPropertyEdit(BASE_COMPANY, "linkedinUrl", "https://www.linkedin.com/in/john-doe", BD_1),
+    (e: unknown) => e instanceof InvalidCompanyLinkedinUrlError && e.reason === "personal_profile",
+  );
+  assert.throws(
+    () => planCompanyPropertyEdit(BASE_COMPANY, "linkedinUrl", "https://avalith.net", BD_1),
+    (e: unknown) => e instanceof InvalidCompanyLinkedinUrlError && e.reason === "not_linkedin",
+  );
+});
+
+test("linkedinUrl edit touches only linkedinUrl and the audit columns", () => {
+  const plan = planCompanyPropertyEdit(BASE_COMPANY, "linkedinUrl", "avalith", BD_1);
+  assert.deepEqual(Object.keys(plan.companyUpdate!).sort(), ["linkedinUrl", "updatedAt", "updatedByBdId"]);
+});
+
+test("linkedinUrl planning does not mutate its input and is repeatable", () => {
+  const input = { ...BASE_COMPANY, linkedinUrl: "linkedin.com/company/old" };
+  const snapshot = structuredClone(input);
+  const a = planCompanyPropertyEdit(input, "linkedinUrl", "linkedin.com/company/new/", BD_1);
+  const b = planCompanyPropertyEdit(input, "linkedinUrl", "linkedin.com/company/new/", BD_1);
+  assert.deepEqual(input, snapshot);
+  assert.deepEqual(a.historyRows, b.historyRows);
+  assert.equal(a.companyUpdate!.linkedinUrl, b.companyUpdate!.linkedinUrl);
 });
