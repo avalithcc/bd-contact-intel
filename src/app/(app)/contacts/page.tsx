@@ -4,7 +4,7 @@ import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
-import { pickListPhone } from "@/lib/phone";
+import { pickListPhone, toTelHref } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
@@ -240,6 +240,8 @@ function columnCell(
     case "phone": {
       const value = pickListPhone(row.phone, row.mobilePhone);
       if (!value) return <span className="badge badge-none">{l.phoneNone}</span>;
+      // Malformed: bare plain text, as drawn (no cell wrapper, no min-width).
+      if (!toTelHref(value)) return <PhoneValue value={value} labels={l} />;
       return (
         <div className="phone-cell">
           <PhoneValue value={value} labels={l} />

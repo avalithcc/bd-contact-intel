@@ -784,6 +784,7 @@ export const es: typeof en = {
     whatsappTitle: "Abrir WhatsApp con este número",
     whatsappLabelPrefix: "Abrir WhatsApp con",
     whatsappNoCountryCodeHint: "Sin código de país no se puede armar el enlace de WhatsApp.",
+    whatsappUnavailableHint: "No se puede armar un enlace de WhatsApp con este número.",
     phoneUnrecognizedTitle: "Formato no reconocido: se muestra como texto",
     // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — never
     // shown alongside verifiedBadge, since email_status can only be one of

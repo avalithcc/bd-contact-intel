@@ -856,6 +856,7 @@ export const en = {
     whatsappTitle: "Open WhatsApp with this number",
     whatsappLabelPrefix: "Open WhatsApp with",
     whatsappNoCountryCodeHint: "Without a country code the WhatsApp link cannot be built.",
+    whatsappUnavailableHint: "A WhatsApp link cannot be built from this number.",
     phoneUnrecognizedTitle: "Unrecognized format: shown as text",
     inferredBadge: "Inferred",
     inferredMatchHint: "The email was matched by a domain pattern (firstname.lastname@company), not verified by hand.",

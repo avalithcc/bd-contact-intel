@@ -13,7 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon } from "@/components/icons";
-import { toTelHref, whatsappLinkFor } from "@/lib/phone";
+import { toTelHref, whatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
@@ -324,6 +324,15 @@ function PropertyRow({
   // number.
   const isPhoneProp = prop.key === "phone" || prop.key === "mobilePhone";
   const telHref = isPhoneProp && prop.value ? toTelHref(prop.value) : null;
+  // Why the WhatsApp shortcut is missing, from the helper's own reason: a
+  // malformed number is already plain text and needs no explanation.
+  const whatsappReason = telHref && prop.value ? whatsappLink(prop.value).reason : undefined;
+  const whatsappHint =
+    whatsappReason === "no_country_code"
+      ? l.whatsappNoCountryCodeHint
+      : whatsappReason === "unsupported"
+        ? l.whatsappUnavailableHint
+        : null;
 
   if (editing) {
     return (
@@ -428,7 +437,7 @@ function PropertyRow({
           <EditPencilIcon className="icon" />
         </button>
       </dd>
-      {telHref && !whatsappLinkFor(prop.value) && <dd className="hint">{l.whatsappNoCountryCodeHint}</dd>}
+      {whatsappHint && <dd className="hint">{whatsappHint}</dd>}
       {hunterHint ? (
         <dd className="hint">{hunterHint}</dd>
       ) : (

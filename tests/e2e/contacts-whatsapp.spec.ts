@@ -22,7 +22,7 @@ test.describe('Contacts: WhatsApp shortcut in the phone column', () => {
     test.skip((await shortcuts.count()) === 0, 'No row on this page has a number with a country code.');
 
     for (const link of await shortcuts.all()) {
-      await expect(link).toHaveAttribute('href', /^https:\/\/wa\.me\/[1-9]\d{5,14}$/);
+      await expect(link).toHaveAttribute('href', /^https:\/\/wa\.me\/[1-9]\d{7,14}$/);
       await expect(link).toHaveAttribute('target', '_blank');
       await expect(link).toHaveAttribute('rel', /noopener/);
       await expect(link).toHaveAttribute('title', L.whatsappTitle);
