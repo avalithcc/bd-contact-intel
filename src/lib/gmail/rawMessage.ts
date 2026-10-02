@@ -53,7 +53,7 @@ export function generateBoundary(
  */
 export function assertSafeHeaderValue(name: string, value: string): void {
   if (/[\r\n\0]/.test(value)) {
-    throw new GmailSendError("invalid_header", `The ${name} header contains a control character (CR, LF or NUL)`);
+    throw new GmailSendError("invalid_header", `The ${name} header contains a control character (CR, LF or NUL)`, name);
   }
 }
 

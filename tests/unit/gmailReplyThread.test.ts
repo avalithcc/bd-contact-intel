@@ -10,6 +10,7 @@ import { test } from "node:test";
 import { buildRawMessage, buildSendPayload } from "@/lib/gmail/rawMessage";
 import { composeEmailBody } from "@/lib/signature/compose";
 import { GmailSendError } from "@/lib/gmail/errors";
+import { replyUnavailableCopyKey } from "@/lib/gmail/replyCopy";
 import { planThreadReply, replySubject, replyView, type ReplySourceMessage } from "@/lib/gmail/replyThread";
 
 const FROM = "bd@avalith.net";
@@ -202,4 +203,26 @@ test("replyView exposes only recipient and subject to the client, never the thre
   const view = replyView(planThreadReply([msg({ n: 1 })]));
   assert.deepEqual(view, { ok: true, to: TO, subject: "Re: Hello" });
   assert.deepEqual(replyView({ ok: false, reason: "no_message_id" }), { ok: false, reason: "no_message_id" });
+});
+
+// --- foreign reply prefixes: keep verbatim, never mangle ----------------------
+
+test("replySubject returns the subject verbatim for foreign and bracketed prefixes, and prepends nothing", () => {
+  for (const s of ["R: Richiesta camera", "AW: Anfrage", "Antw: Anfrage", "SV: x", "VS: x", "RV: x", "RES: x", "ODP: x", "YNT: x", "Ref: 123", "Re[2]: Hello", "aw[10] : Anfrage", "r : Richiesta", "aw: x", "antw: x", "sv: x", "Odp: x"]) {
+    assert.equal(replySubject(s), s);
+  }
+});
+
+test("replySubject still collapses a run of plain English re: and still prepends to a subject with no prefix", () => {
+  assert.equal(replySubject("Re: re: Hello"), "Re: Hello");
+  assert.equal(replySubject("Reserva Re: x"), "Re: Reserva Re: x");
+  assert.equal(replySubject("Renovación de contrato"), "Re: Renovación de contrato");
+  assert.equal(replySubject("Rapporto: Q3"), "Re: Rapporto: Q3");
+});
+
+test("replyUnavailableCopyKey gives each refusal its own copy; unsafe_header is not the 'synced before' copy", () => {
+  assert.equal(replyUnavailableCopyKey("no_message_id"), "timelineReplyUnavailable");
+  assert.equal(replyUnavailableCopyKey("unsafe_header"), "timelineReplyUnsafeHeader");
+  assert.equal(replyUnavailableCopyKey("no_recipient"), "timelineReplyNoRecipient");
+  assert.equal(replyUnavailableCopyKey("empty_thread"), "timelineReplyNoRecipient");
 });

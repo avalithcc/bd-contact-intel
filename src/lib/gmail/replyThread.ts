@@ -14,6 +14,7 @@
  * Never mutates its input.
  */
 import { assertSafeHeaderValue } from "./rawMessage";
+import type { ReplyRefusalReason } from "./replyCopy";
 
 export interface ReplySourceMessage {
   gmailThreadId: string;
@@ -29,17 +30,34 @@ export interface ReplySourceMessage {
 
 export type ReplyPlan =
   | { ok: true; threadId: string; to: string; subject: string; inReplyTo: string; references: string }
-  | { ok: false; reason: "empty_thread" | "no_message_id" | "no_recipient" | "unsafe_header" };
+  | { ok: false; reason: ReplyRefusalReason };
 
 /** RFC 5322 §3.6.4 advises trimming long chains; keep the root and the newest ids. */
 export const MAX_REFERENCE_IDS = 20;
 
-const LEADING_RE = /^\s*(?:re\s*:\s*)+/i;
+// A run of plain English `re:` is collapsed to one `Re: ` (known-good).
+const PLAIN_RE_RUN = /^\s*(?:re\s*:\s*)+/i;
 
-/** One `Re: ` in front of the subject, however many the thread already had. */
+// Reply prefixes of the mail clients this book actually meets: re (English,
+// Spanish), r (Italian Outlook), aw / antw (German), sv (Nordic), vs
+// (Finnish), rv (Spanish), res (Portuguese), odp (Polish), ynt (Turkish),
+// ref. Case-insensitive, optional space before the colon, optional bracketed
+// counter some clients add (`Re[2]:`). DELIBERATELY conservative: when the
+// subject already starts with one of these it is kept verbatim, so Gmail sees
+// exactly the subject the thread already has. An unknown prefix is simply
+// treated as part of the subject (we prepend `Re: `); leaving a prefix alone
+// is safe, rewriting one we did not fully understand is not.
+const KNOWN_REPLY_PREFIX = /^\s*(?:re|r|aw|antw|sv|vs|rv|res|odp|ynt|ref)(?:\[\d+\])?\s*:/i;
+
+/** Subject for a reply: never stacks a prefix, never rewrites one it does not own. */
 export function replySubject(subject: string | null): string {
-  const rest = (subject ?? "").replace(LEADING_RE, "").trim();
-  return rest ? `Re: ${rest}` : "Re:";
+  const text = (subject ?? "").trim();
+  if (PLAIN_RE_RUN.test(text)) {
+    const rest = text.replace(PLAIN_RE_RUN, "").trim();
+    return rest ? `Re: ${rest}` : "Re:";
+  }
+  if (KNOWN_REPLY_PREFIX.test(text)) return text;
+  return text ? `Re: ${text}` : "Re:";
 }
 
 function isUnsafe(value: string | null): boolean {
@@ -93,4 +111,16 @@ export type ReplyView =
 
 export function replyView(plan: ReplyPlan): ReplyView {
   return plan.ok ? { ok: true, to: plan.to, subject: plan.subject } : plan;
+}
+
+/**
+ * A stored Message-ID/References with CR/LF/NUL is not an ordinary gap: it is
+ * either corrupt data or a header-injection attempt that got through the
+ * sync. Leave a greppable, structured trace (ids only, never the header
+ * value) so it can be investigated instead of silently absorbed. A log line,
+ * not an audit_log write: this runs on the read path (thread expand) and must
+ * not write on every view.
+ */
+export function logUnsafeReplyHeader(bdId: string, personId: string, gmailThreadId: string): void {
+  console.error(`[reply] unsafe_header ${JSON.stringify({ bdId, personId, gmailThreadId })}`);
 }

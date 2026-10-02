@@ -60,6 +60,8 @@ export class GmailSendError extends Error {
   constructor(
     public readonly kind: GmailSendErrorKind,
     message: string,
+    // For `invalid_header`: WHICH header was rejected (To, From, In-Reply-To, References).
+    public readonly header?: string,
   ) {
     super(message);
     this.name = "GmailSendError";

@@ -61,6 +61,7 @@ import { getTimelinePillEntriesAction, sendThreadReplyAction } from "../actions"
 import { contactActionErrorHref } from "../actionErrors";
 import { ReplyDialog, type ReplyDialogError } from "./ReplyDialog";
 import type { ReplyView } from "@/lib/gmail/replyThread";
+import { replyUnavailableCopyKey } from "@/lib/gmail/replyCopy";
 import { getThreadBodiesAction } from "./threadActions";
 import type { ThreadMessageBody } from "@/lib/gmail/threadMessages";
 import styles from "./page.module.css";
@@ -932,13 +933,13 @@ export function Timeline({
           type="button"
           className="btn btn-secondary btn-sm"
           disabled={!reply.ok}
-          title={reply.ok ? undefined : l.timelineReplyUnavailable}
+          title={reply.ok ? undefined : l[replyUnavailableCopyKey(reply.reason)]}
           onClick={() => setReplyingThreadId(threadId)}
         >
           <MailIcon className="icon" />
           {l.timelineReplyAction}
         </button>
-        {!reply.ok && <p className="meta mt-2xs">{l.timelineReplyUnavailable}</p>}
+        {!reply.ok && <p className="meta mt-2xs">{l[replyUnavailableCopyKey(reply.reason)]}</p>}
       </div>
     );
   }

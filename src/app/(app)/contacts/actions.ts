@@ -14,7 +14,7 @@ import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
 import { sendGmailMessage } from "@/lib/gmail/send";
 import { composeEmailBody } from "@/lib/signature/compose";
-import { planThreadReply } from "@/lib/gmail/replyThread";
+import { logUnsafeReplyHeader, planThreadReply } from "@/lib/gmail/replyThread";
 import { getThreadReplySource } from "@/lib/gmail/threadMessages";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
@@ -391,7 +391,10 @@ export async function sendThreadReplyAction(
     await assertContactEditableById(personId);
     const me = await getCurrentBd();
     const plan = planThreadReply(await getThreadReplySource(me.id, personId, gmailThreadId));
-    if (!plan.ok) return { ok: false, reason: "reply_unavailable" };
+    if (!plan.ok) {
+      if (plan.reason === "unsafe_header") logUnsafeReplyHeader(me.id, personId, gmailThreadId);
+      return { ok: false, reason: plan.reason === "unsafe_header" ? "reply_unsafe_header" : "reply_unavailable" };
+    }
     await sendGmailMessage({
       bdId: me.id,
       to: plan.to,
