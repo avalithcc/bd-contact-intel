@@ -232,3 +232,18 @@ test("activity is skipped only when the sync won the race and already wrote one 
   assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, "other"), true);
   assert.equal(shouldWriteSentActivity({ emailMessageId: "m", inserted: false }, matches, undefined), true);
 });
+
+test("a legitimate second send to the same person is never suppressed: the key is the Gmail message id, not the person", async () => {
+  const { store, messages } = fakeStore();
+  const second = (id: string) =>
+    classifySentMessage({
+      bdEmail: BD_EMAIL, to: "jane@prospect.com", subject: "Otro", content: { body: "segundo" },
+      gmailMessageId: id, gmailThreadId: "gt-1", metadata: null, now: SENT_AT,
+      knownPersons: [PERSON], neverLogRules: [],
+    });
+  const a = await storeSentEmailMessage(store, BD_ID, second("gm-A"));
+  const b = await storeSentEmailMessage(store, BD_ID, second("gm-B"));
+  assert.equal(messages.size, 2);
+  assert.equal(shouldWriteSentActivity(a, second("gm-A").matches, PERSON_ID), true);
+  assert.equal(shouldWriteSentActivity(b, second("gm-B").matches, PERSON_ID), true);
+});
