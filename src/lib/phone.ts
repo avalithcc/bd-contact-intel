@@ -67,3 +67,38 @@ export function pickListPhone(phone: string | null, mobilePhone: string | null):
   }
   return null;
 }
+
+// E.164: a number is at most 15 digits, country code included.
+const MAX_INTERNATIONAL_DIGITS = 15;
+
+/**
+ * The `https://wa.me/<digits>` link for a stored number, or `null` when none
+ * can be built without guessing.
+ *
+ * A link needs the country code, and numbers are stored as typed, so only
+ * two explicit signals count: a leading `+`, or the `00` international
+ * prefix (stripped). `011 4123-4567` is a valid stored number but carries
+ * neither, and no country is assumed for it. `null` as well for blank,
+ * malformed (same `isValidPhoneFormat` gate as `toTelHref`), more than 15
+ * digits, a country code starting with 0, and a `(0)` trunk digit, which
+ * would have to be dropped by guessing.
+ *
+ * The result says nothing about whether the number is registered on
+ * WhatsApp; the CRM cannot know that.
+ */
+export function whatsappLinkFor(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!isValidPhoneFormat(trimmed)) return null;
+  if (/\(0\)/.test(trimmed)) return null;
+  let digits = trimmed.replace(/[^0-9]/g, "");
+  if (trimmed.startsWith("+")) {
+    // already carries its country code
+  } else if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+  } else {
+    return null;
+  }
+  if (digits === "" || digits.startsWith("0") || digits.length > MAX_INTERNATIONAL_DIGITS) return null;
+  return `https://wa.me/${digits}`;
+}
