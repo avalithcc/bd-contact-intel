@@ -49,8 +49,14 @@ export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "seniority",
 ];
 
-/** Matches the fixed column set the `/contacts` page shipped with pre-13.1
- * (task 12.5), so existing views render unchanged until a BD opts in. */
+/**
+ * Columns shown when a view stores no explicit list: Empresa, Responsable,
+ * Estado, Correo, Teléfono. "phone" was added on the owner's instruction —
+ * BDs filter the list by phone and had to open each record to read the number.
+ * This is safe because `saved_view` has 0 rows in production, so every user
+ * inherits the new default. A view saved with its own column list would keep
+ * that list and need to tick Teléfono in the picker.
+ */
 export const DEFAULT_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "company",
   "owner",
