@@ -57,6 +57,7 @@ export const es: typeof en = {
     project_delivery: "Proyectos y Delivery",
     developers: "Desarrolladores",
     hr_recruiting: "RRHH y Reclutamiento",
+    hospitality_revenue: "Revenue y Reservas",
     sales_bd: "Ventas y BD",
     operations: "Operaciones",
     other: "Otro",

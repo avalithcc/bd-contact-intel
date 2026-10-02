@@ -39,6 +39,7 @@ const ROLE_GROUP_LABELS: Record<RoleGroupKey, string> = {
   project_delivery: "Project/program delivery",
   developers: "Individual contributor developer",
   hr_recruiting: "HR / recruiting",
+  hospitality_revenue: "Hotel revenue / reservations / distribution",
   sales_bd: "Sales / business development",
   operations: "Operations",
   other: "Other / unclassified role",

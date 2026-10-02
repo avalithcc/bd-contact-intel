@@ -181,7 +181,8 @@ async function ownerNames(ex: Executor, ids: string[]): Promise<Record<string, s
 
 async function print(ex: Executor, label: string, scope: string, result: ScanResult) {
   const s = summarizeTally(result.tally);
-  console.log(`\n=== ${label} (${scope}): ${result.total} persons, ${result.changed} would change ===`);
+  const changedWording = label === "EXECUTED" ? "changed" : "would change";
+  console.log(`\n=== ${label} (${scope}): ${result.total} persons, ${result.changed} ${changedWording} ===`);
   console.log("Current distribution:");
   for (const r of s.before) console.log(`  ${String(r.count).padStart(6)}  ${r.group}`);
   console.log("Distribution after the change:");

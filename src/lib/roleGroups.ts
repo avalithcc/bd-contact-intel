@@ -23,6 +23,7 @@ export type RoleGroupKey =
   | "project_delivery"
   | "developers"
   | "hr_recruiting"
+  | "hospitality_revenue"
   | "sales_bd"
   | "operations"
   | "other"
@@ -35,7 +36,7 @@ export interface RoleGroupDef {
 // Ordered for display; classification order is defined separately by RULES
 // below (must match: c_level_tech, c_level_business, eng_leadership,
 // engineering_manager, tech_lead_architect, product, project_delivery,
-// developers, hr_recruiting, sales_bd, operations, other; no_position is
+// developers, hr_recruiting, hospitality_revenue, sales_bd, operations, other; no_position is
 // the null/blank fallback and is checked before any rule).
 //
 // Display labels are localized — see src/lib/i18n/dictionaries/{en,es}.ts
@@ -51,6 +52,7 @@ export const ROLE_GROUPS: RoleGroupDef[] = [
   { key: "project_delivery" },
   { key: "developers" },
   { key: "hr_recruiting" },
+  { key: "hospitality_revenue" },
   { key: "sales_bd" },
   { key: "operations" },
   { key: "other" },
@@ -127,6 +129,18 @@ const RULES: Rule[] = [
       "amministratore (?:delegato|unico)",
       "(?:miembro|vocal) del consejo de administraci[oó]n",
       "(?:membro|membra) del consiglio di amministrazione",
+      // Director-level finance = the CFO of a smaller company. Controllers
+      // ("financial controller") are intentionally NOT listed: not C-level.
+      "directora? financier[oa]",
+      "directora? de finanzas",
+      "directora? de administraci[oó]n y finanzas",
+      "(?:finance|financial) director",
+      "director of finance",
+      "direttore finanziario",
+      "direttrice finanziaria",
+      "finanzdirektor\\w*",
+      "directeur financier",
+      "directrice financi[eè]re",
     ),
   ],
   [
@@ -139,12 +153,15 @@ const RULES: Rule[] = [
       "head of (?:engineering|technology|software|tech|development|it|platform|data|infrastructure)",
       // The comma form ("Director, Software Engineering") is how LinkedIn
       // renders many US titles, and without it these fall through to developers.
-      "(?:director|directora),?(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
+      "(?:director|directora),?(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|ti|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
       "engineering director",
       "technical director",
       "it director",
       "gerente de (?:tecnolog[ií]a|sistemas|desarrollo|it|ingenier[ií]a)",
       "jefe de (?:sistemas|tecnolog[ií]a|desarrollo|it)",
+      // "TI" (tecnologias de la informacion) only inside a leadership title:
+      // a bare "ti" would also match the pronoun and "Ti"-named companies.
+      "(?:gerente|jefe|jefa)(?: de)? ti",
       "it manager",
       "tech manager",
       "technology manager",
@@ -244,6 +261,29 @@ const RULES: Rule[] = [
     ),
   ],
   [
+    "hospitality_revenue",
+    w(
+      // Revenue / reservations / distribution owners at hotels. Sits right
+      // before sales_bd so it beats sales_bd and operations, but never steals
+      // from the groups above. Bare "reservas" is deliberately NOT a term:
+      // it hits front-line "Agente de Reservas" and finance names such as
+      // "Banco de Reservas". Bare "distribution manager" (logistics) and
+      // "revenue operations" (SaaS) and "revenue assurance" (telecom audit)
+      // are left out for the same reason. The "<head|director> of revenue"
+      // form is an ALLOWLIST: it only matches at end of title, before a
+      // separator or employer ("at"/"en"), or before a hotel qualifier
+      // (distribution, reservations, channel, e-commerce). A denylist of SaaS
+      // words (growth, cycle, enablement, ...) would leak every new one.
+      "revenue manag\\w*",
+      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de)? revenue(?=\\s*(?:$|[-–—|(@]|(?:&|y|and|/)\\s*(?:distribution|distribuci[oó]n|reservations?|reservas|channel|e-?commerce)|(?:at|en)\\s))",
+      "channel manager",
+      "(?:online|digital|hotel|channel) distribution manager",
+      "yield manager",
+      "(?:booking|reservations?) manager",
+      "(?:director|directora|head|jefe|jefa|gerente|responsable)(?: of| de) reserv(?:ations|as)",
+    ),
+  ],
+  [
     "sales_bd",
     w(
       "sales",
@@ -257,7 +297,21 @@ const RULES: Rule[] = [
       "marketing",
     ),
   ],
-  ["operations", w("operations", "operaciones", "head of ops")],
+  [
+    "operations",
+    w(
+      "operations",
+      "operaciones",
+      "head of ops",
+      // Hotel guest / event operations. Qualified forms only: bare "event" or
+      // "guest" would sweep in photographers and speakers. This rule runs last,
+      // so marketing/sales/HR event managers keep their earlier group.
+      "guest (?:relations|experience|services)",
+      "directora? de (?:alojamiento|ocio|entretenimiento|eventos)",
+      "event (?:manager|director)",
+      "director of events?",
+    ),
+  ],
 ];
 
 /**
