@@ -157,14 +157,23 @@ export async function getActivitiesByContact(
  * (deriveStatus decides which ones actually move the stage or discard).
  */
 export async function createActivity(input: NewActivity): Promise<Activity> {
+  return db.transaction((tx) => createActivityInTx(tx, input));
+}
+
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * `createActivity`'s body on a caller-owned transaction, for writers that must
+ * commit the activity together with other rows (the send path writes the
+ * `email_message` row in the same transaction).
+ */
+export async function createActivityInTx(tx: DbTransaction, input: NewActivity): Promise<Activity> {
   const lookup = input.personId == null ? resolvePersonIdLookup(input) : null;
   const values =
     lookup && isIdentityDualWriteEnabled() ? { ...input, personId: personIdLookupSql(lookup) } : input;
-  return db.transaction(async (tx) => {
-    const [row] = await tx.insert(activity).values(values).returning();
-    if (row!.personId) await recomputePersonStatus(tx, row!.personId);
-    return row!;
-  });
+  const [row] = await tx.insert(activity).values(values).returning();
+  if (row!.personId) await recomputePersonStatus(tx, row!.personId);
+  return row!;
 }
 
 /**

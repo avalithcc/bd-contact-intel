@@ -12,6 +12,7 @@ import { needsReconnectForSync } from "./needsReconnectForSync";
 import { getNeverLogRules } from "./neverLog";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import { buildSyncedActivityRows } from "./buildSyncedActivities";
+import { buildEmailMessagePersonRows, buildEmailMessageRow } from "./emailMessageRows";
 import { buildAfterSyncSet, type AfterSyncPatch } from "./afterSyncPatch";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "./classify";
 
@@ -163,24 +164,8 @@ export async function writeSyncedMessages(
   if (classified.length === 0) return { inserted: 0 };
 
   return db.transaction(async (tx) => {
-    const values = classified.map((c) => ({
-      bdId,
-      gmailMessageId: c.gmailMessageId,
-      gmailThreadId: c.gmailThreadId,
-      direction: c.direction,
-      personId: c.matches[0]!.personId,
-      fromAddress: c.fromAddress,
-      toAddresses: c.toAddresses,
-      ccAddresses: c.ccAddresses,
-      subject: c.subject,
-      bodyText: c.bodyText,
-      bodyTruncated: c.bodyTruncated,
-      sentAt: c.sentAt,
-      rfcMessageId: c.rfcMessageId,
-      rfcReferences: c.references,
-      matchedEmail: c.matches[0]!.matchedEmail,
-      matchConfidence: c.matches[0]!.matchConfidence,
-    }));
+    // Same builder the send path uses (emailMessageRows.ts) — one row shape.
+    const values = classified.map((c) => buildEmailMessageRow(bdId, c));
 
     const insertedRows = await tx
       .insert(emailMessage)
@@ -198,12 +183,7 @@ export async function writeSyncedMessages(
     const classifiedByGmailId = new Map(classified.map((c) => [c.gmailMessageId, c]));
 
     const joinRows = insertedRows.flatMap((row) =>
-      classifiedByGmailId.get(row.gmailMessageId)!.matches.map((m) => ({
-        emailMessageId: row.id,
-        personId: m.personId,
-        matchedEmail: m.matchedEmail,
-        matchConfidence: m.matchConfidence,
-      })),
+      buildEmailMessagePersonRows(row.id, classifiedByGmailId.get(row.gmailMessageId)!.matches),
     );
     await tx.insert(emailMessagePerson).values(joinRows).onConflictDoNothing();
 

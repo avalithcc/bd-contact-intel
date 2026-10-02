@@ -1,10 +1,12 @@
 import { db } from "@/db";
-import { emailAccount } from "@/db/schema";
+import { emailAccount, type NewActivity } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { decryptToken } from "@/lib/gmail/crypto";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
-import { createActivityAction } from "@/app/activity/actions";
+import { revalidatePath } from "next/cache";
+import { recordSentEmail } from "@/lib/gmail/sentEmailQueries";
+import { fetchSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
 import { assertSafeHeaderValue, buildSendPayload, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
 
 // Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
@@ -133,18 +135,34 @@ export async function sendGmailMessage(input: SendGmailInput) {
     .set({ lastErrorMessage: null })
     .where(eq(emailAccount.bdId, bdId));
 
-  await createActivityAction({
-    type: "email_sent",
-    leadId,
-    companyKey,
-    personId,
-    metadata: {
+  // One metadata read for the Message-ID Gmail assigned (needed by "Responder").
+  // Null on any failure — never fails the send; the sync fills the column later.
+  const metadata = await fetchSentMessageMetadata(access_token, sent.id);
+
+  await recordSentEmail({
+    bdId,
+    message: {
+      bdEmail: account.emailAddress,
       to,
       subject,
+      content,
       gmailMessageId: sent.id,
       gmailThreadId: sent.threadId,
+      metadata,
     },
+    activity: {
+      type: "email_sent",
+      leadId,
+      companyKey,
+      personId,
+      actorBdId: bdId,
+      metadata: { to, subject, gmailMessageId: sent.id, gmailThreadId: sent.threadId },
+    } as NewActivity,
   });
+
+  if (leadId) revalidatePath(`/leads/${leadId}`);
+  if (companyKey) revalidatePath(`/companies/${companyKey}`);
+  if (personId) revalidatePath(`/contacts/${personId}`);
 
   return { messageId: sent.id, threadId: sent.threadId };
 }
