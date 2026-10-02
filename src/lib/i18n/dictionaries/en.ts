@@ -1789,6 +1789,27 @@ export const en = {
   // for src/lib/contacts/views.ts#SYSTEM_VIEWS — a BD-created saved view's
   // name is stored as free text in the DB and rendered as-is, not looked up
   // here.
+  rfcBackfill: {
+    eyebrow: "Admin · Gmail",
+    title: "message-id backfill",
+    subtitle: "Messages synced before reply-to-thread have no Message-ID, so Reply is disabled on their threads.",
+    pendingTitle: "Pending messages",
+    pendingTotal: (total: number) => `${total} message(s) without a Message-ID`,
+    nonePending: "No pending messages. Every synced message already has a Message-ID.",
+    colBd: "BD",
+    colPending: "Pending",
+    runTitle: "Run a batch",
+    runNote: (limit: number) =>
+      `Reads up to ${limit} of the newest pending messages from Gmail (read-only) and fills their Message-ID. Safe to repeat: filled messages are never touched again.`,
+    runButton: "Run one batch",
+    resultTitle: "Last run",
+    resultUpdated: "Updated",
+    resultNotFound: "Not found in Gmail",
+    resultNoHeader: "Without a Message-ID header",
+    resultSkippedBds: "Skipped mailboxes",
+    resultRemaining: "Still pending",
+  },
+
   contactList: {
     pageTitle: "Contacts",
     subtitle: "A shared record per person. Status is derived from logged activity.",

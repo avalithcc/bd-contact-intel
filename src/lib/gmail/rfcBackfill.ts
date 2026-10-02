@@ -90,3 +90,42 @@ export function tallySkipReasons(reasons: readonly BdSkipReason[]): Record<BdSki
   for (const r of reasons) tally[r]++;
   return tally;
 }
+
+export interface RfcBackfillSummary {
+  updated: number;
+  notFoundInGmail: number;
+  noMessageIdHeader: number;
+  skippedBds: number;
+}
+
+/** The admin action redirects with the run summary in the query string; this is the ONE producer of those keys. */
+export function rfcBackfillResultToParams(result: {
+  counts: BackfillPlan["counts"];
+  skippedBds: number;
+  updated: number;
+}): URLSearchParams {
+  return new URLSearchParams({
+    ran: "1",
+    updated: String(result.updated),
+    notFound: String(result.counts.notFoundInGmail),
+    noHeader: String(result.counts.noMessageIdHeader),
+    skippedBds: String(result.skippedBds),
+  });
+}
+
+function count(v: string | string[] | undefined): number {
+  return typeof v === "string" && /^\d{1,6}$/.test(v) ? Number(v) : 0;
+}
+
+/** Reader of `rfcBackfillResultToParams`; query strings are user-editable, so every value is re-validated. */
+export function parseRfcBackfillResultParams(
+  params: Record<string, string | string[] | undefined>,
+): RfcBackfillSummary | null {
+  if (params.ran !== "1") return null;
+  return {
+    updated: count(params.updated),
+    notFoundInGmail: count(params.notFound),
+    noMessageIdHeader: count(params.noHeader),
+    skippedBds: count(params.skippedBds),
+  };
+}

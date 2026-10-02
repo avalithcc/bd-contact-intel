@@ -5,7 +5,14 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampRfcBackfillLimit, groupCandidatesByBd, planRfcBackfill, tallySkipReasons } from "@/lib/gmail/rfcBackfill";
+import {
+  clampRfcBackfillLimit,
+  groupCandidatesByBd,
+  parseRfcBackfillResultParams,
+  planRfcBackfill,
+  rfcBackfillResultToParams,
+  tallySkipReasons,
+} from "@/lib/gmail/rfcBackfill";
 import { parseGmailMessage, type GmailApiMessage } from "@/lib/gmail/parseMessage";
 
 function apiMessage(id: string, headers: { name: string; value: string }[]): GmailApiMessage {
@@ -90,5 +97,21 @@ test("tallySkipReasons counts each coarse reason and always returns all keys", (
     no_account: 1,
     token_refresh_failed: 0,
     fetch_failed: 2,
+  });
+});
+
+test("result params round-trip through the real producer and reject junk", () => {
+  const params = rfcBackfillResultToParams({
+    counts: { candidates: 100, update: 90, notFoundInGmail: 4, noMessageIdHeader: 6 },
+    skippedBds: 1,
+    updated: 90,
+  });
+  assert.deepEqual(parseRfcBackfillResultParams(Object.fromEntries(params)), { updated: 90, notFoundInGmail: 4, noMessageIdHeader: 6, skippedBds: 1 });
+  assert.equal(parseRfcBackfillResultParams({}), null);
+  assert.deepEqual(parseRfcBackfillResultParams({ ran: "1", updated: "-3", notFound: "x", noHeader: "2.5", skippedBds: ["1"] }), {
+    updated: 0,
+    notFoundInGmail: 0,
+    noMessageIdHeader: 0,
+    skippedBds: 0,
   });
 });

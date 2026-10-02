@@ -1757,6 +1757,27 @@ export const es: typeof en = {
     showingRange: (from: number, to: number, total: number) => `Mostrando ${from}–${to} de ${total}`,
   },
 
+  rfcBackfill: {
+    eyebrow: "Administración · Gmail",
+    title: "relleno de Message-ID",
+    subtitle: "Los mensajes sincronizados antes de responder en el hilo no tienen Message-ID, por eso Responder está deshabilitado en sus hilos.",
+    pendingTitle: "Mensajes pendientes",
+    pendingTotal: (total: number) => `${total} mensaje(s) sin Message-ID`,
+    nonePending: "No hay mensajes pendientes. Todos los mensajes sincronizados ya tienen Message-ID.",
+    colBd: "BD",
+    colPending: "Pendientes",
+    runTitle: "Ejecutar un lote",
+    runNote: (limit: number) =>
+      `Lee desde Gmail (solo lectura) hasta ${limit} de los mensajes pendientes más recientes y completa su Message-ID. Se puede repetir sin riesgo: los mensajes ya completados no se vuelven a tocar.`,
+    runButton: "Ejecutar un lote",
+    resultTitle: "Última ejecución",
+    resultUpdated: "Actualizados",
+    resultNotFound: "No encontrados en Gmail",
+    resultNoHeader: "Sin encabezado Message-ID",
+    resultSkippedBds: "Casillas omitidas",
+    resultRemaining: "Siguen pendientes",
+  },
+
   contactList: {
     pageTitle: "Contactos",
     subtitle: "Un registro compartido por persona. El estado se deriva de la actividad registrada.",
