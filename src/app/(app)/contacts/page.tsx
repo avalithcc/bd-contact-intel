@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { pickListPhone, toTelHref } from "@/lib/phone";
+import { PhoneValue } from "@/components/PhoneValue";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { listSavedViews } from "@/lib/contacts/savedViews";
@@ -239,8 +240,13 @@ function columnCell(
     case "phone": {
       const value = pickListPhone(row.phone, row.mobilePhone);
       if (!value) return <span className="badge badge-none">{l.phoneNone}</span>;
-      const href = toTelHref(value);
-      return href ? <a href={href}>{value}</a> : value;
+      // Malformed: bare plain text, as drawn (no cell wrapper, no min-width).
+      if (!toTelHref(value)) return <PhoneValue value={value} labels={l} />;
+      return (
+        <div className="phone-cell">
+          <PhoneValue value={value} labels={l} />
+        </div>
+      );
     }
     case "bdConnections":
       return row.bdConnections.avatars.length ? (
