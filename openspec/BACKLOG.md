@@ -1060,9 +1060,12 @@ enabled, exactly backwards). Re-checked on `main` 2026-10-01:
   (`#d5252f`, `globals.css:25`) is nearly the danger red (`#dc2626`, `:60`). The
   other `danger` class in the app, `.qa.danger` (`QuickActions.tsx:208`), is a
   different component with its own `background: none` base.
-Not fixed. Fix, if wanted: give `.filter-submit` an explicit
-`background`/`color` pair, and promote the danger skin out of its container
-scope.
+**Fixed (2026-10-03, `fix/explicit-button-skins`).** `.filter-submit` now has an
+explicit background/color pair plus its hover/active/disabled states, and the
+danger skin is the global `button.danger:not(.qa)`. Appearance unchanged (before
+and after screenshots byte-identical in a standalone harness). Drift found: the
+`/contacts` submit is at `contacts/page.tsx:754`, and `.filter-submit` is also
+used by `admin/rfc-backfill` and `admin/migration`.
 
 ### drizzle journal is future-dated to 2026-10-20 — every new migration needs a hand-set `when`
 `drizzle/meta/_journal.json` has 36 entries. The timestamptz chain was

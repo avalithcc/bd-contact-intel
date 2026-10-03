@@ -888,6 +888,24 @@ a:hover {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* Explicit skin so the filter submit does not inherit the zero-specificity accent fill of
+   `:where(button)` by accident (the mechanism behind the `.menu-item` bug fixed in #283).
+   Declaring `background` here outranks the `:where()` hover/active/disabled rules, so those
+   states are restated with the same tokens they used to resolve to. */
+.filter-submit {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+.filter-submit:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+.filter-submit:active:not(:disabled) {
+  background: var(--color-accent-focus);
+}
+.filter-submit:disabled {
+  color: var(--color-ink-subtle);
+  cursor: not-allowed;
+}
 @media (max-width: 560px) {
   .filter-toolbar {
     flex-direction: column;
@@ -1406,11 +1424,15 @@ main {
 .duplicates-compare tr:last-child td {
   border-bottom: 0;
 }
-.duplicates-unmerge-confirm button.danger {
+/* Global danger skin, promoted out of `.duplicates-unmerge-confirm` so a danger button is red
+   because it is a danger button, not because the accent happens to be a similar red inherited
+   from the zero-specificity `:where(button)` (same class of bug as `.menu-item`, #283).
+   `:not(.qa)` leaves the quick-action tile (`.qa.danger`, design-system.css) on its own skin. */
+button.danger:not(.qa) {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-accent-fg);
 }
-.duplicates-unmerge-confirm button.danger:hover:not(:disabled) {
+button.danger:not(.qa):hover:not(:disabled) {
   filter: brightness(0.92);
 }
 
