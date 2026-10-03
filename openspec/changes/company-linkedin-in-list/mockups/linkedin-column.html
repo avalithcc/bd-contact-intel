@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinkedIn en la lista de empresas · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  /* Mockup-only scaffolding. */
+  body { background: var(--color-surface-sunken, #f3f4f6); padding: 24px; }
+  .case { margin: 0 0 26px; }
+  .case > h2 { font: 700 12px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-soft); margin: 0 0 4px; }
+  .case > p.note { font: 400 12px/1.5 var(--font-body); color: var(--color-ink-subtle); margin: 0 0 10px; max-width: 70ch; }
+  .lede { font: 400 13px/1.6 var(--font-body); color: var(--color-ink-soft); max-width: 78ch; margin: 0 0 22px; }
+  .lede b { color: var(--color-ink); }
+
+  /* THE ONLY NEW RULE ANY VARIANT NEEDS: a LinkedIn glyph link sized to sit
+     inline in a table cell. Colour and hover come from existing tokens. */
+  .li-link { display: inline-flex; align-items: center; color: var(--color-ink-subtle); }
+  .li-link:hover { color: var(--color-ink); }
+  .li-link svg { width: 15px; height: 15px; }
+  /* The cell becomes the flex container: `.row` is itself `display:flex` and
+     would take the full width, pushing a sibling icon onto a second line and
+     making every row with LinkedIn taller than the others. */
+  .li-cell { display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<p class="lede">Hoy hay <b>18 empresas con <code>linkedin_url</code> cargada, sobre 14.711</b> (0,12&nbsp;%). Por eso cada variante se muestra dos veces: en la <b>lista por defecto</b>, que es como se ve casi siempre, y en la <b>lista filtrada</b> (<code>?linkedin=with</code>), que es como se ve cuando buscás justamente eso. La primera es la que decide.</p>
+
+<div class="case">
+  <h2>Hoy</h2>
+  <p class="note">7 columnas. El dato existe y se puede filtrar, pero no se puede ver.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th><th>Responsable</th><th>Contactos</th><th>Vacantes</th><th>Última actividad</th></tr></thead>
+    <tbody>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">FI</span><span class="strong">Flux IT</span></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td class="num">8</td><td class="num">3</td><td class="soft">2 oct</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">AC</span><span class="strong">Acme Logística</span></a></td><td class="soft">Logística</td><td><span class="badge">Prospecto</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a2">MD</span>Macarena Dávila</span></td><td class="num">2</td><td class="num">0</td><td class="soft">28 sep</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">CO</span><span class="strong">Cobre</span></a></td><td class="soft">Fintech</td><td><span class="badge badge-success">Ganada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td class="num">5</td><td class="num">1</td><td class="soft">1 oct</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>A · Columna dedicada "LinkedIn" — lista por defecto</h2>
+  <p class="note">Una octava columna. En la lista normal queda vacía en prácticamente todas las filas.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th><th>Responsable</th><th>LinkedIn</th><th>Contactos</th><th>Vacantes</th><th>Última actividad</th></tr></thead>
+    <tbody>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">FI</span><span class="strong">Flux IT</span></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td><a class="li-link" href="#" aria-label="LinkedIn de Flux IT"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="num">8</td><td class="num">3</td><td class="soft">2 oct</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">AC</span><span class="strong">Acme Logística</span></a></td><td class="soft">Logística</td><td><span class="badge">Prospecto</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a2">MD</span>Macarena Dávila</span></td><td class="soft">—</td><td class="num">2</td><td class="num">0</td><td class="soft">28 sep</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">CO</span><span class="strong">Cobre</span></a></td><td class="soft">Fintech</td><td><span class="badge badge-success">Ganada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td><a class="li-link" href="#" aria-label="LinkedIn de Cobre"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="num">5</td><td class="num">1</td><td class="soft">1 oct</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>B · Ícono junto al nombre — lista por defecto <em>(propuesto)</em></h2>
+  <p class="note">Sin columna nueva. Aparece exactamente donde hay dato y no ocupa ancho cuando no lo hay. Es como la app ya muestra LinkedIn en el record del contacto.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th><th>Responsable</th><th>Contactos</th><th>Vacantes</th><th>Última actividad</th></tr></thead>
+    <tbody>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">FI</span><span class="strong">Flux IT</span></a><a class="li-link" href="#" aria-label="LinkedIn de Flux IT"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td class="num">8</td><td class="num">3</td><td class="soft">2 oct</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">AC</span><span class="strong">Acme Logística</span></a></td><td class="soft">Logística</td><td><span class="badge">Prospecto</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a2">MD</span>Macarena Dávila</span></td><td class="num">2</td><td class="num">0</td><td class="soft">28 sep</td></tr>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">CO</span><span class="strong">Cobre</span></a><a class="li-link" href="#" aria-label="LinkedIn de Cobre"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Fintech</td><td><span class="badge badge-success">Ganada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td class="num">5</td><td class="num">1</td><td class="soft">1 oct</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>C · Columna con el texto de la página — lista filtrada</h2>
+  <p class="note">Legible y escaneable, pero es la columna más ancha de la tabla para un dato que hoy tienen 18 empresas. Se muestra ya filtrada, que es su mejor caso.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th><th>LinkedIn</th><th>Contactos</th><th>Última actividad</th></tr></thead>
+    <tbody>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">FI</span><span class="strong">Flux IT</span></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td class="soft">linkedin.com/company/fluxit</td><td class="num">8</td><td class="soft">2 oct</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">CB</span><span class="strong">Coderland</span></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td class="soft">linkedin.com/company/coderland-by-dominion</td><td class="num">3</td><td class="soft">30 sep</td></tr>
+      <tr><td><a class="row" href="#"><span class="company-logo" aria-hidden="true">DA</span><span class="strong">Datapar S.A.</span></a></td><td class="soft">Software</td><td><span class="badge badge-success">Ganada</span></td><td class="soft">linkedin.com/company/datapar-s.a.</td><td class="num">4</td><td class="soft">29 sep</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>B · lista filtrada (<code>?linkedin=with</code>)</h2>
+  <p class="note">La misma variante B cuando buscás justamente las que tienen página. El filtro ya existe desde el PR #305.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th><th>Responsable</th><th>Contactos</th><th>Vacantes</th><th>Última actividad</th></tr></thead>
+    <tbody>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">FI</span><span class="strong">Flux IT</span></a><a class="li-link" href="#" aria-label="LinkedIn de Flux IT"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td class="num">8</td><td class="num">3</td><td class="soft">2 oct</td></tr>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">CB</span><span class="strong">Coderland</span></a><a class="li-link" href="#" aria-label="LinkedIn de Coderland"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a2">MD</span>Macarena Dávila</span></td><td class="num">3</td><td class="num">0</td><td class="soft">30 sep</td></tr>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">DA</span><span class="strong">Datapar S.A.</span></a><a class="li-link" href="#" aria-label="LinkedIn de Datapar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Software</td><td><span class="badge badge-success">Ganada</span></td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MM</span>Mariel Meza</span></td><td class="num">4</td><td class="num">1</td><td class="soft">29 sep</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+</body>
+</html>
