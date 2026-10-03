@@ -111,13 +111,13 @@ test('creating a follow-up task on a queue card does not retire the card (a task
 });
 
 test('the empty-queue call to action leads to the not-contacted list, not to an unfiltered one', async ({ page }) => {
-  await page.goto('/contacts?view=uncontacted');
+  // F8 (fixed): an empty queue, then the button she is offered.
+  await sql`update follow_up_queue_item set state = 'skipped'`;
+  await page.goto('/follow-ups');
   await page.waitForLoadState('networkidle');
-  const on = await page.locator('a[aria-current], .tab.on, .filter-pill.on, [aria-selected="true"]').allInnerTexts();
-  console.log(`[queue] view=uncontacted selected tab(s): ${JSON.stringify(on)} url=${page.url()}`);
-  const real = await page.getByRole('link', { name: /^Sin contactar/ }).getAttribute('class');
-  console.log(`[queue] Sin contactar tab class=${real}`);
-  // F-CTA-LINK: the empty-queue button links to a view key that does not exist.
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-CTA-LINK: /contacts?view=uncontacted is not a real view; the real key is notContacted');
+  await page.getByRole('link', { name: /Ver contactos sin contactar/ }).click();
+  await page.waitForURL(/\/contacts\?/);
+  await page.waitForLoadState('networkidle');
+  expect(page.url()).toMatch(/view=notContacted/);
   await expect(page.getByRole('link', { name: /^Sin contactar/ })).toHaveClass(/on|active|selected/);
 });

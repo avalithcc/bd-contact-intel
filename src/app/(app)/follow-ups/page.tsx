@@ -74,7 +74,7 @@ export default async function FollowUpsPage() {
             </div>
             <h3>{l.emptyTitle}</h3>
             <p>{l.emptyBody}</p>
-            <Link className="btn btn-secondary btn-sm" href="/contacts?view=uncontacted">
+            <Link className="btn btn-secondary btn-sm" href="/contacts?view=notContacted">
               {l.emptyCta}
             </Link>
           </div>
