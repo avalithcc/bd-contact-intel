@@ -207,7 +207,10 @@ export function AdminConversationFlow({
                 into `.thread-msg-head` as `.when`.
                 The avatar is unconditional because getConversationForAdmin scopes
                 these rows to `type = 'email_sent'` AND `actor_bd_id = targetBdId`:
-                every entry here was sent by the BD being viewed. */}
+                every entry here was sent by the BD being viewed.
+                A missing subject reads "(no subject)" rather than "Sistema": the
+                avatar already names the BD as sender. The body keeps its line breaks
+                via `pre-wrap`, same as EmailThreadMessage. */}
             {data.emailEntries.map((e) => (
               <div key={e.id} className="thread-msg">
                 <Avatar id={trigger.bdId} initials={initialsFromName(targetBdName)} variant="bd" size="sm" />
@@ -215,12 +218,14 @@ export function AdminConversationFlow({
                   <div className="thread-msg-head">
                     <span className="who">
                       <span className="from">
-                        {typeof e.metadata?.subject === "string" ? e.metadata.subject : l.timelineSystemActor}
+                        {typeof e.metadata?.subject === "string" ? e.metadata.subject : l.adminLegacyEmailNoSubject}
                       </span>
                     </span>
                     <span className="when">{when(e.createdAt)}</span>
                   </div>
-                  <div className="snippet">{typeof e.metadata?.body === "string" ? e.metadata.body : ""}</div>
+                  <div className="snippet" style={{ whiteSpace: "pre-wrap" }}>
+                    {typeof e.metadata?.body === "string" ? e.metadata.body : ""}
+                  </div>
                 </div>
               </div>
             ))}

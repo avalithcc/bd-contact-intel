@@ -965,6 +965,7 @@ export const en = {
     adminSyncedEmailSectionTitle: "Synced email",
     adminNoSyncedEmailContent: "No synced email with this BD.",
     adminLegacyEmailSectionTitle: "Email (manual record)",
+    adminLegacyEmailNoSubject: "(no subject)",
     adminLinkedinSectionTitle: "LinkedIn conversation",
     adminNoLinkedinContent: "No LinkedIn conversation with this BD.",
     // --- admin "Ver conversación" confirmation dialog (admin-conversation-
