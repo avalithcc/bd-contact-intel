@@ -769,6 +769,8 @@ export const en = {
     errorDiscardReasonRequired: "Select a reason to discard.",
     errorDiscardNoteRequired: "A note is required when the reason is 'Other'.",
     errorMeetingDateRequired: "A date is required to log the meeting.",
+    errorMeetingOccurredAtInFuture:
+      "A meeting cannot be logged with a future date. If you have only scheduled it, add a follow-up task instead.",
     errorCallOutcomeRequired: "Select an outcome to log the call.",
     errorCallOccurredAtInFuture: "A call cannot be logged with a future date and time.",
     errorSignalTextRequired: "Signal text is required.",

@@ -7,6 +7,7 @@
  * contact evidence → `contacted`; an outcome of `connected` in either
  * direction is a reply → `replied`). Mirrors meeting.ts/discard.ts.
  */
+import { isBeyondClockSkew } from "@/lib/contacts/futureGuard";
 import { argentinaWallClockToUtc } from "@/lib/tasks/argentinaDate";
 
 // Fixed codes from the contact-record mockup's "Resultado" select.
@@ -64,10 +65,6 @@ export class CallOccurredAtInFutureError extends Error {
   }
 }
 
-/** Small allowance for client/server clock skew — not a real grace window
- * for "logging a call slightly ahead of time". */
-const FUTURE_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
-
 /** Calls logged before the duration field was removed may carry an extra
  * `durationMinutes` in their stored metadata; timelineEntryBody.ts still
  * renders it, but nothing writes it any more. */
@@ -113,7 +110,7 @@ export function planCall(
   const date = rawDate.trim();
   const occurredAtDate = date ? argentinaWallClockToUtc(date, rawTime.trim() || "00:00") : now;
 
-  if (occurredAtDate.getTime() - now.getTime() > FUTURE_CLOCK_SKEW_TOLERANCE_MS) {
+  if (isBeyondClockSkew(occurredAtDate, now)) {
     throw new CallOccurredAtInFutureError();
   }
 

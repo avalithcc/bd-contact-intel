@@ -693,6 +693,8 @@ export const es: typeof en = {
     errorDiscardReasonRequired: "Seleccionar un motivo para descartar.",
     errorDiscardNoteRequired: "Se requiere una nota cuando el motivo es «Otro».",
     errorMeetingDateRequired: "Se requiere una fecha para registrar la reunión.",
+    errorMeetingOccurredAtInFuture:
+      "No se puede registrar una reunión con fecha futura. Si solo la agendaste, crea una tarea de seguimiento.",
     errorCallOutcomeRequired: "Seleccionar un resultado para registrar la llamada.",
     errorCallOccurredAtInFuture: "No se puede registrar una llamada con fecha y hora futuras.",
     errorSignalTextRequired: "Se requiere el texto de la señal.",
