@@ -213,22 +213,30 @@ test('leaving the page right after pressing save still saves exactly one call', 
   console.log(`[nav-away] calls saved after leaving mid-save: ${calls.length}`);
 });
 
-test('a "Número equivocado" call is not queued for a follow-up call a week later', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-WRONGNUM: wrong_number counts as an outbound call, so the contact enters the follow-up queue');
-  const p = await newPerson('CallWrongNumber');
-  await openContact(page, p.id);
-  const dlg = await openQuickAction(page, 'call');
-  await dlg.getByLabel('Resultado').selectOption('wrong_number');
-  await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
-  // Age the call by 10 days so it is eligible for the queue (contacted + 7 days).
-  await sql`update activity set created_at = now() - interval '10 days',
-            metadata = jsonb_set(metadata, '{occurredAt}', to_jsonb((now() - interval '10 days')::text)) where person_id = ${p.id}`;
-  await sql`delete from follow_up_queue_item`;
-  await page.goto('/follow-ups');
-  await page.waitForLoadState('networkidle');
-  await expect(page.getByText(p.name), 'a wrong number was queued for follow-up').toHaveCount(0);
-});
+// F6 (fixed): a wrong-number call still counts as `contacted` (status records
+// what the BD did), but the queue skips a contact whose latest touch is that
+// call. The busy case is the pairing that proves the skip is specific to
+// wrong_number and not a general loss of old calls.
+for (const [outcome, label, queued] of [
+  ['wrong_number', 'Número equivocado', false],
+  ['busy', 'Ocupado', true],
+] as const) {
+  test(`a "${label}" call 10 days old ${queued ? 'is' : 'is not'} queued for a follow-up call`, async ({ page }) => {
+    const p = await newPerson(`CallQueue_${outcome}`);
+    await openContact(page, p.id);
+    const dlg = await openQuickAction(page, 'call');
+    await dlg.getByLabel('Resultado').selectOption(outcome);
+    await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
+    await expect(page.getByText('Llamada registrada.')).toBeVisible();
+    // Age the call by 10 days so it is eligible for the queue (contacted + 7 days).
+    await sql`update activity set created_at = now() - interval '10 days',
+              metadata = jsonb_set(metadata, '{occurredAt}', to_jsonb((now() - interval '10 days')::text)) where person_id = ${p.id}`;
+    await sql`delete from follow_up_queue_item`;
+    await page.goto('/follow-ups');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(p.name)).toHaveCount(queued ? 1 : 0);
+  });
+}
 
 test('after a network error, Escape closes the dialog and every quick action works again without a reload', async ({ page }) => {
   const p = await newPerson('CallOfflineClose');

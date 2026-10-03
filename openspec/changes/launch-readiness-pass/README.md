@@ -75,6 +75,7 @@ Every finding is reproduced by a spec in `tests/launch-readiness/`. Specs for a 
 - Happened: the contact is in the queue.
 - Code: this follows a written owner rule (2026-09-26): any outbound call counts as `contacted` (`src/lib/status/deriveStatus.ts:137-141`, `src/lib/contacts/call.ts` doc on `MANUAL_CALL_DIRECTION`), and the queue takes every `contacted` contact after 7 days (`src/lib/followUp/candidateQuery.ts:81-89`). The side effect on the queue probably was not intended. Needs an owner decision, not necessarily a code fix.
 - Reproduces: every time (spec 03).
+- Closed: the owner decided the call keeps counting as `contacted` (status records what the BD did; `callStage` is unchanged), while the queue skips a contact whose most recent touch is a `wrong_number` call. It needs no flag: any newer touch brings the contact back on its own. Fix in `src/lib/followUp/candidateQuery.ts`; spec 03 no longer wraps it in `test.fail` and now pairs it with a `busy` call that is still queued.
 
 ### F7. No way back to the list she was working except the browser Back button (annoys)
 

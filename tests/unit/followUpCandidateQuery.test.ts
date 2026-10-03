@@ -98,3 +98,27 @@ test("buildFollowUpInsertQuery: excludes a person with a prior postponed/skipped
   assert.match(renderedSql, /fuq_prior\.state in \('postponed', 'skipped'\)/i);
   assert.match(renderedSql, /fuq_prior\.snoozed_until > \$\d+::date/i);
 });
+
+for (const [label, render] of [
+  ["buildFollowUpInsertQuery", renderInsert],
+  ["buildFollowUpVerificationQuery", renderVerification],
+] as const) {
+  test(`${label}: aggregates the latest wrong-number call and drops a contact whose latest touch is that call`, () => {
+    const renderedSql = render();
+    // Aggregate lives in the pre-aggregated activity CTE, fully qualified.
+    assert.match(
+      renderedSql,
+      /max\(case when activity\.type = 'call'\s+and activity\.metadata ->> 'outcome' = 'wrong_number'\s+then[\s\S]*? end\) as fuq_wrong_number_at/i,
+    );
+    // Carried through the candidate CTE, then filtered in fuq_due.
+    assert.match(renderedSql, /fuq_activity\.fuq_wrong_number_at as fuq_wrong_number_at/i);
+    assert.match(
+      renderedSql,
+      /not \(fuq_wrong_number_at is not null and fuq_wrong_number_at >= fuq_last_touch\)/i,
+    );
+  });
+}
+
+test("buildFollowUpInsertQuery: renders identically on repeated calls (no shared mutable state)", () => {
+  assert.equal(renderInsert(), renderInsert());
+});
