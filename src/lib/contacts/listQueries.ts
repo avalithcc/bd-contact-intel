@@ -388,15 +388,17 @@ export async function getContactListPage(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
-  // UNCHANGED from before this perf fix — same WHERE, same ORDER BY (no new
-  // tiebreak added here: the owner report this fixes is round trips, not
-  // pagination-tie stability, and this exact query shape/order already
-  // shipped, so changing tie resolution would risk changing which rows page
-  // 2..N shows for ties even though the total row SET stays identical).
+  // `person.id` closes both orders as a unique tiebreak. Without it, rows that
+  // tie on the sort key (every never-touched contact has a NULL last activity;
+  // equal names) came back in whatever order Postgres happened to produce, so
+  // an unrelated UPDATE reshuffled the list and paging could skip or repeat a
+  // contact. An earlier comment here left the tiebreak out to avoid changing
+  // which tied rows land on page 2..N; that order was never defined, so there
+  // was nothing to preserve. The row SET and the total are unaffected.
   const orderBy =
     sort === "lastActivity"
-      ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`]
-      : [asc(person.lastName), asc(person.firstName)];
+      ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`, asc(person.id)]
+      : [asc(person.lastName), asc(person.firstName), asc(person.id)];
 
   // Perf fix (round trips; orchestrator measured ~1,395ms across 4 serialized
   // queries: count, rows, bd-connections-by-page-ids, last-activity-by-page-

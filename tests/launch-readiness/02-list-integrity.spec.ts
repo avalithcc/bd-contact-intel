@@ -51,10 +51,8 @@ test('the same untouched list loads in the same order every time', async ({ page
   for (let i = 0; i < 4; i++) expect(await idsOnPage(page, url)).toEqual(first);
 });
 
-// FINDING F-LIST-TIE (confirmed defect): marked test.fail so the suite stays green while it exists
-// and goes red the day it is fixed, prompting removal of this line.
+// F4 (fixed): the default sort ends in a unique tiebreak, so an UPDATE cannot reshuffle ties.
 test('the order is still the same after she edits a handful of contacts in it', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-LIST-TIE: default sort has no tiebreak, an UPDATE reshuffles untouched contacts');
   const url = `/contacts?view=notContacted&company=${encodeURIComponent(COHORT_NAME)}`;
   const before = await idsOnPage(page, url);
   // An UPDATE moves the row's physical position; with no tiebreak in the ORDER BY the list may reshuffle.
