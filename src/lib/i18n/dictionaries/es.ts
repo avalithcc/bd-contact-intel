@@ -670,6 +670,7 @@ export const es: typeof en = {
     taskCreate: "Crear tarea",
     emailToLabel: "Para",
     emailSubjectLabel: "Asunto",
+    emailSubjectRequiredHint: "Falta el asunto para poder enviar.",
     emailBodyLabel: "Mensaje",
     emailGenerateAction: "Redactar con IA",
     emailSend: "Enviar",
