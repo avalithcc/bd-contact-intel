@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { gotoAuthed, openFirstContactOrSkip, skipWithoutCredentials } from './helpers';
 // Labels come from the Spanish dictionary so a translation change breaks the build, not the suite silently.
 import { es } from '../../src/lib/i18n/dictionaries/es';

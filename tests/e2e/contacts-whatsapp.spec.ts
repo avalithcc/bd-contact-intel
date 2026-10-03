@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { gotoAuthed, skipWithoutCredentials } from './helpers';
 import { es } from '../../src/lib/i18n/dictionaries/es';
 

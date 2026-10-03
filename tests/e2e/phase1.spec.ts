@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { gotoAuthed, openFirstContactOrSkip, openFirstOrSkip, skipWithoutCredentials } from './helpers';
 // Every label below comes from the Spanish dictionary, never from memory or a
 // component comment: a translation change then breaks the build (typecheck)

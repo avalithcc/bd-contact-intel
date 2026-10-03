@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { gotoAuthed, skipWithoutCredentials } from './helpers';
+import { test, expect } from './fixtures';
+import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 
 skipWithoutCredentials();
 
@@ -31,6 +31,9 @@ test.describe('Phase 14: import -> dedup outcome -> visible in list and board', 
       !csvPath || !contactName,
       'Requires E2E_IMPORT_CONNECTIONS_CSV_PATH (a Connections.csv fixture with one guaranteed-new row) and E2E_IMPORT_CONNECTIONS_CSV_NAME (that row\'s full name).',
     );
+
+    // The import creates persons and an audit row: scratch database only.
+    skipUnlessWritesAllowed();
 
     await gotoAuthed(page, '/contacts/import');
 

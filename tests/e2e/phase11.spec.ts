@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { gotoAuthed, skipWithoutCredentials } from './helpers';
+import { test, expect } from './fixtures';
+import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 
 skipWithoutCredentials();
 
@@ -25,6 +25,10 @@ test.describe('Phase 11: Admin conversation access and audit', () => {
       !contactId || !otherBdId,
       'Requires E2E_CONTACT_WITH_OTHER_BD_HISTORY and E2E_OTHER_BD_ID pointing at seeded data: a Contact with conversation history from a BD other than the seeded admin.',
     );
+
+    // Rendering this page WRITES an audit_log row (view_conversation) on a
+    // plain GET, which the request guard cannot see: scratch database only.
+    skipUnlessWritesAllowed();
 
     // The shared `chromium` project authenticates as the seeded admin
     // (tests/e2e/auth.setup.ts). This suite has no direct DB access, so the

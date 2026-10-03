@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { skipReason } from './credentials';
+import { writeSkipReason } from './readOnlyGuard';
 
 /**
  * Call at the top of a spec file. Without E2E credentials, outside CI, every
@@ -68,4 +69,15 @@ export async function openFirstContactOrSkip(page: Page, listUrl = '/contacts?vi
   await page.waitForURL(`**${href}`, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
   return { opened: true as const };
+}
+
+/**
+ * Call inside a test that writes (a server action, an import, a merge, or a
+ * page render that writes an audit row). Skips unless DATABASE_URL is a
+ * scratch database; against anything else, including production, the suite
+ * is read-only. See readOnlyGuard.ts and tests/e2e/README.md.
+ */
+export function skipUnlessWritesAllowed() {
+  const reason = writeSkipReason(process.env.DATABASE_URL);
+  test.skip(reason !== null, reason ?? '');
 }
