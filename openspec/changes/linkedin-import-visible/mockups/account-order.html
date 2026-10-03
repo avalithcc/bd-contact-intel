@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orden del perfil · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  body { background: var(--color-surface-sunken, #f3f4f6); padding: 22px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .col > h2 { font: 700 12px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-soft); margin: 0 0 4px; }
+  .col > p.note { font: 400 12px/1.5 var(--font-body); color: var(--color-ink-subtle); margin: 0 0 10px; min-height: 48px; }
+  .lede { font: 400 13px/1.65 var(--font-body); color: var(--color-ink-soft); max-width: 90ch; margin: 0 0 20px; }
+  .lede b { color: var(--color-ink); }
+  .card { position: relative; }
+  .n { position: absolute; left: -9px; top: -9px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-ink); color: #fff; font: 700 11px/20px var(--font-body); text-align: center; }
+  .fold { position: relative; border-top: 2px dashed #c0392b; margin: 14px 0; }
+  .fold span { position: absolute; right: 0; top: -9px; background: var(--color-surface-sunken, #f3f4f6); padding: 0 6px; font: 700 10px var(--font-body); color: #c0392b; text-transform: uppercase; letter-spacing: .05em; }
+  .sig-body { padding: var(--space-md); }
+  .sig-box { height: 92px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-2, #fafafa); }
+</style>
+</head>
+<body>
+
+<p class="lede">Las dos columnas tienen <b>los mismos cinco bloques</b>, solo cambia el orden. La línea punteada marca aproximadamente dónde termina una pantalla de portátil (768&nbsp;px de alto útil). Lo que decide es <b>qué queda arriba del pliegue</b>: la firma es el bloque más alto de la página y hoy está tercera, así que empuja todo lo demás abajo.</p>
+
+<div class="cols">
+
+<div class="col">
+  <h2>Hoy</h2>
+  <p class="note">La firma, que es un editor con vista previa, se come el medio de la página. Importación y Conexiones quedan fuera de vista.</p>
+
+  <div class="card"><span class="n">1</span><div class="card-body"><div class="row row-lg"><span class="avatar avatar-lg a3 avatar-bd">CC</span><div class="grow"><h2>Cristian Civita</h2><p class="meta">cristian@avalith.net</p></div><span class="badge badge-brand no-dot">Admin</span></div></div></div>
+
+  <div class="card mt-lg"><span class="n">2</span><div class="card-header"><h3>Preferencias</h3></div><div class="card-body"><div class="field"><span class="label">Idioma</span><div class="segmented" role="group"><button class="on">Inglés</button><button>Español</button></div></div></div></div>
+
+  <div class="card mt-lg"><span class="n">3</span><div class="card-header"><h3>Firma</h3></div><div class="sig-body">
+    <p class="help">Se agrega al final de cada correo que enviás desde el CRM.</p>
+    <div class="sig-box mt-sm"></div>
+    <p class="help mt-sm">Vista previa</p>
+    <div class="sig-box mt-sm" style="height:60px"></div>
+    <div class="row mt-md"><button class="btn btn-primary btn-sm">Guardar</button><button class="btn btn-secondary btn-sm">Limpiar</button></div>
+  </div></div>
+
+  <div class="fold"><span>fin de pantalla</span></div>
+
+  <div class="card"><span class="n">4</span><div class="card-header"><h3>Importación</h3></div>
+  <a class="menu-item list-link" href="#"><span class="grow">Mensajes de LinkedIn<br><span class="meta">14.545 mensajes en 2.988 conversaciones</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div>
+
+  <div class="card mt-lg"><span class="n">5</span><div class="card-header"><h3>Conexiones y seguridad</h3></div>
+  <a class="menu-item list-link" href="#"><span class="grow">Conexión con Gmail<br><span class="meta">cristian@avalith.net</span></span><span class="badge badge-success">Conectado</span></a>
+  <div class="hr flush"></div>
+  <a class="menu-item list-link" href="#"><span class="grow">Contraseña<br><span class="meta">Cambiada hace 3 meses</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div>
+</div>
+
+<div class="col">
+  <h2>Propuesto</h2>
+  <p class="note">Primero lo que se consulta de un vistazo; la firma al final, que es a lo que vas a propósito una vez cada tanto. Todo lo consultable entra en una pantalla.</p>
+
+  <div class="card"><span class="n">1</span><div class="card-body"><div class="row row-lg"><span class="avatar avatar-lg a3 avatar-bd">CC</span><div class="grow"><h2>Cristian Civita</h2><p class="meta">cristian@avalith.net</p></div><span class="badge badge-brand no-dot">Admin</span></div></div></div>
+
+  <div class="card mt-lg"><span class="n">2</span><div class="card-header"><h3>Preferencias</h3></div><div class="card-body"><div class="field"><span class="label">Idioma</span><div class="segmented" role="group"><button class="on">Inglés</button><button>Español</button></div></div></div></div>
+
+  <div class="card mt-lg"><span class="n">3</span><div class="card-header"><h3>Conexiones y seguridad</h3></div>
+  <a class="menu-item list-link" href="#"><span class="grow">Conexión con Gmail<br><span class="meta">cristian@avalith.net</span></span><span class="badge badge-success">Conectado</span></a>
+  <div class="hr flush"></div>
+  <a class="menu-item list-link" href="#"><span class="grow">Contraseña<br><span class="meta">Cambiada hace 3 meses</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div>
+
+  <div class="card mt-lg"><span class="n">4</span><div class="card-header"><h3>Importación</h3></div>
+  <a class="menu-item list-link" href="#"><span class="grow">Mensajes de LinkedIn<br><span class="meta">14.545 mensajes en 2.988 conversaciones</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div>
+
+  <div class="fold"><span>fin de pantalla</span></div>
+
+  <div class="card"><span class="n">5</span><div class="card-header"><h3>Firma</h3></div><div class="sig-body">
+    <p class="help">Se agrega al final de cada correo que enviás desde el CRM.</p>
+    <div class="sig-box mt-sm"></div>
+    <p class="help mt-sm">Vista previa</p>
+    <div class="sig-box mt-sm" style="height:60px"></div>
+    <div class="row mt-md"><button class="btn btn-primary btn-sm">Guardar</button><button class="btn btn-secondary btn-sm">Limpiar</button></div>
+  </div></div>
+</div>
+
+</div>
+</body>
+</html>
