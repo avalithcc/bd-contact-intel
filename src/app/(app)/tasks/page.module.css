@@ -97,13 +97,6 @@
   width: 2.5rem;
 }
 
-.completeCheckbox {
-  width: 1.1rem;
-  height: 1.1rem;
-  cursor: pointer;
-  accent-color: var(--color-success);
-}
-
 /* Clamps to one line with an ellipsis (same idea as .cell-person .sub in
    design-system.css, written out again here with its own max-width). The full title stays reachable through the button's
    `title` attribute (TaskTitleLink) and the edit dialog. */

@@ -85,7 +85,7 @@ export async function updateTaskAction(taskId: string, updates: TaskEditInput): 
 
 /**
  * Completes or reopens a task from ANY entry point — this dialog, a list
- * checkbox (CompleteTaskButton.tsx), a record page's Tareas card, or the
+ * done button (CompleteTaskButton.tsx), a record page's Tareas card, or the
  * timeline's "Marcar como hecha"/"Reabrir" — all route through this one
  * action so every surface authorizes, scopes and logs identically (fixes
  * the IDOR `completeCompanyTaskAction` had via the old unscoped

@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { DoneButton } from "@/components/DoneButton";
 import { useToast } from "@/components/ToastProvider";
 import { completedToastMessage } from "@/lib/tasks/completedToastMessage";
 import { setTaskStatusAction } from "./actions";
-import styles from "./page.module.css";
 
 /**
- * Controlled so the checkbox only stays checked once the server action
- * succeeds: while saving it shows checked and disabled, on success it stays
- * that way until revalidation removes the row, and on failure it unchecks
- * and reports the error as a toast.
+ * A button (DoneButton), not a checkbox: completing is an action. It only
+ * shows the done state once the server action succeeds: while saving it is
+ * filled and disabled, on success it stays that way until revalidation
+ * removes the row, and on failure it returns to rest and reports the error
+ * as a toast.
  *
  * `done` is the task's real status: a task that is already done starts
- * checked and disabled, so the "Completadas" tab shows it as done and a click
+ * filled and disabled, so the "Completadas" tab shows it as done and a click
  * cannot ask for a second completion.
  */
 export function CompleteTaskButton({
@@ -38,7 +39,7 @@ export function CompleteTaskButton({
   const { showToast } = useToast();
   const [state, setState] = useState<"idle" | "saving" | "done">(done ? "done" : "idle");
 
-  const handleChange = async () => {
+  const handleComplete = async () => {
     setState("saving");
     try {
       await setTaskStatusAction(taskId, "done");
@@ -60,7 +61,7 @@ export function CompleteTaskButton({
    * revalidation normally unmounts the row. If revalidation is slow and the
    * instance is still alive, `useState` ignores a changed `done` prop, so
    * success resets to "idle" explicitly rather than leaving an open task
-   * checked and disabled. On failure the task is still done, so "done"
+   * filled and disabled. On failure the task is still done, so "done"
    * stays truthful.
    */
   const handleUndo = async () => {
@@ -72,14 +73,5 @@ export function CompleteTaskButton({
     }
   };
 
-  return (
-    <input
-      type="checkbox"
-      className={styles.completeCheckbox}
-      checked={state !== "idle"}
-      onChange={handleChange}
-      disabled={state !== "idle"}
-      aria-label={ariaLabel}
-    />
-  );
+  return <DoneButton done={state !== "idle"} label={ariaLabel} onClick={handleComplete} />;
 }

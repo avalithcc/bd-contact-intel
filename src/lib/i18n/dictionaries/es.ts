@@ -1258,6 +1258,7 @@ export const es: typeof en = {
     colSubject: "Asociado con",
     colOwner: "Responsable",
     colDue: "Vencimiento",
+    colComplete: "Completar",
     completeAria: "Completar",
     completeError: "No se pudo completar la tarea. Probá de nuevo.",
     completedToast: "Tarea completada",
