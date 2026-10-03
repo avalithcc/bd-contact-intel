@@ -24,6 +24,7 @@ function taskActivityBodyLabels(l: ContactRecordLabels): TaskActivityBodyLabels 
     fieldDue: l.taskChangeFieldDue,
     fieldAssignee: l.taskChangeFieldAssignee,
     fieldDescription: l.taskChangeFieldDescription,
+    createdPrefix: l.taskChangeCreatedPrefix,
     updatedPrefix: l.taskChangeUpdatedPrefix,
     completedPrefix: l.taskChangeCompletedPrefix,
     reopenedPrefix: l.taskChangeReopenedPrefix,
@@ -144,6 +145,7 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
     }
     case "discarded":
       return discardBody(metadata, l);
+    case "task_created":
     case "task_updated":
     case "task_completed":
     case "task_reopened":

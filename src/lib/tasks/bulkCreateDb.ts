@@ -17,11 +17,10 @@
  * observe different snapshots of `person.merged_into_id` (a person merged
  * away between the filter and the insert would otherwise still get a task).
  *
- * No `task_created` activity row is written here — `createTask` itself
- * (src/lib/tasks/queries.ts) writes none for a single-record task creation,
- * so this bulk path stays consistent with it: no more, no less. Only edits/
- * completion/reopening log `activity` rows (task-edit change,
- * updateWithActivity.ts).
+ * No `task_created` activity rows are written here, unlike a single-record
+ * creation (`createTaskWithActivity`, src/lib/tasks/updateWithActivity.ts).
+ * That is a known gap against the "every task change logs an activity" rule,
+ * left for its own change so the bulk insert's shape is not altered here.
  */
 import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";

@@ -17,6 +17,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
+import { ALL_TASK_ACTIVITY_TYPES } from "@/lib/tasks/taskActivityBody";
 
 const source = readFileSync("src/lib/activity/queries.ts", "utf8");
 
@@ -47,5 +48,12 @@ test("TIMELINE_ACTIVITY_TYPES still includes every pre-existing type (no acciden
     "task_reopened",
   ]) {
     assert.ok(types.includes(type), `expected pre-existing type "${type}" to still be present`);
+  }
+});
+
+test("TIMELINE_ACTIVITY_TYPES includes every task activity type, so a task's creation renders and counts", () => {
+  const types = extractTimelineActivityTypes();
+  for (const type of ALL_TASK_ACTIVITY_TYPES) {
+    assert.ok(types.includes(type), `expected ${type} among ${types.join(", ")}`);
   }
 });

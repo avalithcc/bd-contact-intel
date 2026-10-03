@@ -92,7 +92,7 @@ export function sumPillCount(countsByType: Record<string, number>, pill: Timelin
  * its own loaded entry pool down to just these three when that pill is
  * active.
  */
-export const TASK_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened"] as const;
+export const TASK_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;
 
 export function sumTaskActivityCount(countsByType: Record<string, number>): number {
   return TASK_ACTIVITY_TYPES.reduce((sum, type) => sum + (countsByType[type] ?? 0), 0);

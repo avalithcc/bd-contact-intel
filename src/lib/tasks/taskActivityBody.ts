@@ -1,6 +1,6 @@
 /**
- * Pure body-text formatter for the three task activity types (task-edit
- * change): `task_updated`, `task_completed`, `task_reopened`. Shared by the
+ * Pure body-text formatter for the four task activity types:
+ * `task_created`, `task_updated`, `task_completed`, `task_reopened`. Shared by the
  * Contact timeline (src/lib/contacts/timelineEntryBody.ts) and the Company
  * timeline (src/lib/companies/timelineView.ts) so the copy can never drift
  * between the two record pages.
@@ -40,6 +40,8 @@ export interface TaskActivityBodyLabels {
    * (`onDelete: "set null"`) — `actorBdId` itself is always set at write
    * time (see buildTaskActivityRow), this only covers that later edge case. */
   unknownActor: string;
+  /** Lowercase verb phrase for `task_created`, like the three above. */
+  createdPrefix: string;
 }
 
 const FIELD_LABEL_KEY: Record<string, keyof TaskActivityBodyLabels> = {
@@ -60,6 +62,7 @@ export function taskActivityBody(
   const title = metadata.taskTitle ?? "";
   const actor = actorName ?? l.unknownActor;
 
+  if (type === "task_created") return `${actor} ${l.createdPrefix} «${title}»`;
   if (type === "task_completed") return `${actor} ${l.completedPrefix} «${title}»`;
   if (type === "task_reopened") return `${actor} ${l.reopenedPrefix} «${title}»`;
 
@@ -75,7 +78,12 @@ export function taskActivityBody(
   return "";
 }
 
-export type TaskActivityType = "task_updated" | "task_completed" | "task_reopened";
+/** Every `activity.type` a task write produces. The other lists that must
+ * know them (timeline types, the Tareas pill, non-touch types) are pinned to
+ * this one by tests/unit/taskActivityBody.test.ts. */
+export const ALL_TASK_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;
+
+export type TaskActivityType = (typeof ALL_TASK_ACTIVITY_TYPES)[number];
 
 export interface TaskActivitySubject {
   personId: string | null;
@@ -84,10 +92,10 @@ export interface TaskActivitySubject {
 
 /**
  * Pure builder for the `activity` row `updateWithActivity.ts` inserts for
- * all three task activity types — pulled out so "every task activity row
+ * all four task activity types — pulled out so "every task activity row
  * sets `actorBdId`" (owner decision 2026-09-29: any BD may edit/complete/
  * reopen any task, but the system must record WHO did it) is a single,
- * unit-tested construction site instead of three separate object literals
+ * unit-tested construction site instead of four separate object literals
  * that could drift. `actorBdId` is a required (non-optional) parameter,
  * never omitted — see tests/unit/taskActivityBody.test.ts.
  */

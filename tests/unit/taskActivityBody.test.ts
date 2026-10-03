@@ -15,14 +15,18 @@ import { test } from "node:test";
 import {
   taskActivityBody,
   buildTaskActivityRow,
+  ALL_TASK_ACTIVITY_TYPES,
   type TaskActivityBodyLabels,
 } from "@/lib/tasks/taskActivityBody";
+import { TASK_ACTIVITY_TYPES } from "@/lib/activity/timelinePills";
+import { NON_TOUCH_ACTIVITY_TYPES } from "@/lib/contacts/effectiveActivityTime";
 
 const LABELS: TaskActivityBodyLabels = {
   fieldTitle: "Título",
   fieldDue: "Vencimiento",
   fieldAssignee: "Asignada a",
   fieldDescription: "Descripción",
+  createdPrefix: "creó la tarea",
   updatedPrefix: "editó la tarea",
   completedPrefix: "completó la tarea",
   reopenedPrefix: "reabrió la tarea",
@@ -99,4 +103,25 @@ test("buildTaskActivityRow carries the subject's companyKey for a company-scoped
   assert.equal(row.personId, null);
   assert.equal(row.companyKey, "acme");
   assert.equal(row.actorBdId, "bd-1");
+});
+
+test("task_created names the actor: '<actor> creó la tarea «X»'", () => {
+  const body = taskActivityBody("task_created", { taskTitle: "Enviar propuesta" }, "Macarena", LABELS);
+  assert.equal(body, "Macarena creó la tarea «Enviar propuesta»");
+});
+
+test("buildTaskActivityRow builds a task_created row that names the creator", () => {
+  const row = buildTaskActivityRow("task_created", { personId: "person-1", companyKey: null }, "bd-macarena", {
+    taskId: "task-1",
+    taskTitle: "Enviar propuesta",
+  });
+  assert.equal(row.type, "task_created");
+  assert.equal(row.actorBdId, "bd-macarena");
+  assert.deepEqual(row.metadata, { taskId: "task-1", taskTitle: "Enviar propuesta" });
+});
+
+test("every task activity type is registered in each list that must know about it", () => {
+  assert.deepEqual([...ALL_TASK_ACTIVITY_TYPES].sort(), ["task_completed", "task_created", "task_reopened", "task_updated"]);
+  assert.deepEqual([...TASK_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES].sort());
+  assert.deepEqual([...NON_TOUCH_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES].sort());
 });

@@ -61,7 +61,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * timelineGrouping.ts), so this list is defined ONCE here and both twins
  * reference it — no second definition to drift.
  */
-export const NON_TOUCH_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened"] as const;
+export const NON_TOUCH_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;
 
 function isNonTouchActivityType(type: string): boolean {
   return (NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes(type);

@@ -33,6 +33,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "call",
   "discarded",
   "status_backfill",
+  "task_created",
   "task_updated",
   "task_completed",
   "task_reopened",

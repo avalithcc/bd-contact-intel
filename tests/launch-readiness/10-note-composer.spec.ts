@@ -21,7 +21,7 @@ test('note + follow-up task: both saved, the task has no due date, and it shows 
   await expect.poll(async () => (await tasksFor(p.id)).length).toBe(1);
   const [t] = await tasksFor(p.id);
   console.log(`[note+task] due_at=${t!.due_at} assigned=${t!.assigned_to_bd_id}`);
-  expect((await activitiesFor(p.id)).map((a) => a.type)).toEqual(['note']);
+  expect((await activitiesFor(p.id)).map((a) => a.type)).toEqual(['note', 'task_created']);
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
   await expect(page.locator('tr', { hasText: p.name }), 'a follow-up with no date is not on /tasks').toBeVisible();

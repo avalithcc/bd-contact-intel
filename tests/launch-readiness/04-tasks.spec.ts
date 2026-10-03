@@ -81,7 +81,7 @@ test('completing then reopening logs both changes with the actor, and leaves the
   await page.getByRole('button', { name: 'Reabrir', exact: true }).click();
   await expect.poll(async () => (await tasksFor(p.id))[0]!.status).toBe('open');
   const types = (await activitiesFor(p.id)).map((a) => a.type).filter((t) => t.startsWith('task_'));
-  expect(types).toEqual(['task_completed', 'task_reopened']);
+  expect(types).toEqual(['task_created', 'task_completed', 'task_reopened']);
   for (const a of await activitiesFor(p.id)) expect(a.actor_bd_id).toBe(await meId());
 });
 
@@ -105,15 +105,20 @@ test('any BD may complete a task assigned to someone else, and the activity name
   expect(done!.actor_bd_id).toBe(await meId());
 });
 
-test('creating a task leaves a trace in the activity log naming who created it', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-TASK-CREATE: createTask writes no activity row; only edits/completion/reopen are logged');
+test('creating a task leaves exactly one task_created activity naming who created it', async ({ page }) => {
   const p = await newPerson('TaskCreateLog');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Crear deja rastro' });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
+  const [t] = await tasksFor(p.id);
   const created = (await activitiesFor(p.id)).filter((a) => a.type.startsWith('task_'));
-  expect(created.length).toBeGreaterThan(0);
+  expect(created).toHaveLength(1);
+  expect(created[0]!.type).toBe('task_created');
   expect(created[0]!.actor_bd_id).toBe(await meId());
+  expect(created[0]!.metadata).toMatchObject({ taskId: t!.id, taskTitle: 'Crear deja rastro' });
+  // And the record's own timeline says so, with the actor's name.
+  await page.locator('.filter-pill', { hasText: 'Tareas' }).click();
+  await expect(page.locator('main').getByText(/creó la tarea «Crear deja rastro»/)).toBeVisible();
 });
 
 test('editing a task logs ONE activity with the actor and the before/after', async ({ page }) => {
@@ -203,14 +208,15 @@ test('the Tareas card on the record of a contact with no tasks does not say "ass
   await expect(page.getByText('próximamente')).toHaveCount(0);
 });
 
-test('a task created with no due date still shows in the record\'s Todo timeline', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-TASK-NODATE: upcomingTasks() drops tasks with no due date; the timeline says "no activity" while Todo/Tareas say 1');
+test('a task created with no due date is still an actionable card in the record\'s Todo timeline', async ({ page }) => {
+  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-TASK-NODATE: upcomingTasks() drops tasks with no due date, so the open task has no card (the task_created activity row alone no longer hides the problem)');
   const p = await newPerson('TaskNoDate');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Sin fecha de vencimiento' });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
-  await expect(page.locator('.tl, main').getByText('Sin fecha de vencimiento').first()).toBeVisible();
-  await expect(page.getByText('Todavía no hay actividad registrada')).toHaveCount(0);
+  // The open task itself (title + "Marcar como hecha"), not just the log line that says it was created.
+  await expect(page.getByRole('button', { name: 'Sin fecha de vencimiento' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Marcar como hecha' })).toBeVisible();
 });
 
 test('a done task in Completadas shows as done and cannot log a second completion', async ({ page }) => {

@@ -28,6 +28,7 @@ const labels = {
   atDiscarded: "Descartado",
   atHunterLookup: "Búsqueda",
   atStatusBackfill: "Historial",
+  atTaskCreated: "Tarea creada",
   atTaskUpdated: "Tarea editada",
   atTaskCompleted: "Tarea completada",
   atTaskReopened: "Tarea reabierta",
@@ -35,6 +36,7 @@ const labels = {
   taskChangeFieldDue: "Vencimiento",
   taskChangeFieldAssignee: "Asignada a",
   taskChangeFieldDescription: "Descripción",
+  taskChangeCreatedPrefix: "creó la tarea",
   taskChangeUpdatedPrefix: "editó la tarea",
   taskChangeCompletedPrefix: "completó la tarea",
   taskChangeReopenedPrefix: "reabrió la tarea",
@@ -108,6 +110,23 @@ test("buildCompanyTimelineViewRows: a task_updated row's body names the actor, n
   const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
   assert.equal(view.what, "Tarea editada · Bruno Diaz");
   assert.equal(view.body, "Macarena editó la tarea «Enviar propuesta»: Vencimiento 12 oct → 20 oct");
+});
+
+test("buildCompanyTimelineViewRows: a task_created row headlines the person and names the creator in the body", () => {
+  const rows = [
+    {
+      ...baseRow,
+      type: "task_created",
+      metadata: { taskId: "t1", taskTitle: "Llamar el lunes" },
+      actorName: "Macarena",
+      scope: "contact" as const,
+      personId: "p1",
+      personName: "Bruno Diaz",
+    },
+  ];
+  const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
+  assert.equal(view.what, "Tarea creada · Bruno Diaz");
+  assert.equal(view.body, "Macarena creó la tarea «Llamar el lunes»");
 });
 
 // --- reply_received (email-sync brief follow-up review) --------------------

@@ -200,6 +200,7 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   call: "timelineFilterCall",
   discarded: "timelineFilterDiscarded",
   status_backfill: "timelineFilterStatusBackfill",
+  task_created: "timelineFilterTaskCreated",
   task_updated: "timelineFilterTaskUpdated",
   task_completed: "timelineFilterTaskCompleted",
   task_reopened: "timelineFilterTaskReopened",
@@ -221,6 +222,7 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   status_backfill: HistoryIcon,
   // Uses the existing system/status-change entry layout (owner spec) — same
   // icon family as every other internal/system-generated entry.
+  task_created: TasksIcon,
   task_updated: TasksIcon,
   task_completed: TasksIcon,
   task_reopened: TasksIcon,
@@ -234,6 +236,7 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   call: "call",
   discarded: "discard",
   status_backfill: "system",
+  task_created: "system",
   task_updated: "system",
   task_completed: "system",
   task_reopened: "system",
