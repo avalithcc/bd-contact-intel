@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { skipReason } from './tests/e2e/credentials';
+import { isCi, skipReason } from './tests/e2e/credentials';
+import { serverPlan } from './tests/e2e/readOnlyGuard';
 
 // Playwright does not read .env.local on its own (only `next dev` does), so
 // load it here for E2E_EMAIL / E2E_PASSWORD. Existing variables win.
@@ -9,6 +10,17 @@ const envLocal = path.join(__dirname, '.env.local');
 if (fs.existsSync(envLocal)) process.loadEnvFile(envLocal);
 
 const STORAGE_STATE = path.join(__dirname, 'tests/.auth/state.json');
+
+// Read-only mode (the default, and always against production): reuse a dev
+// server on :3000 is fine because tests/e2e/fixtures.ts blocks writes no matter
+// which database that server uses. Scratch mode (DATABASE_URL is a local _e2e
+// database): the suite may write, and writes land wherever the SERVER points,
+// not where this process's DATABASE_URL points. A dev server on :3000 loads
+// .env.local (production), so scratch mode starts its own server on a
+// dedicated port with an explicit env and never reuses one.
+// See serverPlan() in tests/e2e/readOnlyGuard.ts.
+const plan = serverPlan(process.env.DATABASE_URL, isCi());
+const BASE_URL = `http://localhost:${plan.port}`;
 
 // The list reporter hides skip reasons, so say it once (the main process only,
 // not every worker) where a developer will see it.
@@ -34,7 +46,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
 
@@ -43,10 +55,11 @@ export default defineConfig({
   webServer: skipReason()
     ? undefined
     : {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
-        reuseExistingServer: !process.env.CI,
+        command: `npx next dev -p ${plan.port}`,
+        url: BASE_URL,
+        reuseExistingServer: plan.reuseExistingServer,
         timeout: 120_000,
+        ...(plan.env ? { env: plan.env } : {}),
       },
 
   projects: [

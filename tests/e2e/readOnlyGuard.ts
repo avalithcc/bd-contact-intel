@@ -66,6 +66,29 @@ export function writeSkipReason(databaseUrl: string | undefined): string | null 
   );
 }
 
+export interface ServerPlan {
+  port: number;
+  reuseExistingServer: boolean;
+  /** Explicit env for the dev server; set only when writes are allowed. */
+  env?: { DATABASE_URL: string };
+}
+
+/**
+ * Which app server the suite talks to. The guard above judges the TEST
+ * process's DATABASE_URL, but writes land wherever the SERVER points. A dev
+ * server already listening on :3000 loads .env.local (production), so once
+ * writes are allowed the suite must start its OWN server on a dedicated port
+ * with DATABASE_URL passed explicitly, and never reuse one (same reasoning as
+ * playwright.launch-readiness.config.ts). In read-only mode reuse is safe:
+ * the request guard blocks writes whichever database that server uses.
+ */
+export function serverPlan(databaseUrl: string | undefined, ci: boolean): ServerPlan {
+  if (writesAllowed(databaseUrl)) {
+    return { port: 3101, reuseExistingServer: false, env: { DATABASE_URL: databaseUrl! } };
+  }
+  return { port: 3000, reuseExistingServer: !ci };
+}
+
 export function describeViolations(violations: SeenRequest[]): string {
   return [
     'The e2e suite is read-only against this database, but the page sent write requests (blocked, nothing reached the app):',

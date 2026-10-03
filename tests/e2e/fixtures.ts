@@ -11,9 +11,9 @@ import {
  * aborts every write request the app would receive and fails the test if any
  * was attempted, unless DATABASE_URL is a scratch database. Read-only is
  * therefore enforced by the harness, not by reviewer discipline. Server-side
- * writes triggered by a plain GET render (e.g. the admin conversation audit
- * row) are invisible here, so those specs also skip via
- * `skipUnlessWritesAllowed()` in helpers.ts.
+ * writes triggered by a plain GET render are invisible here (known gap: the
+ * first-visit `bd` upsert in getCurrentBd, src/lib/queries.ts:80). Writing
+ * specs also skip via `skipUnlessWritesAllowed()` in helpers.ts.
  */
 export const test = base.extend<{ readOnlyGuard: void }>({
   readOnlyGuard: [

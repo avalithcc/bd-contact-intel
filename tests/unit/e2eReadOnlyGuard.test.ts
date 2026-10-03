@@ -5,6 +5,7 @@ import {
   writesAllowed,
   writeSkipReason,
   describeViolations,
+  serverPlan,
 } from "../e2e/readOnlyGuard";
 
 const APP = "http://localhost:3000";
@@ -71,4 +72,22 @@ test("describeViolations lists each blocked request", () => {
   assert.match(msg, /POST http:\/\/localhost:3000\/contacts/);
   assert.match(msg, /GET http:\/\/localhost:3000\/api\/gmail\/sync/);
   assert.match(msg, /read-only/i);
+});
+
+test("server plan: read-only mode may reuse the dev server on :3000", () => {
+  const plan = serverPlan("postgres://u:p@db.abc.supabase.co:5432/postgres", false);
+  assert.equal(plan.port, 3000);
+  assert.equal(plan.reuseExistingServer, true);
+  assert.equal(plan.env, undefined);
+  assert.equal(serverPlan(undefined, true).reuseExistingServer, false);
+});
+
+test("server plan: writes allowed means a dedicated port, never reused, with an explicit DATABASE_URL", () => {
+  const url = "postgres://localhost:5432/bd_contact_intel_e2e";
+  for (const ci of [false, true]) {
+    const plan = serverPlan(url, ci);
+    assert.notEqual(plan.port, 3000);
+    assert.equal(plan.reuseExistingServer, false);
+    assert.deepEqual(plan.env, { DATABASE_URL: url });
+  }
 });

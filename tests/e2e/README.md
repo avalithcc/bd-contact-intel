@@ -20,19 +20,39 @@ production too (fail closed). In that mode:
   arrives, plus GETs to `/api/*` and `/auth/confirm`) and fails the test,
   listing the requests. Supabase and other origins are not inspected.
 - **A test that writes must call `skipUnlessWritesAllowed()`** (`helpers.ts`).
-  It skips outside a scratch database. This is also required for a page that
-  writes on a plain GET render (for example the admin conversation view writes
-  an `audit_log` row), which the request guard cannot see.
+  It skips outside a scratch database.
 - Today those are: the duplicate-merge test (`phase7.spec.ts`, additionally
   gated by `E2E_ALLOW_DESTRUCTIVE=1`), the CSV import (`phase14.spec.ts`) and
-  the admin conversation audit view (`phase11.spec.ts`). All skip on production.
+  the admin conversation test (`phase11.spec.ts`, whose audit row is written by
+  the `revealAdminConversationAction` server action). All skip on production.
+  `phase11.spec.ts` is also stale: it targets a deleted route (see the comment
+  at the top of that file) and needs rewriting or deleting.
 - The setup project logs in through Supabase Auth (a session in Supabase's own
   `auth` schema, outside the app guard). It does not write app tables.
+- **Known gap:** server-side writes during a plain GET render are invisible to
+  the request guard. The one known case is `getCurrentBd`
+  (`src/lib/queries.ts:80`, called from the app layout on every render), which
+  inserts a `bd` row the first time a session email has none. A seeded e2e
+  account already has its row, so this should not fire, but read-only is not
+  strictly "by construction" until that write is gone or tested.
 
-To exercise the writing tests, point `DATABASE_URL` at a seeded scratch
-database (`scripts/seed-launch-readiness.ts`, see `tests/launch-readiness`).
-The filter specs assert against production-scale data (real BDs with phones,
-contact types), so the tiny launch-readiness seed does not satisfy them; run
+## Writing mode (scratch database only)
+
+The guard judges this process's `DATABASE_URL`, but writes land wherever the
+app SERVER points. So when `DATABASE_URL` is a scratch database,
+`playwright.config.ts` starts its own `next dev` on port 3101 with
+`DATABASE_URL` passed explicitly and never reuses an existing server (a dev
+server on `:3000` normally loads `.env.local`, i.e. production). Without a
+scratch `DATABASE_URL` it keeps the old behaviour: it reuses a server on
+`:3000`, which is safe because the request guard blocks writes.
+
+To use it, seed a scratch database (`scripts/seed-launch-readiness.ts`, see
+`tests/launch-readiness`) and run
+`DATABASE_URL=postgres://localhost/x_e2e npx playwright test`. The shell
+variable wins over `.env.local`. The login still goes to the Supabase Auth
+project configured in `.env.local`; whether that is acceptable for a scratch
+run is unverified. The filter specs assert against production-scale data (real
+BDs with phones, contact types), so the tiny seed does not satisfy them; run
 them read-only against production.
 
 ## One-time setup
