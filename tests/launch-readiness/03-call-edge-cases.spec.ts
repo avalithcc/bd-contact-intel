@@ -130,7 +130,6 @@ test('an unbroken 5,000-character string in a note does not push the page sidewa
 });
 
 test('a 1.1 MB note (server answers 500) fails visibly, not silently', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-FREEZE: onSubmit has no try/finally, a thrown action leaves busy=true forever');
   const p = await newPerson('CallHuge');
   await openContact(page, p.id);
   const dlg = await openQuickAction(page, 'call');
@@ -147,17 +146,58 @@ test('a 1.1 MB note (server answers 500) fails visibly, not silently', async ({ 
 });
 
 test('a dropped connection mid-save leaves the dialog usable and says so', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-FREEZE: onSubmit has no try/finally, a thrown action leaves busy=true forever');
   const p = await newPerson('CallOffline');
   await openContact(page, p.id);
   const dlg = await openQuickAction(page, 'call');
   await dlg.getByLabel('Resultado').selectOption('connected');
+  await dlg.getByLabel('Notas').fill('Pidió que lo llame el lunes.');
   await page.route('**/contacts/**', (route) => (route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.continue()));
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
   await page.waitForTimeout(3000);
   await page.unroute('**/contacts/**');
   expect(await activitiesFor(p.id)).toHaveLength(0);
   await expect(dlg.getByRole('button', { name: 'Cancelar' }), 'dialog frozen after a network error').toBeEnabled();
+  await expect(dlg.getByRole('alert'), 'the BD is told, in Spanish, that the save is unconfirmed').toContainText('No se pudo confirmar que se guardó');
+  await expect(dlg.getByLabel('Notas'), 'what she typed survives').toHaveValue('Pidió que lo llame el lunes.');
+  await expect(dlg.getByRole('button', { name: 'Registrar llamada' }), 'she can retry').toBeEnabled();
+});
+
+test('an unconfirmed save that DID land shows in the timeline without a reload (so "revisar" shows the truth)', async ({ page }) => {
+  const p = await newPerson('CallLandedUnconfirmed');
+  await openContact(page, p.id);
+  const dlg = await openQuickAction(page, 'call');
+  await dlg.getByLabel('Resultado').selectOption('connected');
+  await dlg.getByLabel('Notas').fill('Llegó igual.');
+  // The server writes the call, but the response never reaches the browser.
+  await page.route('**/contacts/**', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await route.fetch();
+    return route.abort('connectionreset');
+  });
+  await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
+  await expect(dlg.getByRole('alert')).toContainText('No se pudo confirmar que se guardó');
+  await page.unroute('**/contacts/**');
+  expect(await activitiesFor(p.id)).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByText('Llegó igual.'), 'the timeline must have refreshed after the unconfirmed result').toBeVisible();
+});
+
+test('while a save is in flight, Escape does not close the dialog (no stale busy leaking into another dialog)', async ({ page }) => {
+  const p = await newPerson('CallEscapeInFlight');
+  await openContact(page, p.id);
+  const dlg = await openQuickAction(page, 'call');
+  await dlg.getByLabel('Resultado').selectOption('connected');
+  await page.route('**/contacts/**', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await new Promise((r) => setTimeout(r, 2500));
+    return route.continue();
+  });
+  await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog'), 'Escape must be ignored while saving').toBeVisible();
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 15000 });
+  await page.unroute('**/contacts/**');
 });
 
 test('leaving the page right after pressing save still saves exactly one call', async ({ page }) => {
@@ -191,7 +231,6 @@ test('a "Número equivocado" call is not queued for a follow-up call a week late
 });
 
 test('after a network error, Escape closes the dialog and every quick action works again without a reload', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-FREEZE: busy lives in QuickActions and closeQuickAction never resets it, every dialog stays disabled');
   const p = await newPerson('CallOfflineClose');
   await openContact(page, p.id);
   const dlg = await openQuickAction(page, 'call');

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { contactActionErrorHref } from "../actionErrors";
+import { settleAction } from "@/lib/contacts/actionOutcome";
 import {
   addContactSignalAction,
   addContactTaskAction,
@@ -259,8 +260,11 @@ export function QuickActions({
             setError(null);
             // Direction has no control on purpose: a hand-logged call is outbound,
             // and `outbound` is what makes a no-answer call count as `contacted`.
-            const result = await logCallAction(personId, outcome, MANUAL_CALL_DIRECTION, date, time, notes);
+            const result = await settleAction(() => logCallAction(personId, outcome, MANUAL_CALL_DIRECTION, date, time, notes));
             setBusy(false);
+            // The write may have landed: show the timeline as it is now, so
+            // "revisar" points at the truth and not at a stale screen.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastCallLogged);
@@ -286,8 +290,11 @@ export function QuickActions({
           onSubmit={async (title, dueAt, description, assignedToBdId) => {
             setBusy(true);
             setError(null);
-            const result = await addContactTaskAction(personId, title, dueAt, description, assignedToBdId);
+            const result = await settleAction(() => addContactTaskAction(personId, title, dueAt, description, assignedToBdId));
             setBusy(false);
+            // The write may have landed: show the timeline as it is now, so
+            // "revisar" points at the truth and not at a stale screen.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastTaskCreated);
@@ -320,8 +327,11 @@ export function QuickActions({
             if (!email) return;
             setBusy(true);
             setError(null);
-            const result = await sendContactEmailAction(personId, email, subject, body);
+            const result = await settleAction(() => sendContactEmailAction(personId, email, subject, body));
             setBusy(false);
+            // The write may have landed: show the timeline as it is now, so
+            // "revisar" points at the truth and not at a stale screen.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastEmailSent);
@@ -344,8 +354,11 @@ export function QuickActions({
           onSubmit={async (date, time, notes) => {
             setBusy(true);
             setError(null);
-            const result = await logContactMeetingAction(personId, date, time, notes);
+            const result = await settleAction(() => logContactMeetingAction(personId, date, time, notes));
             setBusy(false);
+            // The write may have landed: show the timeline as it is now, so
+            // "revisar" points at the truth and not at a stale screen.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastMeetingLogged);
@@ -368,8 +381,11 @@ export function QuickActions({
           onSubmit={async (reason, note) => {
             setBusy(true);
             setError(null);
-            const result = await discardContactAction(personId, reason, note);
+            const result = await settleAction(() => discardContactAction(personId, reason, note));
             setBusy(false);
+            // The write may have landed: show the timeline as it is now, so
+            // "revisar" points at the truth and not at a stale screen.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastDiscarded);
@@ -392,8 +408,11 @@ export function QuickActions({
           onSubmit={async (text) => {
             setBusy(true);
             setError(null);
-            const result = await addContactSignalAction(personId, text);
+            const result = await settleAction(() => addContactSignalAction(personId, text));
             setBusy(false);
+            // The write may have landed: show the timeline as it is now, so
+            // "revisar" points at the truth and not at a stale screen.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastSignalSaved);
@@ -434,6 +453,7 @@ function TaskForm({
     <Dialog
       open
       onClose={onCancel}
+      closeDisabled={busy}
       title={l.taskCreate}
       footer={
         <>
@@ -573,6 +593,7 @@ function EmailForm({
     <Dialog
       open
       onClose={onCancel}
+      closeDisabled={busy}
       title={l.quickActionEmail}
       wide
       footer={
@@ -667,6 +688,7 @@ export function CallForm({
     <Dialog
       open
       onClose={onCancel}
+      closeDisabled={busy}
       title={l.callSubmit}
       footer={
         <>
@@ -767,6 +789,7 @@ export function MeetingForm({
     <Dialog
       open
       onClose={onCancel}
+      closeDisabled={busy}
       title={l.meetingSubmit}
       footer={
         <>
@@ -848,6 +871,7 @@ export function DiscardForm({
     <Dialog
       open
       onClose={onCancel}
+      closeDisabled={busy}
       title={l.discardSubmit}
       footer={
         <>
