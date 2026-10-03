@@ -104,7 +104,16 @@
   accent-color: var(--color-success);
 }
 
+/* One line, ellipsis: the app's long-text pattern (.cell-person .sub in
+   design-system.css). The full title stays reachable through the button's
+   `title` attribute (TaskTitleLink) and the edit dialog. */
 .taskTitle {
+  display: block;
+  max-width: 36rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
   font-weight: 600;
   color: var(--color-ink);
 }

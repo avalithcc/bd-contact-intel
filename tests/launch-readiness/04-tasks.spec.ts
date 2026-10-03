@@ -187,18 +187,22 @@ test('double-clicking the completion checkbox does not log two completions', asy
   expect(completions.length).toBeLessThanOrEqual(1);
 });
 
-test('a 3,000-character title does not break the /tasks table layout', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-LONGTITLE: the title input has no length limit and the row grows without bound (888 px for 3,000 chars)');
+test('a 3,000-character title is clamped to one line on /tasks, stays whole in the database, and is reachable in full', async ({ page }) => {
   const p = await newPerson('TaskLongTitle');
   await openContact(page, p.id);
-  await createTaskOnRecord(page, { title: `Titulo ${'largo '.repeat(500)}`.trim() });
+  const longTitle = `Titulo ${'largo '.repeat(500)}`.trim();
+  await createTaskOnRecord(page, { title: longTitle });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, '/tasks scrolls sideways because of a long title').toBeLessThanOrEqual(0);
-  const rowHeight = await page.locator('tr', { hasText: p.name }).first().evaluate((el) => el.getBoundingClientRect().height);
-  expect(rowHeight, 'one task row is taller than the screen').toBeLessThan(400);
+  const row = page.locator('tr', { hasText: p.name }).first();
+  const rowHeight = await row.evaluate((el) => el.getBoundingClientRect().height);
+  expect(rowHeight, 'one task row is taller than the screen').toBeLessThan(120);
+  // Display is clamped, the stored title is not, and the full text is one hover away.
+  expect((await tasksFor(p.id))[0]!.title).toBe(longTitle);
+  await expect(row.getByRole('button', { name: /^Titulo largo/ })).toHaveAttribute('title', longTitle);
 });
 
 test('the Tareas card on the record of a contact with no tasks does not say "associations coming soon"', async ({ page }) => {

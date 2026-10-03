@@ -33,6 +33,7 @@ export function TaskTitleLink({
         type="button"
         className={`btn-text-reset${className ? ` ${className}` : ""}`}
         onClick={() => setOpen(true)}
+        title={task.title}
       >
         {task.title}
       </button>
