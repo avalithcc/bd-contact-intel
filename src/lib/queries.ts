@@ -31,6 +31,12 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import { isAllowedWorkEmail } from "@/lib/auth/allowedEmail";
+import {
+  buildMessageImportStatsQuery,
+  toMessageImportStats,
+  type MessageImportStats,
+  type MessageImportStatsRow,
+} from "@/lib/linkedin/messageImportStatsQuery";
 
 /**
  * Resolves the current BD from the authenticated Supabase user, creating the
@@ -1030,4 +1036,17 @@ export async function getConversationThreads(
   }));
 
   return { threads, moreConversations, moreMessages };
+}
+
+/**
+ * The signed-in BD's own LinkedIn messages import state (counts and last
+ * import time) for `/account/linkedin-messages` and its row on `/account`.
+ * Scoped by `bdId` in every subquery — message data is private per BD. ONE
+ * round trip; see src/lib/linkedin/messageImportStatsQuery.ts.
+ */
+export async function getMessageImportStats(bdId: string): Promise<MessageImportStats> {
+  const rows = (await db.execute(
+    buildMessageImportStatsQuery(bdId),
+  )) as unknown as MessageImportStatsRow[];
+  return toMessageImportStats(rows[0]);
 }

@@ -18,10 +18,8 @@ const CONNECTIONS_ERROR_KEY: Record<
  * LinkedIn connections upload, moved onto `/contacts/import` (task 14.2)
  * alongside the leads CSV upload. Reuses the EXACT same `uploadCsv` server
  * action (and therefore the same `upsertContacts`/identity-resolver write
- * path) as the pre-existing home-page `UploadForm` — this is a new,
- * Spanish-only (D10) surface for it, not a behavior change to the upload
- * itself. The home-page form is left in place (not removed) so nothing
- * currently depending on it breaks.
+ * path) as the legacy `UploadForm` in src/app/UploadForm.tsx. This is the
+ * only page that renders it; the home page no longer shows an import form.
  */
 export function ConnectionsUploadForm({ labels: l }: { labels: ContactsImportLabels }) {
   const [state, action, pending] = useActionState<UploadResult | null, FormData>(uploadCsv, null);
