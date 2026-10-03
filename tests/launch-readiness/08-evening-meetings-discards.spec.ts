@@ -73,6 +73,7 @@ test('F12: a meeting dated in the future is refused with a message that points a
   const p = await newPerson('MeetingFuture');
   await openContact(page, p.id);
   const dlg = await openQuickAction(page, 'meeting');
+  await expect(dlg.getByLabel('Fecha'), 'courtesy max: today in Argentina').toHaveAttribute('max', argDate(0));
   await dlg.getByLabel('Fecha').fill(argDate(5));
   await dlg.getByRole('button', { name: 'Registrar reunión' }).click();
   await expect(dlg.getByRole('alert')).toContainText('fecha futura');
@@ -102,4 +103,16 @@ test('discarding needs a reason, "Otro" needs a note, and a discarded contact le
   await page.goto('/contacts?view=notContacted&q=' + encodeURIComponent(p.name.split(' ')[0]!));
   await page.waitForLoadState('networkidle');
   await expect(page.locator('tbody').getByText(p.name)).toHaveCount(0);
+});
+
+test('F12 on the company record: a future meeting shows the Spanish message, never the raw English error', async ({ page }) => {
+  const [co] = await sql`select company_key from company order by company_key limit 1`;
+  await page.goto(`/companies/${encodeURIComponent(co!.company_key)}`);
+  await page.getByRole('button', { name: 'Reunión', exact: true }).click();
+  const dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Fecha').fill(argDate(5));
+  await dlg.getByRole('button', { name: 'Registrar reunión' }).click();
+  await expect(dlg.getByRole('alert')).toContainText('tarea de seguimiento');
+  await expect(dlg.getByRole('alert')).not.toContainText('cannot be logged');
+  await expect(dlg.getByRole('button', { name: 'Registrar reunión' })).toBeEnabled();
 });

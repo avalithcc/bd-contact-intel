@@ -31,6 +31,15 @@ export class MeetingOccurredAtInFutureError extends Error {
   }
 }
 
+export type MeetingErrorReason = "meeting_date_required" | "meeting_occurred_at_in_future";
+
+/** Typed reason for the errors `planMeeting` throws, or null for anything else. Lets a caller return a reason the client turns into dictionary copy instead of a raw English `Error.message`. */
+export function meetingErrorReason(err: unknown): MeetingErrorReason | null {
+  if (err instanceof MeetingDateRequiredError) return "meeting_date_required";
+  if (err instanceof MeetingOccurredAtInFutureError) return "meeting_occurred_at_in_future";
+  return null;
+}
+
 export interface MeetingActivityMetadata {
   at: string;
   notes: string | null;

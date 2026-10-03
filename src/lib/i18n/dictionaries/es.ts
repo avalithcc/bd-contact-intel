@@ -1462,6 +1462,9 @@ export const es: typeof en = {
     toastNoteSaved: "Nota guardada.",
     toastTaskCreated: "Tarea creada.",
     toastMeetingLogged: "Reunión registrada.",
+    errorMeetingDateRequired: "Se requiere una fecha para registrar la reunión.",
+    errorMeetingOccurredAtInFuture:
+      "No se puede registrar una reunión con fecha futura. Si solo la agendaste, crea una tarea de seguimiento.",
   },
 
   companyForm: {

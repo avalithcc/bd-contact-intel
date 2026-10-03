@@ -1504,6 +1504,9 @@ export const en = {
     toastNoteSaved: "Note saved.",
     toastTaskCreated: "Task created.",
     toastMeetingLogged: "Meeting logged.",
+    errorMeetingDateRequired: "A date is required to log the meeting.",
+    errorMeetingOccurredAtInFuture:
+      "A meeting cannot be logged with a future date. If you have only scheduled it, add a follow-up task instead.",
   },
 
   companyForm: {

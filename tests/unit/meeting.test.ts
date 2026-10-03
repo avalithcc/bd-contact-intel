@@ -79,3 +79,23 @@ test("planMeeting does not mutate its inputs and is repeatable", () => {
   assert.deepEqual(a, b);
   assert.equal(now.getTime(), NOW.getTime());
 });
+
+// --- company dialog: typed reason instead of a raw English message ---------
+import { meetingErrorReason } from "@/lib/contacts/meeting";
+
+test("meetingErrorReason maps both meeting errors, and nothing else, to a typed reason", () => {
+  assert.equal(meetingErrorReason(new MeetingDateRequiredError()), "meeting_date_required");
+  assert.equal(meetingErrorReason(new MeetingOccurredAtInFutureError()), "meeting_occurred_at_in_future");
+  assert.equal(meetingErrorReason(new Error("boom")), null);
+  assert.equal(meetingErrorReason("nope"), null);
+});
+
+test("the company dialog's reason keys exist in both dictionaries with non-empty copy", async () => {
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  const { es } = await import("@/lib/i18n/dictionaries/es");
+  for (const d of [en, es]) {
+    assert.ok(d.companyRecord.errorMeetingDateRequired.length > 0);
+    assert.ok(d.companyRecord.errorMeetingOccurredAtInFuture.length > 0);
+  }
+  assert.notEqual(es.companyRecord.errorMeetingOccurredAtInFuture, en.companyRecord.errorMeetingOccurredAtInFuture);
+});

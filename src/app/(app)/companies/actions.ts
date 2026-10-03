@@ -8,7 +8,7 @@ import type { Company, NewCompany } from "@/db/schema";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
 import { setTaskStatusChecked } from "@/lib/tasks/updateWithActivity";
-import { planMeeting } from "@/lib/contacts/meeting";
+import { meetingErrorReason, planMeeting, type MeetingErrorReason } from "@/lib/contacts/meeting";
 import { updateCompanyProperty } from "@/lib/companies/propertyEditDb";
 import {
   isEditableCompanyProperty,
@@ -131,6 +131,8 @@ export async function updateCompanyStageAction(
 export interface CompanyActionResult {
   ok: boolean;
   message?: string;
+  /** Typed reason the client maps to dictionary copy (set only where an expected, user-fixable error exists; today the meeting action). */
+  reason?: MeetingErrorReason;
 }
 
 // A redirect()/notFound() thrown inside the try (e.g. getCurrentBd()'s
@@ -201,6 +203,11 @@ export async function logCompanyMeetingAction(
     revalidatePath(`/companies/${companyKey}`);
     return { ok: true };
   } catch (err) {
+    // Expected, user-fixable meeting errors go out as a typed reason (never
+    // a raw English message in a Spanish UI); anything else, including
+    // redirect/notFound, takes the normal path.
+    const reason = meetingErrorReason(err);
+    if (reason) return { ok: false, reason };
     return actionFailure(err);
   }
 }

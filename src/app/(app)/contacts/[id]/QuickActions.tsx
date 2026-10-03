@@ -1,5 +1,6 @@
 "use client";
 
+import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -819,6 +820,8 @@ export function MeetingForm({
             id={`${ids}-date`}
             className="input"
             type="date"
+            // Courtesy only (the server guard is the real check): same ART day as futureGuard.ts.
+            max={argentinaCalendarDate(new Date())}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             disabled={busy}
