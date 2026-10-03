@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Importación de LinkedIn · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  body { background: var(--color-surface-sunken, #f3f4f6); padding: 24px; }
+  .screen { max-width: 720px; margin: 0 0 30px; }
+  .screen > h2 { font: 700 12px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-soft); margin: 0 0 4px; }
+  .screen > p.note { font: 400 12px/1.55 var(--font-body); color: var(--color-ink-subtle); margin: 0 0 10px; }
+  .lede { font: 400 13px/1.65 var(--font-body); color: var(--color-ink-soft); max-width: 80ch; margin: 0 0 24px; }
+  .lede b { color: var(--color-ink); }
+</style>
+</head>
+<body>
+
+<p class="lede">Las tres capacidades ya existen y funcionan — <b>solo están sin pantalla</b>. Lo que se decide acá es dónde vive cada una. El corte no es de navegación sino de <b>propiedad del dato</b>: los contactos importados caen en la tabla <code>person</code> compartida y los ve todo el equipo, mientras que las conversaciones están atadas a <code>conversation.bd_id</code> y son privadas de cada BD — tanto que existe una feature de acceso admin con auditoría para poder mirarlas.</p>
+
+<div class="screen">
+  <h2>1 · Perfil del BD — card nuevo "Importación"</h2>
+  <p class="note">Solo mensajes, porque son tuyos. Mismo patrón de fila que "Conexiones y seguridad" ya usa.</p>
+  <div class="card"><div class="card-body"><div class="row row-lg"><span class="avatar avatar-lg a3 avatar-bd">CC</span><div class="grow"><h2>Cristian Civita</h2><p class="meta">cristian@avalith.net</p></div><span class="badge badge-brand no-dot">Admin</span></div></div></div>
+
+  <div class="card mt-lg"><div class="card-header"><h3>Importación</h3></div>
+  <a class="menu-item list-link" href="#pantalla-2"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg><span class="grow">Mensajes de LinkedIn<br><span class="meta">14.545 mensajes en 2.988 conversaciones · última importación: 17 sep</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+  </div>
+
+  <div class="card mt-lg"><div class="card-header"><h3>Conexiones y seguridad</h3></div>
+  <a class="menu-item list-link" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg><span class="grow">Conexión con Gmail<br><span class="meta">Conectado como cristian@avalith.net</span></span><span class="badge badge-success">Conectado</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+  <div class="hr flush"></div>
+  <a class="menu-item list-link" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg><span class="grow">Contraseña<br><span class="meta">Cambiada hace 3 meses</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div>
+</div>
+
+<div class="screen" id="pantalla-2">
+  <h2>2 · Perfil → Mensajes de LinkedIn</h2>
+  <p class="note">La pantalla de subida. El estado actual arriba, para que se entienda que re-subir un export más nuevo es seguro. Todas las cifras son reales de producción al 2026-10-03; la fecha sale de <code>max(message.created_at)</code>, que es cuando se insertaron las filas — no hay columna de evento de import, y no hace falta.</p>
+  <div class="card"><div class="card-header"><h3>Mensajes de LinkedIn</h3></div><div class="card-body">
+    <p class="help">Estos mensajes son tuyos: solo vos y un administrador pueden verlos, y cada acceso de un administrador queda registrado.</p>
+    <div class="row row-lg mt-md"><div class="grow"><span class="label">Importado hasta ahora</span><p class="meta">14.545 mensajes · 2.988 conversaciones · última importación: 17 sep</p></div></div>
+    <div class="hr"></div>
+    <div class="field mt-md"><span class="label">Archivo <code>messages.csv</code></span>
+      <input class="input" type="file">
+      <p class="help">Sale del export de datos de LinkedIn (Configuración → Privacidad de los datos → Obtener una copia de tus datos). Volver a subir el mismo archivo no duplica nada.</p>
+    </div>
+    <div class="row mt-lg"><button class="btn btn-primary">Importar mensajes</button></div>
+  </div></div>
+</div>
+
+<div class="screen">
+  <h2>3 · <code>/contacts/import</code> — los contactos van acá, no al perfil</h2>
+  <p class="note">Junto al CSV de leads, porque los dos alimentan la misma base compartida de la empresa.</p>
+  <div class="card"><div class="card-header"><h3>Importar contactos</h3></div>
+  <a class="menu-item list-link" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg><span class="grow">Contactos de LinkedIn<br><span class="meta">Archivo <code>Connections.csv</code> · 19.684 contactos importados</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+  <div class="hr flush"></div>
+  <a class="menu-item list-link" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="grow">CSV de leads<br><span class="meta">Ya existente · 1.053 contactos de la lista fi-arg-2026</span></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+  </div>
+  <p class="help mt-md">Los contactos que subas acá quedan visibles para todo el equipo, a diferencia de los mensajes.</p>
+</div>
+
+</body>
+</html>
