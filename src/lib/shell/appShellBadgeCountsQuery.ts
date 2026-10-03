@@ -123,6 +123,14 @@ export function buildAppShellBadgeCountsQuery({
               and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} < ${workedTodayToIso}::timestamptz
           )
       ) as follow_up_count,
+      -- F5: has today's queue been built for this BD? The shell builds it
+      -- when false (readBadgeRowEnsuringQueue.ts). Index-friendly: hits the
+      -- (bd_id, queue_date, person_id) unique key.
+      exists (
+        select 1 from ${followUpQueueItem}
+        where follow_up_queue_item.bd_id = ${bdId}::uuid
+          and follow_up_queue_item.queue_date = ${queueDate}::date
+      ) as queue_built,
       (
         -- Reconnect banner (email-sync.html screen 4) — piggybacked onto
         -- this SAME single round trip (PERFORMANCE.md) rather than a

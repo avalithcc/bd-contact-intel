@@ -37,6 +37,14 @@ test("buildAppShellBadgeCountsQuery: selects exactly task_count and follow_up_co
   assert.match(sql, /as follow_up_count/i);
 });
 
+test("buildAppShellBadgeCountsQuery: queue_built is a cheap exists on today's queue rows for this bd (F5)", () => {
+  const { sql } = render();
+  assert.match(
+    sql,
+    /exists\s*\(\s*select 1 from "follow_up_queue_item"\s+where follow_up_queue_item\.bd_id = \$\d+::uuid\s+and follow_up_queue_item\.queue_date = \$\d+::date\s*\)\s+as queue_built/i,
+  );
+});
+
 test("buildAppShellBadgeCountsQuery: task_count matches getTaskBadgeCount's exact filter", () => {
   const { sql } = render();
   assert.match(sql, /task\.assigned_to_bd_id = \$\d+::uuid/i);
