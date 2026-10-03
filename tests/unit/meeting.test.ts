@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MeetingDateRequiredError, MeetingOccurredAtInFutureError, planMeeting } from "@/lib/contacts/meeting";
+import { MeetingDateRequiredError, MeetingOccurredAtInFutureError, meetingErrorReason, planMeeting } from "@/lib/contacts/meeting";
 import { isBeyondClockSkew, FUTURE_CLOCK_SKEW_TOLERANCE_MS } from "@/lib/contacts/futureGuard";
 import { planCall, CallOccurredAtInFutureError } from "@/lib/contacts/call";
 
@@ -47,7 +47,6 @@ test("notes are trimmed, blank collapses to null", () => {
 // ignores metadata.at for meeting_logged, so a future meeting accepted now
 // would never flip to "Reunión" once its date passed. Hence refuse.
 
-
 test("a meeting more than 5 minutes ahead is rejected", () => {
   assert.throws(() => planMeeting("2026-09-26", "12:06", "", NOW), MeetingOccurredAtInFutureError);
   assert.throws(() => planMeeting("2026-09-30", "", "", NOW), MeetingOccurredAtInFutureError);
@@ -81,7 +80,6 @@ test("planMeeting does not mutate its inputs and is repeatable", () => {
 });
 
 // --- company dialog: typed reason instead of a raw English message ---------
-import { meetingErrorReason } from "@/lib/contacts/meeting";
 
 test("meetingErrorReason maps both meeting errors, and nothing else, to a typed reason", () => {
   assert.equal(meetingErrorReason(new MeetingDateRequiredError()), "meeting_date_required");

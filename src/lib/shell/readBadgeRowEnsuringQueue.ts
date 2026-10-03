@@ -25,18 +25,23 @@
  * page either; /follow-ups still builds on its own.
  *
  * A build failure must never break every page: it is swallowed and the first
- * read (badge 0) is returned. Dependencies are injected so this stays
+ * read (badge 0) is returned. It is NOT silent: with the memo set first it is
+ * never retried on this instance, so it is logged (BD id plus error class and
+ * message, no tokens or PII) to land in the Vercel logs. Dependencies are injected so this stays
  * importable without `@/db`.
  */
 export async function readBadgeRowEnsuringQueue<Row extends { queue_built: boolean }>({
   read,
   ensure,
   attemptKey,
+  bdId,
   attempted,
 }: {
   read: () => Promise<Row>;
   ensure: () => Promise<void>;
   attemptKey: string;
+  /** Only for the failure log line. */
+  bdId: string;
   attempted: Set<string>;
 }): Promise<Row> {
   const first = await read();
@@ -44,7 +49,9 @@ export async function readBadgeRowEnsuringQueue<Row extends { queue_built: boole
   attempted.add(attemptKey);
   try {
     await ensure();
-  } catch {
+  } catch (err) {
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error(`[shell] today's follow-up queue build failed for bd ${bdId}: ${detail}`);
     return first;
   }
   return read();

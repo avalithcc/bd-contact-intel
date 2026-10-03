@@ -36,7 +36,7 @@ interface EmailAccountBannerState {
 /** (bd, ART day) pairs this server instance already tried to build; see readBadgeRowEnsuringQueue.ts. */
 const queueBuildAttempted = new Set<string>();
 
-const toDate =(iso: string | null | undefined): Date | null => (iso ? new Date(iso) : null);
+const toDate = (iso: string | null | undefined): Date | null => (iso ? new Date(iso) : null);
 
 /**
  * ONE round trip for the sidebar badges AND the reconnect banner flag
@@ -81,6 +81,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
     read: readRow,
     ensure: () => ensureTodayFollowUpQueue(bdId, now),
     attemptKey: `${bdId}:${queueDate}`,
+    bdId,
     attempted: queueBuildAttempted,
   });
   const bannerState = row?.email_account_banner_state ?? null;

@@ -737,7 +737,6 @@ export const es: typeof en = {
     toastCallLogged: "Llamada registrada.",
     toastDiscarded: "Contacto descartado.",
     toastSignalSaved: "Señal guardada.",
-    overviewComingSoon: "El resumen del contacto estará disponible próximamente.",
     connectedBdsEmpty: "Ningún BD se ha conectado con este contacto todavía.",
     tasksCardEmpty: "No hay tareas abiertas. Usa el botón + para agregar una.",
     companyCardTitle: "Empresa",

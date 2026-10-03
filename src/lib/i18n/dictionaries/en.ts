@@ -809,7 +809,6 @@ export const en = {
     toastCallLogged: "Call logged.",
     toastDiscarded: "Contact discarded.",
     toastSignalSaved: "Signal saved.",
-    overviewComingSoon: "The contact summary is coming soon.",
     connectedBdsEmpty: "No BD has connected with this contact yet.",
     tasksCardEmpty: "No open tasks. Use the + button to add one.",
     companyCardTitle: "Company",
