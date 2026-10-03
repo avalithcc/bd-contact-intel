@@ -639,8 +639,12 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     <CompleteTaskCheckbox
                       taskId={t.id}
                       personId={record.person.id}
+                      title={t.title}
                       ariaLabel={l.taskMarkDone}
                       errorLabel={l.genericError}
+                      completedLabel={dict.tasksPage.completedToast}
+                      undoLabel={dict.tasksPage.completeUndo}
+                      undoErrorLabel={dict.tasksPage.completeUndoError}
                     />
                     <div className="grow">
                       <TaskTitleLink

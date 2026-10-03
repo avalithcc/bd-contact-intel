@@ -310,8 +310,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                     <CompleteTaskCheckbox
                       taskId={t.id}
                       companyKey={key}
+                      title={t.title}
                       ariaLabel={l.taskMarkDone}
                       errorLabel={l.genericError}
+                      completedLabel={dict.tasksPage.completedToast}
+                      undoLabel={dict.tasksPage.completeUndo}
+                      undoErrorLabel={dict.tasksPage.completeUndoError}
                     />
                     <div className="grow">
                       <TaskTitleLink
