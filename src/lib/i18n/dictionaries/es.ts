@@ -909,6 +909,7 @@ export const es: typeof en = {
     adminSyncedEmailSectionTitle: "Correos sincronizados",
     adminNoSyncedEmailContent: "No hay correo sincronizado con este BD.",
     adminLegacyEmailSectionTitle: "Correos (registro manual)",
+    adminLegacyEmailNoSubject: "(sin asunto)",
     adminLinkedinSectionTitle: "Conversación de LinkedIn",
     adminNoLinkedinContent: "No hay conversación de LinkedIn con este BD.",
     adminViewDialogTitlePrefix: "¿Ver la conversación de",
