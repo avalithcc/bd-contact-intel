@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { LinkedInIcon } from "@/components/icons";
+import { companyLinkedinUrlHref } from "@/lib/companies/linkedinUrl";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { relativeTime } from "@/lib/i18n/format";
@@ -369,15 +371,27 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
             <tbody>
               {rows.map((row) => {
                 const vacantes = vacantesLabel(row.hiring?.openItCount);
+                const linkedinHref = companyLinkedinUrlHref(row.linkedinUrl);
                 return (
                   <tr key={row.companyKey}>
-                    <td>
+                    <td className="li-cell">
                       <Link className="row" href={`/companies/${encodeURIComponent(row.companyKey)}`}>
                         <span className="company-logo" aria-hidden="true">
                           {companyLogoInitials(row.displayName)}
                         </span>
                         <span className="strong">{row.displayName}</span>
                       </Link>
+                      {linkedinHref && (
+                        <a
+                          className="li-link"
+                          href={linkedinHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={l.linkedinLinkLabel(row.displayName)}
+                        >
+                          <LinkedInIcon className="icon" />
+                        </a>
+                      )}
                     </td>
                     <td className="soft">{industryLabel(row)}</td>
                     <td>

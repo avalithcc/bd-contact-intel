@@ -2011,6 +2011,7 @@ export const es: typeof en = {
     filterLinkedinAny: "Cualquiera",
     filterLinkedinWith: "Con página",
     filterLinkedinWithout: "Sin página",
+    linkedinLinkLabel: (name: string) => `LinkedIn de ${name}`,
     noLinkedinYet: "Todavía ninguna empresa tiene página de LinkedIn.",
     stageProspect: "Prospecto",
     stageQualified: "Calificada",
