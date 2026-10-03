@@ -78,3 +78,8 @@ them read-only against production.
   with "session is missing or STALE". Fix: re-run step 3.
 - No credentials set: locally every test is **skipped** with
   "skipped: no E2E credentials"; with `CI` set it **fails**.
+
+> Stop any `npm run dev` before a scratch run. The scratch server starts on its
+> own port, but Next 15.5 has no dev lock, so a second `next dev` in this
+> directory shares `.next` with the first and can corrupt the dev cache. That is
+> a nuisance, not data loss.
