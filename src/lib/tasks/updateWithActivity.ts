@@ -25,6 +25,7 @@ import { assertTaskAuthorized, type TaskAuthActor } from "@/lib/tasks/authorizat
 import { resolveTaskAssignee, InvalidAssigneeError } from "@/lib/tasks/assignee";
 import { assertAssigneeExists } from "@/lib/tasks/queries";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
+import { isTaskStatusNoOp } from "@/lib/tasks/statusChange";
 import { diffTaskEdit, type TaskEditSnapshot } from "@/lib/tasks/taskEditDiff";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
@@ -151,7 +152,8 @@ export async function updateTaskWithActivity(
  * Completes or reopens a task from ANY entry point — the dialog's own
  * button, a list/card checkbox, or the timeline's "Marcar como hecha"/
  * "Reabrir" — always through this one function, so every entry point
- * authorizes, scopes and logs identically.
+ * authorizes, scopes and logs identically. Asking for the status the task
+ * already has is a no-op: no UPDATE and no activity.
  */
 export async function setTaskStatusChecked(
   taskId: string,
@@ -161,6 +163,11 @@ export async function setTaskStatusChecked(
   return db.transaction(async (tx) => {
     const current = await loadTaskForUpdate(tx, taskId);
     await assertTaskAuthorized(current, me, assertContactEditableById);
+    // Already in the requested status (a stale checkbox, a double click on a
+    // done row): nothing changed, so nothing is written and no activity
+    // claims otherwise. Checked AFTER authorization so it never leaks a task
+    // the caller may not touch.
+    if (isTaskStatusNoOp(current.status, status)) return current;
 
     const [updated] = await tx
       .update(task)

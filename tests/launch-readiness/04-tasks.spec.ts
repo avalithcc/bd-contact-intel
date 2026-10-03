@@ -213,7 +213,7 @@ test('a task created with no due date still shows in the record\'s Todo timeline
   await expect(page.getByText('Todavía no hay actividad registrada')).toHaveCount(0);
 });
 
-test('a task completed from /tasks can be found again and reopened from the Completadas tab', async ({ page }) => {
+test('a done task in Completadas shows as done and cannot log a second completion', async ({ page }) => {
   const p = await newPerson('TaskUndo');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Deshacer completar', due: argDate(2) });
@@ -227,13 +227,31 @@ test('a task completed from /tasks can be found again and reopened from the Comp
   const row = page.locator('tr', { hasText: p.name });
   await expect(row).toBeVisible();
   const cb = row.getByRole('checkbox');
-  // A done task must look done: a checked box. F-DONE-CHECKBOX: it renders unchecked.
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-DONE-CHECKBOX: the Completadas checkbox is unchecked and re-completes (logs a second task_completed)');
-  await expect.soft(cb).toBeChecked();
+  // A done task must look done: a checked box that no longer invites a click.
+  await expect(cb).toBeChecked();
+  await expect(cb).toBeDisabled();
   const before = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
+  await cb.click({ force: true });
+  await page.waitForTimeout(1500);
+  const after = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
+  expect(after, 'clicking a done task logged another completion').toBe(before);
+  expect((await tasksFor(p.id))[0]!.status).toBe('done');
+});
+
+test('a stale checkbox on a task that is already done changes nothing and logs no second completion', async ({ page }) => {
+  const p = await newPerson('TaskStale');
+  await openContact(page, p.id);
+  await createTaskOnRecord(page, { title: 'Completada en otra pestaña', due: argDate(2) });
+  await expect(page.getByText('Tarea creada.')).toBeVisible();
+  await page.goto('/tasks');
+  await page.waitForLoadState('networkidle');
+  const cb = page.locator('tr', { hasText: p.name }).getByRole('checkbox');
+  await expect(cb).toBeEnabled();
+  // Someone else finishes the task while this page is still showing it open.
+  await sql`update task set status = 'done' where person_id = ${p.id}`;
   await cb.click();
   await page.waitForTimeout(2000);
-  const after = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
-  console.log(`[undo] task_completed rows before=${before} after=${after} status=${(await tasksFor(p.id))[0]!.status}`);
-  expect(after, 'clicking a done task logged another completion').toBe(before);
+  const completions = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed');
+  expect(completions, 'the server logged a completion for a task that was already done').toHaveLength(0);
+  expect((await tasksFor(p.id))[0]!.status).toBe('done');
 });
