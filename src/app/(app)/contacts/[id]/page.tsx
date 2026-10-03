@@ -609,7 +609,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   </div>
                 ))
               ) : (
-                <div className="placeholder">{l.associationsComingSoon}</div>
+                <div className="placeholder">{l.connectedBdsEmpty}</div>
               )}
             </div>
           </div>
@@ -668,7 +668,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   </div>
                 ))
               ) : (
-                <div className="placeholder">{l.associationsComingSoon}</div>
+                <div className="placeholder">{l.tasksCardEmpty}</div>
               )}
             </div>
           </div>

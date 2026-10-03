@@ -205,11 +205,12 @@ test('a 3,000-character title is clamped to one line on /tasks, stays whole in t
   await expect(row.getByRole('button', { name: /^Titulo largo/ })).toHaveAttribute('title', longTitle);
 });
 
-test('the Tareas card on the record of a contact with no tasks does not say "associations coming soon"', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-PLACEHOLDER: the empty state of the Tareas card is the "asociaciones próximamente" placeholder');
+test('F14: the empty Tareas and BDs conectados cards say what is true, not "coming soon"', async ({ page }) => {
   const p = await newPerson('TaskEmptyCard');
   await openContact(page, p.id);
   await expect(page.getByText('próximamente')).toHaveCount(0);
+  await expect(page.getByText('No hay tareas abiertas. Usa el botón + para agregar una.')).toBeVisible();
+  await expect(page.getByText('Ningún BD se ha conectado con este contacto todavía.')).toBeVisible();
 });
 
 test('a task created with no due date is still an actionable card in the record\'s Todo timeline', async ({ page }) => {
