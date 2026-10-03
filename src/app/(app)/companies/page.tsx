@@ -374,24 +374,26 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                 const linkedinHref = companyLinkedinUrlHref(row.linkedinUrl);
                 return (
                   <tr key={row.companyKey}>
-                    <td className="li-cell">
-                      <Link className="row" href={`/companies/${encodeURIComponent(row.companyKey)}`}>
-                        <span className="company-logo" aria-hidden="true">
-                          {companyLogoInitials(row.displayName)}
-                        </span>
-                        <span className="strong">{row.displayName}</span>
-                      </Link>
-                      {linkedinHref && (
-                        <a
-                          className="li-link"
-                          href={linkedinHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={l.linkedinLinkLabel(row.displayName)}
-                        >
-                          <LinkedInIcon className="icon" />
-                        </a>
-                      )}
+                    <td>
+                      <div className="li-cell">
+                        <Link className="row" href={`/companies/${encodeURIComponent(row.companyKey)}`}>
+                          <span className="company-logo" aria-hidden="true">
+                            {companyLogoInitials(row.displayName)}
+                          </span>
+                          <span className="strong">{row.displayName}</span>
+                        </Link>
+                        {linkedinHref && (
+                          <a
+                            className="li-link"
+                            href={linkedinHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={l.linkedinLinkLabel(row.displayName)}
+                          >
+                            <LinkedInIcon className="icon" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="soft">{industryLabel(row)}</td>
                     <td>
