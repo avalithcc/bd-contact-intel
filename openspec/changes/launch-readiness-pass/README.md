@@ -22,7 +22,7 @@ Severity words used below: **loses data** (something she did is gone or wrong in
 
 ## Findings, most serious first
 
-Every finding is reproduced by a spec in `tests/launch-readiness/`. Specs for a confirmed defect are wrapped in `test.fail(...)` so the suite stays green while the defect exists and goes red the day it is fixed. Set `LR_SHOW_FINDINGS=1` to turn that off and see the raw failure.
+Every finding is reproduced by a spec in `tests/launch-readiness/`. Specs for a confirmed defect were wrapped in `test.fail(...)` so the suite stayed green while the defect existed and went red the day it was fixed; `LR_SHOW_FINDINGS=1` turned that off to see the raw failure. Every finding has since been fixed, so no wrapper is left — see "Last full run" below.
 
 ### F1. A failed save freezes the dialog and every quick action (loses data)
 
@@ -193,6 +193,8 @@ LR_SHOW_FINDINGS=1 ...                             # un-wrap the confirmed defec
 
 Reseed before spec 01: it takes the first contact of the list, and leftovers from earlier runs change which contact that is (this made 01 fail once, and it was the harness, not the app).
 
-Last full run, one file at a time after a reseed: 01 7 passed, 02 7 passed, 03 15 passed, 04 15 passed, 05 7 passed, 06 3 passed, 08 6 passed, 09 5 passed, 10 6 passed. "Passed" includes the specs that confirm a defect (`test.fail`); there are 17 of those, between one and three per defect above (F1 has 3).
+Last full run **of the pass itself, before any fix landed**, one file at a time after a reseed: 01 7 passed, 02 7 passed, 03 15 passed, 04 15 passed, 05 7 passed, 06 3 passed, 08 6 passed, 09 5 passed, 10 6 passed. "Passed" there included the 17 specs that confirmed a defect (`test.fail`), between one and three per defect above (F1 had 3).
+
+Every finding is now fixed (#308-#312), so **no `test.fail` wrapper remains** in `tests/launch-readiness/` — those specs assert the fixed behaviour directly, and `LR_SHOW_FINDINGS` no longer changes anything. The per-file counts above have not been re-measured against the current suite.
 
 Changes to the inherited harness: `reuseExistingServer` is now `true` (a background server on :3100 is reused; the port is dedicated to this pass); `test.fail(true, ...)` became `test.fail(!process.env.LR_SHOW_FINDINGS, ...)`; the 04 reopen spec had a title that collided with the "Reabrir" button matcher and now goes through the Tareas pill; the Completadas spec was rewritten around F3. New specs: 05, 06, 08, 09, 10.
