@@ -104,7 +104,16 @@
   accent-color: var(--color-success);
 }
 
+/* Clamps to one line with an ellipsis (same idea as .cell-person .sub in
+   design-system.css, written out again here with its own max-width). The full title stays reachable through the button's
+   `title` attribute (TaskTitleLink) and the edit dialog. */
 .taskTitle {
+  display: block;
+  max-width: 36rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
   font-weight: 600;
   color: var(--color-ink);
 }

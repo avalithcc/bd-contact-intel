@@ -1,6 +1,6 @@
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { CompanyTimelineRow } from "@/lib/companies/recordQueries";
-import { taskActivityBody, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
+import { taskActivityBody, ALL_TASK_ACTIVITY_TYPES, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
 import { isTimelineEntryVisible } from "@/lib/activity/timelineVisibility";
 
 /**
@@ -23,6 +23,7 @@ export interface CompanyTimelineViewLabels {
   atDiscarded: string;
   atHunterLookup: string;
   atStatusBackfill: string;
+  atTaskCreated: string;
   atTaskUpdated: string;
   atTaskCompleted: string;
   atTaskReopened: string;
@@ -30,6 +31,7 @@ export interface CompanyTimelineViewLabels {
   taskChangeFieldDue: string;
   taskChangeFieldAssignee: string;
   taskChangeFieldDescription: string;
+  taskChangeCreatedPrefix: string;
   taskChangeUpdatedPrefix: string;
   taskChangeCompletedPrefix: string;
   taskChangeReopenedPrefix: string;
@@ -77,6 +79,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atDiscarded;
     case "hunter_lookup":
       return l.atHunterLookup;
+    case "task_created":
+      return l.atTaskCreated;
     case "task_updated":
       return l.atTaskUpdated;
     case "task_completed":
@@ -88,7 +92,7 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
   }
 }
 
-const TASK_ACTIVITY_TYPES_SET = new Set(["task_updated", "task_completed", "task_reopened"]);
+const TASK_ACTIVITY_TYPES_SET = new Set<string>(ALL_TASK_ACTIVITY_TYPES);
 
 /**
  * Same content shape as the Contact record's `entryBody` `reply_received`
@@ -113,6 +117,7 @@ function taskActivityViewBody(
     fieldDue: l.taskChangeFieldDue,
     fieldAssignee: l.taskChangeFieldAssignee,
     fieldDescription: l.taskChangeFieldDescription,
+    createdPrefix: l.taskChangeCreatedPrefix,
     updatedPrefix: l.taskChangeUpdatedPrefix,
     completedPrefix: l.taskChangeCompletedPrefix,
     reopenedPrefix: l.taskChangeReopenedPrefix,

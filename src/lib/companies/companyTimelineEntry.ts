@@ -4,7 +4,7 @@
  * src/lib/activity/timelineEntry.ts (the Contact record's equivalent).
  *
  * `at` is `effectiveActivityAtSql()`'s value: `null` for a
- * NON_TOUCH_ACTIVITY_TYPES row (task_updated/task_completed/task_reopened —
+ * NON_TOUCH_ACTIVITY_TYPES row (the task types in ALL_TASK_ACTIVITY_TYPES, src/lib/tasks/taskActivityBody.ts —
  * see src/lib/contacts/effectiveActivityTime.ts). A non-touch row still
  * needs SOME time to render in the company timeline, so `createdAt` falls
  * back to `rawCreatedAt` (the row's own `activity.created_at`) — it just

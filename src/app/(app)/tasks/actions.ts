@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
-import { createTask, assertAssigneeExists, getTaskById, getTaskCompletionInfo } from "@/lib/tasks/queries";
-import { updateTaskWithActivity, setTaskStatusChecked, type TaskEditInput } from "@/lib/tasks/updateWithActivity";
+import { assertAssigneeExists, getTaskById, getTaskCompletionInfo } from "@/lib/tasks/queries";
+import { createTaskWithActivity, updateTaskWithActivity, setTaskStatusChecked, type TaskEditInput } from "@/lib/tasks/updateWithActivity";
 import { assertTaskAuthorized } from "@/lib/tasks/authorization";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { searchTaskSubjects } from "@/lib/tasks/subjectSearchDb";
@@ -39,12 +39,16 @@ export async function createTaskAction(input: {
   if (assignedToBdId === undefined) throw new InvalidAssigneeError();
   await assertAssigneeExists(assignedToBdId, me.id);
 
-  const task = await createTask({
-    ...input,
-    assignedToBdId,
-    // Who created this task (design "Reference writes"; task 4B.5).
-    actorBdId: me.id,
-  } as NewTask);
+  // The task and its `task_created` activity are one transaction.
+  const task = await createTaskWithActivity(
+    {
+      ...input,
+      assignedToBdId,
+      // Who created this task (design "Reference writes"; task 4B.5).
+      actorBdId: me.id,
+    } as NewTask,
+    me,
+  );
 
   revalidatePath("/tasks");
   revalidatePath("/leads");

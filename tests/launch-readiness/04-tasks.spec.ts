@@ -81,7 +81,7 @@ test('completing then reopening logs both changes with the actor, and leaves the
   await page.getByRole('button', { name: 'Reabrir', exact: true }).click();
   await expect.poll(async () => (await tasksFor(p.id))[0]!.status).toBe('open');
   const types = (await activitiesFor(p.id)).map((a) => a.type).filter((t) => t.startsWith('task_'));
-  expect(types).toEqual(['task_completed', 'task_reopened']);
+  expect(types).toEqual(['task_created', 'task_completed', 'task_reopened']);
   for (const a of await activitiesFor(p.id)) expect(a.actor_bd_id).toBe(await meId());
 });
 
@@ -105,15 +105,20 @@ test('any BD may complete a task assigned to someone else, and the activity name
   expect(done!.actor_bd_id).toBe(await meId());
 });
 
-test('creating a task leaves a trace in the activity log naming who created it', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-TASK-CREATE: createTask writes no activity row; only edits/completion/reopen are logged');
+test('creating a task leaves exactly one task_created activity naming who created it', async ({ page }) => {
   const p = await newPerson('TaskCreateLog');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Crear deja rastro' });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
+  const [t] = await tasksFor(p.id);
   const created = (await activitiesFor(p.id)).filter((a) => a.type.startsWith('task_'));
-  expect(created.length).toBeGreaterThan(0);
+  expect(created).toHaveLength(1);
+  expect(created[0]!.type).toBe('task_created');
   expect(created[0]!.actor_bd_id).toBe(await meId());
+  expect(created[0]!.metadata).toMatchObject({ taskId: t!.id, taskTitle: 'Crear deja rastro' });
+  // And the record's own timeline says so, with the actor's name.
+  await page.locator('.filter-pill', { hasText: 'Tareas' }).click();
+  await expect(page.locator('main').getByText(/creó la tarea «Crear deja rastro»/)).toBeVisible();
 });
 
 test('editing a task logs ONE activity with the actor and the before/after', async ({ page }) => {
@@ -182,18 +187,22 @@ test('double-clicking the completion checkbox does not log two completions', asy
   expect(completions.length).toBeLessThanOrEqual(1);
 });
 
-test('a 3,000-character title does not break the /tasks table layout', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-LONGTITLE: the title input has no length limit and the row grows without bound (888 px for 3,000 chars)');
+test('a 3,000-character title is clamped to one line on /tasks, stays whole in the database, and is reachable in full', async ({ page }) => {
   const p = await newPerson('TaskLongTitle');
   await openContact(page, p.id);
-  await createTaskOnRecord(page, { title: `Titulo ${'largo '.repeat(500)}`.trim() });
+  const longTitle = `Titulo ${'largo '.repeat(500)}`.trim();
+  await createTaskOnRecord(page, { title: longTitle });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, '/tasks scrolls sideways because of a long title').toBeLessThanOrEqual(0);
-  const rowHeight = await page.locator('tr', { hasText: p.name }).first().evaluate((el) => el.getBoundingClientRect().height);
-  expect(rowHeight, 'one task row is taller than the screen').toBeLessThan(400);
+  const row = page.locator('tr', { hasText: p.name }).first();
+  const rowHeight = await row.evaluate((el) => el.getBoundingClientRect().height);
+  expect(rowHeight, 'one task row is taller than the screen').toBeLessThan(120);
+  // Display is clamped, the stored title is not, and the full text is one hover away.
+  expect((await tasksFor(p.id))[0]!.title).toBe(longTitle);
+  await expect(row.getByRole('button', { name: /^Titulo largo/ })).toHaveAttribute('title', longTitle);
 });
 
 test('the Tareas card on the record of a contact with no tasks does not say "associations coming soon"', async ({ page }) => {
@@ -203,17 +212,18 @@ test('the Tareas card on the record of a contact with no tasks does not say "ass
   await expect(page.getByText('próximamente')).toHaveCount(0);
 });
 
-test('a task created with no due date still shows in the record\'s Todo timeline', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-TASK-NODATE: upcomingTasks() drops tasks with no due date; the timeline says "no activity" while Todo/Tareas say 1');
+test('a task created with no due date is still an actionable card in the record\'s Todo timeline', async ({ page }) => {
   const p = await newPerson('TaskNoDate');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Sin fecha de vencimiento' });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
-  await expect(page.locator('.tl, main').getByText('Sin fecha de vencimiento').first()).toBeVisible();
-  await expect(page.getByText('Todavía no hay actividad registrada')).toHaveCount(0);
+  // The open task itself (title + "Marcar como hecha"), not just the log line that says it was created.
+  const timeline = page.locator('.tl');
+  await expect(timeline.getByRole('button', { name: 'Sin fecha de vencimiento' })).toBeVisible();
+  await expect(timeline.getByRole('button', { name: 'Marcar como hecha' })).toBeVisible();
 });
 
-test('a task completed from /tasks can be found again and reopened from the Completadas tab', async ({ page }) => {
+test('a done task in Completadas shows as done and cannot log a second completion', async ({ page }) => {
   const p = await newPerson('TaskUndo');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Deshacer completar', due: argDate(2) });
@@ -227,13 +237,31 @@ test('a task completed from /tasks can be found again and reopened from the Comp
   const row = page.locator('tr', { hasText: p.name });
   await expect(row).toBeVisible();
   const cb = row.getByRole('checkbox');
-  // A done task must look done: a checked box. F-DONE-CHECKBOX: it renders unchecked.
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-DONE-CHECKBOX: the Completadas checkbox is unchecked and re-completes (logs a second task_completed)');
-  await expect.soft(cb).toBeChecked();
+  // A done task must look done: a checked box that no longer invites a click.
+  await expect(cb).toBeChecked();
+  await expect(cb).toBeDisabled();
   const before = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
+  await cb.click({ force: true });
+  await page.waitForTimeout(1500);
+  const after = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
+  expect(after, 'clicking a done task logged another completion').toBe(before);
+  expect((await tasksFor(p.id))[0]!.status).toBe('done');
+});
+
+test('a stale checkbox on a task that is already done changes nothing and logs no second completion', async ({ page }) => {
+  const p = await newPerson('TaskStale');
+  await openContact(page, p.id);
+  await createTaskOnRecord(page, { title: 'Completada en otra pestaña', due: argDate(2) });
+  await expect(page.getByText('Tarea creada.')).toBeVisible();
+  await page.goto('/tasks');
+  await page.waitForLoadState('networkidle');
+  const cb = page.locator('tr', { hasText: p.name }).getByRole('checkbox');
+  await expect(cb).toBeEnabled();
+  // Someone else finishes the task while this page is still showing it open.
+  await sql`update task set status = 'done' where person_id = ${p.id}`;
   await cb.click();
   await page.waitForTimeout(2000);
-  const after = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
-  console.log(`[undo] task_completed rows before=${before} after=${after} status=${(await tasksFor(p.id))[0]!.status}`);
-  expect(after, 'clicking a done task logged another completion').toBe(before);
+  const completions = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed');
+  expect(completions, 'the server logged a completion for a task that was already done').toHaveLength(0);
+  expect((await tasksFor(p.id))[0]!.status).toBe('done');
 });

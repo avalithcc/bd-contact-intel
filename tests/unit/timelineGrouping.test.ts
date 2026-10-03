@@ -43,7 +43,7 @@ test("groups entries into pre-migration vs. month buckets, matching the mockup's
   );
 });
 
-test("upcomingTasks sorts by soonest due date and drops tasks with no due date", () => {
+test("upcomingTasks sorts dated tasks by soonest due date and keeps undated tasks after them", () => {
   const tasks = [
     { id: "t1", dueAt: new Date("2026-10-31T00:00:00Z") },
     { id: "t2", dueAt: null },
@@ -52,6 +52,20 @@ test("upcomingTasks sorts by soonest due date and drops tasks with no due date",
   const result = upcomingTasks(tasks);
   assert.deepEqual(
     result.map((t) => t.id),
-    ["t3", "t1"],
+    ["t3", "t1", "t2"],
   );
+});
+
+test("upcomingTasks keeps several undated tasks in their given order, and never reorders its input", () => {
+  const tasks = [
+    { id: "u1", dueAt: null },
+    { id: "d1", dueAt: new Date("2026-10-31T00:00:00Z") },
+    { id: "u2", dueAt: null },
+  ];
+  const snapshot = tasks.map((t) => t.id);
+  const first = upcomingTasks(tasks).map((t) => t.id);
+  const second = upcomingTasks(tasks).map((t) => t.id);
+  assert.deepEqual(first, ["d1", "u1", "u2"]);
+  assert.deepEqual(second, first);
+  assert.deepEqual(tasks.map((t) => t.id), snapshot);
 });

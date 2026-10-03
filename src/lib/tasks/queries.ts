@@ -460,12 +460,15 @@ export async function assertAssigneeExists(assignedToBdId: string, creatorBdId: 
  * `person_id` is resolved via a `person_id_map` subquery in the same insert
  * statement (design "Reference writes"; task 4B.5) — no matcher, no
  * advisory lock, since this never creates a person.
+ *
+ * `exec` lets `createTaskWithActivity` (updateWithActivity.ts) run this same
+ * insert inside its transaction; a bare call still writes through `db`.
  */
-export async function createTask(input: NewTask): Promise<Task> {
+export async function createTask(input: NewTask, exec: Pick<typeof db, "insert"> = db): Promise<Task> {
   const lookup = input.personId == null ? resolvePersonIdLookup(input) : null;
   const values =
     lookup && isIdentityDualWriteEnabled() ? { ...input, personId: personIdLookupSql(lookup) } : input;
-  const [row] = await db.insert(task).values(values).returning();
+  const [row] = await exec.insert(task).values(values).returning();
   return row!;
 }
 

@@ -50,6 +50,7 @@ const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactEl
   status_change: HistoryIcon,
   status_backfill: HistoryIcon,
   meeting_logged: MeetingIcon,
+  task_created: TasksIcon,
   task_updated: TasksIcon,
   task_completed: TasksIcon,
   task_reopened: TasksIcon,

@@ -14,7 +14,7 @@ export type { TimelinePillKey } from "@/lib/activity/timelinePills";
 export type { TimelineEntry } from "@/lib/activity/timelineEntry";
 
 /** Activity types the Contact record's timeline pane renders (task 10.1).
- * `task_updated`/`task_completed`/`task_reopened` join in with the task-edit
+ * The task activity types (ALL_TASK_ACTIVITY_TYPES (src/lib/tasks/taskActivityBody.ts)) join in with the task-edit
  * change — they appear in "Todo" through this same list (and its
  * `countsByType`), but are grouped under the "Tareas" pill instead of
  * "Sistema" (see TIMELINE_PILL_GROUPS, timelinePills.ts, and
@@ -33,6 +33,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "call",
   "discarded",
   "status_backfill",
+  "task_created",
   "task_updated",
   "task_completed",
   "task_reopened",

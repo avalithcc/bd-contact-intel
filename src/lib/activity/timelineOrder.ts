@@ -4,7 +4,7 @@
  * companies/recordQueries.ts) must order every row by
  * `coalesce(effectiveActivityAtSql(), activity.created_at) DESC`, never
  * `... DESC NULLS LAST`: `NULLS LAST` would push every non-touch row
- * (task_updated/task_completed/task_reopened — effective time NULL) to the
+ * (the ALL_TASK_ACTIVITY_TYPES task types — effective time NULL) to the
  * very bottom, and a busy record's bounded `LIMIT` would then cut them
  * entirely — but the owner explicitly requires task edits to stay visible
  * in the timeline. `coalesce(...)` orders each row by exactly what

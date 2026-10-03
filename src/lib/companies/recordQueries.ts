@@ -118,7 +118,7 @@ export async function getCompanyTimeline(
       // offset-less string at runtime, pinned to UTC below via
       // parseDbTimestamp (same class of bug effectiveActivityTime.ts
       // documents). `null` for a NON_TOUCH_ACTIVITY_TYPES row
-      // (task_updated/task_completed/task_reopened, effectiveActivityAtSql's
+      // (the ALL_TASK_ACTIVITY_TYPES task types, effectiveActivityAtSql's
       // `NULL` branch) — `rawCreatedAt` below is the display fallback for
       // exactly that case.
       at: sql<Date | string | null>`${effectiveActivityAtSql()}`,

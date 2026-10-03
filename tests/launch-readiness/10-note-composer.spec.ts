@@ -4,27 +4,46 @@
  * (note, then task) from the browser, so the seam between them matters.
  */
 import { expect, test } from '@playwright/test';
-import { activitiesFor, newPerson, openContact, personStatus, sql, tasksFor } from './helpers';
+import { activitiesFor, argDate, newPerson, openContact, personStatus, sql, tasksFor } from './helpers';
 
 test.afterAll(async () => {
   await sql.end();
 });
 
-test('note + follow-up task: both saved, the task has no due date, and it shows up on /tasks', async ({ page }) => {
+test('note + follow-up task: both saved, the task is due tomorrow by default, and it shows up on /tasks under its date', async ({ page }) => {
   const p = await newPerson('NoteTask');
   await openContact(page, p.id);
   await page.locator('#note-in').fill('Pidió que lo llame el lunes.');
   await page.getByRole('button', { name: 'Agregar tarea de seguimiento' }).click();
   await page.getByPlaceholder('Agregar tarea de seguimiento').fill('Llamar el lunes');
+  await expect(page.locator('#log-note').getByLabel('Vencimiento')).toHaveValue(argDate(1));
   await page.getByRole('button', { name: 'Guardar nota' }).click();
   await expect(page.getByText('Nota guardada.')).toBeVisible();
   await expect.poll(async () => (await tasksFor(p.id)).length).toBe(1);
   const [t] = await tasksFor(p.id);
-  console.log(`[note+task] due_at=${t!.due_at} assigned=${t!.assigned_to_bd_id}`);
-  expect((await activitiesFor(p.id)).map((a) => a.type)).toEqual(['note']);
+  expect(t!.due_at, 'a follow-up from the note box must carry a due date').not.toBeNull();
+  expect(t!.due_at!.toISOString()).toBe(`${argDate(1)}T00:00:00.000Z`);
+  expect((await activitiesFor(p.id)).map((a) => a.type)).toEqual(['note', 'task_created']);
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('tr', { hasText: p.name }), 'a follow-up with no date is not on /tasks').toBeVisible();
+  await expect(page.locator('tr', { hasText: p.name }), 'the follow-up is not on /tasks').toBeVisible();
+});
+
+test('a follow-up from the note box cannot be saved without a date, and the date she picks is the one stored', async ({ page }) => {
+  const p = await newPerson('NoteTaskDate');
+  await openContact(page, p.id);
+  await page.locator('#note-in').fill('Volver a llamar en una semana.');
+  await page.getByRole('button', { name: 'Agregar tarea de seguimiento' }).click();
+  await page.getByPlaceholder('Agregar tarea de seguimiento').fill('Llamar en una semana');
+  const due = page.locator('#log-note').getByLabel('Vencimiento');
+  await due.fill('');
+  await expect(page.getByRole('button', { name: 'Guardar nota' })).toBeDisabled();
+  await due.fill(argDate(7));
+  await expect(page.getByRole('button', { name: 'Guardar nota' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Guardar nota' }).click();
+  await expect(page.getByText('Nota guardada.')).toBeVisible();
+  await expect.poll(async () => (await tasksFor(p.id)).length).toBe(1);
+  expect((await tasksFor(p.id))[0]!.due_at!.toISOString()).toBe(`${argDate(7)}T00:00:00.000Z`);
 });
 
 test('a note alone does not make the contact "contacted" (it stays in Sin contactar)', async ({ page }) => {

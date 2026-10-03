@@ -176,3 +176,16 @@ test("entryBody for 'reply_received' shows the locked marker when the entry is n
   );
   assert.equal(body, "locked");
 });
+
+test("a task_created entry reads '<actor> created task «X»' on the record's timeline", () => {
+  const l = {
+    ...labels(),
+    taskChangeCreatedPrefix: "created task",
+    taskChangeUnknownActor: "Someone",
+  } as unknown as ContactRecordLabels;
+  const body = entryBody(
+    entry({ type: "task_created", metadata: { taskId: "t1", taskTitle: "Call back" }, actorName: "Mariel" }),
+    l,
+  );
+  assert.equal(body, "Mariel created task «Call back»");
+});

@@ -24,6 +24,7 @@ function taskActivityBodyLabels(l: ContactRecordLabels): TaskActivityBodyLabels 
     fieldDue: l.taskChangeFieldDue,
     fieldAssignee: l.taskChangeFieldAssignee,
     fieldDescription: l.taskChangeFieldDescription,
+    createdPrefix: l.taskChangeCreatedPrefix,
     updatedPrefix: l.taskChangeUpdatedPrefix,
     completedPrefix: l.taskChangeCompletedPrefix,
     reopenedPrefix: l.taskChangeReopenedPrefix,
@@ -36,7 +37,7 @@ export interface TimelineEntryForBody {
   visible: boolean;
   metadata: Record<string, unknown> | null;
   // Owner decision (2026-09-29): any BD may edit/complete/reopen any task,
-  // so the task_updated/task_completed/task_reopened body text must name
+  // so every task activity type's (ALL_TASK_ACTIVITY_TYPES) body text must name
   // WHO did it — see taskActivityBody's doc comment.
   actorName: string | null;
 }
@@ -144,6 +145,7 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
     }
     case "discarded":
       return discardBody(metadata, l);
+    case "task_created":
     case "task_updated":
     case "task_completed":
     case "task_reopened":

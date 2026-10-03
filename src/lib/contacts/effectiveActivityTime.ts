@@ -48,7 +48,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Activity types that record an editorial change to a Task association
- * (feat/task-edit: `task_updated`/`task_completed`/`task_reopened`) — NOT
+ * (the types in `ALL_TASK_ACTIVITY_TYPES`, src/lib/tasks/taskActivityBody.ts) — NOT
  * BD engagement with the Contact itself. Editing a task's due date is not a
  * "touch" the way sending an email or logging a call is, so both twins
  * below treat these types as having NO effective time (SQL: `NULL`, which
@@ -61,7 +61,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * timelineGrouping.ts), so this list is defined ONCE here and both twins
  * reference it — no second definition to drift.
  */
-export const NON_TOUCH_ACTIVITY_TYPES = ["task_updated", "task_completed", "task_reopened"] as const;
+export const NON_TOUCH_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;
 
 function isNonTouchActivityType(type: string): boolean {
   return (NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes(type);

@@ -17,14 +17,15 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, task, type Task } from "@/db/schema";
+import { activity, task, type NewTask, type Task } from "@/db/schema";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { assertTaskAuthorized, type TaskAuthActor } from "@/lib/tasks/authorization";
 import { resolveTaskAssignee, InvalidAssigneeError } from "@/lib/tasks/assignee";
-import { assertAssigneeExists } from "@/lib/tasks/queries";
+import { assertAssigneeExists, createTask } from "@/lib/tasks/queries";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
+import { isTaskStatusNoOp } from "@/lib/tasks/statusChange";
 import { diffTaskEdit, type TaskEditSnapshot } from "@/lib/tasks/taskEditDiff";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
@@ -64,6 +65,26 @@ async function buildNameLookup(): Promise<(bdId: string | null) => string | null
   const options = await listOwnerOptions();
   const nameById = new Map(options.map((o) => [o.id, o.name]));
   return (bdId) => (bdId ? (nameById.get(bdId) ?? null) : null);
+}
+
+/**
+ * Creates a task and its `task_created` activity in ONE transaction, so the
+ * record's timeline can always show who set the follow-up up and a failed
+ * activity write never leaves a task behind (or the reverse). The subject on
+ * the activity is the inserted row's own, so it is right even when
+ * `person_id` was resolved by the identity dual-write lookup.
+ */
+export async function createTaskWithActivity(input: NewTask, me: TaskAuthActor): Promise<Task> {
+  return db.transaction(async (tx) => {
+    const created = await createTask(input, tx);
+    await tx
+      .insert(activity)
+      .values(buildTaskActivityRow("task_created", created, me.id, { taskId: created.id, taskTitle: created.title }));
+    // Same "every activity insert recomputes status in its own transaction"
+    // contract as the other task writes (task_created is a non-touch type).
+    if (created.personId) await recomputePersonStatus(tx, created.personId);
+    return created;
+  });
 }
 
 export interface TaskEditInput {
@@ -151,7 +172,8 @@ export async function updateTaskWithActivity(
  * Completes or reopens a task from ANY entry point — the dialog's own
  * button, a list/card checkbox, or the timeline's "Marcar como hecha"/
  * "Reabrir" — always through this one function, so every entry point
- * authorizes, scopes and logs identically.
+ * authorizes, scopes and logs identically. Asking for the status the task
+ * already has is a no-op: no UPDATE and no activity.
  */
 export async function setTaskStatusChecked(
   taskId: string,
@@ -161,6 +183,11 @@ export async function setTaskStatusChecked(
   return db.transaction(async (tx) => {
     const current = await loadTaskForUpdate(tx, taskId);
     await assertTaskAuthorized(current, me, assertContactEditableById);
+    // Already in the requested status (a stale checkbox, a double click on a
+    // done row): nothing changed, so nothing is written and no activity
+    // claims otherwise. Checked AFTER authorization so it never leaks a task
+    // the caller may not touch.
+    if (isTaskStatusNoOp(current.status, status)) return current;
 
     const [updated] = await tx
       .update(task)
