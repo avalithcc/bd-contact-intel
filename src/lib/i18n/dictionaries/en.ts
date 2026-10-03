@@ -254,6 +254,10 @@ export const en = {
     auditLog: "Audit log",
     duplicates: "Duplicates",
     reports: "Reports",
+    // Admin tools with no sidenav entry (migration is deliberately unlinked),
+    // but they are real pages and need a breadcrumb of their own.
+    migration: "Migration",
+    rfcBackfill: "Message-ID backfill",
     contactsFallback: "Contacts",
     toggleSidebar: "Toggle sidebar",
     // TopBar account menu (tasks.md mockup-parity 3.2).

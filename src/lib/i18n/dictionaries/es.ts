@@ -238,6 +238,11 @@ export const es: typeof en = {
     auditLog: "Registro de auditoría",
     duplicates: "Duplicados",
     reports: "Reportes",
+    // Admin tools with no sidenav entry (migration is deliberately unlinked),
+    // but they are real pages and need a breadcrumb of their own — without
+    // one they fall through and announce themselves as "Contactos".
+    migration: "Migración",
+    rfcBackfill: "Backfill de Message-ID",
     contactsFallback: "Contactos",
     toggleSidebar: "Alternar barra lateral",
     accountMenuLabel: "Menú de cuenta",

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./TopBar.module.css";
-import { NAVIGATION } from "./Sidebar";
+import { resolveBreadcrumbKey } from "@/lib/shell/breadcrumbLabel";
 import type { NavLabels } from "@/lib/i18n/navLabels";
 import type { TopBarSearchLabels } from "@/lib/i18n/topBarSearchLabels";
 import { resolveTopBarSearchTarget, topBarSearchBasePath } from "@/lib/shell/topBarSearchTarget";
@@ -26,21 +26,18 @@ function readCurrentSearchTerm(): string {
   return new URLSearchParams(window.location.search).get("q") ?? "";
 }
 
-function breadcrumbFor(pathname: string, labels: NavLabels): string {
-  // /account, /account/email — not in the sidenav NAVIGATION list (they're
-  // reached from the account menu, not a nav item), so they'd otherwise
-  // fall through to the contacts fallback below (tasks.md mockup-parity
-  // 5.1 fix; mockups/account.html and account-email.html both show
-  // "Cuenta" as the single-level breadcrumb here).
-  if (pathname.startsWith("/account")) return labels.account;
-
-  const item = NAVIGATION.flatMap((section) => section.items).find((i) =>
-    pathname.startsWith(i.href),
-  );
-  // "/" is the legacy pre-Phase-12 contacts home, kept as a separate,
-  // still-bdId-scoped page (task 11.7 SUGGESTION) — /contacts (task 12.2)
-  // is the new unified list this breadcrumb/search now points at.
-  return item ? labels[item.labelKey] : labels.contactsFallback;
+/**
+ * The route list lives in `src/lib/shell/breadcrumbLabel.ts` — it used to be
+ * a search over the sidebar's NAVIGATION with `contactsFallback` for a miss,
+ * which is why /admin, /playbook and /contact-status all read "Contactos"
+ * (owner report 2026-10-03). NAVIGATION never held them: the Sidebar's
+ * "Guías" and "Administración" sections are hardcoded JSX.
+ *
+ * `null` renders no breadcrumb rather than naming the wrong section.
+ */
+function breadcrumbFor(pathname: string, labels: NavLabels): string | null {
+  const key = resolveBreadcrumbKey(pathname);
+  return key ? labels[key] : null;
 }
 
 /**
@@ -102,6 +99,7 @@ export function TopBar({
   const pathname = usePathname();
   const router = useRouter();
   const searchTarget = resolveTopBarSearchTarget(pathname);
+  const breadcrumb = breadcrumbFor(pathname, labels);
   const [q, setQ] = useState(readCurrentSearchTerm);
 
   // Re-seeds the box from the URL whenever the route changes — e.g.
@@ -135,9 +133,11 @@ export function TopBar({
 
   return (
     <header className="topbar">
-      <nav className="breadcrumbs" aria-label="Ruta de navegación">
-        <span>{breadcrumbFor(pathname, labels)}</span>
-      </nav>
+      {breadcrumb && (
+        <nav className="breadcrumbs" aria-label="Ruta de navegación">
+          <span>{breadcrumb}</span>
+        </nav>
+      )}
       {searchCopy && (
         <form className="search" onSubmit={onSubmit} role="search">
           <span className="sr-only">{searchCopy.label}</span>
