@@ -1780,6 +1780,7 @@ export const en = {
     adminOnlyBadge: "Admins only",
     queueTitle: "Open pairs",
     emptyQueue: "No pairs pending review.",
+    hasActivity: "has activity",
     pairMeta: (index: number, total: number) => `Pair ${index} of ${total}`,
     reasonLabels: {
       name_company: "Match: name + company",

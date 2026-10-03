@@ -234,6 +234,7 @@ export default async function DuplicatesAdminPage({
               <div className="n">{item.personAName}</div>
               <div className="s">
                 {item.company ?? dict.noValue} · {reasonLabel(item.reason)}
+                {item.hasActivity && ` · ${dict.hasActivity}`}
               </div>
             </Link>
           ))}
