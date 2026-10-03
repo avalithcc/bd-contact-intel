@@ -199,15 +199,29 @@ export function AdminConversationFlow({
         <section className="mt-lg">
           <h3 className="section-title">{l.adminLegacyEmailSectionTitle}</h3>
           <div className="thread">
+            {/* `.thread-msg` is a two-column grid (avatar + content, design-system.css).
+                These rows used to omit the avatar and append the date as a third
+                child, so the subject landed in the 22px avatar column and the date
+                overlapped it. Same avatar+content shape the synced thread above and
+                the mockup (admin-conversation.html:218) use, with the date folded
+                into `.thread-msg-head` as `.when`.
+                The avatar is unconditional because getConversationForAdmin scopes
+                these rows to `type = 'email_sent'` AND `actor_bd_id = targetBdId`:
+                every entry here was sent by the BD being viewed. */}
             {data.emailEntries.map((e) => (
               <div key={e.id} className="thread-msg">
+                <Avatar id={trigger.bdId} initials={initialsFromName(targetBdName)} variant="bd" size="sm" />
                 <div>
-                  <span className="from">
-                    {typeof e.metadata?.subject === "string" ? e.metadata.subject : l.timelineSystemActor}
-                  </span>
+                  <div className="thread-msg-head">
+                    <span className="who">
+                      <span className="from">
+                        {typeof e.metadata?.subject === "string" ? e.metadata.subject : l.timelineSystemActor}
+                      </span>
+                    </span>
+                    <span className="when">{when(e.createdAt)}</span>
+                  </div>
                   <div className="snippet">{typeof e.metadata?.body === "string" ? e.metadata.body : ""}</div>
                 </div>
-                <span className="meta">{when(e.createdAt)}</span>
               </div>
             ))}
           </div>
