@@ -1,13 +1,13 @@
 import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { activity, bd, company, person } from "@/db/schema";
+import { bd, company, person } from "@/db/schema";
 import type { AccountType } from "@/lib/companies/accountTypeFilter";
 import type { ClientStatus } from "@/lib/companies/clientStatus";
 import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { companyListConditions } from "@/lib/companies/listConditions";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
-import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { companyLastActivity, companyListOrderBy } from "@/lib/companies/lastActivitySignal";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { HiringMatch } from "@/lib/hiring/queries";
 
@@ -47,8 +47,10 @@ export interface CompanyListPage {
  * `/companies` list (mockups/companies.html), same index shape as
  * `/contacts`'s `getContactListPage`: one bounded page at a time (14,240
  * companies total — never a full scan), a batched contacts-per-company
- * count and a batched last-activity MAX for exactly this page's company
- * keys (never one query per row).
+ * count for exactly this page's company keys (never one query per row).
+ * Rows are ordered by last activity (direct or via contacts), most recent
+ * first, blanks last, with display_name/company_key tiebreaks — see
+ * lastActivitySignal.ts.
  *
  * `view` narrows the WHERE clause in SQL, not a post-fetch JS filter:
  * - "all": no extra condition.
@@ -138,7 +140,15 @@ export async function getCompanyListPage(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const offset = (page - 1) * pageSize;
+  // lastActivityAt is computed BEFORE the LIMIT (two pre-aggregated CTEs, see
+  // lastActivitySignal.ts) because the page is ordered by it. The joins are
+  // 1:1 on a unique key, so `total` above and these page slices stay
+  // consistent. It is a computed timestamptz that postgres-js returns as a
+  // possibly offset-less string, not a Date: pinned to UTC below via
+  // parseDbTimestamp, never left as-is.
+  const la = companyLastActivity();
   const companyRows = await db
+    .with(la.direct, la.viaContact)
     .select({
       companyKey: company.companyKey,
       displayName: company.displayName,
@@ -150,11 +160,14 @@ export async function getCompanyListPage(
       city: company.city,
       country: company.country,
       linkedinUrl: company.linkedinUrl,
+      lastActivityAt: la.lastActivityAt.as("last_activity_at"),
     })
     .from(company)
     .leftJoin(owner, eq(company.ownerBdId, owner.id))
+    .leftJoin(la.direct, la.joinDirect)
+    .leftJoin(la.viaContact, la.joinViaContact)
     .where(where)
-    .orderBy(company.displayName)
+    .orderBy(...companyListOrderBy(la.lastActivityAt))
     .limit(pageSize)
     .offset(offset);
 
@@ -164,40 +177,19 @@ export async function getCompanyListPage(
 
   const keys = companyRows.map((r) => r.companyKey);
 
-  // Two batched queries for exactly this page's keys — never N+1, never an
+  // One batched query for exactly this page's keys — never N+1, never an
   // unbounded scan (data-builder.md rule 5/7).
-  const [contactCounts, lastActivityRows] = await Promise.all([
-    db
-      .select({ companyKey: person.companyKey, count: sql<number>`count(*)::int` })
-      .from(person)
-      .where(inArray(person.companyKey, keys))
-      .groupBy(person.companyKey),
-    db
-      .select({
-        companyKey: activity.companyKey,
-        // Raw computed timestamptz expression — postgres-js returns this as
-        // a possibly offset-less string at runtime, not a parsed Date (same
-        // class of bug effectiveActivityTime.ts's own doc comment describes
-        // for listQueries.ts); pinned to UTC below via parseDbTimestamp,
-        // never left as-is.
-        at: sql<Date | string>`max(${effectiveActivityAtSql()})`,
-      })
-      .from(activity)
-      .where(inArray(activity.companyKey, keys))
-      .groupBy(activity.companyKey),
-  ]);
+  const contactCounts = await db
+    .select({ companyKey: person.companyKey, count: sql<number>`count(*)::int` })
+    .from(person)
+    .where(inArray(person.companyKey, keys))
+    .groupBy(person.companyKey);
 
   const contactCountByKey = new Map(
     contactCounts.filter((c): c is typeof c & { companyKey: string } => c.companyKey !== null).map((c) => [c.companyKey, c.count]),
   );
-  const lastActivityByKey = new Map(
-    lastActivityRows
-      .filter((a): a is typeof a & { companyKey: string } => a.companyKey !== null)
-      .map((a) => [a.companyKey, a.at]),
-  );
 
   const rows: CompanyListRow[] = companyRows.map((r) => {
-    const rawAt = lastActivityByKey.get(r.companyKey);
     return {
       companyKey: r.companyKey,
       displayName: r.displayName,
@@ -205,7 +197,7 @@ export async function getCompanyListPage(
       relationshipStage: r.relationshipStage,
       contactCount: contactCountByKey.get(r.companyKey) ?? 0,
       hiring: hiringIndex.get(r.companyKey) ?? null,
-      lastActivityAt: rawAt ? parseDbTimestamp(rawAt) : null,
+      lastActivityAt: r.lastActivityAt ? parseDbTimestamp(r.lastActivityAt) : null,
       industry: r.industry,
       ownerBdId: r.ownerBdId,
       ownerName: r.ownerName,
