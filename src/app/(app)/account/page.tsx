@@ -77,51 +77,12 @@ export default async function AccountPage() {
         </div>
       </div>
 
-      <div className={styles.card}>
-        <h3 className={styles.cardHeader}>{l.signatureTitle}</h3>
-        <SignatureEditor
-          initialHtml={me.signatureHtml}
-          labels={{
-            title: l.signatureTitle,
-            help: l.signatureHelp,
-            inputLabel: l.signatureInputLabel,
-            placeholder: l.signaturePlaceholder,
-            policy: l.signaturePolicy,
-            previewLabel: l.signaturePreviewLabel,
-            previewTitle: l.signaturePreviewTitle,
-            previewEmpty: l.signaturePreviewEmpty,
-            save: l.signatureSave,
-            saving: l.signatureSaving,
-            clear: l.signatureClear,
-            saved: l.signatureSaved,
-            cleared: l.signatureCleared,
-            errorTooLong: l.signatureErrorTooLong,
-            errorOutputTooLong: l.signatureErrorOutputTooLong,
-            errorNothingLeft: l.signatureErrorNothingLeft,
-            errorUnexpected: l.signatureErrorUnexpected,
-          }}
-        />
-      </div>
-
-      <div className={styles.card}>
-        <h3 className={styles.cardHeader}>{l.importTitle}</h3>
-        <Link className={styles.listLink} href="/account/linkedin-messages">
-          <LinkedInIcon className={`icon ${styles.listLinkIcon}`} />
-          <span className={styles.listLinkGrow}>
-            <span className={styles.listLinkTitle}>{l.linkedinMessagesRowTitle}</span>
-            <span className={styles.listLinkMeta}>
-              {importStats.lastImportedAt
-                ? l.linkedinMessagesRowMeta(
-                    numberFormat.format(importStats.messageCount),
-                    numberFormat.format(importStats.conversationCount),
-                    formatArgentinaDayMonth(importStats.lastImportedAt),
-                  )
-                : l.linkedinMessagesRowEmptyMeta}
-            </span>
-          </span>
-          <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
-        </Link>
-      </div>
+      {/* Card order (account-order mockup, owner-approved 2026-10-03): the
+          blocks you CONSULT at a glance come first — who am I, which language,
+          is Gmail still connected — and the one you EDIT on purpose, the
+          signature, goes last. It is the tallest block on the page, so while it
+          sat third it pushed Importación and Conexiones below one laptop
+          screen. Keep the editor at the bottom when adding a card here. */}
 
       <div className={styles.card}>
         <h3 className={styles.cardHeader}>{l.connectionsTitle}</h3>
@@ -148,6 +109,52 @@ export default async function AccountPage() {
           </span>
           <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
         </a>
+      </div>
+
+      <div className={styles.card}>
+        <h3 className={styles.cardHeader}>{l.importTitle}</h3>
+        <Link className={styles.listLink} href="/account/linkedin-messages">
+          <LinkedInIcon className={`icon ${styles.listLinkIcon}`} />
+          <span className={styles.listLinkGrow}>
+            <span className={styles.listLinkTitle}>{l.linkedinMessagesRowTitle}</span>
+            <span className={styles.listLinkMeta}>
+              {importStats.lastImportedAt
+                ? l.linkedinMessagesRowMeta(
+                    numberFormat.format(importStats.messageCount),
+                    numberFormat.format(importStats.conversationCount),
+                    formatArgentinaDayMonth(importStats.lastImportedAt),
+                  )
+                : l.linkedinMessagesRowEmptyMeta}
+            </span>
+          </span>
+          <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
+        </Link>
+      </div>
+
+      <div className={styles.card}>
+        <h3 className={styles.cardHeader}>{l.signatureTitle}</h3>
+        <SignatureEditor
+          initialHtml={me.signatureHtml}
+          labels={{
+            title: l.signatureTitle,
+            help: l.signatureHelp,
+            inputLabel: l.signatureInputLabel,
+            placeholder: l.signaturePlaceholder,
+            policy: l.signaturePolicy,
+            previewLabel: l.signaturePreviewLabel,
+            previewTitle: l.signaturePreviewTitle,
+            previewEmpty: l.signaturePreviewEmpty,
+            save: l.signatureSave,
+            saving: l.signatureSaving,
+            clear: l.signatureClear,
+            saved: l.signatureSaved,
+            cleared: l.signatureCleared,
+            errorTooLong: l.signatureErrorTooLong,
+            errorOutputTooLong: l.signatureErrorOutputTooLong,
+            errorNothingLeft: l.signatureErrorNothingLeft,
+            errorUnexpected: l.signatureErrorUnexpected,
+          }}
+        />
       </div>
 
       <div className={styles.signOutRow}>
