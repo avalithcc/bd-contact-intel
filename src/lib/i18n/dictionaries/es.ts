@@ -675,7 +675,7 @@ export const es: typeof en = {
     emailSend: "Enviar",
     emailNoAddress: "Este contacto no tiene un correo registrado.",
     genericError: "Ocurrió un error. Vuelva a intentarlo.",
-    errorUnconfirmed: "No se pudo confirmar que se guardó. Revisar la actividad del contacto antes de volver a intentarlo.",
+    errorUnconfirmed: "No se pudo confirmar que se guardó. Revisar la actividad y las tareas del contacto antes de volver a intentarlo.",
     noteSavedFollowUpFailed: "La nota se guardó, pero el seguimiento no.",
     noteSavedFollowUpUnconfirmed: "La nota se guardó. No se pudo confirmar que el seguimiento se creó: revisar las tareas del contacto antes de reintentar.",
     followUpRetry: "Reintentar seguimiento",

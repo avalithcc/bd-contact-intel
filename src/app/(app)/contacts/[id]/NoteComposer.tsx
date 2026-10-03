@@ -57,6 +57,8 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
       const message = contactActionErrorMessage(l, outcome.reason);
       setError(message);
       showToast(message, "error");
+      // The note may have landed anyway: show the timeline as it is now.
+      if (outcome.reason === "unconfirmed") router.refresh();
       return;
     }
 

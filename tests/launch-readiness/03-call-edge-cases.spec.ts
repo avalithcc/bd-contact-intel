@@ -162,6 +162,44 @@ test('a dropped connection mid-save leaves the dialog usable and says so', async
   await expect(dlg.getByRole('button', { name: 'Registrar llamada' }), 'she can retry').toBeEnabled();
 });
 
+test('an unconfirmed save that DID land shows in the timeline without a reload (so "revisar" shows the truth)', async ({ page }) => {
+  const p = await newPerson('CallLandedUnconfirmed');
+  await openContact(page, p.id);
+  const dlg = await openQuickAction(page, 'call');
+  await dlg.getByLabel('Resultado').selectOption('connected');
+  await dlg.getByLabel('Notas').fill('Llegó igual.');
+  // The server writes the call, but the response never reaches the browser.
+  await page.route('**/contacts/**', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await route.fetch();
+    return route.abort('connectionreset');
+  });
+  await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
+  await expect(dlg.getByRole('alert')).toContainText('No se pudo confirmar que se guardó');
+  await page.unroute('**/contacts/**');
+  expect(await activitiesFor(p.id)).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByText('Llegó igual.'), 'the timeline must have refreshed after the unconfirmed result').toBeVisible();
+});
+
+test('while a save is in flight, Escape does not close the dialog (no stale busy leaking into another dialog)', async ({ page }) => {
+  const p = await newPerson('CallEscapeInFlight');
+  await openContact(page, p.id);
+  const dlg = await openQuickAction(page, 'call');
+  await dlg.getByLabel('Resultado').selectOption('connected');
+  await page.route('**/contacts/**', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await new Promise((r) => setTimeout(r, 2500));
+    return route.continue();
+  });
+  await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog'), 'Escape must be ignored while saving').toBeVisible();
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 15000 });
+  await page.unroute('**/contacts/**');
+});
+
 test('leaving the page right after pressing save still saves exactly one call', async ({ page }) => {
   const p = await newPerson('CallNavAway');
   await openContact(page, p.id);

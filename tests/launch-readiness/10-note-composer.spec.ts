@@ -106,6 +106,21 @@ test('a note that fails to save keeps its text and the composer usable', async (
   await expect(page.getByRole('button', { name: 'Guardar nota' })).toBeEnabled();
 });
 
+test('an unconfirmed note that DID land shows in the timeline without a reload', async ({ page }) => {
+  const p = await newPerson('NoteLandedUnconfirmed');
+  await openContact(page, p.id);
+  await page.locator('#note-in').fill('Nota que llegó igual.');
+  await page.route('**/contacts/**', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await route.fetch();
+    return route.abort('connectionreset');
+  });
+  await page.getByRole('button', { name: 'Guardar nota' }).click();
+  await expect(page.locator('#log-note').getByRole('alert')).toContainText('No se pudo confirmar que se guardó');
+  await page.unroute('**/contacts/**');
+  await expect(page.getByText('Nota que llegó igual.').first(), 'the timeline must refresh after an unconfirmed result').toBeVisible();
+});
+
 test('double-clicking "Guardar nota" saves ONE note', async ({ page }) => {
   const p = await newPerson('NoteDouble');
   await openContact(page, p.id);

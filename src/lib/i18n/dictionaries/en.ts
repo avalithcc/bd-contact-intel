@@ -751,7 +751,7 @@ export const en = {
     emailSend: "Send",
     emailNoAddress: "This contact has no email on file.",
     genericError: "Something went wrong. Please try again.",
-    errorUnconfirmed: "We couldn't confirm it was saved. Check the contact's activity before trying again.",
+    errorUnconfirmed: "We couldn't confirm it was saved. Check the contact's activity and tasks before trying again.",
     noteSavedFollowUpFailed: "The note was saved, but the follow-up was not.",
     noteSavedFollowUpUnconfirmed: "The note was saved. We couldn't confirm the follow-up was created: check the contact's tasks before retrying.",
     followUpRetry: "Retry follow-up",
