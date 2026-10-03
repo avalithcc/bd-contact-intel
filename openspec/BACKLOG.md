@@ -22,6 +22,15 @@ for this file from now on: **every count carries the date it was measured,
 every code claim carries `file:line`, and anything not re-checked says
 "unverified".** Where a figure has no date, treat it as unverified.
 
+**Partially updated 2026-10-03 against `main` at `c79f7b6` (PRs #307–#317).**
+This update was NOT another full reconciliation. Only two things were rewritten:
+the **Layer 1 → launch-readiness** entry, which asked for an end-to-end pass
+that has since been run and whose 14 findings are all closed, and the
+**Shipped** list. **No production figure in this file was re-measured on
+2026-10-03** — every count below still carries its 2026-10-01 measurement date
+and should be read as that old, including the row counts, the duplicates queue
+and the per-feature usage table. Treat them as unverified at today's date.
+
 ## Where we actually are
 
 Almost everything in the database arrived by import, but it is **no longer
@@ -81,6 +90,30 @@ started.
 
 ## Shipped
 
+- Launch-readiness pass and every defect it found (#307–#312, 2026-10-02/03).
+  The deliberate end-to-end pass Layer 1 asked for, run against a disposable
+  local Postgres rather than production (see **Layer 1 → launch-readiness** for
+  why, and for what that choice leaves untested). 14 defects found, 14 closed.
+  The durable artefact is the harness itself: `tests/launch-readiness/` plus the
+  `scratchDbGuard` that makes a production run impossible.
+- A subjectless email, end to end (#313, #314, #316, #317, 2026-10-03). It began
+  as a layout bug in a screenshot the owner had saved — subject and date
+  overlapping in the admin conversation modal, because those rows omitted the
+  avatar that `.thread-msg`'s two-column grid expects (#313). Fixing how a
+  blank subject *renders* (#314, "(sin asunto)") exposed that a blank subject
+  should not exist: nothing validated it, client or server. So a subject is now
+  **required to send a new email** (#316) — replies stay exempt, because
+  `replySubject()` derives theirs from the thread and may legitimately return
+  `"Re:"`. That left Send disabled with no visible reason, which the owner
+  resolved from a mockup (`openspec/changes/email-subject-required/mockups/`)
+  in favour of a contextual warn hint (#317). Still open: the recipient address
+  shape is not validated (`sendContactEmailAction`).
+- Screenshot hygiene (#315, 2026-10-03). `screenshoots/` (95 files, 14 MB) and
+  `bugs_ss/` were untracked and in no `.gitignore`. Now the directory contents
+  are ignored except the 16 shots an openspec checklist actually cites (1.65 MB),
+  so those citations resolve in a fresh clone. Note for anyone adding one: a
+  bare `dir/` pattern makes inner negations dead, because git never descends
+  into an excluded directory — the rule uses `screenshoots/*` plus `!…`.
 - Follow-up cadence: the Seguimientos queue, capped at 10 contacts/day per BD
   (#215). Decisions in `openspec/decisions/2026-09-30-decision-brief.md`.
 - Email coverage stage 1: 480 emails deduced from each domain's dominant
@@ -278,11 +311,41 @@ Calls, meetings, tasks and discards are complete and reachable, and **have now
 run in production** — but only a little, by two people. Measured 2026-10-01:
 2 calls and 2 meetings (Mariel), 24 tasks (22 by BDs), 1 discard (Macarena).
 (Corrected 2026-10-01: this entry used to say they had "never run once outside
-a test"; the 2026-09-28 inventory was the last time that was true.) What is
-still missing is the thing this entry was written to force: one deliberate
-end-to-end pass of each feature by someone who will not forgive a rough edge,
-against production data — what exists is organic use, not a pass, and nobody
-has written down what broke. This is not QA theatre — `task.lead_id` has schema
+a test"; the 2026-09-28 inventory was the last time that was true.)
+
+**Done 2026-10-02/03 — the pass this entry existed to force has been run, and
+everything it found is fixed.** PR #307 (`b31a146`) walked each feature
+deliberately and wrote down what broke:
+`openspec/changes/launch-readiness-pass/README.md` records **14 defects**
+(F1–F14), each reproduced by a spec in `tests/launch-readiness/`. All 14 are
+closed: **#308** F1–F2 (the two that lost data), **#309** F3/F10/F11/F13,
+**#310** F4/F7/F8/F9, **#311** F5/F12/F14, **#312** F6. F6 was not a code
+question but an owner decision, taken 2026-10-03: a `wrong_number` call still
+counts as `contacted`, but the follow-up queue skips that contact
+(`src/lib/followUp/candidateQuery.ts`; `src/lib/status/deriveStatus.ts` is
+unchanged). No `test.fail` wrapper is left in `tests/launch-readiness/`
+(measured 2026-10-03).
+
+**One correction to this entry's own premise:** it asked for a pass "against
+production data". It was deliberately NOT run that way. The pass **writes**
+(calls, meetings, tasks, discards) and the app has no delete path, so anything
+written to production would stay there forever; it ran against a disposable
+local Postgres (`bd_contact_intel_e2e`) behind
+`tests/launch-readiness/scratchDbGuard.ts`, which refuses any non-local host or
+any database name not ending in `_e2e`. The cost of that choice is recorded in
+the pass README's own limitations: production scale and speed (about 27,700
+persons, 14,700 companies) were not exercised, and `next dev` is not a
+production build.
+
+**Still unverified:** the Playwright suite has not been re-run since the fixes
+landed — it needs `.env.e2e.local` (the e2e bot's Supabase credentials), which
+was absent on the machine that made these fixes. F6's fix was instead verified
+by executing the real query against the scratch Postgres with six fixture cases
+inside a rolled-back transaction (2026-10-03); the other fixes rest on unit
+tests, typecheck and code review. Nothing in #308–#312 was exercised in the
+running app.
+
+This entry was never QA theatre — `task.lead_id` has schema
 and an index (`src/db/schema.ts:1171`, `:1196`) and is selected on every task
 read (`src/lib/tasks/queries.ts:40`), but has **no write path anywhere and no
 join or rendering**: `createTaskAction` declares `leadId?: string`
