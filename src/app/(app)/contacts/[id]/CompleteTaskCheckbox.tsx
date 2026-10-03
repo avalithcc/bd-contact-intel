@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DoneButton } from "@/components/DoneButton";
 import { useToast } from "@/components/ToastProvider";
 import { completedToastMessage } from "@/lib/tasks/completedToastMessage";
 import { setTaskStatusAction } from "../../tasks/actions";
 import { completeContactTaskAction } from "../actions";
 
 /**
- * "Completar tarea" checkbox (mockup-port r05; contact-record.html:181's
- * right-panel Tareas card — a checkbox, unlike the timeline's "Próximas"
- * card which uses a button, CompleteTaskButton.tsx). Same underlying action.
+ * "Completar tarea" button (mockup-port r05; contact-record.html:181's
+ * right-panel Tareas card; task-complete-affordance turned it from a checkbox
+ * into the shared DoneButton). The timeline's "Próximas" card uses a labelled
+ * `btn` instead, CompleteTaskButton.tsx. Same underlying action.
  *
  * Completing shows a toast naming the task with "Deshacer", because the
  * row leaves the list on refresh and the next click would land on a
@@ -19,8 +21,8 @@ import { completeContactTaskAction } from "../actions";
  * the complete action uses); `router.refresh()` then brings the row back
  * even for a task whose subject is not this record. The handler may run
  * after this row has unmounted: its setState is then a no-op and the
- * refreshed list remounts the row unchecked. Checked state is controlled so
- * a still-mounted instance unchecks on undo.
+ * refreshed list remounts the row at rest. The done state is controlled so
+ * a still-mounted instance resets on undo.
  */
 export function CompleteTaskCheckbox({
   taskId,
@@ -56,12 +58,10 @@ export function CompleteTaskCheckbox({
   };
 
   return (
-    <input
-      type="checkbox"
-      aria-label={ariaLabel}
-      checked={busy}
-      disabled={busy}
-      onChange={async () => {
+    <DoneButton
+      done={busy}
+      label={ariaLabel}
+      onClick={async () => {
         setBusy(true);
         const result = await completeContactTaskAction(taskId, personId);
         if (result.ok) {

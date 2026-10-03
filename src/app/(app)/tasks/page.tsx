@@ -258,7 +258,7 @@ function TaskGroup({
         <table className={styles.table}>
           <thead>
             <tr>
-              <th className={styles.colCheck}></th>
+              <th className={styles.colCheck}>{dict.tasksPage.colComplete}</th>
               <th>{dict.tasksPage.colTask}</th>
               <th>{dict.tasksPage.colSubject}</th>
               <th>{dict.tasksPage.colOwner}</th>

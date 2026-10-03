@@ -1296,6 +1296,7 @@ export const en = {
     colSubject: "Related to",
     colOwner: "Owner",
     colDue: "Due",
+    colComplete: "Complete",
     completeAria: "Mark complete",
     completeError: "Could not complete the task. Try again.",
     completedToast: "Task completed",
