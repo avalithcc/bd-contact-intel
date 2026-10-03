@@ -297,7 +297,7 @@ function TaskRow({
   return (
     <tr>
       <td className={styles.colCheck}>
-        <CompleteTaskButton taskId={task.id} done={task.status === "done"} ariaLabel={l.completeAria} errorLabel={l.completeError} completedLabel={l.completedToast} undoLabel={l.completeUndo} undoErrorLabel={l.completeUndoError} />
+        <CompleteTaskButton taskId={task.id} title={task.title} done={task.status === "done"} ariaLabel={l.completeAria} errorLabel={l.completeError} completedLabel={l.completedToast} undoLabel={l.completeUndo} undoErrorLabel={l.completeUndoError} />
       </td>
       <td>
         <TaskTitleLink

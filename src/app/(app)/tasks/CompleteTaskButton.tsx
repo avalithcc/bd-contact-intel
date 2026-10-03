@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ToastProvider";
+import { completedToastMessage } from "@/lib/tasks/completedToastMessage";
 import { setTaskStatusAction } from "./actions";
 import styles from "./page.module.css";
 
@@ -17,6 +18,7 @@ import styles from "./page.module.css";
  */
 export function CompleteTaskButton({
   taskId,
+  title,
   done = false,
   ariaLabel,
   errorLabel,
@@ -25,6 +27,7 @@ export function CompleteTaskButton({
   undoErrorLabel,
 }: {
   taskId: string;
+  title: string;
   done?: boolean;
   ariaLabel: string;
   errorLabel: string;
@@ -45,17 +48,20 @@ export function CompleteTaskButton({
       showToast(errorLabel, "error");
       return;
     }
-    showToast(completedLabel, "success", { actionLabel: undoLabel, onAction: handleUndo });
+    showToast(completedToastMessage(completedLabel, title), "success", { actionLabel: undoLabel, onAction: handleUndo });
   };
 
   /**
    * Runs from a toast whose row has usually been unmounted by revalidation,
    * so this closure may belong to a dead instance (setState there is a safe
    * no-op; the remounted row starts idle from the refreshed `done` prop).
-   * When the row is still mounted (e.g. the "all" view keeps done rows),
-   * `useState` ignores the new `done` prop, so success must reset to "idle"
-   * explicitly or the checkbox would stay checked and disabled on an open
-   * task. On failure the task is still done, so "done" stays truthful.
+   * Defensive guard, not a live case: every list that renders this button
+   * only holds open rows (done rows render disabled and never toast), so
+   * revalidation normally unmounts the row. If revalidation is slow and the
+   * instance is still alive, `useState` ignores a changed `done` prop, so
+   * success resets to "idle" explicitly rather than leaving an open task
+   * checked and disabled. On failure the task is still done, so "done"
+   * stays truthful.
    */
   const handleUndo = async () => {
     try {
