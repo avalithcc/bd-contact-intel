@@ -104,8 +104,8 @@
   accent-color: var(--color-success);
 }
 
-/* One line, ellipsis: the app's long-text pattern (.cell-person .sub in
-   design-system.css). The full title stays reachable through the button's
+/* Clamps to one line with an ellipsis (same idea as .cell-person .sub in
+   design-system.css, written out again here with its own max-width). The full title stays reachable through the button's
    `title` attribute (TaskTitleLink) and the edit dialog. */
 .taskTitle {
   display: block;

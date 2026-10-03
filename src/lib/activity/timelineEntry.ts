@@ -46,7 +46,7 @@ export interface TimelineRowInput {
 
 export function buildTimelineEntry(row: TimelineRowInput, viewerBdId: string): TimelineEntry {
   const visible = isTimelineEntryVisible({ type: row.type, actorBdId: row.actorBdId }, viewerBdId);
-  // A non-touch row (task_updated/task_completed/task_reopened,
+  // A non-touch row (a task type from ALL_TASK_ACTIVITY_TYPES,
   // NON_TOUCH_ACTIVITY_TYPES) still needs SOME time to render in the
   // timeline — it just doesn't count as a "touch" for last-activity
   // aggregation elsewhere. Fall back to its own createdAt, same as every

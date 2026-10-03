@@ -21,8 +21,9 @@
  * client-side switch, never a fetch through this module's `TimelinePillKey`
  * machinery.
  *
- * `task_updated`/`task_completed`/`task_reopened` (task-edit change) ARE
- * real `activity` rows, though — see `TASK_ACTIVITY_TYPES` below. They ride
+ * The task activity types (`ALL_TASK_ACTIVITY_TYPES`,
+ * src/lib/tasks/taskActivityBody.ts) ARE real `activity` rows, though — see
+ * `TASK_ACTIVITY_TYPES` below. They ride
  * along in "Todo" through `TIMELINE_ACTIVITY_TYPES` (queries.ts) like any
  * other type, but are deliberately left OUT of every `TIMELINE_PILL_GROUPS`
  * entry (in particular "system") — the Tareas pill counts and displays them
@@ -84,12 +85,12 @@ export function sumPillCount(countsByType: Record<string, number>, pill: Timelin
 }
 
 /**
- * The three real `activity` types the "Editar tarea" dialog writes
- * (task-edit change) — grouped under the Tareas pill, never a
+ * The real `activity` types a task write produces — exactly
+ * ALL_TASK_ACTIVITY_TYPES (src/lib/tasks/taskActivityBody.ts) — grouped under the Tareas pill, never a
  * `TimelinePillKey`/`TIMELINE_PILL_GROUPS` entry (see this module's doc
  * comment above for why). Timeline.tsx uses this both to add their true
  * count to the Tareas pill's badge (`sumTaskActivityCount`) and to filter
- * its own loaded entry pool down to just these three when that pill is
+ * its own loaded entry pool down to just these types when that pill is
  * active.
  */
 export const TASK_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;

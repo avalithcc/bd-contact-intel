@@ -739,7 +739,7 @@ export function Timeline({
   const sortedTasksForPill = sortTasksForTimelinePill(tasks);
   const openTasksForPill = sortedTasksForPill.filter((t) => t.status === "open");
   const doneTasksForPill = sortedTasksForPill.filter((t) => t.status === "done");
-  // task_updated/task_completed/task_reopened activity (task-edit change) —
+  // Task activity (the types in ALL_TASK_ACTIVITY_TYPES, taskActivityBody.ts) —
   // grouped under the Tareas pill, not "Sistema" (see TASK_ACTIVITY_TYPES,
   // timelinePills.ts). Read from the "Todo" pool (usually complete per
   // isPillSelectionComplete's own contract — see that function's doc
