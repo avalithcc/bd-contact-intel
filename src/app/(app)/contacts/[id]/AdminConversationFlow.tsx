@@ -199,7 +199,10 @@ export function AdminConversationFlow({
         <section className="mt-lg">
           <h3 className="section-title">{l.adminLegacyEmailSectionTitle}</h3>
           <div className="thread">
-            {/* `.thread-msg` is a two-column grid (avatar + content, design-system.css).
+            {/* These are `email_sent` ACTIVITY rows — the activity-log trace of mail
+                the BD sent through the CRM — not a separate manual-logging path and
+                not the synced `email_message` rows the section above renders.
+                `.thread-msg` is a two-column grid (avatar + content, design-system.css).
                 These rows used to omit the avatar and append the date as a third
                 child, so the subject landed in the 22px avatar column and the date
                 overlapped it. Same avatar+content shape the synced thread above and
@@ -209,8 +212,12 @@ export function AdminConversationFlow({
                 these rows to `type = 'email_sent'` AND `actor_bd_id = targetBdId`:
                 every entry here was sent by the BD being viewed.
                 A missing subject reads "(no subject)" rather than "Sistema": the
-                avatar already names the BD as sender. The body keeps its line breaks
-                via `pre-wrap`, same as EmailThreadMessage. */}
+                avatar already names the BD as sender. The check is on the TRIMMED
+                value, not just `typeof`, because an empty subject is reachable —
+                QuickActions.tsx only requires a body to enable Send, and
+                sendGmailMessage does not validate the subject either, so
+                `metadata.subject` can legitimately be "". The body keeps its line
+                breaks via `pre-wrap`, same as EmailThreadMessage. */}
             {data.emailEntries.map((e) => (
               <div key={e.id} className="thread-msg">
                 <Avatar id={trigger.bdId} initials={initialsFromName(targetBdName)} variant="bd" size="sm" />
@@ -218,7 +225,9 @@ export function AdminConversationFlow({
                   <div className="thread-msg-head">
                     <span className="who">
                       <span className="from">
-                        {typeof e.metadata?.subject === "string" ? e.metadata.subject : l.adminLegacyEmailNoSubject}
+                        {typeof e.metadata?.subject === "string" && e.metadata.subject.trim()
+                          ? e.metadata.subject
+                          : l.adminLegacyEmailNoSubject}
                       </span>
                     </span>
                     <span className="when">{when(e.createdAt)}</span>
