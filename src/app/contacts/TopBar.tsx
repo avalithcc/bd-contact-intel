@@ -115,14 +115,20 @@ export function TopBar({
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!searchTarget) return;
     const basePath = topBarSearchBasePath(searchTarget);
     router.push(q ? `${basePath}?q=${encodeURIComponent(q)}` : basePath);
   }
 
+  // Null outside the contacts and companies sections: the box used to appear
+  // on every route and searched contacts by default, so submitting it from
+  // /admin or /tasks threw the user out of the section they were in.
   const searchCopy =
-    searchTarget === "companies"
-      ? { label: searchLabels.companiesLabel, placeholder: searchLabels.companiesPlaceholder }
-      : { label: searchLabels.contactsLabel, placeholder: searchLabels.contactsPlaceholder };
+    searchTarget === null
+      ? null
+      : searchTarget === "companies"
+        ? { label: searchLabels.companiesLabel, placeholder: searchLabels.companiesPlaceholder }
+        : { label: searchLabels.contactsLabel, placeholder: searchLabels.contactsPlaceholder };
 
   const accountLabel = me.name || labels.account;
   const roleLabel = me.role === "admin" ? labels.roleAdmin : labels.roleBd;
@@ -132,16 +138,18 @@ export function TopBar({
       <nav className="breadcrumbs" aria-label="Ruta de navegación">
         <span>{breadcrumbFor(pathname, labels)}</span>
       </nav>
-      <form className="search" onSubmit={onSubmit} role="search">
-        <span className="sr-only">{searchCopy.label}</span>
-        <input
-          type="search"
-          placeholder={searchCopy.placeholder}
-          aria-label={searchCopy.label}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </form>
+      {searchCopy && (
+        <form className="search" onSubmit={onSubmit} role="search">
+          <span className="sr-only">{searchCopy.label}</span>
+          <input
+            type="search"
+            placeholder={searchCopy.placeholder}
+            aria-label={searchCopy.label}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </form>
+      )}
       <div className="topbar-actions">
         <DropdownMenu
           ariaLabel={labels.accountMenuLabel}
