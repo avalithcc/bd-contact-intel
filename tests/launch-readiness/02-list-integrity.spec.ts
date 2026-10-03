@@ -55,9 +55,8 @@ test('the same untouched list loads in the same order every time', async ({ page
 test('the order is still the same after she edits a handful of contacts in it', async ({ page }) => {
   const url = `/contacts?view=notContacted&company=${encodeURIComponent(COHORT_NAME)}`;
   const before = await idsOnPage(page, url);
-  // An UPDATE moves the row's physical position; with no tiebreak in the ORDER BY the list may reshuffle.
   // A session of small fixes (title, phone) over the visible page, last row first. Every UPDATE writes a
-  // new row version at the end of the table, so with no tiebreak the untouched contacts change places.
+  // new row version at the end of the table; the unique tiebreak keeps the untouched contacts in place.
   for (const id of [...before].reverse()) await sql`update person set job_title = 'Gerente' where id = ${id}`;
   const after = await idsOnPage(page, url);
   expect(after).toEqual(before);
