@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ícono antes o después del nombre · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  body { background: var(--color-surface-sunken, #f3f4f6); padding: 24px; }
+  .case { margin: 0 0 26px; max-width: 760px; }
+  .case > h2 { font: 700 12px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-soft); margin: 0 0 4px; }
+  .case > p.note { font: 400 12px/1.5 var(--font-body); color: var(--color-ink-subtle); margin: 0 0 10px; }
+  .lede { font: 400 13px/1.6 var(--font-body); color: var(--color-ink-soft); max-width: 78ch; margin: 0 0 22px; }
+  .lede b { color: var(--color-ink); }
+  .guide { position: absolute; border-left: 1px dashed #c0392b88; height: 100%; }
+
+  .li-link { display: inline-flex; align-items: center; flex: none; color: var(--color-ink-subtle); }
+  .li-link:hover { color: var(--color-ink); }
+  .li-link svg { width: 15px; height: 15px; }
+  /* DESPUÉS: la celda es flex y el ancla ocupa su ancho; con nombre largo el
+     ícono queda contra el borde derecho de la celda, no junto al texto. */
+  .li-cell { display: flex; align-items: center; gap: 6px; }
+  /* ANTES: el ícono va primero, inmediatamente después del logo, así que su
+     posición horizontal es la misma en todas las filas. */
+  .li-cell-pre { display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<p class="lede">La misma variante B, con el ícono en dos lugares distintos. Lo que decide es <b>si podés barrer la columna con la vista</b> para ver cuáles tienen página, así que mirá la posición horizontal del ícono entre filas, no una fila sola. Las dos tablas tienen los mismos cuatro nombres, de corto a muy largo.</p>
+
+<div class="case">
+  <h2>Después del nombre <em>(lo construido hoy)</em></h2>
+  <p class="note">El ícono sigue al final de la caja del nombre, así que su posición salta según el largo. Con un nombre que envuelve, termina contra el borde derecho de la celda.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th></tr></thead>
+    <tbody>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">FI</span><span class="strong">Flux IT</span></a><a class="li-link" href="#" aria-label="LinkedIn de Flux IT"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td></tr>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">CO</span><span class="strong">Cobre</span></a></td><td class="soft">Fintech</td><td><span class="badge badge-success">Ganada</span></td></tr>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">BH</span><span class="strong">Banco Hipotecario</span></a><a class="li-link" href="#" aria-label="LinkedIn de Banco Hipotecario"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">Banca</td><td><span class="badge badge-info">Calificada</span></td></tr>
+      <tr><td class="li-cell"><a class="row" href="#"><span class="company-logo" aria-hidden="true">AP</span><span class="strong">Applicant - IT Talent Management</span></a><a class="li-link" href="#" aria-label="LinkedIn de Applicant"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a></td><td class="soft">RR. HH.</td><td><span class="badge badge-info">Calificada</span></td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>Antes del nombre</h2>
+  <p class="note">El ícono va pegado al logo, así que cae siempre en la misma columna visual. La ausencia se nota igual, porque el nombre arranca corrido.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th>Empresa</th><th>Industria</th><th>Etapa</th></tr></thead>
+    <tbody>
+      <tr><td class="li-cell-pre"><span class="company-logo" aria-hidden="true">FI</span><a class="li-link" href="#" aria-label="LinkedIn de Flux IT"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a><a class="row" href="#"><span class="strong">Flux IT</span></a></td><td class="soft">Software</td><td><span class="badge badge-info">Calificada</span></td></tr>
+      <tr><td class="li-cell-pre"><span class="company-logo" aria-hidden="true">CO</span><span class="li-link" style="visibility:hidden"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></span><a class="row" href="#"><span class="strong">Cobre</span></a></td><td class="soft">Fintech</td><td><span class="badge badge-success">Ganada</span></td></tr>
+      <tr><td class="li-cell-pre"><span class="company-logo" aria-hidden="true">BH</span><a class="li-link" href="#" aria-label="LinkedIn de Banco Hipotecario"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a><a class="row" href="#"><span class="strong">Banco Hipotecario</span></a></td><td class="soft">Banca</td><td><span class="badge badge-info">Calificada</span></td></tr>
+      <tr><td class="li-cell-pre"><span class="company-logo" aria-hidden="true">AP</span><a class="li-link" href="#" aria-label="LinkedIn de Applicant"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a><a class="row" href="#"><span class="strong">Applicant - IT Talent Management</span></a></td><td class="soft">RR. HH.</td><td><span class="badge badge-info">Calificada</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="note"><b>Nota:</b> en esta tabla la fila sin LinkedIn (Cobre) reserva el hueco del ícono para que todos los nombres arranquen alineados. Si no lo reservara, el nombre de esa fila quedaría corrido a la izquierda respecto de las demás. Es la decisión secundaria que trae esta opción.</p>
+</div>
+
+</body>
+</html>
