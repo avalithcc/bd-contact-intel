@@ -26,3 +26,16 @@ backups/
 
 # Agent worktrees (Claude Code isolation); never commit them.
 .claude/worktrees/
+
+# Local verification screenshots: working artifacts from implementation and
+# review passes, not deliverables (95 files, 14 MB). Only the shots an
+# openspec checklist actually cites are tracked, so those citations still
+# resolve in a fresh clone; everything else stays local.
+screenshoots/*
+!screenshoots/bd-playbook-impl-2-cards.png
+!screenshoots/bd-playbook-impl-3-contact-record-hint.png
+!screenshoots/bd-playbook-impl-4-contacts-filter-hint.png
+!screenshoots/email-sync-*.png
+
+# Ad-hoc screenshots the owner drops in while testing; nothing cites them.
+bugs_ss/
