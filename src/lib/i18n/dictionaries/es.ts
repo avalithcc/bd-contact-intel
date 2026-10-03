@@ -1749,6 +1749,7 @@ export const es: typeof en = {
     adminOnlyBadge: "Solo administradores",
     queueTitle: "Pares abiertos",
     emptyQueue: "No hay pares pendientes de revisión.",
+    hasActivity: "con actividad",
     pairMeta: (index: number, total: number) => `Par ${index} de ${total}`,
     reasonLabels: {
       name_company: "Coincidencia: nombre + empresa",
