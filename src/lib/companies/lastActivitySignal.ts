@@ -24,6 +24,15 @@ import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
  * branches, and the person join is on the primary key. Re-measure before
  * reusing this pattern on a table that is not this small.
  *
+ * Measured cost (PERFORMANCE.md), production, 2026-10-03, page 1 of 14,711
+ * companies: the old alphabetical query ran in 19.7 ms (12.3 ms planning);
+ * this one runs in 53.5 ms (45.1 ms planning). Two and a half times slower
+ * in relative terms and still imperceptible in absolute ones, which is the
+ * trade being made — the old ordering could not surface worked companies at
+ * all. Most of the added cost is PLANNING, so it will not grow with
+ * `activity`; the execution half will. Re-measure when `activity` passes
+ * ~50k rows, and denormalise a `company.last_activity_at` column if it hurts.
+ *
  * Aliases are `pbc_`-prefixed: drizzle references CTE columns unqualified, and
  * `company` (joined alongside) has its own `company_key`.
  *
