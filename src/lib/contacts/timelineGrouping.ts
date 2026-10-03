@@ -90,9 +90,16 @@ export function groupTimelineEntries<T extends TimelineGroupingActivityEntry>(
   return groups;
 }
 
-/** Just the "Próximas" bucket — tasks with a due date, soonest first. Tasks without a due date are excluded (nothing to sort "upcoming" by). */
+/**
+ * Just the "Próximas" bucket — every open task passed in: dated ones soonest
+ * first, then the undated ones in the order given. A task with no due date is
+ * still an open task; dropping it made it vanish from the record entirely.
+ * Never mutates its input.
+ */
 export function upcomingTasks<T extends TimelineGroupingTask>(tasks: readonly T[]): T[] {
-  return tasks
+  const dated = tasks
     .filter((t): t is T & { dueAt: Date } => t.dueAt !== null)
     .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+  const undated = tasks.filter((t) => t.dueAt === null);
+  return [...dated, ...undated];
 }

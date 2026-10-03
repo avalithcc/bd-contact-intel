@@ -6,6 +6,7 @@ import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/conta
 import { useToast } from "@/components/ToastProvider";
 import { TasksIcon } from "@/components/icons";
 import { saveNoteWithFollowUp } from "@/lib/contacts/actionOutcome";
+import { defaultFollowUpDueDate } from "@/lib/contacts/followUpDueDate";
 import { addContactNoteAction, addContactTaskAction } from "../actions";
 
 /**
@@ -18,8 +19,10 @@ import { addContactNoteAction, addContactTaskAction } from "../actions";
  * "Agregar tarea de seguimiento" (contact-record.html:105) has no visible
  * sub-fields in the static mockup beyond the button itself — reveals a
  * single title input and reuses the EXISTING `addContactTaskAction` (same
- * action the "Tarea" quick action uses), created with no due date, right
- * after the note saves. Documented interpretation, not a spec'd flow.
+ * action the "Tarea" quick action uses), right after the note saves. The
+ * follow-up always carries a due date (tomorrow by default, editable, never
+ * empty): a task with no date never becomes "Hoy" or "Vencidas", so nothing
+ * would ever surface it. Documented interpretation, not a spec'd flow.
  *
  * The note and the task are two separate writes, so partial success is a
  * real state and is reported honestly (saveNoteWithFollowUp): the note is
@@ -32,11 +35,17 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
   const [note, setNote] = useState("");
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [followUpTitle, setFollowUpTitle] = useState("");
+  // `YYYY-MM-DD`; set to tomorrow when the follow-up opens (not at first
+  // render, so server and client can never disagree across midnight).
+  const [followUpDue, setFollowUpDue] = useState("");
   const [busy, setBusy] = useState(false);
   // True once the note is written but its follow-up task is not: the next
   // save retries only the task.
   const [noteSaved, setNoteSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A follow-up with a title but no date cannot be saved (see the doc above).
+  const followUpNeedsDate = followUpOpen && followUpTitle.trim() !== "" && !followUpDue;
 
   async function handleSave() {
     // Retrying after a partial success: the note is already written, so the
@@ -48,7 +57,7 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
       noteAlreadySaved: noteSaved,
       followUpTitle: followUpOpen ? followUpTitle : "",
       saveNote: () => addContactNoteAction(personId, note.trim()),
-      saveFollowUp: (title) => addContactTaskAction(personId, title),
+      saveFollowUp: (title) => addContactTaskAction(personId, title, new Date(followUpDue)),
     });
     setBusy(false);
 
@@ -92,6 +101,7 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
       setFollowUpTitle("");
       setError(null);
     }
+    if (!followUpOpen) setFollowUpDue(defaultFollowUpDueDate(new Date()));
     setFollowUpOpen((v) => !v);
   }
 
@@ -121,6 +131,17 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
             onChange={(e) => setFollowUpTitle(e.target.value)}
             disabled={busy}
           />
+          <label className="label" htmlFor="follow-up-due">
+            {l.taskDueLabel}
+          </label>
+          <input
+            id="follow-up-due"
+            className="input"
+            type="date"
+            value={followUpDue}
+            onChange={(e) => setFollowUpDue(e.target.value)}
+            disabled={busy}
+          />
         </div>
       )}
       <div className="bar">
@@ -129,7 +150,7 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
           {l.addFollowUpTask}
         </button>
         <span className="grow" />
-        <button type="button" className="btn btn-primary btn-sm" onClick={handleSave} disabled={busy || (noteSaved ? !followUpTitle.trim() : !note.trim())}>
+        <button type="button" className="btn btn-primary btn-sm" onClick={handleSave} disabled={busy || (noteSaved ? !followUpTitle.trim() : !note.trim()) || followUpNeedsDate}>
           {noteSaved ? l.followUpRetry : l.noteSave}
         </button>
       </div>

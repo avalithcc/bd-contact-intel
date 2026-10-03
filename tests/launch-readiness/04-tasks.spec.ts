@@ -209,14 +209,14 @@ test('the Tareas card on the record of a contact with no tasks does not say "ass
 });
 
 test('a task created with no due date is still an actionable card in the record\'s Todo timeline', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-TASK-NODATE: upcomingTasks() drops tasks with no due date, so the open task has no card (the task_created activity row alone no longer hides the problem)');
   const p = await newPerson('TaskNoDate');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Sin fecha de vencimiento' });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
   // The open task itself (title + "Marcar como hecha"), not just the log line that says it was created.
-  await expect(page.getByRole('button', { name: 'Sin fecha de vencimiento' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Marcar como hecha' })).toBeVisible();
+  const timeline = page.locator('.tl');
+  await expect(timeline.getByRole('button', { name: 'Sin fecha de vencimiento' })).toBeVisible();
+  await expect(timeline.getByRole('button', { name: 'Marcar como hecha' })).toBeVisible();
 });
 
 test('a done task in Completadas shows as done and cannot log a second completion', async ({ page }) => {
