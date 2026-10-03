@@ -1,6 +1,6 @@
 /** "Registrar llamada": the obvious wrong things a BD does with the form. */
 import { expect, test } from '@playwright/test';
-import { activitiesFor, argDate, newPerson, openContact, openQuickAction, personStatus, sql } from './helpers';
+import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, personStatus, sql } from './helpers';
 
 test.afterAll(async () => {
   await sql.end();
@@ -213,22 +213,46 @@ test('leaving the page right after pressing save still saves exactly one call', 
   console.log(`[nav-away] calls saved after leaving mid-save: ${calls.length}`);
 });
 
-test('a "Número equivocado" call is not queued for a follow-up call a week later', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-WRONGNUM: wrong_number counts as an outbound call, so the contact enters the follow-up queue');
-  const p = await newPerson('CallWrongNumber');
-  await openContact(page, p.id);
-  const dlg = await openQuickAction(page, 'call');
-  await dlg.getByLabel('Resultado').selectOption('wrong_number');
-  await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
-  // Age the call by 10 days so it is eligible for the queue (contacted + 7 days).
-  await sql`update activity set created_at = now() - interval '10 days',
-            metadata = jsonb_set(metadata, '{occurredAt}', to_jsonb((now() - interval '10 days')::text)) where person_id = ${p.id}`;
-  await sql`delete from follow_up_queue_item`;
-  await page.goto('/follow-ups');
-  await page.waitForLoadState('networkidle');
-  await expect(page.getByText(p.name), 'a wrong number was queued for follow-up').toHaveCount(0);
-});
+// F6 (fixed): a wrong-number call still counts as `contacted` (status records
+// what the BD did), but the queue skips a contact whose latest touch is that
+// call. The busy case is the pairing that proves the skip is specific to
+// wrong_number and not a general loss of old calls.
+for (const [outcome, label, queued] of [
+  ['wrong_number', 'Número equivocado', false],
+  ['busy', 'Ocupado', true],
+] as const) {
+  test(`a "${label}" call 10 days old ${queued ? 'is' : 'is not'} queued for a follow-up call`, async ({ page }) => {
+    const p = await newPerson(`CallQueue_${outcome}`);
+    await openContact(page, p.id);
+    const dlg = await openQuickAction(page, 'call');
+    await dlg.getByLabel('Resultado').selectOption(outcome);
+    await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
+    await expect(page.getByText('Llamada registrada.')).toBeVisible();
+    // Age the call by 10 days so it is eligible for the queue (contacted + 7 days).
+    // `occurredAt` MUST be written as ISO (`...T...Z`): effectiveActivityAtSql()
+    // only trusts that field when it matches that shape, so a space-separated
+    // `::text` cast silently falls back to created_at — the aging would then
+    // depend on a fallback rather than on the field it claims to set.
+    await sql`update activity set created_at = now() - interval '10 days',
+              metadata = jsonb_set(metadata, '{occurredAt}',
+                to_jsonb(to_char((now() - interval '10 days') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+              where person_id = ${p.id}`;
+    await sql`delete from follow_up_queue_item`;
+    await page.goto('/follow-ups');
+    await page.waitForLoadState('networkidle');
+    // Read the queue table as well as the page. The queue is capped at
+    // FOLLOW_UP_DAILY_CAP per BD and ordered most-recent-touch-first, so a
+    // polluted fixture could push this contact below the cap and make the
+    // wrong_number case pass for the wrong reason. Asserting the row tells a
+    // real skip apart from a vacuous one.
+    const queuedRows = await sql`select person_id from follow_up_queue_item
+                                 where bd_id = ${await meId()} and person_id = ${p.id}`;
+    expect(queuedRows.length, `${label}: follow_up_queue_item membership`).toBe(queued ? 1 : 0);
+    // Scoped to the card link (the locator 05-follow-up-queue.spec.ts uses) so a
+    // name appearing in a title or aria-label cannot inflate the count.
+    await expect(page.locator('main .card a.strong').filter({ hasText: p.name })).toHaveCount(queued ? 1 : 0);
+  });
+}
 
 test('after a network error, Escape closes the dialog and every quick action works again without a reload', async ({ page }) => {
   const p = await newPerson('CallOfflineClose');

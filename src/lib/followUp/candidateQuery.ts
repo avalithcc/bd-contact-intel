@@ -7,6 +7,10 @@
  * 3+ days since the last touch) or `contacted` (due at 7+ days), last
  * touched within 12 months, ordered replied-first then most-recent-touch-
  * first, tie-broken by company name ascending, capped at `FOLLOW_UP_DAILY_CAP`.
+ * A contact whose most recent touch is a `call` activity with outcome
+ * `wrong_number` is NOT eligible (launch-readiness finding F6), however old
+ * that call is; any newer touch brings the contact back on its own (see
+ * `WRONG_NUMBER_OUTCOME` below).
  * Schema-only import (no `@/db` client), so this stays importable — and
  * this file's own test stays runnable — without a live DATABASE_URL, same
  * convention as src/lib/companies/defaultPipelineStageQuery.ts.
@@ -41,8 +45,24 @@
  */
 import { sql } from "drizzle-orm";
 import { activity, company, followUpQueueItem, person, personBdConnection } from "@/db/schema";
+import type { CallOutcomeCode } from "@/lib/contacts/call";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { FOLLOW_UP_DAILY_CAP } from "@/lib/followUp/queueSelection";
+
+/**
+ * The call outcome code that takes a contact out of the queue. Typed against
+ * `CallOutcomeCode` (src/lib/contacts/call.ts) so a rename there fails the
+ * typecheck here instead of silently never matching. It is inlined with
+ * `sql.raw` because it is a compile-time constant, not user input.
+ *
+ * Status answers "what did the BD do?"; the queue answers "what is worth
+ * doing today?". A wrong-number call still counts as `contacted` (owner rule
+ * 2026-09-26, `callStage` in src/lib/status/deriveStatus.ts, unchanged): the
+ * BD did the work. But handing the same dead number back a week later as
+ * "call this today" is not worth doing, so the queue skips it. F6 was those
+ * two questions being conflated.
+ */
+const WRONG_NUMBER_OUTCOME: CallOutcomeCode = "wrong_number";
 
 /** `with` body only (no leading `with` keyword) so callers can splice in
  * their own additional CTEs/final SELECT around it. */
@@ -50,7 +70,10 @@ export function fuqCandidatesCte() {
   return sql`
     fuq_activity as (
       select activity.person_id as fuq_activity_person_id,
-        max(${effectiveActivityAtSql()}) as fuq_activity_at
+        max(${effectiveActivityAtSql()}) as fuq_activity_at,
+        max(case when activity.type = 'call'
+            and activity.metadata ->> 'outcome' = ${sql.raw(`'${WRONG_NUMBER_OUTCOME}'`)}
+          then ${effectiveActivityAtSql()} end) as fuq_wrong_number_at
       from ${activity}
       where activity.person_id is not null
       group by activity.person_id
@@ -71,7 +94,8 @@ export function fuqCandidatesCte() {
         greatest(
           coalesce(fuq_activity.fuq_activity_at, timestamptz '-infinity'),
           coalesce(fuq_connection.fuq_connection_at, timestamptz '-infinity')
-        ) as fuq_last_touch
+        ) as fuq_last_touch,
+        fuq_activity.fuq_wrong_number_at as fuq_wrong_number_at
       from ${person}
       left join fuq_activity on fuq_activity.fuq_activity_person_id = person.id
       left join fuq_connection on fuq_connection.fuq_connection_person_id = person.id
@@ -84,6 +108,15 @@ export function fuqCandidatesCte() {
       select *
       from fuq_candidate
       where fuq_last_touch >= now() - interval '12 months'
+        -- fuq_wrong_number_at <= fuq_activity_at <= fuq_last_touch always
+        -- holds, so ">=" is true exactly when the wrong-number call IS the
+        -- latest touch. Any newer touch of any kind (email, reply, another
+        -- call) raises fuq_last_touch and the contact re-enters the queue by
+        -- itself: no stored flag, no manual un-flagging, no migration. Edge
+        -- case: a wrong-number call sharing the exact same effective
+        -- timestamp with another activity excludes the contact; rare and
+        -- harmless, chosen over the complexity of breaking that tie.
+        and not (fuq_wrong_number_at is not null and fuq_wrong_number_at >= fuq_last_touch)
         and (
           (fuq_status = 'replied' and fuq_last_touch <= now() - interval '3 days')
           or (fuq_status = 'contacted' and fuq_last_touch <= now() - interval '7 days')
