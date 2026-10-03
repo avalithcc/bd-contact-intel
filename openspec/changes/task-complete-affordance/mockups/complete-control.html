@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El control de completar · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  body { background: var(--color-surface-sunken, #f3f4f6); padding: 22px; }
+  .case { max-width: 860px; margin: 0 0 26px; }
+  .case > h2 { font: 700 12px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-soft); margin: 0 0 4px; }
+  .case > p.note { font: 400 12px/1.55 var(--font-body); color: var(--color-ink-subtle); margin: 0 0 10px; }
+  .lede { font: 400 13px/1.65 var(--font-body); color: var(--color-ink-soft); max-width: 86ch; margin: 0 0 22px; }
+  .lede b { color: var(--color-ink); }
+
+  /* Opción B: el control pasa a ser un botón. Reusa .btn-ghost y .btn-icon,
+     que ya existen; lo único nuevo es el borde circular en reposo. */
+  .done-btn { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1.5px solid var(--color-border-strong); background: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: transparent; }
+  .done-btn svg { width: 12px; height: 12px; }
+  .done-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+</style>
+</head>
+<body>
+
+<p class="lede">El cuadradito de la primera columna <b>no es un selector: es la acción "completar"</b>, y se dispara al tocarlo. Su columna <b>no tiene encabezado</b>, así que nada lo dice — en cualquier otra lista, un checkbox sin etiqueta en la primera columna significa "seleccionar fila". El mockup aprobado de Tareas tiene el mismo hueco, así que esto viene del diseño, no de la implementación.</p>
+
+<div class="case">
+  <h2>Hoy</h2>
+  <p class="note">Encabezado vacío, checkbox pelado. La única pista es el <code>aria-label</code>, que solo escucha un lector de pantalla.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th class="col-check"></th><th>Tarea</th><th>Asociado con</th><th>Vencimiento</th></tr></thead>
+    <tbody>
+      <tr><td class="col-check"><input type="checkbox" aria-label="Completar"></td><td><span class="strong">tarea de hoy</span></td><td><a href="#">Joaquín Ortega · Kavak</a></td><td class="soft">29 sep</td></tr>
+      <tr><td class="col-check"><input type="checkbox" aria-label="Completar"></td><td><span class="strong">tarea de ayer</span></td><td><a href="#">Camila Duarte · Nubank</a></td><td class="soft">28 sep</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>A · Encabezado "Completar"</h2>
+  <p class="note">Lo mínimo: la columna dice su nombre. Nada nuevo, ni un componente ni una clase. Sigue siendo un checkbox, con lo que eso arrastra.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th class="col-check">Completar</th><th>Tarea</th><th>Asociado con</th><th>Vencimiento</th></tr></thead>
+    <tbody>
+      <tr><td class="col-check"><input type="checkbox" aria-label="Completar"></td><td><span class="strong">tarea de hoy</span></td><td><a href="#">Joaquín Ortega · Kavak</a></td><td class="soft">29 sep</td></tr>
+      <tr><td class="col-check"><input type="checkbox" aria-label="Completar"></td><td><span class="strong">tarea de ayer</span></td><td><a href="#">Camila Duarte · Nubank</a></td><td class="soft">28 sep</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>B · El control pasa a ser un botón <em>(propuesto)</em></h2>
+  <p class="note">Un círculo vacío que al pasar el mouse se tiñe y muestra el tilde. Las acciones son botones; los checkbox son para seleccionar. Es la convención de Todoist y Linear, y deja el checkbox libre por si algún día querés selección múltiple de verdad.</p>
+  <div class="table-wrap"><table class="data">
+    <thead><tr><th class="col-check">Completar</th><th>Tarea</th><th>Asociado con</th><th>Vencimiento</th></tr></thead>
+    <tbody>
+      <tr><td class="col-check"><button class="done-btn" title="Completar" aria-label="Completar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></button></td><td><span class="strong">tarea de hoy</span></td><td><a href="#">Joaquín Ortega · Kavak</a></td><td class="soft">29 sep</td></tr>
+      <tr><td class="col-check"><button class="done-btn" title="Completar" aria-label="Completar" style="border-color:var(--color-accent);color:var(--color-accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></button></td><td><span class="strong">tarea de ayer</span><span class="meta" style="margin-left:8px">← con el mouse encima</span></td><td><a href="#">Camila Duarte · Nubank</a></td><td class="soft">28 sep</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="case">
+  <h2>Y en las dos tarjetas de los registros</h2>
+  <p class="note">El mismo control está en la tarjeta "Tareas" del registro de contacto y en la de empresa, con el mismo problema. Lo que elijas tiene que ir a los tres lugares, o vas a tener tres comportamientos distintos para la misma acción.</p>
+  <div class="card"><div class="card-header"><h3>Tareas</h3></div>
+    <div class="menu-item"><button class="done-btn" title="Completar" aria-label="Completar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></button><span class="grow" style="margin-left:8px">Volver a llamar después de la revisión de precios<br><span class="meta">Vence el 29 sep</span></span></div>
+  </div>
+</div>
+
+</body>
+</html>
