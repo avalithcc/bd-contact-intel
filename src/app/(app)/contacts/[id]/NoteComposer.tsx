@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { useToast } from "@/components/ToastProvider";
 import { TasksIcon } from "@/components/icons";
+import { saveNoteWithFollowUp } from "@/lib/contacts/actionOutcome";
 import { addContactNoteAction, addContactTaskAction } from "../actions";
 
 /**
@@ -19,6 +20,11 @@ import { addContactNoteAction, addContactTaskAction } from "../actions";
  * single title input and reuses the EXISTING `addContactTaskAction` (same
  * action the "Tarea" quick action uses), created with no due date, right
  * after the note saves. Documented interpretation, not a spec'd flow.
+ *
+ * The note and the task are two separate writes, so partial success is a
+ * real state and is reported honestly (saveNoteWithFollowUp): the note is
+ * cleared once saved, the follow-up can be retried alone, and "Nota
+ * guardada." is only shown when everything asked for was saved.
  */
 export function NoteComposer({ personId, labels: l }: { personId: string; labels: ContactRecordLabels }) {
   const router = useRouter();
@@ -27,29 +33,64 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [followUpTitle, setFollowUpTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  // True once the note is written but its follow-up task is not: the next
+  // save retries only the task.
+  const [noteSaved, setNoteSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
-    if (!note.trim()) return;
+    // Retrying after a partial success: the note is already written, so the
+    // textarea is empty and only the follow-up is sent.
+    if (!noteSaved && !note.trim()) return;
     setBusy(true);
     setError(null);
-    const result = await addContactNoteAction(personId, note.trim());
-    if (!result.ok) {
-      setBusy(false);
-      const message = contactActionErrorMessage(l, result.reason);
+    const outcome = await saveNoteWithFollowUp({
+      noteAlreadySaved: noteSaved,
+      followUpTitle: followUpOpen ? followUpTitle : "",
+      saveNote: () => addContactNoteAction(personId, note.trim()),
+      saveFollowUp: (title) => addContactTaskAction(personId, title),
+    });
+    setBusy(false);
+
+    if (outcome.kind === "note_failed") {
+      // Nothing was confirmed: keep the text so she can retry.
+      const message = contactActionErrorMessage(l, outcome.reason);
       setError(message);
       showToast(message, "error");
       return;
     }
-    if (followUpOpen && followUpTitle.trim()) {
-      await addContactTaskAction(personId, followUpTitle.trim());
-    }
-    setBusy(false);
+
+    // From here on the note IS written. Clear it (and refresh the timeline)
+    // so a retry can never duplicate it, even when the follow-up failed.
     setNote("");
+    router.refresh();
+
+    if (outcome.kind === "follow_up_failed") {
+      setNoteSaved(true);
+      const message =
+        outcome.reason === "unconfirmed"
+          ? l.noteSavedFollowUpUnconfirmed
+          : `${l.noteSavedFollowUpFailed} ${contactActionErrorMessage(l, outcome.reason)}`;
+      setError(message);
+      showToast(message, "error");
+      return;
+    }
+
+    setNoteSaved(false);
     setFollowUpOpen(false);
     setFollowUpTitle("");
     showToast(l.toastNoteSaved);
-    router.refresh();
+  }
+
+  function toggleFollowUp() {
+    // Closing the follow-up after a partial success abandons it: the note
+    // is saved, there is nothing left to retry.
+    if (followUpOpen && noteSaved) {
+      setNoteSaved(false);
+      setFollowUpTitle("");
+      setError(null);
+    }
+    setFollowUpOpen((v) => !v);
   }
 
   return (
@@ -62,7 +103,7 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
         placeholder={l.notePlaceholder}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        disabled={busy}
+        disabled={busy || noteSaved}
       />
       {error && (
         <div className="error-text" role="alert">
@@ -81,13 +122,13 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
         </div>
       )}
       <div className="bar">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFollowUpOpen((v) => !v)} disabled={busy}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={toggleFollowUp} disabled={busy}>
           <TasksIcon className="icon" />
           {l.addFollowUpTask}
         </button>
         <span className="grow" />
-        <button type="button" className="btn btn-primary btn-sm" onClick={handleSave} disabled={busy || !note.trim()}>
-          {l.noteSave}
+        <button type="button" className="btn btn-primary btn-sm" onClick={handleSave} disabled={busy || (noteSaved ? !followUpTitle.trim() : !note.trim())}>
+          {noteSaved ? l.followUpRetry : l.noteSave}
         </button>
       </div>
     </div>
