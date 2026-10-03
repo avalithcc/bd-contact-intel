@@ -208,6 +208,8 @@ kbd, .kbd {
 .field { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .label { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink-soft); }
 .help { font-size: var(--text-sm); color: var(--color-ink-subtle); }
+/* Recolours `.help` with the warn token; no new size, weight, spacing or icon. */
+.help-warn { color: var(--color-warn-text); }
 .error-text { font-size: var(--text-sm); color: var(--color-danger-text); }
 .input, .select, .textarea {
   width: 100%; height: var(--control-height); padding: 0 var(--space-sm);

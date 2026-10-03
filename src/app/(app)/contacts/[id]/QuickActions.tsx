@@ -7,6 +7,7 @@ import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { contactActionErrorHref } from "../actionErrors";
 import { settleAction } from "@/lib/contacts/actionOutcome";
+import { shouldShowSubjectHint } from "@/lib/contacts/emailSubjectHint";
 import {
   addContactSignalAction,
   addContactTaskAction,
@@ -581,6 +582,7 @@ function EmailForm({
   onSubmit: (subject: string, body: string) => void;
 }) {
   const ids = useId();
+  const showSubjectHint = shouldShowSubjectHint(subject, body);
 
   if (!to) {
     return (
@@ -642,8 +644,14 @@ function EmailForm({
           onChange={(e) => onSubjectChange(e.target.value)}
           required
           aria-required="true"
+          aria-describedby={showSubjectHint ? `${ids}-subject-hint` : undefined}
           disabled={busy}
         />
+        {showSubjectHint && (
+          <p className="help help-warn" id={`${ids}-subject-hint`}>
+            {l.emailSubjectRequiredHint}
+          </p>
+        )}
       </div>
       <div className="field">
         <label className="label" htmlFor={`${ids}-body`}>

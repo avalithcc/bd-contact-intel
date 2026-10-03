@@ -746,6 +746,7 @@ export const en = {
     taskCreate: "Create task",
     emailToLabel: "To",
     emailSubjectLabel: "Subject",
+    emailSubjectRequiredHint: "A subject is required to send.",
     emailBodyLabel: "Message",
     emailGenerateAction: "Draft with AI",
     emailSend: "Send",
