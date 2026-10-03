@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aviso de asunto obligatorio · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  /* Mockup-only scaffolding: the real dialog is inside an .overlay, which is
+     fixed-position. Here each state is laid out flat so they can be compared
+     side by side on one page. Nothing below this block is mockup-only. */
+  body { background: var(--color-surface-sunken, #f3f4f6); padding: 28px; }
+  .case { max-width: 640px; margin: 0 0 28px; }
+  .case > h2 { font: 700 12px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-soft); margin: 0 0 10px; }
+  .case > h2 small { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--color-ink-subtle); margin-top: 3px; }
+  .case .dialog { position: static; max-width: none; }
+
+  /* THE ONLY NEW RULE THIS CHANGE PROPOSES.
+     `.help` already exists and is already used in this dialog (the "Enviado
+     desde ... vía Gmail" line). This modifier only recolours it with the
+     warn token that globals.css already defines. No new size, weight,
+     spacing, icon or layout. */
+  .help-warn { color: var(--color-warn-text); }
+</style>
+</head>
+<body>
+
+<div class="case">
+  <h2>Hoy<small>Escribió el mensaje y no puso asunto. "Enviar" está deshabilitado y nada explica por qué.</small></h2>
+  <div class="dialog">
+    <div class="dialog-body">
+      <div class="field"><label class="label" for="h-s">Asunto</label><input class="input" id="h-s" value=""></div>
+      <div class="field"><label class="label" for="h-b">Mensaje</label><textarea class="textarea" id="h-b" rows="3">Hola Valentina, te comparto lo que hablamos recién.</textarea></div>
+      <p class="help">Enviado desde cristian@avalith.net vía Gmail. Se registra como "Correo enviado".</p>
+    </div>
+    <div class="dialog-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" disabled>Enviar</button></div>
+  </div>
+</div>
+
+<div class="case">
+  <h2>A · Aviso fijo bajo el campo<small>Siempre visible, incluso con el diálogo recién abierto y vacío.</small></h2>
+  <div class="dialog">
+    <div class="dialog-body">
+      <div class="field"><label class="label" for="a-s">Asunto</label><input class="input" id="a-s" value=""><p class="help">Obligatorio para enviar.</p></div>
+      <div class="field"><label class="label" for="a-b">Mensaje</label><textarea class="textarea" id="a-b" rows="3">Hola Valentina, te comparto lo que hablamos recién.</textarea></div>
+      <p class="help">Enviado desde cristian@avalith.net vía Gmail. Se registra como "Correo enviado".</p>
+    </div>
+    <div class="dialog-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" disabled>Enviar</button></div>
+  </div>
+</div>
+
+<div class="case">
+  <h2>B · Aviso contextual bajo el campo <em>(propuesto)</em><small>Aparece solo cuando ya hay mensaje escrito y el asunto sigue vacío. Invisible el resto del tiempo.</small></h2>
+  <div class="dialog">
+    <div class="dialog-body">
+      <div class="field"><label class="label" for="b-s">Asunto</label><input class="input" id="b-s" value="" aria-describedby="b-s-hint"><p class="help help-warn" id="b-s-hint">Falta el asunto para poder enviar.</p></div>
+      <div class="field"><label class="label" for="b-b">Mensaje</label><textarea class="textarea" id="b-b" rows="3">Hola Valentina, te comparto lo que hablamos recién.</textarea></div>
+      <p class="help">Enviado desde cristian@avalith.net vía Gmail. Se registra como "Correo enviado".</p>
+    </div>
+    <div class="dialog-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" disabled>Enviar</button></div>
+  </div>
+</div>
+
+<div class="case">
+  <h2>B · el mismo diálogo cuando no falta nada<small>El aviso desaparece y "Enviar" se habilita. Este es el estado normal.</small></h2>
+  <div class="dialog">
+    <div class="dialog-body">
+      <div class="field"><label class="label" for="b2-s">Asunto</label><input class="input" id="b2-s" value="Squads nearshore para Mercado Pago"></div>
+      <div class="field"><label class="label" for="b2-b">Mensaje</label><textarea class="textarea" id="b2-b" rows="3">Hola Valentina, te comparto lo que hablamos recién.</textarea></div>
+      <p class="help">Enviado desde cristian@avalith.net vía Gmail. Se registra como "Correo enviado".</p>
+    </div>
+    <div class="dialog-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary">Enviar</button></div>
+  </div>
+</div>
+
+<div class="case">
+  <h2>C · Aviso junto a "Enviar"<small>Contextual, pero al lado del botón deshabilitado en vez del campo a completar.</small></h2>
+  <div class="dialog">
+    <div class="dialog-body">
+      <div class="field"><label class="label" for="c-s">Asunto</label><input class="input" id="c-s" value=""></div>
+      <div class="field"><label class="label" for="c-b">Mensaje</label><textarea class="textarea" id="c-b" rows="3">Hola Valentina, te comparto lo que hablamos recién.</textarea></div>
+      <p class="help">Enviado desde cristian@avalith.net vía Gmail. Se registra como "Correo enviado".</p>
+    </div>
+    <div class="dialog-footer"><span class="help help-warn" style="margin-right:auto">Falta el asunto</span><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" disabled>Enviar</button></div>
+  </div>
+</div>
+
+</body>
+</html>
