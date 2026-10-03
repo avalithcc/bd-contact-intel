@@ -76,12 +76,12 @@ test('phone column shows mobile when there is no landline', async ({ page }) => 
 });
 
 test('the "Tiene teléfono" chip does not read as "Todos" (i.e. filter off) while it is filtering', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-CHIP-LABEL: boolean filters render valueText null as "Todos" (FilterMenu.tsx:255)');
   await page.goto('/contacts?view=notContacted&hasPhone=1');
   await page.waitForLoadState('networkidle');
   const chip = page.locator('main').getByText(/Tiene teléfono/).first().locator('xpath=..');
   await expect(chip).toBeVisible();
   await expect(chip).not.toContainText('Todos');
+  await expect(chip).toContainText('Sí');
 });
 
 test('from a record, the sidebar "Contactos" link returns to the list she was working, filters intact', async ({ page }) => {

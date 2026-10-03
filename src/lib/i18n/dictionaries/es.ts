@@ -1859,6 +1859,7 @@ export const es: typeof en = {
     filtersPanelLabel: "Filtros",
     filterOwnerLabel: "Responsable",
     filterOwnerAny: "Todos",
+    filterBooleanOn: "Sí",
     filterOwnerMe: "Yo",
     filterOwnerUnassigned: "Sin responsable",
     filterIndustryLabel: "Industria",

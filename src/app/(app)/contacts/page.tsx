@@ -789,6 +789,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               applyLabel: l.filtersApply,
               cancelLabel: l.newContactCancel,
               anyLabel: l.filterOwnerAny,
+              booleanOnLabel: l.filterBooleanOn,
               roleGroupFilterHintLabel: dict.common.roleGroupFilterHintLabel,
               roleGroupFilterHintMenuLabel: dict.common.roleGroupFilterHintMenuLabel,
               roleGroupFilterGuideLink: dict.common.roleGroupFilterGuideLink,
