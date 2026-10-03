@@ -81,6 +81,9 @@ export async function uploadCsv(
     const { imported, skippedOwnCompany, identityReport } = await upsertContacts(me.id, parsed);
     revalidatePath("/");
     revalidatePath("/contacts");
+    // The form that calls this lives on /contacts/import, so that page has to
+    // be revalidated too or a successful import leaves its own screen stale.
+    revalidatePath("/contacts/import");
     return { ok: true, imported, skippedOwnCompany, identityReport };
   } catch (err) {
     unstable_rethrow(err);
@@ -145,6 +148,12 @@ export async function uploadMessagesCsv(
       .remove([path]);
 
     revalidatePath("/");
+    // The form that calls this lives on /account/linkedin-messages, and
+    // /account shows the same counts in its Importación row. Both read
+    // getMessageImportStats, so both go stale after a successful import
+    // unless they are revalidated here.
+    revalidatePath("/account");
+    revalidatePath("/account/linkedin-messages");
     return {
       ok: true,
       conversations,

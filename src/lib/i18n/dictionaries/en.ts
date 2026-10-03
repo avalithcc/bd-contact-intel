@@ -1138,6 +1138,11 @@ export const en = {
     badgeConnected: "Connected",
     passwordRowTitle: "Password",
     passwordRowMeta: "Update your sign-in password",
+    importTitle: "Import",
+    linkedinMessagesRowTitle: "LinkedIn messages",
+    linkedinMessagesRowMeta: (messages: string, conversations: string, lastImport: string) =>
+      `${messages} messages in ${conversations} conversations · last import: ${lastImport}`,
+    linkedinMessagesRowEmptyMeta: "No messages imported yet",
     signatureTitle: "Firma de correo",
     signatureHelp:
       "Pega el HTML completo de tu firma. Se añade al final de cada correo que envías desde el CRM; sin firma, tus correos se envían como texto plano.",
@@ -1229,6 +1234,23 @@ export const en = {
     failing: "Gmail is not syncing: new emails are not reaching the CRM.",
     stale: "Gmail has not synced for over an hour.",
     cta: "View details",
+  },
+
+  accountLinkedinMessages: {
+    eyebrow: "Import",
+    title: "linkedin messages",
+    subtitle: "Import the messages.csv file from your LinkedIn data export.",
+    cardTitle: "LinkedIn messages",
+    privacy:
+      "These messages are yours: only you and an administrator can read them, and every administrator access is logged.",
+    statsLabel: "Imported so far",
+    statsMeta: (messages: string, conversations: string, lastImport: string) =>
+      `${messages} messages · ${conversations} conversations · last import: ${lastImport}`,
+    statsEmpty: "No messages imported yet.",
+    fileHelp:
+      "It comes from LinkedIn's data export (Settings → Data privacy → Get a copy of your data). Uploading the same file again does not duplicate anything.",
+    breadcrumbAccount: "Account",
+    breadcrumbCurrent: "LinkedIn messages",
   },
 
   accountEmailNeverLog: {
@@ -2082,6 +2104,8 @@ export const en = {
     connectionsErrorNoConnectionsFound: "No connections were found in that file.",
     connectionsErrorGenericFailed: "Could not import the file.",
     leadsCardTitle: "Leads list",
+    sharedVisibilityNote:
+      "Contacts you upload here are visible to the whole team, unlike messages.",
     outcomeTitle: "Import outcome",
     outcomeAutoMerged: "Auto-merged",
     outcomeFlaggedForReview: "Sent to review",

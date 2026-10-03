@@ -125,14 +125,11 @@ export default async function Home({
     <main>
 
       {/*
-        `UploadForm` (LinkedIn connections CSV, `uploadCsv`) and
-        `UploadMessagesForm` (LinkedIn messages CSV, `uploadMessagesCsv`) are
-        intentionally hidden here — the owner is not using LinkedIn ingestion
-        for now. Both server actions, `src/lib/messagesCsv.ts` and the
-        storage bucket wiring are untouched; re-add
-        `import { UploadForm, UploadMessagesForm } from "../UploadForm";` and
-        render the two `<details className="import-block">` blocks again
-        (see git history of this file) to bring them back.
+        The LinkedIn imports do NOT live on this page. Connections
+        (`ConnectionsUploadForm`, `uploadCsv`) import at `/contacts/import`
+        next to the leads CSV, because they land in the shared `person` table.
+        Messages (`UploadMessagesForm`, `uploadMessagesCsv`) import at
+        `/account/linkedin-messages`, because conversations are private per BD.
       */}
 
       <section className="panel">

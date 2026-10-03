@@ -1,13 +1,15 @@
-import { getCurrentBd } from "@/lib/queries";
+import Link from "next/link";
+import { getCurrentBd, getMessageImportStats } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
-import { MailIcon, LockIcon, ChevronRightIcon } from "@/components/icons";
+import { MailIcon, LockIcon, LinkedInIcon, ChevronRightIcon } from "@/components/icons";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { gmailConnectionState } from "@/lib/gmail/connectionState";
+import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { SignOutButton } from "../../SignOutButton";
 import { SignatureEditor } from "./SignatureEditor";
 import styles from "./page.module.css";
@@ -36,6 +38,9 @@ export default async function AccountPage() {
     .select()
     .from(emailAccount)
     .where(eq(emailAccount.bdId, me.id));
+  // Own LinkedIn messages only: conversations are private per BD (one round trip).
+  const importStats = await getMessageImportStats(me.id);
+  const numberFormat = new Intl.NumberFormat("es-AR");
   // Same state function as /account/email, so the two pages always agree.
   const gmailState = gmailConnectionState(getGmailOAuthConfig().ok, account?.status);
 
@@ -96,6 +101,26 @@ export default async function AccountPage() {
             errorUnexpected: l.signatureErrorUnexpected,
           }}
         />
+      </div>
+
+      <div className={styles.card}>
+        <h3 className={styles.cardHeader}>{l.importTitle}</h3>
+        <Link className={styles.listLink} href="/account/linkedin-messages">
+          <LinkedInIcon className={`icon ${styles.listLinkIcon}`} />
+          <span className={styles.listLinkGrow}>
+            <span className={styles.listLinkTitle}>{l.linkedinMessagesRowTitle}</span>
+            <span className={styles.listLinkMeta}>
+              {importStats.lastImportedAt
+                ? l.linkedinMessagesRowMeta(
+                    numberFormat.format(importStats.messageCount),
+                    numberFormat.format(importStats.conversationCount),
+                    formatArgentinaDayMonth(importStats.lastImportedAt),
+                  )
+                : l.linkedinMessagesRowEmptyMeta}
+            </span>
+          </span>
+          <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
+        </Link>
       </div>
 
       <div className={styles.card}>

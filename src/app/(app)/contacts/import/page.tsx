@@ -2,12 +2,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { pickContactsImportLabels } from "@/lib/contacts/labels";
 import { pickLeadsUploadLabels } from "@/lib/leads/labels";
 import { UploadLeadsForm } from "@/app/(app)/leads/UploadLeadsForm";
-
-// NOTE: `ConnectionsUploadForm` (LinkedIn connections import, `uploadCsv`)
-// is intentionally hidden here — the owner is not using LinkedIn ingestion
-// for now. The action, parser and identity-resolver write path are untouched;
-// re-add `import { ConnectionsUploadForm } from "./ConnectionsUploadForm";`
-// and render its card again (see git history of this file) to bring it back.
+import { ConnectionsUploadForm } from "./ConnectionsUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +12,10 @@ export const dynamic = "force-dynamic";
  * same identity resolver as the live cutover, showing its dedup outcome
  * (`ImportOutcome`) after a run. This page also used to host the LinkedIn
  * connections upload (`ConnectionsUploadForm`/`uploadCsv`) side by side with
- * the leads card; that card is hidden for now (LinkedIn ingestion is not in
- * use) — see the NOTE above the imports to restore it.
+ * the leads card, shown again below (linkedin-import-visible mockup, screen
+ * 3). Both feed the shared `person` table, so the whole team sees what is
+ * imported here; LinkedIn MESSAGES are private per BD and import from
+ * `/account/linkedin-messages` instead.
  */
 export default async function ContactsImportPage() {
   const dict = await getDictionary();
@@ -40,12 +37,23 @@ export default async function ContactsImportPage() {
 
       <div className="card">
         <div className="card-header">
+          <h3>{l.connectionsCardTitle}</h3>
+        </div>
+        <div className="card-body">
+          <ConnectionsUploadForm labels={l} />
+        </div>
+      </div>
+
+      <div className="card mt-lg">
+        <div className="card-header">
           <h3>{l.leadsCardTitle}</h3>
         </div>
         <div className="card-body">
           <UploadLeadsForm labels={leadsLabels} outcomeLabels={l} />
         </div>
       </div>
+
+      <p className="help mt-md">{l.sharedVisibilityNote}</p>
     </main>
   );
 }
