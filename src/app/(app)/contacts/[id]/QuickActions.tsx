@@ -616,8 +616,8 @@ function EmailForm({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy || !body.trim()}
-            onClick={() => body.trim() && onSubmit(subject.trim(), body.trim())}
+            disabled={busy || !subject.trim() || !body.trim()}
+            onClick={() => subject.trim() && body.trim() && onSubmit(subject.trim(), body.trim())}
           >
             {l.emailSend}
           </button>
@@ -640,6 +640,8 @@ function EmailForm({
           className="input"
           value={subject}
           onChange={(e) => onSubjectChange(e.target.value)}
+          required
+          aria-required="true"
           disabled={busy}
         />
       </div>

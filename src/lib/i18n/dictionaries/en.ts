@@ -774,6 +774,8 @@ export const en = {
     errorCallOutcomeRequired: "Select an outcome to log the call.",
     errorCallOccurredAtInFuture: "A call cannot be logged with a future date and time.",
     errorSignalTextRequired: "Signal text is required.",
+    errorEmailSubjectRequired: "A subject is required to send the email.",
+    errorEmailBodyRequired: "A message is required to send the email.",
     meetingDateLabel: "Date",
     meetingTimeLabel: "Time",
     meetingNotesLabel: "Notes",
