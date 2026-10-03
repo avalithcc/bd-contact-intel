@@ -321,6 +321,20 @@ kbd, .kbd {
 }
 .company-logo.lg { width: 40px; height: 40px; font-size: 0.9rem; }
 
+/* LinkedIn glyph link shown inline next to a company name in the list. */
+.li-link { display: inline-flex; align-items: center; flex: none; color: var(--color-ink-subtle); }
+.li-link:hover { color: var(--color-ink); }
+.li-link svg { width: 15px; height: 15px; }
+/* An inner wrapper, not the `<td>`, is the flex container — same shape as
+   `.cell-person` in the contacts list. A `display:flex` `<td>` loses its
+   table-cell behaviour, and `table.data td`'s border-bottom and hover tint
+   would then paint the flex box rather than the cell, so they could stop short
+   when another cell in the row is taller.
+   A flex container is needed at all because `.row` is itself display:flex and
+   takes the full width, so a sibling icon would wrap onto a second line and
+   make every row with a LinkedIn page taller than the rest. */
+.li-cell { display: flex; align-items: center; gap: 6px; }
+
 /* -------------------------------------------------------- cards & panels */
 .card { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .card-header { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--color-border); }

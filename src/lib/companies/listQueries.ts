@@ -31,6 +31,8 @@ export interface CompanyListRow {
   ownerName: string | null;
   city: string | null;
   country: string | null;
+  /** Stored `linkedin.com/company/<slug>` (no scheme); null = no page set. */
+  linkedinUrl: string | null;
 }
 
 export interface CompanyListPage {
@@ -147,6 +149,7 @@ export async function getCompanyListPage(
       ownerName: owner.name,
       city: company.city,
       country: company.country,
+      linkedinUrl: company.linkedinUrl,
     })
     .from(company)
     .leftJoin(owner, eq(company.ownerBdId, owner.id))
@@ -208,6 +211,7 @@ export async function getCompanyListPage(
       ownerName: r.ownerName,
       city: r.city,
       country: r.country,
+      linkedinUrl: r.linkedinUrl,
     };
   });
 

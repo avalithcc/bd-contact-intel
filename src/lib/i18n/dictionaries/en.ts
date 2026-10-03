@@ -2044,6 +2044,7 @@ export const en = {
     filterLinkedinAny: "Any",
     filterLinkedinWith: "With page",
     filterLinkedinWithout: "Without page",
+    linkedinLinkLabel: (name: string) => `LinkedIn page of ${name}`,
     noLinkedinYet: "No company has a LinkedIn page yet.",
     stageProspect: "Prospect",
     stageQualified: "Qualified",
