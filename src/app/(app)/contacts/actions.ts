@@ -8,6 +8,7 @@ import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contact
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { changeContactCompany } from "@/lib/contacts/companyChangeDb";
 import { searchContactCompanies } from "@/lib/contacts/companySearchDb";
+import { validateNewEmailInput } from "@/lib/contacts/newEmailInput";
 import type { TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
@@ -362,11 +363,23 @@ export async function sendContactEmailAction(
   body: string,
 ): Promise<SendContactEmailResult> {
   try {
+    // A NEW email needs its own subject and body; a reply is exempt (its
+    // subject comes from the thread, see sendThreadReplyAction). Returned as
+    // a typed reason, never thrown: Next redacts thrown messages in production.
+    if (!isUuid(personId)) return { ok: false, reason: "not_found" };
+    const input = validateNewEmailInput(subject, body);
+    if (!input.ok) return { ok: false, reason: input.reason };
     await assertContactEditableById(personId);
     const me = await getCurrentBd();
     // BD with a signature sends HTML (body + signature); without one the
     // message is the same single-part plain text as before (composeEmailBody).
-    await sendGmailMessage({ bdId: me.id, to, subject, ...composeEmailBody(body, me.signatureHtml), personId });
+    await sendGmailMessage({
+      bdId: me.id,
+      to,
+      subject: input.subject,
+      ...composeEmailBody(input.body, me.signatureHtml),
+      personId,
+    });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

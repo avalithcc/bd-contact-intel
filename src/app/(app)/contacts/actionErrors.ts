@@ -51,6 +51,10 @@ export type ContactActionErrorReason =
   | "call_outcome_required"
   | "call_occurred_at_in_future"
   | "signal_text_required"
+  // A new email needs its own subject and body (replies are exempt: their
+  // subject comes from the thread). See contacts/newEmailInput.ts.
+  | "email_subject_required"
+  | "email_body_required"
   | "owner_invalid"
   | "owner_locked"
   | "company_not_found"

@@ -116,6 +116,10 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorCallOccurredAtInFuture;
     case "signal_text_required":
       return l.errorSignalTextRequired;
+    case "email_subject_required":
+      return l.errorEmailSubjectRequired;
+    case "email_body_required":
+      return l.errorEmailBodyRequired;
     case "owner_invalid":
       return l.errorOwnerInvalid;
     case "owner_locked":

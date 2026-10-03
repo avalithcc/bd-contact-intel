@@ -698,6 +698,8 @@ export const es: typeof en = {
     errorCallOutcomeRequired: "Seleccionar un resultado para registrar la llamada.",
     errorCallOccurredAtInFuture: "No se puede registrar una llamada con fecha y hora futuras.",
     errorSignalTextRequired: "Se requiere el texto de la señal.",
+    errorEmailSubjectRequired: "Se requiere un asunto para enviar el correo.",
+    errorEmailBodyRequired: "Se requiere un mensaje para enviar el correo.",
     meetingDateLabel: "Fecha",
     meetingTimeLabel: "Hora",
     meetingNotesLabel: "Notas",
