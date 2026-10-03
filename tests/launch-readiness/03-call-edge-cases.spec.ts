@@ -1,6 +1,6 @@
 /** "Registrar llamada": the obvious wrong things a BD does with the form. */
 import { expect, test } from '@playwright/test';
-import { activitiesFor, argDate, newPerson, openContact, openQuickAction, personStatus, sql } from './helpers';
+import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, personStatus, sql } from './helpers';
 
 test.afterAll(async () => {
   await sql.end();
@@ -229,12 +229,28 @@ for (const [outcome, label, queued] of [
     await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
     await expect(page.getByText('Llamada registrada.')).toBeVisible();
     // Age the call by 10 days so it is eligible for the queue (contacted + 7 days).
+    // `occurredAt` MUST be written as ISO (`...T...Z`): effectiveActivityAtSql()
+    // only trusts that field when it matches that shape, so a space-separated
+    // `::text` cast silently falls back to created_at — the aging would then
+    // depend on a fallback rather than on the field it claims to set.
     await sql`update activity set created_at = now() - interval '10 days',
-              metadata = jsonb_set(metadata, '{occurredAt}', to_jsonb((now() - interval '10 days')::text)) where person_id = ${p.id}`;
+              metadata = jsonb_set(metadata, '{occurredAt}',
+                to_jsonb(to_char((now() - interval '10 days') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+              where person_id = ${p.id}`;
     await sql`delete from follow_up_queue_item`;
     await page.goto('/follow-ups');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText(p.name)).toHaveCount(queued ? 1 : 0);
+    // Read the queue table as well as the page. The queue is capped at
+    // FOLLOW_UP_DAILY_CAP per BD and ordered most-recent-touch-first, so a
+    // polluted fixture could push this contact below the cap and make the
+    // wrong_number case pass for the wrong reason. Asserting the row tells a
+    // real skip apart from a vacuous one.
+    const queuedRows = await sql`select person_id from follow_up_queue_item
+                                 where bd_id = ${await meId()} and person_id = ${p.id}`;
+    expect(queuedRows.length, `${label}: follow_up_queue_item membership`).toBe(queued ? 1 : 0);
+    // Scoped to the card link (the locator 05-follow-up-queue.spec.ts uses) so a
+    // name appearing in a title or aria-label cannot inflate the count.
+    await expect(page.locator('main .card a.strong').filter({ hasText: p.name })).toHaveCount(queued ? 1 : 0);
   });
 }
 
