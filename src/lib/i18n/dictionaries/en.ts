@@ -1895,6 +1895,7 @@ export const en = {
     filtersPanelLabel: "Filters",
     filterOwnerLabel: "Owner",
     filterOwnerAny: "All",
+    filterBooleanOn: "Yes",
     filterOwnerMe: "Me",
     filterOwnerUnassigned: "Unassigned",
     filterIndustryLabel: "Industry",

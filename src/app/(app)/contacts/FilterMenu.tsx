@@ -53,6 +53,8 @@ export interface FilterMenuLabels {
   applyLabel: string;
   cancelLabel: string;
   anyLabel: string;
+  /** Value shown on a boolean chip (no separate value): it is filtering, so never "any". */
+  booleanOnLabel: string;
   roleGroupFilterHintLabel: string;
   roleGroupFilterHintMenuLabel: string;
   roleGroupFilterGuideLink: string;
@@ -252,7 +254,7 @@ export function FilterMenu({
                 className="chip-target"
                 onClick={(e) => openEditor(chip.field, e.currentTarget)}
               >
-                <span className="k">{chip.label}:</span> {chip.valueText ?? l.anyLabel}
+                <span className="k">{chip.label}:</span> {chip.valueText ?? l.booleanOnLabel}
               </button>
               <a href={removeHref} aria-label={l.removeFilterLabel} className="chip-remove">
                 ×

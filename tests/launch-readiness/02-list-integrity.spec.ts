@@ -51,15 +51,12 @@ test('the same untouched list loads in the same order every time', async ({ page
   for (let i = 0; i < 4; i++) expect(await idsOnPage(page, url)).toEqual(first);
 });
 
-// FINDING F-LIST-TIE (confirmed defect): marked test.fail so the suite stays green while it exists
-// and goes red the day it is fixed, prompting removal of this line.
+// F4 (fixed): the default sort ends in a unique tiebreak, so an UPDATE cannot reshuffle ties.
 test('the order is still the same after she edits a handful of contacts in it', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-LIST-TIE: default sort has no tiebreak, an UPDATE reshuffles untouched contacts');
   const url = `/contacts?view=notContacted&company=${encodeURIComponent(COHORT_NAME)}`;
   const before = await idsOnPage(page, url);
-  // An UPDATE moves the row's physical position; with no tiebreak in the ORDER BY the list may reshuffle.
   // A session of small fixes (title, phone) over the visible page, last row first. Every UPDATE writes a
-  // new row version at the end of the table, so with no tiebreak the untouched contacts change places.
+  // new row version at the end of the table; the unique tiebreak keeps the untouched contacts in place.
   for (const id of [...before].reverse()) await sql`update person set job_title = 'Gerente' where id = ${id}`;
   const after = await idsOnPage(page, url);
   expect(after).toEqual(before);
@@ -78,16 +75,15 @@ test('phone column shows mobile when there is no landline', async ({ page }) => 
 });
 
 test('the "Tiene teléfono" chip does not read as "Todos" (i.e. filter off) while it is filtering', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-CHIP-LABEL: boolean filters render valueText null as "Todos" (FilterMenu.tsx:255)');
   await page.goto('/contacts?view=notContacted&hasPhone=1');
   await page.waitForLoadState('networkidle');
   const chip = page.locator('main').getByText(/Tiene teléfono/).first().locator('xpath=..');
   await expect(chip).toBeVisible();
   await expect(chip).not.toContainText('Todos');
+  await expect(chip).toContainText('Sí');
 });
 
 test('from a record, the sidebar "Contactos" link returns to the list she was working, filters intact', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-NO-BACK: the sidebar link is a bare /contacts; the record breadcrumb is plain text; only the browser Back button keeps the filters');
   await page.goto('/contacts?view=notContacted&hasPhone=1');
   await page.waitForLoadState('networkidle');
   await page.locator('tbody a[href^="/contacts/"]').first().click();
