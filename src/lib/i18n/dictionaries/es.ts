@@ -1083,7 +1083,7 @@ export const es: typeof en = {
     linkedinMessagesRowTitle: "Mensajes de LinkedIn",
     linkedinMessagesRowMeta: (messages: string, conversations: string, lastImport: string) =>
       `${messages} mensajes en ${conversations} conversaciones · última importación: ${lastImport}`,
-    linkedinMessagesRowEmptyMeta: "Todavía no has importado mensajes",
+    linkedinMessagesRowEmptyMeta: "Todavía no importaste mensajes",
     signatureTitle: "Firma de correo",
     signatureHelp:
       "Pega el HTML completo de tu firma. Se añade al final de cada correo que envías desde el CRM; sin firma, tus correos se envían como texto plano.",
@@ -1195,15 +1195,15 @@ export const es: typeof en = {
   // `/account/linkedin-messages` (linkedin-import-visible mockup, screen 2).
   accountLinkedinMessages: {
     eyebrow: "Importación",
-    title: "mensajes de linkedin",
-    subtitle: "Importa el archivo messages.csv de tu export de LinkedIn.",
+    title: "mensajes de LinkedIn",
+    subtitle: "Importá el archivo messages.csv de tu export de LinkedIn.",
     cardTitle: "Mensajes de LinkedIn",
     privacy:
-      "Estos mensajes son tuyos: solo tú y un administrador pueden verlos, y cada acceso de un administrador queda registrado.",
+      "Estos mensajes son tuyos: solo vos y un administrador pueden verlos, y cada acceso de un administrador queda registrado.",
     statsLabel: "Importado hasta ahora",
     statsMeta: (messages: string, conversations: string, lastImport: string) =>
       `${messages} mensajes · ${conversations} conversaciones · última importación: ${lastImport}`,
-    statsEmpty: "Todavía no has importado mensajes.",
+    statsEmpty: "Todavía no importaste mensajes.",
     fileHelp:
       "Sale del export de datos de LinkedIn (Configuración → Privacidad de los datos → Obtener una copia de tus datos). Volver a subir el mismo archivo no duplica nada.",
     breadcrumbAccount: "Cuenta",
@@ -2077,7 +2077,7 @@ export const es: typeof en = {
     connectionsErrorGenericFailed: "No se pudo importar el archivo.",
     leadsCardTitle: "Lista de leads",
     sharedVisibilityNote:
-      "Los contactos que subas aquí quedan visibles para todo el equipo, a diferencia de los mensajes.",
+      "Los contactos que subas acá quedan visibles para todo el equipo, a diferencia de los mensajes.",
     outcomeTitle: "Resultado de la importación",
     outcomeAutoMerged: "Fusionados automáticamente",
     outcomeFlaggedForReview: "Enviados a revisión",
