@@ -1,5 +1,6 @@
 "use client";
 
+import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
@@ -30,6 +31,8 @@ export type CompanyQuickActionsLabels = ClientStrings<
     | "cancel"
     | "save"
     | "genericError"
+    | "errorMeetingDateRequired"
+    | "errorMeetingOccurredAtInFuture"
     | "noteDialogTitle"
     | "noteLabel"
     | "noteSave"
@@ -207,6 +210,10 @@ export function CompanyQuickActions({
               close();
               showToast(l.toastMeetingLogged);
               router.refresh();
+            } else if (result.reason === "meeting_date_required") {
+              setError(l.errorMeetingDateRequired);
+            } else if (result.reason === "meeting_occurred_at_in_future") {
+              setError(l.errorMeetingOccurredAtInFuture);
             } else {
               setError(result.message ?? l.genericError);
             }
@@ -434,6 +441,8 @@ function MeetingForm({
             id={`${ids}-date`}
             className="input"
             type="date"
+            // Courtesy only (the server guard is the real check): same ART day as futureGuard.ts.
+            max={argentinaCalendarDate(new Date())}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             disabled={busy}

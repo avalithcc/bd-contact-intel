@@ -69,16 +69,21 @@ test('a meeting: required date is enforced, saved once, status moves to meeting'
   expect(await personStatus(p.id)).toBe('meeting');
 });
 
-test('a meeting dated in the future is refused (like a call) or at least does not mark the contact as already met', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-MEETING-FUTURE: unlike calls, a future meeting is saved and flips the status to Reunión at once');
+test('F12: a meeting dated in the future is refused with a message that points at the task action, and nothing is saved', async ({ page }) => {
   const p = await newPerson('MeetingFuture');
   await openContact(page, p.id);
   const dlg = await openQuickAction(page, 'meeting');
+  await expect(dlg.getByLabel('Fecha'), 'courtesy max: today in Argentina').toHaveAttribute('max', argDate(0));
   await dlg.getByLabel('Fecha').fill(argDate(5));
   await dlg.getByRole('button', { name: 'Registrar reunión' }).click();
-  await expect(page.getByText('Reunión registrada.').or(dlg.getByRole('alert'))).toBeVisible();
-  await page.waitForTimeout(500);
-  expect(await personStatus(p.id), 'a meeting 5 days from now already counts as held').not.toBe('meeting');
+  await expect(dlg.getByRole('alert')).toContainText('fecha futura');
+  await expect(dlg.getByRole('alert'), 'she is told what to do for a meeting she has only scheduled').toContainText('tarea de seguimiento');
+  await expect(page.getByText('Reunión registrada.')).toHaveCount(0);
+  // The dialog stays usable (not frozen) so she can correct the date.
+  await expect(dlg.getByRole('button', { name: 'Registrar reunión' })).toBeEnabled();
+  const meetings = (await activitiesFor(p.id)).filter((a) => a.type === 'meeting_logged');
+  expect(meetings, 'nothing saved').toHaveLength(0);
+  expect(await personStatus(p.id)).not.toBe('meeting');
 });
 
 test('discarding needs a reason, "Otro" needs a note, and a discarded contact leaves "Sin contactar"', async ({ page }) => {
@@ -98,4 +103,16 @@ test('discarding needs a reason, "Otro" needs a note, and a discarded contact le
   await page.goto('/contacts?view=notContacted&q=' + encodeURIComponent(p.name.split(' ')[0]!));
   await page.waitForLoadState('networkidle');
   await expect(page.locator('tbody').getByText(p.name)).toHaveCount(0);
+});
+
+test('F12 on the company record: a future meeting shows the Spanish message, never the raw English error', async ({ page }) => {
+  const [co] = await sql`select company_key from company order by company_key limit 1`;
+  await page.goto(`/companies/${encodeURIComponent(co!.company_key)}`);
+  await page.getByRole('button', { name: 'Reunión', exact: true }).click();
+  const dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Fecha').fill(argDate(5));
+  await dlg.getByRole('button', { name: 'Registrar reunión' }).click();
+  await expect(dlg.getByRole('alert')).toContainText('tarea de seguimiento');
+  await expect(dlg.getByRole('alert')).not.toContainText('cannot be logged');
+  await expect(dlg.getByRole('button', { name: 'Registrar reunión' })).toBeEnabled();
 });

@@ -7,6 +7,8 @@
  */
 import { db } from "@/db";
 import { argentinaCalendarDate, argentinaDayBoundaries, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
+import { ensureTodayFollowUpQueue } from "@/lib/followUp/queueQueries";
+import { readBadgeRowEnsuringQueue } from "@/lib/shell/readBadgeRowEnsuringQueue";
 import { buildAppShellBadgeCountsQuery } from "@/lib/shell/appShellBadgeCountsQuery";
 import { shouldShowReconnectBanner } from "@/lib/gmail/reconnectBannerState";
 import { needsReconnectForSync } from "@/lib/gmail/needsReconnectForSync";
@@ -31,6 +33,9 @@ interface EmailAccountBannerState {
   connectedAt: string | null;
 }
 
+/** (bd, ART day) pairs this server instance already tried to build; see readBadgeRowEnsuringQueue.ts. */
+const queueBuildAttempted = new Set<string>();
+
 const toDate = (iso: string | null | undefined): Date | null => (iso ? new Date(iso) : null);
 
 /**
@@ -51,19 +56,34 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
   // 2026-09-30 day-boundary bug: reusing the naive due_at boundary here
   // failed a 21:00-24:00 ART activity's own "worked today" window).
   const { fromUtc: workedTodayFrom, toUtc: workedTodayTo } = argentinaInstantDayWindow(now);
-  const [row] = (await db.execute(
-    buildAppShellBadgeCountsQuery({
-      bdId,
-      queueDate,
-      tomorrowStartUtcIso: tomorrowStartUtc.toISOString(),
-      workedTodayFromIso: workedTodayFrom.toISOString(),
-      workedTodayToIso: workedTodayTo.toISOString(),
-    }),
-  )) as unknown as {
-    task_count: number;
-    follow_up_count: number;
-    email_account_banner_state: EmailAccountBannerState | null;
-  }[];
+  const readRow = async () => {
+    const [r] = (await db.execute(
+      buildAppShellBadgeCountsQuery({
+        bdId,
+        queueDate,
+        tomorrowStartUtcIso: tomorrowStartUtc.toISOString(),
+        workedTodayFromIso: workedTodayFrom.toISOString(),
+        workedTodayToIso: workedTodayTo.toISOString(),
+      }),
+    )) as unknown as {
+      task_count: number;
+      follow_up_count: number;
+      queue_built: boolean;
+      email_account_banner_state: EmailAccountBannerState | null;
+    }[];
+    // An empty result cannot happen (scalar subqueries), but keep the old
+    // `row?.` tolerance rather than throwing in the shell.
+    return r ?? { task_count: 0, follow_up_count: 0, queue_built: true, email_account_banner_state: null };
+  };
+  // F5: build today's queue on the first page of the day — see
+  // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
+  const row = await readBadgeRowEnsuringQueue({
+    read: readRow,
+    ensure: () => ensureTodayFollowUpQueue(bdId, now),
+    attemptKey: `${bdId}:${queueDate}`,
+    bdId,
+    attempted: queueBuildAttempted,
+  });
   const bannerState = row?.email_account_banner_state ?? null;
   // A pre-readonly connection is skipped by the cron entirely, so its
   // timestamp is old by design: the reconnect banner covers it, not this.

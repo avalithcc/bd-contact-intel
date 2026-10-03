@@ -108,6 +108,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorDiscardNoteRequired;
     case "meeting_date_required":
       return l.errorMeetingDateRequired;
+    case "meeting_occurred_at_in_future":
+      return l.errorMeetingOccurredAtInFuture;
     case "call_outcome_required":
       return l.errorCallOutcomeRequired;
     case "call_occurred_at_in_future":

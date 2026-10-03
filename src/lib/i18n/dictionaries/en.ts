@@ -769,6 +769,8 @@ export const en = {
     errorDiscardReasonRequired: "Select a reason to discard.",
     errorDiscardNoteRequired: "A note is required when the reason is 'Other'.",
     errorMeetingDateRequired: "A date is required to log the meeting.",
+    errorMeetingOccurredAtInFuture:
+      "A meeting cannot be logged with a future date. If you have only scheduled it, add a follow-up task instead.",
     errorCallOutcomeRequired: "Select an outcome to log the call.",
     errorCallOccurredAtInFuture: "A call cannot be logged with a future date and time.",
     errorSignalTextRequired: "Signal text is required.",
@@ -807,8 +809,8 @@ export const en = {
     toastCallLogged: "Call logged.",
     toastDiscarded: "Contact discarded.",
     toastSignalSaved: "Signal saved.",
-    overviewComingSoon: "The contact summary is coming soon.",
-    associationsComingSoon: "Full associations are coming soon.",
+    connectedBdsEmpty: "No BD has connected with this contact yet.",
+    tasksCardEmpty: "No open tasks. Use the + button to add one.",
     companyCardTitle: "Company",
     connectedBdsTitle: "Connected BDs",
     noCompany: "No company on file",
@@ -1501,6 +1503,9 @@ export const en = {
     toastNoteSaved: "Note saved.",
     toastTaskCreated: "Task created.",
     toastMeetingLogged: "Meeting logged.",
+    errorMeetingDateRequired: "A date is required to log the meeting.",
+    errorMeetingOccurredAtInFuture:
+      "A meeting cannot be logged with a future date. If you have only scheduled it, add a follow-up task instead.",
   },
 
   companyForm: {

@@ -693,6 +693,8 @@ export const es: typeof en = {
     errorDiscardReasonRequired: "Seleccionar un motivo para descartar.",
     errorDiscardNoteRequired: "Se requiere una nota cuando el motivo es «Otro».",
     errorMeetingDateRequired: "Se requiere una fecha para registrar la reunión.",
+    errorMeetingOccurredAtInFuture:
+      "No se puede registrar una reunión con fecha futura. Si solo la agendaste, crea una tarea de seguimiento.",
     errorCallOutcomeRequired: "Seleccionar un resultado para registrar la llamada.",
     errorCallOccurredAtInFuture: "No se puede registrar una llamada con fecha y hora futuras.",
     errorSignalTextRequired: "Se requiere el texto de la señal.",
@@ -735,8 +737,8 @@ export const es: typeof en = {
     toastCallLogged: "Llamada registrada.",
     toastDiscarded: "Contacto descartado.",
     toastSignalSaved: "Señal guardada.",
-    overviewComingSoon: "El resumen del contacto estará disponible próximamente.",
-    associationsComingSoon: "Las asociaciones completas estarán disponibles próximamente.",
+    connectedBdsEmpty: "Ningún BD se ha conectado con este contacto todavía.",
+    tasksCardEmpty: "No hay tareas abiertas. Usa el botón + para agregar una.",
     companyCardTitle: "Empresa",
     connectedBdsTitle: "BDs conectados",
     noCompany: "Sin empresa registrada",
@@ -1459,6 +1461,9 @@ export const es: typeof en = {
     toastNoteSaved: "Nota guardada.",
     toastTaskCreated: "Tarea creada.",
     toastMeetingLogged: "Reunión registrada.",
+    errorMeetingDateRequired: "Se requiere una fecha para registrar la reunión.",
+    errorMeetingOccurredAtInFuture:
+      "No se puede registrar una reunión con fecha futura. Si solo la agendaste, crea una tarea de seguimiento.",
   },
 
   companyForm: {
