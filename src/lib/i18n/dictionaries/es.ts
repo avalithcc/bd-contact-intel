@@ -675,6 +675,7 @@ export const es: typeof en = {
     emailSend: "Enviar",
     emailNoAddress: "Este contacto no tiene un correo registrado.",
     genericError: "Ocurrió un error. Vuelva a intentarlo.",
+    errorUnconfirmed: "No se pudo confirmar que se guardó. Revisar la actividad del contacto antes de volver a intentarlo.",
     errorNotFound: "No se encontró este contacto.",
     errorMerged: "Este contacto fue fusionado con otro. Abrir el contacto vigente.",
     errorInvalidEmail: "Ese valor no parece un correo electrónico válido.",

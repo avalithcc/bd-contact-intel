@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { contactActionErrorHref } from "../actionErrors";
+import { settleAction } from "@/lib/contacts/actionOutcome";
 import {
   addContactSignalAction,
   addContactTaskAction,
@@ -259,7 +260,7 @@ export function QuickActions({
             setError(null);
             // Direction has no control on purpose: a hand-logged call is outbound,
             // and `outbound` is what makes a no-answer call count as `contacted`.
-            const result = await logCallAction(personId, outcome, MANUAL_CALL_DIRECTION, date, time, notes);
+            const result = await settleAction(() => logCallAction(personId, outcome, MANUAL_CALL_DIRECTION, date, time, notes));
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -286,7 +287,7 @@ export function QuickActions({
           onSubmit={async (title, dueAt, description, assignedToBdId) => {
             setBusy(true);
             setError(null);
-            const result = await addContactTaskAction(personId, title, dueAt, description, assignedToBdId);
+            const result = await settleAction(() => addContactTaskAction(personId, title, dueAt, description, assignedToBdId));
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -320,7 +321,7 @@ export function QuickActions({
             if (!email) return;
             setBusy(true);
             setError(null);
-            const result = await sendContactEmailAction(personId, email, subject, body);
+            const result = await settleAction(() => sendContactEmailAction(personId, email, subject, body));
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -344,7 +345,7 @@ export function QuickActions({
           onSubmit={async (date, time, notes) => {
             setBusy(true);
             setError(null);
-            const result = await logContactMeetingAction(personId, date, time, notes);
+            const result = await settleAction(() => logContactMeetingAction(personId, date, time, notes));
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -368,7 +369,7 @@ export function QuickActions({
           onSubmit={async (reason, note) => {
             setBusy(true);
             setError(null);
-            const result = await discardContactAction(personId, reason, note);
+            const result = await settleAction(() => discardContactAction(personId, reason, note));
             setBusy(false);
             if (result.ok) {
               closeQuickAction();
@@ -392,7 +393,7 @@ export function QuickActions({
           onSubmit={async (text) => {
             setBusy(true);
             setError(null);
-            const result = await addContactSignalAction(personId, text);
+            const result = await settleAction(() => addContactSignalAction(personId, text));
             setBusy(false);
             if (result.ok) {
               closeQuickAction();

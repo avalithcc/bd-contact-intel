@@ -122,6 +122,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorCompanyNotFound;
     case "unexpected":
       return l.genericError;
+    case "unconfirmed":
+      return l.errorUnconfirmed;
   }
 }
 

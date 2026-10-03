@@ -751,6 +751,7 @@ export const en = {
     emailSend: "Send",
     emailNoAddress: "This contact has no email on file.",
     genericError: "Something went wrong. Please try again.",
+    errorUnconfirmed: "We couldn't confirm it was saved. Check the contact's activity before trying again.",
     errorNotFound: "This contact could not be found.",
     errorMerged: "This contact was merged into another one. Open the current contact.",
     errorInvalidEmail: "That doesn't look like a valid email address.",

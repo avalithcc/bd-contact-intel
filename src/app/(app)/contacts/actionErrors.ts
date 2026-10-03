@@ -53,7 +53,10 @@ export type ContactActionErrorReason =
   | "owner_invalid"
   | "owner_locked"
   | "company_not_found"
-  | "unexpected";
+  | "unexpected"
+  // Client-side only: the request threw (dropped connection, HTTP 500), so
+  // whether the write landed is unknown. See contacts/actionOutcome.ts.
+  | "unconfirmed";
 
 /** A `?owner=` `<select>` value that isn't blank and isn't a well-formed
  * uuid (src/lib/contacts/bulkOwner.ts#normalizeOwnerSelectValue). */
