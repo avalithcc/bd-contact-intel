@@ -85,7 +85,6 @@ test('the "Tiene teléfono" chip does not read as "Todos" (i.e. filter off) whil
 });
 
 test('from a record, the sidebar "Contactos" link returns to the list she was working, filters intact', async ({ page }) => {
-  test.fail(!process.env.LR_SHOW_FINDINGS, 'F-NO-BACK: the sidebar link is a bare /contacts; the record breadcrumb is plain text; only the browser Back button keeps the filters');
   await page.goto('/contacts?view=notContacted&hasPhone=1');
   await page.waitForLoadState('networkidle');
   await page.locator('tbody a[href^="/contacts/"]').first().click();

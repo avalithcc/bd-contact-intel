@@ -1,8 +1,14 @@
 "use client";
 
-import type { ComponentType } from "react";
+import { Suspense, useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  CONTACTS_LIST_MEMORY_KEY,
+  CONTACTS_LIST_PATH,
+  contactsListHref,
+  listQueryToRemember,
+} from "@/lib/contacts/listMemory";
 import type { NavLabels } from "@/lib/i18n/navLabels";
 import {
   ContactsIcon,
@@ -75,6 +81,27 @@ export const NAVIGATION: SidebarSection[] = [
 ];
 
 /**
+ * Records the contacts list's query (filters, tab, sort, page) while she is on
+ * it, so the "Contactos" link can bring her back to it from a record. Reads
+ * `useSearchParams`, hence its own Suspense boundary: the rest of the shell
+ * stays static.
+ */
+function ContactsListMemory() {
+  const pathname = usePathname();
+  const search = useSearchParams().toString();
+  useEffect(() => {
+    const query = listQueryToRemember(pathname, search);
+    if (query === null) return;
+    try {
+      sessionStorage.setItem(CONTACTS_LIST_MEMORY_KEY, query);
+    } catch {
+      // Storage blocked: the link simply stays the bare /contacts.
+    }
+  }, [pathname, search]);
+  return null;
+}
+
+/**
  * App shell sidebar (design.md D9, Phase 8). Lives under `src/app/contacts/`
  * rather than `src/components/` per D9 — it's extracted only once Company
  * (or another surface) adopts it too.
@@ -105,6 +132,20 @@ export function Sidebar({
   isAdmin?: boolean;
 }) {
   const pathname = usePathname();
+  // Off the list, "Contactos" returns to the filtered list she was working;
+  // on the list itself it stays the bare link so it still resets the filters.
+  const [contactsHref, setContactsHref] = useState(CONTACTS_LIST_PATH);
+  useEffect(() => {
+    if (pathname === CONTACTS_LIST_PATH) {
+      setContactsHref(CONTACTS_LIST_PATH);
+      return;
+    }
+    try {
+      setContactsHref(contactsListHref(sessionStorage.getItem(CONTACTS_LIST_MEMORY_KEY)));
+    } catch {
+      setContactsHref(CONTACTS_LIST_PATH);
+    }
+  }, [pathname]);
 
   const isActive = (href: string) => pathname.startsWith(href);
   // "Tareas"/"Seguimientos" are the only two items with a cheap badge count
@@ -117,6 +158,9 @@ export function Sidebar({
 
   return (
     <nav className="sidenav" aria-label="Principal">
+      <Suspense fallback={null}>
+        <ContactsListMemory />
+      </Suspense>
       <Link href="/" className="logo">
         avalith<span className="dot">.</span>
       </Link>
@@ -127,7 +171,7 @@ export function Sidebar({
           {section.items.map((item) => (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href === CONTACTS_LIST_PATH ? contactsHref : item.href}
               className={`nav-item${isActive(item.href) ? " active" : ""}`}
               aria-current={isActive(item.href) ? "page" : undefined}
             >
