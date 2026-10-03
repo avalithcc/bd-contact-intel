@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { gotoAuthed, skipWithoutCredentials } from './helpers';
+import { test, expect } from './fixtures';
+import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 
 skipWithoutCredentials();
 
@@ -50,6 +50,9 @@ test.describe('Phase 7: Duplicate review admin page', () => {
       'DESTRUCTIVE: this test MERGES TWO REAL CONTACTS from the live duplicate queue. ' +
         'It is skipped unless E2E_ALLOW_DESTRUCTIVE=1. Never set that against production.',
     );
+
+    // Second lock: even with the env gate set, never outside a scratch DB.
+    skipUnlessWritesAllowed();
 
     await gotoAuthed(page, '/admin/duplicates');
 

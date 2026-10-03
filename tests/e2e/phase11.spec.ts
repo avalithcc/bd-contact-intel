@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { gotoAuthed, skipWithoutCredentials } from './helpers';
+import { test, expect } from './fixtures';
+import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 
 skipWithoutCredentials();
 
@@ -17,6 +17,15 @@ skipWithoutCredentials();
  * with a connected BD other than the admin/non-admin test accounts, and at
  * least one `email_sent` activity or LinkedIn conversation from that BD.
  */
+// STALE, NEEDS A DECISION: both tests navigate to
+// `/contacts/:id/conversation/:bdId`, a page that was deleted (owner decision
+// 2026-09-30; see revealAdminConversationAction in
+// src/app/(app)/contacts/actions.ts). The entry point is now the modal on
+// `/contacts/:id?conversation=<bdId>` (AdminConversationAutoOpen.tsx). The
+// first test would fail on the missing route; the second asserts a 404 that a
+// deleted route returns for everyone, so it passes without testing the
+// non-admin gate. Both are env-gated and never run today. Rewrite them against
+// the modal or delete the file; do not rely on it as coverage.
 test.describe('Phase 11: Admin conversation access and audit', () => {
   test('admin viewing another BD\'s conversation produces exactly one audit row', async ({ page }) => {
     const contactId = process.env.E2E_CONTACT_WITH_OTHER_BD_HISTORY;
@@ -25,6 +34,11 @@ test.describe('Phase 11: Admin conversation access and audit', () => {
       !contactId || !otherBdId,
       'Requires E2E_CONTACT_WITH_OTHER_BD_HISTORY and E2E_OTHER_BD_ID pointing at seeded data: a Contact with conversation history from a BD other than the seeded admin.',
     );
+
+    // Opening a conversation WRITES an audit_log row (view_conversation) via
+    // the revealAdminConversationAction server action (a POST the request
+    // guard would also block): scratch database only.
+    skipUnlessWritesAllowed();
 
     // The shared `chromium` project authenticates as the seeded admin
     // (tests/e2e/auth.setup.ts). This suite has no direct DB access, so the

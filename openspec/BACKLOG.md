@@ -1092,6 +1092,24 @@ whether the assignee pickers hide it, whether the suite cleans up what it
 creates, or how many test rows it has left behind: unverified. No e2e run was
 made in this pass.
 
+Update 2026-10-03 (branch `chore/guard-e2e-against-production`): the suite is now
+read-only by construction against anything but a local `*_e2e` database.
+`tests/e2e/fixtures.ts` aborts and fails any write request to the app,
+`tests/e2e/readOnlyGuard.ts` holds the rules, and `playwright.config.ts` starts
+its own server on a dedicated port (never reuses one) when writes are allowed.
+Classification of the specs, read 2026-10-03: only three tests can write:
+`phase7.spec.ts` (duplicate merge, also behind `E2E_ALLOW_DESTRUCTIVE`),
+`phase14.spec.ts` (CSV import) and `phase11.spec.ts` (admin conversation audit
+row); all three now skip unless the database is a scratch one. Remaining gaps:
+(1) `getCurrentBd` (`src/lib/queries.ts:80`) inserts a `bd` row on a first visit,
+a plain-GET write the guard cannot see, so a session whose email has no `bd`
+row would still create one; (2) `phase11.spec.ts` targets the deleted
+`/contacts/[id]/conversation/[bdId]` route and covers nothing, it needs a
+rewrite or deletion; (3) the guard has not been exercised at runtime by a
+Playwright run (none was possible: no `.env.e2e.local`), only by unit tests,
+typecheck and `playwright test --list`: unverified; (4) whether the rows
+created by the 2026-10-01 runs were ever cleaned up is still unverified.
+
 ### task creation writes no activity row
 `createTask` and `bulkCreateTasks` write **no** `task_created` activity —
 documented deliberately at `src/lib/tasks/bulkCreateDb.ts:20-24` (re-checked on

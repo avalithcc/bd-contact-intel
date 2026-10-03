@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { gotoAuthed, skipWithoutCredentials } from './helpers';
 // Every label below comes from the dictionary, never from memory or a
 // component comment: a translation change then breaks the build (typecheck)
