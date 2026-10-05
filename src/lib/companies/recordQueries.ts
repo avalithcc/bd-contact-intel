@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { buildCompanyTimelineEntry, type CompanyTimelineEntry } from "@/lib/companies/companyTimelineEntry";
+import { notFoldedAttemptSql } from "@/lib/activity/callAttemptFold";
 import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
 import type {
   CompanyActivityFilter,
@@ -106,8 +107,8 @@ export async function getCompanyTimeline(
   const personIds = await getCompanyPersonIds(companyKey);
 
   const baseWhere = personIds.length
-    ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds))
-    : eq(activity.companyKey, companyKey);
+    ? and(or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds)), notFoldedAttemptSql())
+    : and(eq(activity.companyKey, companyKey), notFoldedAttemptSql());
   const filterCondition = companyFilterCondition(opts.filter);
 
   const rows = await db
@@ -173,8 +174,8 @@ export async function getCompanyTimeline(
 export async function getCompanyTimelineFilterCounts(companyKey: string): Promise<CompanyTimelineFilterCounts> {
   const personIds = await getCompanyPersonIds(companyKey);
   const baseWhere = personIds.length
-    ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds))
-    : eq(activity.companyKey, companyKey);
+    ? and(or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds)), notFoldedAttemptSql())
+    : and(eq(activity.companyKey, companyKey), notFoldedAttemptSql());
 
   const [row] = await db
     .select({

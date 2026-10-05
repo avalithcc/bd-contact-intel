@@ -1,5 +1,6 @@
 import { safeWhatsappHref, toTelHref } from "@/lib/phone";
 import { WhatsAppIcon } from "@/components/icons";
+import { PhoneCallLink } from "@/components/PhoneCallLink";
 
 export interface PhoneValueLabels {
   whatsappTitle: string;
@@ -21,6 +22,9 @@ export interface PhoneValueLabels {
  * a chat: it logs nothing and claims nothing about the number being on
  * WhatsApp.
  *
+ * With `call`, clicking the `tel:` link also records a call attempt and asks
+ * the outcome (CallAttemptProvider). The WhatsApp shortcut is unchanged.
+ *
  * `whatsappUrl` is computed on the server (the parsing library must not
  * reach the browser bundle) and is re-checked here: it only becomes an
  * `href` if the number passed `toTelHref` AND the URL passes
@@ -30,10 +34,12 @@ export function PhoneValue({
   value,
   whatsappUrl,
   labels,
+  call,
 }: {
   value: string;
   whatsappUrl?: string | null;
   labels: PhoneValueLabels;
+  call?: { personId: string; personName: string };
 }) {
   const telHref = toTelHref(value);
   if (!telHref) {
@@ -46,9 +52,7 @@ export function PhoneValue({
   const waHref = safeWhatsappHref(whatsappUrl);
   return (
     <>
-      <a className="num" href={telHref}>
-        {value}
-      </a>
+      <PhoneCallLink href={telHref} value={value} personId={call?.personId} personName={call?.personName} />
       {waHref && (
         <a
           className="wa-btn"

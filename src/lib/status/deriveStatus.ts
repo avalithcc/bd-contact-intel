@@ -105,7 +105,19 @@ export interface DiscardCandidate {
   because: StatusBecause;
 }
 
+/**
+ * Activity types that are real engagement but must NEVER move the stage. A
+ * `call_attempt` is a dialled number nobody has confirmed anyone answered
+ * (call-logging-one-tap): not a worked contact. Be plain about what this does:
+ * `deriveStatus` would ALSO fall through to null for an unknown type without
+ * this list, so a passing test is not proof the list is needed. It is a guard
+ * for the next person who adds a `case` that matches on metadata (direction,
+ * outcome) rather than on the type.
+ */
+export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt"] as const;
+
 export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
+  if ((STATUS_NEUTRAL_ACTIVITY_TYPES as readonly string[]).includes(event.type)) return null;
   const fixed = FIXED_STAGE_BY_TYPE[event.type];
   if (fixed) {
     return { rank: STAGE_RANK[fixed], at: event.at, because: { source: "activity", activityId: event.id } };

@@ -836,6 +836,11 @@ export const en = {
     timelineFilterStatusChange: "Status change",
     timelineFilterMeeting: "Meeting",
     timelineFilterCall: "Calls",
+    timelineFilterCallAttempt: "Call attempt",
+    timelineAttemptNoOutcome: "no outcome",
+    timelineAttemptNoAnswer: "no answer",
+    timelineAttemptVoicemail: "voicemail",
+    timelineAttemptToPrefix: "to",
     timelineFilterDiscarded: "Discard",
     timelineFilterStatusBackfill: "Backfilled status",
     // Filter PILLS (contact-record.html:97-106), grouped per
@@ -1225,6 +1230,21 @@ export const en = {
     neverLogLink: "Never log",
   },
 
+  // Outcome bar after a tel: click (call-logging-one-tap, variant A).
+  callAttempt: {
+    barLabel: "Call outcome",
+    question: "did you talk?",
+    spoke: "We talked",
+    noAnswer: "No answer",
+    voicemail: "Voicemail",
+    noteLabel: "Note (optional)",
+    save: "Save",
+    callSaved: "Call logged",
+    attemptSaved: "Attempt logged",
+    recordError: "The call attempt could not be recorded.",
+    saveError: "The outcome could not be saved. Try again.",
+  },
+
   reconnectBanner: {
     message:
       "Reconnect Gmail to turn on automatic email sync: we'll log your contacts' replies without you having to do anything.",
@@ -1475,6 +1495,7 @@ export const en = {
     atStatusChange: "Stage changed",
     atMeetingLogged: "Meeting logged",
     atCall: "Call logged",
+    atCallAttempt: "Call attempt",
     atDiscarded: "Discarded",
     atHunterLookup: "Email lookup",
     atStatusBackfill: "Activity logged",

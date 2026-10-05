@@ -20,6 +20,7 @@ export interface CompanyTimelineViewLabels {
   atStatusChange: string;
   atMeetingLogged: string;
   atCall: string;
+  atCallAttempt: string;
   atDiscarded: string;
   atHunterLookup: string;
   atStatusBackfill: string;
@@ -75,6 +76,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atMeetingLogged;
     case "call":
       return l.atCall;
+    case "call_attempt":
+      return l.atCallAttempt;
     case "discarded":
       return l.atDiscarded;
     case "hunter_lookup":

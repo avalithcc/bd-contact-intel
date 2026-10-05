@@ -935,8 +935,13 @@ export const auditLog = pgTable(
     // 'bd_signature_update' (a BD saved/cleared their own email signature) |
     // 'bd_create' (scripts/create-bd.ts added a BD to the roster) |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
-    // recomputed person owners under the last-worked rule)
+    // recomputed person owners under the last-worked rule; also run nightly by
+    // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
+    // 'import_contactos_comerciales_2026_10' (scripts/import-contactos-comerciales-2026-10.ts
+    // created contacts and filled empty phones from the CEO's PDF)
+    // 'revert_contactos_comerciales_2026_10' (scripts/revert-contactos-comerciales-2026-10.ts
+    // deleted the untouched created contacts and cleared the filled phones)
     // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
     // account's history_id so the cron re-fetches up to two years of mail)
     action: text("action").notNull(),
@@ -1165,7 +1170,8 @@ export const activity = pgTable(
     actorBdId: uuid("actor_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | etc.
+    // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | 'call' |
+    // 'call_attempt' (a tel: click; never moves status or ownership) | etc.
     type: text("type").notNull(),
     // Metadata keyed by type: { gmailMessageId, gmailThreadId } for email_sent,
     // { hunterScore, hunterVerified } for hunter_lookup, etc.

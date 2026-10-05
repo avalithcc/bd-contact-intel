@@ -46,6 +46,7 @@
 import { sql } from "drizzle-orm";
 import { activity, company, followUpQueueItem, person, personBdConnection } from "@/db/schema";
 import type { CallOutcomeCode } from "@/lib/contacts/call";
+import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { FOLLOW_UP_DAILY_CAP } from "@/lib/followUp/queueSelection";
 
@@ -75,7 +76,14 @@ export function fuqCandidatesCte() {
             and activity.metadata ->> 'outcome' = ${sql.raw(`'${WRONG_NUMBER_OUTCOME}'`)}
           then ${effectiveActivityAtSql()} end) as fuq_wrong_number_at
       from ${activity}
+      -- An unanswered dial is not a touch (NO_PROGRESS_ACTIVITY_TYPES): it must
+      -- not reset the staleness window. Only that list; every other type,
+      -- reply_received and status_change included, still moves the clock.
       where activity.person_id is not null
+        and activity.type not in (${sql.join(
+          NO_PROGRESS_ACTIVITY_TYPES.map((t) => sql`${t}`),
+          sql`, `,
+        )})
       group by activity.person_id
     ),
     fuq_connection as (

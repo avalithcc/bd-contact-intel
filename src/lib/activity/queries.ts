@@ -6,6 +6,7 @@ import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { buildTimelineEntry, type TimelineEntry } from "@/lib/activity/timelineEntry";
+import { notFoldedAttemptSql } from "@/lib/activity/callAttemptFold";
 import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
 import { TIMELINE_PILL_GROUPS, type TimelinePillKey } from "@/lib/activity/timelinePills";
 
@@ -31,6 +32,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "status_change",
   "meeting_logged",
   "call",
+  "call_attempt",
   "discarded",
   "status_backfill",
   "task_created",
@@ -206,7 +208,8 @@ export async function getPersonTimeline(
   opts: { pill?: TimelinePillKey; limit?: number } = {},
 ): Promise<PersonTimelinePage> {
   const types = opts.pill ? TIMELINE_PILL_GROUPS[opts.pill] : TIMELINE_ACTIVITY_TYPES;
-  const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))));
+  const notFolded = notFoldedAttemptSql();
+  const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))), notFolded);
 
   const [rows, countRows] = await Promise.all([
     db
@@ -228,7 +231,7 @@ export async function getPersonTimeline(
     db
       .select({ type: activity.type, count: sql<number>`count(*)` })
       .from(activity)
-      .where(and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t)))))
+      .where(and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t))), notFolded))
       .groupBy(activity.type),
   ]);
 

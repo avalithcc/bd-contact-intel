@@ -247,7 +247,12 @@ function columnCell(
       if (!toTelHref(value)) return <PhoneValue value={value} labels={l} />;
       return (
         <div className="phone-cell">
-          <PhoneValue value={value} whatsappUrl={whatsappLinkFor(value)} labels={l} />
+          <PhoneValue
+            value={value}
+            whatsappUrl={whatsappLinkFor(value)}
+            labels={l}
+            call={{ personId: row.id, personName: [row.firstName, row.lastName].filter(Boolean).join(" ") || value }}
+          />
         </div>
       );
     }
