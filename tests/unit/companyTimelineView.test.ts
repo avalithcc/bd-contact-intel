@@ -25,6 +25,7 @@ const labels = {
   atStatusChange: "Cambio de etapa",
   atMeetingLogged: "Reunión",
   atCall: "Llamada",
+  atCallAttempt: "Intento de llamada",
   atDiscarded: "Descartado",
   atHunterLookup: "Búsqueda",
   atStatusBackfill: "Historial",
@@ -342,4 +343,15 @@ test("non-conversation types (note, call, status_change, meeting_logged, discard
     assert.equal(view.visible, true, `expected "${view.type}" to stay visible regardless of actorBdId`);
     assert.notEqual(view.metadata, null, `expected "${view.type}"'s metadata to stay intact`);
   }
+});
+
+test("buildCompanyTimelineViewRows: a call attempt reads as 'Intento de llamada · {contact}', never the raw type", () => {
+  const [row] = buildCompanyTimelineViewRows(
+    [{ ...baseRow, type: "call_attempt", scope: "person", personId: "p1", personName: "Lucila Delgado", at: new Date("2026-10-05"), metadata: { number: "+54 9 11 5555-0142" } } as never],
+    serverStrings,
+    labels,
+    stageLabelOf,
+    VIEWER_BD_ID,
+  );
+  assert.equal(row!.what, "Intento de llamada · Lucila Delgado");
 });

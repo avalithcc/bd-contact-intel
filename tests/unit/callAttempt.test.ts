@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CALL_ATTEMPT_DEDUPE_WINDOW_MS,
+  CALL_ATTEMPT_NOTE_MAX_LENGTH,
   CALL_ATTEMPT_TYPE,
   dedupeCutoff,
   findDuplicateAttempt,
@@ -88,4 +89,9 @@ test("the dialled field is whichever stored number matches, and a foreign number
   assert.equal(resolveDialledField("+54 9 11 5555-0142", stored), "mobile_phone");
   assert.equal(resolveDialledField("+54 9 11 0000-0000", stored), null);
   assert.equal(resolveDialledField("  ", stored), null);
+});
+
+test("a note longer than the cap is cut server-side, whatever the client sent", () => {
+  const plan = planAttemptResolution({ createdAt: ago(1000), metadata: {} }, "connected", "x".repeat(CALL_ATTEMPT_NOTE_MAX_LENGTH + 200));
+  assert.equal(plan.call?.notes?.length, CALL_ATTEMPT_NOTE_MAX_LENGTH);
 });

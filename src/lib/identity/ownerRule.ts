@@ -38,12 +38,9 @@ export const OWNER_BACKFILL_SOURCE = "owner_backfill";
  * who did. The two bars disagree on purpose, so they are two lists and this
  * one must not be merged with, or replaced by, NON_TOUCH_ACTIVITY_TYPES. The
  * task-edit types are not listed here: they already have no effective time.
+ * Enforced in SQL: ownerRuleDb.ts#readOwnerTouches builds a `notInArray` from this list.
  */
 export const OWNER_IGNORED_ACTIVITY_TYPES = ["call_attempt"] as const;
-
-export function countsForOwnership(activityType: string): boolean {
-  return !(OWNER_IGNORED_ACTIVITY_TYPES as readonly string[]).includes(activityType);
-}
 
 export interface OwnerHistoryMarker {
   property: string;

@@ -1266,7 +1266,9 @@ export function Timeline({
                         : l.timelineAttemptNoOutcome;
                   const AttemptIcon = meta.outcome === "no_answer" ? CloseIcon : CallIcon;
                   return (
-                    <div key={timelineEntry.id} className="tl-attempt">
+                    <div key={timelineEntry.id} className="tl-item tl-item-attempt">
+                      {/* Empty icon column: keeps the timeline spine continuous through the row. */}
+                      <div aria-hidden="true" />
                       <div className="try">
                         <AttemptIcon className="icon" />
                         <span>

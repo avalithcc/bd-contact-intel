@@ -1480,6 +1480,7 @@ export const en = {
     atStatusChange: "Stage changed",
     atMeetingLogged: "Meeting logged",
     atCall: "Call logged",
+    atCallAttempt: "Call attempt",
     atDiscarded: "Discarded",
     atHunterLookup: "Email lookup",
     atStatusBackfill: "Activity logged",

@@ -860,6 +860,7 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
   color: var(--color-ink-subtle);
   white-space: nowrap;
 }
-.tl-attempt {
-  padding-bottom: var(--space-md);
+/* No icon circle to hang the spine from, so it runs the full row height. */
+.tl-item-attempt::before {
+  top: 0;
 }

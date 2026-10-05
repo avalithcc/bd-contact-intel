@@ -6,6 +6,7 @@ import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { buildTimelineEntry, type TimelineEntry } from "@/lib/activity/timelineEntry";
+import { notFoldedAttemptSql } from "@/lib/activity/callAttemptFold";
 import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
 import { TIMELINE_PILL_GROUPS, type TimelinePillKey } from "@/lib/activity/timelinePills";
 
@@ -207,9 +208,7 @@ export async function getPersonTimeline(
   opts: { pill?: TimelinePillKey; limit?: number } = {},
 ): Promise<PersonTimelinePage> {
   const types = opts.pill ? TIMELINE_PILL_GROUPS[opts.pill] : TIMELINE_ACTIVITY_TYPES;
-  // An attempt that became a `call` ("Hablé") carries `callActivityId`: the
-  // timeline shows the conversation once, not the dial twice. Still in the table.
-  const notFolded = sql`not (${activity.type} = 'call_attempt' and (${activity.metadata}->>'callActivityId') is not null)`;
+  const notFolded = notFoldedAttemptSql();
   const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))), notFolded);
 
   const [rows, countRows] = await Promise.all([

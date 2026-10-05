@@ -1440,6 +1440,7 @@ export const es: typeof en = {
     atStatusChange: "Cambio de etapa",
     atMeetingLogged: "Reunión registrada",
     atCall: "Llamada registrada",
+    atCallAttempt: "Intento de llamada",
     atDiscarded: "Descartado",
     atHunterLookup: "Búsqueda de correo",
     atStatusBackfill: "Actividad registrada",

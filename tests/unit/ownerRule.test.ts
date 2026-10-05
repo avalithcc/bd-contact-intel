@@ -9,7 +9,6 @@ import { NON_TOUCH_ACTIVITY_TYPES, resolveEffectiveActivityAt } from "@/lib/cont
 import {
   OWNER_BACKFILL_SOURCE,
   OWNER_IGNORED_ACTIVITY_TYPES,
-  countsForOwnership,
   hasManualOwner,
   pickOwnerByLastWorked,
   type OwnerConnection,
@@ -99,20 +98,18 @@ test("the backfill's own source never reads as a manual edit", () => {
 });
 
 // --- call_attempt (call-logging-one-tap) ------------------------------------
+// The exclusion itself is a SQL `notInArray` in ownerRuleDb.ts built from this
+// list, so these tests pin the list and its disagreement with the last-activity bar.
 
-test("dialling a number is not working the relationship: call_attempt is ignored for ownership", () => {
-  assert.equal(countsForOwnership("call_attempt"), false);
-  assert.ok((OWNER_IGNORED_ACTIVITY_TYPES as readonly string[]).includes("call_attempt"));
-});
-
-test("ownership still counts every real engagement type", () => {
-  for (const type of ["call", "note", "email_sent", "reply_received", "meeting_logged", "status_change"]) {
-    assert.equal(countsForOwnership(type), true, type);
-  }
+test("dialling a number is not working the relationship: call_attempt is on the ownership ignore list", () => {
+  assert.deepEqual([...OWNER_IGNORED_ACTIVITY_TYPES], ["call_attempt"]);
 });
 
 test("the ownership bar is stricter than the last-activity bar: a dialled attempt shows in one and not the other", () => {
   assert.equal((NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes("call_attempt"), false);
-  assert.equal(resolveEffectiveActivityAt({ id: "a", type: "call_attempt", createdAt: new Date("2026-10-05"), metadata: {} })?.toISOString(), "2026-10-05T00:00:00.000Z");
-  assert.equal(countsForOwnership("call_attempt"), false);
+  assert.equal(
+    resolveEffectiveActivityAt({ id: "a", type: "call_attempt", createdAt: new Date("2026-10-05"), metadata: {} })?.toISOString(),
+    "2026-10-05T00:00:00.000Z",
+  );
+  assert.notDeepEqual([...OWNER_IGNORED_ACTIVITY_TYPES], [...NON_TOUCH_ACTIVITY_TYPES]);
 });

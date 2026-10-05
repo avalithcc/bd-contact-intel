@@ -22,6 +22,9 @@ export const CALL_ATTEMPT_TYPE = "call_attempt";
 /** A second attempt by the same BD to the same number within this window is the same dial (a double click), not a new one. */
 export const CALL_ATTEMPT_DEDUPE_WINDOW_MS = 60_000;
 
+/** The bar's note input and the server share this cap; a direct action call cannot exceed it. */
+export const CALL_ATTEMPT_NOTE_MAX_LENGTH = 500;
+
 /** Outcomes the bar can set. "connected" is the only one that writes a `call` row. */
 export const ATTEMPT_OUTCOMES = ["connected", "no_answer", "voicemail"] as const;
 export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number];
@@ -107,7 +110,7 @@ export function planAttemptResolution(
       direction: MANUAL_CALL_DIRECTION,
       // The DIAL moment, never "now".
       occurredAt: attempt.createdAt.toISOString(),
-      notes: rawNotes.trim() || null,
+      notes: rawNotes.trim().slice(0, CALL_ATTEMPT_NOTE_MAX_LENGTH) || null,
       number: typeof meta.number === "string" ? meta.number : null,
     },
   };
