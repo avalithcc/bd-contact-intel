@@ -1,15 +1,33 @@
 /**
- * Owner-operated password reset for a BD, for the period before this
- * Supabase project has custom SMTP.
+ * Owner-operated password reset for a BD — the FALLBACK for when email does
+ * not reach them. It is not the normal path.
  *
- * Why this exists: every recovery path is email-based — the app's own
- * forgot-password flow (switched off, see src/lib/auth/passwordReset.ts)
- * and the Supabase dashboard's "send recovery"/"magic link" both rely on
- * Supabase's built-in email service, which only delivers to members of the
- * project's own team. It cannot reach a BD. The only way left to set a
- * password directly is the Supabase Auth admin API with the service-role
- * key, which is why this is a script an owner runs by hand, not a UI
- * button.
+ * The normal paths are both email-based and both work: a BD resets their own
+ * password at /forgot-password (ON since 2026-09-29 — see
+ * src/lib/auth/passwordReset.ts), and a new BD is onboarded with a Supabase
+ * invite, whose link lands on /auth/confirm, confirms the email, opens a
+ * session and drops them at /account/password to choose their own password
+ * (see src/lib/auth/confirmType.ts). Neither puts a password in the owner's
+ * hands, which is why they are preferred.
+ *
+ * This script is for when that fails: the invite or reset mail never arrives,
+ * the link expired, or the custom SMTP credentials are revoked. The only way
+ * left to set a password directly is the Supabase Auth admin API with the
+ * service-role key, which is why this is a script an owner runs by hand, not
+ * a UI button.
+ *
+ * NOTE (history): until 2026-09-29 this script was the ONLY recovery path,
+ * because the project had no custom SMTP and Supabase's built-in email
+ * service only delivers to members of the project's own team — it could not
+ * reach a BD at all. That is no longer true; do not reach for this script
+ * before trying the email paths above.
+ *
+ * LIMITATION: this sets the password and NOTHING else. It does not touch
+ * `email_confirmed_at`, so it CANNOT onboard a BD who was invited but never
+ * accepted: src/lib/queries.ts#getCurrentBd signs out anyone whose email is
+ * unconfirmed and redirects to /login?error=not_authorized, password or no
+ * password. Such a BD needs the invite accepted (or the email confirmed
+ * separately) first.
  *
  * Defaults to a DRY RUN: read-only, resolves the target `bd` row AND the
  * matching `auth.users` row (see src/lib/auth/bdAuthResolveDb.ts,
@@ -151,9 +169,10 @@ async function executeBdPasswordReset(params: {
         authUserId: target.authUser.id,
         irreversible: true,
         note:
-          "Password was reset via the Supabase admin API (no custom SMTP yet — " +
-          "see src/lib/auth/passwordReset.ts). There is no revert path; if this " +
-          "was a mistake, run the script again for the correct target.",
+          "Password was set directly via the Supabase Auth admin API, the " +
+          "owner-run fallback for when the email paths (/forgot-password, or " +
+          "an invite link) do not reach the BD. There is no revert path; if " +
+          "this was a mistake, run the script again for the correct target.",
       },
     });
     return { temporaryPassword, auditWritten: true };
