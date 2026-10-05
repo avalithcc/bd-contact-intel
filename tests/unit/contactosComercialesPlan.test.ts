@@ -130,3 +130,14 @@ test("the report prints counts only and names the marker property", async () => 
   assert.match(text, /history marker 'nameInferred'\): 1/);
   for (const leak of ["secret", "Zed", "5555"]) assert.ok(!text.includes(leak), leak);
 });
+
+test("a new contact with no name at all is created and counted", () => {
+  const plan = buildComercialPlan([r({ email: "a@x.example", firstName: null, lastName: null }), r({ email: "b@x.example", firstName: null }), r({ email: "c@x.example" })], ctx(), genId);
+  assert.equal(plan.creates.length, 3);
+  assert.equal(plan.report.createdWithoutName, 1);
+});
+
+test("a company made only of suffixes yields a null company_key, never an empty string", () => {
+  const [p] = buildComercialPlan([r({ email: "a@x.example", company: "Inc." })], ctx(), genId).creates;
+  assert.equal(p!.companyKey, null);
+});

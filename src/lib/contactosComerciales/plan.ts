@@ -70,6 +70,8 @@ export interface ComercialReport {
   rowsWithLastContact: number;
   inferredNamesLoaded: number;
   inferredNamesOnExisting: number;
+  /** New contacts with neither first nor last name: an email and nothing else to call them by. */
+  createdWithoutName: number;
 }
 
 export interface ComercialPlan {
@@ -104,7 +106,7 @@ export function buildComercialPlan(rowsIn: readonly ComercialRow[], ctx: PlanCon
   const report: ComercialReport = {
     rowsParsed: rowsIn.length, duplicatesInFile: 0, matched: 0, ambiguous: 0, skippedOwnCompany: 0, toCreate: 0, newWithPhone: 0,
     phonePersonsFilled: 0, phoneColumnsFilled: 0, skippedHasPhone: 0, extensionsDropped: 0, extensionsDroppedInFile: 0,
-    invalidNumbers: 0, extraNumbersDropped: 0, rowsWithLastContact: rowsIn.filter((r) => r.lastContact).length, inferredNamesLoaded: 0, inferredNamesOnExisting: 0,
+    invalidNumbers: 0, extraNumbersDropped: 0, rowsWithLastContact: rowsIn.filter((r) => r.lastContact).length, inferredNamesLoaded: 0, inferredNamesOnExisting: 0, createdWithoutName: 0,
   };
   const creates: NewPerson[] = [];
   const fills: PhoneFill[] = [];
@@ -179,12 +181,13 @@ export function buildComercialPlan(rowsIn: readonly ComercialRow[], ctx: PlanCon
       phone: first?.value ?? null,
       mobilePhone: second?.value ?? null,
       company: row.company,
-      companyKey: row.company ? resolveHotelCompanyKey(row.company, ctx.companyAliasByKey) : null,
+      companyKey: (row.company && resolveHotelCompanyKey(row.company, ctx.companyAliasByKey)) || null,
       ownerBdId: ctx.ownerBdId,
       status: "new",
       sourceKey: CONTACTOS_SOURCE_KEY,
     });
     report.toCreate++;
+    if (!row.firstName && !row.lastName) report.createdWithoutName++;
     if (first) report.newWithPhone++;
     storedExt();
     if (row.nameInferred) {
@@ -195,4 +198,3 @@ export function buildComercialPlan(rowsIn: readonly ComercialRow[], ctx: PlanCon
   return { creates, fills, historyRows, report };
 }
 
-const rowsRead = (rows: readonly ComercialRow[]) => rows.filter((r) => r.lastContact).length;

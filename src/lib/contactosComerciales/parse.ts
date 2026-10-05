@@ -11,6 +11,7 @@
  * phone in the TELÉFONO column, a job title in the EMPRESA column (ignored),
  * or the "(inferido del mail)" marker in the APELLIDO column.
  */
+import { isValidPhoneFormat } from "@/lib/phone";
 
 export interface ComercialRow {
   firstName: string | null;
@@ -128,7 +129,6 @@ export function normalizeComercialPhone(raw: string): ComercialPhone {
   return stripped === raw.trim() ? check(stripped, false) : check(stripped, true);
 }
 
-import { isValidPhoneFormat } from "@/lib/phone";
 function check(value: string, extensionDropped: boolean): ComercialPhone {
   return isValidPhoneFormat(value) ? { value, extensionDropped, invalid: false } : { value: null, extensionDropped: false, invalid: true };
 }

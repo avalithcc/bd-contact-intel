@@ -20,6 +20,7 @@ export function formatComercialReport(plan: ComercialPlan): string[] {
     `Invalid numbers (nothing stored): ${r.invalidNumbers}`,
     `Valid numbers beyond the second (no column, not stored): ${r.extraNumbersDropped}`,
     `Inferred names loaded on new contacts (history marker '${NAME_INFERRED_PROPERTY}'): ${r.inferredNamesLoaded}   (on existing contacts, left untouched: ${r.inferredNamesOnExisting})`,
+    `New contacts with NO name (email only; they can be found and called, but show no name in the CRM): ${r.createdWithoutName}`,
     `Rows carrying a last-contact date: ${r.rowsWithLastContact}   (NOT written anywhere; no activity is created)`,
   ];
 }

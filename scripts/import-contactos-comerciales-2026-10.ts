@@ -5,7 +5,7 @@
  * {parse,plan,report}.ts (unit-tested); db.ts does the writes.
  *
  * INPUT: the text of the PDF, never the PDF itself (no parsing dependency):
- *   pdftotext -layout "backups/contactos-comerciales 1.pdf" contactos.txt
+ *   pdftotext -layout "backups/contactos-comerciales 1.pdf" backups/contactos.txt
  * The PDF and the text hold personal data and are NEVER copied into the repo
  * (backups/ is gitignored); the report prints counts only.
  *
@@ -35,7 +35,7 @@
  *
  * PHONES: the PDF does not say landline or mobile. The first valid number goes
  * to `phone`, a second one to `mobile_phone`; the column names carry no
- * meaning here. Numbers are validated with src/lib/phone.ts. An extension
+ * meaning here (not known whether the first PDF number is usually the mobile). Numbers are validated with src/lib/phone.ts. An extension
  * ("ext 1016") is DROPPED so tel: and WhatsApp links keep working (counted in
  * the report); a rejected number stores nothing (counted).
  *
@@ -48,21 +48,19 @@
  * IDEMPOTENT: a re-run matches the created contacts by email (no duplicates)
  * and sees filled phones as "already has one" (no re-fill).
  *
- * IRREVERSIBLE PARTS: none by itself. REVERT (one audit_log row, action
- * 'import_contactos_comerciales_2026_10'; metadata has createdPersonIds and
- * filledPersonIds). Only safe while nobody has acted on these contacts:
- *   DELETE FROM person WHERE id IN (<createdPersonIds>);
- *   UPDATE person SET phone = NULL, mobile_phone = NULL WHERE id IN (<filledPersonIds>);
- *   DELETE FROM person_property_history WHERE source = 'import'
- *     AND property IN ('phone', 'mobilePhone') AND person_id IN (<filledPersonIds>);
- * Run them in one transaction.
+ * REVERT: use scripts/revert-contactos-comerciales-2026-10.ts (dry run by
+ * default). Do NOT hand-write DELETEs: every table that references person
+ * cascades on delete, so an unguarded DELETE would also destroy activities,
+ * tasks and notes a BD logged on these contacts after the import. The one
+ * audit_log row (action 'import_contactos_comerciales_2026_10') carries the
+ * createdPersonIds and filledPersonIds that script reads.
  *
  * EXIT CODES: 0 success (dry run or write); 1 bad arguments, parse failure
  * (zero contacts found), missing bd, or any failed check (nothing written).
  *
  * Usage (do NOT run --execute automatically: this touches the real database):
- *   npx tsx --env-file=.env.local scripts/import-contactos-comerciales-2026-10.ts <contactos.txt>
- *   npx tsx --env-file=.env.local scripts/import-contactos-comerciales-2026-10.ts <contactos.txt> --execute --actor=<bd id>
+ *   npx tsx --env-file=.env.local scripts/import-contactos-comerciales-2026-10.ts <backups/contactos.txt>
+ *   npx tsx --env-file=.env.local scripts/import-contactos-comerciales-2026-10.ts <backups/contactos.txt> --execute --actor=<bd id>
  */
 import { readFileSync } from "node:fs";
 import { dryRunComerciales, executeComerciales } from "../src/lib/contactosComerciales/db";
