@@ -16,6 +16,7 @@
  */
 import type { NewPerson, NewPersonPropertyHistory } from "@/db/schema";
 import type { EmailStatus } from "@/lib/identity/matcher";
+import { OWNER_HISTORY_PROPERTIES } from "@/lib/identity/ownerRule";
 
 type HistoryRow = Omit<NewPersonPropertyHistory, "id" | "at">;
 
@@ -57,6 +58,19 @@ export interface HubSpotRefillPlan {
   changed: boolean;
   personUpdate: Partial<NewPerson> | null;
   historyRows: HistoryRow[];
+}
+
+/**
+ * Sticky manual owner (ownerRule.ts): for a person whose owner a BD set by
+ * hand, drops the owner fill and its history row from a refill plan. Pure:
+ * returns a new plan, never mutates `plan`.
+ */
+export function stripOwnerFromRefill(plan: HubSpotRefillPlan): HubSpotRefillPlan {
+  if (!plan.personUpdate || !("ownerBdId" in plan.personUpdate)) return plan;
+  const { ownerBdId: _dropped, ...personUpdate } = plan.personUpdate;
+  const historyRows = plan.historyRows.filter((h) => !OWNER_HISTORY_PROPERTIES.includes(h.property));
+  if (!Object.keys(personUpdate).some((k) => k !== "updatedAt")) return { changed: false, personUpdate: null, historyRows: [] };
+  return { changed: true, personUpdate, historyRows };
 }
 
 function hasValue(v: string | null): boolean {

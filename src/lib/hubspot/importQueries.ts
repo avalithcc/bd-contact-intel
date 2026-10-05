@@ -16,7 +16,8 @@ import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, auditLog, bd, company, migrationRun, person, personIdMap, personPropertyHistory } from "@/db/schema";
 import type { HubSpotContactRow } from "@/lib/hubspot/contacts";
-import type { HubSpotRefillExistingPerson } from "@/lib/hubspot/refill";
+import { stripOwnerFromRefill, type HubSpotRefillExistingPerson } from "@/lib/hubspot/refill";
+import { readManualOwnerPersonIds } from "@/lib/identity/ownerRuleDb";
 import { statusBackfillIdempotencyKey, type StatusEvidenceStatus } from "@/lib/hubspot/statusEvidence";
 import { hubspotLegacyId } from "@/lib/hubspot/uuidv5";
 import {
@@ -258,13 +259,19 @@ export async function finalizeHubSpotExecute(input: FinalizeHubSpotExecuteInput)
     // person_property_history(source:'import') row. `r.personId` always
     // comes from readExistingHubspotPersonIds' person_id_map read (a real
     // id already), never a plan ref — guarded defensively anyway.
+    // Sticky manual owner: one read for the whole refill set, never per row.
+    const manualOwnerIds = await readManualOwnerPersonIds(
+      tx,
+      plan.refillPlans.map((r) => r.personId),
+    );
     for (const batch of chunk(plan.refillPlans, WRITE_BATCH_SIZE)) {
       for (const r of batch) {
-        if (!r.plan.changed || !r.plan.personUpdate) continue;
+        const refill = manualOwnerIds.has(r.personId) ? stripOwnerFromRefill(r.plan) : r.plan;
+        if (!refill.changed || !refill.personUpdate) continue;
         assertPersonUuid(r.personId, "refill personUpdate");
-        await tx.update(person).set(r.plan.personUpdate).where(eq(person.id, r.personId));
-        if (r.plan.historyRows.length) {
-          await tx.insert(personPropertyHistory).values(r.plan.historyRows);
+        await tx.update(person).set(refill.personUpdate).where(eq(person.id, r.personId));
+        if (refill.historyRows.length) {
+          await tx.insert(personPropertyHistory).values(refill.historyRows);
         }
         touchedPersonIds.add(r.personId);
       }

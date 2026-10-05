@@ -12,6 +12,7 @@ import {
   type InsertedLeadRow,
 } from "@/lib/identity/ingestWrite";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import {
   applyIdentityWrites,
@@ -20,6 +21,7 @@ import {
   withIdentityLock,
 } from "@/lib/identity/resolveDb";
 import { recomputePersonStatus } from "@/lib/status/recompute";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 // Cap on whitespace-separated search tokens in the free-text name filter, so
 // a pathological paste-in doesn't blow up the query into dozens of OR'd
@@ -494,12 +496,14 @@ export async function updateLeadStatus(
 }
 
 /**
- * Reassign a lead's owner. Any signed-in BD may do this. The unified
- * person's `owner_bd_id` only follows this edit when nobody is connected to
- * them yet (no `person_bd_connection` row) — otherwise R3 (earliest
- * LinkedIn connector) already governs the owner and this edit must not
- * override it. DB-only glue (raw SQL): the R3 gate is a single `NOT EXISTS`
- * clause, not meaningfully unit-testable without DATABASE_URL — same
+ * Reassign a lead's owner. Admin-only (manual reassignment). The unified
+ * person's `owner_bd_id` ALWAYS follows this edit (the old R3 "no connection
+ * yet" gate silently dropped it for every LinkedIn-imported person), and the
+ * `source = 'edit'` history row marks the owner as manual, so the automatic
+ * last-worked rule never overrides it (src/lib/identity/ownerRule.ts).
+ * Currently has no caller outside this file (the UI goes through
+ * bulkAssignOwner); kept as the legacy-lead write path.
+ * DB-only glue (raw SQL), not unit-testable without DATABASE_URL — same
  * convention as the rest of this write-cutover's thin DB layer.
  */
 export async function updateLeadOwner(
@@ -507,6 +511,7 @@ export async function updateLeadOwner(
   updatedByBdId: string,
   ownerBdId: string | null,
 ): Promise<void> {
+  await requireAdmin();
   if (!UUID_RE.test(id)) return;
   const dualWriteEnabled = isIdentityDualWriteEnabled();
 
@@ -524,7 +529,6 @@ export async function updateLeadOwner(
         from person_id_map m
         join person p on p.id = m.person_id
         where m.legacy_table = 'lead' and m.legacy_id = ${id}
-          and not exists (select 1 from person_bd_connection c where c.person_id = p.id)
       ),
       updated as (
         update person
@@ -534,7 +538,7 @@ export async function updateLeadOwner(
         returning person.id, target.old_owner_bd_id
       )
       insert into person_property_history (person_id, property, old_value, new_value, changed_by_bd_id, source)
-      select id, 'owner_bd_id', old_owner_bd_id::text, ${ownerBdId}::text, ${updatedByBdId}, 'edit'
+      select id, ${OWNER_HISTORY_PROPERTY}::text, old_owner_bd_id::text, ${ownerBdId}::text, ${updatedByBdId}, ${MANUAL_OWNER_SOURCE}::text
       from updated
     `);
   });

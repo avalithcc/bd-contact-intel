@@ -24,6 +24,7 @@ import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/cont
 import { MeetingDateRequiredError, MeetingOccurredAtInFutureError } from "@/lib/contacts/meeting";
 import { CallOccurredAtInFutureError, CallOutcomeRequiredError } from "@/lib/contacts/call";
 import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
 
@@ -56,7 +57,7 @@ export type ContactActionErrorReason =
   | "email_subject_required"
   | "email_body_required"
   | "owner_invalid"
-  | "owner_locked"
+  | "admin_required"
   | "company_not_found"
   | "unexpected"
   // Client-side only: the request threw (dropped connection, HTTP 500), so
@@ -69,16 +70,6 @@ export class OwnerValueInvalidError extends Error {
   constructor() {
     super("Owner value is not a blank string or a valid uuid");
     this.name = "OwnerValueInvalidError";
-  }
-}
-
-/** R3 blocked the reassignment: the person already has a
- * `person_bd_connection` row (same rule as updateLeadOwner/bulkAssignOwner —
- * see design.md R3). */
-export class OwnerReassignLockedError extends Error {
-  constructor() {
-    super("Owner cannot be reassigned: person already has a connected BD (R3)");
-    this.name = "OwnerReassignLockedError";
   }
 }
 
@@ -140,8 +131,9 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   // A task's assignee `<select>` reuses the same "owner_invalid" message
   // (l.errorOwnerInvalid) — both mean "pick a real, valid BD".
   if (err instanceof InvalidAssigneeError) return "owner_invalid";
-  if (err instanceof OwnerReassignLockedError) return "owner_locked";
   if (err instanceof CompanyNotFoundError) return "company_not_found";
+  // Manual owner reassignment is admin-only; shown, never a 404 (/contacts stays open to every BD).
+  if (err instanceof AdminRequiredError) return "admin_required";
   return "unexpected";
 }
 

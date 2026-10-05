@@ -729,9 +729,8 @@ export const en = {
     emptyValue: "—",
     lastUpdatedByPrefix: "Last updated by",
     ownerUnassignedOption: "Unassigned",
-    ownerLockedNote: "Can't reassign: already has a connected BD.",
-    errorOwnerLocked: "Can't reassign the owner: this contact already has a connected BD.",
     errorOwnerInvalid: "Select a valid owner.",
+    errorAdminRequired: "Only an administrator can reassign the owner.",
     quickActionNote: "Note",
     quickActionCall: "Call",
     quickActionEmail: "Email",
@@ -1028,7 +1027,6 @@ export const en = {
 
   // Server-only formatter templates — see the matching comment in es.ts.
   contactRecordServer: {
-    ownerHintOldestConnection: (date: string) => `Oldest connection (${date})`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence}% confidence · updated by ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "an email was sent",
@@ -2032,8 +2030,9 @@ export const en = {
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
-        ? `Owner assigned to ${assigned}. ${skipped} skipped (already has a connected BD).`
+        ? `Owner assigned to ${assigned}. ${skipped} skipped (no longer available).`
         : `Owner assigned to ${assigned}.`,
+    bulkResultOwnerForbidden: "Only an administrator can reassign the owner.",
     bulkResultTask: (created: number) => `${created} task(s) created.`,
     layoutTable: "Table",
     layoutBoard: "Board",

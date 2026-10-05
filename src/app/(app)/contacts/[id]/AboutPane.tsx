@@ -34,8 +34,9 @@ export interface AboutPaneProps {
   linkedinHref: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
-  ownerLocked: boolean;
   ownerOptions: OwnerOption[];
+  // Manual owner reassignment is admin-only; false hides the edit control.
+  canReassignOwner: boolean;
   // Same `bd` list as `ownerOptions`, handed to the "Tarea" quick action's
   // assignee `<select>` (task-essentials backlog item 2) — a separate prop
   // because it's conceptually a different picker (task assignee, not
@@ -44,7 +45,6 @@ export interface AboutPaneProps {
   // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
   // on the "Tarea" quick action's assignee `<select>`.
   meId: string;
-  ownerHint: string | null;
   email: string | null;
   hunterHint: string | null;
   sourceText: string | null;
@@ -84,11 +84,10 @@ export function AboutPane({
   linkedinHref,
   ownerLabel,
   ownerBdId,
-  ownerLocked,
   ownerOptions,
+  canReassignOwner,
   assigneeOptions,
   meId,
-  ownerHint,
   email,
   hunterHint,
   sourceText,
@@ -166,9 +165,8 @@ export function AboutPane({
         statusReasonText={statusReasonText}
         ownerLabel={ownerLabel}
         ownerBdId={ownerBdId}
-        ownerLocked={ownerLocked}
         ownerOptions={ownerOptions}
-        ownerHint={ownerHint}
+        canReassignOwner={canReassignOwner}
         emailVerified={emailVerified}
         emailInferred={emailInferred}
         hunterHint={hunterHint}

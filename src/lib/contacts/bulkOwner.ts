@@ -1,11 +1,10 @@
 /**
- * Pure planner for the `/contacts` list's bulk "Asignar responsable" action
- * (task 13.2; mockup `.bulk-bar` "Asignar responsable"; orchestrator
- * decision: same R3 rule as updateLeadOwner — "owner set only when the
- * person has no person_bd_connection yet" — applied per row, with a
- * per-row outcome reported back instead of a silent no-op on skipped rows).
- * No I/O here — the DB glue (bulkOwnerDb.ts) reads which selected persons
- * already have a connection and calls this to decide the plan.
+ * Pure helpers for the `/contacts` list's bulk "Asignar responsable" action
+ * (task 13.2; mockup `.bulk-bar` "Asignar responsable"). A manual
+ * reassignment always applies: the old R3 gate ("only when the person has no
+ * person_bd_connection") is gone, and the change is recorded as a manual
+ * `edit` that the automatic owner rule never overrides (see
+ * src/lib/identity/ownerRule.ts). No I/O here — the DB glue is bulkOwnerDb.ts.
  */
 import { isUuid } from "@/lib/uuid";
 
@@ -19,25 +18,6 @@ export const MAX_BULK_SELECTION = 200;
  * exists to bound a plain checked-boxes POST). Owner decision: 2,000. */
 export const BULK_FILTER_TARGET_CAP = 2000;
 
-export interface BulkOwnerRowInput {
-  personId: string;
-  hasConnection: boolean;
-}
-
-export type BulkOwnerOutcome = "assigned" | "skipped_has_connection";
-
-export interface BulkOwnerPlanRow {
-  personId: string;
-  outcome: BulkOwnerOutcome;
-}
-
-export function planBulkOwnerAssignment(rows: BulkOwnerRowInput[]): BulkOwnerPlanRow[] {
-  return rows.map((row) => ({
-    personId: row.personId,
-    outcome: row.hasConnection ? "skipped_has_connection" : "assigned",
-  }));
-}
-
 /**
  * Normalizes a single `<select>` owner value (task 13.3 parity gap:
  * single-record owner reassignment on `/contacts/[id]`, reusing bulkAssignOwner
@@ -49,6 +29,26 @@ export function planBulkOwnerAssignment(rows: BulkOwnerRowInput[]): BulkOwnerPla
 export function normalizeOwnerSelectValue(raw: string): string | null | undefined {
   if (raw === "") return null;
   return isUuid(raw) ? raw : undefined;
+}
+
+export interface OwnerAssignmentPlan {
+  /** Persons whose owner really changes: the only ones whose row, updated_at and audit entry are written. */
+  toUpdate: string[];
+  /** One manual-owner marker per person that does not already have one, INCLUDING persons whose owner stays the same (picking the current owner confirms it). */
+  history: { personId: string; oldValue: string | null }[];
+}
+
+/** Pure; never mutates its inputs. `manualPersonIds` = persons that already carry the manual-owner marker. */
+export function planOwnerAssignment(
+  rows: readonly { id: string; ownerBdId: string | null }[],
+  ownerBdId: string | null,
+  manualPersonIds: ReadonlySet<string>,
+): OwnerAssignmentPlan {
+  const toUpdate = rows.filter((r) => r.ownerBdId !== ownerBdId).map((r) => r.id);
+  const history = rows
+    .filter((r) => r.ownerBdId !== ownerBdId || !manualPersonIds.has(r.id))
+    .map((r) => ({ personId: r.id, oldValue: r.ownerBdId }));
+  return { toUpdate, history };
 }
 
 /** Shared by both bulk actions (assign owner, create task): validates every

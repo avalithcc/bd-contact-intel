@@ -654,9 +654,8 @@ export const es: typeof en = {
     emptyValue: "—",
     lastUpdatedByPrefix: "Última actualización por",
     ownerUnassignedOption: "Sin responsable",
-    ownerLockedNote: "No se puede reasignar: ya tiene un BD conectado.",
-    errorOwnerLocked: "No se puede reasignar el responsable: este contacto ya tiene un BD conectado.",
     errorOwnerInvalid: "Seleccionar un responsable válido.",
+    errorAdminRequired: "Solo un administrador puede reasignar el responsable.",
     quickActionNote: "Nota",
     quickActionCall: "Llamada",
     quickActionEmail: "Correo",
@@ -973,7 +972,6 @@ export const es: typeof en = {
   // final plain strings from these templates via describeStatusReason()/
   // inline formatting, and only ever passes the RESULT down as a prop.
   contactRecordServer: {
-    ownerHintOldestConnection: (date: string) => `Conexión más antigua (${date})`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "se envió un correo",
@@ -2001,8 +1999,9 @@ export const es: typeof en = {
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
-        ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya tiene un BD conectado).`
+        ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya no está disponible).`
         : `Responsable asignado a ${assigned}.`,
+    bulkResultOwnerForbidden: "Solo un administrador puede reasignar el responsable.",
     bulkResultTask: (created: number) => `${created} tarea(s) creada(s).`,
     layoutTable: "Tabla",
     layoutBoard: "Tablero",

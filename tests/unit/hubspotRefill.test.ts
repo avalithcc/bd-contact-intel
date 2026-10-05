@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   planHubSpotRefill,
+  stripOwnerFromRefill,
   type HubSpotRefillExistingPerson,
   type HubSpotRefillIncoming,
 } from "@/lib/hubspot/refill";
@@ -121,4 +122,27 @@ test("no-op refill (nothing empty, nothing to fill) reports changed:false and wr
 test("an incoming blank/null value never fills anything (nothing to fill from)", () => {
   const plan = planHubSpotRefill(existing({ jobTitle: null }), incoming({ jobTitle: null }));
   assert.equal(plan.changed, false);
+});
+
+test("stripOwnerFromRefill: a manually unassigned person keeps no owner and no owner history row", () => {
+  const plan = planHubSpotRefill(existing({ ownerBdId: null, city: null }), incoming({ ownerBdId: "bd-new", city: "CABA" }));
+  const stripped = stripOwnerFromRefill(plan);
+  assert.equal(stripped.changed, true);
+  assert.equal("ownerBdId" in stripped.personUpdate!, false);
+  assert.equal(stripped.personUpdate!.city, "CABA");
+  assert.deepEqual(stripped.historyRows.map((h) => h.property), ["city"]);
+});
+
+test("stripOwnerFromRefill: a refill that only filled the owner becomes a no-op", () => {
+  const plan = planHubSpotRefill(existing({ ownerBdId: null }), incoming({ ownerBdId: "bd-new" }));
+  assert.equal(plan.changed, true);
+  assert.deepEqual(stripOwnerFromRefill(plan), { changed: false, personUpdate: null, historyRows: [] });
+});
+
+test("stripOwnerFromRefill never mutates its input and is repeatable", () => {
+  const plan = planHubSpotRefill(existing({ ownerBdId: null, city: null }), incoming({ ownerBdId: "bd-new", city: "CABA" }));
+  const before = JSON.stringify(plan);
+  assert.deepEqual(stripOwnerFromRefill(plan), stripOwnerFromRefill(plan));
+  assert.equal(JSON.stringify(plan), before);
+  assert.equal(plan.personUpdate!.ownerBdId, "bd-new");
 });

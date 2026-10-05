@@ -10,13 +10,15 @@
  * selection state is client-side, see BulkActionsBar.tsx).
  *
  * Every action redirects back to the current view with a `?bulkResult=`
- * summary in the query string instead of throwing, so a partial R3 skip
- * (bulk owner) or a truncated selection (MAX_BULK_SELECTION) surfaces as a
+ * summary in the query string instead of throwing, so a partial result
+ * (bulk owner: persons no longer available) or a truncated selection (MAX_BULK_SELECTION) surfaces as a
  * Spanish banner (page.tsx) rather than an opaque error.
  */
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
 import { isUuid } from "@/lib/uuid";
 import { BULK_FILTER_TARGET_CAP, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
@@ -90,7 +92,15 @@ async function resolveBulkTargetIds(formData: FormData, meBdId: string, idCap: n
 }
 
 export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
-  const me = await getCurrentBd();
+  // Manual owner reassignment is admin-only (the hidden control is a courtesy;
+  // this is the boundary). Not a 404: /contacts stays open to every BD.
+  let me;
+  try {
+    me = await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminRequiredError) redirect(backTo(formData, { bulkResult: "owner:forbidden" }));
+    throw err;
+  }
   const { ids: sanitizedIds, wasLimited, mode, filtersQuery } = await resolveBulkTargetIds(
     formData,
     me.id,
@@ -100,13 +110,13 @@ export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
   const ownerBdId = rawOwner && isUuid(rawOwner) ? rawOwner : null;
   if (rawOwner && !ownerBdId) redirect(backTo(formData, { bulkResult: "owner:0:0" }));
 
-  const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, {
+  const assigned = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, {
     idCap: BULK_FILTER_TARGET_CAP,
     mode,
     filtersQuery,
   });
-  const assigned = plan.filter((p) => p.outcome === "assigned").length;
-  const skipped = plan.filter((p) => p.outcome === "skipped_has_connection").length;
+  // Anything not assigned was no longer a live person (merged away or deleted).
+  const skipped = sanitizedIds.length - assigned;
 
   revalidatePath("/contacts");
   redirect(

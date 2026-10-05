@@ -56,13 +56,8 @@ export interface PropertyListProps {
   statusReasonText: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
-  // R3 (design.md): reassignment is only allowed while the person has no
-  // `person_bd_connection` row yet — same rule bulkAssignOwner enforces
-  // server-side; this only decides whether to render the picker as busy/
-  // disabled instead of silently letting a doomed request through.
-  ownerLocked: boolean;
   ownerOptions: OwnerOption[];
-  ownerHint: string | null;
+  canReassignOwner: boolean;
   emailVerified: boolean;
   // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — renders
   // "Deducido" next to the value, same spot as the verified badge (mutually
@@ -97,9 +92,8 @@ export function PropertyList({
   statusReasonText,
   ownerLabel,
   ownerBdId,
-  ownerLocked,
   ownerOptions,
-  ownerHint,
+  canReassignOwner,
   emailVerified,
   emailInferred,
   hunterHint,
@@ -205,15 +199,13 @@ export function PropertyList({
             ) : (
               l.emptyValue
             )}
-            {!ownerLocked && (
+            {canReassignOwner && (
               <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={() => setOwnerEditing(true)} aria-label={l.edit}>
                 <EditPencilIcon className="icon" />
               </button>
             )}
           </dd>
         )}
-        {ownerLocked && <dd className="hint">{l.ownerLockedNote}</dd>}
-        {!ownerLocked && ownerHint && <dd className="hint">{ownerHint}</dd>}
       </div>
 
       {properties.map((prop) => (

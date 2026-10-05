@@ -10,6 +10,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, bd, company, companyAlias, person, personPropertyHistory } from "@/db/schema";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
+import { readManualOwnerPersonIds } from "@/lib/identity/ownerRuleDb";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import type { AttendeeRecord } from "./buildAttendeeRecords";
 import {
@@ -82,7 +83,9 @@ async function buildImportContext(tx: DbTransaction, records: readonly AttendeeR
     : [];
   const existingCompaniesByKey = new Map(companyRows.map((r) => [r.companyKey, r]));
 
-  return { marielBdId, bdNamesById, existingPersonsByEmail, companyAliasByKey, existingCompaniesByKey };
+  const manualOwnerIds = await readManualOwnerPersonIds(tx, existingPersonsRows.map((r) => r.id));
+
+  return { marielBdId, manualOwnerIds, bdNamesById, existingPersonsByEmail, companyAliasByKey, existingCompaniesByKey };
 }
 
 /** Read-only — the dry-run path. Wrapped in a transaction for the same

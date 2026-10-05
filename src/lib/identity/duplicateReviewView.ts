@@ -62,6 +62,7 @@ export interface DuplicatePairPreviewInput {
   mergedConnections: readonly MergeConnection[];
 }
 
+/** Preview only: passes no activity touches or manual-owner markers, so its owner can diverge from the real merge (callers read only the field-merge outcome). */
 export function previewMergeOutcome(input: DuplicatePairPreviewInput): MergePlan {
   return planMerge({
     survivor: input.survivor,

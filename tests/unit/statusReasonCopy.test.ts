@@ -13,7 +13,6 @@ import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { StatusReasonEvidence } from "@/lib/status/deriveStatus";
 
 const serverStrings: Dictionary["contactRecordServer"] = {
-  ownerHintOldestConnection: (date) => `Conexión más antigua (${date})`,
   hunterHint: (confidence, name, date) => `Hunter · ${confidence} % de confianza · actualizado por ${name}, ${date}`,
   statusReasonSourceEmail: "se envió un correo",
   statusReasonSourceMeeting: "se registró una reunión",

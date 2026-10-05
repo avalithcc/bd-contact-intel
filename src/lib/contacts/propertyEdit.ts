@@ -8,9 +8,9 @@
  * diverge.
  *
  * Deliberately scoped to plain scalar columns: `ownerBdId` (Responsable in
- * the mockup) is excluded — reassigning the owner has its own business rule
- * (design R3: "owner set only when the person has no person_bd_connection
- * yet") that a generic property editor would bypass. `status` is excluded
+ * the mockup) is excluded — reassigning the owner has its own write path
+ * (bulkAssignOwner: manual-owner marker + audit row, see ownerRule.ts) that a
+ * generic property editor would bypass. `status` is excluded
  * per design D4 (a derived cache, never edited directly). Owner reassignment
  * is left as a documented gap for a later phase.
  */

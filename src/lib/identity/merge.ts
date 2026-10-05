@@ -4,8 +4,8 @@
  * `merged` into `survivor`: property conflicts resolve via the existing
  * `mergeProperties`/`mergeProperty` rules (contact-identity R7, same
  * functions the migration and live resolver already use), the owner
- * follows the "earliest connector, lead-owner fallback" rule (R3), and
- * every reference (activity/task/signal/person_id_map/duplicate_candidate)
+ * follows the last-worked rule (ownerRule.ts; R3 changed 2026-10-05, a manual
+ * owner is sticky), and every reference (activity/task/signal/person_id_map/duplicate_candidate)
  * is moved set-based.
  *
  * Safe unmerge (fresh-review fix): the snapshot records field-level and
@@ -23,6 +23,7 @@
  */
 import { classifyPosition } from "@/lib/roleGroups";
 import { mergeProperties, mergeProperty, emailStatusRank, type EmailStatus, type PropertyLoss } from "@/lib/identity/matcher";
+import { pickOwnerByLastWorked, type OwnerTouch } from "@/lib/identity/ownerRule";
 import { parseConnectedOnDate } from "@/lib/migration/connectedOn";
 
 // --- Row shapes (subset of src/db/schema.ts's person/personBdConnection) ---
@@ -188,6 +189,12 @@ export interface PlanMergeInput {
   // Survivor's email_message_person rows sharing an emailMessageId with one
   // of the above — the only rows that can collide (see mergeDb.ts's query).
   survivorEmailMessagePersonRows: readonly EmailMessagePersonRow[];
+  // Per-BD latest activity on either person (ownerRuleDb.ts#readOwnerTouches);
+  // absent = only connection last-message times count.
+  ownerTouches?: readonly OwnerTouch[];
+  // Sticky manual owner markers (ownerRuleDb.ts#readManualOwnerPersonIds).
+  survivorHasManualOwner?: boolean;
+  mergedHasManualOwner?: boolean;
   queueItemRowsOnMerged: readonly FollowUpQueueItemRow[];
   // Survivor's follow_up_queue_item rows sharing a (bdId, queueDate) with one
   // of the above — the only rows that can collide (see mergeDb.ts's query).
@@ -348,16 +355,21 @@ function fillBlank(survivorValue: string | null, mergedValue: string | null): { 
   return { value: mergedHas ? mergedValue : survivorValue, loss: null };
 }
 
-/** Earliest parsed connectedOn wins ownership (R3); no parseable connection falls back to the lead's existing owner. */
-function pickOwner(survivor: MergePersonFields, merged: MergePersonFields, connections: readonly MergeConnection[]): string | null {
-  let best: { bdId: string; time: number } | null = null;
-  for (const c of connections) {
-    const parsed = parseConnectedOnDate(c.connectedOn);
-    if (!parsed) continue;
-    const time = parsed.getTime();
-    if (!best || time < best.time) best = { bdId: c.bdId, time };
-  }
-  return best?.bdId ?? survivor.ownerBdId ?? merged.ownerBdId;
+/**
+ * Owner on merge: a manual assignment is sticky (survivor's first, then
+ * merged's), otherwise the BD who worked the contact last wins (see
+ * ownerRule.ts; replaces R3's earliest-connector rule). Undecided keeps the
+ * lead's existing owner.
+ */
+function pickOwner(
+  survivor: MergePersonFields,
+  merged: MergePersonFields,
+  connections: readonly MergeConnection[],
+  input: Pick<PlanMergeInput, "ownerTouches" | "survivorHasManualOwner" | "mergedHasManualOwner">,
+): string | null {
+  if (input.survivorHasManualOwner) return survivor.ownerBdId;
+  if (input.mergedHasManualOwner) return merged.ownerBdId;
+  return pickOwnerByLastWorked(connections, input.ownerTouches ?? []) ?? survivor.ownerBdId ?? merged.ownerBdId;
 }
 
 function repointPair(candidate: MergeDuplicateCandidateRow, mergedId: string, survivorId: string): { personAId: string; personBId: string } {
@@ -582,7 +594,7 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     phone: phoneResult.value,
     mobilePhone: mobileResult.value,
     contactType: contactTypeResult.value,
-    ownerBdId: pickOwner(survivor, merged, [...input.survivorConnections, ...input.mergedConnections]),
+    ownerBdId: pickOwner(survivor, merged, [...input.survivorConnections, ...input.mergedConnections], input),
   };
 
   const survivorFieldChanges: SurvivorFieldChange[] = [];

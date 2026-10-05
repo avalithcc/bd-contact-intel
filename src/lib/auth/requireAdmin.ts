@@ -9,7 +9,7 @@
 import { getCurrentBd } from "@/lib/queries";
 import { assertAdminRole } from "@/lib/auth/adminRole";
 
-export { AdminRequiredError, assertAdminRole } from "@/lib/auth/adminRole";
+export { AdminRequiredError, assertAdminRole, isAdminRole } from "@/lib/auth/adminRole";
 
 /**
  * Resolves the current bd (see getCurrentBd) and asserts it is an admin.

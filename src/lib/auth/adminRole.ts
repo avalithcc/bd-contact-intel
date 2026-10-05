@@ -17,5 +17,10 @@ export class AdminRequiredError extends Error {
  * file's tests — don't need a real bd row to exercise the check.
  */
 export function assertAdminRole(bd: { role: string } | null | undefined): void {
-  if (bd?.role !== "admin") throw new AdminRequiredError();
+  if (!isAdminRole(bd)) throw new AdminRequiredError();
+}
+
+/** Non-throwing form of the same predicate, for UI affordances. */
+export function isAdminRole(bd: { role: string } | null | undefined): boolean {
+  return bd?.role === "admin";
 }

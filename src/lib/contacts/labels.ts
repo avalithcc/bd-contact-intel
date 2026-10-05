@@ -122,8 +122,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorEmailBodyRequired;
     case "owner_invalid":
       return l.errorOwnerInvalid;
-    case "owner_locked":
-      return l.errorOwnerLocked;
+    case "admin_required":
+      return l.errorAdminRequired;
     case "company_not_found":
       return l.errorCompanyNotFound;
     case "unexpected":

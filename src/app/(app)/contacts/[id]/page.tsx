@@ -13,6 +13,7 @@ import { resolveConversationDialogParam } from "@/lib/contacts/conversationDialo
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
@@ -147,10 +148,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // non-admin never gets AdminConversationAutoOpen rendered at all, so no
   // modal and no data, no matter what the query string says.
   const autoOpenAdminBdId = isAdmin ? resolveConversationDialogParam(rawConversation) : null;
-  // R3 (design.md): reassignment is only allowed while the person has no
-  // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
-  // enforces server-side for updateContactOwnerAction (task 13.3).
-  const ownerLocked = record.connections.length > 0;
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
@@ -211,12 +208,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
         formatArgentinaDayMonth(record.statusReason.at),
       )
     : null;
-
-  // Oldest connection date for the "Responsable" hint (contact-record.html:78
-  // "Conexión más antigua (14 mar 2019)") — `record.connections` is already
-  // ordered oldest-first (queries.ts `orderBy(asc(connectedOn))`).
-  const oldestConnectedOn = record.connections[0]?.connectedOn ?? null;
-  const ownerHint = oldestConnectedOn ? dict.contactRecordServer.ownerHintOldestConnection(oldestConnectedOn) : null;
 
   // "Correo electrónico" Hunter provenance hint (contact-record.html:79
   // "Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago").
@@ -419,11 +410,10 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           linkedinHref={linkedinProfileHref(record.person.profileKey)}
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}
-          ownerLocked={ownerLocked}
           ownerOptions={ownerOptions}
+          canReassignOwner={isAdminRole(me)}
           assigneeOptions={ownerOptions}
           meId={me.id}
-          ownerHint={ownerHint}
           email={record.person.email}
           hunterHint={hunterHint}
           sourceText={sourceText}

@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AdminRequiredError, assertAdminRole } from "@/lib/auth/adminRole";
+import { AdminRequiredError, assertAdminRole, isAdminRole } from "@/lib/auth/adminRole";
 
 test("assertAdminRole allows a bd with role 'admin'", () => {
   assert.doesNotThrow(() => assertAdminRole({ role: "admin" }));
@@ -22,4 +22,15 @@ test("assertAdminRole rejects a null bd (not authenticated)", () => {
 
 test("assertAdminRole rejects an unrecognized role", () => {
   assert.throws(() => assertAdminRole({ role: "superuser" }), AdminRequiredError);
+});
+
+// isAdminRole drives the owner-edit affordance (canReassignOwner) and shares
+// its predicate with assertAdminRole, so the hidden control and the server
+// gate can never disagree.
+test("isAdminRole is true only for role 'admin'", () => {
+  assert.equal(isAdminRole({ role: "admin" }), true);
+  assert.equal(isAdminRole({ role: "bd" }), false);
+  assert.equal(isAdminRole({ role: "superuser" }), false);
+  assert.equal(isAdminRole(null), false);
+  assert.equal(isAdminRole(undefined), false);
 });
