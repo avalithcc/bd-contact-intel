@@ -8,24 +8,33 @@ import { and, inArray, isNotNull, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { activity, personPropertyHistory } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
-import { hasManualOwner, MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES } from "@/lib/identity/ownerRule";
+import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES } from "@/lib/identity/ownerRule";
 
-type Executor = Pick<typeof db, "select">;
+type Executor = Pick<typeof db, "select" | "selectDistinct">;
 
-/** Ids (among `personIds`, or all) whose owner was set by hand. */
-export async function readManualOwnerPersonIds(executor: Executor, personIds?: readonly string[]): Promise<Set<string>> {
+async function readOwnerHistoryPersonIds(executor: Executor, source: string, personIds?: readonly string[]): Promise<Set<string>> {
   if (personIds && personIds.length === 0) return new Set();
   const rows = await executor
-    .select({ personId: personPropertyHistory.personId, property: personPropertyHistory.property, source: personPropertyHistory.source })
+    .selectDistinct({ personId: personPropertyHistory.personId })
     .from(personPropertyHistory)
     .where(
       and(
         inArray(personPropertyHistory.property, [...OWNER_HISTORY_PROPERTIES]),
-        sql`${personPropertyHistory.source} = ${MANUAL_OWNER_SOURCE}`,
+        sql`${personPropertyHistory.source} = ${source}`,
         personIds ? inArray(personPropertyHistory.personId, [...personIds]) : undefined,
       ),
     );
-  return new Set(rows.filter((r) => hasManualOwner([r])).map((r) => r.personId));
+  return new Set(rows.map((r) => r.personId));
+}
+
+/** Ids (among `personIds`, or all) whose owner was set by hand (see hasManualOwner: same property list and source). */
+export function readManualOwnerPersonIds(executor: Executor, personIds?: readonly string[]): Promise<Set<string>> {
+  return readOwnerHistoryPersonIds(executor, MANUAL_OWNER_SOURCE, personIds);
+}
+
+/** Ids whose owner was ever written by an import (NOT sticky; diagnostic for the backfill dry run). */
+export function readImportOwnerPersonIds(executor: Executor, personIds?: readonly string[]): Promise<Set<string>> {
+  return readOwnerHistoryPersonIds(executor, "import", personIds);
 }
 
 /**

@@ -32,6 +32,12 @@ function groupBy<T extends { personId: string }>(rows: readonly T[]): Map<string
   return map;
 }
 
+/** Counts-only split of planned changes by whether the person has a marker (e.g. a prior import-sourced owner row). */
+export function countChangesWithMarker(changes: readonly OwnerChange[], markedPersonIds: ReadonlySet<string>): { marked: number; unmarked: number } {
+  const marked = changes.filter((c) => markedPersonIds.has(c.personId)).length;
+  return { marked, unmarked: changes.length - marked };
+}
+
 export function planOwnerBackfill(input: OwnerBackfillInput): OwnerBackfillPlan {
   const connectionsByPerson = groupBy(input.connections);
   const touchesByPerson = groupBy(input.touches);
