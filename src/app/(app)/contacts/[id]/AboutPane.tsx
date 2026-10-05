@@ -159,6 +159,7 @@ export function AboutPane({
 
       <PropertyList
         personId={personId}
+        personName={name}
         labels={l}
         statusLabel={statusLabel}
         statusValue={statusValue}

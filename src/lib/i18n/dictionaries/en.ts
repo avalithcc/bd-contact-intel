@@ -1230,6 +1230,21 @@ export const en = {
     neverLogLink: "Never log",
   },
 
+  // Outcome bar after a tel: click (call-logging-one-tap, variant A).
+  callAttempt: {
+    barLabel: "Call outcome",
+    question: "did you talk?",
+    spoke: "We talked",
+    noAnswer: "No answer",
+    voicemail: "Voicemail",
+    noteLabel: "Note (optional)",
+    save: "Save",
+    callSaved: "Call logged",
+    attemptSaved: "Attempt logged",
+    recordError: "The call attempt could not be recorded.",
+    saveError: "The outcome could not be saved. Try again.",
+  },
+
   reconnectBanner: {
     message:
       "Reconnect Gmail to turn on automatic email sync: we'll log your contacts' replies without you having to do anything.",

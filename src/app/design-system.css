@@ -839,10 +839,79 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 }
 
 /* =========================================================================
-   Call-attempt timeline row (call-logging-one-tap mockup, variant A).
-   PROPOSED addition: the system has no timeline row quieter than a real
-   activity. Tokens only.
+   Call outcome bar and call-attempt timeline row
+   call-logging-one-tap mockup, variant A. PROPOSED additions: the system has
+   .toast (dark, leaves on its own) but no dark bar with actions that waits
+   for an answer, and no timeline row quieter than a real activity.
+   Tokens only.
    ========================================================================= */
+.outcome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 300px;
+  max-width: 520px;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-ink);
+  color: var(--color-on-dark);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dialog);
+  font-size: var(--text-base);
+}
+.outcome .who {
+  font-weight: 600;
+}
+.outcome .acts {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-2xs);
+}
+.outcome .obtn {
+  height: var(--control-height-sm);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-on-dark-sep);
+  background: transparent;
+  color: var(--color-on-dark);
+  font: 600 var(--text-sm) var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.outcome .obtn:hover {
+  background: var(--color-on-dark-hover);
+}
+.outcome .obtn.primary {
+  background: var(--color-on-dark);
+  color: var(--color-ink);
+  border-color: var(--color-on-dark);
+}
+.outcome .obtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* "Hablé" opens the optional note in the same bar. */
+.outcome .onote-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+.outcome .onote {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-on-dark-sep);
+  background: transparent;
+  color: var(--color-on-dark);
+  font: var(--text-sm) var(--font-body);
+}
+.outcome .onote::placeholder {
+  color: var(--color-on-dark);
+  opacity: 0.7;
+}
 .try {
   display: flex;
   align-items: center;

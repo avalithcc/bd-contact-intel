@@ -5,6 +5,7 @@ import { pickTopBarSearchLabels } from "@/lib/i18n/topBarSearchLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
+import { CallAttemptProvider } from "@/components/CallAttemptProvider";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { SyncHealthBanner } from "@/components/SyncHealthBanner";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
@@ -51,6 +52,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      <CallAttemptProvider labels={dict.callAttempt}>
       <div className="app">
         <Sidebar
           labels={labels}
@@ -71,6 +73,7 @@ export default async function AppLayout({
           {children}
         </div>
       </div>
+      </CallAttemptProvider>
     </ToastProvider>
   );
 }
