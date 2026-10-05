@@ -58,7 +58,7 @@
  */
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { auditLog, bd, emailAccount } from "../src/db/schema";
+import { auditLog, bd, emailAccount, emailMessage } from "../src/db/schema";
 import { BACKFILL_WINDOW_DAYS } from "../src/lib/gmail/backfillWindow";
 import { planGmailRebackfill, type RebackfillAccountState } from "../src/lib/gmail/rebackfillPlan";
 
@@ -92,9 +92,16 @@ async function main() {
   if (!email) throw new Error("--email=<account email> is required");
   if (args.execute && !args.actor) throw new Error("--execute requires --actor=<bd id> for the audit log");
 
-  // One round trip: the account row plus its stored-message aggregates, as
-  // correlated scalar subqueries (served by email_message_bd_*_idx).
-  const [row] = await db
+  // Two round trips, deliberately NOT one correlated query. Interpolating
+  // `${emailAccount.bdId}` inside a `sql` subquery emits the column
+  // UNQUALIFIED (`"bd_id"`), and Postgres resolves an unqualified name
+  // against the innermost scope first — so `where m.bd_id = "bd_id"` became
+  // `m.bd_id = m.bd_id`, always true, and the "stored messages" figure was
+  // the count for EVERY account (361 instead of this account's 239). It did
+  // not fail, it reported a plausible wrong number, and that number is also
+  // written into the audit_log row. Reading the account first and counting
+  // with a bound parameter cannot be shadowed.
+  const [account] = await db
     .select({
       bdId: emailAccount.bdId,
       status: emailAccount.status,
@@ -104,13 +111,23 @@ async function main() {
       backfillPageToken: emailAccount.backfillPageToken,
       lastSyncedAt: emailAccount.lastSyncedAt,
       syncError: emailAccount.syncError,
-      msgCount: sql<number | string>`(select count(*) from email_message m where m.bd_id = ${emailAccount.bdId})`,
-      msgOldest: sql<Date | string | null>`(select min(m.sent_at) from email_message m where m.bd_id = ${emailAccount.bdId})`,
-      msgNewest: sql<Date | string | null>`(select max(m.sent_at) from email_message m where m.bd_id = ${emailAccount.bdId})`,
     })
     .from(emailAccount)
     .where(sql`lower(${emailAccount.emailAddress}) = ${email}`)
     .limit(1);
+
+  const [stats] = account
+    ? await db
+        .select({
+          msgCount: sql<number | string>`count(*)`,
+          msgOldest: sql<Date | string | null>`min(${emailMessage.sentAt})`,
+          msgNewest: sql<Date | string | null>`max(${emailMessage.sentAt})`,
+        })
+        .from(emailMessage)
+        .where(eq(emailMessage.bdId, account.bdId))
+    : [{ msgCount: 0, msgOldest: null, msgNewest: null }];
+
+  const row = account ? { ...account, ...stats } : undefined;
 
   let actorExists: boolean | null = null;
   if (args.actor) {
