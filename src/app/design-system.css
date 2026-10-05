@@ -837,3 +837,30 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
   color: var(--color-ink-soft);
   white-space: nowrap;
 }
+
+/* =========================================================================
+   Call-attempt timeline row (call-logging-one-tap mockup, variant A).
+   PROPOSED addition: the system has no timeline row quieter than a real
+   activity. Tokens only.
+   ========================================================================= */
+.try {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  font-size: var(--text-base);
+  color: var(--color-ink-soft);
+}
+.try .when {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--color-ink-subtle);
+  white-space: nowrap;
+}
+/* No icon circle to hang the spine from, so it runs the full row height. */
+.tl-item-attempt::before {
+  top: 0;
+}

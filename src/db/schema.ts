@@ -1164,7 +1164,8 @@ export const activity = pgTable(
     actorBdId: uuid("actor_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | etc.
+    // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | 'call' |
+    // 'call_attempt' (a tel: click; never moves status or ownership) | etc.
     type: text("type").notNull(),
     // Metadata keyed by type: { gmailMessageId, gmailThreadId } for email_sent,
     // { hunterScore, hunterVerified } for hunter_lookup, etc.

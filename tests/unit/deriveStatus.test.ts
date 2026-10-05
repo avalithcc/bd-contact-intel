@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { MANUAL_CALL_DIRECTION, planCall } from "@/lib/contacts/call";
 import {
   activityRowToStatusEvent,
+  activityStageCandidate,
   buildPersonStatusUpdates,
   connectionRowToStatusEvent,
   deriveStatus,
@@ -383,4 +384,46 @@ test("activityRowToStatusEvent falls back to createdAt for reply_received when o
     metadata: { gmailThreadId: "t1", occurredAt: "not-a-date" },
   });
   assert.equal(event.at.getTime(), createdAt.getTime());
+});
+
+// --- call_attempt (call-logging-one-tap) ------------------------------------
+
+test("a call_attempt never advances status, even if its metadata looks like an outbound call", () => {
+  const attempt = activityEvent({
+    id: "att1",
+    type: "call_attempt",
+    at: new Date("2026-10-05"),
+    callOutcome: "connected",
+    callDirection: "outbound",
+  });
+  assert.equal(activityStageCandidate(attempt as Extract<StatusEvent, { kind: "activity" }>), null);
+  assert.equal(deriveStatus([attempt]).status, "new");
+});
+
+test("a persisted call_attempt row leaves the contact in 'new'", () => {
+  const updates = buildPersonStatusUpdates(
+    ["p1"],
+    [
+      {
+        id: "att1",
+        type: "call_attempt",
+        createdAt: new Date("2026-10-05T10:00:00Z"),
+        metadata: { number: "+54 9 11 5555-0142", outcome: "connected", direction: "outbound" },
+        personId: "p1",
+      },
+    ],
+    [],
+  );
+  assert.deepEqual(updates, [{ personId: "p1", status: "new", statusActivityId: null }]);
+});
+
+test("a confirmed call (type call, connected) still moves the contact to replied", () => {
+  const event = activityRowToStatusEvent({
+    id: "c1",
+    type: "call",
+    createdAt: new Date("2026-10-05T12:00:00Z"),
+    metadata: { outcome: "connected", direction: "outbound", occurredAt: "2026-10-05T10:42:00.000Z" },
+  });
+  assert.equal(deriveStatus([event]).status, "replied");
+  assert.equal(event.at.toISOString(), "2026-10-05T10:42:00.000Z");
 });

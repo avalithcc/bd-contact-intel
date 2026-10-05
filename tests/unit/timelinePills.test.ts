@@ -175,3 +175,8 @@ test("resolveScopeEntries: a newly added note that belongs to the active pill sh
     ["new-note", "old-note"],
   );
 });
+
+test("a call attempt shows under the Llamadas pill and is not a system entry", () => {
+  assert.ok(TIMELINE_PILL_GROUPS.call.includes("call_attempt"));
+  assert.ok(!TIMELINE_PILL_GROUPS.system.includes("call_attempt"));
+});
