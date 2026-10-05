@@ -1209,7 +1209,7 @@ export const en = {
     syncStaleBody:
       "No error is recorded, but a sync has not completed in over an hour. Try “Sync now”; if it persists, tell an administrator.",
     syncErrorDetailSummary: "Technical detail (administrators only)",
-    backfillTitle: "Syncing the last 90 days…",
+    backfillTitle: "Syncing the last two years…",
     backfillBody:
       "This can take several minutes the first time. Contacts who replied in this window will move to Replied once it finishes. You can close this page; it keeps running in the background.",
     backfillButtonLabel: "Syncing…",

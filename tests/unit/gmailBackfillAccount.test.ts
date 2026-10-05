@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { backfillAccountFirstSync, buildBackfillQuery, type BackfillAccountDeps } from "@/lib/gmail/backfillAccount";
+import { BACKFILL_WINDOW_DAYS } from "@/lib/gmail/backfillWindow";
 import type { GmailClient, GmailMessagesListPage } from "@/lib/gmail/client";
 import type { GmailApiMessage } from "@/lib/gmail/parseMessage";
 import type { ClassifiedMessage, KnownPersonEmail } from "@/lib/gmail/classify";
@@ -80,6 +81,17 @@ function baseDeps(overrides: Partial<BackfillAccountDeps> = {}): BackfillAccount
 test("buildBackfillQuery renders an after: filter windowDays before now", () => {
   const query = buildBackfillQuery(90, new Date("2026-09-30T00:00:00Z"));
   assert.equal(query, "after:2026/07/02");
+});
+
+test("the production backfill window is two years", () => {
+  assert.equal(BACKFILL_WINDOW_DAYS, 730);
+});
+
+test("buildBackfillQuery at the production window lands on the UTC day two years back, whatever the time of day", () => {
+  // 2024-10-05 -> 2026-10-05 spans no 29 February, so 730 days is exactly two calendar years.
+  assert.equal(buildBackfillQuery(BACKFILL_WINDOW_DAYS, new Date("2026-10-05T00:00:00Z")), "after:2024/10/05");
+  assert.equal(buildBackfillQuery(BACKFILL_WINDOW_DAYS, new Date("2026-10-05T23:59:59Z")), "after:2024/10/05");
+  assert.equal(buildBackfillQuery(BACKFILL_WINDOW_DAYS, new Date("2026-10-06T00:00:00Z")), "after:2024/10/06");
 });
 
 test("a single exhausted page with no messages completes the backfill and seeds historyId", async () => {

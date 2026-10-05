@@ -14,6 +14,7 @@ import { refreshGmailAccessToken } from "./accessToken";
 import { createGmailClient } from "./client";
 import { syncAccountIncremental } from "./syncAccount";
 import { backfillAccountFirstSync } from "./backfillAccount";
+import { BACKFILL_WINDOW_DAYS } from "./backfillWindow";
 import {
   getKnownPersonsForAddresses,
   getNeverLogRules,
@@ -24,7 +25,6 @@ import {
 } from "./syncQueries";
 
 export const PER_BD_BUDGET_MS = 20_000;
-export const BACKFILL_WINDOW_DAYS = 90;
 
 export interface AccountSyncOutcome {
   bdId: string;
