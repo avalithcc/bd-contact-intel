@@ -15,7 +15,7 @@
  * `"owner_change"` action rather than `"bulk_owner_change"` — reassigning
  * one Contact from its own record page is not the same operator action as
  * a list-page bulk/filter-wide reassignment, even though both go through
- * the same `bulkAssignOwner` write path (R3 rule, one-element selection).
+ * the same `bulkAssignOwner` write path (one-element selection).
  */
 export const AUDIT_LOG_ID_CAP = 100;
 
@@ -29,9 +29,9 @@ export interface BulkOwnerAuditInput {
   /** Only meaningful (and only ever set) for `mode: "filter"` — the same
    * serialized ContactFilters the filter-wide request itself sent. */
   filtersQuery?: string;
-  /** The ids actually updated (bulkAssignOwner's `toAssign`, not the raw
-   * request) — R3-skipped rows never touched `owner_bd_id`, so they don't
-   * belong in an audit of what changed. */
+  /** The ids actually updated (bulkAssignOwner's `toUpdate`, not the raw
+   * request) — persons that already had this owner are not rewritten, so
+   * they don't belong in an audit of what changed. */
   personIds: string[];
 }
 

@@ -9,6 +9,7 @@ import {
   BULK_FILTER_TARGET_CAP,
   MAX_BULK_SELECTION,
   normalizeOwnerSelectValue,
+  planOwnerAssignment,
   sanitizeBulkPersonIds,
 } from "@/lib/contacts/bulkOwner";
 
@@ -42,4 +43,28 @@ test("normalizeOwnerSelectValue maps a blank <select> value to null (unassign), 
   assert.equal(normalizeOwnerSelectValue(""), null);
   assert.equal(normalizeOwnerSelectValue(uuid), uuid);
   assert.equal(normalizeOwnerSelectValue("not-a-uuid"), undefined);
+});
+
+test("planOwnerAssignment: confirming the current owner writes the manual marker but no row update", () => {
+  const plan = planOwnerAssignment([{ id: "p1", ownerBdId: "bd-a" }], "bd-a", new Set());
+  assert.deepEqual(plan, { toUpdate: [], history: [{ personId: "p1", oldValue: "bd-a" }] });
+});
+
+test("planOwnerAssignment: a change updates the row and records the old owner", () => {
+  const plan = planOwnerAssignment([{ id: "p1", ownerBdId: "bd-a" }, { id: "p2", ownerBdId: null }], "bd-b", new Set());
+  assert.deepEqual(plan.toUpdate, ["p1", "p2"]);
+  assert.deepEqual(plan.history, [{ personId: "p1", oldValue: "bd-a" }, { personId: "p2", oldValue: null }]);
+});
+
+test("planOwnerAssignment: re-confirming an already-marked owner writes nothing", () => {
+  const plan = planOwnerAssignment([{ id: "p1", ownerBdId: "bd-a" }], "bd-a", new Set(["p1"]));
+  assert.deepEqual(plan, { toUpdate: [], history: [] });
+});
+
+test("planOwnerAssignment: unassigning is a change like any other and does not mutate input", () => {
+  const rows = [{ id: "p1", ownerBdId: "bd-a" }];
+  const before = JSON.stringify(rows);
+  assert.deepEqual(planOwnerAssignment(rows, null, new Set()), planOwnerAssignment(rows, null, new Set()));
+  assert.deepEqual(planOwnerAssignment(rows, null, new Set()).toUpdate, ["p1"]);
+  assert.equal(JSON.stringify(rows), before);
 });

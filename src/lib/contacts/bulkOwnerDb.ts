@@ -11,9 +11,10 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, bd, person, personPropertyHistory } from "@/db/schema";
-import { sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
+import { planOwnerAssignment, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { buildBulkOwnerAuditRow, type BulkOwnerAuditMode } from "@/lib/contacts/bulkOwnerAudit";
 import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
+import { readManualOwnerPersonIds } from "@/lib/identity/ownerRuleDb";
 
 export interface BulkAssignOwnerOptions {
   idCap?: number;
@@ -54,40 +55,35 @@ export async function bulkAssignOwner(
       .where(and(inArray(person.id, personIds), isNull(person.mergedIntoId)));
     if (!rows.length) return 0;
 
-    const toAssign = rows.map((r) => r.id);
-    const oldOwnerById = new Map(rows.map((r) => [r.id, r.ownerBdId]));
+    const plan = planOwnerAssignment(rows, ownerBdId, await readManualOwnerPersonIds(tx, rows.map((r) => r.id)));
 
-    await tx
-      .update(person)
-      .set({ ownerBdId, updatedByBdId: changedByBdId, updatedAt: new Date() })
-      .where(inArray(person.id, toAssign));
-
-    const historyRows = toAssign
-      .map((id) => {
-        const oldValue = oldOwnerById.get(id) ?? null;
-        if (oldValue === ownerBdId) return null;
-        return {
-          personId: id,
+    // Only persons whose owner really changes are rewritten (and audited);
+    // confirming the current owner just leaves the manual marker below.
+    if (plan.toUpdate.length) {
+      await tx
+        .update(person)
+        .set({ ownerBdId, updatedByBdId: changedByBdId, updatedAt: new Date() })
+        .where(inArray(person.id, plan.toUpdate));
+    }
+    if (plan.history.length) {
+      await tx.insert(personPropertyHistory).values(
+        plan.history.map((h) => ({
+          personId: h.personId,
           property: OWNER_HISTORY_PROPERTY,
-          oldValue,
+          oldValue: h.oldValue,
           newValue: ownerBdId,
           changedByBdId,
           source: MANUAL_OWNER_SOURCE,
-        };
-      })
-      .filter((h): h is NonNullable<typeof h> => h !== null);
-    if (historyRows.length) await tx.insert(personPropertyHistory).values(historyRows);
+        })),
+      );
+    }
+    if (plan.toUpdate.length) {
+      await tx.insert(auditLog).values(
+        buildBulkOwnerAuditRow({ actorBdId: changedByBdId, ownerBdId, mode, filtersQuery, personIds: plan.toUpdate }),
+      );
+    }
 
-    const auditRow = buildBulkOwnerAuditRow({
-      actorBdId: changedByBdId,
-      ownerBdId,
-      mode,
-      filtersQuery,
-      personIds: toAssign,
-    });
-    await tx.insert(auditLog).values(auditRow);
-
-    return toAssign.length;
+    return rows.length;
   });
 }
 

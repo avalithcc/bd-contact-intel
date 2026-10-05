@@ -31,6 +31,26 @@ export function normalizeOwnerSelectValue(raw: string): string | null | undefine
   return isUuid(raw) ? raw : undefined;
 }
 
+export interface OwnerAssignmentPlan {
+  /** Persons whose owner really changes: the only ones whose row, updated_at and audit entry are written. */
+  toUpdate: string[];
+  /** One manual-owner marker per person that does not already have one, INCLUDING persons whose owner stays the same (picking the current owner confirms it). */
+  history: { personId: string; oldValue: string | null }[];
+}
+
+/** Pure; never mutates its inputs. `manualPersonIds` = persons that already carry the manual-owner marker. */
+export function planOwnerAssignment(
+  rows: readonly { id: string; ownerBdId: string | null }[],
+  ownerBdId: string | null,
+  manualPersonIds: ReadonlySet<string>,
+): OwnerAssignmentPlan {
+  const toUpdate = rows.filter((r) => r.ownerBdId !== ownerBdId).map((r) => r.id);
+  const history = rows
+    .filter((r) => r.ownerBdId !== ownerBdId || !manualPersonIds.has(r.id))
+    .map((r) => ({ personId: r.id, oldValue: r.ownerBdId }));
+  return { toUpdate, history };
+}
+
 /** Shared by both bulk actions (assign owner, create task): validates every
  * id as a real UUID before it can reach a `uuid` column (src/lib/uuid.ts),
  * dedups, and caps at `cap` (defaults to MAX_BULK_SELECTION — the plain
