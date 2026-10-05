@@ -4,8 +4,8 @@
  * `merged` into `survivor`: property conflicts resolve via the existing
  * `mergeProperties`/`mergeProperty` rules (contact-identity R7, same
  * functions the migration and live resolver already use), the owner
- * follows the "earliest connector, lead-owner fallback" rule (R3), and
- * every reference (activity/task/signal/person_id_map/duplicate_candidate)
+ * follows the last-worked rule (ownerRule.ts; R3 changed 2026-10-05, a manual
+ * owner is sticky), and every reference (activity/task/signal/person_id_map/duplicate_candidate)
  * is moved set-based.
  *
  * Safe unmerge (fresh-review fix): the snapshot records field-level and

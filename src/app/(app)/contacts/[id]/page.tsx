@@ -208,12 +208,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
       )
     : null;
 
-  // Oldest connection date for the "Responsable" hint (contact-record.html:78
-  // "Conexión más antigua (14 mar 2019)") — `record.connections` is already
-  // ordered oldest-first (queries.ts `orderBy(asc(connectedOn))`).
-  const oldestConnectedOn = record.connections[0]?.connectedOn ?? null;
-  const ownerHint = oldestConnectedOn ? dict.contactRecordServer.ownerHintOldestConnection(oldestConnectedOn) : null;
-
   // "Correo electrónico" Hunter provenance hint (contact-record.html:79
   // "Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago").
   const emailHistory = record.properties.find((p) => p.key === "email")?.lastEdit ?? null;
@@ -418,7 +412,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           ownerOptions={ownerOptions}
           assigneeOptions={ownerOptions}
           meId={me.id}
-          ownerHint={ownerHint}
           email={record.person.email}
           hunterHint={hunterHint}
           sourceText={sourceText}

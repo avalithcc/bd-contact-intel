@@ -5,6 +5,9 @@
  * did. Connection seniority survives only as a tie-breaker and as the
  * fallback when nobody has touched the contact.
  *
+ * The rule runs only at merge time and in the one-shot backfill; nothing
+ * re-evaluates it when a BD later works the contact.
+ *
  * A BD's last touch is the later of their `person_bd_connection.last_message_at`
  * and their latest activity on the person (`OwnerTouch`, read by
  * ownerRuleDb.ts). Direction does not matter: an inbound reply is still that

@@ -10,8 +10,8 @@
  * selection state is client-side, see BulkActionsBar.tsx).
  *
  * Every action redirects back to the current view with a `?bulkResult=`
- * summary in the query string instead of throwing, so a partial R3 skip
- * (bulk owner) or a truncated selection (MAX_BULK_SELECTION) surfaces as a
+ * summary in the query string instead of throwing, so a partial result
+ * (bulk owner: persons no longer available) or a truncated selection (MAX_BULK_SELECTION) surfaces as a
  * Spanish banner (page.tsx) rather than an opaque error.
  */
 import { redirect } from "next/navigation";

@@ -43,7 +43,6 @@ export interface AboutPaneProps {
   // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
   // on the "Tarea" quick action's assignee `<select>`.
   meId: string;
-  ownerHint: string | null;
   email: string | null;
   hunterHint: string | null;
   sourceText: string | null;
@@ -86,7 +85,6 @@ export function AboutPane({
   ownerOptions,
   assigneeOptions,
   meId,
-  ownerHint,
   email,
   hunterHint,
   sourceText,
@@ -165,7 +163,6 @@ export function AboutPane({
         ownerLabel={ownerLabel}
         ownerBdId={ownerBdId}
         ownerOptions={ownerOptions}
-        ownerHint={ownerHint}
         emailVerified={emailVerified}
         emailInferred={emailInferred}
         hunterHint={hunterHint}

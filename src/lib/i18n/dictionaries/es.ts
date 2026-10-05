@@ -971,7 +971,6 @@ export const es: typeof en = {
   // final plain strings from these templates via describeStatusReason()/
   // inline formatting, and only ever passes the RESULT down as a prop.
   contactRecordServer: {
-    ownerHintOldestConnection: (date: string) => `Conexión más antigua (${date})`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "se envió un correo",

@@ -1026,7 +1026,6 @@ export const en = {
 
   // Server-only formatter templates — see the matching comment in es.ts.
   contactRecordServer: {
-    ownerHintOldestConnection: (date: string) => `Oldest connection (${date})`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence}% confidence · updated by ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "an email was sent",

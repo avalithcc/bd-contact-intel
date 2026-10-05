@@ -57,7 +57,6 @@ export interface PropertyListProps {
   ownerLabel: string | null;
   ownerBdId: string | null;
   ownerOptions: OwnerOption[];
-  ownerHint: string | null;
   emailVerified: boolean;
   // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — renders
   // "Deducido" next to the value, same spot as the verified badge (mutually
@@ -93,7 +92,6 @@ export function PropertyList({
   ownerLabel,
   ownerBdId,
   ownerOptions,
-  ownerHint,
   emailVerified,
   emailInferred,
   hunterHint,
@@ -204,7 +202,6 @@ export function PropertyList({
             </button>
           </dd>
         )}
-        {ownerHint && <dd className="hint">{ownerHint}</dd>}
       </div>
 
       {properties.map((prop) => (
