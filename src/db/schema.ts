@@ -805,7 +805,9 @@ export const personPropertyHistory = pgTable(
     changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration'
+    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration' | 'owner_backfill'.
+    // property 'ownerBdId' + source 'edit' marks a manual owner, sticky against
+    // the automatic owner rule (src/lib/identity/ownerRule.ts).
     source: text("source").notNull(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -931,7 +933,9 @@ export const auditLog = pgTable(
     // 'migration_approve' | 'migration_execute' | 'bd_password_reset' |
     // 'bulk_merge_duplicates_run' | 'bulk_merge_duplicates_revert' |
     // 'bd_signature_update' (a BD saved/cleared their own email signature) |
-    // 'bd_create' (scripts/create-bd.ts added a BD to the roster)
+    // 'bd_create' (scripts/create-bd.ts added a BD to the roster) |
+    // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
+    // recomputed person owners under the last-worked rule)
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
