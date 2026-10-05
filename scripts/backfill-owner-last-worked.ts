@@ -26,6 +26,11 @@
  * permanently sticky and defeat the rule this script applies. The row keeps
  * old_value, which is what makes the change revertible.
  *
+ * The dry run also splits the planned changes by whether the person has a
+ * prior `ownerBdId` history row with source `import` (counts only): import
+ * ownership is not sticky, and the DFF import wrote it as a deliberate owner
+ * reconfirmation, so a non-zero count needs a decision before --execute.
+ *
  * Defaults to a DRY RUN that prints counts only, never row-level data.
  * `--execute --actor=<bd id>` writes the `person.owner_bd_id` updates, one
  * history row per change and ONE `audit_log` row (action
@@ -58,9 +63,9 @@
 import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog, bd, person, personBdConnection, personPropertyHistory } from "../src/db/schema";
-import { planOwnerBackfill, type OwnerChange } from "../src/lib/identity/ownerBackfillPlan";
+import { countChangesWithMarker, planOwnerBackfill, type OwnerChange } from "../src/lib/identity/ownerBackfillPlan";
 import { OWNER_BACKFILL_SOURCE, OWNER_HISTORY_PROPERTY } from "../src/lib/identity/ownerRule";
-import { readManualOwnerPersonIds, readOwnerTouches } from "../src/lib/identity/ownerRuleDb";
+import { readImportOwnerPersonIds, readManualOwnerPersonIds, readOwnerTouches } from "../src/lib/identity/ownerRuleDb";
 import { chunk, WRITE_BATCH_SIZE } from "../src/lib/migration/collapseWriteRows";
 
 const MAX_CHANGES = 2000;
@@ -83,7 +88,7 @@ async function main() {
   const { execute, actor } = parseArgs(process.argv.slice(2));
 
   // Four set-based reads, no per-row queries.
-  const [persons, connections, touches, manualPersonIds] = await Promise.all([
+  const [persons, connections, touches, manualPersonIds, importOwnerPersonIds] = await Promise.all([
     db.select({ id: person.id, ownerBdId: person.ownerBdId }).from(person).where(isNull(person.mergedIntoId)),
     db
       .select({
@@ -95,6 +100,7 @@ async function main() {
       .from(personBdConnection),
     readOwnerTouches(db),
     readManualOwnerPersonIds(db),
+    readImportOwnerPersonIds(db),
   ]);
 
   const plan = planOwnerBackfill({ persons, connections, touches, manualPersonIds });
@@ -104,6 +110,11 @@ async function main() {
   console.log(`Would change: ${plan.changes.length}`);
   console.log(`  by last touch: ${byBasis("last_touch")}`);
   console.log(`  by earliest connection (nobody touched it): ${byBasis("earliest_connection")}`);
+  // `import` ownership is NOT sticky, but the DFF import wrote it as a deliberate
+  // owner reconfirmation: a non-zero count here needs an owner decision before --execute.
+  const byImport = countChangesWithMarker(plan.changes, importOwnerPersonIds);
+  console.log(`  of which the person has a prior ownerBdId history row with source 'import': ${byImport.marked}`);
+  console.log(`  of which no such row: ${byImport.unmarked}`);
   console.log(`Unchanged: ${plan.unchanged}`);
   console.log(`Skipped, owner set manually: ${plan.skippedManual}`);
 

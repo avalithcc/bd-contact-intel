@@ -1,7 +1,7 @@
 /** Unit tests for the pure planner behind scripts/backfill-owner-last-worked.ts. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { planOwnerBackfill } from "@/lib/identity/ownerBackfillPlan";
+import { countChangesWithMarker, planOwnerBackfill } from "@/lib/identity/ownerBackfillPlan";
 
 const d = (iso: string) => new Date(iso);
 
@@ -47,4 +47,10 @@ test("planOwnerBackfill never mutates its input and is repeatable", () => {
   const second = planOwnerBackfill(data);
   assert.deepEqual(first, second);
   assert.equal(JSON.stringify({ ...data, manualPersonIds: [...data.manualPersonIds] }), snapshot);
+});
+
+test("countChangesWithMarker splits planned changes by marker, counts only", () => {
+  const plan = planOwnerBackfill(input());
+  assert.deepEqual(countChangesWithMarker(plan.changes, new Set(["p-change", "someone-else"])), { marked: 1, unmarked: 1 });
+  assert.deepEqual(countChangesWithMarker(plan.changes, new Set()), { marked: 0, unmarked: 2 });
 });
