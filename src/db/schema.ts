@@ -937,6 +937,8 @@ export const auditLog = pgTable(
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule)
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
+    // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
+    // account's history_id so the cron re-fetches up to two years of mail)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
@@ -1274,7 +1276,7 @@ export const emailAccount = pgTable(
     // debugging purpose as lastErrorMessage but scoped to sync rather than
     // send (a send failure and a sync failure are unrelated conditions).
     syncError: text("sync_error"),
-    // `users.messages.list` nextPageToken for the first-sync 90-day backfill
+    // `users.messages.list` nextPageToken for the first-sync backfill
     // (email-sync brief slice 4) — resumable across runs since one cron
     // tick's time budget rarely covers a whole mailbox. Null once the
     // backfill completes (historyId then takes over for incremental sync)
