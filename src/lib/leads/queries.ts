@@ -21,6 +21,7 @@ import {
   withIdentityLock,
 } from "@/lib/identity/resolveDb";
 import { recomputePersonStatus } from "@/lib/status/recompute";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 // Cap on whitespace-separated search tokens in the free-text name filter, so
 // a pathological paste-in doesn't blow up the query into dozens of OR'd
@@ -495,7 +496,7 @@ export async function updateLeadStatus(
 }
 
 /**
- * Reassign a lead's owner. Any signed-in BD may do this. The unified
+ * Reassign a lead's owner. Admin-only (manual reassignment). The unified
  * person's `owner_bd_id` ALWAYS follows this edit (the old R3 "no connection
  * yet" gate silently dropped it for every LinkedIn-imported person), and the
  * `source = 'edit'` history row marks the owner as manual, so the automatic
@@ -510,6 +511,7 @@ export async function updateLeadOwner(
   updatedByBdId: string,
   ownerBdId: string | null,
 ): Promise<void> {
+  await requireAdmin();
   if (!UUID_RE.test(id)) return;
   const dualWriteEnabled = isIdentityDualWriteEnabled();
 

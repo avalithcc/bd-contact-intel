@@ -114,17 +114,19 @@ export async function updateContactLocationAction(
  * excludes `ownerBdId` — see propertyEdit.ts's doc comment). Reuses
  * `bulkAssignOwner` — the same write as the list's bulk "Asignar
  * responsable" (task 13.2), applied to a one-element selection. Always
- * applies (no connection gate) and is sticky against the automatic owner rule.
+ * applies (no connection gate), is admin-only, and is sticky against the
+ * automatic owner rule.
  */
 export async function updateContactOwnerAction(
   personId: string,
   ownerBdIdRaw: string,
 ): Promise<ContactActionResult> {
   try {
+    // Admin-only; AdminRequiredError surfaces as the "admin_required" reason.
+    const me = await requireAdmin();
     await assertContactEditableById(personId);
     const ownerBdId = normalizeOwnerSelectValue(ownerBdIdRaw);
     if (ownerBdId === undefined) throw new OwnerValueInvalidError();
-    const me = await getCurrentBd();
     // mode: "single" — this is one Contact's own record page, not a
     // list-page bulk/filter-wide reassignment; the audit_log row must say
     // so (see bulkOwnerAudit.ts's "owner_change" vs "bulk_owner_change").

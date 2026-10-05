@@ -13,6 +13,7 @@ import { resolveConversationDialogParam } from "@/lib/contacts/conversationDialo
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
@@ -410,6 +411,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}
           ownerOptions={ownerOptions}
+          canReassignOwner={isAdminRole(me)}
           assigneeOptions={ownerOptions}
           meId={me.id}
           email={record.person.email}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
@@ -132,6 +133,7 @@ function bulkResultMessage(
 ): string | null {
   if (!raw) return null;
   const [kind, a, b] = raw.split(":");
+  if (kind === "owner" && a === "forbidden") return l.bulkResultOwnerForbidden;
   if (kind === "owner") return l.bulkResultOwner(Number(a) || 0, Number(b) || 0);
   if (kind === "task") return l.bulkResultTask(Number(a) || 0);
   return null;
@@ -1018,6 +1020,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         <BulkActionsBar
           labels={bulkLabels}
           ownerOptions={ownerOptions}
+          canReassignOwner={isAdminRole(me)}
           meId={me.id}
           view={activeView.viewKey}
           q={sp.q}

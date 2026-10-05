@@ -33,6 +33,8 @@ import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 export interface BulkActionsBarProps {
   labels: BulkActionsLabels;
   ownerOptions: { id: string; name: string }[];
+  // Manual owner reassignment is admin-only; false hides "Asignar responsable".
+  canReassignOwner: boolean;
   // Current BD's id — preselects "Asignado a" and marks that option "(yo)"
   // via buildTaskAssigneeOptions (mockup contact-record.html #task).
   meId: string;
@@ -82,6 +84,7 @@ type Panel = "owner" | "task" | null;
 export function BulkActionsBar({
   labels: l,
   ownerOptions,
+  canReassignOwner,
   meId,
   view,
   q,
@@ -188,10 +191,12 @@ export function BulkActionsBar({
           </span>
           <span className="sep" />
 
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("owner")}>
-            <PersonIcon className="icon" />
-            {l.bulkAssignOwner}
-          </button>
+          {canReassignOwner && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("owner")}>
+              <PersonIcon className="icon" />
+              {l.bulkAssignOwner}
+            </button>
+          )}
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPanel("task")}>
             <TasksIcon className="icon" />
             {l.bulkCreateTask}

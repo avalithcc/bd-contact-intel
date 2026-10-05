@@ -655,6 +655,7 @@ export const es: typeof en = {
     lastUpdatedByPrefix: "Última actualización por",
     ownerUnassignedOption: "Sin responsable",
     errorOwnerInvalid: "Seleccionar un responsable válido.",
+    errorAdminRequired: "Solo un administrador puede reasignar el responsable.",
     quickActionNote: "Nota",
     quickActionCall: "Llamada",
     quickActionEmail: "Correo",
@@ -2000,6 +2001,7 @@ export const es: typeof en = {
       skipped > 0
         ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya no está disponible).`
         : `Responsable asignado a ${assigned}.`,
+    bulkResultOwnerForbidden: "Solo un administrador puede reasignar el responsable.",
     bulkResultTask: (created: number) => `${created} tarea(s) creada(s).`,
     layoutTable: "Tabla",
     layoutBoard: "Tablero",

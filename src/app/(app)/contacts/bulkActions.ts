@@ -17,6 +17,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
 import { isUuid } from "@/lib/uuid";
 import { BULK_FILTER_TARGET_CAP, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
@@ -90,7 +92,15 @@ async function resolveBulkTargetIds(formData: FormData, meBdId: string, idCap: n
 }
 
 export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
-  const me = await getCurrentBd();
+  // Manual owner reassignment is admin-only (the hidden control is a courtesy;
+  // this is the boundary). Not a 404: /contacts stays open to every BD.
+  let me;
+  try {
+    me = await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminRequiredError) redirect(backTo(formData, { bulkResult: "owner:forbidden" }));
+    throw err;
+  }
   const { ids: sanitizedIds, wasLimited, mode, filtersQuery } = await resolveBulkTargetIds(
     formData,
     me.id,

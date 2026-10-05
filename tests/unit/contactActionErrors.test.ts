@@ -12,6 +12,7 @@ import { ContactNotFoundError } from "@/lib/contacts/errors";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
 import { InvalidContactTypeError, InvalidEmailError } from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
 import {
   contactActionErrorReason,
   contactActionErrorHref,
@@ -93,4 +94,8 @@ test("contactActionErrorHref points reconnect reasons at /account/email", () => 
 test("contactActionErrorHref returns undefined for other reasons", () => {
   assert.equal(contactActionErrorHref("gmail_unavailable"), undefined);
   assert.equal(contactActionErrorHref("unexpected"), undefined);
+});
+
+test("contactActionErrorReason maps AdminRequiredError to a visible reason, not 'unexpected'", () => {
+  assert.equal(contactActionErrorReason(new AdminRequiredError()), "admin_required");
 });

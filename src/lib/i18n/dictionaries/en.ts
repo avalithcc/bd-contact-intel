@@ -730,6 +730,7 @@ export const en = {
     lastUpdatedByPrefix: "Last updated by",
     ownerUnassignedOption: "Unassigned",
     errorOwnerInvalid: "Select a valid owner.",
+    errorAdminRequired: "Only an administrator can reassign the owner.",
     quickActionNote: "Note",
     quickActionCall: "Call",
     quickActionEmail: "Email",
@@ -2031,6 +2032,7 @@ export const en = {
       skipped > 0
         ? `Owner assigned to ${assigned}. ${skipped} skipped (no longer available).`
         : `Owner assigned to ${assigned}.`,
+    bulkResultOwnerForbidden: "Only an administrator can reassign the owner.",
     bulkResultTask: (created: number) => `${created} task(s) created.`,
     layoutTable: "Table",
     layoutBoard: "Board",

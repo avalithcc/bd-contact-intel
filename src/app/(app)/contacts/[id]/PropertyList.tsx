@@ -57,6 +57,7 @@ export interface PropertyListProps {
   ownerLabel: string | null;
   ownerBdId: string | null;
   ownerOptions: OwnerOption[];
+  canReassignOwner: boolean;
   emailVerified: boolean;
   // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — renders
   // "Deducido" next to the value, same spot as the verified badge (mutually
@@ -92,6 +93,7 @@ export function PropertyList({
   ownerLabel,
   ownerBdId,
   ownerOptions,
+  canReassignOwner,
   emailVerified,
   emailInferred,
   hunterHint,
@@ -197,9 +199,11 @@ export function PropertyList({
             ) : (
               l.emptyValue
             )}
-            <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={() => setOwnerEditing(true)} aria-label={l.edit}>
-              <EditPencilIcon className="icon" />
-            </button>
+            {canReassignOwner && (
+              <button type="button" className="btn btn-ghost btn-icon btn-sm edit" onClick={() => setOwnerEditing(true)} aria-label={l.edit}>
+                <EditPencilIcon className="icon" />
+              </button>
+            )}
           </dd>
         )}
       </div>
