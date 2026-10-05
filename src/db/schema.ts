@@ -930,7 +930,8 @@ export const auditLog = pgTable(
     // 'view_conversation' | 'merge' | 'unmerge' | 'not_duplicate' |
     // 'migration_approve' | 'migration_execute' | 'bd_password_reset' |
     // 'bulk_merge_duplicates_run' | 'bulk_merge_duplicates_revert' |
-    // 'bd_signature_update' (a BD saved/cleared their own email signature)
+    // 'bd_signature_update' (a BD saved/cleared their own email signature) |
+    // 'bd_create' (scripts/create-bd.ts added a BD to the roster)
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
