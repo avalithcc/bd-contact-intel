@@ -935,7 +935,8 @@ export const auditLog = pgTable(
     // 'bd_signature_update' (a BD saved/cleared their own email signature) |
     // 'bd_create' (scripts/create-bd.ts added a BD to the roster) |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
-    // recomputed person owners under the last-worked rule)
+    // recomputed person owners under the last-worked rule; also run nightly by
+    // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {

@@ -38,7 +38,12 @@
  * is guarded by the owner the plan read (`owner_bd_id IS NOT DISTINCT FROM
  * old`), so a person re-assigned between the read and the write is left alone
  * and counted as "changed since read". Refuses to run when the plan exceeds
- * MAX_CHANGES (a sanity cap: the measured problem is ~90 persons).
+ * OWNER_SCRIPT_MAX_CHANGES (2000, ownerBackfillGuards.ts).
+ *
+ * The nightly cron (src/app/api/owners/recompute/route.ts) runs the SAME
+ * shared code (ownerBackfillRun.ts) with a much tighter cap and `trigger: cron`
+ * in the audit row; this script writes `trigger: manual`. Run this one-shot
+ * `--execute` BEFORE trusting the cron: it applies the initial cleanup.
  *
  * Irreversible: nothing is deleted, but the previous owners are only
  * recoverable through the history rows. Revert path (restores the previous
@@ -52,7 +57,7 @@
  * Exit codes:
  *   0 = clean dry run, or the update, history and audit rows were written
  *   1 = nothing was written: bad arguments, actor is not a real bd row, the
- *       plan exceeds MAX_CHANGES, or an unexpected error
+ *       plan exceeds the cap, or an unexpected error
  *
  * Usage (do NOT run --execute automatically: it writes the real database):
  *   npx tsx --env-file=.env.local scripts/backfill-owner-last-worked.ts
@@ -60,16 +65,10 @@
  *
  * Requires DATABASE_URL. Never prints the connection string.
  */
-import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { auditLog, bd, person, personBdConnection, personPropertyHistory } from "../src/db/schema";
-import { countChangesWithMarker, planOwnerBackfill, type OwnerChange } from "../src/lib/identity/ownerBackfillPlan";
-import { OWNER_BACKFILL_SOURCE, OWNER_HISTORY_PROPERTY } from "../src/lib/identity/ownerRule";
-import { readImportOwnerPersonIds, readManualOwnerPersonIds, readOwnerTouches } from "../src/lib/identity/ownerRuleDb";
-import { chunk, WRITE_BATCH_SIZE } from "../src/lib/migration/collapseWriteRows";
-
-const MAX_CHANGES = 2000;
-const AUDIT_ACTION = "backfill_owner_last_worked";
+import { countChangesWithMarker, type OwnerChange } from "../src/lib/identity/ownerBackfillPlan";
+import { decideOwnerBackfillRun, OWNER_SCRIPT_MAX_CHANGES } from "../src/lib/identity/ownerBackfillGuards";
+import { applyOwnerBackfill, bdExists, loadOwnerBackfill, OWNER_BACKFILL_AUDIT_ACTION } from "../src/lib/identity/ownerBackfillRun";
 
 function parseArgs(argv: readonly string[]): { execute: boolean; actor: string | null } {
   let execute = false;
@@ -87,26 +86,10 @@ function parseArgs(argv: readonly string[]): { execute: boolean; actor: string |
 async function main() {
   const { execute, actor } = parseArgs(process.argv.slice(2));
 
-  // Four set-based reads, no per-row queries.
-  const [persons, connections, touches, manualPersonIds, importOwnerPersonIds] = await Promise.all([
-    db.select({ id: person.id, ownerBdId: person.ownerBdId }).from(person).where(isNull(person.mergedIntoId)),
-    db
-      .select({
-        personId: personBdConnection.personId,
-        bdId: personBdConnection.bdId,
-        connectedOn: personBdConnection.connectedOn,
-        lastMessageAt: personBdConnection.lastMessageAt,
-      })
-      .from(personBdConnection),
-    readOwnerTouches(db),
-    readManualOwnerPersonIds(db),
-    readImportOwnerPersonIds(db),
-  ]);
-
-  const plan = planOwnerBackfill({ persons, connections, touches, manualPersonIds });
+  const { livePersons, plan, importOwnerPersonIds } = await loadOwnerBackfill(db);
   const byBasis = (basis: OwnerChange["basis"]) => plan.changes.filter((c) => c.basis === basis).length;
 
-  console.log(`Live persons: ${persons.length}`);
+  console.log(`Live persons: ${livePersons}`);
   console.log(`Would change: ${plan.changes.length}`);
   console.log(`  by last touch: ${byBasis("last_touch")}`);
   console.log(`  by earliest connection (nobody touched it): ${byBasis("earliest_connection")}`);
@@ -122,67 +105,25 @@ async function main() {
     console.log("Dry run only — nothing was written. Re-run with --execute --actor=<bd id>.");
     return;
   }
-  if (!plan.changes.length) {
+  const decision = decideOwnerBackfillRun(plan, OWNER_SCRIPT_MAX_CHANGES);
+  if (decision === "nothing_to_do") {
     console.log("Nothing to update.");
     return;
   }
-  if (plan.changes.length > MAX_CHANGES) {
-    console.error(`Refusing: ${plan.changes.length} changes exceeds the safety cap of ${MAX_CHANGES}. Review the dry run first.`);
+  if (decision === "over_cap") {
+    console.error(`Refusing: ${plan.changes.length} changes exceeds the safety cap of ${OWNER_SCRIPT_MAX_CHANGES}. Review the dry run first.`);
     process.exitCode = 1;
     return;
   }
-  const [actorRow] = await db.select({ id: bd.id }).from(bd).where(eq(bd.id, actor!)).limit(1);
-  if (!actorRow) {
+  if (!(await bdExists(db, actor!))) {
     console.error(`Refusing: --actor=${actor} does not match any bd row.`);
     process.exitCode = 1;
     return;
   }
 
-  const applied = await db.transaction(async (tx) => {
-    const appliedChanges: OwnerChange[] = [];
-    for (const batch of chunk(plan.changes, WRITE_BATCH_SIZE)) {
-      const values = batch.map((c) => sql`(${c.personId}::uuid, ${c.fromBdId}::uuid, ${c.toBdId}::uuid)`);
-      const updated = (await tx.execute(sql`
-        UPDATE person AS p SET owner_bd_id = v.new_owner
-        FROM (VALUES ${sql.join(values, sql`, `)}) AS v(id, old_owner, new_owner)
-        WHERE p.id = v.id AND p.owner_bd_id IS NOT DISTINCT FROM v.old_owner
-        RETURNING p.id::text AS id
-      `)) as unknown as { id: string }[];
-      const updatedIds = new Set(updated.map((r) => r.id));
-      const done = batch.filter((c) => updatedIds.has(c.personId));
-      if (done.length) {
-        await tx.insert(personPropertyHistory).values(
-          done.map((c) => ({
-            personId: c.personId,
-            property: OWNER_HISTORY_PROPERTY,
-            oldValue: c.fromBdId,
-            newValue: c.toBdId,
-            changedByBdId: actorRow.id,
-            source: OWNER_BACKFILL_SOURCE,
-          })),
-        );
-      }
-      appliedChanges.push(...done);
-    }
-    await tx.insert(auditLog).values({
-      actorBdId: actorRow.id,
-      action: AUDIT_ACTION,
-      metadata: {
-        planned: plan.changes.length,
-        updated: appliedChanges.length,
-        changedSinceRead: plan.changes.length - appliedChanges.length,
-        byLastTouch: appliedChanges.filter((c) => c.basis === "last_touch").length,
-        byEarliestConnection: appliedChanges.filter((c) => c.basis === "earliest_connection").length,
-        unchanged: plan.unchanged,
-        skippedManual: plan.skippedManual,
-        historySource: OWNER_BACKFILL_SOURCE,
-      },
-    });
-    return appliedChanges.length;
-  });
-
+  const { applied } = await applyOwnerBackfill(db, plan, actor!, "manual");
   console.log(`Updated ${applied} persons (${plan.changes.length - applied} changed since the read and were left alone).`);
-  console.log(`audit_log row written (action ${AUDIT_ACTION}).`);
+  console.log(`audit_log row written (action ${OWNER_BACKFILL_AUDIT_ACTION}, trigger manual).`);
 }
 
 main()
