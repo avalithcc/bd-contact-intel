@@ -15,7 +15,7 @@ export const SYNC_COOLDOWN_MS = 60_000;
 
 export interface SyncCooldownInput {
   lastSyncedAt: Date | null;
-  /** Non-null while the first-sync 90-day backfill hasn't finished yet (src/lib/gmail/backfillAccount.ts) — the cron already has this account's own turn in flight/imminent. */
+  /** Non-null while the first-sync backfill hasn't finished yet (src/lib/gmail/backfillAccount.ts) — the cron already has this account's own turn in flight/imminent. */
   backfillPageToken: string | null;
   now: Date;
 }

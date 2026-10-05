@@ -1168,7 +1168,7 @@ export const es: typeof en = {
     // No percentage/ETA (owner brief override of README decision 4): the
     // history/messages-list APIs never expose a total up front, so a real
     // progress bar can't be computed — see the checklist for the full note.
-    backfillTitle: "Sincronizando los últimos 90 días…",
+    backfillTitle: "Sincronizando los últimos dos años…",
     backfillBody:
       "Puede tardar varios minutos la primera vez. Los contactos que respondieron en esta ventana van a pasar a Respondió apenas termine. Podés cerrar esta página; el proceso sigue en segundo plano.",
     backfillButtonLabel: "Sincronizando…",

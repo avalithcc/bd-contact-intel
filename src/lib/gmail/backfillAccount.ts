@@ -1,6 +1,6 @@
 /**
  * First-sync backfill for a newly-(re)connected account (email-sync brief,
- * slice 4): pulls the last `windowDays` (90, per owner decision) of mail via
+ * slice 4): pulls the last `windowDays` (see backfillWindow.ts) of mail via
  * `users.messages.list`, one page at a time, resumable across cron runs via
  * a stored `pageToken` (email_account.backfill_page_token). Once the last
  * page is drained, seeds `historyId` from `getCurrentHistoryId()` so future

@@ -942,6 +942,8 @@ export const auditLog = pgTable(
     // created contacts and filled empty phones from the CEO's PDF)
     // 'revert_contactos_comerciales_2026_10' (scripts/revert-contactos-comerciales-2026-10.ts
     // deleted the untouched created contacts and cleared the filled phones)
+    // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
+    // account's history_id so the cron re-fetches up to two years of mail)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
@@ -1280,7 +1282,7 @@ export const emailAccount = pgTable(
     // debugging purpose as lastErrorMessage but scoped to sync rather than
     // send (a send failure and a sync failure are unrelated conditions).
     syncError: text("sync_error"),
-    // `users.messages.list` nextPageToken for the first-sync 90-day backfill
+    // `users.messages.list` nextPageToken for the first-sync backfill
     // (email-sync brief slice 4) — resumable across runs since one cron
     // tick's time budget rarely covers a whole mailbox. Null once the
     // backfill completes (historyId then takes over for incremental sync)

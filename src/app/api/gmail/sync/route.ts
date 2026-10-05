@@ -19,8 +19,8 @@ import { syncOneAccountNow } from "@/lib/gmail/syncOneAccountNow";
  * crash every other BD's sync in the same run.
  *
  * An account with no stored `historyId` yet (a fresh connection, or one
- * reset after a stale/404 `history.list`) runs the first-sync 90-day
- * backfill instead of incremental polling (src/lib/gmail/backfillAccount.ts)
+ * reset after a stale/404 `history.list`) runs the first-sync
+ * backfill (two years, backfillWindow.ts) instead of incremental polling (src/lib/gmail/backfillAccount.ts)
  * — one bounded `messages.list` page per run, resumable via
  * `backfill_page_token`, until it seeds a fresh `historyId` and switches
  * that account over to incremental sync.

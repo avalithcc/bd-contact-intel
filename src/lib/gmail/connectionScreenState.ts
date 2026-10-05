@@ -14,7 +14,7 @@
  *     reconnect attempt reset the grant, since `/api/gmail/sync` already
  *     skips a pre-readonly account entirely (getSyncableAccounts), so any
  *     error/backfill columns here are necessarily stale for this state.
- *  4. `backfilling` — first-sync 90-day backfill still in progress
+ *  4. `backfilling` — first-sync backfill still in progress
  *     (`backfillPageToken` not null).
  *  5. `synced` — steady-state incremental sync.
  *
