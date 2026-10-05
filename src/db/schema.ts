@@ -938,6 +938,8 @@ export const auditLog = pgTable(
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
+    // 'import_contactos_comerciales_2026_10' (scripts/import-contactos-comerciales-2026-10.ts
+    // created contacts and filled empty phones from the CEO's PDF)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
