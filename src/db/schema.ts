@@ -940,6 +940,8 @@ export const auditLog = pgTable(
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
     // 'import_contactos_comerciales_2026_10' (scripts/import-contactos-comerciales-2026-10.ts
     // created contacts and filled empty phones from the CEO's PDF)
+    // 'revert_contactos_comerciales_2026_10' (scripts/revert-contactos-comerciales-2026-10.ts
+    // deleted the untouched created contacts and cleared the filled phones)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
