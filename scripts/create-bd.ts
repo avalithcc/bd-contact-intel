@@ -17,12 +17,28 @@
  * refuses (the row already exists) and the name has to be fixed with an
  * UPDATE instead.
  *
- * This script does NOT create the Supabase auth user — that needs the
- * service-role key and stays a dashboard action (Authentication -> Add user,
- * with "Auto Confirm User" on, because `getCurrentBd` signs out anyone whose
- * `email_confirmed_at` is null). Order does not matter between the two
- * halves as long as BOTH are done before the first login; the script prints
- * the remaining steps.
+ * This script does NOT create the Supabase auth user — that stays a dashboard
+ * action: Authentication -> Invite user. The invite is the supported path, not
+ * "Add user": its link lands on /auth/confirm, which confirms the email, opens
+ * a session and redirects the new BD to /account/password to choose their own
+ * password (see src/lib/auth/confirmType.ts, which allowlists exactly
+ * `recovery` and `invite`). Nothing temporary passes through the owner's
+ * hands. Custom SMTP has been live since 2026-09-29, so the mail is delivered
+ * (src/lib/auth/passwordReset.ts).
+ *
+ * Order does not matter between the two halves, as long as the `bd` row exists
+ * before the FIRST LOGIN — not merely before the invite is sent. Accepting an
+ * invite is itself an authenticated request, so it reaches `getCurrentBd`.
+ *
+ * Invite checklist, both verified in production on 2026-10-05:
+ * - The Supabase "Invite user" template must link to
+ *   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite`.
+ *   With the default `{{ .ConfirmationURL }}` there is no `token_hash`, so
+ *   /auth/confirm falls through to `/login?error=invalid_or_expired_link` —
+ *   the same trap documented for the recovery template.
+ * - If the mail seems not to arrive, `auth.users.confirmation_sent_at` tells
+ *   you whether GoTrue even attempted the send. When it is set, the fault is
+ *   the relay or the mailbox, not this app.
  *
  * `role` is hardcoded to 'bd' and is deliberately NOT a flag. 'admin' opens
  * /admin/reports, /admin/audit-log and the migration gate (see
@@ -176,12 +192,24 @@ async function main() {
   console.log("audit_log row written (action bd_create).");
   console.log("\nRemaining steps before they can sign in:");
   console.log(
-    `  1. Supabase dashboard -> Authentication -> Add user -> ${created.email}, with "Auto Confirm User" ON.`,
+    `  1. Supabase dashboard -> Authentication -> Invite user -> ${created.email}`,
   );
   console.log(
-    `  2. Issue the first password: npx tsx --env-file=.env.local scripts/reset-bd-password.ts --email=${created.email} --execute --actor=<bd id>`,
+    "  2. They click the link: it confirms their email, opens a session and lands them",
   );
-  console.log("  3. Hand it over out of band and have them change it at /account/password.");
+  console.log("     on /account/password to choose their own password. Nothing to hand over.");
+  console.log(
+    "\nIf the mail never arrives, check auth.users.confirmation_sent_at first — when it is set,",
+  );
+  console.log(
+    "the send was attempted and the fault is the relay or the mailbox. Only then fall back to",
+  );
+  console.log(
+    `  npx tsx --env-file=.env.local scripts/reset-bd-password.ts --email=${created.email} --execute --actor=<bd id>`,
+  );
+  console.log(
+    "which sets a password but does NOT confirm the email — so it alone cannot get them in.",
+  );
 }
 
 main()
