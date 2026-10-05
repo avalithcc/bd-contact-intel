@@ -500,6 +500,8 @@ export async function updateLeadStatus(
  * yet" gate silently dropped it for every LinkedIn-imported person), and the
  * `source = 'edit'` history row marks the owner as manual, so the automatic
  * last-worked rule never overrides it (src/lib/identity/ownerRule.ts).
+ * Currently has no caller outside this file (the UI goes through
+ * bulkAssignOwner); kept as the legacy-lead write path.
  * DB-only glue (raw SQL), not unit-testable without DATABASE_URL — same
  * convention as the rest of this write-cutover's thin DB layer.
  */
@@ -525,7 +527,6 @@ export async function updateLeadOwner(
         from person_id_map m
         join person p on p.id = m.person_id
         where m.legacy_table = 'lead' and m.legacy_id = ${id}
-          and not exists (select 1 from person_bd_connection c where c.person_id = p.id)
       ),
       updated as (
         update person
