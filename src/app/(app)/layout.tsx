@@ -53,26 +53,26 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <CallAttemptProvider labels={dict.callAttempt}>
-      <div className="app">
-        <Sidebar
-          labels={labels}
-          taskCount={taskCount}
-          followUpCount={followUpCount}
-          isAdmin={me.role === "admin"}
-        />
-        <div className="main">
-          <TopBar
+        <div className="app">
+          <Sidebar
             labels={labels}
-            searchLabels={searchLabels}
-            locale={locale}
-            me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
+            taskCount={taskCount}
+            followUpCount={followUpCount}
+            isAdmin={me.role === "admin"}
           />
-          {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
-          {/* Without server OAuth config /account/email renders no card, so the link would land on nothing. */}
-          {syncBanner && getGmailOAuthConfig().ok && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
-          {children}
+          <div className="main">
+            <TopBar
+              labels={labels}
+              searchLabels={searchLabels}
+              locale={locale}
+              me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
+            />
+            {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
+            {/* Without server OAuth config /account/email renders no card, so the link would land on nothing. */}
+            {syncBanner && getGmailOAuthConfig().ok && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
+            {children}
+          </div>
         </div>
-      </div>
       </CallAttemptProvider>
     </ToastProvider>
   );

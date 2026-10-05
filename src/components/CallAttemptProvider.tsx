@@ -1,9 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { CallIcon } from "@/components/icons";
 import { useToast } from "@/components/ToastProvider";
+import { CALL_ATTEMPT_NOTE_MAX_LENGTH } from "@/lib/contacts/callAttempt";
+import { mayOpenBar, mayRestoreBar } from "@/lib/contacts/callBarGuard";
 import { recordCallAttemptAction, resolveCallAttemptAction } from "@/app/(app)/contacts/actions";
 
 export interface CallAttemptLabels {
@@ -51,30 +54,59 @@ export function useCallAttempt() {
 export function CallAttemptProvider({ labels, children }: { labels: CallAttemptLabels; children: React.ReactNode }) {
   const { showToast } = useToast();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const [bar, setBar] = useState<OpenBar | null>(null);
   const [note, setNote] = useState("");
+  const [region, setRegion] = useState<HTMLElement | null>(null);
   const inFlight = useRef(new Set<string>());
+  // The attempt whose bar is open right now; null once dismissed or left behind.
+  const openAttempt = useRef<string | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const spokeRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => setBar(null), [pathname]);
+  const dismiss = useCallback(() => {
+    openAttempt.current = null;
+    setBar(null);
+  }, []);
+
+  // The bar lives in the toast region ToastProvider already renders (one fixed
+  // stack, one live region) instead of a second region stacked on top of it.
+  useEffect(() => setRegion(document.getElementById("toast-region")), []);
+
+  useEffect(dismiss, [pathname, dismiss]);
+
+  // Announce by moving focus to the first answer when the bar opens.
+  useEffect(() => {
+    if (bar?.step === "ask") spokeRef.current?.focus();
+  }, [bar?.attemptId, bar?.step]);
 
   useEffect(() => {
     if (!bar) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setBar(null);
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Escape meant for a menu or dialog (focus lives inside it) is not ours.
+      const active = document.activeElement;
+      if (active && active !== document.body && !barRef.current?.contains(active)) return;
+      dismiss();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [bar]);
+  }, [bar, dismiss]);
 
   const startCall = useCallback(
     (target: CallTarget) => {
       const key = `${target.personId}|${target.number}`;
       if (inFlight.current.has(key)) return;
       inFlight.current.add(key);
+      const pathnameAtDial = pathnameRef.current;
       recordCallAttemptAction(target.personId, target.number)
         .then((result) => {
           if (!result.ok) return showToast(labels.recordError, "error");
+          // The attempt is recorded either way; the bar only belongs to the page that dialled.
+          if (!mayOpenBar(pathnameAtDial, pathnameRef.current)) return;
           setNote("");
+          openAttempt.current = result.attemptId;
           setBar({ attemptId: result.attemptId, personId: target.personId, personName: target.personName, step: "ask", busy: false });
         })
         .catch(() => showToast(labels.recordError, "error"))
@@ -94,9 +126,9 @@ export function CallAttemptProvider({ labels, children }: { labels: CallAttemptL
       ok = false;
     }
     if (ok) {
-      setBar(null);
+      dismiss();
       showToast(outcome === "connected" ? labels.callSaved : labels.attemptSaved);
-    } else {
+    } else if (mayRestoreBar(openAttempt.current, open.attemptId)) {
       setBar({ ...open, busy: false });
       showToast(labels.saveError, "error");
     }
@@ -105,9 +137,10 @@ export function CallAttemptProvider({ labels, children }: { labels: CallAttemptL
   return (
     <CallAttemptContext.Provider value={{ startCall }}>
       {children}
-      {bar && (
-        <div className="toast-region">
-          <div className="outcome" role="group" aria-label={labels.barLabel}>
+      {bar &&
+        region &&
+        createPortal(
+          <div className="outcome" ref={barRef} role="status" aria-label={labels.barLabel}>
             <CallIcon className="icon" />
             {bar.step === "ask" ? (
               <>
@@ -115,7 +148,7 @@ export function CallAttemptProvider({ labels, children }: { labels: CallAttemptL
                   <span className="who">{bar.personName}</span> · {labels.question}
                 </span>
                 <span className="acts">
-                  <button className="obtn primary" type="button" disabled={bar.busy} onClick={() => setBar({ ...bar, step: "note" })}>
+                  <button ref={spokeRef} className="obtn primary" type="button" disabled={bar.busy} onClick={() => setBar({ ...bar, step: "note" })}>
                     {labels.spoke}
                   </button>
                   <button className="obtn" type="button" disabled={bar.busy} onClick={() => answer("no_answer")}>
@@ -142,7 +175,7 @@ export function CallAttemptProvider({ labels, children }: { labels: CallAttemptL
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={labels.noteLabel}
                   aria-label={labels.noteLabel}
-                  maxLength={500}
+                  maxLength={CALL_ATTEMPT_NOTE_MAX_LENGTH}
                   autoFocus
                 />
                 <button className="obtn primary" type="submit" disabled={bar.busy}>
@@ -150,9 +183,9 @@ export function CallAttemptProvider({ labels, children }: { labels: CallAttemptL
                 </button>
               </form>
             )}
-          </div>
-        </div>
-      )}
+          </div>,
+          region,
+        )}
     </CallAttemptContext.Provider>
   );
 }
