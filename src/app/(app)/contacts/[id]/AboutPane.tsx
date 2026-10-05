@@ -34,7 +34,6 @@ export interface AboutPaneProps {
   linkedinHref: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
-  ownerLocked: boolean;
   ownerOptions: OwnerOption[];
   // Same `bd` list as `ownerOptions`, handed to the "Tarea" quick action's
   // assignee `<select>` (task-essentials backlog item 2) — a separate prop
@@ -84,7 +83,6 @@ export function AboutPane({
   linkedinHref,
   ownerLabel,
   ownerBdId,
-  ownerLocked,
   ownerOptions,
   assigneeOptions,
   meId,
@@ -166,7 +164,6 @@ export function AboutPane({
         statusReasonText={statusReasonText}
         ownerLabel={ownerLabel}
         ownerBdId={ownerBdId}
-        ownerLocked={ownerLocked}
         ownerOptions={ownerOptions}
         ownerHint={ownerHint}
         emailVerified={emailVerified}

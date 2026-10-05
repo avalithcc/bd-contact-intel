@@ -729,8 +729,6 @@ export const en = {
     emptyValue: "—",
     lastUpdatedByPrefix: "Last updated by",
     ownerUnassignedOption: "Unassigned",
-    ownerLockedNote: "Can't reassign: already has a connected BD.",
-    errorOwnerLocked: "Can't reassign the owner: this contact already has a connected BD.",
     errorOwnerInvalid: "Select a valid owner.",
     quickActionNote: "Note",
     quickActionCall: "Call",
@@ -2032,7 +2030,7 @@ export const en = {
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
-        ? `Owner assigned to ${assigned}. ${skipped} skipped (already has a connected BD).`
+        ? `Owner assigned to ${assigned}. ${skipped} skipped (no longer available).`
         : `Owner assigned to ${assigned}.`,
     bulkResultTask: (created: number) => `${created} task(s) created.`,
     layoutTable: "Table",

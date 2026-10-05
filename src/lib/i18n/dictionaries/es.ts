@@ -654,8 +654,6 @@ export const es: typeof en = {
     emptyValue: "—",
     lastUpdatedByPrefix: "Última actualización por",
     ownerUnassignedOption: "Sin responsable",
-    ownerLockedNote: "No se puede reasignar: ya tiene un BD conectado.",
-    errorOwnerLocked: "No se puede reasignar el responsable: este contacto ya tiene un BD conectado.",
     errorOwnerInvalid: "Seleccionar un responsable válido.",
     quickActionNote: "Nota",
     quickActionCall: "Llamada",
@@ -2001,7 +1999,7 @@ export const es: typeof en = {
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
-        ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya tiene un BD conectado).`
+        ? `Responsable asignado a ${assigned}. ${skipped} sin cambios (ya no está disponible).`
         : `Responsable asignado a ${assigned}.`,
     bulkResultTask: (created: number) => `${created} tarea(s) creada(s).`,
     layoutTable: "Tabla",

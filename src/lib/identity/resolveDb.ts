@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { duplicateCandidate, person, personBdConnection, personIdMap } from "@/db/schema";
+import { readManualOwnerPersonIds } from "@/lib/identity/ownerRuleDb";
 import type { EmailStatus } from "@/lib/identity/matcher";
 import {
   buildIdentityWriteRows,
@@ -205,6 +206,13 @@ export async function applyIdentityWrites(
     if (batch.length) await tx.insert(duplicateCandidate).values(batch).onConflictDoNothing();
   }
 
+  // Sticky manual owner (ownerRule.ts): an import must never move an owner a
+  // BD set by hand, so those persons' updates leave owner_bd_id alone.
+  const manualOwnerIds = await readManualOwnerPersonIds(
+    tx,
+    rows.existingUpdates.map((u) => u.personId),
+  );
+
   for (const update of rows.existingUpdates) {
     await tx
       .update(person)
@@ -218,7 +226,7 @@ export async function applyIdentityWrites(
         industry: update.merged.industry,
         city: update.merged.city,
         country: update.merged.country,
-        ownerBdId: update.merged.ownerBdId,
+        ...(manualOwnerIds.has(update.personId) ? {} : { ownerBdId: update.merged.ownerBdId }),
         email: update.merged.email,
         emailNormalized: update.merged.emailNormalized,
         emailStatus: update.merged.emailStatus,

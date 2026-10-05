@@ -12,6 +12,7 @@ import {
   type InsertedLeadRow,
 } from "@/lib/identity/ingestWrite";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
+import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import {
   applyIdentityWrites,
@@ -495,11 +496,11 @@ export async function updateLeadStatus(
 
 /**
  * Reassign a lead's owner. Any signed-in BD may do this. The unified
- * person's `owner_bd_id` only follows this edit when nobody is connected to
- * them yet (no `person_bd_connection` row) — otherwise R3 (earliest
- * LinkedIn connector) already governs the owner and this edit must not
- * override it. DB-only glue (raw SQL): the R3 gate is a single `NOT EXISTS`
- * clause, not meaningfully unit-testable without DATABASE_URL — same
+ * person's `owner_bd_id` ALWAYS follows this edit (the old R3 "no connection
+ * yet" gate silently dropped it for every LinkedIn-imported person), and the
+ * `source = 'edit'` history row marks the owner as manual, so the automatic
+ * last-worked rule never overrides it (src/lib/identity/ownerRule.ts).
+ * DB-only glue (raw SQL), not unit-testable without DATABASE_URL — same
  * convention as the rest of this write-cutover's thin DB layer.
  */
 export async function updateLeadOwner(
@@ -534,7 +535,7 @@ export async function updateLeadOwner(
         returning person.id, target.old_owner_bd_id
       )
       insert into person_property_history (person_id, property, old_value, new_value, changed_by_bd_id, source)
-      select id, 'owner_bd_id', old_owner_bd_id::text, ${ownerBdId}::text, ${updatedByBdId}, 'edit'
+      select id, ${OWNER_HISTORY_PROPERTY}::text, old_owner_bd_id::text, ${ownerBdId}::text, ${updatedByBdId}, ${MANUAL_OWNER_SOURCE}::text
       from updated
     `);
   });

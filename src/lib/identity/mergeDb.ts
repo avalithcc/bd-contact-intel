@@ -24,6 +24,8 @@ import {
   signal,
   task,
 } from "@/db/schema";
+import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
+import { readManualOwnerPersonIds, readOwnerTouches } from "@/lib/identity/ownerRuleDb";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import {
   parseMergeSnapshot,
@@ -313,7 +315,16 @@ export async function mergeContacts(
       readSurvivorQueueItemRows(tx, survivorId, queueItemRowsOnMerged),
     ]);
 
+    // Owner rule inputs (ownerRule.ts): one read each, over both persons.
+    const [ownerTouchRows, manualOwnerIds] = await Promise.all([
+      readOwnerTouches(tx, [survivorId, mergedId]),
+      readManualOwnerPersonIds(tx, [survivorId, mergedId]),
+    ]);
+
     const plan = planMerge({
+      ownerTouches: ownerTouchRows,
+      survivorHasManualOwner: manualOwnerIds.has(survivorId),
+      mergedHasManualOwner: manualOwnerIds.has(mergedId),
       survivor: toMergeFields(survivorRow),
       merged: toMergeFields(mergedRow),
       survivorConnections: survivorConnections.map(toMergeConnection),
@@ -444,6 +455,19 @@ export async function mergeContacts(
           source: "merge",
         })),
       );
+    }
+    // The merged person's manual owner now lives on the survivor: its history
+    // stays behind on the hidden row, so re-mark the survivor or the choice
+    // would stop being sticky.
+    if (manualOwnerIds.has(mergedId) && !manualOwnerIds.has(survivorId)) {
+      await tx.insert(personPropertyHistory).values({
+        personId: survivorId,
+        property: OWNER_HISTORY_PROPERTY,
+        oldValue: survivorRow.ownerBdId,
+        newValue: plan.survivorUpdate.ownerBdId,
+        changedByBdId: actorBdId,
+        source: MANUAL_OWNER_SOURCE,
+      });
     }
 
     await recomputePersonStatuses(tx, [survivorId]);

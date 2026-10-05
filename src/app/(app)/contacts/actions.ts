@@ -32,7 +32,6 @@ import { isUuid } from "@/lib/uuid";
 import {
   contactActionErrorReason,
   contactLocationActionErrorReason,
-  OwnerReassignLockedError,
   OwnerValueInvalidError,
   PropertyNotEditableError,
   type ContactActionResult,
@@ -113,10 +112,9 @@ export async function updateContactLocationAction(
  * Single-record owner reassignment (task 13.3 parity gap: `/leads/[id]`
  * offered this, `/contacts/[id]`'s generic property editor deliberately
  * excludes `ownerBdId` — see propertyEdit.ts's doc comment). Reuses
- * `bulkAssignOwner` — the SAME R3 rule as the list's bulk "Asignar
- * responsable" (task 13.2) and `updateLeadOwner`, applied to a one-element
- * selection, so a single-record and bulk reassignment can never disagree on
- * when a reassignment is allowed.
+ * `bulkAssignOwner` — the same write as the list's bulk "Asignar
+ * responsable" (task 13.2), applied to a one-element selection. Always
+ * applies (no connection gate) and is sticky against the automatic owner rule.
  */
 export async function updateContactOwnerAction(
   personId: string,
@@ -130,8 +128,7 @@ export async function updateContactOwnerAction(
     // mode: "single" — this is one Contact's own record page, not a
     // list-page bulk/filter-wide reassignment; the audit_log row must say
     // so (see bulkOwnerAudit.ts's "owner_change" vs "bulk_owner_change").
-    const plan = await bulkAssignOwner([personId], ownerBdId, me.id, { mode: "single" });
-    if (plan[0]?.outcome === "skipped_has_connection") throw new OwnerReassignLockedError();
+    await bulkAssignOwner([personId], ownerBdId, me.id, { mode: "single" });
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

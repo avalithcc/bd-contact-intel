@@ -100,13 +100,13 @@ export async function bulkAssignOwnerAction(formData: FormData): Promise<void> {
   const ownerBdId = rawOwner && isUuid(rawOwner) ? rawOwner : null;
   if (rawOwner && !ownerBdId) redirect(backTo(formData, { bulkResult: "owner:0:0" }));
 
-  const plan = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, {
+  const assigned = await bulkAssignOwner(sanitizedIds, ownerBdId, me.id, {
     idCap: BULK_FILTER_TARGET_CAP,
     mode,
     filtersQuery,
   });
-  const assigned = plan.filter((p) => p.outcome === "assigned").length;
-  const skipped = plan.filter((p) => p.outcome === "skipped_has_connection").length;
+  // Anything not assigned was no longer a live person (merged away or deleted).
+  const skipped = sanitizedIds.length - assigned;
 
   revalidatePath("/contacts");
   redirect(

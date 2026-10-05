@@ -147,10 +147,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // non-admin never gets AdminConversationAutoOpen rendered at all, so no
   // modal and no data, no matter what the query string says.
   const autoOpenAdminBdId = isAdmin ? resolveConversationDialogParam(rawConversation) : null;
-  // R3 (design.md): reassignment is only allowed while the person has no
-  // `person_bd_connection` row yet — same rule bulkAssignOwner (task 13.2)
-  // enforces server-side for updateContactOwnerAction (task 13.3).
-  const ownerLocked = record.connections.length > 0;
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
@@ -419,7 +415,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           linkedinHref={linkedinProfileHref(record.person.profileKey)}
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}
-          ownerLocked={ownerLocked}
           ownerOptions={ownerOptions}
           assigneeOptions={ownerOptions}
           meId={me.id}
