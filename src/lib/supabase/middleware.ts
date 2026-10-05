@@ -59,6 +59,7 @@ export async function updateSession(request: NextRequest) {
     "/api/leads/ingest",
     "/api/tasks/digest",
     "/api/gmail/sync",
+    "/api/owners/recompute",
   ];
   const isCronRoute = CRON_ROUTES.some(
     (route) => path === route || path.startsWith(`${route}/`),
