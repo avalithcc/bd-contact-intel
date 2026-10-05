@@ -1185,6 +1185,20 @@ export const es: typeof en = {
     neverLogLink: "Nunca registrar",
   },
 
+  callAttempt: {
+    barLabel: "Resultado de la llamada",
+    question: "¿hablaste?",
+    spoke: "Hablé",
+    noAnswer: "No atendió",
+    voicemail: "Buzón",
+    noteLabel: "Nota (opcional)",
+    save: "Guardar",
+    callSaved: "Llamada registrada",
+    attemptSaved: "Intento registrado",
+    recordError: "No se pudo registrar el intento de llamada.",
+    saveError: "No se pudo guardar el resultado. Inténtalo de nuevo.",
+  },
+
   reconnectBanner: {
     message:
       "Reconectá Gmail para activar la sincronización automática de correos: vamos a registrar las respuestas de tus contactos sin que tengas que hacer nada.",

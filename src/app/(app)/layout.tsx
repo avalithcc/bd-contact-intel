@@ -5,6 +5,7 @@ import { pickTopBarSearchLabels } from "@/lib/i18n/topBarSearchLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
+import { CallAttemptProvider } from "@/components/CallAttemptProvider";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { SyncHealthBanner } from "@/components/SyncHealthBanner";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
@@ -51,26 +52,28 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
-      <div className="app">
-        <Sidebar
-          labels={labels}
-          taskCount={taskCount}
-          followUpCount={followUpCount}
-          isAdmin={me.role === "admin"}
-        />
-        <div className="main">
-          <TopBar
+      <CallAttemptProvider labels={dict.callAttempt}>
+        <div className="app">
+          <Sidebar
             labels={labels}
-            searchLabels={searchLabels}
-            locale={locale}
-            me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
+            taskCount={taskCount}
+            followUpCount={followUpCount}
+            isAdmin={me.role === "admin"}
           />
-          {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
-          {/* Without server OAuth config /account/email renders no card, so the link would land on nothing. */}
-          {syncBanner && getGmailOAuthConfig().ok && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
-          {children}
+          <div className="main">
+            <TopBar
+              labels={labels}
+              searchLabels={searchLabels}
+              locale={locale}
+              me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
+            />
+            {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
+            {/* Without server OAuth config /account/email renders no card, so the link would land on nothing. */}
+            {syncBanner && getGmailOAuthConfig().ok && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
+            {children}
+          </div>
         </div>
-      </div>
+      </CallAttemptProvider>
     </ToastProvider>
   );
 }

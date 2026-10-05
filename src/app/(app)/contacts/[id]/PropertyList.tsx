@@ -50,6 +50,8 @@ export interface JobTitleRoleGroupHint {
 
 export interface PropertyListProps {
   personId: string;
+  /** Named in the call outcome bar after a tel: click. */
+  personName: string;
   labels: ContactRecordLabels;
   statusLabel: string;
   statusValue: string;
@@ -86,6 +88,7 @@ export interface PropertyListProps {
  */
 export function PropertyList({
   personId,
+  personName,
   labels: l,
   statusLabel,
   statusValue,
@@ -231,6 +234,7 @@ export function PropertyList({
           <PropertyRow
             key={prop.key}
             labels={l}
+            call={{ personId, personName }}
             prop={prop}
             emailVerified={prop.key === "email" && emailVerified}
             emailInferred={prop.key === "email" && emailInferred}
@@ -286,6 +290,7 @@ export function PropertyList({
 
 function PropertyRow({
   labels: l,
+  call,
   prop,
   emailVerified,
   emailInferred,
@@ -299,6 +304,7 @@ function PropertyRow({
   onSave,
 }: {
   labels: ContactRecordLabels;
+  call: { personId: string; personName: string };
   prop: AboutPaneProperty;
   emailVerified: boolean;
   emailInferred: boolean;
@@ -387,7 +393,7 @@ function PropertyRow({
       <dt>{prop.label}</dt>
       <dd>
         {isPhoneProp && prop.value ? (
-          <PhoneValue value={prop.value} whatsappUrl={prop.whatsapp?.url} labels={l} />
+          <PhoneValue value={prop.value} whatsappUrl={prop.whatsapp?.url} labels={l} call={call} />
         ) : prop.key === "contactType" ? (
           contactTypeLabel(prop.value, l.emptyValue)
         ) : (
