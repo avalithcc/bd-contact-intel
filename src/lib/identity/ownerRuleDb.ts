@@ -8,7 +8,8 @@ import { and, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { activity, personPropertyHistory } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
-import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES, OWNER_IGNORED_ACTIVITY_TYPES } from "@/lib/identity/ownerRule";
+import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES } from "@/lib/identity/ownerRule";
+import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 
 type Executor = Pick<typeof db, "select" | "selectDistinct">;
 
@@ -41,7 +42,8 @@ export function readImportOwnerPersonIds(executor: Executor, personIds?: readonl
  * Latest effective activity time per (person, BD): `person_id` + `actor_bd_id`
  * + the shared effective-time rule (status_backfill uses metadata.originalAt;
  * task edits are not touches), never the denormalized contact_owner_bd_id.
- * Types in OWNER_IGNORED_ACTIVITY_TYPES (call attempts) are not touches either.
+ * Types in NO_PROGRESS_ACTIVITY_TYPES (call attempts) are not touches either:
+ * ownership is stricter than "última actividad" (see that list).
  */
 export async function readOwnerTouches(
   executor: Executor,
@@ -59,7 +61,7 @@ export async function readOwnerTouches(
       and(
         isNotNull(activity.personId),
         isNotNull(activity.actorBdId),
-        notInArray(activity.type, [...OWNER_IGNORED_ACTIVITY_TYPES]),
+        notInArray(activity.type, [...NO_PROGRESS_ACTIVITY_TYPES]),
         personIds ? inArray(activity.personId, [...personIds]) : undefined,
       ),
     )

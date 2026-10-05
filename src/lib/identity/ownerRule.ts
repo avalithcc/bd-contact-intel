@@ -28,20 +28,6 @@ export const MANUAL_OWNER_SOURCE = "edit";
 /** Source of history rows written by scripts/backfill-owner-last-worked.ts. Must NEVER equal `edit`, or every backfilled owner would turn sticky. */
 export const OWNER_BACKFILL_SOURCE = "owner_backfill";
 
-/**
- * Activity types that do NOT count as working the relationship for ownership.
- *
- * Ownership has a stricter bar than "última actividad": a `call_attempt` is
- * real engagement for the list column, sort and filter (it is deliberately not
- * in NON_TOUCH_ACTIVITY_TYPES), but dialling a number is not building the
- * relationship, and an attempt must never transfer a contact away from the BD
- * who did. The two bars disagree on purpose, so they are two lists and this
- * one must not be merged with, or replaced by, NON_TOUCH_ACTIVITY_TYPES. The
- * task-edit types are not listed here: they already have no effective time.
- * Enforced in SQL: ownerRuleDb.ts#readOwnerTouches builds a `notInArray` from this list.
- */
-export const OWNER_IGNORED_ACTIVITY_TYPES = ["call_attempt"] as const;
-
 export interface OwnerHistoryMarker {
   property: string;
   source: string;

@@ -9,7 +9,8 @@
  *   conversation");
  * - does NOT move the contact's status (deriveStatus.ts#STATUS_NEUTRAL_ACTIVITY_TYPES);
  * - DOES count as "última actividad" (it is not in NON_TOUCH_ACTIVITY_TYPES);
- * - does NOT count for ownership (ownerRule.ts#OWNER_IGNORED_ACTIVITY_TYPES).
+ * - does NOT count for ownership and does NOT reset the follow-up clock
+ *   (activity/noProgressActivity.ts).
  *
  * Confirming "Hablé" writes a real `call` row whose `occurredAt` is the moment
  * of the DIAL (the attempt's `created_at`), not the moment of the click on the

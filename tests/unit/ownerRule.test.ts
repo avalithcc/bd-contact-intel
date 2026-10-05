@@ -6,9 +6,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NON_TOUCH_ACTIVITY_TYPES, resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
+import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import {
   OWNER_BACKFILL_SOURCE,
-  OWNER_IGNORED_ACTIVITY_TYPES,
   hasManualOwner,
   pickOwnerByLastWorked,
   type OwnerConnection,
@@ -101,8 +101,8 @@ test("the backfill's own source never reads as a manual edit", () => {
 // The exclusion itself is a SQL `notInArray` in ownerRuleDb.ts built from this
 // list, so these tests pin the list and its disagreement with the last-activity bar.
 
-test("dialling a number is not working the relationship: call_attempt is on the ownership ignore list", () => {
-  assert.deepEqual([...OWNER_IGNORED_ACTIVITY_TYPES], ["call_attempt"]);
+test("dialling a number is not working the relationship: call_attempt is on the shared no-progress list (ownership and the follow-up clock both read it)", () => {
+  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], ["call_attempt"]);
 });
 
 test("the ownership bar is stricter than the last-activity bar: a dialled attempt shows in one and not the other", () => {
@@ -111,5 +111,5 @@ test("the ownership bar is stricter than the last-activity bar: a dialled attemp
     resolveEffectiveActivityAt({ id: "a", type: "call_attempt", createdAt: new Date("2026-10-05"), metadata: {} })?.toISOString(),
     "2026-10-05T00:00:00.000Z",
   );
-  assert.notDeepEqual([...OWNER_IGNORED_ACTIVITY_TYPES], [...NON_TOUCH_ACTIVITY_TYPES]);
+  assert.notDeepEqual([...NO_PROGRESS_ACTIVITY_TYPES], [...NON_TOUCH_ACTIVITY_TYPES]);
 });
