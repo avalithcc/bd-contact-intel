@@ -4,11 +4,11 @@
  * owner-run backfill). Not unit-tested directly (needs a DB): the rule they
  * feed is tested in ownerRule.test.ts.
  */
-import { and, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { activity, personPropertyHistory } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
-import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES } from "@/lib/identity/ownerRule";
+import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES, OWNER_IGNORED_ACTIVITY_TYPES } from "@/lib/identity/ownerRule";
 
 type Executor = Pick<typeof db, "select" | "selectDistinct">;
 
@@ -41,6 +41,7 @@ export function readImportOwnerPersonIds(executor: Executor, personIds?: readonl
  * Latest effective activity time per (person, BD): `person_id` + `actor_bd_id`
  * + the shared effective-time rule (status_backfill uses metadata.originalAt;
  * task edits are not touches), never the denormalized contact_owner_bd_id.
+ * Types in OWNER_IGNORED_ACTIVITY_TYPES (call attempts) are not touches either.
  */
 export async function readOwnerTouches(
   executor: Executor,
@@ -54,7 +55,14 @@ export async function readOwnerTouches(
       lastAt: sql<Date | string | null>`max(${effectiveActivityAtSql()})`,
     })
     .from(activity)
-    .where(and(isNotNull(activity.personId), isNotNull(activity.actorBdId), personIds ? inArray(activity.personId, [...personIds]) : undefined))
+    .where(
+      and(
+        isNotNull(activity.personId),
+        isNotNull(activity.actorBdId),
+        notInArray(activity.type, [...OWNER_IGNORED_ACTIVITY_TYPES]),
+        personIds ? inArray(activity.personId, [...personIds]) : undefined,
+      ),
+    )
     .groupBy(activity.personId, activity.actorBdId);
   const touches: { personId: string; bdId: string; at: Date }[] = [];
   for (const r of rows) {

@@ -141,7 +141,9 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
       const durationMinutes = typeof metadata.durationMinutes === "number" ? metadata.durationMinutes : null;
       const notes = typeof metadata.notes === "string" && metadata.notes ? metadata.notes : null;
       const durationText = durationMinutes !== null ? `${l.timelineCallDurationPrefix} ${durationMinutes} min.` : null;
-      return [durationText, notes].filter(Boolean).join(" ") || l.timelineCallDefault;
+      // A call confirmed from the tel: bar carries the number that was dialled.
+      const toText = typeof metadata.number === "string" && metadata.number ? `${l.timelineAttemptToPrefix} ${metadata.number}` : null;
+      return [durationText, notes, toText].filter(Boolean).join(" ") || l.timelineCallDefault;
     }
     case "discarded":
       return discardBody(metadata, l);

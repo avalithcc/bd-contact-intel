@@ -105,7 +105,17 @@ export interface DiscardCandidate {
   because: StatusBecause;
 }
 
+/**
+ * Activity types that are real engagement but must NEVER move the stage. A
+ * `call_attempt` is a dialled number nobody has confirmed anyone answered
+ * (call-logging-one-tap): not a worked contact. Listed explicitly, and checked
+ * before the `call` branch, so no metadata on the row (direction, outcome) can
+ * ever make an attempt read as a call.
+ */
+export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt"] as const;
+
 export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
+  if ((STATUS_NEUTRAL_ACTIVITY_TYPES as readonly string[]).includes(event.type)) return null;
   const fixed = FIXED_STAGE_BY_TYPE[event.type];
   if (fixed) {
     return { rank: STAGE_RANK[fixed], at: event.at, because: { source: "activity", activityId: event.id } };

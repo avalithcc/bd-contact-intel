@@ -40,6 +40,7 @@ import { initialsFromName } from "@/components/initials";
 import {
   CallIcon,
   ChevronDownIcon,
+  CloseIcon,
   DiscardIcon,
   ExternalLinkIcon,
   EyeIcon,
@@ -198,6 +199,7 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   status_change: "timelineFilterStatusChange",
   meeting_logged: "timelineFilterMeeting",
   call: "timelineFilterCall",
+  call_attempt: "timelineFilterCallAttempt",
   discarded: "timelineFilterDiscarded",
   status_backfill: "timelineFilterStatusBackfill",
   task_created: "timelineFilterTaskCreated",
@@ -218,6 +220,8 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   status_change: HistoryIcon,
   meeting_logged: MeetingIcon,
   call: CallIcon,
+  // Rendered by the dashed attempt row below, which draws its own icon.
+  call_attempt: CallIcon,
   discarded: DiscardIcon,
   status_backfill: HistoryIcon,
   // Uses the existing system/status-change entry layout (owner spec) — same
@@ -1250,6 +1254,35 @@ export function Timeline({
                 }
 
                 const timelineEntry = entry as TimelineEntry;
+                // An attempt is not a conversation: dashed, grey, one line
+                // (call-logging-one-tap mockup, variant A).
+                if (timelineEntry.type === "call_attempt") {
+                  const meta = timelineEntry.metadata ?? {};
+                  const outcomeText =
+                    meta.outcome === "no_answer"
+                      ? l.timelineAttemptNoAnswer
+                      : meta.outcome === "voicemail"
+                        ? l.timelineAttemptVoicemail
+                        : l.timelineAttemptNoOutcome;
+                  const AttemptIcon = meta.outcome === "no_answer" ? CloseIcon : CallIcon;
+                  return (
+                    <div key={timelineEntry.id} className="tl-attempt">
+                      <div className="try">
+                        <AttemptIcon className="icon" />
+                        <span>
+                          <strong>{l.timelineFilterCallAttempt}</strong> · {outcomeText}
+                          {typeof meta.number === "string" && (
+                            <>
+                              {" "}
+                              · {l.timelineAttemptToPrefix} <span className="mono">{meta.number}</span>
+                            </>
+                          )}
+                        </span>
+                        <span className="when">{formatWhen(at)}</span>
+                      </div>
+                    </div>
+                  );
+                }
                 const Icon = TYPE_ICON[timelineEntry.type as TimelineActivityType] ?? NoteIcon;
                 const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
                 return (

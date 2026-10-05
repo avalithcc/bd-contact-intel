@@ -31,6 +31,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "status_change",
   "meeting_logged",
   "call",
+  "call_attempt",
   "discarded",
   "status_backfill",
   "task_created",
@@ -206,7 +207,10 @@ export async function getPersonTimeline(
   opts: { pill?: TimelinePillKey; limit?: number } = {},
 ): Promise<PersonTimelinePage> {
   const types = opts.pill ? TIMELINE_PILL_GROUPS[opts.pill] : TIMELINE_ACTIVITY_TYPES;
-  const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))));
+  // An attempt that became a `call` ("Hablé") carries `callActivityId`: the
+  // timeline shows the conversation once, not the dial twice. Still in the table.
+  const notFolded = sql`not (${activity.type} = 'call_attempt' and (${activity.metadata}->>'callActivityId') is not null)`;
+  const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))), notFolded);
 
   const [rows, countRows] = await Promise.all([
     db
@@ -228,7 +232,7 @@ export async function getPersonTimeline(
     db
       .select({ type: activity.type, count: sql<number>`count(*)` })
       .from(activity)
-      .where(and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t)))))
+      .where(and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t))), notFolded))
       .groupBy(activity.type),
   ]);
 

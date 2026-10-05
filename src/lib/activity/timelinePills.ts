@@ -48,7 +48,8 @@ export type TimelinePillKey = (typeof TIMELINE_PILL_KEYS)[number];
  */
 export const TIMELINE_PILL_GROUPS: Record<TimelinePillKey, readonly string[]> = {
   note: ["note"],
-  call: ["call"],
+  // An attempt is shown with calls, but dashed and without a conversation.
+  call: ["call", "call_attempt"],
   // `reply_received` (email-sync brief) is a synced Gmail reply — grouped
   // here with `email_sent` (not its own pill key) since both are "Correos"
   // to a BD reading the timeline.

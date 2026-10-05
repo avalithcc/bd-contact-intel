@@ -836,6 +836,11 @@ export const en = {
     timelineFilterStatusChange: "Status change",
     timelineFilterMeeting: "Meeting",
     timelineFilterCall: "Calls",
+    timelineFilterCallAttempt: "Call attempt",
+    timelineAttemptNoOutcome: "no outcome",
+    timelineAttemptNoAnswer: "no answer",
+    timelineAttemptVoicemail: "voicemail",
+    timelineAttemptToPrefix: "to",
     timelineFilterDiscarded: "Discard",
     timelineFilterStatusBackfill: "Backfilled status",
     // Filter PILLS (contact-record.html:97-106), grouped per

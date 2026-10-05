@@ -19,6 +19,7 @@ import { logUnsafeReplyHeader, planThreadReply } from "@/lib/gmail/replyThread";
 import { getThreadReplySource } from "@/lib/gmail/threadMessages";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
+import { recordCallAttempt, resolveCallAttempt } from "@/lib/contacts/callAttemptDb";
 import { planDiscard } from "@/lib/contacts/discard";
 import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
@@ -277,6 +278,46 @@ export async function logCallAction(
     const metadata = planCall(outcome, direction, date, time, notes);
     await createActivityAction({ type: "call", personId, metadata: { ...metadata } });
     revalidatePath(`/contacts/${personId}`);
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+export type CallAttemptActionResult = { ok: true; attemptId: string } | { ok: false };
+
+/**
+ * The `tel:` click (call-logging-one-tap, variant A): records a `call_attempt`
+ * for the number just dialled. Never moves status or ownership; a double click
+ * within the dedupe window returns the same attempt.
+ */
+export async function recordCallAttemptAction(personId: string, number: string): Promise<CallAttemptActionResult> {
+  try {
+    if (!isUuid(personId)) return { ok: false };
+    const me = await getCurrentBd();
+    const attempt = await recordCallAttempt(personId, me.id, number);
+    revalidatePath(`/contacts/${personId}`);
+    return { ok: true, attemptId: attempt.attemptId };
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error("[contacts] call attempt not recorded", err);
+    return { ok: false };
+  }
+}
+
+/** The outcome bar's answer: "connected" writes a `call` row dated at the dial; the others only close the attempt. */
+export async function resolveCallAttemptAction(
+  attemptId: string,
+  personId: string,
+  outcome: string,
+  notes: string,
+): Promise<ContactActionResult> {
+  try {
+    if (!isUuid(attemptId) || !isUuid(personId)) return { ok: false, reason: "not_found" };
+    const me = await getCurrentBd();
+    await resolveCallAttempt(attemptId, personId, me.id, outcome, notes);
+    revalidatePath(`/contacts/${personId}`);
+    revalidatePath("/contacts");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

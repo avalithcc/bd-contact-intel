@@ -765,6 +765,11 @@ export const es: typeof en = {
     timelineFilterStatusChange: "Cambio de estado",
     timelineFilterMeeting: "Reunión",
     timelineFilterCall: "Llamadas",
+    timelineFilterCallAttempt: "Intento de llamada",
+    timelineAttemptNoOutcome: "sin resultado",
+    timelineAttemptNoAnswer: "no atendió",
+    timelineAttemptVoicemail: "buzón",
+    timelineAttemptToPrefix: "al",
     timelineFilterDiscarded: "Descarte",
     timelineFilterStatusBackfill: "Estado respaldado",
     // Filter PILLS (contact-record.html:97-106), grouped per
