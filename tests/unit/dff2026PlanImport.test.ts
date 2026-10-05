@@ -269,3 +269,22 @@ test("selectDffAuditRow: an explicit --audit-id selects exactly that row, or rep
   assert.deepEqual(selectDffAuditRow(rows, "b"), { kind: "selected", row: rows[1] });
   assert.deepEqual(selectDffAuditRow(rows, "c"), { kind: "not_found", requestedAuditId: "c", candidates: rows });
 });
+
+test("a manually owned person is neither reassigned to Mariel nor refilled with an owner", () => {
+  for (const ownerBdId of ["bd-cristian", null]) {
+    const existing = existingPerson({ ownerBdId });
+    const plan = buildImportPlan(
+      [record()],
+      ctx({
+        manualOwnerIds: new Set(["p1"]),
+        existingPersonsByEmail: new Map([["juan.perez@example.com", existing]]),
+        bdNamesById: new Map([["bd-cristian", "Cristian Civita"]]),
+      }),
+    );
+    const update = plan.updates[0]!;
+    assert.equal("ownerBdId" in update.personUpdate, false);
+    assert.equal(update.historyRows.some((h) => h.property === "ownerBdId"), false);
+    assert.equal(update.reassignedFromBdId, null);
+    assert.deepEqual(plan.report.existingReassignedFromOtherBd, []);
+  }
+});

@@ -22,7 +22,7 @@ import { randomUUID } from "node:crypto";
 import type { NewPerson, NewPersonPropertyHistory } from "@/db/schema";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
 import type { EmailStatus } from "@/lib/identity/matcher";
-import { planHubSpotRefill } from "@/lib/hubspot/refill";
+import { planHubSpotRefill, stripOwnerFromRefill } from "@/lib/hubspot/refill";
 import { isValidPhoneFormat, formatPhoneForDisplay } from "@/lib/phone";
 import { classifyPosition } from "@/lib/roleGroups";
 import type { AttendeeRecord } from "./buildAttendeeRecords";
@@ -54,6 +54,8 @@ export interface ExistingCompanyForImport {
 
 export interface ImportContext {
   marielBdId: string;
+  /** Persons whose owner a BD set by hand (ownerRule.ts): never reassigned or refilled. */
+  manualOwnerIds?: ReadonlySet<string>;
   bdNamesById: ReadonlyMap<string, string>;
   /** Keyed by `person.email_normalized`, non-merged persons only. */
   existingPersonsByEmail: ReadonlyMap<string, ExistingPersonForImport>;
@@ -246,7 +248,8 @@ function buildExistingUpdate(
       ? resolveCompanyKey(record.companyRaw, ctx, companiesToCreate, matchedCompanyKeys)
       : null;
 
-  const refill = planHubSpotRefill(
+  const manualOwner = ctx.manualOwnerIds?.has(existing.id) ?? false;
+  const rawRefill = planHubSpotRefill(
     { ...existing, industry: null, city: null, country: null },
     {
       firstName: record.firstName,
@@ -267,6 +270,7 @@ function buildExistingUpdate(
       emailSource: null,
     },
   );
+  const refill = manualOwner ? stripOwnerFromRefill(rawRefill) : rawRefill;
   for (const key of UNSUPPORTED_REFILL_KEYS) {
     if (refill.personUpdate && key in refill.personUpdate) {
       throw new Error(`dff-2026 import: unexpected '${key}' fill for person ${existing.id} — matched-by-email persons must already have a non-empty email.`);
@@ -295,7 +299,7 @@ function buildExistingUpdate(
   // ever fills a field that's currently empty.
   let reassignedFromBdId: string | null = null;
   let reassignedFromName: string | null = null;
-  if (existing.ownerBdId && existing.ownerBdId !== ctx.marielBdId) {
+  if (!manualOwner && existing.ownerBdId && existing.ownerBdId !== ctx.marielBdId) {
     personUpdate.ownerBdId = ctx.marielBdId;
     historyRows.push({ personId: existing.id, property: "ownerBdId", oldValue: existing.ownerBdId, newValue: ctx.marielBdId, changedByBdId: null, source: "import" });
     reassignedFromBdId = existing.ownerBdId;
