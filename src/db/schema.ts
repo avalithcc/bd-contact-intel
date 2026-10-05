@@ -937,6 +937,8 @@ export const auditLog = pgTable(
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule)
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
+    // 'import_contactos_comerciales_2026_10' (scripts/import-contactos-comerciales-2026-10.ts
+    // created contacts and filled empty phones from the CEO's PDF)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
