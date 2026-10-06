@@ -814,7 +814,9 @@ export const personPropertyHistory = pgTable(
     changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration' | 'owner_backfill'.
+    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration' | 'owner_backfill' |
+    // 'company_cleanup' (scripts/clear-non-company-employers.ts cleared a
+    // Freelance/Independiente employer).
     // property 'ownerBdId' + source 'edit' marks a manual owner, sticky against
     // the automatic owner rule (src/lib/identity/ownerRule.ts).
     source: text("source").notNull(),
@@ -955,6 +957,9 @@ export const auditLog = pgTable(
     // account's history_id so the cron re-fetches up to two years of mail)
     // 'merge_companies' (scripts/merge-companies.ts folded confirmed duplicate
     // company records into one survivor; metadata lists what moved per table)
+    // 'clear_non_company_employers' (scripts/clear-non-company-employers.ts
+    // removed Freelance/Independiente as employers and deleted those company
+    // records)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
