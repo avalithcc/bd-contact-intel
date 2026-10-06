@@ -7,6 +7,16 @@
  * spelling is caught, "Freelance Studio" and "Club Atletico Independiente" are not. The dry run prints each matched
  * key with the display names found under it, so the owner sees exactly what will be cleared before approving.
  *
+ * CONFIRMED LIST (--key=<company_key>, repeatable, and/or --file=<path>, one key per line, `#` comments skipped):
+ * when given, the built-in matcher is BYPASSED ENTIRELY and only the listed keys are acted on; without it,
+ * behaviour is exactly the matcher above. The matcher is a CANDIDATE FINDER for the obvious variants. Anything
+ * beyond them is confirmed by the owner by hand, because "independiente" and "autonomo" also sit inside real
+ * company names and job titles ("Freelancer.com", "Directora Independiente", "Ciudad Autonoma de Buenos
+ * Aires"), and a substring rule would clear real employers. A listed key that exists in no company_key table
+ * is reported, and execute refuses (a typo must not pass as a no-op). Every guard below applies to listed
+ * keys too: an explicit list confirms a key is not a company, it is NOT permission to delete rows other data
+ * depends on, so a listed key that hits the STOP list is still refused.
+ *
  * WHAT HAPPENS PER TABLE (all 14 company_key tables are accounted for; a test fails if one is added unhandled)
  *   person, contact, lead (CLEARED): company, company_key and company_category set to NULL (lead: company_key only;
  *     the imported company_raw/company_display text stays as source data). company_category is cleared too: it is
@@ -34,31 +44,38 @@
  *
  * DRY RUN IS THE DEFAULT (read-only transaction). Usage (do NOT run --execute without the owner's approval):
  *   npx tsx --env-file=.env.local scripts/clear-non-company-employers.ts
- *   npx tsx --env-file=.env.local scripts/clear-non-company-employers.ts --execute --actor=<bd id>
+ *   npx tsx --env-file=.env.local scripts/clear-non-company-employers.ts --file=confirmed-keys.txt [--key=<key>]
+ *   npx tsx --env-file=.env.local scripts/clear-non-company-employers.ts [--file=...] --execute --actor=<bd id>
  *
  * EXIT CODES: 0 success (dry run or write, including "nothing to clear"); 1 bad arguments, a STOP, or any failed
  * check (nothing written).
  */
 import { refCount } from "../src/lib/companyMerge/keys";
-import { CLEARED_TABLES, DELETED_TABLES } from "../src/lib/nonCompanyEmployers/match";
+import { readFileSync } from "node:fs";
+import { CLEARED_TABLES, DELETED_TABLES, parseKeyList } from "../src/lib/nonCompanyEmployers/match";
 import { dryRunCleanup, executeCleanup } from "../src/lib/nonCompanyEmployers/db";
 
 function parseArgs(argv: readonly string[]) {
   let execute = false;
   let actor: string | null = null;
+  const lines: string[] = [];
+  let listed = false;
   for (const a of argv) {
     if (a === "--execute") execute = true;
     else if (a.startsWith("--actor=")) actor = a.slice(8);
-    else throw new Error(`Unknown argument: ${a}. Valid: --execute, --actor=<bd id>`);
+    else if (a.startsWith("--key=")) (listed = true), lines.push(a.slice(6));
+    else if (a.startsWith("--file=")) (listed = true), lines.push(...readFileSync(a.slice(7), "utf8").split("\n"));
+    else throw new Error(`Unknown argument: ${a}. Valid: --key=<company_key>, --file=<path>, --execute, --actor=<bd id>`);
   }
   if (execute && !actor) throw new Error("--execute requires --actor=<bd id> for the audit log.");
-  return { execute, actor };
+  return { execute, actor, keys: listed ? parseKeyList(lines) : null };
 }
 
 async function main() {
-  const { execute, actor } = parseArgs(process.argv.slice(2));
-  const r = execute ? await executeCleanup(actor!) : await dryRunCleanup();
+  const { execute, actor, keys } = parseArgs(process.argv.slice(2));
+  const r = execute ? await executeCleanup(actor!, keys) : await dryRunCleanup(keys);
   console.log(execute ? "EXECUTED\n" : "DRY RUN (read-only transaction)\n");
+  if (r.unknown.length) console.log(`Listed keys found in no company_key table (typo?): ${r.unknown.join(", ")}\n`);
   if (!r.keys.length) return void console.log("No non-company employers found.");
   for (const k of r.keys) {
     const rows = [...CLEARED_TABLES, ...DELETED_TABLES].filter((t) => refCount(r.counts, t, k) > 0).map((t) => `${t}=${refCount(r.counts, t, k)}`);
