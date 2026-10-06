@@ -96,16 +96,39 @@ export function parseGroupSpec(spec: string): MergeGroup {
   const parts = spec.split(":").map((s) => s.trim());
   const deadKeys = (parts[1] ?? "").split(",").map((s) => s.trim());
   if (parts.length !== 2 || !parts[0] || deadKeys.some((k) => !k)) {
-    throw new Error(`Bad group "${spec}": expected survivor:dead[,dead...] (keys containing ':' or ',' are not supported).`);
+    throw new Error(`Bad group "${spec}": expected survivor:dead[,dead...] (a key containing ':' or ',' cannot be written this way: use --json=<path> with [{"survivor": "...", "dead": ["..."]}]).`);
   }
   if (deadKeys.includes(parts[0])) throw new Error(`Bad group "${spec}": a key cannot be merged into itself.`);
   return { survivorKey: parts[0], deadKeys };
 }
 
 /** One spec per line; blank lines and `#` comments are skipped. A key may appear once in the whole input. */
-export function parseGroupLines(lines: readonly string[]): MergeGroup[] {
-  const groups = lines.map((l) => l.trim()).filter((l) => l && !l.startsWith("#")).map(parseGroupSpec);
-  if (!groups.length) throw new Error("Pass at least one --group=<survivor>:<dead>[,<dead>...] (or --file=).");
+export const parseGroupLines = (lines: readonly string[]): MergeGroup[] =>
+  checkGroups(lines.map((l) => l.trim()).filter((l) => l && !l.startsWith("#")).map(parseGroupSpec));
+
+/** `[{"survivor": "...", "dead": ["...", "..."]}]`: no separator, so no character in a key can break it. Keys are exact. */
+export function parseGroupJson(text: string): MergeGroup[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`The --json file is not valid JSON: ${e instanceof Error ? e.message : e}`);
+  }
+  if (!Array.isArray(data)) throw new Error('The --json file must hold an array: [{"survivor": "...", "dead": ["..."]}].');
+  return checkGroups(
+    data.map((raw: { survivor?: unknown; dead?: unknown } | null, i) => {
+      const bad = (why: string) => new Error(`--json entry ${i + 1}: ${why}`);
+      const { survivor, dead } = raw ?? {};
+      const isKey = (k: unknown): k is string => typeof k === "string" && k.trim() !== "";
+      if (!isKey(survivor) || !Array.isArray(dead) || !dead.length || !dead.every(isKey)) throw bad('expected {"survivor": "<key>", "dead": ["<key>", ...]} with non-empty keys.');
+      if (dead.includes(survivor)) throw bad("a key cannot be merged into itself.");
+      return { survivorKey: survivor, deadKeys: [...dead] };
+    }),
+  );
+}
+
+function checkGroups(groups: MergeGroup[]): MergeGroup[] {
+  if (!groups.length) throw new Error("Pass at least one --group=<survivor>:<dead>[,<dead>...] (or --file= / --json=).");
   if (groups.length > MAX_GROUPS) throw new Error(`At most ${MAX_GROUPS} groups per run.`);
   const keys = groups.flatMap((g) => [g.survivorKey, ...g.deadKeys]);
   const dup = keys.find((k, i) => keys.indexOf(k) !== i);

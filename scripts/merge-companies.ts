@@ -3,7 +3,10 @@
  * `company_alias` per merged-away key so the next import resolves to the survivor instead of recreating it.
  *
  * INPUT IS ALWAYS EXPLICIT. Groups come from --group=<survivor_key>:<dead_key>[,<dead_key>...] (repeatable) or
- * --file=<path> (one such line per row; blanks and # comments skipped). The squash heuristic is used ONLY by
+ * --file=<path> (one such line per row; blanks and # comments skipped), or --json=<path> holding
+ * [{"survivor": "<key>", "dead": ["<key>", ...]}]. JSON is the way to merge a key containing ':' (which
+ * normalizeCompanyKey keeps, e.g. "quares :: it solutions") since the line format uses ':' as its separator;
+ * it cannot be combined with --group/--file. The squash heuristic is used ONLY by
  * --report to PROPOSE candidates; `&company` and `Company` squash alike and are different companies, so it must
  * never decide a merge. Keys are `company.company_key` values, matched exactly.
  *
@@ -34,25 +37,30 @@
  * DRY RUN IS THE DEFAULT (read-only transaction). Usage (do NOT run --execute without the owner's approval):
  *   npx tsx --env-file=.env.local scripts/merge-companies.ts --report [--match=<text>]
  *   npx tsx --env-file=.env.local scripts/merge-companies.ts --group=<survivor>:<dead>[,<dead>] [--file=groups.txt]
+ *   npx tsx --env-file=.env.local scripts/merge-companies.ts --json=groups.json
  *   npx tsx --env-file=.env.local scripts/merge-companies.ts --group=... --execute --actor=<bd id>
  *
  * EXIT CODES: 0 success (dry run, report or write); 1 bad arguments, a blocker, or any failed check (nothing written).
  */
 import { readFileSync } from "node:fs";
 import { dryRunMerge, executeMerge, readCandidateRecords } from "../src/lib/companyMerge/db";
-import { groupCandidates, parseGroupLines } from "../src/lib/companyMerge/plan";
+import { groupCandidates, parseGroupJson, parseGroupLines } from "../src/lib/companyMerge/plan";
 
 function parseArgs(argv: readonly string[]) {
-  const o = { execute: false, report: false, actor: null as string | null, match: null as string | null, lines: [] as string[] };
+  const o = { execute: false, report: false, actor: null as string | null, match: null as string | null, lines: [] as string[], json: null as string | null };
   for (const a of argv) {
     if (a === "--execute") o.execute = true;
     else if (a === "--report") o.report = true;
     else if (a.startsWith("--actor=")) o.actor = a.slice(8);
     else if (a.startsWith("--match=")) o.match = a.slice(8);
     else if (a.startsWith("--group=")) o.lines.push(a.slice(8));
-    else if (a.startsWith("--file=")) o.lines.push(...readFileSync(a.slice(7), "utf8").split("\n"));
-    else throw new Error(`Unknown argument: ${a}. Valid: --report, --match=<text>, --group=<survivor>:<dead>[,<dead>], --file=<path>, --execute, --actor=<bd id>`);
+    else if (a.startsWith("--json=")) {
+      if (o.json) throw new Error("Pass --json once.");
+      o.json = a.slice(7);
+    } else if (a.startsWith("--file=")) o.lines.push(...readFileSync(a.slice(7), "utf8").split("\n"));
+    else throw new Error(`Unknown argument: ${a}. Valid: --report, --match=<text>, --group=<survivor>:<dead>[,<dead>], --file=<path>, --json=<path>, --execute, --actor=<bd id>`);
   }
+  if (o.json && o.lines.length) throw new Error("--json cannot be combined with --group or --file: pick one input.");
   if (o.execute && !o.actor) throw new Error("--execute requires --actor=<bd id> for the audit log.");
   return o;
 }
@@ -69,7 +77,7 @@ async function main() {
     }
     return;
   }
-  const groups = parseGroupLines(o.lines);
+  const groups = o.json ? parseGroupJson(readFileSync(o.json, "utf8")) : parseGroupLines(o.lines);
   if (o.execute) {
     const r = await executeMerge(groups, o.actor!);
     console.log(`Merged ${r.plans.length} group(s). Rows repointed per table:`, r.moved, `\naudit_log id: ${r.auditLogId}`);

@@ -13,6 +13,7 @@ import {
   groupCandidates,
   mergeCompanyFields,
   movedRowCounts,
+  parseGroupJson,
   parseGroupLines,
   parseGroupSpec,
   planMerge,
@@ -210,4 +211,30 @@ test("groupCandidates: groups by squash, biggest group first, suggests the recor
   assert.equal(JSON.stringify(input), before);
   assert.deepEqual(groups.map((g) => [g.squash, g.contacts, g.records[0]!.companyKey]), [["ml", 7, "m l"], ["zz", 2, "z z"]]);
   assert.deepEqual(groupCandidates(input), groups);
+});
+
+test("parseGroupJson: a key containing ':' (and ',') round-trips, which the line format cannot express", () => {
+  const text = JSON.stringify([{ survivor: "quares :: it solutions", dead: ["quares it solutions", "a, b"] }]);
+  assert.deepEqual(parseGroupJson(text), [{ survivorKey: "quares :: it solutions", deadKeys: ["quares it solutions", "a, b"] }]);
+});
+
+test("the line format's refusal of ':' points at --json", () => {
+  assert.throws(() => parseGroupSpec("quares :: it solutions:quares it solutions"), /--json/);
+});
+
+test("parseGroupJson refuses malformed input with the entry it found it in", () => {
+  assert.throws(() => parseGroupJson("not json"), /not valid JSON/);
+  assert.throws(() => parseGroupJson('{"survivor":"a"}'), /array/);
+  assert.throws(() => parseGroupJson('[{"survivor":"a","dead":["b"]},{"survivor":"c"}]'), /entry 2/);
+  assert.throws(() => parseGroupJson('[{"survivor":"a","dead":["b",""]}]'), /entry 1/);
+  assert.throws(() => parseGroupJson('[{"survivor":"a","dead":["a"]}]'), /entry 1.*itself/);
+  assert.throws(() => parseGroupJson("[]"), /at least one/);
+});
+
+test("parseGroupJson applies the same cross-group rule: a key may appear once", () => {
+  assert.throws(() => parseGroupJson('[{"survivor":"a","dead":["b"]},{"survivor":"c","dead":["b"]}]'), /more than once/);
+});
+
+test("the existing line formats are unchanged", () => {
+  assert.deepEqual(parseGroupLines(["a:b,c", "# x", "d:e"]), [{ survivorKey: "a", deadKeys: ["b", "c"] }, { survivorKey: "d", deadKeys: ["e"] }]);
 });
