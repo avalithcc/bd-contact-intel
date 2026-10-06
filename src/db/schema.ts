@@ -965,6 +965,9 @@ export const auditLog = pgTable(
     // 'extract_signature_phones' (scripts/extract-signature-phones.ts filled
     // empty phones from the sender's own signature in inbound mail; history
     // rows carry source 'signature_extract')
+    // 'backfill_fi_arg_fields' (scripts/backfill-fi-arg-fields.ts filled the
+    // empty company, city, country and seniority of fi-arg-2026 persons from
+    // the lead_gen CSVs; history rows carry source 'import')
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
