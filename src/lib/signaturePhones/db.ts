@@ -58,14 +58,26 @@ export async function executeSignaturePhones(actorBdId: string, limit: number | 
     if (!plan.fills.length) return { plan, report, auditLogId: null };
     for (const f of plan.fills) if (!isUuid(f.personId)) throw new Error(`Planned fill target is not a uuid: ${f.personId}`);
 
-    for (const batch of chunk(plan.fills, WRITE_BATCH_SIZE)) {
-      const values = batch.map((f) => sql`(${f.personId}::uuid, ${f.column === "phone" ? f.value : null}::text, ${f.column === "mobilePhone" ? f.value : null}::text)`);
+    // One row per person (a person can get both columns), so the UPDATE ... FROM matches each id once.
+    const targets = new Map<string, { phone: string | null; mobile: string | null }>();
+    for (const f of plan.fills) {
+      const t = targets.get(f.personId) ?? { phone: null, mobile: null };
+      targets.set(f.personId, t);
+      if (f.column === "phone") t.phone = f.value;
+      else t.mobile = f.value;
+    }
+    for (const batch of chunk([...targets], WRITE_BATCH_SIZE)) {
+      const values = batch.map(([id, t]) => sql`(${id}::uuid, ${t.phone}::text, ${t.mobile}::text)`);
+      // Fill-empty per column, guarded again in SQL: a number added since the read is never overwritten.
       const updated = (await tx.execute(sql`
         update person as p
-        set phone = v.phone, mobile_phone = v.mobile_phone, updated_at = now(), updated_by_bd_id = ${actorBdId}::uuid
+        set phone = case when btrim(coalesce(p.phone, '')) = '' then v.phone else p.phone end,
+            mobile_phone = case when btrim(coalesce(p.mobile_phone, '')) = '' then v.mobile_phone else p.mobile_phone end,
+            updated_at = now(), updated_by_bd_id = ${actorBdId}::uuid
         from (values ${sql.join(values, sql`, `)}) as v(id, phone, mobile_phone)
         where p.id = v.id and p.merged_into_id is null
-          and btrim(coalesce(p.phone, '')) = '' and btrim(coalesce(p.mobile_phone, '')) = ''
+          and (v.phone is null or btrim(coalesce(p.phone, '')) = '')
+          and (v.mobile_phone is null or btrim(coalesce(p.mobile_phone, '')) = '')
         returning p.id::text as id
       `)) as unknown as { id: string }[];
       if (updated.length !== batch.length) throw new Error(`Expected to fill ${batch.length} contacts, filled ${updated.length}: a phone appeared since the plan was built.`);

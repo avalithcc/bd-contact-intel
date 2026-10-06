@@ -15,6 +15,7 @@
  *    international "+" number of 10+ digits. Everything else is "unlabeled".
  * 3. ATTRIBUTION is not decided here: see plan.ts and db.ts.
  *
+ * Kind comes from the label only (mobile / explicit landline / generic).
  * The stored value is the dialable part: extension dropped, dots turned into
  * spaces (src/lib/phone.ts does not accept them), validated with phone.ts.
  */
@@ -22,7 +23,8 @@ import { isValidPhoneFormat } from "@/lib/phone";
 
 export type QuoteBoundary = "wrote_header" | "dashed_original" | "outlook_rule" | "header_block" | "quoted_line" | "forwarded";
 export type RejectReason = "url" | "email" | "cuit" | "date" | "postal" | "reference" | "fax" | "too_short" | "too_long" | "invalid" | "unlabeled";
-export type PhoneKind = "mobile" | "phone";
+/** What the LABEL says, never the number's shape. "generic" = a bare "Tel:"/"Phone:" or an unlabelled "+" number: the kind is not stated. */
+export type PhoneKind = "mobile" | "landline" | "generic";
 
 export interface PhoneCandidate {
   value: string;
@@ -81,6 +83,7 @@ const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 const B = String.raw`(?<![a-záéíóúñ])`;
 const TAIL = String.raw`\s*[:.\-–|]?\s*$`;
 const MOBILE_LABEL = new RegExp(`${B}(?:cel(?:ular)?|cell(?:phone)?|m[oó]vil|mobile|mob|whats\\s?app|wsp|wpp)${TAIL}|${B}[mc]\\s*:\\s*$`, "i");
+const LANDLINE_LABEL = new RegExp(`${B}(?:(?:tel(?:[eé]fono)?|phone)\\s*)?(?:fijo|landline|l[ií]nea fija)${TAIL}`, "i");
 const PHONE_LABEL = new RegExp(`${B}(?:tel(?:[eé]fono)?|tlf|phone|fono|directo)${TAIL}|${B}t\\s*:\\s*$`, "i");
 const FAX_LABEL = new RegExp(`${B}fax${TAIL}`, "i");
 const CUIT_LABEL = new RegExp(`${B}(?:cuit|cuil|cdi)${TAIL}`, "i");
@@ -130,10 +133,10 @@ export function extractSenderPhones(body: string): ExtractResult {
     else if (digits.length > 15) reject("too_long");
     else {
       const value = raw.replace(/[./]/g, " ").replace(/\s+/g, " ").trim();
-      const kind: PhoneKind | null = MOBILE_LABEL.test(prefix) ? "mobile" : PHONE_LABEL.test(prefix) ? "phone" : null;
+      const kind: PhoneKind | null = MOBILE_LABEL.test(prefix) ? "mobile" : LANDLINE_LABEL.test(prefix) ? "landline" : PHONE_LABEL.test(prefix) ? "generic" : null;
       if (raw.includes("/") || /^(\d)\1+$/.test(digits) || !isValidPhoneFormat(value)) reject("invalid");
       else if (!kind && !(value.startsWith("+") && digits.length >= 10)) reject("unlabeled");
-      else if (!found.has(phoneKey(value))) found.set(phoneKey(value), { value, kind: kind ?? "phone", extensionDropped: extension });
+      else if (!found.has(phoneKey(value))) found.set(phoneKey(value), { value, kind: kind ?? "generic", extensionDropped: extension });
     }
   }
   return { boundary, phones: [...found.values()], rejected };

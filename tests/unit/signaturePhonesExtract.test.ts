@@ -90,7 +90,12 @@ test("dots become spaces so the stored value passes phone.ts", () => {
 test("labels decide the column kind", () => {
   assert.equal(extractSenderPhones("Móvil: 11 5555 0002").phones[0]?.kind, "mobile");
   assert.equal(extractSenderPhones("WhatsApp 11 5555 0002").phones[0]?.kind, "mobile");
-  assert.equal(extractSenderPhones("Tel: 4123 4567").phones[0]?.kind, "phone");
+  assert.equal(extractSenderPhones("Tel: 4123 4567").phones[0]?.kind, "generic");
+  assert.equal(extractSenderPhones("Tel fijo: 4123 4567").phones[0]?.kind, "landline");
+  assert.equal(extractSenderPhones("Landline 4123 4567").phones[0]?.kind, "landline");
+  assert.equal(extractSenderPhones("Ana\n+54 11 4123 4567").phones[0]?.kind, "generic");
+  // The kind comes from the label, never from the shape of the number.
+  assert.equal(extractSenderPhones("Tel: +54 9 11 5555 0002").phones[0]?.kind, "generic");
 });
 
 test("an international number is accepted without a label", () => {

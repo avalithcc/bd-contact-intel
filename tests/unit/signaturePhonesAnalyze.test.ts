@@ -19,7 +19,8 @@ test("counts attribution skips, missing boundaries, rejections and outcomes", ()
   assert.equal(report.bodiesNoBoundary, 3);
   assert.equal(report.rejected.cuit, 1);
   assert.equal(report.personsToFill, 1);
-  assert.equal(report.personsConflicting, 1);
+  assert.equal(report.personsConflictingKindUnstated, 1);
+  assert.equal(report.personsConflicting, 0);
   assert.equal(plan.fills[0]?.supportingMessages, 2);
   assert.ok(formatSignatureReport(report).some((l) => l.includes("75.0%")));
 });

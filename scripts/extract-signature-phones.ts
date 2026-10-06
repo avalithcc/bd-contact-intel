@@ -26,12 +26,17 @@
  *      person is not merged. Otherwise the row is skipped and counted.
  *
  * DATA CONTRACT
- *   - Fill-empty only: a person with any phone or mobile_phone is skipped.
- *   - Two or more DIFFERENT numbers for one person: no write, counted, left
- *     for a human (no "most frequent"). A landline plus a mobile in the same
- *     signature therefore counts as a conflict by design.
- *   - Number kind: all supporting labels mobile/whatsapp -> mobile_phone,
- *     anything else -> phone.
+ *   - Fill-empty only, per column. Kind comes from the LABEL, never from the
+ *     number's shape: cel/móvil/whatsapp = mobile, "tel fijo"/landline =
+ *     landline, a bare "Tel:" or an unlabelled "+" number = kind not stated.
+ *   - One number: mobile -> mobile_phone, otherwise phone; skipped if the
+ *     person already has any number.
+ *   - A labelled landline AND a labelled mobile are two facts: landline ->
+ *     phone, mobile -> mobile_phone, each only if empty (and never a number the
+ *     other column already holds).
+ *   - Two different numbers of the SAME stated kind: no write for that column,
+ *     counted, left for a human (no "most frequent"). Several numbers where
+ *     any label does not state its kind: no write, counted separately.
  *   - Agreement: the audit_log metadata lists, per filled person, how many
  *     distinct messages carried the written number (supportingMessages).
  *   - One person_property_history row per fill, source 'signature_extract'

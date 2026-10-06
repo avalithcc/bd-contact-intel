@@ -29,13 +29,18 @@ export interface SignatureReport {
   personsWithNumbers: number;
   personsToFill: number;
   personsAlreadyHaveNumber: number;
+  /** Two different numbers of the same stated kind. */
   personsConflicting: number;
+  /** Several numbers, at least one label did not state the kind. */
+  personsConflictingKindUnstated: number;
+  /** A labelled landline and a labelled mobile, both written. */
+  personsBothWritten: number;
 }
 
 export function analyzeCandidates(rows: readonly CandidateRow[]): { plan: SignaturePhonePlan; report: SignatureReport } {
   const report: SignatureReport = {
     candidatesRead: rows.length, unresolvedSender: 0, examined: 0, bodiesNoBoundary: 0, messagesWithNumber: 0, extensionsDropped: 0,
-    rejected: {}, personsWithNumbers: 0, personsToFill: 0, personsAlreadyHaveNumber: 0, personsConflicting: 0,
+    rejected: {}, personsWithNumbers: 0, personsToFill: 0, personsAlreadyHaveNumber: 0, personsConflicting: 0, personsConflictingKindUnstated: 0, personsBothWritten: 0,
   };
   const persons = new Map<string, PersonPhoneState>();
   const messages: ExtractedMessage[] = [];
@@ -55,8 +60,8 @@ export function analyzeCandidates(rows: readonly CandidateRow[]): { plan: Signat
   }
   const plan = planSignaturePhones(messages, persons);
   Object.assign(report, {
-    personsWithNumbers: plan.personsWithNumbers, personsToFill: plan.fills.length,
-    personsAlreadyHaveNumber: plan.skippedHasNumber, personsConflicting: plan.skippedConflict,
+    personsWithNumbers: plan.personsWithNumbers, personsToFill: new Set(plan.fills.map((f) => f.personId)).size,
+    personsAlreadyHaveNumber: plan.skippedHasNumber, personsConflicting: plan.skippedConflict, personsConflictingKindUnstated: plan.skippedConflictKindUnstated, personsBothWritten: plan.bothWritten,
   });
   return { plan, report };
 }
@@ -75,6 +80,8 @@ export function formatSignatureReport(r: SignatureReport): string[] {
     `Persons with an accepted number: ${r.personsWithNumbers}`,
     `Persons that would be filled: ${r.personsToFill}`,
     `Persons skipped, already have a number: ${r.personsAlreadyHaveNumber}`,
-    `Persons skipped, conflicting numbers (left for a human): ${r.personsConflicting}`,
+    `Persons with landline + mobile, both written: ${r.personsBothWritten}`,
+    `Persons skipped, conflicting (same kind, left for a human): ${r.personsConflicting}`,
+    `Persons skipped, several numbers with a kind not stated by the label: ${r.personsConflictingKindUnstated}`,
   ];
 }
