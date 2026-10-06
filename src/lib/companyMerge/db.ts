@@ -36,9 +36,9 @@ import {
 export const MERGE_AUDIT_ACTION = "merge_companies";
 const MOVED_ROW_CAP = 20_000;
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-const run = async <T>(tx: Tx, q: SQL): Promise<T[]> => (await tx.execute(q)) as unknown as T[];
-const list = (items: readonly string[]): SQL => sql.join(items.map((i) => sql`${i}`), sql`, `);
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export const run = async <T>(tx: Tx, q: SQL): Promise<T[]> => (await tx.execute(q)) as unknown as T[];
+export const list = (items: readonly string[]): SQL => sql.join(items.map((i) => sql`${i}`), sql`, `);
 const pairs = (plans: readonly GroupPlan[]): SQL =>
   sql.join(plans.flatMap((p) => p.deadKeys.map((d) => sql`(${d}::text, ${p.survivorKey}::text)`)), sql`, `);
 
@@ -58,7 +58,7 @@ const REPOINT: readonly (readonly [string, string])[] = [
   ["task", "id"],
 ];
 
-async function countRefs(tx: Tx, keys: readonly string[]) {
+export async function countRefs(tx: Tx, keys: readonly string[]) {
   const per = COMPANY_KEY_TABLES.map((t) => sql`select ${t}::text as t, company_key as k, count(*)::int as n from ${sql.raw(t)} where company_key in (${list(keys)}) group by company_key`);
   return buildRefCounts(await run(tx, sql.join(per, sql` union all `)));
 }
