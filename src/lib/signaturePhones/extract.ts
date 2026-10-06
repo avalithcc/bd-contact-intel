@@ -15,7 +15,10 @@
  *    international "+" number of 10+ digits. Everything else is "unlabeled".
  * 3. ATTRIBUTION is not decided here: see plan.ts and db.ts.
  *
- * Kind comes from the label only (mobile / explicit landline / generic).
+ * Kind comes from the label only (mobile / explicit landline / generic), never
+ * from the digits. One exception, by the author's own contrast: a bare "Tel:"
+ * label becomes a landline when a labelled mobile sits within CONTRAST_LINES
+ * lines of it in the sender's part (the same signature block); flagged.
  * The stored value is the dialable part: extension dropped, dots turned into
  * spaces (src/lib/phone.ts does not accept them), validated with phone.ts.
  */
@@ -30,6 +33,8 @@ export interface PhoneCandidate {
   value: string;
   kind: PhoneKind;
   extensionDropped: boolean;
+  /** True when a bare "Tel:" became a landline only by contrast with a labelled mobile in the same block. */
+  landlineInferred?: true;
 }
 export interface ExtractResult {
   boundary: QuoteBoundary | null;
@@ -77,6 +82,7 @@ const NUM = String.raw`(?:\(\d{1,5}\)|\d+)`;
 const SEP = String.raw`(?:[  ]?[./-][  ]?|[  ])`;
 const EXT = String.raw`(?:[  ]*(?:ext|int|interno|anexo|x)\.?[  ]*\d+)`;
 const CANDIDATE = new RegExp(String.raw`(?<![A-Za-z0-9])\+?[  ]?${NUM}(?:${SEP}${NUM})*(${EXT})?(?![A-Za-z0-9])`, "gi");
+const CONTRAST_LINES = 5;
 const URL_RE = /(?:https?:\/\/|www\.)\S+/gi;
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
@@ -107,7 +113,7 @@ export function extractSenderPhones(body: string): ExtractResult {
   const emails = spansOf(EMAIL_RE, text);
   const rejected: ExtractResult["rejected"] = {};
   const reject = (reason: RejectReason) => void (rejected[reason] = (rejected[reason] ?? 0) + 1);
-  const found = new Map<string, PhoneCandidate>();
+  const found = new Map<string, { phone: PhoneCandidate; line: number; bare: boolean }>();
 
   for (const m of text.matchAll(CANDIDATE)) {
     const at = m.index!;
@@ -136,8 +142,16 @@ export function extractSenderPhones(body: string): ExtractResult {
       const kind: PhoneKind | null = MOBILE_LABEL.test(prefix) ? "mobile" : LANDLINE_LABEL.test(prefix) ? "landline" : PHONE_LABEL.test(prefix) ? "generic" : null;
       if (raw.includes("/") || /^(\d)\1+$/.test(digits) || !isValidPhoneFormat(value)) reject("invalid");
       else if (!kind && !(value.startsWith("+") && digits.length >= 10)) reject("unlabeled");
-      else if (!found.has(phoneKey(value))) found.set(phoneKey(value), { value, kind: kind ?? "generic", extensionDropped: extension });
+      else if (!found.has(phoneKey(value))) {
+        const line = text.slice(0, at).split("\n").length;
+        found.set(phoneKey(value), { phone: { value, kind: kind ?? "generic", extensionDropped: extension }, line, bare: kind === "generic" || kind === null ? PHONE_LABEL.test(prefix) : false });
+      }
     }
   }
-  return { boundary, phones: [...found.values()], rejected };
+  const entries = [...found.values()];
+  const mobileLines = entries.filter((e) => e.phone.kind === "mobile").map((e) => e.line);
+  const phones = entries.map(({ phone, line, bare }) =>
+    bare && mobileLines.some((l) => Math.abs(l - line) <= CONTRAST_LINES) ? { ...phone, kind: "landline" as const, landlineInferred: true as const } : phone,
+  );
+  return { boundary, phones, rejected };
 }

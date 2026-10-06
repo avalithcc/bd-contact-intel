@@ -131,3 +131,34 @@ test("the same number in two formats is deduplicated within a message", () => {
 test("empty body yields nothing", () => {
   assert.deepEqual(extractSenderPhones("").phones, []);
 });
+
+test("a bare Tel: next to a labelled mobile in the same block is a landline, flagged as inferred", () => {
+  const { phones } = extractSenderPhones("Ana\nTel: 4123 4567\nCel: 11 5555 0002");
+  assert.deepEqual(phones.map((p) => [p.kind, p.landlineInferred ?? false]), [["landline", true], ["mobile", false]]);
+});
+
+test("a bare Tel: alone, or two bare labels with no mobile, stay generic", () => {
+  assert.equal(extractSenderPhones("Tel: 4123 4567").phones[0]?.kind, "generic");
+  const two = extractSenderPhones("Tel: 4123 4567\nPhone: 4123 9999").phones;
+  assert.deepEqual(two.map((p) => p.kind), ["generic", "generic"]);
+});
+
+test("contrast never uses the digits: an unlabelled + number is not licensed", () => {
+  const { phones } = extractSenderPhones("+54 11 4123 4567\nCel: 11 5555 0002");
+  assert.deepEqual(phones.map((p) => p.kind), ["generic", "mobile"]);
+});
+
+test("an explicit landline label is not marked as inferred", () => {
+  const { phones } = extractSenderPhones("Tel fijo: 4123 4567\nCel: 11 5555 0002");
+  assert.equal(phones[0]?.landlineInferred, undefined);
+});
+
+test("contrast does not cross the quote boundary", () => {
+  const body = ["Tel: 4123 4567", "", "On Mon, Oct 5, 2026, Beto <b@example.test> wrote:", "> Cel: 11 5555 0009"].join("\n");
+  assert.equal(extractSenderPhones(body).phones[0]?.kind, "generic");
+});
+
+test("contrast does not cross into a distant, different block of the same message", () => {
+  const far = ["Cel: 11 5555 0002", "", "", "", "", "", "", "Saludos", "Tel: 4123 4567"].join("\n");
+  assert.deepEqual(extractSenderPhones(far).phones.map((p) => p.kind), ["mobile", "generic"]);
+});

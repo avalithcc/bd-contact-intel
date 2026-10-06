@@ -91,7 +91,7 @@ export async function executeSignaturePhones(actorBdId: string, limit: number | 
         actorBdId,
         action: SIGNATURE_AUDIT_ACTION,
         // Revert: see the header of scripts/extract-signature-phones.ts. supportingMessages is the audit trail of agreement.
-        metadata: { report, fills: plan.fills.map((f) => ({ personId: f.personId, column: f.column, supportingMessages: f.supportingMessages })) },
+        metadata: { report, fills: plan.fills.map((f) => ({ personId: f.personId, column: f.column, supportingMessages: f.supportingMessages, ...(f.landlineInferred ? { landlineInferred: true } : {}) })) },
       })
       .returning({ id: auditLog.id });
     return { plan, report, auditLogId: audit!.id };

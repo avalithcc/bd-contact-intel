@@ -32,6 +32,8 @@ export interface SignaturePhoneFill {
   column: "phone" | "mobilePhone";
   value: string;
   supportingMessages: number;
+  /** The landline kind rests on contrast with a labelled mobile, not on its own label. */
+  landlineInferred?: true;
 }
 export interface SignaturePhonePlan {
   fills: SignaturePhoneFill[];
@@ -42,14 +44,16 @@ export interface SignaturePhonePlan {
   skippedConflictKindUnstated: number;
   /** Persons that got both `phone` and `mobile_phone` written. */
   bothWritten: number;
+  /** Landline fills whose kind rests on contrast with a labelled mobile. */
+  landlineInferredWritten: number;
   /** Known persons with at least one extracted number, before any skip. */
   personsWithNumbers: number;
 }
 
 const blank = (v: string | null) => (v ?? "").trim() === "";
-type Found = { value: string; kinds: Set<PhoneKind>; messageIds: Set<string> };
+type Found = { value: string; kinds: Set<PhoneKind>; messageIds: Set<string>; inferred: boolean; explicit: boolean };
 const kindOf = (n: Found): PhoneKind => (n.kinds.size === 1 ? [...n.kinds][0]! : "generic");
-const fillOf = (personId: string, column: SignaturePhoneFill["column"], n: Found): SignaturePhoneFill => ({ personId, column, value: n.value, supportingMessages: n.messageIds.size });
+const fillOf = (personId: string, column: SignaturePhoneFill["column"], n: Found): SignaturePhoneFill => ({ personId, column, value: n.value, supportingMessages: n.messageIds.size, ...(column === "phone" && n.inferred && !n.explicit ? { landlineInferred: true as const } : {}) });
 
 export function planSignaturePhones(messages: readonly ExtractedMessage[], persons: ReadonlyMap<string, PersonPhoneState>): SignaturePhonePlan {
   const byPerson = new Map<string, Map<string, Found>>();
@@ -59,14 +63,16 @@ export function planSignaturePhones(messages: readonly ExtractedMessage[], perso
       const numbers = byPerson.get(message.personId) ?? new Map<string, Found>();
       byPerson.set(message.personId, numbers);
       const key = phoneKey(phone.value);
-      const entry = numbers.get(key) ?? { value: phone.value, kinds: new Set<PhoneKind>(), messageIds: new Set<string>() };
+      const entry = numbers.get(key) ?? { value: phone.value, kinds: new Set<PhoneKind>(), messageIds: new Set<string>(), inferred: false, explicit: false };
       numbers.set(key, entry);
       entry.kinds.add(phone.kind);
+      if (phone.landlineInferred) entry.inferred = true;
+      else if (phone.kind === "landline") entry.explicit = true;
       entry.messageIds.add(message.messageId);
     }
   }
 
-  const plan: SignaturePhonePlan = { fills: [], skippedHasNumber: 0, skippedConflict: 0, skippedConflictKindUnstated: 0, bothWritten: 0, personsWithNumbers: byPerson.size };
+  const plan: SignaturePhonePlan = { fills: [], skippedHasNumber: 0, skippedConflict: 0, skippedConflictKindUnstated: 0, bothWritten: 0, landlineInferredWritten: 0, personsWithNumbers: byPerson.size };
   for (const [personId, numbers] of byPerson) {
     const state = persons.get(personId)!;
     const found = [...numbers.values()];
@@ -87,6 +93,7 @@ export function planSignaturePhones(messages: readonly ExtractedMessage[], perso
     const written = wanted.filter(([column, n]) => phoneKey(n.value) !== phoneKey((column === "phone" ? state.mobilePhone : state.phone) ?? ""));
     plan.fills.push(...written.map(([column, n]) => fillOf(personId, column, n)));
     if (written.length === 2) plan.bothWritten++;
+    plan.landlineInferredWritten += written.filter(([, n]) => n.inferred && !n.explicit && kindOf(n) === "landline").length;
     if (conflict) plan.skippedConflict++;
     else if (!written.length) plan.skippedHasNumber++;
   }

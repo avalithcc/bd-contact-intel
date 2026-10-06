@@ -35,7 +35,7 @@ test("a person who already has a number is skipped, never overwritten", () => {
 
 test("messages for an unknown person are ignored", () => {
   const plan = planSignaturePhones([msg("m1", "ghost", "Cel: 11 5555-0002")], new Map());
-  assert.deepEqual(plan, { fills: [], skippedHasNumber: 0, skippedConflict: 0, skippedConflictKindUnstated: 0, bothWritten: 0, personsWithNumbers: 0 });
+  assert.deepEqual(plan, { fills: [], skippedHasNumber: 0, skippedConflict: 0, skippedConflictKindUnstated: 0, bothWritten: 0, landlineInferredWritten: 0, personsWithNumbers: 0 });
 });
 
 test("pure: same input twice gives the same plan and the input is untouched", () => {
@@ -91,8 +91,25 @@ test("a conflicting mobile does not block an unrelated single landline", () => {
   assert.equal(plan.skippedConflict, 1);
 });
 
-test("a mix with an unlabelled-kind number is treated as one ambiguous set: no write", () => {
-  const messages = [msg("m1", "p1", "Tel: 4123 4567\nCel: 11 5555-0002"), msg("m2", "p2", "Tel fijo: 4123 4567\n+54 11 5555 0002")];
-  const plan = planSignaturePhones(messages, new Map([["p1", EMPTY], ["p2", EMPTY]]));
-  assert.deepEqual([plan.fills.length, plan.skippedConflict, plan.skippedConflictKindUnstated], [0, 0, 2]);
+test("bare Tel: + labelled Cel: in one signature writes both columns and counts the inference", () => {
+  const plan = planSignaturePhones([msg("m1", "p1", "Tel: 4123 4567\nCel: 11 5555-0002")], new Map([["p1", EMPTY]]));
+  assert.deepEqual(plan.fills.map((f) => [f.column, f.value, f.landlineInferred ?? false]), [["phone", "4123 4567", true], ["mobilePhone", "11 5555-0002", false]]);
+  assert.equal(plan.bothWritten, 1);
+  assert.equal(plan.landlineInferredWritten, 1);
+});
+
+test("a bare Tel: in one message and a Cel: in ANOTHER is no contrast: no write", () => {
+  const messages = [msg("m1", "p1", "Tel: 4123 4567"), msg("m2", "p1", "Cel: 11 5555-0002")];
+  const plan = planSignaturePhones(messages, new Map([["p1", EMPTY]]));
+  assert.deepEqual([plan.fills.length, plan.skippedConflictKindUnstated], [0, 1]);
+});
+
+test("two bare labels and no mobile still refuse", () => {
+  const plan = planSignaturePhones([msg("m1", "p1", "Tel: 4123 4567\nPhone: 4123 9999")], new Map([["p1", EMPTY]]));
+  assert.deepEqual([plan.fills.length, plan.skippedConflictKindUnstated], [0, 1]);
+});
+
+test("a mix with an unlabelled + number is an ambiguous set: no write", () => {
+  const plan = planSignaturePhones([msg("m1", "p1", "Tel fijo: 4123 4567\n+54 11 5555 0002")], new Map([["p1", EMPTY]]));
+  assert.deepEqual([plan.fills.length, plan.skippedConflictKindUnstated], [0, 1]);
 });

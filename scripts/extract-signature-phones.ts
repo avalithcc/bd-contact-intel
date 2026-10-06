@@ -37,6 +37,12 @@
  *   - Two different numbers of the SAME stated kind: no write for that column,
  *     counted, left for a human (no "most frequent"). Several numbers where
  *     any label does not state its kind: no write, counted separately.
+ *   - One inference, by the author's own contrast and never from the digits: a
+ *     bare "Tel:"/"Phone:"/"T:" is read as a landline when a labelled mobile
+ *     sits within 5 lines of it in the sender's part of the SAME message (never
+ *     across messages or into quoted text). Alone, or with another bare label
+ *     and no mobile, it stays "kind not stated". These fills are counted on
+ *     their own report line and flagged landlineInferred in the audit metadata.
  *   - Agreement: the audit_log metadata lists, per filled person, how many
  *     distinct messages carried the written number (supportingMessages).
  *   - One person_property_history row per fill, source 'signature_extract'

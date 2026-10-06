@@ -35,12 +35,14 @@ export interface SignatureReport {
   personsConflictingKindUnstated: number;
   /** A labelled landline and a labelled mobile, both written. */
   personsBothWritten: number;
+  /** Landline fills that rest on contrast with a labelled mobile (bare "Tel:"). */
+  landlinesInferred: number;
 }
 
 export function analyzeCandidates(rows: readonly CandidateRow[]): { plan: SignaturePhonePlan; report: SignatureReport } {
   const report: SignatureReport = {
     candidatesRead: rows.length, unresolvedSender: 0, examined: 0, bodiesNoBoundary: 0, messagesWithNumber: 0, extensionsDropped: 0,
-    rejected: {}, personsWithNumbers: 0, personsToFill: 0, personsAlreadyHaveNumber: 0, personsConflicting: 0, personsConflictingKindUnstated: 0, personsBothWritten: 0,
+    rejected: {}, personsWithNumbers: 0, personsToFill: 0, personsAlreadyHaveNumber: 0, personsConflicting: 0, personsConflictingKindUnstated: 0, personsBothWritten: 0, landlinesInferred: 0,
   };
   const persons = new Map<string, PersonPhoneState>();
   const messages: ExtractedMessage[] = [];
@@ -61,7 +63,7 @@ export function analyzeCandidates(rows: readonly CandidateRow[]): { plan: Signat
   const plan = planSignaturePhones(messages, persons);
   Object.assign(report, {
     personsWithNumbers: plan.personsWithNumbers, personsToFill: new Set(plan.fills.map((f) => f.personId)).size,
-    personsAlreadyHaveNumber: plan.skippedHasNumber, personsConflicting: plan.skippedConflict, personsConflictingKindUnstated: plan.skippedConflictKindUnstated, personsBothWritten: plan.bothWritten,
+    personsAlreadyHaveNumber: plan.skippedHasNumber, personsConflicting: plan.skippedConflict, personsConflictingKindUnstated: plan.skippedConflictKindUnstated, personsBothWritten: plan.bothWritten, landlinesInferred: plan.landlineInferredWritten,
   });
   return { plan, report };
 }
@@ -81,6 +83,7 @@ export function formatSignatureReport(r: SignatureReport): string[] {
     `Persons that would be filled: ${r.personsToFill}`,
     `Persons skipped, already have a number: ${r.personsAlreadyHaveNumber}`,
     `Persons with landline + mobile, both written: ${r.personsBothWritten}`,
+    `  of which landline inferred from contrast with a labelled mobile: ${r.landlinesInferred}`,
     `Persons skipped, conflicting (same kind, left for a human): ${r.personsConflicting}`,
     `Persons skipped, several numbers with a kind not stated by the label: ${r.personsConflictingKindUnstated}`,
   ];
