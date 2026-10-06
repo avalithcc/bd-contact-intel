@@ -816,7 +816,9 @@ export const personPropertyHistory = pgTable(
     }),
     // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration' | 'owner_backfill' |
     // 'company_cleanup' (scripts/clear-non-company-employers.ts cleared a
-    // Freelance/Independiente employer).
+    // Freelance/Independiente employer) | 'signature_extract'
+    // (scripts/extract-signature-phones.ts filled an empty phone from the
+    // sender's own signature in inbound mail).
     // property 'ownerBdId' + source 'edit' marks a manual owner, sticky against
     // the automatic owner rule (src/lib/identity/ownerRule.ts).
     source: text("source").notNull(),
@@ -960,6 +962,9 @@ export const auditLog = pgTable(
     // 'clear_non_company_employers' (scripts/clear-non-company-employers.ts
     // removed Freelance/Independiente as employers and deleted those company
     // records)
+    // 'extract_signature_phones' (scripts/extract-signature-phones.ts filled
+    // empty phones from the sender's own signature in inbound mail; history
+    // rows carry source 'signature_extract')
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
