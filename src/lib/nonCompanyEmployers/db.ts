@@ -11,17 +11,19 @@ import { countRefs, list, run, type Tx } from "../companyMerge/db";
 import { COMPANY_KEY_TABLES, refCount } from "../companyMerge/keys";
 import { chunk, WRITE_BATCH_SIZE } from "../migration/collapseWriteRows";
 import { isUuid } from "../uuid";
-import { cascadeBlockers, CLEARED_TABLES, clearedHistoryRows, findNonCompanyKeys, type ClearedPerson } from "./match";
+import { cascadeBlockers, CLEARED_TABLES, clearedHistoryRows, findNonCompanyKeys, resolveExplicitKeys, type ClearedPerson } from "./match";
 
 export const CLEANUP_AUDIT_ACTION = "clear_non_company_employers";
 const ROW_CAP = 5_000;
 
-async function read(tx: Tx, lock: boolean) {
-  // Same squash as match.ts; the SQL only prefilters, the JS matcher decides.
+async function read(tx: Tx, lock: boolean, explicit: readonly string[] | null) {
+  // Built-in matcher: the SQL only prefilters (same squash as match.ts), the JS matcher decides. An explicit,
+  // owner-confirmed list bypasses the matcher entirely and is only checked for existence.
   const squashed = sql`regexp_replace(lower(company_key), '[^a-z0-9]', '', 'g') ~ '(freelance|independiente)'`;
-  const found = await run<{ k: string }>(tx, sql.join(COMPANY_KEY_TABLES.map((t) => sql`select company_key as k from ${sql.raw(t)} where ${squashed}`), sql` union `));
-  const keys = findNonCompanyKeys(found.map((r) => r.k));
-  if (!keys.length) return { keys, names: new Map<string, string[]>(), counts: new Map<string, number>(), blockers: [] as string[] };
+  const filter = explicit ? sql`company_key in (${list(explicit)})` : squashed;
+  const found = await run<{ k: string }>(tx, sql.join(COMPANY_KEY_TABLES.map((t) => sql`select company_key as k from ${sql.raw(t)} where ${filter}`), sql` union `));
+  const { keys, unknown } = explicit ? resolveExplicitKeys(explicit, new Set(found.map((r) => r.k))) : { keys: findNonCompanyKeys(found.map((r) => r.k)), unknown: [] as string[] };
+  if (!keys.length) return { keys, unknown, names: new Map<string, string[]>(), counts: new Map<string, number>(), blockers: [] as string[] };
   if (lock) await run(tx, sql`select 1 from company where company_key in (${list(keys)}) for update`);
   const named = await run<{ k: string; name: string }>(tx, sql`
     select company_key as k, display_name as name from company where company_key in (${list(keys)})
@@ -30,20 +32,21 @@ async function read(tx: Tx, lock: boolean) {
   const names = new Map<string, string[]>();
   for (const n of named) names.set(n.k, [...(names.get(n.k) ?? []), n.name]);
   const counts = await countRefs(tx, keys);
-  return { keys, names, counts, blockers: cascadeBlockers(counts, keys) };
+  return { keys, unknown, names, counts, blockers: cascadeBlockers(counts, keys) };
 }
 
-export async function dryRunCleanup() {
+export async function dryRunCleanup(explicit: readonly string[] | null = null) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`set transaction read only`);
-    return read(tx, false);
+    return read(tx, false, explicit);
   });
 }
 
-export async function executeCleanup(actorBdId: string) {
+export async function executeCleanup(actorBdId: string, explicit: readonly string[] | null = null) {
   if (!isUuid(actorBdId)) throw new Error("--actor must be a bd uuid.");
   return db.transaction(async (tx) => {
-    const r = await read(tx, true);
+    const r = await read(tx, true, explicit);
+    if (r.unknown.length) throw new Error(`These listed keys exist in no company_key table (typo, or already cleared): ${r.unknown.join(", ")}. Nothing written.`);
     if (!r.keys.length) return { ...r, auditLogId: null as string | null };
     if (r.blockers.length) throw new Error(`STOP, nothing written. Deleting these companies would cascade into real data:\n- ${r.blockers.join("\n- ")}`);
     const cleared = CLEARED_TABLES.reduce((n, t) => n + r.keys.reduce((m, k) => m + refCount(r.counts, t, k), 0), 0);
@@ -70,7 +73,7 @@ export async function executeCleanup(actorBdId: string) {
       action: CLEANUP_AUDIT_ACTION,
       // Revert source: see the header of scripts/clear-non-company-employers.ts.
       metadata: {
-        matchedKeys: r.keys, displayNames: Object.fromEntries(r.names), referenceCounts: Object.fromEntries(r.keys.map((k) => [k, Object.fromEntries(COMPANY_KEY_TABLES.map((t) => [t, refCount(r.counts, t, k)]))])),
+        mode: explicit ? "explicit_keys" : "matcher", matchedKeys: r.keys, displayNames: Object.fromEntries(r.names), referenceCounts: Object.fromEntries(r.keys.map((k) => [k, Object.fromEntries(COMPANY_KEY_TABLES.map((t) => [t, refCount(r.counts, t, k)]))])),
         clearedPersons: persons, clearedContacts: contacts, clearedLeads: leads, deletedBoardCandidates: candidates, deletedProbes: probes, deletedCompanies: companies.map((c) => c.snapshot),
       },
     }).returning({ id: auditLog.id });

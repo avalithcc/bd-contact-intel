@@ -10,6 +10,8 @@ import {
   DELETED_TABLES,
   findNonCompanyKeys,
   isNonCompanyEmployer,
+  parseKeyList,
+  resolveExplicitKeys,
   STOP_TABLES,
 } from "../../src/lib/nonCompanyEmployers/match";
 
@@ -78,4 +80,30 @@ test("clearedHistoryRows: one row per property that held a value, new value null
     [["p1", "company", "Freelance", null], ["p1", "companyKey", "freelance", null], ["p2", "company", "Independiente", null], ["p2", "companyKey", "independiente", null], ["p2", "companyCategory", "Services", null]],
   );
   assert.ok(rows.every((r) => r.source === CLEANUP_HISTORY_SOURCE && (r.source as string) !== "edit" && r.changedByBdId === "bd1"));
+});
+
+test("parseKeyList reads one key per line, skips blanks and # comments, dedupes, and never mutates its input", () => {
+  const lines = ["# confirmed by the owner", "", "  profesional independiente ", "consultor independiente", "profesional independiente"];
+  const before = [...lines];
+  assert.deepEqual(parseKeyList(lines), ["profesional independiente", "consultor independiente"]);
+  assert.deepEqual(lines, before);
+  assert.deepEqual(parseKeyList(lines), parseKeyList(lines));
+  assert.throws(() => parseKeyList(["# only a comment", ""]), /at least one/);
+});
+
+test("an explicit list acts only on the listed keys that exist; one that matches nothing is reported, not ignored", () => {
+  const existing = new Set(["profesional independiente", "freelance", "acme"]);
+  const r = resolveExplicitKeys(["profesional independiente", "profesional independente"], existing);
+  assert.deepEqual(r, { keys: ["profesional independiente"], unknown: ["profesional independente"] });
+});
+
+test("the built-in matcher is untouched: it still does not catch PROFESIONAL INDEPENDIENTE, which only an explicit list can", () => {
+  assert.equal(isNonCompanyEmployer("profesional independiente"), false);
+  assert.equal(isNonCompanyEmployer("freelance"), true);
+});
+
+test("an explicitly listed key that is not a matcher variant still hits the refusal list", () => {
+  const counts = buildRefCounts([{ t: "task", k: "profesional independiente", n: 2 }, { t: "person", k: "profesional independiente", n: 152 }]);
+  assert.equal(isNonCompanyEmployer("profesional independiente"), false);
+  assert.deepEqual(cascadeBlockers(counts, ["profesional independiente"]), ["task: 2 row(s)"]);
 });

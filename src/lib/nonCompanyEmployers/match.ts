@@ -50,3 +50,19 @@ export const clearedHistoryRows = (cleared: readonly ClearedPerson[], actorBdId:
       personId: p.id, property: prop, oldValue: p[prop], newValue: null, changedByBdId: actorBdId, source: CLEANUP_HISTORY_SOURCE,
     })),
   );
+
+const MAX_EXPLICIT_KEYS = 500;
+
+/** A confirmed list: one company_key per line, blanks and `#` comments skipped, trimmed, deduped (order kept). */
+export function parseKeyList(lines: readonly string[]): string[] {
+  const keys = [...new Set(lines.map((l) => l.trim()).filter((l) => l && !l.startsWith("#")))];
+  if (!keys.length) throw new Error("The confirmed list needs at least one company_key.");
+  if (keys.length > MAX_EXPLICIT_KEYS) throw new Error(`At most ${MAX_EXPLICIT_KEYS} keys per run.`);
+  return keys;
+}
+
+/** `existing` = the requested keys found in any company_key table. A key found nowhere is a typo, not a no-op. */
+export const resolveExplicitKeys = (requested: readonly string[], existing: ReadonlySet<string>) => ({
+  keys: requested.filter((k) => existing.has(k)),
+  unknown: requested.filter((k) => !existing.has(k)),
+});
