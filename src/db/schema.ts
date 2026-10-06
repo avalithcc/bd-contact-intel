@@ -971,6 +971,9 @@ export const auditLog = pgTable(
     // 'assign_won_company_owners' (scripts/assign-won-company-owners.ts gave
     // ownerless won companies an owner; company history rows carry source
     // 'import')
+    // 'delete_nameless_imported_contacts' (scripts/delete-nameless-imported-contacts.ts
+    // deleted the untouched contacts of the commercial-contacts import that
+    // have neither first nor last name; metadata holds the deleted rows)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",

@@ -25,6 +25,31 @@ interface Loaded {
   filledIds: string[];
 }
 
+/**
+ * Touch flags per still-existing contact of the import (one query, one correlated EXISTS per table); an id absent
+ * from the result no longer exists. Shared with scripts/delete-nameless-imported-contacts.ts so the deletability
+ * guard exists once.
+ */
+export async function readTouchFlags(tx: DbTransaction, ids: readonly string[], importOwnerBdId: string): Promise<Map<string, TouchFlag[]>> {
+  if (!ids.length) return new Map();
+  const refFlags = REFERENCING_TABLES.map(
+    ([flag, table, cols]) =>
+      sql`exists (select 1 from ${sql.raw(table)} r where ${sql.join(cols.map((c) => sql`r.${sql.raw(c)} = p.id`), sql` or `)}) as ${sql.raw(flag)}`,
+  );
+  const stateFlags = [
+    sql`(p.merged_into_id is not null) as ${sql.raw(STATE_FLAGS[0])}`,
+    sql`exists (select 1 from person m where m.merged_into_id = p.id) as ${sql.raw(STATE_FLAGS[1])}`,
+    sql`exists (select 1 from person_property_history h where h.person_id = p.id and h.source <> 'import') as ${sql.raw(STATE_FLAGS[2])}`,
+    sql`(p.owner_bd_id is distinct from ${importOwnerBdId}::uuid or p.status <> 'new') as ${sql.raw(STATE_FLAGS[3])}`,
+  ];
+  const factRows = (await tx.execute(sql`
+    select p.id::text as id, ${sql.join([...refFlags, ...stateFlags], sql`, `)}
+    from person p
+    where p.source_key = ${CONTACTOS_SOURCE_KEY} and p.id in (${sql.join(ids.map((id) => sql`${id}::uuid`), sql`, `)})
+  `)) as unknown as ({ id: string } & Record<TouchFlag, boolean>)[];
+  return new Map(factRows.map((r) => [r.id, TOUCH_FLAGS.filter((f) => r[f])]));
+}
+
 async function load(tx: DbTransaction, auditId: string | null): Promise<Loaded> {
   const [row] = await tx
     .select({ id: auditLog.id, at: auditLog.at, metadata: auditLog.metadata })
@@ -38,24 +63,7 @@ async function load(tx: DbTransaction, auditId: string | null): Promise<Loaded> 
   const filledIds = meta.filledPersonIds ?? [];
   if (![...createdIds, ...filledIds, meta.ownerBdId ?? ""].every(isUuid)) throw new Error("audit_log metadata holds a non-uuid id: refusing to run.");
 
-  const refFlags = REFERENCING_TABLES.map(
-    ([flag, table, cols]) =>
-      sql`exists (select 1 from ${sql.raw(table)} r where ${sql.join(cols.map((c) => sql`r.${sql.raw(c)} = p.id`), sql` or `)}) as ${sql.raw(flag)}`,
-  );
-  const stateFlags = [
-    sql`(p.merged_into_id is not null) as ${sql.raw(STATE_FLAGS[0])}`,
-    sql`exists (select 1 from person m where m.merged_into_id = p.id) as ${sql.raw(STATE_FLAGS[1])}`,
-    sql`exists (select 1 from person_property_history h where h.person_id = p.id and h.source <> 'import') as ${sql.raw(STATE_FLAGS[2])}`,
-    sql`(p.owner_bd_id is distinct from ${meta.ownerBdId}::uuid or p.status <> 'new') as ${sql.raw(STATE_FLAGS[3])}`,
-  ];
-  const factRows = createdIds.length
-    ? ((await tx.execute(sql`
-        select p.id::text as id, ${sql.join([...refFlags, ...stateFlags], sql`, `)}
-        from person p
-        where p.source_key = ${CONTACTOS_SOURCE_KEY} and p.id in (${sql.join(createdIds.map((id) => sql`${id}::uuid`), sql`, `)})
-      `)) as unknown as ({ id: string } & Record<TouchFlag, boolean>)[])
-    : [];
-  const facts = new Map(factRows.map((r) => [r.id, TOUCH_FLAGS.filter((f) => r[f])]));
+  const facts = await readTouchFlags(tx, createdIds, meta.ownerBdId!);
 
   const phones = filledIds.length
     ? await tx.select({ id: person.id, phone: person.phone, mobilePhone: person.mobilePhone }).from(person).where(inArray(person.id, filledIds))
