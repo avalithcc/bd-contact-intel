@@ -201,9 +201,18 @@ export const companyAlias = pgTable(
   {
     // Normalized key as it appears in contact.company_key.
     aliasKey: text("alias_key").primaryKey(),
+    // The canonical key an alias resolves to: a foreign key to `company`
+    // (migration 0039; it used to point at target_company). The canonical
+    // record is usually a plain CRM company, not a hiring target, and
+    // scripts/merge-companies.ts writes one alias per merged-away key so a
+    // re-import lands on the survivor. Pointing at `company` also means an
+    // alias can never name a company that does not exist. ON DELETE CASCADE:
+    // an alias to a deleted company is meaningless, and both delete paths
+    // that touch company rows repoint (merge) or refuse (non-company cleanup)
+    // before deleting, so the cascade never removes an alias that still matters.
     companyKey: text("company_key")
       .notNull()
-      .references(() => targetCompany.companyKey, { onDelete: "cascade" }),
+      .references(() => company.companyKey, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -944,6 +953,8 @@ export const auditLog = pgTable(
     // deleted the untouched created contacts and cleared the filled phones)
     // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
     // account's history_id so the cron re-fetches up to two years of mail)
+    // 'merge_companies' (scripts/merge-companies.ts folded confirmed duplicate
+    // company records into one survivor; metadata lists what moved per table)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
@@ -1126,9 +1137,8 @@ export const companyPropertyHistory = pgTable(
     changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // 'edit' | 'import' — mirrors person_property_history.source; company
-    // rows have no merge/unmerge concept yet, so those two source values
-    // never appear here.
+    // 'edit' | 'import' | 'merge' — mirrors person_property_history.source.
+    // 'merge' is a field filled or promoted by scripts/merge-companies.ts.
     source: text("source").notNull(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },

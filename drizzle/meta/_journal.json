@@ -274,6 +274,13 @@
       "when": 1792787071556,
       "tag": "0038_company_linkedin_url",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792873471556,
+      "tag": "0039_company_alias_fk_to_company",
+      "breakpoints": true
     }
   ]
 }
