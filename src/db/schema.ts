@@ -805,7 +805,8 @@ export const personPropertyHistory = pgTable(
     changedByBdId: uuid("changed_by_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),
-    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration' | 'owner_backfill'.
+    // 'edit' | 'merge' | 'unmerge' | 'import' | 'migration' | 'owner_backfill' |
+    // 'signature_extract'.
     // property 'ownerBdId' + source 'edit' marks a manual owner, sticky against
     // the automatic owner rule (src/lib/identity/ownerRule.ts).
     source: text("source").notNull(),
@@ -944,6 +945,9 @@ export const auditLog = pgTable(
     // deleted the untouched created contacts and cleared the filled phones)
     // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
     // account's history_id so the cron re-fetches up to two years of mail)
+    // 'extract_signature_phones' (scripts/extract-signature-phones.ts filled
+    // empty phones from the sender's own signature in inbound mail; history
+    // rows carry source 'signature_extract')
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
