@@ -29,6 +29,13 @@
  * removed — deleting an alias from the source file does NOT delete it from
  * the database (remove it manually if that's ever needed).
  *
+ * An alias requires a `company` row: `company_alias.company_key` is a foreign
+ * key to `company` (migration 0039; it used to point at `target_company`, which
+ * could not hold an alias to a plain CRM company). So before writing a row's
+ * aliases this inserts a bare `company` row (company_key + display_name only,
+ * the same shape src/lib/hubspot/importQueries.ts creates) with ON CONFLICT DO
+ * NOTHING: an existing company, and everything a BD has set on it, is untouched.
+ *
  * Usage (do NOT run automatically — this touches the real database):
  *   npx tsx scripts/seed-target-companies.ts /path/to/target_companies.json
  *
@@ -37,7 +44,7 @@
 import fs from "node:fs";
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { companyAlias, targetCompany } from "../src/db/schema";
+import { company, companyAlias, targetCompany } from "../src/db/schema";
 
 interface SeedRow {
   companyKey: string;
@@ -84,6 +91,10 @@ async function main() {
     console.log(`  upserted ${row.companyKey}`);
 
     if (row.aliases?.length) {
+      await db
+        .insert(company)
+        .values({ companyKey: row.companyKey, displayName: row.displayName })
+        .onConflictDoNothing({ target: company.companyKey });
       await db
         .insert(companyAlias)
         .values(row.aliases.map((aliasKey) => ({ aliasKey, companyKey: row.companyKey })))
