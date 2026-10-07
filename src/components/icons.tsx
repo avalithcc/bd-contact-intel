@@ -415,3 +415,14 @@ export function MergeIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+// "Absorciones" admin nav entry — path copied 1:1 from company-absorption-review/mockups/absorciones-revision.html.
+export function AbsorbIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M8 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+      <path d="M16 17h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+      <path d="M12 8v8M9 13l3 3 3-3" />
+    </Svg>
+  );
+}

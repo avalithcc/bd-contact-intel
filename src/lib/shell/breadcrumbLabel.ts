@@ -30,6 +30,7 @@ export type BreadcrumbKey = keyof NavLabels;
  * entry, and `/contacts` must not swallow `/contact-status`.
  */
 const ROUTE_LABELS: ReadonlyArray<readonly [string, BreadcrumbKey]> = [
+  ["/admin/absorptions", "absorptions"],
   ["/admin/audit-log", "auditLog"],
   ["/admin/duplicates", "duplicates"],
   ["/admin/migration", "migration"],
