@@ -40,6 +40,7 @@ const CONVERTED_TABLES: readonly string[] = [
   "company_category",
   "target_company",
   "company_alias",
+  "company_absorption_proposal",
   "sync_run",
   "discovery_run",
   "company_probe",

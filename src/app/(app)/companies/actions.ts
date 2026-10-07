@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { createCompany, getCompanyByKey, updateCompany } from "@/lib/companies/queries";
 import { getCurrentBd } from "@/lib/queries";
+import { proposeAbsorption, type ProposeAbsorptionResult } from "@/lib/companies/absorptionDb";
 import type { Company, NewCompany } from "@/db/schema";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
@@ -277,4 +278,17 @@ export async function getCompanyTimelineFilterEntriesAction(
     console.error("[companies] getCompanyTimelineFilterEntriesAction failed", err);
     return { ok: false };
   }
+}
+
+/**
+ * "This company was absorbed by that one": records a PROPOSAL for the owner, never a merge (the merge stays an
+ * owner-run script). Any BD may call it, so there is no admin gate; the proposer is always the session's bd, never
+ * a client-supplied id. Refusals come back as data (`reason`, plus `openProposalId` when one is already open).
+ * Not wired to any component yet: the record-page affordance waits on an approved mockup.
+ */
+export async function proposeCompanyAbsorptionAction(absorbedKey: string, survivorKey: string, note?: string): Promise<ProposeAbsorptionResult> {
+  const me = await getCurrentBd();
+  const result = await proposeAbsorption({ absorbedKey, survivorKey, proposerBdId: me.id, note });
+  if (result.ok) revalidatePath(`/companies/${absorbedKey}`);
+  return result;
 }
