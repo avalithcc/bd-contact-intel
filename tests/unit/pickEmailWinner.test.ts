@@ -129,3 +129,49 @@ test(`pickEmailWinnerSide agrees with pickEmailWinner for every row of the cross
     assert.equal(actualSide, expectedSide, row.label);
   }
 });
+
+// Owner's decision (2026-10-07): in a B2B CRM the employer's address is the
+// one we write to, so a corporate domain outranks `verified` on a consumer
+// one. Measured against the open duplicate pairs, the status-only rule kept
+// the personal address in 4 of the 7 that disagree.
+type Side = { email: string | null; emailStatus: EmailStatus };
+const side = (email: string | null, emailStatus: EmailStatus): Side => ({ email, emailStatus });
+
+test("the corporate domain beats a verified consumer address", () => {
+  const work = side("aldo.malaver@globant.com", "probable");
+  const personal = side("almalaver@gmail.com", "verified");
+  assert.equal(pickEmailWinner(work, personal), work);
+  assert.equal(pickEmailWinner(personal, work), work);
+});
+
+test("between two corporate addresses the status still decides", () => {
+  const probable = side("dardo.marasca@jampp.com", "probable");
+  const verified = side("dardo@jampp.com", "verified");
+  assert.equal(pickEmailWinner(probable, verified), verified);
+  assert.equal(pickEmailWinner(verified, probable), verified);
+});
+
+test("between two consumer addresses the status still decides", () => {
+  const hotmail = side("arymolcha@hotmail.com", "none");
+  const gmail = side("ary@gmail.com", "verified");
+  assert.equal(pickEmailWinner(hotmail, gmail), gmail);
+});
+
+test("a regional consumer domain is still consumer", () => {
+  const work = side("x@kandasoft.com", "none");
+  const yahooAr = side("x@yahoo.com.ar", "verified");
+  assert.equal(pickEmailWinner(yahooAr, work), work);
+});
+
+test("an unparseable address never wins on domain alone", () => {
+  const broken = side("not-an-address", "verified");
+  const work = side("x@globant.com", "probable");
+  assert.equal(pickEmailWinner(broken, work), work);
+});
+
+test("having an address still beats having none, whatever the domain", () => {
+  const gmail = side("x@gmail.com", "none");
+  const empty = side(null, "none");
+  assert.equal(pickEmailWinner(empty, gmail), gmail);
+  assert.equal(pickEmailWinner(gmail, empty), gmail);
+});

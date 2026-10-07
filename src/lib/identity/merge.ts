@@ -23,6 +23,7 @@
  */
 import { classifyPosition } from "@/lib/roleGroups";
 import { mergeProperties, mergeProperty, emailStatusRank, type EmailStatus, type PropertyLoss } from "@/lib/identity/matcher";
+import { isFreeMailDomain, splitEmail } from "@/lib/emailPatterns";
 import { pickOwnerByLastWorked, type OwnerTouch } from "@/lib/identity/ownerRule";
 import { parseConnectedOnDate } from "@/lib/migration/connectedOn";
 
@@ -301,9 +302,26 @@ function candidate(value: string | null, specificity?: number) {
  * The one shared email-winner decision for a merge: given two candidates
  * that each carry an `email` + `emailStatus`, picks which one keeps its
  * email column. Ties — including neither side having an email — favor `a`.
- * Ranks by `emailStatusRank` (matcher.ts), so this can never drift from the
- * definition every other email-status comparison in the codebase already
- * uses.
+ *
+ * ORDER OF PREFERENCE, highest first:
+ *   1. The side that HAS an email at all.
+ *   2. The side whose domain is NOT a consumer mail provider
+ *      (`isFreeMailDomain`, emailPatterns.ts).
+ *   3. `emailStatusRank` (matcher.ts), so this can never drift from the
+ *      definition every other email-status comparison already uses.
+ *
+ * WHY THE CORPORATE DOMAIN OUTRANKS THE STATUS (owner's decision, 2026-10-07):
+ * the Gmail sync marks an address `verified` when it has seen real messages
+ * from it, while an address inferred from the employer's domain stays
+ * `probable`. Ranking by status alone therefore kept the PERSONAL address
+ * and discarded the work one — measured on the 7 open duplicate pairs whose
+ * two sides disagree, it did exactly that in 4 of them (e.g. keeping
+ * `...@gmail.com` over `...@globant.com`). `verified` answers "is this
+ * address real"; this is a B2B CRM, where the question is "which address do
+ * we write to for business", and that is the employer's.
+ *
+ * The discarded address is NOT lost: `mergeEmailFields` records it as a
+ * `PropertyLoss`, the merge snapshot keeps it, and `planUnmerge` restores it.
  *
  * This is the single source of truth for the winner side: `mergeEmailFields`
  * below (the live merge write path used by `/admin/duplicates` and
@@ -320,6 +338,15 @@ export function pickEmailWinner<T extends { email: string | null; emailStatus: E
   if (aHas && !bHas) return a;
   if (bHas && !aHas) return b;
   if (!aHas && !bHas) return a;
+  // An address this cannot parse counts as free-mail, i.e. it never wins on
+  // domain alone and the decision falls through to the status rank.
+  const corporate = (email: string | null) => {
+    const split = email ? splitEmail(email) : null;
+    return !!split && !isFreeMailDomain(split.domain);
+  };
+  const aCorp = corporate(a.email);
+  const bCorp = corporate(b.email);
+  if (aCorp !== bCorp) return aCorp ? a : b;
   return emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus) ? b : a;
 }
 
