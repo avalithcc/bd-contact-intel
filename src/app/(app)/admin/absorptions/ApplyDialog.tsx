@@ -2,17 +2,10 @@
 
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
-import { CheckIcon } from "@/components/icons";
+import { CheckIcon, WarningIcon } from "@/components/icons";
 import { confirmationMatches } from "@/lib/companies/absorptionReview";
 
-export interface ApplyDialogLabels {
-  open: string;
-  title: string;
-  body: string;
-  confirm: string;
-  audit: string;
-  cancel: string;
-}
+type Labels = Record<"open" | "title" | "body" | "confirm" | "audit" | "cancel", string>;
 
 /**
  * The typed-name brake before an irreversible merge (mockup's "Aplicar la fusión" dialog). The disabled button is a
@@ -24,11 +17,14 @@ export function ApplyDialog({
   proposalId,
   expectedName,
   labels,
+  lostWarning,
   action,
 }: {
   proposalId: string;
   expectedName: string;
-  labels: ApplyDialogLabels;
+  labels: Labels;
+  /** Other open proposals this merge would destroy (cascade); shown where the decision is made. */
+  lostWarning: string | null;
   action: (formData: FormData) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -73,6 +69,12 @@ export function ApplyDialog({
         <form id={formId} action={run} className="stack">
           <input type="hidden" name="proposalId" value={proposalId} />
           <p>{labels.body}</p>
+          {lostWarning && (
+            <div className="alert alert-warn" role="alert">
+              <WarningIcon className="icon" />
+              <div>{lostWarning}</div>
+            </div>
+          )}
           <div className="field">
             <label className="label" htmlFor={inputId}>
               {labels.confirm}

@@ -3,8 +3,10 @@
  * absorptionDb.ts (reads and the reject UPDATE) and companyMerge/db.ts#executeMerge (the merge itself).
  */
 import { canTransition, isAbsorptionStatus } from "@/lib/companies/absorption";
-import { strongestStage } from "@/lib/companyMerge/plan";
+import { REFUSAL_PREFIX, strongestStage } from "@/lib/companyMerge/plan";
 import type { MergeGroup } from "@/lib/companyMerge/plan";
+import { matchProposalsToGroups } from "@/lib/companyMerge/proposals";
+import type { OpenProposalView } from "@/lib/companies/absorption";
 
 /** What the apply action re-reads from the database, so nothing the client posts decides what gets merged. */
 export interface ResolutionFacts {
@@ -16,9 +18,12 @@ export interface ResolutionFacts {
   absorbedName: string | null;
 }
 
-/** Exact match after trimming: this is the brake on an irreversible merge, so no case folding. */
+/** Unicode-composed, whitespace runs collapsed, trimmed. Still case-sensitive: it is the brake on an irreversible merge. */
+const canonical = (s: string): string => s.normalize("NFC").replace(/\s+/g, " ").trim();
+
+/** Compares in canonical form so a name stored decomposed (NFD, common in imports) can still be typed on a keyboard. */
 export const confirmationMatches = (typed: unknown, expected: string): boolean =>
-  typeof typed === "string" && expected.trim() !== "" && typed.trim() === expected.trim();
+  typeof typed === "string" && canonical(expected) !== "" && canonical(typed) === canonical(expected);
 
 export type ApplyDecision = { ok: true; group: MergeGroup } | { ok: false; code: "not_open" | "name_mismatch" };
 
@@ -32,12 +37,11 @@ export function decideApply(f: ResolutionFacts | null, typed: unknown): ApplyDec
 }
 
 export const DETAIL_MAX = 600;
-const BLOCKER_PREFIX = "Refusing to execute:";
 
 /** executeMerge throws `Refusing to execute:\n- reason\n- reason` on blockers; anything else is not a blocker. */
 export function blockerDetail(err: unknown): string | null {
-  if (!(err instanceof Error) || !err.message.startsWith(BLOCKER_PREFIX)) return null;
-  const reasons = err.message.slice(BLOCKER_PREFIX.length).split("\n").map((l) => l.replace(/^\s*-\s*/, "").trim()).filter(Boolean);
+  if (!(err instanceof Error) || !err.message.startsWith(REFUSAL_PREFIX)) return null;
+  const reasons = err.message.slice(REFUSAL_PREFIX.length).split("\n").map((l) => l.replace(/^\s*-\s*/, "").trim()).filter(Boolean);
   return reasons.join(" · ").slice(0, DETAIL_MAX);
 }
 
@@ -74,4 +78,16 @@ export const keptSide = (absorbed: string | null, survivor: string | null): Side
 export function keptStage(absorbed: string | null, survivor: string | null): Side {
   const kept = strongestStage(survivor, absorbed);
   return kept === null ? null : kept === survivor ? "survivor" : "absorbed";
+}
+
+/**
+ * The other open proposals that applying this one destroys: their survivor FK is ON DELETE CASCADE, so one that names
+ * the absorbed company as its survivor is deleted with it. Classified by the merge engine's own matcher, over the
+ * proposals already on screen (no extra read). A proposal that merely absorbs the survivor is untouched.
+ */
+export function proposalsLostByApplying(selected: OpenProposalView, open: readonly OpenProposalView[]): OpenProposalView[] {
+  const refs = open.map((p) => ({ id: p.id, absorbedKey: p.absorbed.key, survivorKey: p.survivor.key }));
+  const group = { survivorKey: selected.survivor.key, deadKeys: [selected.absorbed.key] };
+  const lost = new Set(matchProposalsToGroups([group], refs).divergent.filter((d) => d.reason !== "absorbed_is_survivor").map((d) => d.id));
+  return open.filter((p) => lost.has(p.id));
 }

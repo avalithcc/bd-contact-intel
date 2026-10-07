@@ -9,8 +9,12 @@ import {
   keptStage,
   outcomeTone,
   parseOutcome,
+  proposalsLostByApplying,
   type ResolutionFacts,
 } from "../../src/lib/companies/absorptionReview";
+import { refusalMessage } from "../../src/lib/companyMerge/plan";
+import { ProposalNotOpenError, assertProposalMatched } from "../../src/lib/companyMerge/proposals";
+import type { OpenProposalView } from "../../src/lib/companies/absorption";
 
 const facts = (over: Partial<ResolutionFacts> = {}): ResolutionFacts => ({
   status: "open",
@@ -49,11 +53,11 @@ test("apply refuses when the typed name does not match the live name", () => {
 });
 
 test("executeMerge blockers are parsed from the thrown message; other errors are not blockers", () => {
-  const err = new Error("Refusing to execute:\n- a posting collides\n- 30000 rows would move");
+  const err = new Error(refusalMessage(["a posting collides", "30000 rows would move"]));
   assert.equal(blockerDetail(err), "a posting collides · 30000 rows would move");
   assert.equal(blockerDetail(new Error("No company row with company_key \"x\".")), null);
-  assert.equal(blockerDetail("Refusing to execute:\n- x"), null);
-  assert.equal(blockerDetail(new Error(`Refusing to execute:\n- ${"y".repeat(2000)}`))?.length, 600);
+  assert.equal(blockerDetail(refusalMessage(["x"])), null);
+  assert.equal(blockerDetail(new Error(refusalMessage(["y".repeat(2000)])))?.length, 600);
 });
 
 test("outcomes: only known codes parse, blockers keep a bounded detail, and tone is never green for a refusal", () => {
@@ -87,4 +91,32 @@ test("the stronger stage survives, a tie keeps the survivor, and no stage keeps 
   assert.equal(keptStage("lost", "qualified"), "survivor");
   assert.equal(keptStage(null, null), null);
   assert.equal(keptStage("qualified", null), "absorbed");
+});
+
+test("the typed name matches across Unicode forms and whitespace runs, so a decomposed import name can be confirmed", () => {
+  const nfd = "Da\u0301vila  Hermanos\u00a0S.A.";
+  assert.notEqual(nfd, nfd.normalize("NFC"));
+  assert.ok(confirmationMatches("D\u00e1vila Hermanos S.A.", nfd), "keyboard (NFC) input vs stored NFD");
+  assert.ok(confirmationMatches(nfd, "D\u00e1vila Hermanos S.A."));
+  assert.ok(!confirmationMatches("Davila Hermanos S.A.", nfd), "a different letter is still a mismatch");
+  assert.ok(!confirmationMatches("D\u00e1vila Hermanos", nfd));
+});
+
+test("a merge that no longer fulfils the required open proposal is refused, before anything is written", () => {
+  const ref = { id: "p1", absorbedKey: "a", survivorKey: "b" };
+  assert.doesNotThrow(() => assertProposalMatched([ref], "p1"));
+  assert.throws(() => assertProposalMatched([], "p1"), ProposalNotOpenError);
+  assert.throws(() => assertProposalMatched([{ ...ref, id: "p2" }], "p1"), ProposalNotOpenError);
+});
+
+const view = (id: string, absorbed: string, survivor: string) =>
+  ({ id, absorbed: { key: absorbed, displayName: absorbed.toUpperCase() }, survivor: { key: survivor } }) as unknown as OpenProposalView;
+
+test("applying A->B loses the open proposals that name A as survivor, and nothing else", () => {
+  const p1 = view("p1", "a", "b");
+  const toA = view("p2", "x", "a");
+  const unrelated = view("p3", "y", "z");
+  const absorbsB = view("p4", "b", "c");
+  assert.deepEqual(proposalsLostByApplying(p1, [p1, toA, unrelated, absorbsB]).map((p) => p.id), ["p2"]);
+  assert.deepEqual(proposalsLostByApplying(p1, [p1, unrelated]), []);
 });

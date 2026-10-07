@@ -34,3 +34,14 @@ export function matchProposalsToGroups(groups: readonly MergeGroup[], open: read
   }
   return { matched, divergent };
 }
+
+/** Thrown inside executeMerge's transaction, before any write, when the proposal it was asked to fulfil is no longer open. */
+export class ProposalNotOpenError extends Error {
+  constructor(id: string) {
+    super(`Proposal ${id} is no longer open. Nothing was written.`);
+  }
+}
+
+export function assertProposalMatched(matched: readonly OpenProposalRef[], id: string): void {
+  if (!matched.some((m) => m.id === id)) throw new ProposalNotOpenError(id);
+}

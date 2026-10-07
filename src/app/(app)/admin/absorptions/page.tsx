@@ -5,8 +5,8 @@ import { CheckIcon, CloseIcon, CompaniesIcon, LockIcon, WarningIcon } from "@/co
 import { initialsFromName } from "@/components/initials";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { listOpenAbsorptionProposals } from "@/lib/companies/absorptionDb";
-import { keptSide, keptStage, outcomeTone, parseOutcome, type Side } from "@/lib/companies/absorptionReview";
+import { listOpenAbsorptionProposals, OPEN_PROPOSALS_MAX_LIMIT } from "@/lib/companies/absorptionDb";
+import { keptSide, keptStage, outcomeTone, parseOutcome, proposalsLostByApplying, type Side } from "@/lib/companies/absorptionReview";
 import type { ProposalCompanyView } from "@/lib/companies/absorption";
 import { stageBadgeClass, stageLabelOf } from "@/lib/companies/listMappers";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -19,12 +19,11 @@ export const dynamic = "force-dynamic";
 
 // Spanish-only regardless of `locale`, same rationale as /admin/duplicates.
 const dict = es.absorptions;
-const PAGE_SIZE = 25;
 
 export default async function AbsorptionsAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ proposal?: string; page?: string; result?: string; detail?: string }>;
+  searchParams: Promise<{ proposal?: string; result?: string; detail?: string }>;
 }) {
   try {
     await requireAdmin();
@@ -35,16 +34,15 @@ export default async function AbsorptionsAdminPage({
   }
 
   const sp = await searchParams;
-  const page = Math.max(1, Math.trunc(Number(sp.page)) || 1);
-  const items = await listOpenAbsorptionProposals(PAGE_SIZE, (page - 1) * PAGE_SIZE);
+  // No pagination: one read of up to OPEN_PROPOSALS_MAX_LIMIT, oldest first; the subtitle keeps the real total.
+  const items = await listOpenAbsorptionProposals(OPEN_PROPOSALS_MAX_LIMIT);
   const total = items[0]?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selectedIndex = Math.max(0, sp.proposal && isUuid(sp.proposal) ? items.findIndex((i) => i.id === sp.proposal) : 0);
   const selected = items[selectedIndex] ?? null;
   const outcome = parseOutcome(sp);
   const tone = outcome ? outcomeTone(outcome.code) : null;
-  const href = (p: number, proposal?: string) => `/admin/absorptions?page=${p}${proposal ? `&proposal=${proposal}` : ""}`;
-  const oldestAgo = page === 1 && items[0] ? relativeTime(items[0].createdAt, "es") : null;
+  const oldestAgo = items[0] ? relativeTime(items[0].createdAt, "es") : null;
+  const lostNames = selected ? proposalsLostByApplying(selected, items).map((p) => p.absorbed.displayName) : [];
 
   return (
     <main className="page">
@@ -90,7 +88,7 @@ export default async function AbsorptionsAdminPage({
             </div>
             <div className="pad-2xs">
               {items.map((item, i) => (
-                <Link key={item.id} href={href(page, item.id)} className={`queue-item${i === selectedIndex ? " active" : ""}`}>
+                <Link key={item.id} href={`/admin/absorptions?proposal=${item.id}`} className={`queue-item${i === selectedIndex ? " active" : ""}`}>
                   <div>
                     <div className="strong">{item.absorbed.displayName}</div>
                     <div className="meta">{dict.queueItemMeta(item.survivor.displayName, item.proposedBy.name, relativeTime(item.createdAt, "es"))}</div>
@@ -98,13 +96,6 @@ export default async function AbsorptionsAdminPage({
                 </Link>
               ))}
             </div>
-            {pageCount > 1 && (
-              <div className="card-footer row between">
-                {page > 1 ? <Link href={href(page - 1)}>{dict.prevPage}</Link> : <span />}
-                <span className="meta">{dict.pageOf(page, pageCount)}</span>
-                {page < pageCount ? <Link href={href(page + 1)}>{dict.nextPage}</Link> : <span />}
-              </div>
-            )}
           </div>
 
           <div className="card">
@@ -116,7 +107,7 @@ export default async function AbsorptionsAdminPage({
                 </span>
               </div>
               <span className="actions">
-                <span className="meta">{dict.proposalOf((page - 1) * PAGE_SIZE + selectedIndex + 1, total)}</span>
+                <span className="meta">{dict.proposalOf(selectedIndex + 1, total)}</span>
               </span>
             </div>
             <div className="card-body">
@@ -151,6 +142,7 @@ export default async function AbsorptionsAdminPage({
                 proposalId={selected.id}
                 expectedName={selected.absorbed.displayName}
                 action={applyAbsorptionAction}
+                lostWarning={lostNames.length ? dict.lostWarning(selected.absorbed.displayName, lostNames) : null}
                 labels={{
                   open: dict.applyButton,
                   title: dict.dialogTitle,
@@ -243,14 +235,12 @@ function CompareTable({ absorbed: a, survivor: s }: { absorbed: ProposalCompanyV
           {rows.map((r) => (
             <tr key={r.label}>
               <th scope="row">{r.label}</th>
-              <td className={r.differs ? "differs" : ""}>
-                {r.a}
-                {keep(r.side ?? null, "absorbed")}
-              </td>
-              <td className={r.differs ? "differs" : ""}>
-                {r.s}
-                {keep(r.side ?? null, "survivor")}
-              </td>
+              {(["absorbed", "survivor"] as const).map((side) => (
+                <td key={side} className={r.differs ? "differs" : ""}>
+                  {side === "absorbed" ? r.a : r.s}
+                  {keep(r.side ?? null, side)}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>

@@ -21,12 +21,13 @@ import { db } from "@/db";
 import { auditLog, companyPropertyHistory } from "@/db/schema";
 import { isUuid } from "@/lib/uuid";
 import { buildRefCounts, COMPANY_KEY_TABLES, refCount, squashCompanyKey } from "./keys";
-import { matchProposalsToGroups, type OpenProposalRef, type ProposalMatches } from "./proposals";
+import { assertProposalMatched, matchProposalsToGroups, type OpenProposalRef, type ProposalMatches } from "./proposals";
 import {
   findBlockers,
   MERGE_FIELDS,
   movedRowCounts,
   planMerge,
+  refusalMessage,
   type CandidateRecord,
   type CompanyRow,
   type GroupPlan,
@@ -128,11 +129,17 @@ export async function dryRunMerge(groups: readonly MergeGroup[]) {
   });
 }
 
-export async function executeMerge(groups: readonly MergeGroup[], actorBdId: string) {
+/**
+ * `requireProposalId` (the review screen): throws ProposalNotOpenError inside the transaction, after the locked read
+ * and before any write, unless that proposal is still open and fulfilled by the groups. Checking earlier, outside the
+ * transaction, would only move the window in which someone else can reject it.
+ */
+export async function executeMerge(groups: readonly MergeGroup[], actorBdId: string, requireProposalId?: string) {
   if (!isUuid(actorBdId)) throw new Error("--actor must be a bd uuid.");
   return db.transaction(async (tx) => {
     const { plans, moved, blockers, targetsToCreate, proposals } = await read(tx, groups, true);
-    if (blockers.length) throw new Error(`Refusing to execute:\n- ${blockers.join("\n- ")}`);
+    if (requireProposalId) assertProposalMatched(proposals.matched, requireProposalId);
+    if (blockers.length) throw new Error(refusalMessage(blockers));
     const deads = plans.flatMap((p) => p.deadKeys);
 
     await run(tx, sql`

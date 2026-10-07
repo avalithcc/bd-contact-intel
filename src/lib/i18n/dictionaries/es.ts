@@ -1874,14 +1874,13 @@ export const es: typeof en = {
     queueItemMeta: (survivor: string, proposer: string, ago: string) => `hacia ${survivor} · ${proposer} · ${ago}`,
     reasonBadge: "Fusión propuesta",
     proposalOf: (index: number, total: number) => `Propuesta ${index} de ${total}`,
-    prevPage: "Anterior",
-    nextPage: "Siguiente",
-    pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,
     warnLead: (absorbed: string, survivor: string, contacts: number) =>
       contacts === 0
         ? `Al aplicar, ${absorbed} se fusiona en ${survivor} y la empresa deja de existir.`
         : `Al aplicar, ${contacts === 1 ? "el contacto" : `los ${contacts} contactos`} de ${absorbed} ${contacts === 1 ? "pasa" : "pasan"} a ${survivor} y la empresa deja de existir.`,
     warnBody: "También se mueven sus actividades, tareas, vacantes y alias. No se puede deshacer desde la aplicación.",
+    lostWarning: (survivor: string, names: string[]) =>
+      `Al aplicar también se eliminará${names.length === 1 ? "" : "n"} sin dejar registro ${names.length === 1 ? "otra propuesta abierta" : `otras ${names.length} propuestas abiertas`} que ${names.length === 1 ? "tiene" : "tienen"} a ${survivor} como empresa que sobrevive: ${names.join(", ")}.`,
     noNote: "Sin nota.",
     absorbedRole: "Se absorbe",
     survivorRole: "Sobrevive",
@@ -1892,7 +1891,7 @@ export const es: typeof en = {
     rowOwner: "Responsable",
     rowLastActivity: "Última actividad",
     kept: "✓ conservado",
-    moving: "se mudan",
+    moving: "se trasladan",
     remaining: (n: number) => `quedan ${n}`,
     noValue: "—",
     rejectButton: "Rechazar",
@@ -1904,7 +1903,7 @@ export const es: typeof en = {
     dialogAudit: (survivor: string) => `Queda registrado en el historial de ${survivor} y en el registro de auditoría, a tu nombre.`,
     cancelButton: "Cancelar",
     emptyTitle: "No hay absorciones propuestas",
-    emptyBody: "Cuando un BD marque una empresa como absorbida desde su ficha, la propuesta aparece acá para que la apruebes o la rechaces.",
+    emptyBody: "Cuando un BD marque una empresa como absorbida desde su ficha, la propuesta aparece aquí para que la apruebes o la rechaces.",
     blockedReasonsLabel: "Motivos",
     outcomes: {
       applied: "La fusión se aplicó y la propuesta quedó resuelta.",

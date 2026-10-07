@@ -1903,12 +1903,11 @@ export const en = {
     queueItemMeta: (survivor: string, proposer: string, ago: string) => `into ${survivor} · ${proposer} · ${ago}`,
     reasonBadge: "Proposed merge",
     proposalOf: (index: number, total: number) => `Proposal ${index} of ${total}`,
-    prevPage: "Previous",
-    nextPage: "Next",
-    pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
     warnLead: (absorbed: string, survivor: string, contacts: number) =>
       `On apply, ${contacts} contacts of ${absorbed} move to ${survivor} and the company ceases to exist.`,
     warnBody: "Its activities, tasks, postings and aliases move too. This cannot be undone from the app.",
+    lostWarning: (survivor: string, names: string[]) =>
+      `Applying also deletes, without a trace, ${names.length} other open proposals that name ${survivor} as the surviving company: ${names.join(", ")}.`,
     noNote: "No note.",
     absorbedRole: "Absorbed",
     survivorRole: "Survives",
