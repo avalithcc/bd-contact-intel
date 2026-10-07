@@ -16,7 +16,12 @@ import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { accountTypeLabel, industryLabel, ownerLabel, stageBadgeClass, vacantesLabel } from "@/lib/companies/listMappers";
 import { ACCOUNT_TYPES, isAccountType, type AccountType } from "@/lib/companies/accountTypeFilter";
 import { LINKEDIN_PRESENCES, isLinkedinPresence, linkedinPresenceLabel, type LinkedinPresence } from "@/lib/companies/linkedinPresence";
-import { CLIENT_STATUSES, clientStatusLabel, isClientStatus, type ClientStatus } from "@/lib/companies/clientStatus";
+import { CLIENT_STATUSES, clientStatusLabel } from "@/lib/companies/clientStatus";
+import { CLIENT_STATUS_FILTER_NONE, isClientStatusFilter, type ClientStatusFilter } from "@/lib/companies/clientStatusFilter";
+import { BULK_COMPANY_TARGET_CAP } from "@/lib/companies/bulkClientStatus";
+import { SELECT_ALL_COMPANIES_CHECKBOX_ID } from "@/lib/contacts/bulkSelection";
+import { BulkResultToast } from "../contacts/BulkResultToast";
+import { CompanyBulkBar } from "./CompanyBulkBar";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +31,18 @@ type Stage = (typeof STAGES)[number];
 
 function isStage(value: string | undefined): value is Stage {
   return !!value && (STAGES as readonly string[]).includes(value);
+}
+
+const CLIENT_STATUS_OPTIONS: ClientStatusFilter[] = [...CLIENT_STATUSES, CLIENT_STATUS_FILTER_NONE];
+
+/** Parses the `?bulkResult=` redirect param (bulkActions.ts) into the toast text. */
+function bulkResultMessage(raw: string | undefined, l: Awaited<ReturnType<typeof getDictionary>>["companyList"]): string | null {
+  if (!raw) return null;
+  const [kind, a, b] = raw.split(":");
+  if (kind !== "clientStatus") return null;
+  if (a === "confirm") return l.bulkResultClientStatusConfirm;
+  if (a === "invalid") return l.bulkResultClientStatusInvalid;
+  return l.bulkResultClientStatus(Number(a) || 0, Number(b) || 0);
 }
 
 function isView(value: string | undefined): value is CompanyListView {
@@ -43,6 +60,8 @@ interface CompaniesPageProps {
     clientStatus?: string;
     linkedin?: string;
     q?: string;
+    bulkResult?: string;
+    bulkLimited?: string;
   }>;
 }
 
@@ -66,7 +85,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
   const industry = sp.industry || undefined;
   const owner = sp.owner || undefined;
   const accountType: AccountType | undefined = isAccountType(sp.accountType) ? sp.accountType : undefined;
-  const clientStatus: ClientStatus | undefined = isClientStatus(sp.clientStatus) ? sp.clientStatus : undefined;
+  const clientStatus: ClientStatusFilter | undefined = isClientStatusFilter(sp.clientStatus) ? sp.clientStatus : undefined;
   const linkedin: LinkedinPresence | undefined = isLinkedinPresence(sp.linkedin) ? sp.linkedin : undefined;
   // Text search (owner report 2026-09-30: "no tengo buscador de empresas") —
   // trimmed here once so every consumer below (the two list reads, every
@@ -135,6 +154,17 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     return `/companies?${params.toString()}`;
   }
 
+  // Current list query (filters + view + page): the bulk action re-derives
+  // "select all matching" from it and redirects back to the same view.
+  const returnQuery = (() => {
+    const params = baseParams();
+    params.set("view", view);
+    if (page > 1) params.set("page", String(page));
+    return params.toString();
+  })();
+
+  const bulkMessage = bulkResultMessage(sp.bulkResult, l);
+
   function ownerNameFor(id: string): string {
     return ownerOptions.find((o) => o.id === id)?.name ?? l.emptyValue;
   }
@@ -143,8 +173,8 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
     return accountTypeLabel(value, dict.companyRecord);
   }
 
-  function clientStatusLabelFor(value: ClientStatus): string {
-    return clientStatusLabel(value, dict.companyRecord);
+  function clientStatusLabelFor(value: ClientStatusFilter): string {
+    return value === CLIENT_STATUS_FILTER_NONE ? l.filterClientStatusNone : clientStatusLabel(value, dict.companyRecord);
   }
 
   function linkedinLabelFor(value: LinkedinPresence): string {
@@ -315,7 +345,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
               {l.filterClientStatusLabel}
               <select name="clientStatus" defaultValue={clientStatus ?? ""}>
                 <option value="">{l.filterClientStatusAny}</option>
-                {CLIENT_STATUSES.map((v) => (
+                {CLIENT_STATUS_OPTIONS.map((v) => (
                   <option key={v} value={v}>
                     {clientStatusLabelFor(v)}
                   </option>
@@ -348,6 +378,13 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         </button>
       </div>
 
+      <BulkResultToast message={bulkMessage} />
+      {sp.bulkLimited === "1" && (
+        <div className="alert alert-warn mb-lg">
+          <p>{l.bulkLimitedNotice.replace("{n}", BULK_COMPANY_TARGET_CAP.toLocaleString(locale))}</p>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <p className="muted">
           {linkedin === "with" && !q && !stage && !industry && !owner && !accountType && !clientStatus && view === "all"
@@ -355,13 +392,28 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
             : l.noResults}
         </p>
       ) : (
+        <CompanyBulkBar
+          labels={dict.companyBulk}
+          statusLabels={{
+            active: dict.companyRecord.clientStatusActive,
+            inactive: dict.companyRecord.clientStatusInactive,
+            none: dict.companyRecord.clientStatusNone,
+          }}
+          locale={locale}
+          total={total}
+          returnQuery={returnQuery}
+        >
         <div className="table-wrap">
           <table className="data">
             <thead>
               <tr>
+                <th className="col-check">
+                  <input type="checkbox" id={SELECT_ALL_COMPANIES_CHECKBOX_ID} aria-label={dict.companyBulk.selectAllLabel} />
+                </th>
                 <th>{l.colCompany}</th>
                 <th>{l.colIndustry}</th>
                 <th>{l.colStage}</th>
+                <th>{l.colClientStatus}</th>
                 <th>{l.colOwner}</th>
                 <th>{l.colContacts}</th>
                 <th>{l.colOpenings}</th>
@@ -374,6 +426,14 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                 const linkedinHref = companyLinkedinUrlHref(row.linkedinUrl);
                 return (
                   <tr key={row.companyKey}>
+                    <td className="col-check">
+                      <input
+                        type="checkbox"
+                        name="companyKey"
+                        value={row.companyKey}
+                        aria-label={dict.companyBulk.selectRowLabel.replace("{name}", row.displayName)}
+                      />
+                    </td>
                     <td>
                       <div className="li-cell">
                         <Link className="row" href={`/companies/${encodeURIComponent(row.companyKey)}`}>
@@ -400,6 +460,15 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                       <span className={stageBadgeClass(row.relationshipStage)}>
                         {row.relationshipStage ? stageLabel(row.relationshipStage as Stage) : l.emptyValue}
                       </span>
+                    </td>
+                    <td>
+                      {row.clientStatus === "active" ? (
+                        <span className="badge badge-info">{clientStatusLabelFor("active")}</span>
+                      ) : row.clientStatus === "inactive" ? (
+                        <span className="badge badge-outline">{clientStatusLabelFor("inactive")}</span>
+                      ) : (
+                        <span className="meta">{l.emptyValue}</span>
+                      )}
                     </td>
                     <td>{ownerLabel(row)}</td>
                     <td className="num">{row.contactCount}</td>
@@ -433,6 +502,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
             </div>
           </div>
         </div>
+        </CompanyBulkBar>
       )}
     </main>
   );
