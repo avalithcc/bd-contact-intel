@@ -1,22 +1,26 @@
 /**
  * Owner-run backfill of the fi-arg-2026 fields the lead -> person fold dropped:
- * person.company (display text), city, country and seniority. They exist in the
- * lead_gen CSVs and never landed on person (measured: 0 of 1,053).
+ * person.company (display text), city, country and seniority. Measured on
+ * person: 0 of 1,053 carried any of them.
  *
- * INPUT: the lead_gen data directory (a sibling of this repo, never copied in):
- *   --dir=<path to lead_gen/data>   reads fi-arg-2026-attendees.csv and
- *   fi-arg-2026-decisores-bancos-fintech.csv. The rows hold personal data; the
- *   report prints COUNTS ONLY.
+ * INPUT: the `lead` table itself. No files, no arguments beyond --execute and
+ * --actor. scripts/import-leads.ts already wrote these values onto `lead`
+ * (measured for fi-arg-2026: city 1057/1057, country 1057/1057, company_raw
+ * 1057/1057, seniority 994/1057), so everything this needs is already in the
+ * database. Reading the attendee CSVs instead would tie the script to
+ * ../lead_gen/data, a directory outside this repo: the day it moves, the script
+ * dies and the reason is not obvious. The report prints COUNTS ONLY.
  *
  * DRY RUN IS THE DEFAULT, inside a READ ONLY transaction. Nothing is written
  * unless --execute is passed, and --execute also needs --actor=<bd id>.
  *
- * IDENTITY (same as scripts/import-leads.ts): the CSVs go through the same
- * buildLeadDrafts() merge the import used; an attendee_id is matched to its
+ * IDENTITY (same as scripts/import-leads.ts): an attendee_id is matched to its
  * person by lead(source_key 'fi-arg-2026', attendee_id) -> person_id_map
  * ('lead', lead.id) -> person. No name or email matching, nothing is guessed.
  * An attendee with no person, and a person that is merged away or whose
- * source_key is not 'fi-arg-2026', are counted and left alone.
+ * source_key is not 'fi-arg-2026', are counted and left alone. `lead` holds
+ * more rows than there are persons (leadRowsToIdentityRows drops leads with no
+ * owner), and that difference shows up as the unmatched count.
  *
  * FILL-EMPTY ONLY: a field is written only where it is NULL or blank, and the
  * UPDATE re-checks that in SQL, so a value a BD set since the read is never
@@ -31,39 +35,33 @@
  * at >= the audit row's time, property in company/city/country/seniority), then
  * delete those history rows.
  *
- * EXIT CODES: 0 success (dry run or write); 1 bad arguments, a missing file, or
- * any failed check (nothing written).
+ * EXIT CODES: 0 success (dry run or write); 1 bad arguments or any failed check
+ * (nothing written).
  *
  * Usage (do NOT run --execute automatically: this touches the real database):
- *   npx tsx --env-file=.env.local scripts/backfill-fi-arg-fields.ts --dir=<lead_gen/data>
- *   npx tsx --env-file=.env.local scripts/backfill-fi-arg-fields.ts --dir=<lead_gen/data> --execute --actor=<bd id>
+ *   npx tsx --env-file=.env.local scripts/backfill-fi-arg-fields.ts
+ *   npx tsx --env-file=.env.local scripts/backfill-fi-arg-fields.ts --execute --actor=<bd id>
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { dryRunFiArg, executeFiArg } from "../src/lib/fiArgBackfill/db";
 import { FILL_FIELDS, type FiArgReport } from "../src/lib/fiArgBackfill/plan";
-import { buildLeadDrafts } from "../src/lib/leads/csv";
 
 function parseArgs(argv: readonly string[]) {
-  let dir: string | null = null;
   let execute = false;
   let actor: string | null = null;
   for (const arg of argv) {
     if (arg === "--execute") execute = true;
     else if (arg.startsWith("--actor=")) actor = arg.slice("--actor=".length);
-    else if (arg.startsWith("--dir=")) dir = arg.slice("--dir=".length);
-    else throw new Error(`Unknown argument: ${arg}. Valid: --dir=<path>, --execute, --actor=<bd id>`);
+    else throw new Error(`Unknown argument: ${arg}. Valid: --execute, --actor=<bd id>`);
   }
-  if (!dir) throw new Error("Usage: backfill-fi-arg-fields.ts --dir=<lead_gen/data> [--execute --actor=<bd id>]");
   if (execute && !actor) throw new Error("--execute requires --actor=<bd id> for the audit log.");
-  return { dir, execute, actor };
+  return { execute, actor };
 }
 
 function report(r: FiArgReport): string {
   return [
-    `Source attendees (merged like the import): ${r.sourceRows}`,
+    `Source lead rows (fi-arg-2026): ${r.leads}`,
     `Matched to an in-scope person: ${r.matched}`,
-    `No person found (kept, not guessed): ${r.unmatched}`,
+    `Lead with no person (counted, not guessed): ${r.unmatched}`,
     `Person merged away or other source_key (kept): ${r.outOfScope}`,
     `Persons with at least one fill: ${r.personsFilled}`,
     ...FILL_FIELDS.map((f) => `    ${f}: ${r.filled[f]}`),
@@ -71,20 +69,15 @@ function report(r: FiArgReport): string {
 }
 
 async function main() {
-  const { dir, execute, actor } = parseArgs(process.argv.slice(2));
-  const drafts = buildLeadDrafts({
-    attendees: readFileSync(join(dir, "fi-arg-2026-attendees.csv"), "utf-8"),
-    decisores: readFileSync(join(dir, "fi-arg-2026-decisores-bancos-fintech.csv"), "utf-8"),
-  });
-  if (!drafts.length) throw new Error("No attendees found in the CSVs.");
+  const { execute, actor } = parseArgs(process.argv.slice(2));
 
   if (!execute) {
     console.log("DRY RUN (read-only transaction)\n");
-    console.log(report((await dryRunFiArg(drafts)).report));
+    console.log(report((await dryRunFiArg()).report));
     console.log("\nNothing written. Re-run with --execute --actor=<bd id> to apply.");
     return;
   }
-  const { fills, report: r, auditLogId } = await executeFiArg(drafts, actor!);
+  const { fills, report: r, auditLogId } = await executeFiArg(actor!);
   console.log(report(r));
   console.log(auditLogId ? `\nFilled ${fills.length} field(s) on ${r.personsFilled} person(s). audit_log id: ${auditLogId}` : "\nNothing to fill.");
 }

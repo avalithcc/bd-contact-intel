@@ -10,44 +10,61 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, personPropertyHistory } from "@/db/schema";
-import type { LeadDraft } from "@/lib/leads/csv";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import { isUuid } from "@/lib/uuid";
-import { attendeeKey, FI_ARG_SOURCE_KEY, FILL_FIELDS, planFiArgBackfill, type FiArgFill, type FiArgPerson, type FiArgReport } from "./plan";
+import { FI_ARG_SOURCE_KEY, FILL_FIELDS, planFiArgBackfill, type FiArgFill, type FiArgReport, type FiArgRow } from "./plan";
 
 export const FI_ARG_AUDIT_ACTION = "backfill_fi_arg_fields";
 export const FI_ARG_HISTORY_SOURCE = "import";
 const ROW_CAP = 5_000;
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type Raw = { attendee_id: string; id: string; in_scope: boolean; company: string | null; city: string | null; country: string | null; seniority: string | null };
+type Raw = {
+  lead_id: string; person_id: string | null; in_scope: boolean;
+  company_display: string | null; company_raw: string | null;
+  lead_city: string | null; lead_country: string | null; lead_seniority: string | null;
+  company: string | null; city: string | null; country: string | null; seniority: string | null;
+};
 
-async function readPersons(tx: DbTransaction): Promise<FiArgPerson[]> {
+/** ONE read: each lead's own values and its person's current state in the same
+ * row, so the planner needs no second input and no re-matching. `lead` already
+ * holds everything the attendee CSVs did — see plan.ts's header for why this
+ * reads no files. LEFT JOIN on purpose: a lead with no person is counted, not
+ * dropped silently. */
+async function readRows(tx: DbTransaction): Promise<FiArgRow[]> {
   const rows = (await tx.execute(sql`
-    select l.attendee_id, p.id::text as id,
-      (p.merged_into_id is null and p.source_key = ${FI_ARG_SOURCE_KEY}) as in_scope,
+    select l.id::text as lead_id, p.id::text as person_id,
+      (p.id is not null and p.merged_into_id is null and p.source_key = ${FI_ARG_SOURCE_KEY}) as in_scope,
+      l.company_display, l.company_raw,
+      l.city as lead_city, l.country as lead_country, l.seniority as lead_seniority,
       p.company, p.city, p.country, p.seniority
     from lead l
-    join person_id_map m on m.legacy_table = 'lead' and m.legacy_id = l.id
-    join person p on p.id = m.person_id
+    left join person_id_map m on m.legacy_table = 'lead' and m.legacy_id = l.id
+    left join person p on p.id = m.person_id
     where l.source_key = ${FI_ARG_SOURCE_KEY}
     limit ${ROW_CAP + 1}
   `)) as unknown as Raw[];
   if (rows.length > ROW_CAP) throw new Error(`More than ${ROW_CAP} fi-arg leads: refusing to plan against a truncated set.`);
-  return rows.map((r) => ({ id: r.id, attendeeId: attendeeKey(r.attendee_id), inScope: Boolean(r.in_scope), company: r.company, city: r.city, country: r.country, seniority: r.seniority }));
+  return rows.map((r) => ({
+    leadId: r.lead_id,
+    personId: r.person_id,
+    inScope: Boolean(r.in_scope),
+    source: { companyDisplay: r.company_display, companyRaw: r.company_raw, city: r.lead_city, country: r.lead_country, seniority: r.lead_seniority },
+    current: { company: r.company, city: r.city, country: r.country, seniority: r.seniority },
+  }));
 }
 
-export async function dryRunFiArg(drafts: readonly LeadDraft[]): Promise<{ fills: FiArgFill[]; report: FiArgReport }> {
+export async function dryRunFiArg(): Promise<{ fills: FiArgFill[]; report: FiArgReport }> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`set transaction read only`);
-    return planFiArgBackfill(drafts, await readPersons(tx));
+    return planFiArgBackfill(await readRows(tx));
   });
 }
 
-export async function executeFiArg(drafts: readonly LeadDraft[], actorBdId: string): Promise<{ fills: FiArgFill[]; report: FiArgReport; auditLogId: string | null }> {
+export async function executeFiArg(actorBdId: string): Promise<{ fills: FiArgFill[]; report: FiArgReport; auditLogId: string | null }> {
   if (!isUuid(actorBdId)) throw new Error("--actor must be a bd uuid.");
   return db.transaction(async (tx) => {
-    const { fills, report } = planFiArgBackfill(drafts, await readPersons(tx));
+    const { fills, report } = planFiArgBackfill(await readRows(tx));
     if (!fills.length) return { fills, report, auditLogId: null };
     for (const f of fills) if (!isUuid(f.personId)) throw new Error(`Planned fill target is not a uuid: ${f.personId}`);
 

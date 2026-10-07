@@ -1,73 +1,60 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildLeadDrafts } from "@/lib/leads/csv";
-import { attendeeKey, FI_ARG_SOURCE_KEY, planFiArgBackfill, type FiArgPerson } from "@/lib/fiArgBackfill/plan";
+import { FI_ARG_SOURCE_KEY, planFiArgBackfill, type FiArgRow } from "@/lib/fiArgBackfill/plan";
 
-// Synthetic fixtures, built through the real producer (buildLeadDrafts) so the mapping is tested against what the import used.
-const ATTENDEES = [
-  "first_name,last_name,job_title,seniority,company,industry,city,region,country,attendee_type,attendee_id",
-  "Ana,Uno,CTO,C-Level,Acme Raw,Banking,Buenos Aires,CABA,Argentina,Speaker,a1",
-  "Beto,Dos,Dev,Senior,Beta SA,Software,Cordoba,Cordoba,Argentina,Visitor,a2",
-  "Cleo,Tres,PM,,Gamma,Retail,,,,Visitor,a3",
-  "Dino,Cuatro,CEO,C-Level,Delta,Fintech,Rosario,Santa Fe,Argentina,Visitor,a4",
-].join("\n");
-const DECISORES = [
-  "first_name,last_name,job_title,seniority,company,industry,city,region,country,attendee_type,attendee_id,company_group,company_display,owner",
-  "Ana,Uno,CTO,C-Level,Acme Raw,Banking,Buenos Aires,CABA,Argentina,Speaker,a1,acme,Acme Display,Mariel",
-].join("\n");
-
-const drafts = () => buildLeadDrafts({ attendees: ATTENDEES, decisores: DECISORES });
-const person = (id: string, attendeeId: string, over: Partial<FiArgPerson> = {}): FiArgPerson => ({
-  id,
-  attendeeId: attendeeKey(attendeeId),
+// Synthetic rows shaped like the lead -> person_id_map -> person join.
+const row = (leadId: string, over: Partial<FiArgRow> = {}): FiArgRow => ({
+  leadId,
+  personId: `p-${leadId}`,
   inScope: true,
-  company: null,
-  city: null,
-  country: null,
-  seniority: null,
+  source: { companyDisplay: null, companyRaw: "Acme Raw", city: "Buenos Aires", country: "Argentina", seniority: "C-Level" },
+  current: { company: null, city: null, country: null, seniority: null },
   ...over,
 });
 
-test("fills the four empty fields; company prefers the display name, as the import did", () => {
-  const { fills, report } = planFiArgBackfill(drafts(), [person("p1", "a1")]);
-  const byField = Object.fromEntries(fills.filter((f) => f.personId === "p1").map((f) => [f.property, f.value]));
-  assert.deepEqual(byField, { company: "Acme Display", city: "Buenos Aires", country: "Argentina", seniority: "C-Level" });
+test("fills the four empty fields from the lead row; company prefers display over raw", () => {
+  const { fills, report } = planFiArgBackfill([row("l1", { source: { companyDisplay: "Acme Display", companyRaw: "Acme Raw", city: "Rosario", country: "Argentina", seniority: "Senior" } })]);
+  assert.deepEqual(Object.fromEntries(fills.map((f) => [f.property, f.value])), { company: "Acme Display", city: "Rosario", country: "Argentina", seniority: "Senior" });
   assert.deepEqual(report.filled, { company: 1, city: 1, country: 1, seniority: 1 });
 });
 
-test("never overwrites a value that is already set, including whitespace-only as empty", () => {
-  const { fills } = planFiArgBackfill(drafts(), [person("p2", "a2", { city: "Mendoza", company: "   " })]);
-  const fields = fills.map((f) => f.property).sort();
-  assert.deepEqual(fields, ["company", "country", "seniority"]);
-  assert.equal(fills.find((f) => f.property === "company")!.value, "Beta SA");
+test("falls back to company_raw when there is no display name", () => {
+  const { fills } = planFiArgBackfill([row("l1")]);
+  assert.equal(fills.find((f) => f.property === "company")!.value, "Acme Raw");
 });
 
-test("an empty source value fills nothing", () => {
-  const { fills, report } = planFiArgBackfill(drafts(), [person("p3", "a3")]);
-  assert.deepEqual(fills.map((f) => f.property), ["company"]);
+test("never overwrites a value that is already set; whitespace-only counts as empty", () => {
+  const { fills } = planFiArgBackfill([row("l1", { current: { company: "   ", city: "Mendoza", country: null, seniority: null } })]);
+  assert.deepEqual(fills.map((f) => f.property).sort(), ["company", "country", "seniority"]);
+});
+
+test("an empty source value fills nothing (seniority is missing on some leads)", () => {
+  const { fills, report } = planFiArgBackfill([row("l1", { source: { companyDisplay: null, companyRaw: "X", city: "C", country: "AR", seniority: null } })]);
+  assert.equal(fills.some((f) => f.property === "seniority"), false);
   assert.equal(report.filled.seniority, 0);
 });
 
-test("unmatched attendees and out-of-scope persons are counted, never guessed", () => {
-  const { fills, report } = planFiArgBackfill(drafts(), [person("p4", "a4", { inScope: false })]);
-  assert.equal(fills.length, 0);
-  assert.equal(report.sourceRows, 4);
-  assert.equal(report.unmatched, 3);
+test("leads without a person are their own count; out-of-scope persons are kept", () => {
+  const { fills, report } = planFiArgBackfill([row("l1", { personId: null }), row("l2", { inScope: false }), row("l3")]);
+  assert.equal(report.leads, 3);
+  assert.equal(report.unmatched, 1);
   assert.equal(report.outOfScope, 1);
+  assert.equal(report.matched, 1);
+  assert.ok(fills.every((f) => f.personId === "p-l3"));
 });
 
-test("two attendees on one person fill each empty field once, first attendee wins", () => {
-  const { fills } = planFiArgBackfill(drafts(), [person("p1", "a1"), person("p1", "a2")]);
+test("two leads on one person fill each empty field once, first lead wins", () => {
+  const second = row("l2", { personId: "p-l1", source: { companyDisplay: null, companyRaw: "Other", city: "Other", country: "Other", seniority: "Other" } });
+  const { fills } = planFiArgBackfill([row("l1"), second]);
   assert.equal(fills.length, 4);
   assert.equal(fills.find((f) => f.property === "city")!.value, "Buenos Aires");
 });
 
 test("planner never mutates its inputs and is repeatable", () => {
-  const d = drafts();
-  const people = [person("p1", "a1"), person("p2", "a2", { city: "X" })];
-  const snapshot = JSON.stringify([d, people]);
-  assert.deepEqual(planFiArgBackfill(d, people), planFiArgBackfill(d, people));
-  assert.equal(JSON.stringify([d, people]), snapshot);
+  const rows = [row("l1"), row("l2", { current: { company: "x", city: null, country: null, seniority: null } })];
+  const snapshot = JSON.stringify(rows);
+  assert.deepEqual(planFiArgBackfill(rows), planFiArgBackfill(rows));
+  assert.equal(JSON.stringify(rows), snapshot);
 });
 
 test("source key constant is the one the import used", () => {
