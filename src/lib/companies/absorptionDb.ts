@@ -3,18 +3,30 @@
  * (imports `db`). Any BD may propose, so there is no admin gate here; resolving a proposal is the owner's.
  * Round trips: a proposal costs one facts query plus one insert; the owner's read is one query for a whole page.
  */
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { companyAbsorptionProposal } from "@/db/schema";
+import { company, companyAbsorptionProposal } from "@/db/schema";
+import { companySearchCondition } from "@/lib/companies/searchCondition";
+import { isUuid } from "@/lib/uuid";
 import {
+  CANDIDATE_MAX,
   checkProposalInput,
   decideProposal,
+  decideWithdrawal,
+  normalizeCandidateQuery,
+  toCandidateView,
+  toOpenNoticeView,
   toOpenProposalView,
+  type CandidateRow,
+  type CandidateView,
   type InputRefusal,
+  type OpenNoticeRow,
+  type OpenNoticeView,
   type OpenProposalRow,
   type OpenProposalView,
   type ProposalFacts,
   type ProposalRefusal,
+  type WithdrawRefusal,
 } from "@/lib/companies/absorption";
 
 export type ProposeAbsorptionResult =
@@ -101,4 +113,74 @@ export async function listOpenAbsorptionProposals(limit = 50, offset = 0): Promi
     join bd b on b.id = pg.pg_bd
     order by pg.pg_created, pg.pg_id`)) as unknown as OpenProposalRow[];
   return rows.map(toOpenProposalView);
+}
+
+export type WithdrawAbsorptionResult = { ok: true; absorbedKey: string | null } | { ok: false; reason: WithdrawRefusal };
+
+/**
+ * A BD retracts their own proposal. The row is kept (status `withdrawn`): the partial unique index only covers
+ * `open`, so it blocks nothing, and the trace of a retracted mis-click is worth keeping apart from the owner's
+ * `rejected`. The UPDATE's WHERE is the guard (open AND proposed by the actor), so two concurrent withdrawals or a
+ * resolution racing the click cannot both win. Only when it touches nothing do we read the row, once, to say why.
+ */
+export async function withdrawAbsorption(proposalId: unknown, actorBdId: unknown): Promise<WithdrawAbsorptionResult> {
+  if (typeof proposalId !== "string" || !isUuid(proposalId)) return { ok: false, reason: "proposal_not_found" };
+  if (typeof actorBdId !== "string" || !isUuid(actorBdId)) return { ok: false, reason: "not_proposer" };
+  const done = await db
+    .update(companyAbsorptionProposal)
+    .set({ status: "withdrawn", resolvedByBdId: actorBdId, resolvedAt: new Date() })
+    .where(
+      and(
+        eq(companyAbsorptionProposal.id, proposalId),
+        eq(companyAbsorptionProposal.status, "open"),
+        eq(companyAbsorptionProposal.proposedByBdId, actorBdId),
+      ),
+    )
+    .returning({ absorbedKey: companyAbsorptionProposal.absorbedCompanyKey });
+  if (done[0]) return { ok: true, absorbedKey: done[0].absorbedKey };
+
+  const [row] = await db
+    .select({ status: companyAbsorptionProposal.status, proposedByBdId: companyAbsorptionProposal.proposedByBdId })
+    .from(companyAbsorptionProposal)
+    .where(eq(companyAbsorptionProposal.id, proposalId));
+  const verdict = decideWithdrawal(row ?? null, actorBdId);
+  // The WHERE already refused it, so a verdict of "ok" here means the row changed between the two statements.
+  return verdict.ok ? { ok: false, reason: "not_open" } : verdict;
+}
+
+/** The open proposal on this company as the ABSORBED side, for the record page's notice. One indexed query (the partial unique index). */
+export async function getOpenAbsorptionNotice(absorbedKey: string): Promise<OpenNoticeView | null> {
+  const [row] = (await db.execute(sql`
+    select p.id::text as id, p.created_at, b.id::text as proposer_id, b.name as proposer_name,
+      s.company_key as survivor_key, s.display_name as survivor_name
+    from company_absorption_proposal p
+    join bd b on b.id = p.proposed_by_bd_id
+    join company s on s.company_key = p.survivor_company_key
+    where p.status = 'open' and p.absorbed_company_key = ${absorbedKey}`)) as unknown as OpenNoticeRow[];
+  return row ? toOpenNoticeView(row) : null;
+}
+
+/**
+ * The survivor picker's read: companies matching `q` by the same rule as the `/companies` search
+ * (companySearchCondition: name, domain, alias, LinkedIn), minus the company being absorbed. ONE query, never more
+ * than CANDIDATE_MAX rows; the page is a CTE with its own LIMIT so the contact count runs once per returned row,
+ * not once per match. The `/companies` list read was not reused: it also counts the whole match set, joins owners
+ * and orders by last activity, none of which a picker needs.
+ */
+export async function searchAbsorptionCandidates(rawQuery: unknown, excludeKey: string): Promise<CandidateView[]> {
+  const q = normalizeCandidateQuery(rawQuery);
+  const where = q ? companySearchCondition(q) : undefined;
+  if (!where) return [];
+  const rows = (await db.execute(sql`
+    with pg_page as (
+      select ${company.companyKey} as pg_key, ${company.displayName} as pg_name, ${company.relationshipStage} as pg_stage, ${company.domain} as pg_domain
+      from ${company}
+      where ${where} and ${company.companyKey} <> ${excludeKey}
+      order by ${company.displayName}, ${company.companyKey}
+      limit ${CANDIDATE_MAX})
+    select pg_key as company_key, pg_name as display_name, pg_stage as relationship_stage, pg_domain as domain,
+      (select count(*) from person x where x.company_key = pg_key and x.merged_into_id is null) as contacts
+    from pg_page
+    order by pg_name, pg_key`)) as unknown as CandidateRow[];
+  return rows.map(toCandidateView);
 }

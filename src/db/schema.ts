@@ -225,7 +225,7 @@ export type NewCompanyAlias = typeof companyAlias.$inferInsert;
 
 // A BD's proposal that one company was absorbed by (or renamed into) another. A SUGGESTION for the owner: the
 // merge itself stays owner-only (scripts/merge-companies.ts) and never reads this table as input. Free-text
-// `status`, no CHECK (same convention as relationship_stage): 'open' | 'applied' | 'rejected', validated in
+// `status`, no CHECK (same convention as relationship_stage): 'open' | 'applied' | 'rejected' | 'withdrawn' (the proposer's own retraction, never the owner's `rejected`), validated in
 // src/lib/companies/absorption.ts. ON DELETE differs per side, deliberately (migration 0040): the absorbed company
 // is the one a merge DELETES, so its key is SET NULL (the applied proposal survives as history, named by
 // `absorbedDisplayName`); the survivor is the one that must keep existing, so a proposal whose survivor is
