@@ -3,7 +3,12 @@ import { test } from "node:test";
 import {
   ABSORPTION_NOTE_MAX,
   ABSORPTION_STATUSES,
+  ABSORPTION_REFUSAL_KEY,
+  CANDIDATE_MAX,
   canTransition,
+  decideWithdrawal,
+  normalizeCandidateQuery,
+  toCandidateView,
   checkProposalInput,
   decideProposal,
   isAbsorptionStatus,
@@ -27,8 +32,9 @@ const valid = (over: Record<string, unknown> = {}) => {
   return r.value;
 };
 
-test("status vocabulary is open / applied / rejected and nothing else is accepted", () => {
-  assert.deepEqual([...ABSORPTION_STATUSES], ["open", "applied", "rejected"]);
+test("status vocabulary is open / applied / rejected / withdrawn and nothing else is accepted", () => {
+  assert.deepEqual([...ABSORPTION_STATUSES], ["open", "applied", "rejected", "withdrawn"]);
+  assert.ok(isAbsorptionStatus("withdrawn"));
   assert.ok(isAbsorptionStatus("open"));
   assert.ok(!isAbsorptionStatus("OPEN"));
   assert.ok(!isAbsorptionStatus(undefined));
@@ -126,4 +132,50 @@ test("toOpenProposalView: normalizes the strings raw SQL returns (timestamps, co
   assert.deepEqual(view.absorbed, { key: "old", displayName: "Old", stage: "prospect", domain: "old.com", contacts: 3 });
   assert.deepEqual(view.proposedBy, { id: BD, name: "Ana" });
   assert.equal(toOpenProposalView({ ...raw, created_at: new Date("2026-10-01T10:00:00Z") }).createdAt.getTime(), view.createdAt.getTime());
+});
+
+test("withdrawn is reachable only from open; applied and rejected can never become withdrawn", () => {
+  assert.ok(canTransition("open", "withdrawn"));
+  assert.ok(!canTransition("applied", "withdrawn"));
+  assert.ok(!canTransition("rejected", "withdrawn"));
+  assert.ok(!canTransition("withdrawn", "withdrawn"));
+  for (const to of ABSORPTION_STATUSES) assert.ok(!canTransition("withdrawn", to), `withdrawn is final (-> ${to})`);
+});
+
+test("withdrawing: only the proposer, only while open, and the reason says which", () => {
+  const ME = BD;
+  const other = "22222222-2222-4222-8222-222222222222";
+  assert.deepEqual(decideWithdrawal({ status: "open", proposedByBdId: ME }, ME), { ok: true });
+  assert.deepEqual(decideWithdrawal({ status: "open", proposedByBdId: ME }, other), { ok: false, reason: "not_proposer" });
+  assert.deepEqual(decideWithdrawal(null, ME), { ok: false, reason: "proposal_not_found" });
+  for (const status of ["applied", "rejected", "withdrawn"]) {
+    assert.deepEqual(decideWithdrawal({ status, proposedByBdId: ME }, ME), { ok: false, reason: "not_open" });
+  }
+  // A non-open proposal is "not open" even for a stranger: the status, not the person, is the stronger fact.
+  assert.deepEqual(decideWithdrawal({ status: "applied", proposedByBdId: ME }, other), { ok: false, reason: "not_open" });
+  // An unknown status string in the column never opens the gate.
+  assert.deepEqual(decideWithdrawal({ status: "OPEN", proposedByBdId: ME }, ME), { ok: false, reason: "not_open" });
+});
+
+test("candidate search query: trimmed, collapsed, at least 2 characters, bounded", () => {
+  assert.equal(normalizeCandidateQuery("  grupo   cedro "), "grupo cedro");
+  assert.equal(normalizeCandidateQuery("a"), null);
+  assert.equal(normalizeCandidateQuery("   "), null);
+  assert.equal(normalizeCandidateQuery(undefined), null);
+  assert.equal(normalizeCandidateQuery("x".repeat(500))?.length, 80);
+  assert.ok(CANDIDATE_MAX <= 10);
+});
+
+test("candidate rows come back from raw SQL with string counts; the view carries numbers", () => {
+  const v = toCandidateView({ company_key: "grupo cedro", display_name: "Grupo Cedro", relationship_stage: "qualified", domain: "grupocedro.com", contacts: "84" });
+  assert.deepEqual(v, { key: "grupo cedro", displayName: "Grupo Cedro", stage: "qualified", domain: "grupocedro.com", contacts: 84 });
+});
+
+test("every refusal the UI can receive has a dictionary key, in both languages", async () => {
+  const { en } = await import("../../src/lib/i18n/dictionaries/en");
+  const { es } = await import("../../src/lib/i18n/dictionaries/es");
+  for (const [reason, key] of Object.entries(ABSORPTION_REFUSAL_KEY)) {
+    assert.equal(typeof (en.companyRecord as Record<string, unknown>)[key], "string", `en ${reason} -> ${key}`);
+    assert.equal(typeof (es.companyRecord as Record<string, unknown>)[key], "string", `es ${reason} -> ${key}`);
+  }
 });

@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { createCompany, getCompanyByKey, updateCompany } from "@/lib/companies/queries";
 import { getCurrentBd } from "@/lib/queries";
-import { proposeAbsorption, type ProposeAbsorptionResult } from "@/lib/companies/absorptionDb";
+import {
+  proposeAbsorption,
+  searchAbsorptionCandidates,
+  withdrawAbsorption,
+  type ProposeAbsorptionResult,
+  type WithdrawAbsorptionResult,
+} from "@/lib/companies/absorptionDb";
+import type { CandidateView } from "@/lib/companies/absorption";
 import type { Company, NewCompany } from "@/db/schema";
 import { createActivityAction } from "@/app/activity/actions";
 import { createTaskAction } from "@/app/(app)/tasks/actions";
@@ -284,11 +291,36 @@ export async function getCompanyTimelineFilterEntriesAction(
  * "This company was absorbed by that one": records a PROPOSAL for the owner, never a merge (the merge stays an
  * owner-run script). Any BD may call it, so there is no admin gate; the proposer is always the session's bd, never
  * a client-supplied id. Refusals come back as data (`reason`, plus `openProposalId` when one is already open).
- * Not wired to any component yet: the record-page affordance waits on an approved mockup.
  */
 export async function proposeCompanyAbsorptionAction(absorbedKey: string, survivorKey: string, note?: string): Promise<ProposeAbsorptionResult> {
   const me = await getCurrentBd();
   const result = await proposeAbsorption({ absorbedKey, survivorKey, proposerBdId: me.id, note });
   if (result.ok) revalidatePath(`/companies/${absorbedKey}`);
+  return result;
+}
+
+/**
+ * The survivor picker's search (one bounded query, see searchAbsorptionCandidates). Any signed-in BD, same as the
+ * proposal itself. A failed read returns `null` so the dialog can say so instead of showing "no results".
+ */
+export async function searchAbsorptionCandidatesAction(absorbedKey: string, q: string): Promise<CandidateView[] | null> {
+  try {
+    await getCurrentBd();
+    return await searchAbsorptionCandidates(q, absorbedKey);
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error("[companies] searchAbsorptionCandidatesAction failed", err);
+    return null;
+  }
+}
+
+/**
+ * "Deshacer": the proposer retracts their own open proposal. The actor is the session's bd, never a client-supplied
+ * id; the proposer-only / open-only guard lives in withdrawAbsorption's UPDATE. Refusals come back as data.
+ */
+export async function withdrawCompanyAbsorptionAction(proposalId: string): Promise<WithdrawAbsorptionResult> {
+  const me = await getCurrentBd();
+  const result = await withdrawAbsorption(proposalId, me.id);
+  if (result.ok && result.absorbedKey) revalidatePath(`/companies/${result.absorbedKey}`);
   return result;
 }

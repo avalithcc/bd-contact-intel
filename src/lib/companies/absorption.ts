@@ -4,9 +4,10 @@
  * proposals as input. Any BD may propose, so nothing here is admin-gated; the admin gate belongs on resolution.
  * No I/O: the DB glue is absorptionDb.ts, which gathers the facts these functions judge.
  */
+import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { isUuid } from "@/lib/uuid";
 
-export const ABSORPTION_STATUSES = ["open", "applied", "rejected"] as const;
+export const ABSORPTION_STATUSES = ["open", "applied", "rejected", "withdrawn"] as const;
 export type AbsorptionStatus = (typeof ABSORPTION_STATUSES)[number];
 
 /** Free text in the column (the repo's no-CHECK convention), validated here at the write boundary. */
@@ -14,12 +15,17 @@ export const isAbsorptionStatus = (value: unknown): value is AbsorptionStatus =>
   typeof value === "string" && (ABSORPTION_STATUSES as readonly string[]).includes(value);
 
 const TRANSITIONS: Readonly<Record<AbsorptionStatus, readonly AbsorptionStatus[]>> = {
-  open: ["applied", "rejected"],
+  open: ["applied", "rejected", "withdrawn"],
   applied: [],
   rejected: [],
+  withdrawn: [],
 };
 
-/** Only an open proposal can be resolved; applied and rejected are final. */
+/**
+ * Only an open proposal can be resolved; applied, rejected and withdrawn are final. `withdrawn` is the PROPOSER taking
+ * their own proposal back; it is deliberately not `rejected`, which is the owner's verdict that the two companies are
+ * not the same. The history must keep telling them apart.
+ */
 export const canTransition = (from: AbsorptionStatus, to: AbsorptionStatus): boolean => TRANSITIONS[from].includes(to);
 
 export const ABSORPTION_NOTE_MAX = 1000;
@@ -129,3 +135,106 @@ export function toOpenProposalView(r: OpenProposalRow): OpenProposalView {
     total: Number(r.total),
   };
 }
+
+/** What the database says about the proposal someone wants to withdraw; `null` when no such row exists. */
+export interface WithdrawFacts {
+  status: string;
+  proposedByBdId: string;
+}
+
+export type WithdrawRefusal = "proposal_not_found" | "not_open" | "not_proposer";
+
+/**
+ * Only the proposer may withdraw, and only while the proposal is open. Status is judged first: a proposal that is
+ * already resolved is "not open" for everyone, so the message never blames the person for a fact about the row.
+ * absorptionDb.ts enforces the same two conditions in the UPDATE's WHERE clause (the atomic guard); this function
+ * only explains a refusal.
+ */
+export function decideWithdrawal(f: WithdrawFacts | null, actorBdId: string): { ok: true } | { ok: false; reason: WithdrawRefusal } {
+  if (!f) return { ok: false, reason: "proposal_not_found" };
+  if (!isAbsorptionStatus(f.status) || !canTransition(f.status, "withdrawn")) return { ok: false, reason: "not_open" };
+  if (f.proposedByBdId !== actorBdId) return { ok: false, reason: "not_proposer" };
+  return { ok: true };
+}
+
+/** Dictionary key (`companyRecord`) for every refusal the record page can show. Exhaustive by construction. */
+export const ABSORPTION_REFUSAL_KEY = {
+  invalid_company_key: "absorbRefusalInvalidCompany",
+  same_company: "absorbRefusalSameCompany",
+  proposer_not_bd: "absorbRefusalNotBd",
+  invalid_note: "absorbRefusalInvalidNote",
+  note_too_long: "absorbRefusalNoteTooLong",
+  absorbed_not_found: "absorbRefusalAbsorbedNotFound",
+  survivor_not_found: "absorbRefusalSurvivorNotFound",
+  already_proposed: "absorbRefusalAlreadyProposed",
+  survivor_is_absorbed: "absorbRefusalSurvivorIsAbsorbed",
+  proposal_not_found: "absorbWithdrawNotFound",
+  not_open: "absorbWithdrawNotOpen",
+  not_proposer: "absorbWithdrawNotProposer",
+} as const satisfies Record<InputRefusal | ProposalRefusal | WithdrawRefusal, string>;
+
+export type AbsorptionRefusalKey = (typeof ABSORPTION_REFUSAL_KEY)[keyof typeof ABSORPTION_REFUSAL_KEY];
+
+export const CANDIDATE_MIN_CHARS = 2;
+export const CANDIDATE_QUERY_MAX = 80;
+/** The picker never shows more than this many companies: the BD refines the search, not a long list. */
+export const CANDIDATE_MAX = 8;
+
+/** Trims and collapses whitespace; `null` when the text is too short to search (no query is worth running). */
+export function normalizeCandidateQuery(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const q = raw.trim().replace(/\s+/g, " ").slice(0, CANDIDATE_QUERY_MAX).trim();
+  return q.length >= CANDIDATE_MIN_CHARS ? q : null;
+}
+
+export interface CandidateRow {
+  company_key: string;
+  display_name: string;
+  relationship_stage: string | null;
+  domain: string | null;
+  contacts: number | string;
+}
+
+export interface CandidateView {
+  key: string;
+  displayName: string;
+  stage: string | null;
+  domain: string | null;
+  contacts: number;
+}
+
+export const toCandidateView = (r: CandidateRow): CandidateView => ({
+  key: r.company_key,
+  displayName: r.display_name,
+  stage: r.relationship_stage,
+  domain: r.domain,
+  contacts: Number(r.contacts),
+});
+
+/** What the record page needs to show an open proposal on the absorbed company. Serializable (ISO string, no Date). */
+export interface OpenNoticeRow {
+  id: string;
+  created_at: Date | string;
+  proposer_id: string;
+  proposer_name: string;
+  survivor_key: string;
+  survivor_name: string;
+}
+
+export interface OpenNoticeView {
+  id: string;
+  survivorKey: string;
+  survivorName: string;
+  proposerId: string;
+  proposerName: string;
+  createdAt: Date;
+}
+
+export const toOpenNoticeView = (r: OpenNoticeRow): OpenNoticeView => ({
+  id: r.id,
+  survivorKey: r.survivor_key,
+  survivorName: r.survivor_name,
+  proposerId: r.proposer_id,
+  proposerName: r.proposer_name,
+  createdAt: parseDbTimestamp(r.created_at),
+});
