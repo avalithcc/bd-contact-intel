@@ -7,10 +7,10 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { company } from "@/db/schema";
-import { clientStatusCondition } from "@/lib/companies/clientStatusFilter";
+import { clientStatusCondition, isClientStatusFilter } from "@/lib/companies/clientStatusFilter";
 import { companyListConditions, type CompanyListFilters } from "@/lib/companies/listConditions";
 
 const ME = "11111111-1111-1111-1111-111111111111";
@@ -23,6 +23,16 @@ function render(conditions: ReturnType<typeof companyListConditions>) {
 test("clientStatusCondition: equality for each value", () => {
   assert.deepEqual(clientStatusCondition("active"), eq(company.clientStatus, "active"));
   assert.deepEqual(clientStatusCondition("inactive"), eq(company.clientStatus, "inactive"));
+});
+
+test("clientStatusCondition: 'none' matches companies that never stated a status (IS NULL)", () => {
+  assert.deepEqual(clientStatusCondition("none"), isNull(company.clientStatus));
+});
+
+test("isClientStatusFilter: active, inactive and none are valid; anything else is not", () => {
+  for (const v of ["active", "inactive", "none"]) assert.equal(isClientStatusFilter(v), true);
+  assert.equal(isClientStatusFilter("x"), false);
+  assert.equal(isClientStatusFilter(undefined), false);
 });
 
 test("clientStatusCondition: undefined when no filter is set", () => {

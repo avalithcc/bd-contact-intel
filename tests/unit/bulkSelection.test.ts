@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveSelectAllChecked, SELECT_ALL_CHECKBOX_ID } from "@/lib/contacts/bulkSelection";
+import { resolveSelectAllChecked, SELECT_ALL_CHECKBOX_ID, SELECT_ALL_COMPANIES_CHECKBOX_ID } from "@/lib/contacts/bulkSelection";
 
 test("resolveSelectAllChecked: the header select-all checkbox drives every row to its own checked value", () => {
   assert.equal(resolveSelectAllChecked(SELECT_ALL_CHECKBOX_ID, true), true);
@@ -17,4 +17,9 @@ test("resolveSelectAllChecked: the header select-all checkbox drives every row t
 test("resolveSelectAllChecked: any other checkbox (a per-row personId box) is not the select-all toggle", () => {
   assert.equal(resolveSelectAllChecked("some-other-id", true), null);
   assert.equal(resolveSelectAllChecked("", false), null);
+});
+
+test("resolveSelectAllChecked: the companies list passes its own header id, and the contacts id is then not the toggle", () => {
+  assert.equal(resolveSelectAllChecked(SELECT_ALL_COMPANIES_CHECKBOX_ID, true, SELECT_ALL_COMPANIES_CHECKBOX_ID), true);
+  assert.equal(resolveSelectAllChecked(SELECT_ALL_CHECKBOX_ID, true, SELECT_ALL_COMPANIES_CHECKBOX_ID), null);
 });

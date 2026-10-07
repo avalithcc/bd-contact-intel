@@ -1004,6 +1004,8 @@ export const auditLog = pgTable(
     // 'backfill_fi_arg_fields' (scripts/backfill-fi-arg-fields.ts filled the
     // empty company, city, country and seniority of fi-arg-2026 persons from
     // their own `lead` rows; history rows carry source 'import')
+    // 'bulk_client_status_change' (the /companies bulk "Estado de cliente" action;
+    // one row per run, metadata carries count, mode and the capped company keys)
     // 'assign_won_company_owners' (scripts/assign-won-company-owners.ts gave
     // ownerless won companies an owner; company history rows carry source
     // 'import')

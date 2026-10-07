@@ -1,11 +1,10 @@
 import { eq, type SQL } from "drizzle-orm";
 import { company } from "@/db/schema";
 import { accountTypeCondition, type AccountType } from "@/lib/companies/accountTypeFilter";
-import { clientStatusCondition } from "@/lib/companies/clientStatusFilter";
+import { clientStatusCondition, type ClientStatusFilter } from "@/lib/companies/clientStatusFilter";
 import { linkedinPresenceCondition } from "@/lib/companies/linkedinFilter";
 import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
-import type { ClientStatus } from "@/lib/companies/clientStatus";
 
 export interface CompanyListFilters {
   view: "all" | "mine" | "hiring";
@@ -14,7 +13,7 @@ export interface CompanyListFilters {
   industry?: string;
   owner?: string;
   accountType?: AccountType;
-  clientStatus?: ClientStatus;
+  clientStatus?: ClientStatusFilter;
   linkedin?: LinkedinPresence;
   q?: string;
 }

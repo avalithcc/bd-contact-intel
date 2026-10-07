@@ -12,12 +12,18 @@
  * unit-tested without a DOM.
  */
 export const SELECT_ALL_CHECKBOX_ID = "select-all-contacts";
+/** The `/companies` list reuses the same decision with its own header id. */
+export const SELECT_ALL_COMPANIES_CHECKBOX_ID = "select-all-companies";
 
 /**
  * `null` means "this wasn't the select-all toggle — leave every row
  * checkbox exactly as the user just set it individually." A non-null
  * boolean means "set every `personId` row checkbox to this value."
  */
-export function resolveSelectAllChecked(targetId: string, targetChecked: boolean): boolean | null {
-  return targetId === SELECT_ALL_CHECKBOX_ID ? targetChecked : null;
+export function resolveSelectAllChecked(
+  targetId: string,
+  targetChecked: boolean,
+  selectAllId: string = SELECT_ALL_CHECKBOX_ID,
+): boolean | null {
+  return targetId === selectAllId ? targetChecked : null;
 }
