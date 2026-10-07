@@ -967,13 +967,17 @@ export const auditLog = pgTable(
     // rows carry source 'signature_extract')
     // 'backfill_fi_arg_fields' (scripts/backfill-fi-arg-fields.ts filled the
     // empty company, city, country and seniority of fi-arg-2026 persons from
-    // the lead_gen CSVs; history rows carry source 'import')
+    // their own `lead` rows; history rows carry source 'import')
     // 'assign_won_company_owners' (scripts/assign-won-company-owners.ts gave
     // ownerless won companies an owner; company history rows carry source
     // 'import')
     // 'delete_nameless_imported_contacts' (scripts/delete-nameless-imported-contacts.ts
     // deleted the untouched contacts of the commercial-contacts import that
     // have neither first nor last name; metadata holds the deleted rows)
+    // 'apply_resolved_phones' (scripts/apply-resolved-phones.ts wrote the
+    // numbers a human picked for the people whose signatures disagreed and
+    // extract-signature-phones.ts therefore left alone; history rows carry
+    // source 'signature_extract', the same provenance as the extractor)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
