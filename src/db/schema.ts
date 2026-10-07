@@ -223,6 +223,42 @@ export const companyAlias = pgTable(
 export type CompanyAlias = typeof companyAlias.$inferSelect;
 export type NewCompanyAlias = typeof companyAlias.$inferInsert;
 
+// A BD's proposal that one company was absorbed by (or renamed into) another. A SUGGESTION for the owner: the
+// merge itself stays owner-only (scripts/merge-companies.ts) and never reads this table as input. Free-text
+// `status`, no CHECK (same convention as relationship_stage): 'open' | 'applied' | 'rejected', validated in
+// src/lib/companies/absorption.ts. ON DELETE differs per side, deliberately (migration 0040): the absorbed company
+// is the one a merge DELETES, so its key is SET NULL (the applied proposal survives as history, named by
+// `absorbedDisplayName`); the survivor is the one that must keep existing, so a proposal whose survivor is
+// deleted is meaningless and CASCADEs. One OPEN proposal per absorbed company, enforced by the partial unique index.
+export const companyAbsorptionProposal = pgTable(
+  "company_absorption_proposal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    absorbedCompanyKey: text("absorbed_company_key").references(() => company.companyKey, { onDelete: "set null" }),
+    // Snapshot at proposal time: what the owner reads once the absorbed row (and so its key) is gone.
+    absorbedDisplayName: text("absorbed_display_name").notNull(),
+    survivorCompanyKey: text("survivor_company_key")
+      .notNull()
+      .references(() => company.companyKey, { onDelete: "cascade" }),
+    proposedByBdId: uuid("proposed_by_bd_id")
+      .notNull()
+      .references(() => bd.id),
+    note: text("note"),
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedByBdId: uuid("resolved_by_bd_id").references(() => bd.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => ({
+    oneOpenPerAbsorbed: uniqueIndex("company_absorption_proposal_open_absorbed_idx")
+      .on(t.absorbedCompanyKey)
+      .where(sql`${t.status} = 'open'`),
+    bySurvivor: index("company_absorption_proposal_survivor_idx").on(t.survivorCompanyKey),
+  }),
+);
+
+export type CompanyAbsorptionProposal = typeof companyAbsorptionProposal.$inferSelect;
+
 // One job posting seen on a target company's public job board. Rows persist
 // across sync runs — a posting that disappears is marked closed rather than
 // deleted, so "postings closed over time" stays queryable.

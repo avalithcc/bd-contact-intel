@@ -21,6 +21,7 @@ import { db } from "@/db";
 import { auditLog, companyPropertyHistory } from "@/db/schema";
 import { isUuid } from "@/lib/uuid";
 import { buildRefCounts, COMPANY_KEY_TABLES, refCount, squashCompanyKey } from "./keys";
+import { matchProposalsToGroups, type OpenProposalRef, type ProposalMatches } from "./proposals";
 import {
   findBlockers,
   MERGE_FIELDS,
@@ -72,6 +73,23 @@ const duplicateIds = (plans: readonly GroupPlan[], table: string, pk: string, ex
     where j.company_key in (${list(plans.flatMap((p) => [p.survivorKey, ...p.deadKeys]))})
   ) x where x.d_rn > 1`;
 
+/**
+ * Open absorption proposals touching the planned keys, classified against the owner's explicit groups. Reporting
+ * and the applied marker only: a proposal never adds, removes or changes a group. Until migration 0040 is applied the
+ * table does not exist, and the merge must keep working, so absence is an empty result, not an error. With `lock` the
+ * rows are held for update so none can be resolved by someone else between this read and the marker below.
+ */
+async function readProposals(tx: Tx, groups: readonly MergeGroup[], keys: readonly string[], lock: boolean): Promise<ProposalMatches & { tableMissing: boolean }> {
+  const [t] = await run<{ present: boolean }>(tx, sql`select to_regclass('public.company_absorption_proposal') is not null as present`);
+  if (!t?.present) return { matched: [], divergent: [], tableMissing: true };
+  const open = await run<OpenProposalRef>(tx, sql`
+    select id::text as id, absorbed_company_key as "absorbedKey", survivor_company_key as "survivorKey"
+    from company_absorption_proposal
+    where status = 'open' and (absorbed_company_key in (${list(keys)}) or survivor_company_key in (${list(keys)}))
+    order by created_at, id ${lock ? sql`for update` : sql``}`);
+  return { ...matchProposalsToGroups(groups, open), tableMissing: false };
+}
+
 async function read(tx: Tx, groups: readonly MergeGroup[], lock: boolean) {
   const keys = groups.flatMap((g) => [g.survivorKey, ...g.deadKeys]);
   const rows = await run<CompanyRow>(tx, sql`
@@ -95,7 +113,8 @@ async function read(tx: Tx, groups: readonly MergeGroup[], lock: boolean) {
   const total = Object.values(moved).reduce((a, b) => a + b, 0);
   if (total > MOVED_ROW_CAP) blockers.push(`${total} rows would move; the cap is ${MOVED_ROW_CAP}. Split the groups across runs.`);
   const targetsToCreate = plans.filter((p) => !ctx.targetKeys.has(p.survivorKey) && p.deadKeys.some((d) => ctx.targetKeys.has(d))).map((p) => p.survivorKey);
-  return { plans, counts, moved, blockers, targetsToCreate };
+  const proposals = await readProposals(tx, groups, keys, lock);
+  return { plans, counts, moved, blockers, targetsToCreate, proposals };
 }
 
 export async function dryRunMerge(groups: readonly MergeGroup[]) {
@@ -112,7 +131,7 @@ export async function dryRunMerge(groups: readonly MergeGroup[]) {
 export async function executeMerge(groups: readonly MergeGroup[], actorBdId: string) {
   if (!isUuid(actorBdId)) throw new Error("--actor must be a bd uuid.");
   return db.transaction(async (tx) => {
-    const { plans, moved, blockers, targetsToCreate } = await read(tx, groups, true);
+    const { plans, moved, blockers, targetsToCreate, proposals } = await read(tx, groups, true);
     if (blockers.length) throw new Error(`Refusing to execute:\n- ${blockers.join("\n- ")}`);
     const deads = plans.flatMap((p) => p.deadKeys);
 
@@ -144,6 +163,15 @@ export async function executeMerge(groups: readonly MergeGroup[], actorBdId: str
     const left = await countRefs(tx, deads);
     const stray = COMPANY_KEY_TABLES.filter((t) => t !== "company" && t !== "target_company" && deads.some((k) => refCount(left, t, k) > 0));
     if (stray.length) throw new Error(`Rows still reference a dead key in: ${stray.join(", ")}. Nothing was written.`);
+    // Matched proposals become 'applied' BEFORE the dead company rows go (their FK is SET NULL, so the row survives as
+    // history). `status = 'open'` is the open -> applied transition of absorption.ts#canTransition, and the rows were
+    // locked by the read above, so the count must match or something is wrong and nothing is written.
+    if (proposals.matched.length) {
+      const marked = await run(tx, sql`
+        update company_absorption_proposal set status = 'applied', resolved_by_bd_id = ${actorBdId}::uuid, resolved_at = now()
+        where status = 'open' and id::text in (${list(proposals.matched.map((m) => m.id))}) returning id`);
+      if (marked.length !== proposals.matched.length) throw new Error(`Expected to mark ${proposals.matched.length} proposals applied, marked ${marked.length}. Nothing was written.`);
+    }
     const deadTargets = await run(tx, sql`delete from target_company where company_key in (${list(deads)}) returning to_jsonb(target_company) as snapshot`);
     const deadCompanies = await run(tx, sql`delete from company where company_key in (${list(deads)}) returning to_jsonb(company) - 'notes' as snapshot`);
     if (deadCompanies.length !== deads.length) throw new Error(`Expected to delete ${deads.length} company rows, deleted ${deadCompanies.length}.`);
@@ -176,9 +204,12 @@ export async function executeMerge(groups: readonly MergeGroup[], actorBdId: str
         deletedCompanies: deadCompanies.map((r) => (r as { snapshot: unknown }).snapshot),
         deletedTargetCompanies: deadTargets.map((r) => (r as { snapshot: unknown }).snapshot),
         createdTargetCompanies: targetsToCreate, aliasesWritten: aliases.map((a) => a.alias_key),
+        // Proposals marked applied (revert: set status back to 'open' and clear resolved_*; the absorbed key is gone, see
+        // the deleted company snapshots) and open ones the groups contradicted, left untouched.
+        appliedProposals: proposals.matched, divergentProposals: proposals.divergent,
       },
     }).returning({ id: auditLog.id });
-    return { plans, moved, auditLogId: audit!.id };
+    return { plans, moved, proposals, auditLogId: audit!.id };
   });
 }
 

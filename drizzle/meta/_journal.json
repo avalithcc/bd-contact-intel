@@ -281,6 +281,13 @@
       "when": 1792873471556,
       "tag": "0039_company_alias_fk_to_company",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792959871556,
+      "tag": "0040_company_absorption_proposal",
+      "breakpoints": true
     }
   ]
 }

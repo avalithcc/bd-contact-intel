@@ -32,6 +32,13 @@
  * key (`movedIds`), the dead company rows (minus notes), the dead target_company rows, the discarded values, the
  * aliases written. Take a backup (src/lib/migration/backup.ts#snapshotBackup) before --execute.
  *
+ * PROPOSALS (migration 0040): a BD may propose "company X was absorbed by Y" (company_absorption_proposal). The dry run
+ * REPORTS which open proposals the groups fulfil and which they contradict; --execute marks the fulfilled ones 'applied'
+ * in the same transaction (before the dead company rows go) and records both lists in the audit row. A proposal is a
+ * suggestion: it never adds, removes or alters a group, so each group is still confirmed by hand. A proposal the groups
+ * contradict is NOT marked applied and is only reported (one whose survivor is merged away is removed by the FK cascade
+ * when that company is deleted). Without migration 0040 the merge works and simply reports none.
+ *
  * Bounded: at most 100 groups and 20,000 moved rows per run. Counts and company names only, never a person.
  *
  * DRY RUN IS THE DEFAULT (read-only transaction). Usage (do NOT run --execute without the owner's approval):
@@ -80,7 +87,7 @@ async function main() {
   const groups = o.json ? parseGroupJson(readFileSync(o.json, "utf8")) : parseGroupLines(o.lines);
   if (o.execute) {
     const r = await executeMerge(groups, o.actor!);
-    console.log(`Merged ${r.plans.length} group(s). Rows repointed per table:`, r.moved, `\naudit_log id: ${r.auditLogId}`);
+    console.log(`Merged ${r.plans.length} group(s). Rows repointed per table:`, r.moved, `\nProposals marked applied: ${r.proposals.matched.length} | contradicted, not marked: ${r.proposals.divergent.length}\naudit_log id: ${r.auditLogId}`);
     return;
   }
   const r = await dryRunMerge(groups);
@@ -93,6 +100,10 @@ async function main() {
   }
   console.log("\nRows that would move to the surviving key, per table:", r.moved);
   console.log(`Duplicate job postings dropped: ${r.duplicatePostings} | duplicate probe rows dropped: ${r.duplicateProbes} | target companies created for a survivor: ${r.targetsToCreate.length}`);
+  if (r.proposals.tableMissing) console.log("\nProposals: table company_absorption_proposal not found (migration 0040 not applied); none reported.");
+  else console.log(`\nProposals: ${r.proposals.matched.length} open proposal(s) match these groups and would be marked applied; ${r.proposals.divergent.length} open proposal(s) are contradicted by them and would NOT be marked.`);
+  for (const m of r.proposals.matched) console.log(`  matches: ${m.id} | ${m.absorbedKey} -> ${m.survivorKey}`);
+  for (const d of r.proposals.divergent) console.log(`  CONTRADICTED (${d.reason}): ${d.id} | ${d.absorbedKey} -> ${d.survivorKey}`);
   if (r.blockers.length) console.log(`\nBLOCKED, --execute would refuse:\n- ${r.blockers.join("\n- ")}`);
   console.log("\nNothing written. Re-run with --execute --actor=<bd id> to apply.");
 }
