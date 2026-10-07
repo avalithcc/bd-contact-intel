@@ -404,3 +404,14 @@ export function WhatsAppIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+/** Merge arrow (company-absorption/absorcion.html `#i-merge`). */
+export function MergeIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M6 3v6a6 6 0 0 0 6 6h6" />
+      <path d="M15 12l3 3-3 3" />
+      <path d="M18 3v4" />
+    </Svg>
+  );
+}

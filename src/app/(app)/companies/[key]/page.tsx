@@ -9,6 +9,9 @@ import {
   getCompanyTimeline,
   getCompanyTimelineFilterCounts,
 } from "@/lib/companies/recordQueries";
+import { getOpenAbsorptionNotice } from "@/lib/companies/absorptionDb";
+import { relativeTime } from "@/lib/i18n/format";
+import { getLocale } from "@/lib/i18n/server";
 import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { accountTypeLabel, industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/lib/companies/listMappers";
 import {
@@ -29,6 +32,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { RecordTabs } from "@/app/(app)/contacts/[id]/RecordTabs";
 import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import { CompanyAboutPane } from "./CompanyAboutPane";
+import { AbsorptionNotice } from "./AbsorptionNotice";
 import { CompanyTimeline } from "./CompanyTimeline";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
@@ -108,7 +112,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     );
   }
 
-  const [hiringIndex, people, timelineRows, timelineCounts, openTasks, postings, propertyHistoryRows, ownerOptions] =
+  const [hiringIndex, people, timelineRows, timelineCounts, openTasks, postings, propertyHistoryRows, ownerOptions, absorption] =
     await Promise.all([
       getHiringMatchIndex(),
       getCompanyPeople(key),
@@ -126,6 +130,8 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
       getCompanyPostingsForKey(key),
       getCompanyPropertyHistory(key),
       listOwnerOptions(),
+      // The open absorption proposal, if any (one indexed query on the partial unique index).
+      getOpenAbsorptionNotice(key),
     ]);
 
   const hiring = hiringIndex.get(key) ?? null;
@@ -201,9 +207,20 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           linkedinUrl={company.linkedinUrl}
           labels={pickCompanyRecordLabels(dict)}
           newContactLabels={newContactLabels}
+          absorptionOpen={absorption !== null}
         />
 
         <div className="record-main">
+          {absorption && (
+            <AbsorptionNotice
+              proposalId={absorption.id}
+              survivorName={absorption.survivorName}
+              proposerName={absorption.proposerName}
+              when={relativeTime(absorption.createdAt, await getLocale())}
+              canUndo={absorption.proposerId === me.id}
+              labels={l}
+            />
+          )}
           <RecordTabs
             tabs={[
               {

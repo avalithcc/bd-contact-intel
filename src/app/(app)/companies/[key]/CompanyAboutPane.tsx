@@ -106,6 +106,8 @@ export interface CompanyAboutPaneProps {
   linkedinUrl: string | null;
   labels: CompanyAboutPaneLabels;
   newContactLabels: NewContactDialogLabels;
+  /** An absorption proposal is open on this company (disables "Fue absorbida"). */
+  absorptionOpen: boolean;
 }
 
 function stageLabel(l: CompanyAboutPaneLabels, s: Stage): string {
@@ -169,6 +171,7 @@ export function CompanyAboutPane({
   linkedinUrl,
   labels: l,
   newContactLabels,
+  absorptionOpen,
 }: CompanyAboutPaneProps) {
   const router = useRouter();
   const [editingStage, setEditingStage] = useState(false);
@@ -250,6 +253,7 @@ export function CompanyAboutPane({
         assigneeOptions={assigneeOptions}
         meId={meId}
         ownerBdId={ownerBdId}
+        absorptionOpen={absorptionOpen}
       />
 
       <div className="section-title">{l.aboutSectionTitle}</div>

@@ -135,6 +135,13 @@ const BUTTON_EXCEPTIONS: { match: string; reason: string }[] = [
       "component covers it; NewTaskButton.module.css's .resultItem explicitly sets background:none/border:none, " +
       "overriding the legacy `:where(button)` fallback on its own (documented in that CSS module).",
   },
+  {
+    match: 'className="pick"',
+    reason:
+      "AbsorbedDialog.tsx's company search result (design-system.css `.pick`, mockup company-absorption/absorcion.html) — " +
+      "`.pick` sets its own background, border, color and font, so the legacy `:where(button)` fallback never shows; " +
+      "`.btn` would impose a 2.25rem inline-flex action button on a two-line result row.",
+  },
 ];
 
 interface DialogBlock {

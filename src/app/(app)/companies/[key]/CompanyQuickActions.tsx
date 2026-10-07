@@ -5,7 +5,8 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
-import { NoteIcon, TasksIcon, MeetingIcon, ContactsIcon } from "@/components/icons";
+import { NoteIcon, TasksIcon, MeetingIcon, ContactsIcon, MergeIcon } from "@/components/icons";
+import { AbsorbedDialog, type AbsorbedDialogLabels } from "./AbsorbedDialog";
 import { NewContactDialog, type NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
@@ -27,6 +28,7 @@ export type CompanyQuickActionsLabels = ClientStrings<
     | "quickActionContact"
     | "quickActionMeeting"
     | "quickActionMore"
+    | "quickActionAbsorbed"
     | "moreComingSoon"
     | "cancel"
     | "save"
@@ -51,9 +53,10 @@ export type CompanyQuickActionsLabels = ClientStrings<
     | "toastTaskCreated"
     | "toastMeetingLogged"
   >
->;
+> &
+  AbsorbedDialogLabels;
 
-type OpenAction = "note" | "task" | "contact" | "meeting" | null;
+type OpenAction = "note" | "task" | "contact" | "meeting" | "absorbed" | null;
 
 /**
  * Company-scoped quick actions row (mockup-port c03; company-record.html:66
@@ -80,6 +83,7 @@ export function CompanyQuickActions({
   assigneeOptions,
   meId,
   ownerBdId,
+  absorptionOpen,
 }: {
   companyKey: string;
   companyName: string;
@@ -91,6 +95,9 @@ export function CompanyQuickActions({
   // loaded on the record page, never fetched here — see buildTaskAssigneeOptions).
   meId: string;
   ownerBdId: string | null;
+  // An absorption proposal is already open on this company: "Fue absorbida" stays visible but disabled (one open
+  // proposal per company; the notice on the record explains who marked it).
+  absorptionOpen: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -140,6 +147,12 @@ export function CompanyQuickActions({
           </span>
           {l.quickActionMeeting}
         </button>
+        <button type="button" className="qa" onClick={() => setOpen("absorbed")} disabled={absorptionOpen}>
+          <span className="qa-icon">
+            <MergeIcon className="icon" />
+          </span>
+          {l.quickActionAbsorbed}
+        </button>
         {/* Mockup's 5th icon (company-record.html:66) has no specified menu —
             see company-record-checklist.md's "Still open" section. */}
         <button type="button" className="qa" disabled title={l.moreComingSoon}>
@@ -147,6 +160,10 @@ export function CompanyQuickActions({
           {l.quickActionMore}
         </button>
       </div>
+
+      {open === "absorbed" && (
+        <AbsorbedDialog companyKey={companyKey} companyName={companyName} labels={l} onClose={close} />
+      )}
 
       {open === "note" && (
         <NoteForm

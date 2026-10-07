@@ -653,6 +653,24 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .alert-neutral { background: var(--color-surface-1); border-color: var(--color-border); color: var(--color-ink-soft); }
 .alert-audit { background: var(--color-warn-bg); border-color: rgba(180, 83, 9, 0.3); color: var(--color-warn-text); }
 
+/* Pending proposal notice on a record (company-absorption/absorcion.html, marked PROPUESTO there): .alert has no action slot on the right. */
+.pending { display: flex; align-items: flex-start; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); border: 1px solid rgba(180, 83, 9, 0.3); background: var(--color-warn-bg); color: var(--color-warn-text); border-radius: var(--radius-md); }
+.pending .icon { margin-top: 2px; }
+.pending .body { min-width: 0; }
+.pending .title { font-weight: 600; color: var(--color-ink); }
+.pending .who { font-size: var(--text-sm); margin-top: 2px; }
+.pending .act { margin-left: auto; flex: none; }
+
+/* Company search result inside a dialog (same mockup, also PROPUESTO): a pressable row showing stage, contacts and domain. */
+.pick { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; font: inherit; color: inherit; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-1); cursor: pointer; }
+.pick + .pick { margin-top: var(--space-2xs); }
+.pick:hover { border-color: var(--color-ink-subtle); }
+.pick[aria-pressed="true"] { border-color: var(--color-accent-strong); border-width: 2px; background: var(--color-surface-2); }
+.pick:disabled { cursor: not-allowed; opacity: 0.6; }
+.pick .n { font-weight: 600; }
+.pick .m { display: flex; gap: var(--space-sm); align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.pick .dom { font-family: var(--font-mono); font-size: 0.7rem; }
+
 /* ------------------------------------------------------ states: empty etc */
 .empty { text-align: center; padding: var(--space-4xl) var(--space-2xl); color: var(--color-ink-soft); }
 .empty .empty-icon { width: 48px; height: 48px; margin: 0 auto var(--space-md); border-radius: 50%; background: var(--color-surface-sunken); display: grid; place-items: center; color: var(--color-ink-subtle); }
