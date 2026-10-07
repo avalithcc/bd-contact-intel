@@ -140,7 +140,9 @@ const BUTTON_EXCEPTIONS: { match: string; reason: string }[] = [
     reason:
       "AbsorbedDialog.tsx's company search result (design-system.css `.pick`, mockup company-absorption/absorcion.html) — " +
       "`.pick` sets its own background, border, color and font, so the legacy `:where(button)` fallback never shows; " +
-      "`.btn` would impose a 2.25rem inline-flex action button on a two-line result row.",
+      "`.btn` would impose a 2.25rem inline-flex action button on a two-line result row. " +
+      "Precedent for an exception: the control SELECTS a value (a pressable option row, like styles.resultItem) and " +
+      "does not run a command; the rule exists to keep action buttons (Cancelar, Guardar) consistent.",
   },
 ];
 
