@@ -237,6 +237,7 @@ export const es: typeof en = {
     administrationSection: "Administración",
     auditLog: "Registro de auditoría",
     duplicates: "Duplicados",
+    absorptions: "Absorciones",
     reports: "Reportes",
     // Admin tools with no sidenav entry (migration is deliberately unlinked),
     // but they are real pages and need a breadcrumb of their own — without
@@ -1858,6 +1859,61 @@ export const es: typeof en = {
       not_found: "No se encontró el par o la fusión indicada.",
       already_resolved: "Este par ya fue resuelto por otra persona.",
       unexpected: "La acción no se pudo completar. Intenta de nuevo.",
+    },
+  },
+
+  // /admin/absorptions: the owner's queue for absorption proposals raised from a company record. Spanish-only like
+  // `duplicates` (the page reads `es.absorptions` directly); the `en` copy exists to satisfy `Dictionary = typeof en`.
+  absorptions: {
+    eyebrow: "Administración",
+    title: "absorciones propuestas",
+    subtitle: (total: number, oldestAgo: string | null) =>
+      `${total === 1 ? "1 abierta" : `${total} abiertas`}${oldestAgo ? ` · la más vieja ${oldestAgo}` : ""}`,
+    adminOnlyBadge: "Solo administradores",
+    queueTitle: "Abiertas",
+    queueItemMeta: (survivor: string, proposer: string, ago: string) => `hacia ${survivor} · ${proposer} · ${ago}`,
+    reasonBadge: "Fusión propuesta",
+    proposalOf: (index: number, total: number) => `Propuesta ${index} de ${total}`,
+    prevPage: "Anterior",
+    nextPage: "Siguiente",
+    pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,
+    warnLead: (absorbed: string, survivor: string, contacts: number) =>
+      contacts === 0
+        ? `Al aplicar, ${absorbed} se fusiona en ${survivor} y la empresa deja de existir.`
+        : `Al aplicar, ${contacts === 1 ? "el contacto" : `los ${contacts} contactos`} de ${absorbed} ${contacts === 1 ? "pasa" : "pasan"} a ${survivor} y la empresa deja de existir.`,
+    warnBody: "También se mueven sus actividades, tareas, vacantes y alias. No se puede deshacer desde la aplicación.",
+    noNote: "Sin nota.",
+    absorbedRole: "Se absorbe",
+    survivorRole: "Sobrevive",
+    rowName: "Nombre",
+    rowDomain: "Dominio",
+    rowStage: "Etapa",
+    rowContacts: "Contactos",
+    rowOwner: "Responsable",
+    rowLastActivity: "Última actividad",
+    kept: "✓ conservado",
+    moving: "se mudan",
+    remaining: (n: number) => `quedan ${n}`,
+    noValue: "—",
+    rejectButton: "Rechazar",
+    applyButton: "Aplicar la fusión",
+    dialogTitle: "Aplicar la fusión",
+    dialogBody: (absorbed: string, survivor: string, contacts: number) =>
+      `${absorbed} deja de existir y ${contacts === 1 ? "su contacto pasa" : `sus ${contacts} contactos pasan`} a ${survivor}.`,
+    confirmLabel: "Escribe el nombre de la empresa que se absorbe",
+    dialogAudit: (survivor: string) => `Queda registrado en el historial de ${survivor} y en el registro de auditoría, a tu nombre.`,
+    cancelButton: "Cancelar",
+    emptyTitle: "No hay absorciones propuestas",
+    emptyBody: "Cuando un BD marque una empresa como absorbida desde su ficha, la propuesta aparece acá para que la apruebes o la rechaces.",
+    blockedReasonsLabel: "Motivos",
+    outcomes: {
+      applied: "La fusión se aplicó y la propuesta quedó resuelta.",
+      rejected: "La propuesta se rechazó.",
+      invalid_id: "La propuesta indicada no es válida.",
+      not_open: "Esa propuesta ya no está abierta: otra persona la resolvió o la empresa cambió. No se hizo ningún cambio.",
+      name_mismatch: "El nombre escrito no coincide con el de la empresa que se absorbe. No se hizo ningún cambio.",
+      blocked: "La fusión no se aplicó porque hay un impedimento. No se hizo ningún cambio.",
+      failed: "La fusión no se pudo aplicar. No se hizo ningún cambio; recarga la página y revisa si la propuesta sigue abierta.",
     },
   },
 
