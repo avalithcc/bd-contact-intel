@@ -968,6 +968,9 @@ export const auditLog = pgTable(
     // 'backfill_fi_arg_fields' (scripts/backfill-fi-arg-fields.ts filled the
     // empty company, city, country and seniority of fi-arg-2026 persons from
     // the lead_gen CSVs; history rows carry source 'import')
+    // 'assign_won_company_owners' (scripts/assign-won-company-owners.ts gave
+    // ownerless won companies an owner; company history rows carry source
+    // 'import')
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",
