@@ -49,6 +49,8 @@ export async function bulkClientStatusAction(formData: FormData): Promise<void> 
     wasLimited = rawKeys.length > keys.length;
   }
 
+  // Known gap (W3): the typed count is compared to the server-resolved count, which may differ
+  // from what the dialog showed, and a filter above BULK_COMPANY_TARGET_CAP is cut silently.
   // The dialog enforces this too; the server is the boundary.
   if (requiresCountConfirmation(keys.length) && !isCountConfirmed(String(formData.get("confirmCount") ?? ""), keys.length)) {
     redirect(backTo(returnQuery, { bulkResult: "clientStatus:confirm" }));

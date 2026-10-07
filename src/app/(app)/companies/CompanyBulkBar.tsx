@@ -14,7 +14,7 @@ import { useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { CheckIcon, CloseIcon, WarningIcon } from "@/components/icons";
 import { requiresCountConfirmation, isCountConfirmed } from "@/lib/companies/bulkClientStatus";
-import { resolveSelectAllChecked, SELECT_ALL_COMPANIES_CHECKBOX_ID } from "@/lib/contacts/bulkSelection";
+import { endsFilterWideMode, resolveSelectAllChecked, SELECT_ALL_COMPANIES_CHECKBOX_ID } from "@/lib/contacts/bulkSelection";
 import type { CompanyBulkLabels } from "@/lib/companies/labels";
 import type { Locale } from "@/lib/i18n/locales";
 import { bulkClientStatusAction } from "./bulkActions";
@@ -56,9 +56,9 @@ export function CompanyBulkBar({ labels: l, statusLabels, locale, total, returnQ
     const target = e.target as unknown as HTMLInputElement;
     const selectAll = resolveSelectAllChecked(target.id, target.checked, SELECT_ALL_COMPANIES_CHECKBOX_ID);
     if (selectAll !== null) rowBoxes()?.forEach((box) => (box.checked = selectAll));
-    if (target.name === "companyKey" || selectAll !== null) {
-      // A manual change after "Seleccionar las N" drops the filter-wide mode.
-      if (target.name === "companyKey") setFilterWideMode(false);
+    if (endsFilterWideMode(target.id, target.name, "companyKey", SELECT_ALL_COMPANIES_CHECKBOX_ID)) {
+      // Any manual change (row or header toggle) drops the filter-wide mode.
+      setFilterWideMode(false);
       recount();
     }
   }

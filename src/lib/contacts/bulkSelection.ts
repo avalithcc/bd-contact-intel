@@ -20,6 +20,16 @@ export const SELECT_ALL_COMPANIES_CHECKBOX_ID = "select-all-companies";
  * checkbox exactly as the user just set it individually." A non-null
  * boolean means "set every `personId` row checkbox to this value."
  */
+/**
+ * Filter-wide mode ("Seleccionar las N") applies to the whole filter, so it
+ * must end the moment the selection is touched by hand: a row toggle OR the
+ * header select-all toggle. Leaving it armed after a select-all toggle made
+ * a re-ticked page write the entire filter.
+ */
+export function endsFilterWideMode(targetId: string, targetName: string, rowName: string, selectAllId: string): boolean {
+  return targetId === selectAllId || targetName === rowName;
+}
+
 export function resolveSelectAllChecked(
   targetId: string,
   targetChecked: boolean,

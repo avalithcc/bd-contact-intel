@@ -378,7 +378,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         </button>
       </div>
 
-      <BulkResultToast message={bulkMessage} />
+      <BulkResultToast message={bulkMessage} variant={sp.bulkResult === "clientStatus:confirm" || sp.bulkResult === "clientStatus:invalid" ? "error" : "success"} />
       {sp.bulkLimited === "1" && (
         <div className="alert alert-warn mb-lg">
           <p>{l.bulkLimitedNotice.replace("{n}", BULK_COMPANY_TARGET_CAP.toLocaleString(locale))}</p>

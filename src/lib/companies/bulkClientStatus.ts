@@ -31,6 +31,8 @@ export const BULK_COMPANY_TARGET_CAP = 20000;
 export const BULK_WRITE_CHUNK = 2000;
 
 export const AUDIT_KEY_CAP = AUDIT_LOG_ID_CAP;
+/** `returnQuery` is client-supplied; the audit row stores at most this much of it. */
+export const AUDIT_FILTERS_QUERY_CAP = 500;
 
 /** `undefined` = not a valid dialog value. Blank means "No es cliente" (NULL). */
 export function parseBulkClientStatusValue(raw: string): ClientStatus | null | undefined {
@@ -116,6 +118,6 @@ export function buildBulkClientStatusAuditRow(input: BulkClientStatusAuditInput)
     companyKeys: input.companyKeys.slice(0, AUDIT_KEY_CAP),
     truncated: input.companyKeys.length > AUDIT_KEY_CAP,
   };
-  if (input.mode === "filter" && input.filtersQuery) metadata.filtersQuery = input.filtersQuery;
+  if (input.mode === "filter" && input.filtersQuery) metadata.filtersQuery = input.filtersQuery.slice(0, AUDIT_FILTERS_QUERY_CAP);
   return { actorBdId: input.actorBdId, action: "bulk_client_status_change" as const, targetBdId: null, metadata };
 }

@@ -58,7 +58,8 @@ export async function bulkSetClientStatus(
   changedByBdId: string,
   options: { mode: BulkClientStatusMode; filtersQuery?: string },
 ): Promise<BulkClientStatusResult> {
-  const keys = sanitizeBulkCompanyKeys(rawKeys);
+  // Sorted so two overlapping bulk runs lock rows in the same order (no deadlock).
+  const keys = sanitizeBulkCompanyKeys(rawKeys).sort();
   if (!keys.length) return { changed: 0, unchanged: 0 };
 
   return db.transaction(async (tx) => {
@@ -68,7 +69,10 @@ export async function bulkSetClientStatus(
         ...(await tx
           .select({ companyKey: company.companyKey, clientStatus: company.clientStatus })
           .from(company)
-          .where(inArray(company.companyKey, slice))),
+          .where(inArray(company.companyKey, slice))
+          // Row lock until commit: a concurrent edit cannot slip between this read
+          // and the update below, so the history rows' old values are always true.
+          .for("update")),
       );
     }
 

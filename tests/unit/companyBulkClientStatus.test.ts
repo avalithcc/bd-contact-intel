@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  AUDIT_FILTERS_QUERY_CAP,
   AUDIT_KEY_CAP,
   BULK_CLIENT_STATUS_CONFIRM_THRESHOLD,
   buildBulkClientStatusAuditRow,
@@ -115,4 +116,15 @@ test("buildBulkClientStatusAuditRow: filtersQuery is recorded only in filter mod
   });
   assert.equal("filtersQuery" in row.metadata, false);
   assert.equal(row.metadata.truncated, false);
+});
+
+test("buildBulkClientStatusAuditRow: client-supplied filtersQuery is capped", () => {
+  const row = buildBulkClientStatusAuditRow({
+    actorBdId: BD,
+    clientStatus: "active",
+    mode: "filter",
+    filtersQuery: "q=" + "x".repeat(5000),
+    companyKeys: ["a"],
+  });
+  assert.equal(row.metadata.filtersQuery?.length, AUDIT_FILTERS_QUERY_CAP);
 });
