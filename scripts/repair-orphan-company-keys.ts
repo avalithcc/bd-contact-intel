@@ -35,8 +35,23 @@ import { db } from "../src/db";
 import { changeContactCompany } from "../src/lib/contacts/companyChangeDb";
 import { isUuid } from "../src/lib/uuid";
 
+/** Latin-only, used ONLY to match a key against an existing company. A
+ * non-Latin key simply fails to match and falls into the "left alone"
+ * bucket, which is the safe one. */
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 const JUNK = new Set(["", "-", "sindato", "na", "none", "null", "."]);
+
+/**
+ * BUG THIS GUARDS AGAINST (hit on the first run, 2026-10-08): the junk test
+ * used to be `squash(key).length < 2`, and `squash` strips everything outside
+ * [a-z0-9]. A Cyrillic or Arabic company name squashes to the empty string,
+ * so "АО «Системы управления»" and "مؤسسه تراتيل" were classified as junk and
+ * detached, wiping real employer text. Count letters and digits in ANY
+ * script instead, so the test never depends on the alphabet.
+ */
+const meaningfulChars = (s: string) => (s.match(/[\p{L}\p{N}]/gu) ?? []).length;
+const isJunkKey = (key: string) => JUNK.has(squash(key)) || meaningfulChars(key) < 2;
 
 function parseArgs(argv: readonly string[]) {
   let execute = false;
@@ -70,9 +85,8 @@ async function main() {
   const detach: { id: string; from: string }[] = [];
   let leftAlone = 0;
   for (const o of orphans) {
-    const s = squash(o.key);
-    if (JUNK.has(s) || s.length < 2) { detach.push({ id: o.id, from: o.key }); continue; }
-    const hit = canonical.get(s);
+    if (isJunkKey(o.key)) { detach.push({ id: o.id, from: o.key }); continue; }
+    const hit = canonical.get(squash(o.key));
     if (hit) repair.push({ id: o.id, from: o.key, to: hit });
     else leftAlone++;
   }
