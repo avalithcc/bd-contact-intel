@@ -178,6 +178,10 @@ export interface MergeContext {
 }
 
 /** Reasons an execute must refuse. The dry run prints them; nothing is left to a constraint error. */
+export const REFUSAL_PREFIX = "Refusing to execute:";
+/** The one place the refusal text is built; executeMerge throws it and the review screen parses it back. */
+export const refusalMessage = (blockers: readonly string[]): string => `${REFUSAL_PREFIX}\n- ${blockers.join("\n- ")}`;
+
 export function findBlockers(plans: readonly GroupPlan[], ctx: MergeContext): string[] {
   const blockers: string[] = [];
   for (const p of plans) {

@@ -3,10 +3,11 @@
  * (imports `db`). Any BD may propose, so there is no admin gate here; resolving a proposal is the owner's.
  * Round trips: a proposal costs one facts query plus one insert; the owner's read is one query for a whole page.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { company, companyAbsorptionProposal } from "@/db/schema";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
+import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { isUuid } from "@/lib/uuid";
 import {
   CANDIDATE_MAX,
@@ -28,6 +29,7 @@ import {
   type ProposalRefusal,
   type WithdrawRefusal,
 } from "@/lib/companies/absorption";
+import type { ResolutionFacts } from "@/lib/companies/absorptionReview";
 
 export type ProposeAbsorptionResult =
   | { ok: true; id: string }
@@ -84,11 +86,17 @@ export async function proposeAbsorption(raw: {
 
 export const OPEN_PROPOSALS_MAX_LIMIT = 100;
 
+/** Latest effective activity time of a company, direct or through a contact (same rule as the /companies column). */
+const lastActivityOf = (companyKey: SQL) => sql`(select greatest(
+    (select max(${effectiveActivityAtSql()}) from activity where activity.company_key = ${companyKey}),
+    (select max(${effectiveActivityAtSql()}) from activity join person pe on pe.id = activity.person_id where pe.company_key = ${companyKey})))`;
+
 /**
  * The owner's read: open proposals, oldest first, with what a human needs to judge each (both companies' names,
  * stage, domain and live contact counts, who proposed it, when, the note). ONE query: the page is a CTE with its
  * own LIMIT, so the correlated contact counts run exactly once per returned row. Proposals whose absorbed company
- * is gone (NULL key) are excluded, and `total` is counted over the same predicate.
+ * is gone (NULL key) are excluded, and `total` is counted over the same predicate. The owner and last activity of each
+ * side are correlated subqueries over the page's rows only (at most `limit` of them), never over the whole table.
  */
 export async function listOpenAbsorptionProposals(limit = 50, offset = 0): Promise<OpenProposalView[]> {
   const take = Math.min(Math.max(Math.trunc(limit) || 0, 1), OPEN_PROPOSALS_MAX_LIMIT);
@@ -105,14 +113,49 @@ export async function listOpenAbsorptionProposals(limit = 50, offset = 0): Promi
       b.id::text as proposer_id, b.name as proposer_name,
       a.company_key as absorbed_key, a.display_name as absorbed_name, a.relationship_stage as absorbed_stage, a.domain as absorbed_domain,
       (select count(*) from person x where x.company_key = a.company_key and x.merged_into_id is null) as absorbed_contacts,
+      (select name from bd where id = a.owner_bd_id) as absorbed_owner, ${lastActivityOf(sql`a.company_key`)} as absorbed_last_activity,
       s.company_key as survivor_key, s.display_name as survivor_name, s.relationship_stage as survivor_stage, s.domain as survivor_domain,
-      (select count(*) from person y where y.company_key = s.company_key and y.merged_into_id is null) as survivor_contacts
+      (select count(*) from person y where y.company_key = s.company_key and y.merged_into_id is null) as survivor_contacts,
+      (select name from bd where id = s.owner_bd_id) as survivor_owner, ${lastActivityOf(sql`s.company_key`)} as survivor_last_activity
     from pg_page pg
     join company a on a.company_key = pg.pg_absorbed
     join company s on s.company_key = pg.pg_survivor
     join bd b on b.id = pg.pg_bd
     order by pg.pg_created, pg.pg_id`)) as unknown as OpenProposalRow[];
   return rows.map(toOpenProposalView);
+}
+
+/**
+ * What the apply action judges, read fresh from the database: the proposal's current status and keys plus the absorbed
+ * company's LIVE name (the typed confirmation is checked against it). ONE query; null when no such proposal exists.
+ */
+export async function readProposalForResolution(proposalId: string): Promise<ResolutionFacts | null> {
+  const [row] = await db
+    .select({
+      status: companyAbsorptionProposal.status,
+      absorbedKey: companyAbsorptionProposal.absorbedCompanyKey,
+      survivorKey: companyAbsorptionProposal.survivorCompanyKey,
+      absorbedName: company.displayName,
+    })
+    .from(companyAbsorptionProposal)
+    .leftJoin(company, eq(company.companyKey, companyAbsorptionProposal.absorbedCompanyKey))
+    .where(eq(companyAbsorptionProposal.id, proposalId));
+  return row ?? null;
+}
+
+/**
+ * The owner's "no": open -> rejected (absorption.ts#canTransition). Same guard as `withdrawAbsorption`: the WHERE on
+ * `status = 'open'` is the atomic check, so two concurrent rejections (or one racing an apply) cannot both win. False
+ * when it touched nothing: the proposal does not exist or is no longer open.
+ */
+export async function rejectAbsorption(proposalId: string, actorBdId: string): Promise<boolean> {
+  if (!isUuid(proposalId) || !isUuid(actorBdId)) return false;
+  const done = await db
+    .update(companyAbsorptionProposal)
+    .set({ status: "rejected", resolvedByBdId: actorBdId, resolvedAt: new Date() })
+    .where(and(eq(companyAbsorptionProposal.id, proposalId), eq(companyAbsorptionProposal.status, "open")))
+    .returning({ id: companyAbsorptionProposal.id });
+  return done.length > 0;
 }
 
 export type WithdrawAbsorptionResult = { ok: true; absorbedKey: string | null } | { ok: false; reason: WithdrawRefusal };

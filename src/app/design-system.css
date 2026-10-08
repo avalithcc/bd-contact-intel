@@ -728,6 +728,11 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .compare tr:last-child th, .compare tr:last-child td { border-bottom: 0; }
 .reason { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
 
+/* Quoted note (absorption review): no quote style existed in the shared sheet; built from existing tokens only. */
+.note-quote { margin: 0 0 var(--space-lg); padding: var(--space-sm) var(--space-md); border-left: 3px solid var(--color-border-strong); background: var(--color-surface-1); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.note-quote p { margin: 0; color: var(--color-ink); }
+.note-quote footer { margin-top: var(--space-2xs); }
+
 /* ------------------------------------------------------------ auth pages */
 .auth { min-height: 100vh; display: grid; place-items: center; padding: var(--space-2xl); background: var(--color-canvas); }
 .auth-card { width: min(400px, 100%); }

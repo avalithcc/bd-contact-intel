@@ -116,11 +116,15 @@ test("toOpenProposalView: normalizes the strings raw SQL returns (timestamps, co
     absorbed_stage: "prospect",
     absorbed_domain: "old.com",
     absorbed_contacts: "3",
+    absorbed_owner: "Dana",
+    absorbed_last_activity: "2026-09-01 10:00:00.5+00",
     survivor_key: "new",
     survivor_name: "New",
     survivor_stage: null,
     survivor_domain: null,
     survivor_contacts: 0,
+    survivor_owner: null,
+    survivor_last_activity: null,
     total: "7",
   };
   const view = toOpenProposalView(raw);
@@ -129,7 +133,17 @@ test("toOpenProposalView: normalizes the strings raw SQL returns (timestamps, co
   assert.equal(view.absorbed.contacts, 3);
   assert.equal(view.survivor.contacts, 0);
   assert.equal(view.total, 7);
-  assert.deepEqual(view.absorbed, { key: "old", displayName: "Old", stage: "prospect", domain: "old.com", contacts: 3 });
+  assert.deepEqual(view.absorbed, {
+    key: "old",
+    displayName: "Old",
+    stage: "prospect",
+    domain: "old.com",
+    contacts: 3,
+    ownerName: "Dana",
+    lastActivityAt: new Date("2026-09-01T10:00:00.500Z"),
+  });
+  assert.deepEqual(view.survivor.ownerName, null);
+  assert.equal(view.survivor.lastActivityAt, null);
   assert.deepEqual(view.proposedBy, { id: BD, name: "Ana" });
   assert.equal(toOpenProposalView({ ...raw, created_at: new Date("2026-10-01T10:00:00Z") }).createdAt.getTime(), view.createdAt.getTime());
 });

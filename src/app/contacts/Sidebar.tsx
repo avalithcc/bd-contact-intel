@@ -25,6 +25,7 @@ import {
   EyeIcon,
   PersonIcon,
   ReportsIcon,
+  AbsorbIcon,
 } from "@/components/icons";
 
 export interface SidebarItem {
@@ -222,6 +223,14 @@ export function Sidebar({
           >
             <ReportsIcon className="icon" />
             {labels.reports}
+          </Link>
+          <Link
+            href="/admin/absorptions"
+            className={`nav-item${isActive("/admin/absorptions") ? " active" : ""}`}
+            aria-current={isActive("/admin/absorptions") ? "page" : undefined}
+          >
+            <AbsorbIcon className="icon" />
+            {labels.absorptions}
           </Link>
           <Link
             href="/admin/duplicates"

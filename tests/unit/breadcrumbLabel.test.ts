@@ -7,6 +7,7 @@ test("names each section instead of falling back to Contactos", () => {
   // "Contactos", because NAVIGATION never held them — the Sidebar's "Guías"
   // and "Administración" sections are hardcoded JSX.
   assert.equal(resolveBreadcrumbKey("/admin/duplicates"), "duplicates");
+  assert.equal(resolveBreadcrumbKey("/admin/absorptions"), "absorptions");
   assert.equal(resolveBreadcrumbKey("/admin/reports"), "reports");
   assert.equal(resolveBreadcrumbKey("/admin/audit-log"), "auditLog");
   assert.equal(resolveBreadcrumbKey("/admin/migration"), "migration");
@@ -64,6 +65,7 @@ test("every sidebar destination has a breadcrumb — the drift guard", () => {
     "/playbook",
     "/contact-status",
     "/admin/reports",
+    "/admin/absorptions",
     "/admin/duplicates",
     "/admin/audit-log",
     "/account",

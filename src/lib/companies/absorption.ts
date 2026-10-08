@@ -97,11 +97,15 @@ export interface OpenProposalRow {
   absorbed_stage: string | null;
   absorbed_domain: string | null;
   absorbed_contacts: number | string;
+  absorbed_owner: string | null;
+  absorbed_last_activity: Date | string | null;
   survivor_key: string;
   survivor_name: string;
   survivor_stage: string | null;
   survivor_domain: string | null;
   survivor_contacts: number | string;
+  survivor_owner: string | null;
+  survivor_last_activity: Date | string | null;
   total: number | string;
 }
 
@@ -111,6 +115,9 @@ export interface ProposalCompanyView {
   stage: string | null;
   domain: string | null;
   contacts: number;
+  ownerName: string | null;
+  /** Effective activity time (direct or through a contact); null when the company has none. */
+  lastActivityAt: Date | null;
 }
 
 export interface OpenProposalView {
@@ -127,10 +134,18 @@ export interface OpenProposalView {
 export function toOpenProposalView(r: OpenProposalRow): OpenProposalView {
   return {
     id: r.id,
-    absorbed: { key: r.absorbed_key, displayName: r.absorbed_name, stage: r.absorbed_stage, domain: r.absorbed_domain, contacts: Number(r.absorbed_contacts) },
-    survivor: { key: r.survivor_key, displayName: r.survivor_name, stage: r.survivor_stage, domain: r.survivor_domain, contacts: Number(r.survivor_contacts) },
+    absorbed: {
+      key: r.absorbed_key, displayName: r.absorbed_name, stage: r.absorbed_stage, domain: r.absorbed_domain,
+      contacts: Number(r.absorbed_contacts), ownerName: r.absorbed_owner,
+      lastActivityAt: r.absorbed_last_activity ? parseDbTimestamp(r.absorbed_last_activity) : null,
+    },
+    survivor: {
+      key: r.survivor_key, displayName: r.survivor_name, stage: r.survivor_stage, domain: r.survivor_domain,
+      contacts: Number(r.survivor_contacts), ownerName: r.survivor_owner,
+      lastActivityAt: r.survivor_last_activity ? parseDbTimestamp(r.survivor_last_activity) : null,
+    },
     proposedBy: { id: r.proposer_id, name: r.proposer_name },
-    createdAt: new Date(r.created_at),
+    createdAt: parseDbTimestamp(r.created_at),
     note: r.note,
     total: Number(r.total),
   };
