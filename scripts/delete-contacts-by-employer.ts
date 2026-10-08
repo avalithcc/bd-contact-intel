@@ -18,13 +18,16 @@
  * linkedin_scrape_job, person_bd_connection, merge_event) blocks deletion,
  * and so does any person_property_history row whose source is not 'import'.
  *
- * `person_bd_connection` blocks on purpose: it records that a BD is connected
- * to this person on LinkedIn, and the cascade would destroy it. Re-inserting
- * the person row — which is the whole revert path — does NOT bring it back.
+ * `person_bd_connection` blocks by default: it records that a BD is connected
+ * to this person on LinkedIn, and the cascade destroys it. `--with-connections`
+ * lifts that block for an owner who has decided those contacts go anyway, and
+ * then the connection rows are snapshotted into the audit row alongside the
+ * person rows, so the revert restores both and nothing is lost for good.
  *
  * ONE transaction under the identity lock. ONE audit_log row
  * ('delete_contacts_by_employer') holding the deleted ids AND the deleted
- * rows. REVERT: re-INSERT metadata.deletedPersons into `person` (same ids).
+ * rows. REVERT: re-INSERT metadata.deletedPersons into `person` (same ids),
+ * then metadata.deletedConnections into `person_bd_connection`.
  *
  * Usage (dry run by default — never writes):
  *   npx tsx --env-file=.env.local scripts/delete-contacts-by-employer.ts --keys=<a,b,c>
@@ -45,22 +48,25 @@ const SCAN_CAP = 2_000;
 function parseArgs(argv: readonly string[]) {
   let keys: string[] = [];
   let execute = false;
+  let withConnections = false;
   let actor: string | null = null;
   for (const a of argv) {
     if (a === "--execute") execute = true;
+    else if (a === "--with-connections") withConnections = true;
     else if (a.startsWith("--actor=")) actor = a.slice("--actor=".length);
     else if (a.startsWith("--keys=")) keys = a.slice("--keys=".length).split(",").map((k) => k.trim()).filter(Boolean);
-    else throw new Error(`Unknown argument: ${a}. Valid: --keys=<a,b,c>, --execute, --actor=<bd id>`);
+    else throw new Error(`Unknown argument: ${a}. Valid: --keys=<a,b,c>, --with-connections, --execute, --actor=<bd id>`);
   }
   if (!keys.length) throw new Error("Usage: --keys=<company_key,company_key,...> [--execute --actor=<bd id>]");
   if (execute && (!actor || !isUuid(actor))) throw new Error("--execute requires --actor=<bd uuid> for the audit row.");
-  return { keys, execute, actor };
+  return { keys, execute, actor, withConnections };
 }
 
 type Row = { id: string; name: string; emp: string | null; blockers: string };
 
-async function read(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], keys: readonly string[]): Promise<Row[]> {
-  const blocking = REFERENCING_TABLES.filter(([flag]) => !NOT_A_FOOTPRINT.has(flag));
+async function read(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], keys: readonly string[], withConnections: boolean): Promise<Row[]> {
+  const skip = withConnections ? new Set([...NOT_A_FOOTPRINT, "connection"]) : NOT_A_FOOTPRINT;
+  const blocking = REFERENCING_TABLES.filter(([flag]) => !skip.has(flag));
   const flags = blocking.map(([flag, table, cols]) =>
     sql`(exists (select 1 from ${sql.raw(table)} r where ${sql.join(cols.map((c) => sql`r.${sql.raw(c)} = p.id`), sql` or `)}))::int as ${sql.raw(flag)}`);
   const rows = (await tx.execute(sql`
@@ -77,9 +83,10 @@ async function read(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], key
 }
 
 async function main() {
-  const { keys, execute, actor } = parseArgs(process.argv.slice(2));
+  const { keys, execute, actor, withConnections } = parseArgs(process.argv.slice(2));
+  if (withConnections) console.log("--with-connections: LinkedIn connection rows will be deleted, and snapshotted into the audit row.\n");
   const run = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
-    const all = await read(tx, keys);
+    const all = await read(tx, keys, withConnections);
     const deletable = all.filter((r) => !r.blockers);
     const blocked = all.filter((r) => r.blockers);
     console.log(`Matched contacts: ${all.length}`);
@@ -102,12 +109,15 @@ async function main() {
       const ids = deletable.map((d) => d.id);
       // The revert path: these plain person rows go into the audit row.
       const snapshot = await tx.select().from(person).where(inArray(person.id, ids));
+      // Captured BEFORE the cascade takes them, so the revert can restore them too.
+      const connections = (await tx.execute(sql`
+        select * from person_bd_connection where person_id in (${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})`)) as unknown as unknown[];
       const gone = await tx.delete(person).where(inArray(person.id, ids)).returning({ id: person.id });
       if (gone.length !== ids.length) throw new Error(`Expected to delete ${ids.length}, deleted ${gone.length}: aborting.`);
       const [row] = await tx.insert(auditLog).values({
         actorBdId: actor!,
         action: DELETE_BY_EMPLOYER_ACTION,
-        metadata: { companyKeys: keys, deletedCount: ids.length, deletedPersonIds: ids, deletedPersons: snapshot },
+        metadata: { companyKeys: keys, deletedCount: ids.length, deletedPersonIds: ids, deletedPersons: snapshot, deletedConnections: connections },
       }).returning({ id: auditLog.id });
       return row!.id;
     }));
