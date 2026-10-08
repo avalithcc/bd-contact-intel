@@ -2159,6 +2159,43 @@ export const en = {
     nextPage: "Next",
     pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,
     applyFilter: "Apply",
+    colClientStatus: "Client status",
+    filterClientStatusNone: "Not stated",
+    bulkLimitedNotice: "Only applied to the first {n} companies matching the filter.",
+    bulkResultClientStatus: (changed: number, unchanged: number) =>
+      `${changed} company(ies) updated.${unchanged > 0 ? ` ${unchanged} already had that status.` : ""}`,
+    bulkResultClientStatusConfirm: "Not applied: the number typed does not match the selected companies.",
+    bulkResultClientStatusInvalid: "Not applied: the chosen client status is not valid.",
+  },
+
+  // Bulk "Client status" action on `/companies` (mockup
+  // company-client-status-bulk/estado-cliente-masivo.html). Strings only: the
+  // whole block crosses to a client component (ClientStrings).
+  companyBulk: {
+    regionLabel: "Bulk actions",
+    selectAllLabel: "Select all on this page",
+    selectRowLabel: "Select {name}",
+    selectedMany: "{n} selected",
+    selectedOne: "1 selected",
+    clientStatusAction: "Client status",
+    selectAllMatching: "Select all {n}",
+    clearSelection: "Clear selection",
+    dialogTitle: "Client status",
+    dialogIntroPrefix: "Mark",
+    dialogIntroSuffixOne: "selected.",
+    dialogIntroSuffixMany: "selected.",
+    companiesOne: "1 company",
+    companiesMany: "{n} companies",
+    activeHint: "Is a client and the relationship is current.",
+    inactiveHint: "Used to be a client and is not one today.",
+    noneHint: "Clears the status: the company goes back to not stated.",
+    historyNote: "Every change is recorded in the company history, with who made it.",
+    cancel: "Cancel",
+    confirmPrefix: "Mark",
+    guardTitle: "You are about to mark {n} companies.",
+    guardBody:
+      "Client status asserts that the company is a client. If it is set on all of them, the filter stops being useful for finding the real ones. Filter first.",
+    guardInputLabel: "Type the number to confirm",
   },
 
   contactsImport: {

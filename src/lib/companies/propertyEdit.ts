@@ -64,7 +64,9 @@ export interface CompanyPropertyEditPlan {
   historyRows: HistoryRow[];
 }
 
-export type EditableCompanyForPlan = Pick<Company, "companyKey" | EditableCompanyProperty>;
+// Only the key is required; the planner reads just the edited property, so a
+// bulk caller may load a single column (bulkClientStatus.ts).
+export type EditableCompanyForPlan = Pick<Company, "companyKey"> & Partial<Pick<Company, EditableCompanyProperty>>;
 
 function historyRow(
   companyKey: string,

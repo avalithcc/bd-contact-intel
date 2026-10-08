@@ -3,7 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { bd, company, person } from "@/db/schema";
 import type { AccountType } from "@/lib/companies/accountTypeFilter";
-import type { ClientStatus } from "@/lib/companies/clientStatus";
+import type { ClientStatusFilter } from "@/lib/companies/clientStatusFilter";
 import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { companyListConditions } from "@/lib/companies/listConditions";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
@@ -33,6 +33,8 @@ export interface CompanyListRow {
   country: string | null;
   /** Stored `linkedin.com/company/<slug>` (no scheme); null = no page set. */
   linkedinUrl: string | null;
+  /** "active" | "inactive" | null (never stated). */
+  clientStatus: string | null;
 }
 
 export interface CompanyListPage {
@@ -109,7 +111,7 @@ export async function getCompanyListPage(
   ownerFilter?: string,
   accountTypeFilter?: AccountType,
   q?: string,
-  clientStatusFilter?: ClientStatus,
+  clientStatusFilter?: ClientStatusFilter,
   linkedinFilter?: LinkedinPresence,
 ): Promise<CompanyListPage> {
   const conditions = companyListConditions({
@@ -160,6 +162,7 @@ export async function getCompanyListPage(
       city: company.city,
       country: company.country,
       linkedinUrl: company.linkedinUrl,
+      clientStatus: company.clientStatus,
       lastActivityAt: la.lastActivityAt.as("last_activity_at"),
     })
     .from(company)
@@ -204,6 +207,7 @@ export async function getCompanyListPage(
       city: r.city,
       country: r.country,
       linkedinUrl: r.linkedinUrl,
+      clientStatus: r.clientStatus,
     };
   });
 

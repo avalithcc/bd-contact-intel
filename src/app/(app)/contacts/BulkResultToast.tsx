@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
+import type { ToastVariant } from "@/components/Toast";
 
 /**
  * Fires a success Toast once when the bulk-action bar's `<form>` submission
@@ -16,7 +17,8 @@ import { useToast } from "@/components/ToastProvider";
  * `bulkLimited` stays a persistent inline banner in page.tsx (it's a
  * warning about a truncated selection, not a one-time success message).
  */
-export function BulkResultToast({ message }: { message: string | null }) {
+// `variant` defaults to "success"; refusals ("not applied") must pass "error".
+export function BulkResultToast({ message, variant = "success" }: { message: string | null; variant?: ToastVariant }) {
   const { showToast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -31,7 +33,7 @@ export function BulkResultToast({ message }: { message: string | null }) {
     }
     if (shown.current) return;
     shown.current = true;
-    showToast(message, "success");
+    showToast(message, variant);
     // Read the query string client-side (not `useSearchParams`, which would
     // force this page into the Suspense-boundary dance) so `view`/`q`/
     // `page`/`bulkLimited` survive the replace and only `bulkResult` drops.
@@ -39,7 +41,7 @@ export function BulkResultToast({ message }: { message: string | null }) {
     params.delete("bulkResult");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [message, showToast, router, pathname]);
+  }, [message, variant, showToast, router, pathname]);
 
   return null;
 }

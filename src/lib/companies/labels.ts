@@ -37,3 +37,6 @@ export function pickCompanyRecordLabels(dict: Dictionary): CompanyRecordLabels {
     stageLost: dict.companyList.stageLost,
   };
 }
+
+/** `/companies` bulk bar (CompanyBulkBar.tsx) is a client component: the whole `companyBulk` block is strings only. */
+export type CompanyBulkLabels = ClientStrings<Dictionary["companyBulk"]>;

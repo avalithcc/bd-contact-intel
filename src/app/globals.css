@@ -1631,3 +1631,59 @@ button.danger:not(.qa):hover:not(:disabled) {
 .toast .close {
   color: var(--color-on-dark);
 }
+
+/* Radio with a description (bulk "Estado de cliente" dialog, mockup
+   company-client-status-bulk). .check is inline-flex centered and cannot hold
+   two lines. Selected state shifts the BACKGROUND, never the border width: a
+   1px -> 2px swap moves every sibling row by a pixel. */
+.status-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.status-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  cursor: pointer;
+}
+/* The label (not a wrapping <label>: dialog markup guard) stretches over the
+   whole row so a click anywhere selects the radio. */
+.status-option label::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+.status-option:hover {
+  background: var(--color-surface-1);
+}
+.status-option input {
+  margin-top: 3px;
+  flex: none;
+}
+.status-option input:focus-visible {
+  z-index: 1;
+}
+.status-option .name {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.status-option .hint {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-subtle);
+}
+.status-option:has(input:checked) {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border-strong);
+}

@@ -2127,6 +2127,43 @@ export const es: typeof en = {
     nextPage: "Siguiente",
     pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,
     applyFilter: "Aplicar",
+    colClientStatus: "Estado de cliente",
+    filterClientStatusNone: "Sin declarar",
+    bulkLimitedNotice: "Solo se aplicó a las primeras {n} empresas que coinciden con el filtro.",
+    bulkResultClientStatus: (changed: number, unchanged: number) =>
+      `${changed} empresa(s) actualizada(s).${unchanged > 0 ? ` ${unchanged} ya tenía(n) ese estado.` : ""}`,
+    bulkResultClientStatusConfirm: "No se aplicó: la cantidad escrita no coincide con las empresas seleccionadas.",
+    bulkResultClientStatusInvalid: "No se aplicó: el estado de cliente elegido no es válido.",
+  },
+
+  // Acción masiva "Estado de cliente" de `/companies` (mockup
+  // company-client-status-bulk/estado-cliente-masivo.html). Solo strings: el
+  // bloque entero cruza a un componente cliente (ClientStrings).
+  companyBulk: {
+    regionLabel: "Acciones masivas",
+    selectAllLabel: "Seleccionar todo en la página",
+    selectRowLabel: "Seleccionar {name}",
+    selectedMany: "{n} seleccionadas",
+    selectedOne: "1 seleccionada",
+    clientStatusAction: "Estado de cliente",
+    selectAllMatching: "Seleccionar las {n}",
+    clearSelection: "Quitar selección",
+    dialogTitle: "Estado de cliente",
+    dialogIntroPrefix: "Marcar",
+    dialogIntroSuffixOne: "seleccionada.",
+    dialogIntroSuffixMany: "seleccionadas.",
+    companiesOne: "1 empresa",
+    companiesMany: "{n} empresas",
+    activeHint: "Es cliente y la relación está vigente.",
+    inactiveHint: "Fue cliente y hoy no lo es.",
+    noneHint: "Borra el estado: la empresa vuelve a no estar declarada.",
+    historyNote: "Cada cambio queda en el historial de la empresa, con quién lo hizo.",
+    cancel: "Cancelar",
+    confirmPrefix: "Marcar",
+    guardTitle: "Vas a marcar {n} empresas.",
+    guardBody:
+      "El estado de cliente afirma que la empresa es cliente. Si se pone en todas, el filtro deja de servir para encontrar a las que sí lo son. Filtra primero.",
+    guardInputLabel: "Escribe la cantidad para confirmar",
   },
 
   // `/contacts/import` (task 14.2; mockups/import.html) — consolidates the

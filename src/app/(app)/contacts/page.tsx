@@ -881,7 +881,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         </div>
       )}
 
-      <BulkResultToast message={bulkMessage} />
+      <BulkResultToast message={bulkMessage} variant={sp.bulkResult === "owner:forbidden" ? "error" : "success"} />
       {sp.bulkLimited === "1" && (
         <div className="alert alert-warn mb-lg">
           <p>{l.bulkLimitedNotice}</p>
