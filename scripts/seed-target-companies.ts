@@ -36,15 +36,25 @@
  * the same shape src/lib/hubspot/importQueries.ts creates) with ON CONFLICT DO
  * NOTHING: an existing company, and everything a BD has set on it, is untouched.
  *
+ * REFUSES a colliding alias (it does not skip it): an alias key that is already
+ * a `company` key, or that this run creates as one, is not an alias for anyone
+ * (src/lib/companies/aliasRule.ts), so the contact counts would ignore it. The
+ * whole file is checked BEFORE the first write; on any collision it prints each
+ * one and exits 1 with nothing written (a typo must not pass as a no-op, same
+ * discipline as clear-non-company-employers.ts). Resolve it in the source file,
+ * or merge the two companies with merge-companies.ts. This script has no dry
+ * run, so the check is unconditional.
+ *
  * Usage (do NOT run automatically — this touches the real database):
  *   npx tsx scripts/seed-target-companies.ts /path/to/target_companies.json
  *
  * Requires DATABASE_URL to be set (see .env).
  */
 import fs from "node:fs";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { company, companyAlias, targetCompany } from "../src/db/schema";
+import { allSeedAliasKeys, findAliasCollisions } from "../src/lib/companies/seedAliasGuard";
 
 interface SeedRow {
   companyKey: string;
@@ -66,6 +76,20 @@ async function main() {
 
   const raw = fs.readFileSync(filePath, "utf8");
   const rows: SeedRow[] = JSON.parse(raw);
+
+  const aliasKeys = allSeedAliasKeys(rows);
+  const live = aliasKeys.length
+    ? await db.select({ key: company.companyKey }).from(company).where(inArray(company.companyKey, aliasKeys))
+    : [];
+  const collisions = findAliasCollisions(rows, new Set(live.map((r) => r.key)));
+  if (collisions.length) {
+    console.error(`Refusing to seed: ${collisions.length} alias(es) are company keys, so they would be ignored. Nothing was written.`);
+    for (const c of collisions) {
+      const why = c.reason === "live-company" ? "is already a company" : "is created as a company by this run";
+      console.error(`  alias "${c.aliasKey}" (for ${c.companyKey}) ${why}`);
+    }
+    process.exit(1);
+  }
 
   console.log(`Seeding ${rows.length} target companies from ${filePath}...`);
 
