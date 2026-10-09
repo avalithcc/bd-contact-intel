@@ -38,7 +38,10 @@
  *
  * REFUSES a colliding alias (it does not skip it): an alias key that is already
  * a `company` key, or that this run creates as one, is not an alias for anyone
- * (src/lib/companies/aliasRule.ts), so the contact counts would ignore it. The
+ * (src/lib/companies/aliasRule.ts), so the contact counts would ignore it. It
+ * also refuses the reverse: a row (with aliases) whose own key is already an
+ * alias_key, because the bare company this script inserts would silence that
+ * working alias. The
  * whole file is checked BEFORE the first write; on any collision it prints each
  * one and exits 1 with nothing written (a typo must not pass as a no-op, same
  * discipline as clear-non-company-employers.ts). Resolve it in the source file,
@@ -54,7 +57,7 @@ import fs from "node:fs";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { company, companyAlias, targetCompany } from "../src/db/schema";
-import { allSeedAliasKeys, findAliasCollisions } from "../src/lib/companies/seedAliasGuard";
+import { allSeedAliasKeys, findAliasCollisions, seedCompanyKeys } from "../src/lib/companies/seedAliasGuard";
 
 interface SeedRow {
   companyKey: string;
@@ -77,16 +80,32 @@ async function main() {
   const raw = fs.readFileSync(filePath, "utf8");
   const rows: SeedRow[] = JSON.parse(raw);
 
+  // Two bounded reads, both before the first write: which alias keys / to-be-created
+  // company keys are already companies, and which to-be-created company keys are
+  // already aliases (creating that company would silence the alias).
   const aliasKeys = allSeedAliasKeys(rows);
-  const live = aliasKeys.length
-    ? await db.select({ key: company.companyKey }).from(company).where(inArray(company.companyKey, aliasKeys))
+  const newCompanyKeys = seedCompanyKeys(rows);
+  const lookupKeys = [...new Set([...aliasKeys, ...newCompanyKeys])];
+  const live = lookupKeys.length
+    ? await db.select({ key: company.companyKey }).from(company).where(inArray(company.companyKey, lookupKeys))
     : [];
-  const collisions = findAliasCollisions(rows, new Set(live.map((r) => r.key)));
+  const existing = newCompanyKeys.length
+    ? await db
+        .select({ aliasKey: companyAlias.aliasKey, companyKey: companyAlias.companyKey })
+        .from(companyAlias)
+        .where(inArray(companyAlias.aliasKey, newCompanyKeys))
+    : [];
+  const collisions = findAliasCollisions(
+    rows,
+    new Set(live.map((r) => r.key)),
+    new Map(existing.map((r) => [r.aliasKey, r.companyKey])),
+  );
   if (collisions.length) {
-    console.error(`Refusing to seed: ${collisions.length} alias(es) are company keys, so they would be ignored. Nothing was written.`);
+    console.error(`Refusing to seed: ${collisions.length} alias collision(s) with company keys. Nothing was written.`);
     for (const c of collisions) {
-      const why = c.reason === "live-company" ? "is already a company" : "is created as a company by this run";
-      console.error(`  alias "${c.aliasKey}" (for ${c.companyKey}) ${why}`);
+      if (c.reason === "live-company") console.error(`  alias "${c.aliasKey}" (for ${c.companyKey}) is already a company`);
+      else if (c.reason === "created-by-this-run") console.error(`  alias "${c.aliasKey}" (for ${c.companyKey}) is created as a company by this run`);
+      else console.error(`  creating company "${c.companyKey}" would silence its existing alias "${c.aliasKey}" -> ${c.existingTarget}`);
     }
     process.exit(1);
   }

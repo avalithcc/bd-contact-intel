@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { findAliasCollisions, type SeedAliasRow } from "@/lib/companies/seedAliasGuard";
+import { allSeedAliasKeys, findAliasCollisions, seedCompanyKeys, type SeedAliasRow } from "@/lib/companies/seedAliasGuard";
 
 const rows: SeedAliasRow[] = [
   { companyKey: "acme", aliases: ["acme-sa", "globex"] },
@@ -62,10 +62,35 @@ test("pure: never mutates its inputs and gives the same answer twice", () => {
   assert.deepEqual([...live], ["globex"]);
 });
 
+test("a row whose key is already an alias would shadow it: the seed creates that company, which silences the alias", () => {
+  const r: SeedAliasRow[] = [{ companyKey: "globex", aliases: ["globex-sa"] }];
+  assert.deepEqual(findAliasCollisions(r, new Set(), new Map([["globex", "acme"]])), [
+    { aliasKey: "globex", companyKey: "globex", reason: "would-shadow-existing-alias", existingTarget: "acme" },
+  ]);
+});
+
+test("a row key that is already a live company creates nothing, so an existing alias on it is not shadowed by this run", () => {
+  const r: SeedAliasRow[] = [{ companyKey: "globex", aliases: ["globex-sa"] }];
+  assert.deepEqual(findAliasCollisions(r, new Set(["globex"]), new Map([["globex", "acme"]])), []);
+});
+
+test("a row without aliases creates no company, so it cannot shadow an alias", () => {
+  assert.deepEqual(findAliasCollisions([{ companyKey: "globex" }], new Set(), new Map([["globex", "acme"]])), []);
+});
+
+test("the keys the script must look up are exactly the alias keys, and the keys of rows that will create a company", () => {
+  const r: SeedAliasRow[] = [{ companyKey: "b", aliases: ["z", "y", "z"] }, { companyKey: "a" }, { companyKey: "c", aliases: ["x"] }];
+  assert.deepEqual(allSeedAliasKeys(r), ["x", "y", "z"]);
+  assert.deepEqual(seedCompanyKeys(r), ["b", "c"]);
+});
+
 test("the seed script checks for collisions before its first write and exits non-zero on one", () => {
   const src = readFileSync("scripts/seed-target-companies.ts", "utf8");
   const check = src.indexOf("findAliasCollisions(");
   assert.ok(check >= 0, "script must call findAliasCollisions");
   assert.ok(check < src.indexOf(".insert("), "the check must run before any insert");
+  // Both directions are read before the first write: alias keys vs company, and company-to-be keys vs company_alias.
+  assert.ok(src.indexOf("inArray(company.companyKey") >= 0 && src.indexOf("inArray(companyAlias.aliasKey") >= 0);
+  assert.ok(src.indexOf("inArray(companyAlias.aliasKey") < src.indexOf(".insert("));
   assert.match(src.slice(check, src.indexOf(".insert(")), /process\.exit\(1\)|process\.exitCode = 1|throw /);
 });
