@@ -18,13 +18,36 @@ import {
 } from "@/lib/companies/propertyEdit";
 import { CompanyNotFoundError } from "@/lib/companies/errors";
 
+/** Another company (not `companyKey`) holding `domain`, or null. */
+async function findDomainHolder(tx: Pick<typeof db, "select">, domain: string, companyKey: string): Promise<string | null> {
+  const [holder] = await tx
+    .select({ companyKey: company.companyKey })
+    .from(company)
+    .where(and(eq(company.domain, domain), ne(company.companyKey, companyKey)))
+    .limit(1);
+  return holder?.companyKey ?? null;
+}
+
+/**
+ * `deps` exists for tests/db: `database` lets a rolled-back transaction host
+ * the write (drizzle nests it as a savepoint), and `domainHolder` replaces the
+ * pre-check so the unique-index race path can be driven for real. Production
+ * callers pass nothing.
+ */
+export interface UpdateCompanyPropertyDeps {
+  database?: Pick<typeof db, "transaction">;
+  domainHolder?: typeof findDomainHolder;
+}
+
 export async function updateCompanyProperty(
   companyKey: string,
   property: EditableCompanyProperty,
   rawNewValue: string,
   changedByBdId: string,
+  deps: UpdateCompanyPropertyDeps = {},
 ): Promise<Company> {
-  return db.transaction(async (tx) => {
+  const { database = db, domainHolder = findDomainHolder } = deps;
+  return database.transaction(async (tx) => {
     const [row] = await tx.select().from(company).where(eq(company.companyKey, companyKey));
     if (!row) throw new CompanyNotFoundError(companyKey);
 
@@ -45,12 +68,7 @@ export async function updateCompanyProperty(
     // read and the write, mapped below.
     const newDomain = property === "domain" ? (plan.companyUpdate!.domain ?? null) : null;
     if (newDomain) {
-      const [holder] = await tx
-        .select({ companyKey: company.companyKey })
-        .from(company)
-        .where(and(eq(company.domain, newDomain), ne(company.companyKey, companyKey)))
-        .limit(1);
-      if (holder) throw new DomainInUseError(newDomain);
+      if (await domainHolder(tx, newDomain, companyKey)) throw new DomainInUseError(newDomain);
     }
 
     let updated: Company | undefined;
