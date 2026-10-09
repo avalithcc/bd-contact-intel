@@ -1,7 +1,8 @@
 import { and, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { bd, company, type Company, type NewCompany } from "@/db/schema";
+import { bd, company, person, type Company, type NewCompany } from "@/db/schema";
+import { companyContactsCondition } from "@/lib/companies/contactCounts";
 
 const owner = alias(bd, "owner");
 
@@ -119,12 +120,12 @@ export async function getCompanies(
  * "N contactos en esta empresa" (mockup-port r05; contact-record.html:163).
  * Bounded to one company — excludes merged-away rows (design D6), same
  * convention as every other Contact read (queries.ts's `findPersonById`).
+ * Alias-resolved inside the same statement (`companyContactsCondition`), so
+ * it is still ONE round trip.
  */
 export async function getCompanyContactCount(companyKey: string): Promise<number> {
-  const [row] = await db.execute<{ count: string }>(
-    sql`select count(*)::text as count from person where company_key = ${companyKey} and merged_into_id is null`,
-  );
-  return row ? Number(row.count) : 0;
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(person).where(companyContactsCondition(companyKey));
+  return row?.count ?? 0;
 }
 
 export type CompanyWithOwner = Company & { ownerName: string | null };

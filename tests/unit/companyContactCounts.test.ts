@@ -11,7 +11,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { QueryBuilder } from "drizzle-orm/pg-core";
 import type { db } from "@/db";
-import { companyContactCountsQuery } from "@/lib/companies/contactCounts";
+import { person } from "@/db/schema";
+import { companyContactCountsQuery, companyContactsCondition } from "@/lib/companies/contactCounts";
 
 function render(keys: string[]) {
   const qb = new QueryBuilder() as unknown as Pick<typeof db, "select">;
@@ -28,4 +29,17 @@ test("the count stays one grouped query bound to exactly the page's keys", () =>
   assert.match(sql, /"person"\."company_key" in \(\$1, \$2\)/);
   assert.match(sql, /group by "person"\."company_key"$/);
   assert.deepEqual(params, ["acme", "globex"]);
+});
+
+// --- single-company reads: the company record --------------------------------
+
+function renderRecordWhere(companyKey: string) {
+  return new QueryBuilder().select({ id: person.id }).from(person).where(companyContactsCondition(companyKey)).toSQL();
+}
+
+test("the record's people filter excludes merged-away rows and resolves aliases in the same statement", () => {
+  const { sql, params } = renderRecordWhere("acme");
+  assert.match(sql, /"person"\."merged_into_id" is null/i);
+  assert.match(sql, /"person"\."company_key" in \(select \$\d::text union select "company_alias"\."alias_key" from "company_alias" where "company_alias"\."company_key" = \$\d\)/i);
+  assert.deepEqual(params, ["acme", "acme"]);
 });

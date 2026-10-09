@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
+import { companyContactsCondition } from "@/lib/companies/contactCounts";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { buildCompanyTimelineEntry, type CompanyTimelineEntry } from "@/lib/companies/companyTimelineEntry";
 import { notFoldedAttemptSql } from "@/lib/activity/callAttemptFold";
@@ -31,12 +32,12 @@ export interface CompanyPeoplePage {
 
 /**
  * People at this company (companies-checklist.md's Contactos card /
- * company-record.html:90) — matches `person.company_key` directly, same
- * known limitation as the list's contacts count (not alias-resolved yet,
- * flagged as a todo, not a blocker).
+ * company-record.html:90) — merged-away people excluded and `company_alias`
+ * keys resolved, in the same statements (`companyContactsCondition`), so
+ * the count and the rows each stay one round trip.
  */
 export async function getCompanyPeople(companyKey: string, limit: number = ASSOC_PEOPLE_PREVIEW): Promise<CompanyPeoplePage> {
-  const where = and(eq(person.companyKey, companyKey), isNull(person.mergedIntoId));
+  const where = companyContactsCondition(companyKey);
   const [[totalRow], rows] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(person).where(where),
     db
@@ -56,7 +57,7 @@ async function getCompanyPersonIds(companyKey: string): Promise<string[]> {
   const rows = await db
     .select({ id: person.id })
     .from(person)
-    .where(and(eq(person.companyKey, companyKey), isNull(person.mergedIntoId)))
+    .where(companyContactsCondition(companyKey))
     .limit(PEOPLE_LIMIT);
   return rows.map((r) => r.id);
 }
