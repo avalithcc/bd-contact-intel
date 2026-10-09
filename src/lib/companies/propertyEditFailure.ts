@@ -8,11 +8,14 @@
  */
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { CompanyNotFoundError } from "@/lib/companies/errors";
+import { companyDomainErrorMessage, InvalidCompanyDomainError, type DomainRejection } from "@/lib/companies/domain";
 import { InvalidCompanyLinkedinUrlError, linkedinUrlErrorMessage, type LinkedinUrlRejection } from "@/lib/companies/linkedinUrl";
-import { InvalidClientStatusError, InvalidOwnerError } from "@/lib/companies/propertyEdit";
+import { DomainInUseError, InvalidClientStatusError, InvalidOwnerError } from "@/lib/companies/propertyEdit";
 
 export type PropertyEditFailure =
   | { kind: "linkedin"; reason: LinkedinUrlRejection }
+  | { kind: "domain"; reason: DomainRejection }
+  | { kind: "domain_in_use" }
   | { kind: "client_status" }
   | { kind: "owner" }
   | { kind: "not_found" };
@@ -20,6 +23,8 @@ export type PropertyEditFailure =
 /** Maps a thrown error to a failure, or null when it is unexpected. */
 export function propertyEditFailureOf(err: unknown): PropertyEditFailure | null {
   if (err instanceof InvalidCompanyLinkedinUrlError) return { kind: "linkedin", reason: err.reason };
+  if (err instanceof InvalidCompanyDomainError) return { kind: "domain", reason: err.reason };
+  if (err instanceof DomainInUseError) return { kind: "domain_in_use" };
   if (err instanceof InvalidClientStatusError) return { kind: "client_status" };
   if (err instanceof InvalidOwnerError) return { kind: "owner" };
   if (err instanceof CompanyNotFoundError) return { kind: "not_found" };
@@ -28,15 +33,20 @@ export function propertyEditFailureOf(err: unknown): PropertyEditFailure | null 
 
 export type PropertyEditFailureLabels = Pick<
   Dictionary["companyRecord"],
-  "editErrorClientStatus" | "editErrorOwner" | "editErrorCompanyNotFound"
+  "editErrorClientStatus" | "editErrorOwner" | "editErrorCompanyNotFound" | "editErrorDomainInUse"
 > &
-  Parameters<typeof linkedinUrlErrorMessage>[1];
+  Parameters<typeof linkedinUrlErrorMessage>[1] &
+  Parameters<typeof companyDomainErrorMessage>[1];
 
 /** The message is chosen by failure kind, never by assumption. */
 export function propertyEditFailureMessage(failure: PropertyEditFailure, l: PropertyEditFailureLabels): string {
   switch (failure.kind) {
     case "linkedin":
       return linkedinUrlErrorMessage(failure.reason, l);
+    case "domain":
+      return companyDomainErrorMessage(failure.reason, l);
+    case "domain_in_use":
+      return l.editErrorDomainInUse;
     case "client_status":
       return l.editErrorClientStatus;
     case "owner":

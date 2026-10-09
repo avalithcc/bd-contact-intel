@@ -7,10 +7,12 @@
  * against `bd`) and writes the update plus the company_property_history row
  * in ONE transaction so they can never diverge.
  */
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, company, companyPropertyHistory, type Company } from "@/db/schema";
 import {
+  DomainInUseError,
+  isDomainIndexViolation,
   planCompanyPropertyEdit,
   type EditableCompanyProperty,
 } from "@/lib/companies/propertyEdit";
@@ -38,11 +40,26 @@ export async function updateCompanyProperty(
     const plan = planCompanyPropertyEdit(row, property, rawNewValue, changedByBdId, { ownerExists });
     if (!plan.changed) return row;
 
-    const [updated] = await tx
-      .update(company)
-      .set(plan.companyUpdate!)
-      .where(eq(company.companyKey, companyKey))
-      .returning();
+    // Another company holding the domain is a user-correctable failure, not
+    // a raw constraint error. The index still guards the race between this
+    // read and the write, mapped below.
+    const newDomain = property === "domain" ? (plan.companyUpdate!.domain ?? null) : null;
+    if (newDomain) {
+      const [holder] = await tx
+        .select({ companyKey: company.companyKey })
+        .from(company)
+        .where(and(eq(company.domain, newDomain), ne(company.companyKey, companyKey)))
+        .limit(1);
+      if (holder) throw new DomainInUseError(newDomain);
+    }
+
+    let updated: Company | undefined;
+    try {
+      [updated] = await tx.update(company).set(plan.companyUpdate!).where(eq(company.companyKey, companyKey)).returning();
+    } catch (err) {
+      if (newDomain && isDomainIndexViolation(err)) throw new DomainInUseError(newDomain);
+      throw err;
+    }
     if (plan.historyRows.length) {
       await tx.insert(companyPropertyHistory).values(plan.historyRows);
     }

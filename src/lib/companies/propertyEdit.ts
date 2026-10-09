@@ -14,9 +14,10 @@
  */
 import type { Company, NewCompany, NewCompanyPropertyHistory } from "@/db/schema";
 import { isClientStatus } from "@/lib/companies/clientStatus";
+import { InvalidCompanyDomainError, normalizeCompanyDomain } from "@/lib/companies/domain";
 import { InvalidCompanyLinkedinUrlError, normalizeCompanyLinkedinUrl } from "@/lib/companies/linkedinUrl";
 
-export const EDITABLE_COMPANY_PROPERTIES = ["industry", "ownerBdId", "city", "country", "clientStatus", "linkedinUrl"] as const;
+export const EDITABLE_COMPANY_PROPERTIES = ["industry", "ownerBdId", "city", "country", "clientStatus", "linkedinUrl", "domain"] as const;
 
 export type EditableCompanyProperty = (typeof EDITABLE_COMPANY_PROPERTIES)[number];
 
@@ -47,6 +48,29 @@ export class InvalidClientStatusError extends Error {
     super(`Invalid client status: ${value}`);
     this.name = "InvalidClientStatusError";
   }
+}
+
+/**
+ * Thrown by the DB glue (never the pure planner, which cannot see other
+ * rows) when another company already holds the domain: `company_domain_idx`
+ * is a partial unique index, so the write would otherwise fail with a raw
+ * constraint error the BD cannot act on.
+ */
+export class DomainInUseError extends Error {
+  constructor(public readonly domain: string) {
+    super(`Domain already in use: ${domain}`);
+    this.name = "DomainInUseError";
+  }
+}
+
+/** True for the Postgres unique violation on `company_domain_idx`, whether
+ * the driver error is raw or wrapped (drizzle keeps it on `cause`). */
+export function isDomainIndexViolation(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === "object" && depth < 4; e = (e as { cause?: unknown }).cause, depth++) {
+    const { code, constraint_name: constraint, constraint: alt } = e as { code?: string; constraint_name?: string; constraint?: string };
+    if (code === "23505" && (constraint ?? alt) === "company_domain_idx") return true;
+  }
+  return false;
 }
 
 type HistoryRow = Omit<NewCompanyPropertyHistory, "id" | "at">;
@@ -103,6 +127,14 @@ export function planCompanyPropertyEdit(
     newValue = result.value;
   }
   const oldValue = companyRow[property] ?? null;
+  // domain follows the same rule. A value equal to what is already stored is
+  // a no-op BEFORE validation, so an existing row is never refused by a rule
+  // that is stricter than the data it already holds.
+  if (property === "domain" && newValue !== null && newValue !== oldValue) {
+    const result = normalizeCompanyDomain(newValue);
+    if (!result.ok) throw new InvalidCompanyDomainError(result.reason, newValue);
+    newValue = result.value;
+  }
 
   if (oldValue === newValue) {
     return { changed: false, companyUpdate: null, historyRows: [] };

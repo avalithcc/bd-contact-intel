@@ -12,9 +12,11 @@ import {
   EDITABLE_COMPANY_PROPERTIES,
   InvalidClientStatusError,
   InvalidOwnerError,
+  isDomainIndexViolation,
   isEditableCompanyProperty,
   planCompanyPropertyEdit,
 } from "@/lib/companies/propertyEdit";
+import { InvalidCompanyDomainError } from "@/lib/companies/domain";
 import { InvalidCompanyLinkedinUrlError } from "@/lib/companies/linkedinUrl";
 
 const BD_1 = "11111111-1111-1111-1111-111111111111";
@@ -28,6 +30,7 @@ const BASE_COMPANY = {
   country: null,
   clientStatus: null,
   linkedinUrl: null,
+  domain: null as string | null,
 };
 
 test("isEditableCompanyProperty accepts only the allow-listed columns", () => {
@@ -121,6 +124,7 @@ test("planCompanyPropertyEdit is a pure function: same input twice yields the sa
     country: null,
     clientStatus: null,
     linkedinUrl: null,
+    domain: null,
   });
 });
 
@@ -255,4 +259,69 @@ test("linkedinUrl planning does not mutate its input and is repeatable", () => {
   assert.deepEqual(input, snapshot);
   assert.deepEqual(a.historyRows, b.historyRows);
   assert.equal(a.companyUpdate!.linkedinUrl, b.companyUpdate!.linkedinUrl);
+});
+
+test("domain is an editable property", () => {
+  assert.equal(isEditableCompanyProperty("domain"), true);
+});
+
+test("planCompanyPropertyEdit stores the normalised domain and records the old one in history", () => {
+  const stored = { ...BASE_COMPANY, domain: "bancogalicia.com.ar" };
+  const plan = planCompanyPropertyEdit(stored, "domain", " https://www.Galicia.AR/personas ", BD_1);
+  assert.equal(plan.changed, true);
+  assert.equal(plan.companyUpdate!.domain, "galicia.ar");
+  assert.deepEqual(plan.historyRows, [
+    {
+      companyKey: "acme",
+      property: "domain",
+      oldValue: "bancogalicia.com.ar",
+      newValue: "galicia.ar",
+      changedByBdId: BD_1,
+      source: "edit",
+    },
+  ]);
+});
+
+test("planCompanyPropertyEdit reports no change when the pasted domain normalises to the stored one", () => {
+  const stored = { ...BASE_COMPANY, domain: "galicia.ar" };
+  for (const raw of ["galicia.ar", "GALICIA.ar", "https://www.galicia.ar/", " galicia.ar "]) {
+    const plan = planCompanyPropertyEdit(stored, "domain", raw, BD_1);
+    assert.equal(plan.changed, false, raw);
+    assert.deepEqual(plan.historyRows, []);
+  }
+});
+
+test("planCompanyPropertyEdit never refuses to re-save the value a company already holds", () => {
+  // `live.com` trips the free-mail rule, but a stored row must stay a no-op.
+  const stored = { ...BASE_COMPANY, domain: "live.com" };
+  assert.equal(planCompanyPropertyEdit(stored, "domain", "live.com", BD_1).changed, false);
+});
+
+test("planCompanyPropertyEdit clears domain to null on a blank value", () => {
+  const stored = { ...BASE_COMPANY, domain: "galicia.ar" };
+  const plan = planCompanyPropertyEdit(stored, "domain", "  ", BD_1);
+  assert.equal(plan.changed, true);
+  assert.equal(plan.companyUpdate!.domain, null);
+  assert.equal(plan.historyRows[0]!.newValue, null);
+});
+
+test("planCompanyPropertyEdit rejects an invalid domain before building a plan", () => {
+  assert.throws(
+    () => planCompanyPropertyEdit(BASE_COMPANY, "domain", "juan@foo.com", BD_1),
+    (e: unknown) => e instanceof InvalidCompanyDomainError && e.reason === "email",
+  );
+  assert.throws(
+    () => planCompanyPropertyEdit(BASE_COMPANY, "domain", "avalith", BD_1),
+    (e: unknown) => e instanceof InvalidCompanyDomainError && e.reason === "no_tld",
+  );
+});
+
+test("isDomainIndexViolation recognises the domain unique violation, raw or wrapped, and nothing else", () => {
+  const raw = { code: "23505", constraint_name: "company_domain_idx" };
+  assert.equal(isDomainIndexViolation(raw), true);
+  assert.equal(isDomainIndexViolation(Object.assign(new Error("Failed query"), { cause: raw })), true);
+  assert.equal(isDomainIndexViolation({ code: "23505", constraint_name: "company_pkey" }), false);
+  assert.equal(isDomainIndexViolation({ code: "40001" }), false);
+  assert.equal(isDomainIndexViolation(new Error("boom")), false);
+  assert.equal(isDomainIndexViolation(null), false);
 });

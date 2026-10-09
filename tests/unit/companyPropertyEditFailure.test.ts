@@ -6,15 +6,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CompanyNotFoundError } from "@/lib/companies/errors";
-import { planCompanyPropertyEdit } from "@/lib/companies/propertyEdit";
+import { DomainInUseError, planCompanyPropertyEdit } from "@/lib/companies/propertyEdit";
 import { propertyEditFailureMessage, propertyEditFailureOf } from "@/lib/companies/propertyEditFailure";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 
 const BD = "11111111-1111-1111-1111-111111111111";
-const COMPANY = { companyKey: "acme", industry: null, ownerBdId: null, city: null, country: null, clientStatus: null, linkedinUrl: null };
+const COMPANY = { companyKey: "acme", industry: null, ownerBdId: null, city: null, country: null, clientStatus: null, linkedinUrl: null, domain: null };
 
-function thrownBy(property: "linkedinUrl" | "clientStatus" | "ownerBdId", value: string): unknown {
+function thrownBy(property: "linkedinUrl" | "clientStatus" | "ownerBdId" | "domain", value: string): unknown {
   try {
     planCompanyPropertyEdit(COMPANY, property, value, BD, { ownerExists: false });
   } catch (e) {
@@ -25,6 +25,8 @@ function thrownBy(property: "linkedinUrl" | "clientStatus" | "ownerBdId", value:
 
 test("every typed planner failure is classified by kind", () => {
   assert.deepEqual(propertyEditFailureOf(thrownBy("linkedinUrl", "linkedin.com/in/x")), { kind: "linkedin", reason: "personal_profile" });
+  assert.deepEqual(propertyEditFailureOf(thrownBy("domain", "juan@foo.com")), { kind: "domain", reason: "email" });
+  assert.deepEqual(propertyEditFailureOf(new DomainInUseError("foo.com")), { kind: "domain_in_use" });
   assert.deepEqual(propertyEditFailureOf(thrownBy("clientStatus", "dormant")), { kind: "client_status" });
   assert.deepEqual(propertyEditFailureOf(thrownBy("ownerBdId", BD)), { kind: "owner" });
   assert.deepEqual(propertyEditFailureOf(new CompanyNotFoundError("acme")), { kind: "not_found" });
@@ -42,7 +44,10 @@ test("each kind maps to its own message in both languages, never a LinkedIn one 
     const status = propertyEditFailureMessage({ kind: "client_status" }, l);
     const missing = propertyEditFailureMessage({ kind: "not_found" }, l);
     const linkedin = propertyEditFailureMessage({ kind: "linkedin", reason: "not_linkedin" }, l);
-    assert.equal(new Set([owner, status, missing, linkedin]).size, 4);
+    const domain = propertyEditFailureMessage({ kind: "domain", reason: "email" }, l);
+    const inUse = propertyEditFailureMessage({ kind: "domain_in_use" }, l);
+    assert.equal(new Set([owner, status, missing, linkedin, domain, inUse]).size, 6);
+    assert.equal(inUse, l.editErrorDomainInUse);
     assert.equal(owner, l.editErrorOwner);
     assert.equal(status, l.editErrorClientStatus);
     assert.equal(missing, l.editErrorCompanyNotFound);
