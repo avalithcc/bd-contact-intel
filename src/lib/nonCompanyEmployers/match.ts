@@ -12,6 +12,7 @@ const ONLY_NON_COMPANY_WORDS = /^(?:selfemployed|freelancer|freelance|independie
 
 export function isNonCompanyEmployer(companyKey: string): boolean {
   const squashed = squashCompanyKey(companyKey);
+  if (squashed === null) return false; // nothing to recognise: a non-Latin name is a company, not "freelance"
   return /freelance|independiente/.test(squashed) && ONLY_NON_COMPANY_WORDS.test(squashed);
 }
 

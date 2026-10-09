@@ -34,7 +34,21 @@ export const refCount = (counts: ReadonlyMap<string, number>, table: string, com
   counts.get(refKey(table, companyKey)) ?? 0;
 
 /**
- * Same squash as the SQL `regexp_replace(lower(company_key), '[^a-z0-9]', '', 'g')`. A HEURISTIC: `&company` and
- * `Company` squash alike and are different companies, so it may only propose candidates for a human to confirm.
+ * Same squash as the SQL `regexp_replace(lower(company_key), '[^a-z0-9]', '', 'g')`, except that "nothing left" is
+ * `null`, never `""`. A HEURISTIC: `&company` and `Company` squash alike and are different companies, so it may only
+ * propose candidates for a human to confirm.
+ *
+ * WHY null: the squash keeps [a-z0-9] only, so every Cyrillic, Arabic, Hebrew, CJK, Korean, Greek or Thai name (and
+ * "---") squashes to nothing. As `""` that read as data at two call sites: a junk set containing `""` detached real
+ * employers (2026-10-08, "АО «Системы управления»" and "مؤسسه تراتيل" lost their text), and
+ * `anything.startsWith("")` is true, so an unordered SELECT made an arbitrary company the repoint target of "日本".
+ * "Could not normalize" is not a value, so the type no longer lets a caller treat it as one.
+ *
+ * The SQL copies (companyMerge/db.ts, nonCompanyEmployers/db.ts) cannot return null from a regexp_replace; they stay
+ * `''` and are safe because each guards it in SQL (`sq_squash <> ''`) or only uses it as a prefilter whose JS
+ * matcher decides.
  */
-export const squashCompanyKey = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+export const squashCompanyKey = (key: string): string | null => {
+  const squashed = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return squashed === "" ? null : squashed;
+};

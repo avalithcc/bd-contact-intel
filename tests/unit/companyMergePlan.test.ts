@@ -68,7 +68,10 @@ test("squashCompanyKey drops everything but a-z0-9 after lowercasing", () => {
   assert.equal(squashCompanyKey("mercado-libre."), "mercadolibre");
   // The known false positive: the heuristic proposes, a human decides.
   assert.equal(squashCompanyKey("&company"), squashCompanyKey("Company"));
-  assert.equal(squashCompanyKey("---"), "");
+  // Nothing left is "could not normalize", not a key: null, so no caller can mistake it for data.
+  assert.equal(squashCompanyKey("---"), null);
+  assert.equal(squashCompanyKey("日本"), null);
+  assert.equal(squashCompanyKey("АО «Системы управления»"), null);
 });
 
 test("parseGroupSpec reads survivor and dead keys, trimmed", () => {
