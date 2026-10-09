@@ -9,6 +9,7 @@ import { CompanyQuickActions, type CompanyQuickActionsLabels, type TaskAssigneeO
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { CLIENT_STATUSES, clientStatusLabel } from "@/lib/companies/clientStatus";
+import { companyDomainHref } from "@/lib/companies/domain";
 import { companyLinkedinUrlHref } from "@/lib/companies/linkedinUrl";
 import { propertyEditFailureMessage } from "@/lib/companies/propertyEditFailure";
 
@@ -56,6 +57,18 @@ export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
       | "linkedinErrorPersonalProfile"
       | "linkedinErrorInvalidPath"
       | "linkedinErrorUnparseable"
+      | "propDomain"
+      | "domainPlaceholder"
+      | "domainHelp"
+      | "domainErrorNotHttp"
+      | "domainErrorEmail"
+      | "domainErrorIpAddress"
+      | "domainErrorNoTld"
+      | "domainErrorNonAscii"
+      | "domainErrorInvalidHost"
+      | "domainErrorFreeMail"
+      | "domainErrorUnparseable"
+      | "editErrorDomainInUse"
       | "editErrorClientStatus"
       | "editErrorOwner"
       | "editErrorCompanyNotFound"
@@ -104,6 +117,8 @@ export interface CompanyAboutPaneProps {
   clientStatus: string | null;
   /** Stored `company.linkedin_url` (`linkedin.com/company/<slug>`; null = not set). */
   linkedinUrl: string | null;
+  /** Stored `company.domain` (lowercase host, e.g. `galicia.ar`; null = not set). */
+  domain: string | null;
   labels: CompanyAboutPaneLabels;
   newContactLabels: NewContactDialogLabels;
   /** An absorption proposal is open on this company (disables "Fue absorbida"). */
@@ -169,6 +184,7 @@ export function CompanyAboutPane({
   accountTypeText,
   clientStatus,
   linkedinUrl,
+  domain,
   labels: l,
   newContactLabels,
   absorptionOpen,
@@ -451,10 +467,38 @@ export function CompanyAboutPane({
           onSave={(value) => saveProperty("clientStatus", value)}
         />
 
+        {/* Domain — the host the email-to-company matching keys on, edited as
+            free text that is normalised and validated on the server
+            (domain.ts). Same row as LinkedIn: only the copy and the link differ. */}
+        <FreeTextPropertyRow
+          label={l.propDomain}
+          placeholder={l.domainPlaceholder}
+          help={l.domainHelp}
+          hrefOf={companyDomainHref}
+          value={domain}
+          editing={editingProperty === "domain"}
+          busy={busy}
+          error={editingProperty === "domain" ? error : null}
+          hint={formatLastEdit(l, lastEditByProperty.domain)}
+          labels={l}
+          onStartEdit={() => {
+            setError(null);
+            setEditingProperty("domain");
+          }}
+          onCancel={() => {
+            setError(null);
+            setEditingProperty(null);
+          }}
+          onSave={(value) => saveProperty("domain", value)}
+        />
+
         {/* LinkedIn page — a link (new tab) when set; edited as free text that
             is normalised and validated on the server (linkedinUrl.ts). */}
-        <LinkedinPropertyRow
+        <FreeTextPropertyRow
           label={l.propLinkedinUrl}
+          placeholder={l.linkedinUrlPlaceholder}
+          help={l.linkedinUrlHelp}
+          hrefOf={companyLinkedinUrlHref}
           value={linkedinUrl}
           editing={editingProperty === "linkedinUrl"}
           busy={busy}
@@ -692,8 +736,12 @@ function ClientStatusPropertyRow({
   );
 }
 
-interface LinkedinPropertyRowProps {
+interface FreeTextPropertyRowProps {
   label: string;
+  placeholder: string;
+  help: string;
+  /** The external link for a stored value, or null to render it as text. */
+  hrefOf: (stored: string | null) => string | null;
   value: string | null;
   editing: boolean;
   busy: boolean;
@@ -705,11 +753,15 @@ interface LinkedinPropertyRowProps {
   onSave: (value: string) => void;
 }
 
-/** LinkedIn row — text input with placeholder + help while editing; the
- * stored value renders as an external link (the stored form is already
- * short and readable, so it is shown as-is). */
-function LinkedinPropertyRow({
+/** Free-text row (LinkedIn, domain) — text input with placeholder + help
+ * while editing; the stored value renders as an external link when `hrefOf`
+ * accepts it (the stored form is already short and readable, so it is shown
+ * as-is). */
+function FreeTextPropertyRow({
   label,
+  placeholder,
+  help,
+  hrefOf,
   value,
   editing,
   busy,
@@ -719,7 +771,7 @@ function LinkedinPropertyRow({
   onStartEdit,
   onCancel,
   onSave,
-}: LinkedinPropertyRowProps) {
+}: FreeTextPropertyRowProps) {
   const [draft, setDraft] = useState(value ?? "");
 
   // The stored form differs from what was pasted, so seed the draft from the
@@ -738,13 +790,13 @@ function LinkedinPropertyRow({
           <input
             className="input"
             value={draft}
-            placeholder={l.linkedinUrlPlaceholder}
+            placeholder={placeholder}
             onChange={(e) => setDraft(e.target.value)}
             disabled={busy}
             autoFocus
           />
         </dd>
-        <dd className="help">{l.linkedinUrlHelp}</dd>
+        <dd className="help">{help}</dd>
         {error && (
           <dd className="error-text" role="alert">
             {error}
@@ -762,7 +814,7 @@ function LinkedinPropertyRow({
     );
   }
 
-  const href = companyLinkedinUrlHref(value);
+  const href = hrefOf(value);
   return (
     <div className="prop">
       <dt>{label}</dt>

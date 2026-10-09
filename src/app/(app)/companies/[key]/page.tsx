@@ -205,6 +205,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           accountTypeText={accountTypeLabel(company.accountType, l)}
           clientStatus={company.clientStatus}
           linkedinUrl={company.linkedinUrl}
+          domain={company.domain}
           labels={pickCompanyRecordLabels(dict)}
           newContactLabels={newContactLabels}
           absorptionOpen={absorption !== null}
