@@ -40,6 +40,6 @@ function renderRecordWhere(companyKey: string) {
 test("the record's people filter excludes merged-away rows and resolves aliases in the same statement", () => {
   const { sql, params } = renderRecordWhere("acme");
   assert.match(sql, /"person"\."merged_into_id" is null/i);
-  assert.match(sql, /"person"\."company_key" in \(select \$\d::text union select "company_alias"\."alias_key" from "company_alias" where "company_alias"\."company_key" = \$\d\)/i);
+  assert.match(sql, /"person"\."company_key" in \(select \$\d::text union select "company_alias"\."alias_key" from "company_alias" where "company_alias"\."company_key" = \$\d and not exists \(select 1 from "company" where "company"\."company_key" = "company_alias"\."alias_key"\)\)/i);
   assert.deepEqual(params, ["acme", "acme"]);
 });

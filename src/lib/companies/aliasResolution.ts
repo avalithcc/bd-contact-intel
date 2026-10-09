@@ -40,14 +40,20 @@ export interface CompanyAliasRow {
  *
  * - Every requested key gets an entry, even with zero aliases.
  * - An alias row for a company that was not requested is ignored.
- * - Duplicate alias rows collapse to one key.
- * - An alias whose key is itself a requested canonical key is skipped: the
- *   canonical owner of a key wins, otherwise the same person rows would be
- *   counted under two companies. `alias_key` is the table's primary key, so
- *   after this rule each raw key belongs to at most one requested company and
- *   summing per company can never double count.
+ * - Duplicate alias rows collapse into the single entry for that key, so
+ *   summing can never count a key twice.
+ * - An alias equal to its own company key is skipped. The SQL rule already
+ *   drops that row (the company is live by the FK), so this only guards a
+ *   hand-fed row, which would otherwise yield `[k, k]` and make
+ *   `sumCountsByCompany` count it twice.
  * - The output order does not depend on the order of `aliasRows` or
  *   `canonicalKeys`.
+ *
+ * It does NOT decide which alias rows are real: an alias key that is itself a
+ * live company key is excluded by the database (aliasRule.ts), the same rule
+ * the record uses, so this stays page-independent. Callers must feed it rows
+ * from `getCompanyAliasRows`. `alias_key` is the table's primary key, so each
+ * raw key belongs to at most one company and summing cannot double count.
  *
  * Never mutates its inputs; calling it twice with the same input gives the
  * same result.
@@ -56,7 +62,7 @@ export function buildCompanyMatchKeys(canonicalKeys: readonly string[], aliasRow
   const requested = new Set(canonicalKeys);
   const aliasesByCompany = new Map<string, Set<string>>();
   for (const row of aliasRows) {
-    if (!requested.has(row.companyKey) || requested.has(row.aliasKey)) continue;
+    if (!requested.has(row.companyKey) || row.aliasKey === row.companyKey) continue;
     const set = aliasesByCompany.get(row.companyKey) ?? new Set<string>();
     set.add(row.aliasKey);
     aliasesByCompany.set(row.companyKey, set);

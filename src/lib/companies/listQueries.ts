@@ -5,9 +5,8 @@ import { bd, company } from "@/db/schema";
 import type { AccountType } from "@/lib/companies/accountTypeFilter";
 import type { ClientStatusFilter } from "@/lib/companies/clientStatusFilter";
 import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
-import { buildCompanyMatchKeys, sumCountsByCompany } from "@/lib/companies/aliasResolution";
 import { getCompanyAliasRows } from "@/lib/companies/aliasResolutionDb";
-import { companyContactCountsQuery } from "@/lib/companies/contactCounts";
+import { companyContactCountsQuery, countContactsByCompany } from "@/lib/companies/contactCounts";
 import { companyListConditions } from "@/lib/companies/listConditions";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
 import { companyLastActivity, companyListOrderBy } from "@/lib/companies/lastActivitySignal";
@@ -190,9 +189,10 @@ export async function getCompanyListPage(
   // company_alias_company_key_idx), then the single grouped count over the
   // page's keys plus their aliases — never a query per row (data-builder.md
   // rule 5/7). Merged-away people are excluded (see contactCounts.ts).
-  const matchKeysByCompany = buildCompanyMatchKeys(keys, await getCompanyAliasRows(keys));
-  const contactCounts = await companyContactCountsQuery(db, [...new Set([...matchKeysByCompany.values()].flat())]);
-  const contactCountByKey = sumCountsByCompany(matchKeysByCompany, contactCounts);
+  const contactCountByKey = await countContactsByCompany(keys, {
+    readAliasRows: getCompanyAliasRows,
+    readCounts: (matchKeys) => companyContactCountsQuery(db, matchKeys),
+  });
 
   const rows: CompanyListRow[] = companyRows.map((r) => {
     return {

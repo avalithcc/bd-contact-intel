@@ -53,6 +53,12 @@ export function companyLastActivity() {
       .groupBy(activity.companyKey),
   );
 
+  // DELIBERATELY no `person.merged_into_id is null` here, unlike the contact
+  // counts (contactCounts.ts): this is a max() timestamp, not a count, and an
+  // activity logged against a person who was later merged still happened at
+  // this company — filtering would make the company look staler than it is.
+  // Do not "fix" it to match the counts. The company_alias gap is latent and
+  // out of scope here.
   const viaContact = qb.$with("pbc_via_contact").as(
     qb
       .select({

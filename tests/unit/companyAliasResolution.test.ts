@@ -82,11 +82,11 @@ test("a duplicated alias row is listed once", () => {
   assert.deepEqual(buildCompanyMatchKeys(["acme"], rows).get("acme"), ["acme", "acme-a"]);
 });
 
-test("an alias that is another requested company's own key never steals its contacts", () => {
-  const rows: CompanyAliasRow[] = [{ aliasKey: "globex", companyKey: "acme" }];
-  const map = buildCompanyMatchKeys(["acme", "globex"], rows);
+test("an alias equal to its own company key is not listed twice, so it cannot double count", () => {
+  const map = buildCompanyMatchKeys(["acme"], [{ aliasKey: "acme", companyKey: "acme" }]);
   assert.deepEqual(map.get("acme"), ["acme"]);
-  assert.deepEqual(map.get("globex"), ["globex"]);
+  const totals = sumCountsByCompany(map, [{ companyKey: "acme", count: 3 }]);
+  assert.equal(totals.get("acme"), 3);
 });
 
 test("counts on a company's own key and on its aliases are summed under the canonical key", () => {
