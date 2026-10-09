@@ -32,7 +32,7 @@ export function resolveTaskSubject(task: TaskSubjectInput): TaskSubject | null {
 
   if (task.companyKey) {
     if (!task.subjectCompanyName) return null;
-    return { label: `${task.subjectCompanyName} (empresa)`, href: `/companies/${task.companyKey}` };
+    return { label: `${task.subjectCompanyName} (empresa)`, href: `/companies/${encodeURIComponent(task.companyKey)}` };
   }
 
   return null;

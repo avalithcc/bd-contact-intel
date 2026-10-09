@@ -67,3 +67,15 @@ test("a joined person row missing (deleted/merged) falls back to null even if pe
   });
   assert.equal(subject, null);
 });
+
+test("a company subject's href percent-encodes the key", () => {
+  const subject = resolveTaskSubject({
+    personId: null,
+    companyKey: "a b/c",
+    subjectPersonFirstName: null,
+    subjectPersonLastName: null,
+    subjectPersonCompany: null,
+    subjectCompanyName: "A B",
+  });
+  assert.equal(subject?.href, "/companies/a%20b%2Fc");
+});

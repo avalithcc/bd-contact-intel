@@ -19,7 +19,8 @@ export interface AboutPaneProps {
   name: string;
   jobTitle: string | null;
   company: string | null;
-  companyKey: string | null;
+  /** Precomputed server-side (companyHref.ts): null renders the employer as plain text. */
+  companyHref: string | null;
   statusLabel: string;
   statusValue: string;
   // "Estado" derivation "why" hint (contact-record.html:77) — pre-composed
@@ -75,7 +76,7 @@ export function AboutPane({
   name,
   jobTitle,
   company,
-  companyKey,
+  companyHref,
   statusLabel,
   statusValue,
   statusReasonText,
@@ -112,7 +113,7 @@ export function AboutPane({
                 <>
                   {" "}
                   {l.headlineConnector}{" "}
-                  {companyKey ? <Link href={`/companies/${companyKey}`}>{company}</Link> : company}
+                  {companyHref ? <Link href={companyHref}>{company}</Link> : company}
                 </>
               )}
             </p>

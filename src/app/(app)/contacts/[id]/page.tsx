@@ -20,6 +20,7 @@ import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { getCompanyByKey, getCompanyContactCount } from "@/lib/companies/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
+import { companyHref } from "@/lib/contacts/companyHref";
 import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
@@ -256,6 +257,9 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // one from this Contact's own verified email domain only when the
   // company has none on file (see resolveCompanyDomain).
   const companyDomain = resolveCompanyDomain(companyRow?.domain, record.person.email);
+  // Null when the key resolves to no `company` row, so the name renders as
+  // text instead of a link to a not-found page (companyHref.ts).
+  const employerHref = companyHref(companyKey, companyRow !== null);
   // Bug fix (Empresa recovery, same rule as /contacts' list/board/export/
   // outreach reads — companyDisplayName.ts): `companyRow` is already fetched
   // above for this one person, so this is a free fallback, not a new query.
@@ -401,7 +405,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           name={name}
           jobTitle={record.person.jobTitle}
           company={companyDisplayName}
-          companyKey={record.person.companyKey}
+          companyHref={employerHref}
           statusLabel={statusLabel}
           statusValue={record.person.status}
           statusReasonText={statusReasonText}
@@ -522,9 +526,9 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                 <ChangeCompanyButton
                   personId={record.person.id}
                   // Detach must stay available for every person that HAS a
-                  // companyKey, even the ~1,100 in production whose key has
-                  // no matching `company` row (a pre-existing data gap:
-                  // person.companyKey has no FK — see companyChange.ts).
+                  // companyKey, even the 314 in production (measured read-only
+                  // 2026-10-09) whose key has no matching `company` row (a
+                  // pre-existing data gap: person.companyKey has no FK — see companyChange.ts).
                   // Display name prefers the company table's own
                   // displayName (companyRow), falls back to the person's
                   // own `company` text when there's no matching row, and
@@ -547,9 +551,13 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       {initialsFromName(companyDisplayName ?? l.noCompany)}
                     </span>
                     <div className="grow">
-                      <Link className="n" href={`/companies/${record.person.companyKey}`}>
-                        {companyDisplayName ?? l.noCompany}
-                      </Link>
+                      {employerHref ? (
+                        <Link className="n" href={employerHref}>
+                          {companyDisplayName ?? l.noCompany}
+                        </Link>
+                      ) : (
+                        <span className="n">{companyDisplayName ?? l.noCompany}</span>
+                      )}
                       <div className="s">
                         {[companyDomain, record.person.industry].filter(Boolean).join(" · ")}
                       </div>
