@@ -1,10 +1,11 @@
 import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { bd, company, person } from "@/db/schema";
+import { bd, company } from "@/db/schema";
 import type { AccountType } from "@/lib/companies/accountTypeFilter";
 import type { ClientStatusFilter } from "@/lib/companies/clientStatusFilter";
 import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
+import { companyContactCountsQuery } from "@/lib/companies/contactCounts";
 import { companyListConditions } from "@/lib/companies/listConditions";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
 import { companyLastActivity, companyListOrderBy } from "@/lib/companies/lastActivitySignal";
@@ -181,12 +182,9 @@ export async function getCompanyListPage(
   const keys = companyRows.map((r) => r.companyKey);
 
   // One batched query for exactly this page's keys — never N+1, never an
-  // unbounded scan (data-builder.md rule 5/7).
-  const contactCounts = await db
-    .select({ companyKey: person.companyKey, count: sql<number>`count(*)::int` })
-    .from(person)
-    .where(inArray(person.companyKey, keys))
-    .groupBy(person.companyKey);
+  // unbounded scan (data-builder.md rule 5/7). Excludes merged-away people so
+  // the count matches the company's own record (see contactCounts.ts).
+  const contactCounts = await companyContactCountsQuery(db, keys);
 
   const contactCountByKey = new Map(
     contactCounts.filter((c): c is typeof c & { companyKey: string } => c.companyKey !== null).map((c) => [c.companyKey, c.count]),
