@@ -4,7 +4,8 @@
  * CAUSE: the fi-arg-2026 and contactos-comerciales-2026-10 importers wrote
  * `person.company_key` from the company text without creating the matching
  * `company` row. Those contacts are NOT broken for a BD — `person.company`
- * still holds the text, so the record reads normally — but they belong to no
+ * still holds the text, so the record reads normally (until a detach clears
+ * it, see DETACH below) — but they belong to no
  * company, so they are missing from every company-side count and view.
  *
  * This script handles only the two unambiguous groups and deliberately leaves
@@ -16,7 +17,16 @@
  *            Repointed to the one company that fits; if two companies squash
  *            alike the contact is reported as ambiguous and left alone.
  *   DETACH — the key is not a company at all ("-", "(sin dato)", empty).
- *            The contact keeps its own text; only the key is cleared.
+ *            Detaching CLEARS BOTH `company` and `company_key`: it goes
+ *            through planCompanyChange(null), which sets both to null (they
+ *            always move together, see src/lib/contacts/companyChange.ts).
+ *            The contact's own employer text is NOT kept. What survives is the
+ *            old values in `person_property_history`, which is the revert
+ *            path. That is the owner's stated end state for an unmatched
+ *            employer (a null key), and it is why a wrongly detached real
+ *            employer has to be restored as TEXT ONLY.
+ *            Repoints rewrite `company` too: it becomes the target company's
+ *            display name, not the contact's own spelling.
  *   LEFT ALONE — a real company that has no `company` row. Creating those is
  *            a product decision (it would add hundreds of bare rows to a
  *            table where most companies already carry no client status), so
