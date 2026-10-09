@@ -25,10 +25,37 @@ assertScratchDatabaseUrl(process.env.DATABASE_URL);
 
 const ROLLBACK = new Error("rollback");
 
+/**
+ * FAILS LOUDLY when the scratch database is behind migration 0039. There,
+ * `company_alias.company_key` references `target_company` instead of `company`,
+ * so the "alias key is a live company" collision this test exists to build would
+ * be a different world from production's. Bridging the gap (inserting a
+ * target_company row to satisfy the old FK) would make the test pass on a schema
+ * production cannot have and hide that the scratch database is stale, so the
+ * stale state is made visible instead. `bd_contact_intel_e2e` was built by
+ * `db:push` from an older schema (0 rows in drizzle.__drizzle_migrations), so
+ * `db:migrate` cannot bring it forward; rebuild it per tests/e2e/README.md.
+ */
+async function assertAliasFkPointsAtCompany(tx: Tx): Promise<void> {
+  const { sql } = await import("drizzle-orm");
+  const rows = (await tx.execute<{ target: string }>(
+    sql`select c.confrelid::regclass::text as target
+        from pg_constraint c
+        where c.conrelid = 'public.company_alias'::regclass and c.contype = 'f'
+          and c.confrelid in ('public.company'::regclass, 'public.target_company'::regclass)`,
+  ));
+  const targets = rows.map((r) => r.target);
+  assert.ok(
+    targets.includes("company") && !targets.includes("target_company"),
+    `the scratch database is behind migration 0039 (company_alias.company_key references ${targets.join(", ") || "nothing"}, production references company); rebuild it, see tests/e2e/README.md`,
+  );
+}
+
 async function inRolledBackTransaction(body: (tx: Tx) => Promise<void>): Promise<void> {
   const { db } = await import("@/db");
   try {
     await db.transaction(async (tx) => {
+      await assertAliasFkPointsAtCompany(tx as unknown as Tx);
       await body(tx as unknown as Tx);
       throw ROLLBACK;
     });
@@ -37,10 +64,10 @@ async function inRolledBackTransaction(body: (tx: Tx) => Promise<void>): Promise
   }
 }
 
-type Tx = Pick<typeof import("@/db").db, "select" | "insert" | "update">;
+type Tx = Pick<typeof import("@/db").db, "select" | "insert" | "update" | "execute">;
 
 async function seedAndCount(tx: Tx) {
-  const { company, companyAlias, person, targetCompany } = await import("@/db/schema");
+  const { company, companyAlias, person } = await import("@/db/schema");
   const { getCompanyAliasRows } = await import("@/lib/companies/aliasResolutionDb");
   const { companyContactCountsQuery, companyContactsCondition, countContactsByCompany } = await import("@/lib/companies/contactCounts");
   const { sql } = await import("drizzle-orm");
@@ -58,15 +85,7 @@ async function seedAndCount(tx: Tx) {
       readCounts: (k) => companyContactCountsQuery(tx, k),
     });
 
-  // `bd_contact_intel_e2e` was found (2026-10-09) still carrying the pre-0039
-  // FK `company_alias.company_key -> target_company`, so an alias target needs a
-  // target_company row there. Harmless on a migrated schema (rolled back with
-  // everything else), and it keeps this test independent of which side of 0039
-  // the scratch database is on.
-  const asAliasTarget = (companyKey: string) =>
-    tx.insert(targetCompany).values({ companyKey, displayName: companyKey, ats: "lever", config: {} });
-
-  return { company, companyAlias, people, recordCount, listCounts, asAliasTarget };
+  return { company, companyAlias, people, recordCount, listCounts };
 }
 
 test("collision: an alias whose key is a live company belongs to nobody, on the list and on the record", async () => {
@@ -76,7 +95,6 @@ test("collision: an alias whose key is a live company belongs to nobody, on the 
       { companyKey: "zz-eq-x", displayName: "X" },
       { companyKey: "zz-eq-y", displayName: "Y" },
     ]);
-    await t.asAliasTarget("zz-eq-y");
     await tx.insert(t.companyAlias).values({ aliasKey: "zz-eq-x", companyKey: "zz-eq-y" });
     await t.people("zz-eq-x", 2);
     await t.people("zz-eq-y", 3);
@@ -99,7 +117,6 @@ test("no collision: a real alias counts toward its company on both paths, merged
     const { person } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
     await tx.insert(t.company).values({ companyKey: "zz-eq-a", displayName: "A" });
-    await t.asAliasTarget("zz-eq-a");
     await tx.insert(t.companyAlias).values({ aliasKey: "zz-eq-a1", companyKey: "zz-eq-a" });
     const own = await t.people("zz-eq-a", 2);
     await t.people("zz-eq-a1", 4);
@@ -115,10 +132,14 @@ test("no collision: a real alias counts toward its company on both paths, merged
   });
 });
 
-test("the transaction is rolled back: no test row survives", async () => {
+test("the transaction is rolled back: no test row survives in any table the tests write to", async () => {
   const { db } = await import("@/db");
-  const { company } = await import("@/db/schema");
-  const { like, sql } = await import("drizzle-orm");
-  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(company).where(like(company.companyKey, "zz-eq-%"));
-  assert.equal(row?.n, 0);
+  const { sql } = await import("drizzle-orm");
+  const [row] = await db.execute<{ company: number; person: number; alias: number; target: number }>(sql`
+    select
+      (select count(*)::int from company where company_key like 'zz-eq-%') as company,
+      (select count(*)::int from person where company_key like 'zz-eq-%') as person,
+      (select count(*)::int from company_alias where alias_key like 'zz-eq-%' or company_key like 'zz-eq-%') as alias,
+      (select count(*)::int from target_company where company_key like 'zz-eq-%') as target`);
+  assert.deepEqual({ ...row }, { company: 0, person: 0, alias: 0, target: 0 });
 });
