@@ -1517,6 +1517,7 @@ export const en = {
     domainErrorNonAscii: "Domains with special characters are not accepted. Enter the ASCII (xn--) form of the domain.",
     domainErrorInvalidHost: "This is not a valid domain. Use letters, numbers and hyphens, for example company.com.",
     domainErrorFreeMail: "This is a personal email provider, not a company domain. Enter the company's own domain.",
+    domainErrorOwnCompany: "This is Avalith's own domain, which is ignored when matching emails. Enter the client company's domain.",
     domainErrorUnparseable: "The domain could not be read. Enter it like company.com.",
     editErrorDomainInUse: "Another company already uses this domain. Merge the companies if they are the same one.",
     linkedinUrlPlaceholder: "linkedin.com/company/your-company",

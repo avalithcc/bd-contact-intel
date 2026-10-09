@@ -136,8 +136,14 @@ test("a consumer mail provider is rejected", () => {
   assert.deepEqual(normalizeCompanyDomain("https://www.hotmail.com"), bad("free_mail"));
 });
 
+test("Avalith's own domains are rejected after normalisation", () => {
+  for (const raw of ["avalith.net", "avalith.com", "www.avalith.net", "AVALITH.NET", "https://www.Avalith.com/team"]) {
+    assert.deepEqual(normalizeCompanyDomain(raw), bad("own_company"), raw);
+  }
+});
+
 test("every rejection reason has a message in both languages", () => {
-  const reasons: DomainRejection[] = ["not_http", "email", "ip_address", "no_tld", "non_ascii", "invalid_host", "free_mail", "unparseable"];
+  const reasons: DomainRejection[] = ["not_http", "email", "ip_address", "no_tld", "non_ascii", "invalid_host", "free_mail", "own_company", "unparseable"];
   for (const l of [es.companyRecord, en.companyRecord]) {
     const messages = reasons.map((r) => companyDomainErrorMessage(r, l));
     assert.equal(new Set(messages).size, reasons.length);

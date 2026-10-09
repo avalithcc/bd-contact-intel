@@ -1476,6 +1476,7 @@ export const es: typeof en = {
     domainErrorNonAscii: "No se aceptan dominios con caracteres especiales. Ingresa la forma ASCII (xn--) del dominio.",
     domainErrorInvalidHost: "Este dominio no es válido. Usa letras, números y guiones, por ejemplo empresa.com.",
     domainErrorFreeMail: "Este es un proveedor de correo personal, no un dominio de empresa. Ingresa el dominio propio de la empresa.",
+    domainErrorOwnCompany: "Este es el dominio propio de Avalith, que se ignora al asociar correos. Ingresa el dominio de la empresa cliente.",
     domainErrorUnparseable: "No se pudo leer el dominio. Ingrésalo como empresa.com.",
     editErrorDomainInUse: "Otra empresa ya usa este dominio. Fusiona las empresas si son la misma.",
     linkedinUrlPlaceholder: "linkedin.com/company/tu-empresa",

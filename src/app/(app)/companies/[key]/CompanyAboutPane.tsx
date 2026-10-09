@@ -67,6 +67,7 @@ export type CompanyAboutPaneLabels = CompanyQuickActionsLabels &
       | "domainErrorNonAscii"
       | "domainErrorInvalidHost"
       | "domainErrorFreeMail"
+      | "domainErrorOwnCompany"
       | "domainErrorUnparseable"
       | "editErrorDomainInUse"
       | "editErrorClientStatus"

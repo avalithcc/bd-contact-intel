@@ -40,14 +40,25 @@
  *  - `free_mail`: a consumer mail provider (gmail, hotmail, ...), using the
  *    same `isFreeMailDomain` rule as every other domain check in the app.
  *    Matching a company by `gmail.com` would attach every Gmail contact to it.
+ *  - `own_company`: Avalith's own domains (the set in ownCompany.ts, reused
+ *    here, not restated). The identity matcher skips own-company mail, so a
+ *    company holding `avalith.net` would look saved yet have no effect: a
+ *    write with no effect is refused instead.
  *  - `unparseable`: whitespace inside the text, a path-only string
  *    (`/about`), a scheme with no host (`https://`, `https:foo.com`).
+ *
+ * Known limitation: `free_mail` reuses the email-convention list, whose
+ * first-label rule also refuses `terra.*`, `uol.*`, `bol.*`, `speedy.*`,
+ * `fibertel.*` and `arnet.*`, some of which could be real companies. Measured
+ * 2026-10-09: no production company holds any of them. A narrower list needs
+ * an owner decision about real customers, so the rule is left as is.
  *
  * Blank or whitespace-only input clears the field (`value: null`), the same
  * precedent as `linkedinUrl`.
  */
 
 import { isFreeMailDomain } from "@/lib/emailPatterns";
+import { ownCompanyMatchReason } from "@/lib/ownCompany";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 export type DomainRejection =
@@ -58,6 +69,7 @@ export type DomainRejection =
   | "non_ascii"
   | "invalid_host"
   | "free_mail"
+  | "own_company"
   | "unparseable";
 
 export type DomainResult = { ok: true; value: string | null } | { ok: false; reason: DomainRejection };
@@ -108,6 +120,7 @@ export function normalizeCompanyDomain(raw: string): DomainResult {
   if (host.length > MAX_HOST_LENGTH) return reject("invalid_host");
   if (!labels.every((l) => LABEL.test(l)) || !TLD.test(labels[labels.length - 1]!)) return reject("invalid_host");
   if (isFreeMailDomain(host)) return reject("free_mail");
+  if (ownCompanyMatchReason(null, host) === "domain") return reject("own_company");
   return { ok: true, value: host };
 }
 
@@ -139,6 +152,7 @@ export type DomainErrorLabels = Pick<
   | "domainErrorNonAscii"
   | "domainErrorInvalidHost"
   | "domainErrorFreeMail"
+  | "domainErrorOwnCompany"
   | "domainErrorUnparseable"
 >;
 
@@ -159,6 +173,8 @@ export function companyDomainErrorMessage(reason: DomainRejection, l: DomainErro
       return l.domainErrorInvalidHost;
     case "free_mail":
       return l.domainErrorFreeMail;
+    case "own_company":
+      return l.domainErrorOwnCompany;
     case "unparseable":
       return l.domainErrorUnparseable;
   }
