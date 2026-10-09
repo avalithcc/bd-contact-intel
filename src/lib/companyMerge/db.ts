@@ -223,6 +223,9 @@ export async function executeMerge(groups: readonly MergeGroup[], actorBdId: str
 /** Reporting only: squash-heuristic duplicate candidates for a human to confirm. Never an input to execute. */
 export async function readCandidateRecords(match: string | null): Promise<CandidateRecord[]> {
   const needle = match === null ? null : squashCompanyKey(match);
+  // A filter that squashes to nothing (a non-Latin name) can match no squashed key. It used to fall through to "no
+  // filter" and list every candidate group, which reads as if the filter had matched them all.
+  if (match !== null && needle === null) return [];
   const rows = await db.execute(sql`
     with pc_n as (select company_key as pc_key, count(*)::int as pc_contacts from person where merged_into_id is null and company_key is not null group by company_key),
     sq_rows as (

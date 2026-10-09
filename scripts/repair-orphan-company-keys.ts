@@ -32,26 +32,13 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
+import { isJunkCompanyKey } from "../src/lib/companyMerge/junkKey";
+import { squashCompanyKey } from "../src/lib/companyMerge/keys";
 import { changeContactCompany } from "../src/lib/contacts/companyChangeDb";
 import { isUuid } from "../src/lib/uuid";
 
-/** Latin-only, used ONLY to match a key against an existing company. A
- * non-Latin key simply fails to match and falls into the "left alone"
- * bucket, which is the safe one. */
-const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-const JUNK = new Set(["", "-", "sindato", "na", "none", "null", "."]);
-
-/**
- * BUG THIS GUARDS AGAINST (hit on the first run, 2026-10-08): the junk test
- * used to be `squash(key).length < 2`, and `squash` strips everything outside
- * [a-z0-9]. A Cyrillic or Arabic company name squashes to the empty string,
- * so "АО «Системы управления»" and "مؤسسه تراتيل" were classified as junk and
- * detached, wiping real employer text. Count letters and digits in ANY
- * script instead, so the test never depends on the alphabet.
- */
-const meaningfulChars = (s: string) => (s.match(/[\p{L}\p{N}]/gu) ?? []).length;
-const isJunkKey = (key: string) => JUNK.has(squash(key)) || meaningfulChars(key) < 2;
+// The junk classifier lives in src/lib/companyMerge/junkKey.ts so it is unit-tested: it was inline here, wrong twice,
+// and no test could see it.
 
 function parseArgs(argv: readonly string[]) {
   let execute = false;
@@ -77,16 +64,17 @@ async function main() {
   const companies = (await db.execute(sql`select company_key as key from company`)) as unknown as { key: string }[];
   const canonical = new Map<string, string>();
   for (const c of companies) {
-    const s = squash(c.key);
-    if (s && !canonical.has(s)) canonical.set(s, c.key);
+    const s = squashCompanyKey(c.key);
+    if (s !== null && !canonical.has(s)) canonical.set(s, c.key);
   }
 
   const repair: { id: string; from: string; to: string }[] = [];
   const detach: { id: string; from: string }[] = [];
   let leftAlone = 0;
   for (const o of orphans) {
-    if (isJunkKey(o.key)) { detach.push({ id: o.id, from: o.key }); continue; }
-    const hit = canonical.get(squash(o.key));
+    if (isJunkCompanyKey(o.key)) { detach.push({ id: o.id, from: o.key }); continue; }
+    const sq = squashCompanyKey(o.key);
+    const hit = sq === null ? undefined : canonical.get(sq);
     if (hit) repair.push({ id: o.id, from: o.key, to: hit });
     else leftAlone++;
   }
