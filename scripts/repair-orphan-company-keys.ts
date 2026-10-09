@@ -12,8 +12,9 @@
  *
  *   REPAIR — the company already exists under a different spelling
  *            ("bunkerdb" vs "bunker db", "naranjax" vs "naranja x"). Matched
- *            by squashing both keys to [a-z0-9], the same normalization
- *            scripts/merge-companies.ts uses. Repointed to the canonical key.
+ *            by squashing both keys to [a-z0-9] (src/lib/companyMerge/sameCompany.ts).
+ *            Repointed to the one company that fits; if two companies squash
+ *            alike the contact is reported as ambiguous and left alone.
  *   DETACH — the key is not a company at all ("-", "(sin dato)", empty).
  *            The contact keeps its own text; only the key is cleared.
  *   LEFT ALONE — a real company that has no `company` row. Creating those is
@@ -33,7 +34,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { isJunkCompanyKey } from "../src/lib/companyMerge/junkKey";
-import { squashCompanyKey } from "../src/lib/companyMerge/keys";
+import { buildCompanyKeyIndex, findSameCompany } from "../src/lib/companyMerge/sameCompany";
 import { changeContactCompany } from "../src/lib/contacts/companyChangeDb";
 import { isUuid } from "../src/lib/uuid";
 
@@ -61,28 +62,31 @@ async function main() {
       and not exists (select 1 from company c where c.company_key = p.company_key)
     order by p.company_key, p.id`)) as unknown as { id: string; key: string }[];
 
-  const companies = (await db.execute(sql`select company_key as key from company`)) as unknown as { key: string }[];
-  const canonical = new Map<string, string>();
-  for (const c of companies) {
-    const s = squashCompanyKey(c.key);
-    if (s !== null && !canonical.has(s)) canonical.set(s, c.key);
-  }
+  // ORDER BY: the matcher is order-independent, but the printed report should be stable run to run.
+  const companies = (await db.execute(sql`select company_key as key from company order by company_key`)) as unknown as { key: string }[];
+  const index = buildCompanyKeyIndex(companies.map((c) => c.key));
 
   const repair: { id: string; from: string; to: string }[] = [];
   const detach: { id: string; from: string }[] = [];
+  const ambiguous = new Map<string, string[]>();
   let leftAlone = 0;
+  const verdicts = new Map<string, ReturnType<typeof findSameCompany>>(); // per distinct key, not per contact
   for (const o of orphans) {
     if (isJunkCompanyKey(o.key)) { detach.push({ id: o.id, from: o.key }); continue; }
-    const sq = squashCompanyKey(o.key);
-    const hit = sq === null ? undefined : canonical.get(sq);
-    if (hit) repair.push({ id: o.id, from: o.key, to: hit });
-    else leftAlone++;
+    let v = verdicts.get(o.key);
+    if (!v) { v = findSameCompany(o.key, index); verdicts.set(o.key, v); }
+    if (v.kind === "match") repair.push({ id: o.id, from: o.key, to: v.to });
+    else { leftAlone++; if (v.kind === "ambiguous") ambiguous.set(o.key, v.candidates); }
   }
 
   console.log(`Orphaned contacts: ${orphans.length}`);
   console.log(`  repoint to an existing company: ${repair.length}`);
   console.log(`  detach (key is not a company):  ${detach.length}`);
-  console.log(`  left alone (company does not exist): ${leftAlone}`);
+  console.log(`  left alone (no company, or several fit): ${leftAlone}`);
+  if (ambiguous.size) {
+    console.log(`\nAmbiguous, left alone — more than one company squashes to the same key; merge them (merge-companies.ts) first:`);
+    for (const [k, c] of ambiguous) console.log(`  ${JSON.stringify(k)} fits ${c.map((x) => JSON.stringify(x)).join(" and ")}`);
+  }
   const pairs = [...new Set(repair.map((r) => `${r.from} -> ${r.to}`))];
   if (pairs.length) console.log(`\nRepoints:\n${pairs.map((p) => `  ${p}`).join("\n")}`);
   const keys = [...new Set(detach.map((d) => d.from))];

@@ -16,8 +16,9 @@
  *
  * The decisions come from a human reading the records, never from this script.
  * For "same" the TARGET is derived here the same way the review page derived
- * its suggestion (squash both keys to [a-z0-9], then prefix containment), and
- * a key with no target is reported and left alone rather than guessed at — the
+ * its suggestion (squash both keys to [a-z0-9], then prefix containment, see
+ * src/lib/companyMerge/sameCompany.ts), and a key with no target, or with
+ * several, is reported and left alone rather than guessed at — the
  * owner marked the employer, not the destination.
  *
  * Repoints go through `changeContactCompany`, the same path the record page's
@@ -38,11 +39,11 @@ import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog, company } from "../src/db/schema";
+import { buildCompanyKeyIndex, findSameCompany } from "../src/lib/companyMerge/sameCompany";
 import { changeContactCompany } from "../src/lib/contacts/companyChangeDb";
 import { isUuid } from "../src/lib/uuid";
 
 export const GREY_ZONE_AUDIT_ACTION = "apply_grey_zone_decisions";
-const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 function parseArgs(argv: readonly string[]) {
   let json: string | null = null, execute = false, actor: string | null = null;
@@ -71,22 +72,22 @@ async function main() {
     group by p.company_key`)) as unknown as { k: string; emp: string | null; n: number; ids: string[] }[];
   const byKey = new Map(orphans.map((o) => [o.k, o]));
 
-  const companies = (await db.execute(sql`select company_key as k, display_name as n from company`)) as unknown as { k: string; n: string }[];
-  const idx = companies.map((c) => ({ ...c, s: squash(c.k) })).filter((c) => c.s.length >= 3);
+  const companies = (await db.execute(sql`select company_key as k from company order by company_key`)) as unknown as { k: string }[];
+  const index = buildCompanyKeyIndex(companies.map((c) => c.k));
 
   const repoint: { id: string; from: string; to: string }[] = [];
   const toCreate: { key: string; name: string; contacts: number }[] = [];
-  const noTarget: string[] = [], gone: string[] = [];
+  const noTarget: string[] = [], ambiguous: string[] = [], gone: string[] = [];
 
   for (const m of marks) {
     const o = byKey.get(m.key);
     if (!o) { gone.push(m.key); continue; }           // already resolved or deleted since the review
     if (m.mark === "skip") continue;
     if (m.mark === "same") {
-      const s = squash(m.key);
-      const hit = idx.find((c) => c.s !== s && (c.s.startsWith(s) || s.startsWith(c.s)));
-      if (!hit) { noTarget.push(m.key); continue; }
-      for (const id of o.ids) repoint.push({ id, from: m.key, to: hit.k });
+      const hit = findSameCompany(m.key, index, { prefix: true });
+      if (hit.kind === "ambiguous") { ambiguous.push(`${m.key} -> ${hit.candidates.join(" | ")}`); continue; }
+      if (hit.kind === "none") { noTarget.push(m.key); continue; }
+      for (const id of o.ids) repoint.push({ id, from: m.key, to: hit.to });
     } else if (m.mark === "create") {
       toCreate.push({ key: m.key, name: (o.emp ?? m.key).trim(), contacts: o.n });
     }
@@ -96,6 +97,7 @@ async function main() {
   console.log(`  repoint: ${repoint.length} contact(s) across ${new Set(repoint.map((r) => r.from)).size} employer(s)`);
   console.log(`  create:  ${toCreate.length} company/companies covering ${toCreate.reduce((n, c) => n + c.contacts, 0)} contact(s)`);
   if (noTarget.length) console.log(`  marked "same" but no target found, left alone: ${noTarget.join(" | ")}`);
+  if (ambiguous.length) console.log(`  marked "same" but several companies fit, left alone: ${ambiguous.join(" ;; ")}`);
   if (gone.length) console.log(`  no longer in the grey zone, skipped: ${gone.length}`);
 
   if (!execute) { console.log("\nNothing written. Re-run with --execute --actor=<bd id> to apply."); return; }
@@ -111,7 +113,7 @@ async function main() {
   const [row] = await db.insert(auditLog).values({
     actorBdId: actor!,
     action: GREY_ZONE_AUDIT_ACTION,
-    metadata: { createdCompanyKeys: toCreate.map((c) => c.key), createdCount: created, repointed: repoint, noTarget },
+    metadata: { createdCompanyKeys: toCreate.map((c) => c.key), createdCount: created, repointed: repoint, noTarget, ambiguous },
   }).returning({ id: auditLog.id });
   console.log(`\nCreated ${created} company/companies, repointed ${moved} contact(s). audit_log id: ${row!.id}`);
 }
