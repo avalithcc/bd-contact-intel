@@ -7,7 +7,8 @@
  * spelling is caught, "Freelance Studio" and "Club Atletico Independiente" are not. The dry run prints each matched
  * key with the display names found under it, so the owner sees exactly what will be cleared before approving.
  *
- * CONFIRMED LIST (--key=<company_key>, repeatable, and/or --file=<path>, one key per line, `#` comments skipped):
+ * CONFIRMED LIST (--key=<company_key>, repeatable, and/or --file=<path>, one key per line, `#` comments skipped IN
+ * FILE LINES ONLY -- a --key is taken literally, so a real key that starts with '#' can still be named):
  * when given, the built-in matcher is BYPASSED ENTIRELY and only the listed keys are acted on; without it,
  * behaviour is exactly the matcher above. The matcher is a CANDIDATE FINDER for the obvious variants. Anything
  * beyond them is confirmed by the owner by hand, because "independiente" and "autonomo" also sit inside real
@@ -52,23 +53,27 @@
  */
 import { refCount } from "../src/lib/companyMerge/keys";
 import { readFileSync } from "node:fs";
-import { CLEARED_TABLES, DELETED_TABLES, parseKeyList } from "../src/lib/nonCompanyEmployers/match";
+import { CLEARED_TABLES, DELETED_TABLES, parseKeyList, type ConfirmedKeyInput } from "../src/lib/nonCompanyEmployers/match";
 import { dryRunCleanup, executeCleanup } from "../src/lib/nonCompanyEmployers/db";
 
 function parseArgs(argv: readonly string[]) {
   let execute = false;
   let actor: string | null = null;
-  const lines: string[] = [];
+  // Tagged by origin: `#` opens a comment in a --file line only. A --key is the owner naming one key by hand, so a
+  // key that starts with '#' reaches the run instead of vanishing as a comment. Sharing one array made such a key
+  // impossible to name, and silent when it travelled beside others (see parseKeyList for the incident).
+  const inputs: ConfirmedKeyInput[] = [];
   let listed = false;
   for (const a of argv) {
     if (a === "--execute") execute = true;
     else if (a.startsWith("--actor=")) actor = a.slice(8);
-    else if (a.startsWith("--key=")) (listed = true), lines.push(a.slice(6));
-    else if (a.startsWith("--file=")) (listed = true), lines.push(...readFileSync(a.slice(7), "utf8").split("\n"));
+    else if (a.startsWith("--key=")) (listed = true), inputs.push({ value: a.slice(6), fromFile: false });
+    else if (a.startsWith("--file="))
+      (listed = true), inputs.push(...readFileSync(a.slice(7), "utf8").split("\n").map((value) => ({ value, fromFile: true })));
     else throw new Error(`Unknown argument: ${a}. Valid: --key=<company_key>, --file=<path>, --execute, --actor=<bd id>`);
   }
   if (execute && !actor) throw new Error("--execute requires --actor=<bd id> for the audit log.");
-  return { execute, actor, keys: listed ? parseKeyList(lines) : null };
+  return { execute, actor, keys: listed ? parseKeyList(inputs) : null };
 }
 
 async function main() {

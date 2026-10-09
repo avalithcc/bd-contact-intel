@@ -82,13 +82,39 @@ test("clearedHistoryRows: one row per property that held a value, new value null
   assert.ok(rows.every((r) => r.source === CLEANUP_HISTORY_SOURCE && (r.source as string) !== "edit" && r.changedByBdId === "bd1"));
 });
 
+const fromFile = (...values: string[]) => values.map((value) => ({ value, fromFile: true }));
+const fromKeyArg = (...values: string[]) => values.map((value) => ({ value, fromFile: false }));
+
 test("parseKeyList reads one key per line, skips blanks and # comments, dedupes, and never mutates its input", () => {
-  const lines = ["# confirmed by the owner", "", "  profesional independiente ", "consultor independiente", "profesional independiente"];
-  const before = [...lines];
+  const lines = fromFile("# confirmed by the owner", "", "  profesional independiente ", "consultor independiente", "profesional independiente");
+  const before = structuredClone(lines);
   assert.deepEqual(parseKeyList(lines), ["profesional independiente", "consultor independiente"]);
   assert.deepEqual(lines, before);
   assert.deepEqual(parseKeyList(lines), parseKeyList(lines));
-  assert.throws(() => parseKeyList(["# only a comment", ""]), /at least one/);
+  assert.throws(() => parseKeyList(fromFile("# only a comment", "")), /at least one/);
+});
+
+test("a --key that starts with '#' is a key, not a comment: production holds '#ono (open to new opportunities)'", () => {
+  // The bug this pins: --key values used to share the file lines' array, so the `#` filter ate them. Beside other
+  // keys the loss was SILENT -- the key never reached resolveExplicitKeys, so it was not reported as unknown either.
+  assert.deepEqual(parseKeyList(fromKeyArg("#ono (open to new opportunities)")), ["#ono (open to new opportunities)"]);
+  assert.deepEqual(
+    parseKeyList([...fromKeyArg("open to work", "#ono (open to new opportunities)", "ex: navent and quintoandar")]),
+    ["open to work", "#ono (open to new opportunities)", "ex: navent and quintoandar"],
+  );
+  // The file rule is untouched: there `#` still opens a comment.
+  assert.throws(() => parseKeyList(fromFile("#ono (open to new opportunities)")), /at least one/);
+  // Mixed sources keep each rule: the file comment goes, the --key stays.
+  assert.deepEqual(
+    parseKeyList([...fromFile("# a note"), ...fromKeyArg("#ono (open to new opportunities)")]),
+    ["#ono (open to new opportunities)"],
+  );
+});
+
+test("a CRLF-authored file survives a split on \\n alone: the trailing \\r is trimmed off keys and comments alike", () => {
+  // The script splits --file content on "\n", so a Windows-authored list leaves "\r" on every line. That works only
+  // because the trim runs before both the comment check and the dedupe; without it every key would miss by one byte.
+  assert.deepEqual(parseKeyList(fromFile("open to work\r", "# a note\r", "open to work\r")), ["open to work"]);
 });
 
 test("an explicit list acts only on the listed keys that exist; one that matches nothing is reported, not ignored", () => {

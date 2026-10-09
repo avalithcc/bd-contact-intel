@@ -54,9 +54,33 @@ export const clearedHistoryRows = (cleared: readonly ClearedPerson[], actorBdId:
 
 const MAX_EXPLICIT_KEYS = 500;
 
-/** A confirmed list: one company_key per line, blanks and `#` comments skipped, trimmed, deduped (order kept). */
-export function parseKeyList(lines: readonly string[]): string[] {
-  const keys = [...new Set(lines.map((l) => l.trim()).filter((l) => l && !l.startsWith("#")))];
+/** One confirmed key and where it came from: `#` opens a comment in a --file line, never in a --key argument. */
+export interface ConfirmedKeyInput {
+  value: string;
+  fromFile: boolean;
+}
+
+/**
+ * A confirmed list: trimmed, blanks dropped (in both sources), deduped, order kept. A trailing `\r` from a
+ * CRLF-authored file is removed by the same trim, so the caller may split on `\n` alone.
+ *
+ * The `#` comment rule belongs to FILE lines only. A `--key=` argument is the owner naming one key by hand, so it is
+ * taken literally. Treating it as a comment made a key that starts with '#' impossible to pass AND dropped it
+ * SILENTLY when it travelled beside other keys: it never reached resolveExplicitKeys, so it was not reported as
+ * unknown either, and the run looked like a success that had quietly done less. Production held such a key -
+ * "#ono (open to new opportunities)", a LinkedIn hashtag an import stored as an employer (cleared 2026-10-09,
+ * audit_log 0786bcbb, which is what the bug was blocking). A key starting with '#' still cannot come from a file;
+ * `--key=` is the way to name one.
+ */
+export function parseKeyList(inputs: readonly ConfirmedKeyInput[]): string[] {
+  const keys = [
+    ...new Set(
+      inputs
+        .map((i) => ({ value: i.value.trim(), fromFile: i.fromFile }))
+        .filter((i) => i.value && !(i.fromFile && i.value.startsWith("#")))
+        .map((i) => i.value),
+    ),
+  ];
   if (!keys.length) throw new Error("The confirmed list needs at least one company_key.");
   if (keys.length > MAX_EXPLICIT_KEYS) throw new Error(`At most ${MAX_EXPLICIT_KEYS} keys per run.`);
   return keys;
