@@ -1085,7 +1085,11 @@ skipped. `tests/unit/drizzleJournal.test.ts` enforces strictly increasing `when`
 and its failure message says how to fix it (`src/lib/migration/journalWhen.ts`,
 #279). Nothing to fix; recorded so nobody rediscovers it by losing a migration.
 
-### `db:migrate` cannot build the database from empty — use `db:push` (2026-10-13)
+### `db:migrate` could not build the database from empty — fixed 2026-10-13: use `db:migrate`, never `db:push` (2026-10-13)
+The first three paragraphs are the finding as first written, kept as history; the
+fix and the current recipe are in the "Fixed 2026-10-13" paragraph and the
+recipe below it.
+
 Found while rebuilding `bd_contact_intel_e2e`. Against a **freshly created empty
 database**, `npm run db:migrate` fails with `PostgresError: relation "contact"
 does not exist` (`42P01`): an early entry in the chain assumes a table a later
@@ -1094,29 +1098,31 @@ same root cause area as the entry above — the `when` values were hand-set per
 slice, so the journal's order is artificial and no longer reflects the SQL's
 dependency order.
 
-**There is therefore no tested path from an empty database to the current
-schema.** Nobody noticed because production grew one migration at a time and
+**At the time there was therefore no tested path from an empty database to the
+current schema (no longer true after the fix below).** Nobody noticed because production grew one migration at a time and
 never replayed the chain, and because the e2e scratch database had **0 rows** in
 `drizzle.__drizzle_migrations` — it had been built with `db:push` from the start.
 The two facts hid each other.
 
-(Superseded by the "Fixed 2026-10-13" paragraph below: use `db:migrate`; `db:push`
-leaves RLS off on all 37 tables.) `npm run db:push` works: it syncs `src/db/schema.ts` directly
-and produced 37 tables matching production table-for-table, including the
-post-0039 `company_alias.company_key -> company` FK. Its only output is a
-harmless `42622` NOTICE about a constraint identifier truncated to Postgres's
-63-character limit.
+**Do not use `db:push` — this was the original workaround and it is wrong.**
+It syncs `src/db/schema.ts` directly and did produce 37 tables matching production
+table-for-table, including the post-0039 `company_alias.company_key -> company` FK
+(its only output was a harmless `42622` NOTICE about a constraint identifier
+truncated to Postgres's 63-character limit). But `src/db/schema.ts` declares no
+RLS, so a `db:push` database has row-level security **off on all 37 tables**; see
+"What was measured" below. Same ruling as `README.md`, "Standing up a new
+environment".
 
-Recipe that works (2026-10-13):
+Recipe that works (updated 2026-10-13 to the chain-built path; the original used `db:push`):
 ```
 dropdb bd_contact_intel_e2e && createdb bd_contact_intel_e2e
-DATABASE_URL='postgres://localhost:5432/bd_contact_intel_e2e' npm run db:push
+DATABASE_URL='postgres://localhost:5432/bd_contact_intel_e2e' npm run db:migrate
 DATABASE_URL='postgres://localhost:5432/bd_contact_intel_e2e' \
   E2E_EMAIL="$(grep -o 'E2E_EMAIL=.*' .env.local | cut -d= -f2-)" \
   npx tsx scripts/seed-launch-readiness.ts --execute
 ```
 Two traps: **always pass `DATABASE_URL` explicitly** (drizzle-kit auto-loads
-`.env`, where the production URL lives, so a bare `db:push`/`db:migrate` points
+`.env`, where the production URL lives, so a bare `db:migrate` (or `db:push`) points
 at production), and `E2E_EMAIL` lives in `.env.local`, not the `.env.e2e.local`
 the seed auto-loads — pass it on the command line rather than sourcing
 `.env.local`, which would bring the production `DATABASE_URL` with it.
@@ -1133,8 +1139,13 @@ or `contact`** (re-checked 2026-10-13: `rg -i 'create table (if not exists )?"(c
 returns nothing). Both tables were created by `drizzle-kit push` before the
 chain existed, as `drizzle/0000_crazy_wind_dancer.sql:1-7` said all along, so
 the chain had no genesis at all. A static replay of the chain found exactly
-**27 statements** across 16 files touching a missing table, and exactly **two**
-distinct missing tables — `bd` and `contact`, nothing else.
+**56 statements** across 16 files touching a missing table, and exactly **two**
+distinct missing tables — `bd` and `contact`, nothing else. (Corrected 2026-10-13:
+this said 27. That figure came from the first, broken version of the guard, whose
+splitter blanked a standalone `--> statement-breakpoint` line before splitting,
+so most files collapsed into one chunk. Re-derived with the current guard against
+the pre-fix chain at `91ebed0^` and at `5832862`: 56 statements, 16 files, tables
+`bd` and `contact`. The file count and the table set never changed.)
 
 Two root causes, both fixed by editing already-applied files:
 1. `drizzle/0000_crazy_wind_dancer.sql:22-57` — added the genesis
@@ -1289,8 +1300,9 @@ same files:
 
 Regression guard: `tests/unit/drizzleChainReplay.test.ts` replays the chain
 statement by statement and fails if any statement touches a table no earlier
-statement created (`src/lib/migration/chainReplay.ts`). It was RED at 27
-findings before the fix.
+statement created (`src/lib/migration/chainReplay.ts`). It was RED at 56
+findings before the fix (re-derived 2026-10-13; the 27 first published here was an
+artifact of the broken splitter, see above, not a change in the chain).
 
 **Hardened the same day after review.** The first version matched only quoted
 identifiers, so `drizzle/0039_company_alias_fk_to_company.sql:18,21`
@@ -1308,9 +1320,35 @@ parsing: `GRANT`/`REVOKE ... ON TABLE`, `CREATE TRIGGER ... ON`, a view's `FROM`
 **It checks tables only.** A missing column, enum, extension, function or ROLE is
 invisible to it; the second blocker that actually broke the build (the `anon` role
 in `0019`) would have passed it. The only proof that the chain builds from empty is
-still running `db:migrate` against an empty database; there is no CI in this repo. Suites after the fix: `test:unit` 3037/3037 pass,
+still running `db:migrate` against an empty database; there is no CI in this repo. Suites after the fix (measured 2026-10-13, before the second hardening below): `test:unit` 3037/3037 pass,
 `test:db` 6/6 pass against a migrate-built database, `typecheck` clean,
 `npx next build` compiles through page-data collection.
+
+**Second hardening, 2026-10-13 (`9dd0572`), after a fresh review ran the real
+exported function against hand-written inputs.** Closed, each pinned by a test in
+`tests/unit/drizzleChainReplay.test.ts`:
+- *False negative, the dangerous direction:* comments were stripped in two passes
+  (`/* */` first, then `--` lines), so `-- see /* below` opened a block comment that
+  swallowed real SQL up to the next `*/`. Now one left-to-right pass: block
+  comments nest, and `--` inside a string or quoted identifier is not a comment.
+- *False negative:* `TRUNCATE a, b` reported only `a` (the comma list existed for
+  `DROP` only).
+- *False negative:* `INSERT INTO a SELECT … FROM g`, `UPDATE a SET … FROM g` and
+  `DELETE FROM a USING g` reported only `a`. Backfill migrations such as `0034` are
+  where this would have appeared.
+- *False positive:* `GRANT … UPDATE ON TABLE a`, `REVOKE UPDATE ON …`,
+  `GRANT REFERENCES, TRUNCATE ON …` and `AFTER TRUNCATE ON a` reported a table
+  named `on`; a trailing `-- references company` or `; -- ALTER TABLE ghost` reported
+  `company` / `ghost`.
+
+Documented, not fixed (module comment in `chainReplay.ts`): string literals and
+dollar-quoted bodies are scanned as SQL; `::regclass`, `CREATE POLICY … ON`,
+`CREATE/DROP TRIGGER … ON`, `LOCK TABLE`, `COPY`, `INHERITS`, `PARTITION OF`,
+`COMMENT ON COLUMN/CONSTRAINT`, `CREATE TABLE … AS SELECT` are unchecked; after
+`RENAME TO` the old name stays "existing"; rare fakes `of` and `all`; and inside a
+write statement any `FROM x` is read as a table (`EXTRACT(epoch FROM col)`, a CTE
+name). Over-reporting is the accepted direction. The real chain still reports 0.
+`test:unit` after this change: 3068/3068 (2026-10-13, with other commits in the tree).
 
 ### Free-mail is two predicates now: LATAM ISP roots are still refused for matching, no longer for company edits (2026-10-13)
 Commit `5832862` split the free-mail test in two because the two callers pay
@@ -1318,8 +1356,8 @@ opposite prices for being wrong:
 - `isFreeMailDomain` (`src/lib/emailPatterns.ts:92`, broad) — pattern inference,
   identity matching, merge ranking. A false negative **merges two strangers** who
   both used an ISP mailbox, so it stays aggressive.
-- `isUnownableMailDomain` (`src/lib/emailPatterns.ts:139`, narrow, backed by the
-  literal `UNOWNABLE_MAIL_ROOTS` at `:116`) — used only by the company-domain
+- `isUnownableMailDomain` (`src/lib/emailPatterns.ts:143`, narrow, backed by the
+  literal `UNOWNABLE_MAIL_ROOTS` at `:120`) — used only by the company-domain
   validator (`src/lib/companies/domain.ts:117`). A false positive **blocks a
   legitimate BD edit**, so it is narrow.
 
@@ -1328,7 +1366,7 @@ the broad set only. The owner confirmed none of them is a real or prospective
 client. Measured 2026-10-13 (production, read-only; the queries are not recorded
 in this file): **0 companies** with a domain on any of the six roots; exactly
 **1 person** with an `@fibertel.com.ar` address. `test:unit` was 3037 pass / 0 fail
-on that commit.
+on that commit (measured 2026-10-13).
 
 **Still open — owner has NOT decided.** The narrow predicate reuses the
 exact-domain set `FREE_MAIL_DOMAINS` (`src/lib/emailPatterns.ts:39`) unchanged, so
@@ -1337,20 +1375,73 @@ the validator still refuses `zoho.com` (`:56`, Zoho Corporation's real domain) a
 purpose until someone with the call says whether a company may own those. Until
 then a BD who types `zoho.com` on Zoho's own company record is told it is free mail.
 
-**Worry checked and not reachable: "a company on `fibertel.com.ar` would swallow
-every Fibertel customer."** Nothing attaches a contact to a company *by*
-`company.domain`. Read 2026-10-13, each at the cited line:
+**Worry checked, first answer WRONG, corrected 2026-10-13: "a company on
+`fibertel.com.ar` would swallow every Fibertel customer."** An earlier version of
+this entry said nothing attaches a contact to a company by `company.domain`. That
+is false: the HubSpot import does exactly that. See **"HubSpot import matches and
+groups companies by domain with no free-mail guard"** below; it is an open defect,
+not a settled worry. Readers of `company.domain` that are *not* a problem, read
+2026-10-13, each at the cited line:
 - `src/lib/identity/matcher.ts:115-116` reads the **person's** email domain, for
   the own-company skip only.
 - `src/lib/companies/searchCondition.ts:42` is the company search box.
 - `src/lib/contacts/companyDomain.ts` is display (the contact record's "Empresa" card).
-- `src/lib/accounts/accountTypeBackfill.ts:311` groups **person** email domains.
+- `src/lib/accounts/accountTypeBackfill.ts:306-315` (`findCrossNameEmailDomainOverlaps`)
+  groups the domains of the emails found in **account notes**, not person email
+  domains (an earlier version of this entry said person domains). It only reports
+  overlaps; it attaches nothing.
 - `src/lib/companyDomain.ts` guesses a domain from a company *name* for
   `src/lib/emailSuggestion.ts:14`.
+- `src/lib/identity/emailPatternInferenceBackfill.ts:219` reads `company.domain`
+  (through `src/lib/identity/emailPatternInferenceBackfillDb.ts:77`) but is guarded
+  by the broad `isFreeMailDomain` at `:324`, so a BD-saved ISP domain is skipped
+  there ("personal_domain"). Mitigated.
 
-Unverified: I did not search the whole repo for other readers of `company.domain`;
-only these five were read. If a future feature joins people to companies on the
-domain column, revisit this split first.
+Unverified: I still did not search the whole repo for every reader of
+`company.domain`; the list above is what was read, plus the HubSpot path below.
+
+### HubSpot import matches and groups companies by domain with no free-mail guard (found 2026-10-13, OPEN)
+**Defect, not fixed, owner has not decided.** The HubSpot company import attaches
+rows to existing companies, and merges rows with each other, by domain, and none of
+that code asks whether the domain is free mail. All lines read 2026-10-13:
+- `src/lib/hubspot/companies.ts:128-139` `normalizeDomain` lowercases and strips
+  scheme, `www.`, path, port and trailing dot. No free-mail check. Neither
+  `isFreeMailDomain` nor `isUnownableMailDomain` appears anywhere in that file.
+- `:240` `groupHubSpotCompanies`: a union-find that merges rows sharing at least one
+  normalized domain, primary or additional. Two unrelated HubSpot companies that
+  both carry `fibertel.com.ar` land in ONE group.
+- `:346` `planCompanyResolution`: `existingByDomain` is built at `:352` and filled at
+  `:379`; `:423` `matched = existingByDomain.get(d)` matches an existing company BY
+  DOMAIN (`matchReason: "domain"`, `:426`). `domainClaimedByOtherCompany` (`:203`)
+  only prevents writing a domain another company already owns
+  (`company_domain_idx`, a partial unique index, `drizzle/0015_company_domain.sql:2`).
+  `own_company` is handled (`:414`); free mail is not.
+- It is live code: `src/lib/hubspot/planner.ts:201` (the import planner),
+  `scripts/backfill-company-domains.ts:126` (which WRITES `company.domain`, `:153`),
+  `scripts/backfill-hubspot-company-fields.ts:91`, `scripts/unify-contacts.ts:280`.
+
+**Why it matters now.** Since `5832862` a BD may save an ISP domain such as
+`fibertel.com.ar` on a company (the narrow predicate allows it). That company then
+owns the domain, and the next import or backfill that sees a HubSpot company with
+that domain matches it to this one, pulling in unrelated contacts and companies.
+
+**Reachability, stated honestly.** The HubSpot import has run once (2026-09-26,
+5,867 rows). It is not a scheduled job, so nothing fires today; the risk lands on
+the next import. `scripts/backfill-company-domains.ts` is the likeliest trigger
+because it writes domains. Whether the HubSpot export carries any free-mail or ISP
+domains at all: unverified (not measured; the export is PII and was not opened for
+this entry). As of 2026-10-13 production has 0 companies on any of the six ISP roots,
+so no exposure exists in the data today.
+
+**Recommended fix, NOT implemented.** Apply the BROAD `isFreeMailDomain` in the
+HubSpot domain path (at minimum `normalizeDomain`'s callers, or inside
+`groupHubSpotCompanies` and `planCompanyResolution`'s domain lookup). This is
+Job A, matching, where a false negative groups strangers and a false positive only
+weakens a match. That is consistent with the split above, not contradictory: a BD
+may SAVE `fibertel.com.ar` on a company (Job B, a false positive blocks a legitimate
+edit), but no importer should MATCH on it. Add a test that two HubSpot rows sharing
+a free-mail domain stay in separate groups and that an existing company holding such
+a domain is never returned by the domain lookup.
 
 ### e2e suite runs against production
 Found while reconciling #287: the revived e2e suite logs in as a test account
