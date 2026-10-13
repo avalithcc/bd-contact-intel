@@ -37,9 +37,10 @@
  *    hyphen at a label edge, characters outside `a-z0-9-` (underscore,
  *    `*`, `%`, backslash), a TLD that is not letters (or punycode) of 2+
  *    characters (`foo.c`, `foo.123`), or a host over 253 characters.
- *  - `free_mail`: a consumer mail provider (gmail, hotmail, ...), using the
- *    same `isFreeMailDomain` rule as every other domain check in the app.
- *    Matching a company by `gmail.com` would attach every Gmail contact to it.
+ *  - `free_mail`: a global consumer mail provider (gmail, hotmail, ... and
+ *    their country variants), via `isUnownableMailDomain`. Matching a company
+ *    by `gmail.com` would attach every Gmail contact to it. This is the narrow
+ *    predicate, not `isFreeMailDomain`: see emailPatterns.ts for why the two differ.
  *  - `own_company`: Avalith's own domains (the set in ownCompany.ts, reused
  *    here, not restated). The identity matcher skips own-company mail, so a
  *    company holding `avalith.net` would look saved yet have no effect: a
@@ -47,17 +48,11 @@
  *  - `unparseable`: whitespace inside the text, a path-only string
  *    (`/about`), a scheme with no host (`https://`, `https:foo.com`).
  *
- * Known limitation: `free_mail` reuses the email-convention list, whose
- * first-label rule also refuses `terra.*`, `uol.*`, `bol.*`, `speedy.*`,
- * `fibertel.*` and `arnet.*`, some of which could be real companies. Measured
- * 2026-10-09: no production company holds any of them. A narrower list needs
- * an owner decision about real customers, so the rule is left as is.
- *
  * Blank or whitespace-only input clears the field (`value: null`), the same
  * precedent as `linkedinUrl`.
  */
 
-import { isFreeMailDomain } from "@/lib/emailPatterns";
+import { isUnownableMailDomain } from "@/lib/emailPatterns";
 import { ownCompanyMatchReason } from "@/lib/ownCompany";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
@@ -119,7 +114,7 @@ export function normalizeCompanyDomain(raw: string): DomainResult {
   const host = labels.join(".");
   if (host.length > MAX_HOST_LENGTH) return reject("invalid_host");
   if (!labels.every((l) => LABEL.test(l)) || !TLD.test(labels[labels.length - 1]!)) return reject("invalid_host");
-  if (isFreeMailDomain(host)) return reject("free_mail");
+  if (isUnownableMailDomain(host)) return reject("free_mail");
   if (ownCompanyMatchReason(null, host) === "domain") return reject("own_company");
   return { ok: true, value: host };
 }

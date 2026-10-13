@@ -36,7 +36,7 @@ export type PatternId = (typeof PATTERN_IDS)[number];
 // convention (everyone gets @gmail.com regardless of employer). If a
 // company's samples are all free-mail, there is no company convention to
 // detect, so these are excluded before pattern matching runs at all.
-const FREE_MAIL_DOMAINS = new Set([
+export const FREE_MAIL_DOMAINS: ReadonlySet<string> = new Set([
   "gmail.com",
   "googlemail.com",
   "hotmail.com",
@@ -62,7 +62,7 @@ const FREE_MAIL_DOMAINS = new Set([
 // variant without listing them one by one, at the cost of also excluding a
 // company that literally named itself "gmail" or "yahoo" — a trade worth
 // making, since a LATAM contact base is full of these.
-const FREE_MAIL_ROOTS = new Set([
+export const FREE_MAIL_ROOTS: ReadonlySet<string> = new Set([
   "gmail",
   "googlemail",
   "hotmail",
@@ -94,6 +94,53 @@ export function isFreeMailDomain(domain: string): boolean {
   if (FREE_MAIL_DOMAINS.has(lowered)) return true;
   const firstLabel = lowered.split(".")[0] ?? "";
   return FREE_MAIL_ROOTS.has(firstLabel);
+}
+
+// The same list is NOT the right answer to a second, opposite question. The
+// company-domain validator asks "may a BD save this domain on this company?",
+// and there a false positive blocks a legitimate edit with a message that
+// makes no sense to the person typing, while a false negative only lets a
+// useless domain through. isFreeMailDomain above asks the reverse ("is it safe
+// to match two people on this mailbox, does it say anything about a company?"),
+// where a false negative merges two strangers who both used Fibertel and a
+// false positive costs one lost inference sample. Aggressive is correct there
+// and wrong here, so the lists differ on purpose.
+//
+// This is the globally unambiguous subset: providers no company could
+// legitimately own. It is a literal, not "FREE_MAIL_ROOTS minus the ISPs", so
+// a root added to the broad list does not silently start blocking company
+// edits; the subset test (freeMailSplit.test.ts) fails if this one ever holds
+// a root the broad list lacks. Left out on purpose: terra, uol, bol, speedy,
+// fibertel, arnet, LATAM ISPs/portals whose first label a real company can
+// share (terra*). They stay free mail for matching, just not for validation.
+export const UNOWNABLE_MAIL_ROOTS: ReadonlySet<string> = new Set([
+  "gmail",
+  "googlemail",
+  "hotmail",
+  "outlook",
+  "live",
+  "msn",
+  "yahoo",
+  "ymail",
+  "icloud",
+  "proton",
+  "protonmail",
+  "aol",
+  "gmx",
+  "yandex",
+]);
+
+/**
+ * True when no company could legitimately own this domain because it is a
+ * global consumer mailbox provider (country variants included). Used ONLY by
+ * the company-domain validator; identity matching and pattern inference keep
+ * the broader isFreeMailDomain. Exact-domain entries are shared with it.
+ */
+export function isUnownableMailDomain(domain: string): boolean {
+  const lowered = domain.trim().toLowerCase();
+  if (FREE_MAIL_DOMAINS.has(lowered)) return true;
+  const firstLabel = lowered.split(".")[0] ?? "";
+  return UNOWNABLE_MAIL_ROOTS.has(firstLabel);
 }
 
 // A single winning pattern needs at least this many agreeing samples. One
