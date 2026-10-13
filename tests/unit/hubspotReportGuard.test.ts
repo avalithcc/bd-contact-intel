@@ -36,6 +36,7 @@ const baseFields = {
     noCompanyResolved: 0,
     domainConflicts: 0,
     ambiguousCompactMatches: 0,
+    freeMailDomainsSkipped: 0,
     unknownLeadStatuses: {},
   },
 };

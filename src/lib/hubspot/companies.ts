@@ -18,11 +18,14 @@
  *      primary company of at least one imported contact, or carries a
  *      non-empty "Associated Note" (an unlinked, note-less company creates
  *      nothing);
+ *      Steps 1-3 and the domain fill/creation below treat a free-mail domain
+ *      (`isFreeMailDomain`) as NO evidence at all — see `CompanyGroup`;
  *   5. own-company groups (see src/lib/ownCompany.ts) short-circuit all of
  *      the above: they create nothing and get no note, matching the
  *      existing own-company skip rule for contacts.
  */
 import { normalizeCompanyKey } from "@/lib/companyCategories";
+import { isFreeMailDomain } from "@/lib/emailPatterns";
 import { ownCompanyMatchReason, type OwnCompanyMatchReason } from "@/lib/ownCompany";
 
 export interface HubSpotCompanyRow {
@@ -106,6 +109,11 @@ export interface CompanyResolutionResult {
    * "Bridge"). Company names are business data, not personal PII, so they
    * are safe in the persisted report (unlike contact names/emails). */
   compactMatches: HubSpotCompactMatch[];
+  /** Free-mail domains (`isFreeMailDomain`) carried by HubSpot rows that were
+   * ignored as identity evidence — summed per group, so one domain on two
+   * groups counts twice. Reported so a skip is visible in the run report
+   * instead of silently disappearing. */
+  freeMailDomainsSkipped: number;
 }
 
 export interface HubSpotCompactMatch {
@@ -114,8 +122,14 @@ export interface HubSpotCompactMatch {
 }
 
 export interface CompanyGroup {
-  /** All normalized domains carried by any row in this group, deduped. */
+  /** The normalized domains carried by any row in this group, deduped, that
+   * may act as company IDENTITY: used to group, to match an existing company
+   * and to fill/create a `company.domain`. Free-mail domains are excluded. */
   domains: string[];
+  /** Free-mail domains carried by the group's rows, deduped. Kept out of
+   * `domains` so nothing can use them as identity by accident; only the
+   * own-company check and the skip counter read them. */
+  freeMailDomains: string[];
   rows: HubSpotCompanyRow[];
 }
 
@@ -235,8 +249,22 @@ function rowDomains(row: HubSpotCompanyRow): string[] {
   return row.domain ? [row.domain, ...row.additionalDomains] : [...row.additionalDomains];
 }
 
-/** Union-find: rows sharing at least one normalized domain (primary or
- * additional) merge into one group. Domain-less rows are singleton groups. */
+/** The domains of a row that may identify a company. Uses the BROAD
+ * `isFreeMailDomain` on purpose, NOT `isUnownableMailDomain`. The two answer
+ * opposite questions: a BD typing into the company-domain validator may
+ * deliberately SAVE `fibertel.com.ar` on a company (so the narrow predicate
+ * lets the six LATAM ISP roots through), but no importer may ever MATCH,
+ * GROUP or INFER on it — a false negative here merges two unrelated companies
+ * that merely share an ISP, a false positive only costs a weaker match.
+ * Do not "align" this with the validator. `normalizeDomain` stays a pure
+ * normalizer (it also feeds storage); the policy lives at these call sites. */
+function identityDomains(row: HubSpotCompanyRow): string[] {
+  return rowDomains(row).filter((d) => !isFreeMailDomain(d));
+}
+
+/** Union-find: rows sharing at least one IDENTITY domain (primary or
+ * additional, free-mail excluded — see `identityDomains`) merge into one
+ * group. Rows with no identity domain are singleton groups. */
 export function groupHubSpotCompanies(rows: readonly HubSpotCompanyRow[]): CompanyGroup[] {
   const parent = rows.map((_, i) => i);
   function find(i: number): number {
@@ -254,7 +282,7 @@ export function groupHubSpotCompanies(rows: readonly HubSpotCompanyRow[]): Compa
 
   const domainToFirstIndex = new Map<string, number>();
   rows.forEach((row, i) => {
-    for (const d of rowDomains(row)) {
+    for (const d of identityDomains(row)) {
       const existing = domainToFirstIndex.get(d);
       if (existing === undefined) domainToFirstIndex.set(d, i);
       else union(existing, i);
@@ -269,7 +297,8 @@ export function groupHubSpotCompanies(rows: readonly HubSpotCompanyRow[]): Compa
   });
 
   return [...groups.values()].map((groupRows) => ({
-    domains: [...new Set(groupRows.flatMap(rowDomains))],
+    domains: [...new Set(groupRows.flatMap(identityDomains))],
+    freeMailDomains: [...new Set(groupRows.flatMap(rowDomains).filter((d) => isFreeMailDomain(d)))],
     rows: groupRows,
   }));
 }
@@ -315,7 +344,9 @@ function groupOwnCompanyReason(group: CompanyGroup): OwnCompanyMatchReason {
     const reason = ownCompanyMatchReason(row.name);
     if (reason) return reason;
   }
-  for (const domain of group.domains) {
+  // Own-company detection reads EVERY domain, free-mail included, so the
+  // identity guard cannot change which groups are skipped as own-company.
+  for (const domain of [...group.domains, ...group.freeMailDomains]) {
     const reason = ownCompanyMatchReason(null, domain);
     if (reason) return reason;
   }
@@ -376,10 +407,14 @@ export function planCompanyResolution(
   for (const c of existingCompanies) {
     const ref: ExistingCompanyRef = { ...c };
     existingByKey.set(ref.companyKey, ref);
-    if (ref.domain) existingByDomain.set(ref.domain, ref);
+    // A free-mail domain already stored on a company (a BD may have saved one
+    // deliberately, or an earlier import wrote it) must not become a magnet:
+    // leaving it out of the index means no row can match it or claim it.
+    if (ref.domain && !isFreeMailDomain(ref.domain)) existingByDomain.set(ref.domain, ref);
     addCompact(normalizeCompactCompanyKey(ref.companyKey), ref);
   }
   let ambiguousCompactMatches = 0;
+  let freeMailDomainsSkipped = 0;
   // companyKeys whose domain was set (filled or created) DURING this run —
   // only these can produce a domainConflict; a domain already on file
   // before this run is left untouched, matching the pre-existing
@@ -406,6 +441,7 @@ export function planCompanyResolution(
     .sort((a, b) => compareIds(groupMinId(a), groupMinId(b)));
 
   for (const group of orderedGroups) {
+    freeMailDomainsSkipped += group.freeMailDomains.length;
     const ownReason = groupOwnCompanyReason(group);
     if (ownReason) {
       for (const row of group.rows) {
@@ -542,6 +578,7 @@ export function planCompanyResolution(
     notesToCreate,
     ambiguousCompactMatches,
     compactMatches,
+    freeMailDomainsSkipped,
   };
 }
 

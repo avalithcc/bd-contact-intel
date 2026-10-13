@@ -1379,8 +1379,8 @@ then a BD who types `zoho.com` on Zoho's own company record is told it is free m
 `fibertel.com.ar` would swallow every Fibertel customer."** An earlier version of
 this entry said nothing attaches a contact to a company by `company.domain`. That
 is false: the HubSpot import does exactly that. See **"HubSpot import matches and
-groups companies by domain with no free-mail guard"** below; it is an open defect,
-not a settled worry. Readers of `company.domain` that are *not* a problem, read
+groups companies by domain with no free-mail guard"** below; it was a real defect
+(fixed, see that entry), not a settled worry. Readers of `company.domain` that are *not* a problem, read
 2026-10-13, each at the cited line:
 - `src/lib/identity/matcher.ts:115-116` reads the **person's** email domain, for
   the own-company skip only.
@@ -1400,8 +1400,9 @@ not a settled worry. Readers of `company.domain` that are *not* a problem, read
 Unverified: I still did not search the whole repo for every reader of
 `company.domain`; the list above is what was read, plus the HubSpot path below.
 
-### HubSpot import matches and groups companies by domain with no free-mail guard (found 2026-10-13, OPEN)
-**Defect, not fixed, owner has not decided.** The HubSpot company import attaches
+### HubSpot import matches and groups companies by domain with no free-mail guard (found 2026-10-13, FIXED 2026-10-13)
+**Fixed 2026-10-13, see "Fix applied" at the end of this entry.** The text below
+describes the defect as found. The HubSpot company import attaches
 rows to existing companies, and merges rows with each other, by domain, and none of
 that code asks whether the domain is free mail. All lines read 2026-10-13:
 - `src/lib/hubspot/companies.ts:128-139` `normalizeDomain` lowercases and strips
@@ -1433,15 +1434,27 @@ domains at all: unverified (not measured; the export is PII and was not opened f
 this entry). As of 2026-10-13 production has 0 companies on any of the six ISP roots,
 so no exposure exists in the data today.
 
-**Recommended fix, NOT implemented.** Apply the BROAD `isFreeMailDomain` in the
-HubSpot domain path (at minimum `normalizeDomain`'s callers, or inside
-`groupHubSpotCompanies` and `planCompanyResolution`'s domain lookup). This is
-Job A, matching, where a false negative groups strangers and a false positive only
-weakens a match. That is consistent with the split above, not contradictory: a BD
-may SAVE `fibertel.com.ar` on a company (Job B, a false positive blocks a legitimate
-edit), but no importer should MATCH on it. Add a test that two HubSpot rows sharing
-a free-mail domain stay in separate groups and that an existing company holding such
-a domain is never returned by the domain lookup.
+**Fix applied (2026-10-13).** The BROAD `isFreeMailDomain` now guards the three
+places `src/lib/hubspot/companies.ts` uses a domain as identity, at the call sites;
+`normalizeDomain` is untouched because it also feeds storage.
+- Grouping: `groupHubSpotCompanies` unions rows only on non-free-mail domains. A
+  `CompanyGroup` now carries `domains` (identity-eligible only) and `freeMailDomains`.
+- Matching: `existingByDomain` never indexes a free-mail domain, so no row can match
+  or "claim" one, whoever stored it. The row falls through to name/compact, exactly
+  as a domain-less row does.
+- Filling: fills and created companies take `group.domains[0]`, which is never a
+  free-mail domain.
+- `own_company` still reads every domain, free mail included, so it is unchanged.
+- Visibility: `freeMailDomainsSkipped` on the resolution result and on the report's
+  `warnings` (not shown in the admin table; absent on reports persisted earlier), and
+  a line in `scripts/backfill-company-domains.ts` output.
+The asymmetry is deliberate: a BD may SAVE `fibertel.com.ar` on a company, no
+importer may MATCH, GROUP or INFER on it.
+
+**Existing damage, measured read-only against production 2026-10-13.** Of 2,701
+companies with a non-null domain, 1 holds a domain `isFreeMailDomain` flags:
+`hotmail` -> `hotmail.com.ar`, 1 contact. 0 on any of the six ISP roots. No two
+companies share a free-mail domain. Not cleaned up: that is the owner's call.
 
 ### e2e suite runs against production
 Found while reconciling #287: the revived e2e suite logs in as a test account

@@ -131,6 +131,9 @@ async function main() {
   console.log(`Companies read from CSV: ${companies.length}`);
   console.log(`Existing companies read from DB: ${existingCompanies.length}`);
   console.log(`Domain fills found: ${fills.length}`);
+  console.log(
+    `Free-mail domains ignored as company identity (never matched, grouped or filled): ${companyResolution.freeMailDomainsSkipped}`,
+  );
   console.log(`Domain conflicts found (skipped — domain already claimed by a different company): ${conflicts.length}`);
 
   if (!args.execute) {

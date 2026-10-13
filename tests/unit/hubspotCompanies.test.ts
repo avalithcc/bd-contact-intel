@@ -526,3 +526,182 @@ test("planCompanyResolution must not mutate its existingCompanies input — call
     "a second call against the SAME existingCompanies array must still report the fill — planCompanyResolution must not mutate its input",
   );
 });
+
+// --- Free-mail domains are never an IDENTITY signal for companies -----------
+//
+// The importer must never GROUP, MATCH or FILL on a consumer-mail domain, but a
+// BD may still deliberately SAVE one on a company (the validator uses the
+// narrower isUnownableMailDomain, which leaves the six LATAM ISP roots
+// ownable). The broad isFreeMailDomain is the right predicate HERE: a false
+// negative merges two unrelated companies that both carry "fibertel.com.ar".
+
+const ISP_DOMAINS = [
+  "terra.com.br",
+  "uol.com.br",
+  "bol.com.br",
+  "speedy.com.ar",
+  "fibertel.com.ar",
+  "arnet.com.ar",
+];
+const FREE_MAIL_DOMAINS_UNDER_TEST = [...ISP_DOMAINS, "gmail.com"];
+
+for (const free of FREE_MAIL_DOMAINS_UNDER_TEST) {
+  test(`groupHubSpotCompanies: two rows sharing ONLY the free-mail domain ${free} stay separate`, () => {
+    const rows = [
+      mapHubSpotCompanyRow({ "ID de registro": "1", "Nombre de la empresa": "Alpha SRL", "Nombre de dominio de la empresa": free }),
+      mapHubSpotCompanyRow({ "ID de registro": "2", "Nombre de la empresa": "Beta SA", "Nombre de dominio de la empresa": free }),
+    ];
+    const groups = groupHubSpotCompanies(rows);
+    assert.equal(groups.length, 2);
+    for (const g of groups) {
+      assert.deepEqual(g.domains, [], "a free-mail domain is not identity evidence");
+      assert.deepEqual(g.freeMailDomains, [free]);
+    }
+  });
+
+  test(`groupHubSpotCompanies: ${free} as an ADDITIONAL domain does not group either`, () => {
+    const groups = groupHubSpotCompanies([
+      row({ hubspotCompanyId: "1", name: "Alpha", domain: "alpha.com", additionalDomains: [free] }),
+      row({ hubspotCompanyId: "2", name: "Beta", domain: "beta.com", additionalDomains: [free] }),
+    ]);
+    assert.equal(groups.length, 2);
+  });
+
+  test(`planCompanyResolution: ${free} on an existing company is not matched by domain; falls through to name`, () => {
+    const existing: ExistingCompanyRef[] = [
+      { companyKey: "acme", domain: free },
+      { companyKey: "other", domain: null },
+    ];
+    // Same domain, different name: the old code linked this to "acme" by domain.
+    const stranger = planCompanyResolution(
+      [row({ hubspotCompanyId: "1", name: "Totally Different Ltd", domain: free })],
+      existing,
+      new Map([["1", 1]]),
+      new Set(),
+    );
+    assert.equal(stranger.byHubspotCompanyId.get("1")?.matchReason, "created");
+    assert.notEqual(stranger.byHubspotCompanyId.get("1")?.companyKey, "acme");
+
+    // Same domain AND same name: still resolves, but via the name path, exactly
+    // as a domain-less row would.
+    const named = planCompanyResolution(
+      [row({ hubspotCompanyId: "2", name: "Acme Corp", domain: free })],
+      existing,
+      new Map(),
+      new Set(),
+    );
+    assert.equal(named.byHubspotCompanyId.get("2")?.companyKey, "acme");
+    assert.equal(named.byHubspotCompanyId.get("2")?.matchReason, "name");
+  });
+
+  test(`planCompanyResolution: ${free} is never written as a fill nor as a created company's domain`, () => {
+    const filled = planCompanyResolution(
+      [row({ hubspotCompanyId: "1", name: "Acme Corp", domain: free })],
+      [{ companyKey: "acme", domain: null }],
+      new Map(),
+      new Set(),
+    );
+    assert.deepEqual(filled.domainFills, []);
+    assert.deepEqual(filled.domainConflicts, []);
+
+    const created = planCompanyResolution(
+      [row({ hubspotCompanyId: "2", name: "Newco", domain: free })],
+      [],
+      new Map([["2", 1]]),
+      new Set(),
+    );
+    assert.equal(created.companiesToCreate.length, 1);
+    assert.equal(created.companiesToCreate[0]!.domain, null);
+  });
+}
+
+test("groupHubSpotCompanies: a free-mail domain next to a real one still groups on the real one", () => {
+  const groups = groupHubSpotCompanies([
+    row({ hubspotCompanyId: "1", name: "Acme", domain: "acme.com", additionalDomains: ["fibertel.com.ar"] }),
+    row({ hubspotCompanyId: "2", name: "Acme Inc", domain: null, additionalDomains: ["acme.com", "fibertel.com.ar"] }),
+    row({ hubspotCompanyId: "3", name: "Unrelated", domain: "fibertel.com.ar" }),
+  ]);
+  assert.equal(groups.length, 2);
+  const acme = groups.find((g) => g.rows.length === 2)!;
+  assert.deepEqual(acme.rows.map((r) => r.hubspotCompanyId).sort(), ["1", "2"]);
+  assert.deepEqual(acme.domains, ["acme.com"]);
+  assert.deepEqual(acme.freeMailDomains, ["fibertel.com.ar"]);
+});
+
+test("planCompanyResolution: a row carrying BOTH a free-mail and a real domain matches and fills on the real one", () => {
+  const matched = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", name: "Whatever", domain: "fibertel.com.ar", additionalDomains: ["acme.com"] })],
+    [
+      { companyKey: "acme", domain: "acme.com" },
+      { companyKey: "isp-squatter", domain: "fibertel.com.ar" },
+    ],
+    new Map(),
+    new Set(),
+  );
+  assert.equal(matched.byHubspotCompanyId.get("1")?.companyKey, "acme");
+  assert.equal(matched.byHubspotCompanyId.get("1")?.matchReason, "domain");
+
+  const filled = planCompanyResolution(
+    [row({ hubspotCompanyId: "2", name: "Acme Corp", domain: "fibertel.com.ar", additionalDomains: ["acme.com"] })],
+    [{ companyKey: "acme", domain: null }],
+    new Map(),
+    new Set(),
+  );
+  assert.deepEqual(filled.domainFills, [{ companyKey: "acme", domain: "acme.com" }]);
+});
+
+test("planCompanyResolution: skipped free-mail domains are counted so the run report shows them", () => {
+  const result = planCompanyResolution(
+    [
+      row({ hubspotCompanyId: "1", name: "Alpha", domain: "fibertel.com.ar" }),
+      row({ hubspotCompanyId: "2", name: "Beta", domain: "fibertel.com.ar", additionalDomains: ["gmail.com"] }),
+      row({ hubspotCompanyId: "3", name: "Gamma", domain: "gamma.com" }),
+    ],
+    [],
+    new Map(),
+    new Set(),
+  );
+  // Groups {1} (fibertel) and {2} (fibertel, gmail) -> 3 skipped; gamma has none.
+  assert.equal(result.freeMailDomainsSkipped, 3);
+  assert.equal(
+    planCompanyResolution([row({ hubspotCompanyId: "3", domain: "gamma.com" })], [], new Map(), new Set())
+      .freeMailDomainsSkipped,
+    0,
+  );
+});
+
+test("planCompanyResolution: own_company is unchanged — by name, by own domain, and with a free-mail domain beside it", () => {
+  const byName = planCompanyResolution(
+    [row({ hubspotCompanyId: "1", name: "Avalith", domain: "fibertel.com.ar" })],
+    [{ companyKey: "someone", domain: "fibertel.com.ar" }],
+    new Map([["1", 3]]),
+    new Set(),
+  );
+  assert.equal(byName.byHubspotCompanyId.get("1")?.matchReason, "own_company");
+  assert.equal(byName.companiesToCreate.length, 0);
+
+  const byDomain = planCompanyResolution(
+    [row({ hubspotCompanyId: "2", name: "Some Holding", domain: "avalith.net", additionalDomains: ["gmail.com"] })],
+    [],
+    new Map([["2", 3]]),
+    new Set(),
+  );
+  assert.equal(byDomain.byHubspotCompanyId.get("2")?.matchReason, "own_company");
+});
+
+test("planCompanyResolution: the free-mail guard does not mutate its inputs — two calls with the same input agree", () => {
+  const existing: ExistingCompanyRef[] = [{ companyKey: "acme", domain: null }];
+  const rows = [
+    row({ hubspotCompanyId: "1", name: "Acme Corp", domain: "fibertel.com.ar", additionalDomains: ["acme.com"] }),
+    row({ hubspotCompanyId: "2", name: "Beta", domain: "fibertel.com.ar" }),
+  ];
+  const rowsBefore = JSON.parse(JSON.stringify(rows));
+  const existingBefore = JSON.parse(JSON.stringify(existing));
+  const first = planCompanyResolution(rows, existing, new Map([["2", 1]]), new Set());
+  const second = planCompanyResolution(rows, existing, new Map([["2", 1]]), new Set());
+  assert.deepEqual(second.domainFills, first.domainFills);
+  assert.equal(second.freeMailDomainsSkipped, first.freeMailDomainsSkipped);
+  assert.deepEqual(second.companiesToCreate, first.companiesToCreate);
+  assert.deepEqual(rows, rowsBefore);
+  assert.deepEqual(existing, existingBefore);
+});

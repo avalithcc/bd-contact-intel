@@ -41,6 +41,7 @@ function emptyReport(overrides: Partial<HubSpotImportReport["outcomes"]> = {}): 
       noCompanyResolved: 0,
       domainConflicts: 0,
       ambiguousCompactMatches: 0,
+      freeMailDomainsSkipped: 0,
       unknownLeadStatuses: {},
     },
   };
@@ -79,6 +80,7 @@ function planResult(outcomes: HubSpotContactPlanOutcome[], reviewCount = 0): Pla
       notesToCreate: [],
       ambiguousCompactMatches: 0,
       compactMatches: [],
+      freeMailDomainsSkipped: 0,
     },
     identityPlan: null,
     refillPlans: [],

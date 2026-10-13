@@ -120,6 +120,10 @@ export interface HubSpotImportReport {
      * reported instead of guessing; the group still gets created (H6 dry-
      * run finding). */
     ambiguousCompactMatches: number;
+    /** Free-mail domains on HubSpot company rows that were ignored as company
+     * identity (see `planCompanyResolution`). Absent on reports persisted
+     * before this counter existed. */
+    freeMailDomainsSkipped: number;
     /** Non-empty HubSpot lead status values this module doesn't recognize
      * (value -> row count) — never used to plan evidence, just surfaced so
      * an unmapped label doesn't silently disappear (H6 dry-run finding).
@@ -185,6 +189,7 @@ function emptyReport(rowsRead: number): HubSpotImportReport {
       noCompanyResolved: 0,
       domainConflicts: 0,
       ambiguousCompactMatches: 0,
+      freeMailDomainsSkipped: 0,
       unknownLeadStatuses: {},
     },
   };
@@ -215,6 +220,7 @@ export function planHubSpotImport(input: PlanHubSpotImportInput): PlanHubSpotImp
   report.companies.compactMatches = companyResolution.compactMatches;
   report.warnings.domainConflicts = companyResolution.domainConflicts.length;
   report.warnings.ambiguousCompactMatches = companyResolution.ambiguousCompactMatches;
+  report.warnings.freeMailDomainsSkipped = companyResolution.freeMailDomainsSkipped;
 
   // Indexed by the row's position in input.contacts, so the final
   // `outcomes` array preserves original row order regardless of which
