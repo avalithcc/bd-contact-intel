@@ -23,7 +23,24 @@ Use `npm run db:migrate`, not `db:push`. Replaying the chain is the only path
 that reproduces what production actually has (constraint names included) and it
 leaves `drizzle.__drizzle_migrations` correctly populated, so the next migration
 applies instead of being silently skipped. Verified 2026-10-13 from an empty
-local database: 41 ledger rows, 37 tables, 133 indexes.
+local database: 41 ledger rows, 37 tables, 133 indexes, row-level security on
+for 37 of 37 tables.
+
+**`db:push` is for inspecting drift, not for building anything anyone will use.**
+`src/db/schema.ts` declares no RLS; `drizzle/0019_enable_rls.sql` is what turns it
+on. Measured 2026-10-13: a `db:push`-built database has RLS **off on all 37
+tables**, a chain-built one has it on for 37/37. A database built with `db:push`
+silently reopens the exposure `0019` closed.
+
+**This only works on an empty database.** `npm run db:migrate` against an
+already-populated database that was built with `db:push` fails hard, e.g.
+`PostgresError: column "is_startup" of relation "target_company" already exists`
+(`42701`, from `drizzle/0010_flowery_sunset_bain.sql:1`). The whole run is one
+transaction, so it rolls back and the ledger stays at 0 rows; nothing is half
+applied, but nothing moves forward either. Such a database cannot be migrated
+forward: rebuild it from empty (drop, create, `db:migrate`). The case is
+documented at `tests/db/aliasEquivalence.test.ts:48-50`, and the e2e database's
+rebuild recipe is in `tests/e2e/README.md`.
 
 **Always pass `DATABASE_URL` explicitly.** drizzle-kit auto-loads `.env`, where
 the production URL lives, so a bare `npm run db:migrate` or `db:push` points at
@@ -39,11 +56,11 @@ truncated to Postgres's 63-character limit, and — off Supabase — the
 `anon`/`authenticated` privilege revoke in `0019_enable_rls.sql` skipping itself
 because those roles only exist on Supabase.
 
-`npm run db:push` still works and syncs `src/db/schema.ts` directly, but it
-writes no ledger rows, names five foreign keys differently from production, and
-leaves row-level security **off** on every table — `src/db/schema.ts` declares
-no RLS, so push undoes what `0019_enable_rls.sql` closed. Prefer it only for
-throwaway schema experiments. Details in `openspec/BACKLOG.md`.
+`npm run db:push` still runs and syncs `src/db/schema.ts` directly, but it
+writes no ledger rows and names five foreign keys differently from production
+(on top of leaving RLS off, above). Point it at a scratch database to inspect
+drift against `src/db/schema.ts`, never at one anybody will use. Details in
+`openspec/BACKLOG.md`.
 
 Also set `CRON_SECRET` (a random string) as an env var in the deployment
 environment (e.g. Vercel project settings) — it authenticates the
@@ -129,8 +146,10 @@ stored and tagged with its `market` instead. The `country_filter` column is
 left in place (not dropped) but ignored by sync.
 
 After pulling this change, run in order:
-1. `npm run db:push` (or apply `drizzle/0006_job_posting_market.sql`
-   manually) — adds `job_posting.market` + its index.
+1. Apply `drizzle/0006_job_posting_market.sql` through the migration chain
+   (`npm run db:migrate`, see "Migrations" below) — adds `job_posting.market` +
+   its index. Do not use `db:push` for this; see "Standing up a new
+   environment" for why.
 2. `npx tsx scripts/backfill-posting-markets.ts` — classifies `market` for
    every existing row.
 3. Trigger a sync (`/api/hiring/sync` or `syncAllCompanies()`) — re-fetches
@@ -163,7 +182,8 @@ the same journal. Rules:
 - Never trust the success message: verify the objects exist afterwards, e.g.
   `select to_regclass('public.<table>')`.
 - Don't use `drizzle-kit push` against production: it changes the schema
-  without recording anything in the ledger.
+  without recording anything in the ledger. Don't use it to build any other
+  environment either: it leaves RLS off (see "Standing up a new environment").
 
 ## Leads ingest API (external push from lead_gen)
 

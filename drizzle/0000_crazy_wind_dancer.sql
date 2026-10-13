@@ -11,14 +11,25 @@
 -- records them, minus `role_group` and its index, which this migration adds
 -- itself further down.
 --
--- Every statement is `IF NOT EXISTS` / `duplicate_object`-guarded, so this
--- block is a no-op on any database that already has the two tables. It is also
--- unreachable in production: the migrator applies an entry only when its
--- journal `when` exceeds the latest applied `created_at`
--- (node_modules/drizzle-orm/pg-core/dialect.js, PgDialect.migrate), and this
--- entry's `when` is the lowest in the chain. The file hash is stored in
--- `drizzle.__drizzle_migrations` but never compared, so editing this file
--- cannot change what an existing database replays.
+-- The two CREATE TABLEs and the four indexes are `IF NOT EXISTS`, so they are
+-- no-ops on a database that already has them. The foreign key is NOT as strong:
+-- its `DO $$ ... EXCEPTION WHEN duplicate_object` block keys on the constraint
+-- NAME, so it is a no-op only when `contact` already holds a constraint called
+-- `contact_bd_id_bd_id_fk` (a database built by `drizzle-kit push` and one built
+-- by this chain both name it that way). A database holding the same FK under a
+-- different name would get a second, duplicate FK, plus an ACCESS EXCLUSIVE lock
+-- on `contact` while Postgres validates it over every row.
+--
+-- That cannot happen in production, because the block never runs there: the
+-- migrator applies an entry only when its journal `when` exceeds the latest
+-- applied `created_at`, and this entry's `when` is the lowest in the chain. The
+-- file hash is stored in `drizzle.__drizzle_migrations` but never compared, so
+-- editing this file cannot change what an existing database replays.
+--
+-- Both facts are properties of drizzle-orm 0.36.4, read from
+-- node_modules/drizzle-orm/pg-core/dialect.js (PgDialect.migrate, lines 44-71)
+-- on 2026-10-13; package.json allows ^0.36.4, so only patch releases can drift.
+-- Re-read that function before bumping drizzle-orm past 0.36.x.
 CREATE TABLE IF NOT EXISTS "bd" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,

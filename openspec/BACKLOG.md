@@ -1100,7 +1100,8 @@ never replayed the chain, and because the e2e scratch database had **0 rows** in
 `drizzle.__drizzle_migrations` — it had been built with `db:push` from the start.
 The two facts hid each other.
 
-`npm run db:push` works and is what to use: it syncs `src/db/schema.ts` directly
+(Superseded by the "Fixed 2026-10-13" paragraph below: use `db:migrate`; `db:push`
+leaves RLS off on all 37 tables.) `npm run db:push` works: it syncs `src/db/schema.ts` directly
 and produced 37 tables matching production table-for-table, including the
 post-0039 `company_alias.company_key -> company` FK. Its only output is a
 harmless `42622` NOTICE about a constraint identifier truncated to Postgres's
@@ -1164,8 +1165,11 @@ place needs no journal change at all.
 
 ### Production-safety proof for the two edited migration files
 
-**The migrator's real rule, read from source (2026-10-13).** `npm run db:migrate`
-is `drizzle-kit migrate`. `node_modules/drizzle-kit/bin.cjs:88508`/`:88542-88543` hands
+**The migrator's real rule, read from source (2026-10-13), as shipped in
+drizzle-orm 0.36.4** (`node_modules/drizzle-orm/package.json`; `package.json` pins
+`^0.36.4`, so drift is bounded to patch releases). Everything in this proof is a
+property of that version: re-read `PgDialect.migrate` before bumping drizzle-orm
+past 0.36.x. `npm run db:migrate` is `drizzle-kit migrate`. `node_modules/drizzle-kit/bin.cjs:88508`/`:88542-88543` hands
 off to `preparePostgresDB`, which at `:76402-76409` picks
 `drizzle-orm/postgres-js/migrator` because `pg` is not installed and `postgres`
 is (confirmed by the run's own line, `Using 'postgres' driver for database
@@ -1286,7 +1290,25 @@ same files:
 Regression guard: `tests/unit/drizzleChainReplay.test.ts` replays the chain
 statement by statement and fails if any statement touches a table no earlier
 statement created (`src/lib/migration/chainReplay.ts`). It was RED at 27
-findings before the fix. Suites after the fix: `test:unit` 3037/3037 pass,
+findings before the fix.
+
+**Hardened the same day after review.** The first version matched only quoted
+identifiers, so `drizzle/0039_company_alias_fk_to_company.sql:18,21`
+(`ALTER TABLE public.company_alias`, unquoted, inside `DO`/`EXECUTE`) was invisible
+to it, and a later migration copying that style while omitting its `CREATE TABLE`
+would have passed. It now reads quoted and bare names, with or without `public.`;
+ignores other schemas; replays events in source order inside one statement (a
+reference before its `CREATE` is caught); clears a table on `DROP TABLE`; also
+checks `DELETE FROM`, `TRUNCATE`, `COMMENT ON TABLE` and unnamed or bare-named
+`CREATE INDEX`; and splits on standalone `--> statement-breakpoint` lines, which
+the first version stripped as comments (so most of each file was one "statement").
+Deliberately NOT covered, because the chain uses none of them and each needs real
+parsing: `GRANT`/`REVOKE ... ON TABLE`, `CREATE TRIGGER ... ON`, a view's `FROM`,
+`CREATE TABLE ... (LIKE x)`, `RENAME TO`, and tables created inside `EXECUTE`.
+**It checks tables only.** A missing column, enum, extension, function or ROLE is
+invisible to it; the second blocker that actually broke the build (the `anon` role
+in `0019`) would have passed it. The only proof that the chain builds from empty is
+still running `db:migrate` against an empty database; there is no CI in this repo. Suites after the fix: `test:unit` 3037/3037 pass,
 `test:db` 6/6 pass against a migrate-built database, `typecheck` clean,
 `npx next build` compiles through page-data collection.
 
