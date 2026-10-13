@@ -4,7 +4,7 @@
  * UTC is already tomorrow.
  */
 import { expect } from '@playwright/test';
-import { activitiesFor, argDate, newPerson, openContact, openQuickAction, personStatus, sql, tasksFor, test } from './helpers';
+import { activitiesFor, argDate, newPerson, openContact, openQuickAction, personStatus, sql, tasksFor, test, toastRegion } from './helpers';
 
 test('a task due TODAY (Argentina date) is in "Hoy", not in "Vencidas"', async ({ page }) => {
   const p = await newPerson('TaskToday');
@@ -41,7 +41,7 @@ test('a call logged with no date/time shows today\'s Argentina date in the timel
   const dlg = await openQuickAction(page, 'call');
   await dlg.getByLabel('Resultado').selectOption('busy');
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   const [call] = await activitiesFor(p.id);
   console.log(`[evening] occurredAt=${call!.metadata.occurredAt} (argDate=${argDate(0)})`);
   const meta = await page.locator('.tl').first().innerText();
@@ -58,7 +58,7 @@ test('a meeting: required date is enforced, saved once, status moves to meeting'
   await dlg.getByLabel('Fecha').fill(argDate(0));
   await dlg.getByLabel('Notas').fill('Reunión inicial');
   await dlg.getByRole('button', { name: 'Registrar reunión' }).dblclick();
-  await expect(page.getByText('Reunión registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Reunión registrada.')).toBeVisible();
   await page.waitForTimeout(1200);
   const meetings = (await activitiesFor(p.id)).filter((a) => a.type === 'meeting_logged');
   expect(meetings).toHaveLength(1);
@@ -74,7 +74,7 @@ test('F12: a meeting dated in the future is refused with a message that points a
   await dlg.getByRole('button', { name: 'Registrar reunión' }).click();
   await expect(dlg.getByRole('alert')).toContainText('fecha futura');
   await expect(dlg.getByRole('alert'), 'she is told what to do for a meeting she has only scheduled').toContainText('tarea de seguimiento');
-  await expect(page.getByText('Reunión registrada.')).toHaveCount(0);
+  await expect(toastRegion(page).getByText('Reunión registrada.')).toHaveCount(0);
   // The dialog stays usable (not frozen) so she can correct the date.
   await expect(dlg.getByRole('button', { name: 'Registrar reunión' })).toBeEnabled();
   const meetings = (await activitiesFor(p.id)).filter((a) => a.type === 'meeting_logged');
@@ -94,7 +94,7 @@ test('discarding needs a reason, "Otro" needs a note, and a discarded contact le
   expect(await activitiesFor(p.id)).toHaveLength(0);
   await dlg.getByLabel('Nota').fill('Cerró el hotel');
   await dlg.getByRole('button', { name: 'Descartar contacto' }).click();
-  await expect(page.getByText('Contacto descartado.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Contacto descartado.')).toBeVisible();
   expect(await personStatus(p.id)).toBe('discarded');
   await page.goto('/contacts?view=notContacted&q=' + encodeURIComponent(p.name.split(' ')[0]!));
   await page.waitForLoadState('networkidle');

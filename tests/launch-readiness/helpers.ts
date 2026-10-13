@@ -94,6 +94,16 @@ export async function openContact(page: Page, id: string) {
   await expect(page).not.toHaveURL(/\/login/);
 }
 
+/**
+ * The app-level toast region. Scope toast assertions to it: several toast
+ * messages are byte-identical to a timeline fallback line on the contact
+ * record (call, meeting, discard), so an unscoped `getByText` can match both
+ * nodes and fail Playwright strict mode, depending only on the data logged.
+ */
+export function toastRegion(page: Page) {
+  return page.locator('#toast-region');
+}
+
 export const QUICK = { call: 'Llamada', task: 'Tarea', meeting: 'Reunión', discard: 'Descartar' } as const;
 
 /** Quick-action buttons live in the `.quick-actions` toolbar (Nota is an anchor, the rest are buttons). */

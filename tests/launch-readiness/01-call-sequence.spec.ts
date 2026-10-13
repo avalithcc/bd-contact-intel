@@ -5,7 +5,7 @@
  * "to call" view, do filters survive a refresh, does the status refresh.
  */
 import { expect, type Page } from '@playwright/test';
-import { activitiesFor, meId, openQuickAction, personStatus, test } from './helpers';
+import { activitiesFor, meId, openQuickAction, personStatus, test, toastRegion } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -51,7 +51,7 @@ test.describe('log a call from the to-call list', () => {
     await dlg.getByLabel('Resultado').selectOption('no_answer');
     await dlg.getByLabel('Notas').fill('No contestó. Reintentar mañana por la tarde.');
     await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-    await expect(page.getByText('Llamada registrada.')).toBeVisible();
+    await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
     await expect(page.getByRole('dialog')).toBeHidden();
 
     // UI: the timeline shows the call and the status badge moved.

@@ -4,7 +4,7 @@
  * badge, without a manual reload. State is serial and shared on purpose.
  */
 import { expect, type Page } from '@playwright/test';
-import { sql, test } from './helpers';
+import { sql, test, toastRegion } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -50,7 +50,7 @@ test('logging a call from a queue card: the card leaves the list and the badge d
   await expect(dlg, 'the call dialog should open by itself from the queue icon').toBeVisible();
   await dlg.getByLabel('Resultado').selectOption('connected');
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   await expect.poll(() => badge(page), { message: 'sidebar badge on the record page after the call' }).toBe(badgeBefore - 1);
   await page.locator('nav a', { hasText: 'Seguimientos' }).first().click();
   await page.waitForURL('**/follow-ups');

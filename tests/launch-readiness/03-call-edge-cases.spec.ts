@@ -1,6 +1,6 @@
 /** "Registrar llamada": the obvious wrong things a BD does with the form. */
 import { expect } from '@playwright/test';
-import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, personStatus, sql, test } from './helpers';
+import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, personStatus, sql, test, toastRegion } from './helpers';
 
 test('the submit button stays disabled until an outcome is chosen', async ({ page }) => {
   const p = await newPerson('CallNoOutcome');
@@ -19,7 +19,7 @@ test('whitespace-only notes are stored as no notes, not as blank text', async ({
   await dlg.getByLabel('Resultado').selectOption('busy');
   await dlg.getByLabel('Notas').fill('   \n   ');
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   const [call] = await activitiesFor(p.id);
   expect(call!.metadata.notes).toBeNull();
 });
@@ -38,7 +38,7 @@ test('every outcome moves the contact to the stage the dialog promises', async (
     const dlg = await openQuickAction(page, 'call');
     await dlg.getByLabel('Resultado').selectOption(outcome);
     await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-    await expect(page.getByText('Llamada registrada.')).toBeVisible();
+    await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
     expect(await personStatus(p.id), outcome).toBe(status);
   }
 });
@@ -49,7 +49,7 @@ test('double-clicking the submit button logs ONE call', async ({ page }) => {
   const dlg = await openQuickAction(page, 'call');
   await dlg.getByLabel('Resultado').selectOption('connected');
   await dlg.getByRole('button', { name: 'Registrar llamada' }).dblclick();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   await page.waitForTimeout(1500);
   expect((await activitiesFor(p.id)).filter((a) => a.type === 'call')).toHaveLength(1);
 });
@@ -62,7 +62,7 @@ test('a call dated yesterday is stored at the Argentina wall-clock time the BD t
   await dlg.getByLabel('Fecha').fill(argDate(-1));
   await dlg.getByLabel('Hora').fill('10:30');
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   const [call] = await activitiesFor(p.id);
   // 10:30 ART is 13:30 UTC.
   expect(call!.metadata.occurredAt).toBe(`${argDate(-1)}T13:30:00.000Z`);
@@ -76,7 +76,7 @@ test('a date with no time is accepted (stored as ART midnight) and the timeline 
   await dlg.getByLabel('Resultado').selectOption('no_answer');
   await dlg.getByLabel('Fecha').fill(argDate(-2));
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   const [call] = await activitiesFor(p.id);
   expect(call!.metadata.occurredAt).toBe(`${argDate(-2)}T03:00:00.000Z`);
   await expect(page.locator('main').getByText('00:00')).toHaveCount(0);
@@ -106,7 +106,7 @@ test('a 20,000-character note is saved whole and does not break the page layout'
   const long = ('palabra'.repeat(8) + ' ').repeat(360).slice(0, 20_000);
   await dlg.getByLabel('Notas').fill(long);
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   const [call] = await activitiesFor(p.id);
   expect((call!.metadata.notes as string).length).toBe(long.trim().length);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -120,7 +120,7 @@ test('an unbroken 5,000-character string in a note does not push the page sidewa
   await dlg.getByLabel('Resultado').selectOption('connected');
   await dlg.getByLabel('Notas').fill('x'.repeat(5000));
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-  await expect(page.getByText('Llamada registrada.')).toBeVisible();
+  await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
@@ -223,7 +223,7 @@ for (const [outcome, label, queued] of [
     const dlg = await openQuickAction(page, 'call');
     await dlg.getByLabel('Resultado').selectOption(outcome);
     await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
-    await expect(page.getByText('Llamada registrada.')).toBeVisible();
+    await expect(toastRegion(page).getByText('Llamada registrada.')).toBeVisible();
     // Age the call by 10 days so it is eligible for the queue (contacted + 7 days).
     // `occurredAt` MUST be written as ISO (`...T...Z`): effectiveActivityAtSql()
     // only trusts that field when it matches that shape, so a space-separated
