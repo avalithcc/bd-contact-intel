@@ -71,17 +71,19 @@ dropdb --if-exists bd_contact_intel_e2e && createdb bd_contact_intel_e2e
 DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npm run db:migrate
 DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e \
   E2E_EMAIL=<test account email> npx tsx scripts/seed-launch-readiness.ts --execute
-DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npx playwright test
+E2E_ALLOW_SHARED_SUPABASE=1 DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npx playwright test
 ```
+
+`E2E_ALLOW_SHARED_SUPABASE=1` is explained in "Supabase isolation" below; without
+it (and without a throwaway project) the run refuses to start.
 
 Always pass `DATABASE_URL` explicitly: `.env` and drizzle-kit load the
 production URL. `.env.e2e.local` (gitignored) may hold the scratch
 `DATABASE_URL` and `E2E_EMAIL` for the seed script; never put a production
 credential in it. `E2E_PASSWORD` stays in `.env.local`, which
-`playwright.config.ts` loads without overriding variables already set. The shell
-variable wins over `.env.local`. The login still goes to the Supabase Auth
-project configured in `.env.local`; whether that is acceptable for a scratch
-run is unverified. The filter specs also pass on the tiny seed (the second BD
+`playwright.config.ts` loads without overriding variables already set (only
+`E2E_*` keys are loaded from dotenv files, see below). The shell variable wins
+over `.env.local`. The filter specs also pass on the tiny seed (the second BD
 has one contact with a phone and one without, which the "responsable + Tiene
 teléfono" spec needs to narrow); read-only mode against a dev server whose
 database is the scratch one runs them too (start `DATABASE_URL=<scratch>
@@ -94,6 +96,68 @@ the layout answers 500 ("No bd row for this session, and first-visit
 provisioning is disabled for a read-only e2e request") and no row is inserted;
 without it the page answers 200 and a row is inserted. The session cookie
 reaches the server alongside the marker (`route.fallback({headers})` keeps it).
+
+## Supabase isolation
+
+Only the database is isolated today. **The Supabase project is still shared**:
+`auth.setup.ts` fills `#password` and logs in through the real Supabase Auth
+project that `.env.local` points at. That is production auth, so a test run can
+lock out, rate-limit or otherwise touch real auth users. The scratch database
+does not change that.
+
+### Env contract
+
+`playwright.config.ts` (rules in `supabaseIsolation.ts`, tests in
+`tests/unit/e2eSupabaseIsolation.test.ts`):
+
+- **The Playwright process** loads only `E2E_*` keys from the dotenv files
+  (`.env.development.local`, `.env.local`, `.env.development`, `.env`; the shell
+  wins). A production `DATABASE_URL` or an OAuth secret in `.env.local` never
+  enters it.
+- **The app server it starts** (scratch mode, port 3101) is given exactly three
+  values: `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Every other key defined in a dotenv file is
+  set to an empty string in the server's environment. `next dev` never
+  overrides a variable that is already defined, even empty, so a secret added
+  to `.env.local` tomorrow (Gmail key, OAuth secret, SMTP) cannot reach the test
+  server and nothing here needs editing. If a spec ever needs another variable,
+  add it to `buildServerEnv` on purpose.
+- Not covered: a secret exported in your shell (not in a dotenv file) is still
+  inherited by the server. Do not export production secrets before a run.
+- Read-only mode reuses a server the suite did not start, so none of this can
+  be enforced there; that server keeps its own `.env.local`.
+
+### The guard and its escape hatch
+
+The repository cannot know which Supabase project is production without
+committing a project ref, so it fails closed the other way round: a project is
+used silently only if you NAME it for e2e. Otherwise the run refuses to start
+(at config load, in under a second) with a message saying what to do.
+
+- `E2E_SUPABASE_URL` + `E2E_SUPABASE_ANON_KEY` (both, different from
+  `NEXT_PUBLIC_SUPABASE_URL`): a dedicated project, no warning. The same value
+  as the app's own project still counts as shared.
+- `E2E_ALLOW_SHARED_SUPABASE=1`: deliberate acknowledgement that this run uses
+  the shared project. It is honoured only when typed in the shell for that run,
+  never from a dotenv file, and every such run prints a `[e2e] WARNING` banner.
+  Any value other than `1` is ignored.
+- No credentials means every test is skipped and nothing logs in, so the guard
+  does not run.
+
+### Pointing the suite at a throwaway Supabase project (one step)
+
+Create the project, create the e2e user in it **with a password** (the same
+email as `E2E_EMAIL` and a matching `bd` row in the scratch database), then add
+to `.env.local`:
+
+```
+E2E_SUPABASE_URL=<throwaway project URL>
+E2E_SUPABASE_ANON_KEY=<its anon key>
+E2E_EMAIL=<that user's email>
+E2E_PASSWORD=<its password>
+```
+
+Drop `E2E_ALLOW_SHARED_SUPABASE=1` from the command. Nothing else changes.
 
 ## One-time setup
 

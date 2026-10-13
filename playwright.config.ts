@@ -1,13 +1,30 @@
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
+import { parseEnv } from 'util';
 import { isCi, skipReason } from './tests/e2e/credentials';
 import { serverPlan } from './tests/e2e/readOnlyGuard';
+import {
+  DOTENV_FILES_BY_PRECEDENCE,
+  SHARED_SUPABASE_HATCH,
+  buildServerEnv,
+  mergeDotenv,
+  resolveSupabase,
+  testProcessDotenv,
+} from './tests/e2e/supabaseIsolation';
 
-// Playwright does not read .env.local on its own (only `next dev` does), so
-// load it here for E2E_EMAIL / E2E_PASSWORD. Existing variables win.
-const envLocal = path.join(__dirname, '.env.local');
-if (fs.existsSync(envLocal)) process.loadEnvFile(envLocal);
+// Playwright does not read dotenv files on its own (only `next dev` does).
+// This process loads E2E_* settings from them and NOTHING else: no production
+// DATABASE_URL, no OAuth or Gmail secret. Existing variables win. The shared
+// Supabase hatch is read from the shell BEFORE any file is consulted and is
+// never loaded from a file. See tests/e2e/supabaseIsolation.ts.
+const hatch = process.env[SHARED_SUPABASE_HATCH];
+const dotenvFiles = DOTENV_FILES_BY_PRECEDENCE.map((name) => {
+  const file = path.join(__dirname, name);
+  return fs.existsSync(file) ? parseEnv(fs.readFileSync(file, 'utf8')) : {};
+});
+const dotenv = mergeDotenv(dotenvFiles);
+Object.assign(process.env, testProcessDotenv(dotenv, process.env));
 
 const STORAGE_STATE = path.join(__dirname, 'tests/.auth/state.json');
 
@@ -26,6 +43,32 @@ const BASE_URL = `http://localhost:${plan.port}`;
 // not every worker) where a developer will see it.
 if (skipReason() && process.env.TEST_WORKER_INDEX === undefined) {
   console.warn(`\n[e2e] ${skipReason()}\n`);
+}
+
+// Which Supabase project the login goes through, and exactly what the app
+// server receives. With no credentials nothing logs in, so nothing to judge.
+// A refusal throws at config load: the run fails before any server boots.
+let serverEnv: Record<string, string> | undefined;
+if (!skipReason()) {
+  const supabase = resolveSupabase({
+    e2eUrl: process.env.E2E_SUPABASE_URL,
+    e2eAnonKey: process.env.E2E_SUPABASE_ANON_KEY,
+    appUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? dotenv.NEXT_PUBLIC_SUPABASE_URL,
+    appAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? dotenv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    hatch,
+    serverIsOurs: plan.env !== undefined,
+  });
+  if (supabase.refusal) throw new Error(`[e2e] ${supabase.refusal}`);
+  if (supabase.notice && process.env.TEST_WORKER_INDEX === undefined) {
+    console.warn(`\n[e2e] WARNING ${supabase.notice}\n`);
+  }
+  if (plan.env && supabase.target) {
+    serverEnv = buildServerEnv({
+      databaseUrl: plan.env.DATABASE_URL,
+      supabase: supabase.target,
+      dotenvKeys: Object.keys(dotenv),
+    });
+  }
 }
 
 export default defineConfig({
@@ -59,7 +102,7 @@ export default defineConfig({
         url: BASE_URL,
         reuseExistingServer: plan.reuseExistingServer,
         timeout: 120_000,
-        ...(plan.env ? { env: plan.env } : {}),
+        ...(serverEnv ? { env: serverEnv } : {}),
       },
 
   projects: [
