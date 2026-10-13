@@ -132,7 +132,7 @@ async function main() {
   console.log(`Existing companies read from DB: ${existingCompanies.length}`);
   console.log(`Domain fills found: ${fills.length}`);
   console.log(
-    `Free-mail domains ignored as company identity (never matched, grouped or filled): ${companyResolution.freeMailDomainsSkipped}`,
+    `Free-mail domains ignored as company identity (never matched, grouped or filled) — counted per group, so one domain carried by two groups counts twice: ${companyResolution.freeMailDomainsSkipped}`,
   );
   console.log(`Domain conflicts found (skipped — domain already claimed by a different company): ${conflicts.length}`);
 
