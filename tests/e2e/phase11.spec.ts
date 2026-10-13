@@ -1,72 +1,102 @@
+import postgres from 'postgres';
 import { test, expect } from './fixtures';
 import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 
 skipWithoutCredentials();
 
 /**
- * Phase 11 task 11.5 (admin-access-audit spec: "Admin conversation views are
- * audit-logged" / "Non-admins cannot read other BDs' conversation content";
- * contact-record spec "Conversation visibility on the record").
+ * Admin conversation access and its audit trail (admin-access-audit spec:
+ * "Admin conversation views are audit-logged" / "Non-admins cannot read other
+ * BDs' conversation content").
  *
- * NOT EXECUTED by this batch — same reasons as tests/e2e/phase7.spec.ts: no
- * DATABASE_URL/live server in this environment, and the non-admin case needs
- * a second, non-admin session the current single-session
- * `tests/e2e/auth.setup.ts` does not set up. Written to the repo's existing
- * e2e conventions (gotoAuthed, test.skip with a stated reason) for a
- * maintainer to run against a real environment with seeded data: a Contact
- * with a connected BD other than the admin/non-admin test accounts, and at
- * least one `email_sent` activity or LinkedIn conversation from that BD.
+ * The entry point is the modal on `/contacts/:id?conversation=<bdId>`
+ * (AdminConversationAutoOpen.tsx), reached from Administración -> Registro de
+ * auditoría's "Abrir" link. The standalone `/contacts/:id/conversation/:bdId`
+ * page this file used to target was deleted (owner decision 2026-09-30).
+ *
+ * The audit row is written by the `revealAdminConversationAction` server
+ * action, so these tests write and run on a scratch database only
+ * (skipUnlessWritesAllowed). The same property makes a direct read of
+ * `audit_log` safe: DATABASE_URL is known to be a local `*_e2e` database by
+ * the time any test body runs. Role is flipped on the e2e account's own `bd`
+ * row for the test and restored afterwards; the seed
+ * (scripts/seed-launch-readiness.ts) provides the second BD and the contacts.
+ *
+ * Not covered here: the "Ver conversación" confirm step on the record's
+ * history card (needs seeded email_message / conversation rows), and the
+ * Administración -> Registro de auditoría list itself.
  */
-// STALE, NEEDS A DECISION: both tests navigate to
-// `/contacts/:id/conversation/:bdId`, a page that was deleted (owner decision
-// 2026-09-30; see revealAdminConversationAction in
-// src/app/(app)/contacts/actions.ts). The entry point is now the modal on
-// `/contacts/:id?conversation=<bdId>` (AdminConversationAutoOpen.tsx). The
-// first test would fail on the missing route; the second asserts a 404 that a
-// deleted route returns for everyone, so it passes without testing the
-// non-admin gate. Both are env-gated and never run today. Rewrite them against
-// the modal or delete the file; do not rely on it as coverage.
-test.describe('Phase 11: Admin conversation access and audit', () => {
-  test('admin viewing another BD\'s conversation produces exactly one audit row', async ({ page }) => {
-    const contactId = process.env.E2E_CONTACT_WITH_OTHER_BD_HISTORY;
-    const otherBdId = process.env.E2E_OTHER_BD_ID;
-    test.skip(
-      !contactId || !otherBdId,
-      'Requires E2E_CONTACT_WITH_OTHER_BD_HISTORY and E2E_OTHER_BD_ID pointing at seeded data: a Contact with conversation history from a BD other than the seeded admin.',
-    );
+test.describe('Admin conversation access and audit', () => {
+  let sql: ReturnType<typeof postgres>;
+  let meId: string;
+  let originalRole: string;
+  let otherBdId: string;
+  let personId: string;
 
-    // Opening a conversation WRITES an audit_log row (view_conversation) via
-    // the revealAdminConversationAction server action (a POST the request
-    // guard would also block): scratch database only.
+  test.beforeEach(async () => {
     skipUnlessWritesAllowed();
-
-    // The shared `chromium` project authenticates as the seeded admin
-    // (tests/e2e/auth.setup.ts). This suite has no direct DB access, so the
-    // audit assertion is the UI-visible proxy: the admin-only conversation
-    // page renders once cleanly, and a second view of the same conversation
-    // does not error or duplicate visible content — the real "exactly one
-    // audit row per view" count must be asserted against `audit_log` in a
-    // DB-backed run (`SELECT count(*) FROM audit_log WHERE action =
-    // 'view_conversation' AND person_id = $1 AND target_bd_id = $2`).
-    await gotoAuthed(page, `/contacts/${contactId}/conversation/${otherBdId}`);
-    await expect(page.locator('text=/registro de auditoría|audit log/i')).toBeVisible();
+    sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+    const [me] = await sql`select id, role from bd where email = ${process.env.E2E_EMAIL!}`;
+    const [other] = await sql`select id from bd where id <> ${me.id} order by email limit 1`;
+    const [person] = await sql`select id from person order by id limit 1`;
+    expect(me, 'the e2e account has no bd row in the scratch database; re-run the seed').toBeTruthy();
+    expect(other, 'the scratch database needs a second bd (the seed creates one)').toBeTruthy();
+    expect(person, 'the scratch database has no person (run the seed)').toBeTruthy();
+    meId = me.id;
+    originalRole = me.role;
+    otherBdId = other.id;
+    personId = person.id;
   });
 
-  test('non-admin cannot read another BD\'s conversation content', async ({ page }) => {
-    const nonAdminEmail = process.env.E2E_NON_ADMIN_EMAIL;
-    const contactId = process.env.E2E_CONTACT_WITH_OTHER_BD_HISTORY;
-    const otherBdId = process.env.E2E_OTHER_BD_ID;
-    test.skip(
-      !nonAdminEmail || !contactId || !otherBdId,
-      'Requires a second, non-admin session (E2E_NON_ADMIN_EMAIL/E2E_NON_ADMIN_PASSWORD) plus the same seeded Contact/BD env vars as the admin test above.',
-    );
+  test.afterEach(async () => {
+    if (!sql) return;
+    await sql`update bd set role = ${originalRole} where id = ${meId}`;
+    await sql.end();
+  });
 
-    // A real run needs its own non-admin storageState (see phase7.spec.ts's
-    // equivalent note) rather than the shared admin session.
-    await gotoAuthed(page, `/contacts/${contactId}/conversation/${otherBdId}`);
-    await expect(page.locator('text=/404/')).toBeVisible();
+  const setRole = (role: 'admin' | 'bd') => sql`update bd set role = ${role} where id = ${meId}`;
+  const auditRows = async () => {
+    const [row] = await sql`
+      select count(*)::int as n from audit_log
+      where action = 'view_conversation' and person_id = ${personId} and target_bd_id = ${otherBdId}`;
+    return row.n as number;
+  };
 
-    await gotoAuthed(page, `/contacts/${contactId}`);
-    await expect(page.locator('text=/registro de auditoría|audit log/i')).toHaveCount(0);
+  test("admin opening another BD's conversation writes exactly one audit row", async ({ page }) => {
+    await setRole('admin');
+    const before = await auditRows();
+
+    await gotoAuthed(page, `/contacts/${personId}?conversation=${otherBdId}`);
+    // The audit banner only renders once the audited fetch has returned.
+    await expect(page.locator('.alert-audit')).toBeVisible();
+    expect(await auditRows()).toBe(before + 1);
+
+    // `next dev` double-invokes mount effects; a late second fetch would land here.
+    await page.waitForTimeout(1_000);
+    expect(await auditRows()).toBe(before + 1);
+  });
+
+  test("a non-admin gets no conversation modal and writes no audit row", async ({ page }) => {
+    await setRole('bd');
+    const before = await auditRows();
+
+    await gotoAuthed(page, `/contacts/${personId}?conversation=${otherBdId}`);
+    await expect(page.locator('main')).toBeVisible();
+    await page.waitForTimeout(1_000);
+
+    await expect(page.locator('.alert-audit')).toHaveCount(0);
+    expect(await auditRows()).toBe(before);
+  });
+
+  test('a malformed ?conversation= value never mounts the flow or writes', async ({ page }) => {
+    await setRole('admin');
+    const before = await auditRows();
+
+    await gotoAuthed(page, `/contacts/${personId}?conversation=not-a-uuid`);
+    await expect(page.locator('main')).toBeVisible();
+    await page.waitForTimeout(1_000);
+
+    await expect(page.locator('.alert-audit')).toHaveCount(0);
+    expect(await auditRows()).toBe(before);
   });
 });
