@@ -185,7 +185,7 @@ Meetings, discards, notes (spec 08, 10): meeting needs a date, saves once on dou
 set -a; source .env.e2e.local; set +a            # scratch DATABASE_URL + the e2e bot's credentials
 npx tsx scripts/seed-launch-readiness.ts           # dry run
 npx tsx scripts/seed-launch-readiness.ts --execute # wipes and reseeds the SCRATCH db only
-nohup npx next dev -p 3100 > dev.log 2>&1 &         # background, then poll /login until 200
+# (the pass originally used a hand-started server on :3100; the config now starts its own, see tests/e2e/README.md)
 npx playwright test -c playwright.launch-readiness.config.ts 01- --reporter=line --timeout=45000
 # repeat per file: 01, 02, 03, 04, 05, 06, 08, 09, 10
 LR_SHOW_FINDINGS=1 ...                             # un-wrap the confirmed defects to see the raw failure
@@ -197,4 +197,4 @@ Last full run **of the pass itself, before any fix landed**, one file at a time 
 
 Every finding is now fixed (#308-#312), so **no `test.fail` wrapper remains** in `tests/launch-readiness/` — those specs assert the fixed behaviour directly, and `LR_SHOW_FINDINGS` no longer changes anything. The per-file counts above have not been re-measured against the current suite.
 
-Changes to the inherited harness: `reuseExistingServer` is now `true` (a background server on :3100 is reused; the port is dedicated to this pass); `test.fail(true, ...)` became `test.fail(!process.env.LR_SHOW_FINDINGS, ...)`; the 04 reopen spec had a title that collided with the "Reabrir" button matcher and now goes through the Tareas pill; the Completadas spec was rewritten around F3. New specs: 05, 06, 08, 09, 10.
+Changes to the inherited harness: `reuseExistingServer` is now `false` and the server env is explicit (see "The launch-readiness config follows the same contract" in `tests/e2e/README.md`); an earlier revision reused a background server on :3100; `test.fail(true, ...)` became `test.fail(!process.env.LR_SHOW_FINDINGS, ...)`; the 04 reopen spec had a title that collided with the "Reabrir" button matcher and now goes through the Tareas pill; the Completadas spec was rewritten around F3. New specs: 05, 06, 08, 09, 10.

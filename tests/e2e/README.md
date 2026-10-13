@@ -148,6 +148,24 @@ used silently only if you NAME it for e2e. Otherwise the run refuses to start
 - No credentials means every test is skipped and nothing logs in, so the guard
   does not run.
 
+### The launch-readiness config follows the same contract
+
+`playwright.launch-readiness.config.ts` (manual QA pass, run by hand with
+`npx playwright test -c playwright.launch-readiness.config.ts <file>`, no npm
+script) writes data and logs in through the same Supabase Auth, so it had the
+same silent inheritance and now uses the same rules through
+`planIsolatedServer()` in `supabaseIsolation.ts`: a scratch `_e2e` database
+(shell `DATABASE_URL` wins, `.env.e2e.local` may supply it), only `E2E_*` keys
+loaded into the Playwright process, an explicit three-variable server env with
+every other dotenv key blanked, and the same refusal and
+`E2E_ALLOW_SHARED_SUPABASE=1` shell-only hatch (banner prefix
+`[launch-readiness]`). Its pass never needs the shared project, so there is no
+other opt-in. It always starts its own server on :3100 and never reuses one: a
+server started by hand (`nohup next dev -p 3100`) would not carry this env.
+Run it one spec file at a time: `helpers.ts` shares one `sql` pool per worker
+and each spec ends it in `afterAll`, so two files in one run can fail with
+`CONNECTION_ENDED`.
+
 ### Pointing the suite at a throwaway hosted project (alternative)
 
 Create the project, create the e2e user in it **with a password** (the same

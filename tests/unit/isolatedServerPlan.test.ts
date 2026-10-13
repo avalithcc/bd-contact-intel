@@ -94,12 +94,18 @@ test("readDotenvFiles reads the named files in order and treats a missing file a
 
 // Source-level tripwire: the config may not go back to loading dotenv files or
 // building a server env on its own.
-for (const config of ["playwright.config.ts"]) {
+for (const config of ["playwright.config.ts", "playwright.launch-readiness.config.ts"]) {
   test(`${config} uses the shared isolation plan and does not inherit dotenv wholesale`, () => {
     const src = readFileSync(join(__dirname, "../..", config), "utf8").replace(/\/\/.*$/gm, "");
     assert.match(src, /planIsolatedServer\(/);
     assert.match(src, /readDotenvFiles\(/);
     assert.doesNotMatch(src, /loadEnvFile/);
+    assert.doesNotMatch(src, /\.env\.local['"`]/);
     assert.doesNotMatch(src, /resolveSupabase\(|buildServerEnv\(/);
   });
 }
+
+test("the launch-readiness config never reuses a server it did not start", () => {
+  const src = readFileSync(join(__dirname, "../..", "playwright.launch-readiness.config.ts"), "utf8");
+  assert.match(src.replace(/\/\/.*$/gm, ""), /reuseExistingServer:\s*false/);
+});
