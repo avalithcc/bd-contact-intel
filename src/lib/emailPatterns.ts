@@ -109,10 +109,13 @@ export function isFreeMailDomain(domain: string): boolean {
 // This is the globally unambiguous subset: providers no company could
 // legitimately own. It is a literal, not "FREE_MAIL_ROOTS minus the ISPs", so
 // a root added to the broad list does not silently start blocking company
-// edits; the subset test (freeMailSplit.test.ts) fails if this one ever holds
-// a root the broad list lacks. Left out on purpose: terra, uol, bol, speedy,
-// fibertel, arnet, LATAM ISPs/portals whose first label a real company can
-// share (terra*). They stay free mail for matching, just not for validation.
+// edits. Two tests in freeMailSplit.test.ts keep the lists in step, and a root
+// added to EITHER list alone fails the suite: the "exactly" test (broad roots
+// minus the six ISPs below must equal this set) fails for a root added to the
+// broad list only or to this one only, and the subset test fails for a root
+// here that the broad list lacks. Adding a root to both lists passes. Left out
+// on purpose: terra, uol, bol, speedy, fibertel, arnet, LATAM ISPs/portals
+// whose first label a real company can share (terra*). They stay free mail for matching, just not for validation.
 export const UNOWNABLE_MAIL_ROOTS: ReadonlySet<string> = new Set([
   "gmail",
   "googlemail",

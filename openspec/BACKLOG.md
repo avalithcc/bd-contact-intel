@@ -1290,6 +1290,46 @@ findings before the fix. Suites after the fix: `test:unit` 3037/3037 pass,
 `test:db` 6/6 pass against a migrate-built database, `typecheck` clean,
 `npx next build` compiles through page-data collection.
 
+### Free-mail is two predicates now: LATAM ISP roots are still refused for matching, no longer for company edits (2026-10-13)
+Commit `5832862` split the free-mail test in two because the two callers pay
+opposite prices for being wrong:
+- `isFreeMailDomain` (`src/lib/emailPatterns.ts:92`, broad) — pattern inference,
+  identity matching, merge ranking. A false negative **merges two strangers** who
+  both used an ISP mailbox, so it stays aggressive.
+- `isUnownableMailDomain` (`src/lib/emailPatterns.ts:139`, narrow, backed by the
+  literal `UNOWNABLE_MAIL_ROOTS` at `:116`) — used only by the company-domain
+  validator (`src/lib/companies/domain.ts:117`). A false positive **blocks a
+  legitimate BD edit**, so it is narrow.
+
+The six LATAM ISP roots `terra`, `uol`, `bol`, `speedy`, `fibertel`, `arnet` are in
+the broad set only. The owner confirmed none of them is a real or prospective
+client. Measured 2026-10-13 (production, read-only; the queries are not recorded
+in this file): **0 companies** with a domain on any of the six roots; exactly
+**1 person** with an `@fibertel.com.ar` address. `test:unit` was 3037 pass / 0 fail
+on that commit.
+
+**Still open — owner has NOT decided.** The narrow predicate reuses the
+exact-domain set `FREE_MAIL_DOMAINS` (`src/lib/emailPatterns.ts:39`) unchanged, so
+the validator still refuses `zoho.com` (`:56`, Zoho Corporation's real domain) and
+`mail.com` (`:53`). It is the same asymmetry the ISP roots had, left in place on
+purpose until someone with the call says whether a company may own those. Until
+then a BD who types `zoho.com` on Zoho's own company record is told it is free mail.
+
+**Worry checked and not reachable: "a company on `fibertel.com.ar` would swallow
+every Fibertel customer."** Nothing attaches a contact to a company *by*
+`company.domain`. Read 2026-10-13, each at the cited line:
+- `src/lib/identity/matcher.ts:115-116` reads the **person's** email domain, for
+  the own-company skip only.
+- `src/lib/companies/searchCondition.ts:42` is the company search box.
+- `src/lib/contacts/companyDomain.ts` is display (the contact record's "Empresa" card).
+- `src/lib/accounts/accountTypeBackfill.ts:311` groups **person** email domains.
+- `src/lib/companyDomain.ts` guesses a domain from a company *name* for
+  `src/lib/emailSuggestion.ts:14`.
+
+Unverified: I did not search the whole repo for other readers of `company.domain`;
+only these five were read. If a future feature joins people to companies on the
+domain column, revisit this split first.
+
 ### e2e suite runs against production
 Found while reconciling #287: the revived e2e suite logs in as a test account
 (`e2e-bot`) against the **production** database; the PR's own result table says so.
