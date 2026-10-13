@@ -2,6 +2,12 @@ import { asc, eq, isNotNull, sql } from "drizzle-orm";
 import { QueryBuilder } from "drizzle-orm/pg-core";
 import { activity, company, person } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import type { ClientStatus } from "@/lib/companies/clientStatus";
+
+// Typed against the ClientStatus union on purpose: if the vocabulary in
+// clientStatus.ts ever drops "active", this stops compiling instead of
+// silently ordering by a value no row can hold.
+const ACTIVE_CLIENT: ClientStatus = "active";
 
 /**
  * The `/companies` "Última actividad" signal: the latest effective activity
@@ -84,12 +90,34 @@ export function companyLastActivity() {
 }
 
 /**
- * Most recent activity first, companies with none last. `display_name` and
- * then `company_key` (the primary key) make the order total, so pagination
- * never drops or repeats a row across pages when many share a null or an
- * identical timestamp (launch-readiness finding F4; same discipline as
- * followUp/candidateQuery.ts).
+ * Declared active clients last, then most recent activity first, then
+ * companies with no activity. `display_name` and then `company_key` (the
+ * primary key) make the order total, so pagination never drops or repeats a
+ * row across pages when many share a null or an identical timestamp
+ * (launch-readiness finding F4; same discipline as
+ * followUp/candidateQuery.ts). Adding a leading key keeps that totality: the
+ * trailing primary key still breaks every remaining tie.
+ *
+ * WHY active clients sink. The list is a PROSPECTING list: the BD is looking
+ * for companies to sell to. But an active client is exactly the company the BD
+ * emails most — invoices, collections, status — so it carries the freshest
+ * `lastActivityAt` and "most recent first" pinned it to the top. The sort key
+ * was effectively a proxy for "who do I talk to most", which is the inverse of
+ * "who should I pitch next"; active clients did not merely happen to be first,
+ * they were structurally guaranteed to be, and they stayed there for as long
+ * as the billing continued.
+ *
+ * Nothing is hidden and no count changes: `client_status = 'active'` rows are
+ * still in the list, still searchable and filterable, just at the end. Only
+ * `active` sinks. `inactive` (a dormant client, a prime re-sell) and NULL (not
+ * stated, not a client) keep the normal activity order, which is also what the
+ * `case` yields for NULL since `NULL = 'active'` is not true.
  */
 export function companyListOrderBy(lastActivityAt: ReturnType<typeof companyLastActivity>["lastActivityAt"]) {
-  return [sql`${lastActivityAt} desc nulls last`, asc(company.displayName), asc(company.companyKey)];
+  return [
+    sql`case when ${company.clientStatus} = ${ACTIVE_CLIENT} then 1 else 0 end`,
+    sql`${lastActivityAt} desc nulls last`,
+    asc(company.displayName),
+    asc(company.companyKey),
+  ];
 }

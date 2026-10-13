@@ -51,12 +51,40 @@ test("lastActivityAt is the latest of the two aggregates", () => {
   assert.match(sql, /greatest\("pbc_direct_at", "pbc_via_contact_at"\) as "last_activity_at"/i);
 });
 
-test("order: latest first, blanks last, then display_name and company_key tiebreaks", () => {
+test("order: declared active clients last, then latest first, blanks last, then display_name and company_key tiebreaks", () => {
   const { sql } = renderPage();
   assert.match(
     sql,
-    /order by greatest\("pbc_direct_at", "pbc_via_contact_at"\) desc nulls last, "company"."display_name" asc, "company"."company_key" asc limit \$\d+ offset \$\d+$/i,
+    /order by case when "company"."client_status" = \$\d+ then 1 else 0 end, greatest\("pbc_direct_at", "pbc_via_contact_at"\) desc nulls last, "company"."display_name" asc, "company"."company_key" asc limit \$\d+ offset \$\d+$/i,
   );
+});
+
+// The point of the whole key: /companies is a prospecting list, and an active
+// client is the company the BD emails most (invoices, collections, status), so
+// "most recent activity first" pinned it to the top. This asserts the sink key
+// is applied BEFORE the activity key, which is what actually demotes it — the
+// two in the other order would leave the list exactly as it was.
+test("the active-client key outranks the activity key, so a fresh invoice cannot lift a client back to the top", () => {
+  const { sql } = renderPage();
+  const orderBy = sql.slice(sql.toLowerCase().indexOf("order by"));
+  const sinkAt = orderBy.indexOf("client_status");
+  const activityAt = orderBy.indexOf("pbc_direct_at");
+  // Both must be PRESENT before comparing. `indexOf` returns -1 for a missing
+  // needle and `-1 < n` is true, so a bare `<` would pass vacuously for the
+  // exact regression this test exists to catch: someone deleting the key.
+  assert.ok(sinkAt >= 0, `the client_status ordering key is gone: ${orderBy}`);
+  assert.ok(activityAt >= 0, `the activity ordering key is gone: ${orderBy}`);
+  assert.ok(sinkAt < activityAt, `client_status must be the FIRST ordering key, got: ${orderBy}`);
+});
+
+test("only 'active' sinks: inactive and not-stated keep the normal activity order", () => {
+  const la = companyLastActivity();
+  const d = new PgDialect();
+  const [sinkKey] = companyListOrderBy(la.lastActivityAt).map((s) => d.sqlToQuery(s));
+  // `inactive` is a dormant client and a prime re-sell, and NULL means "not
+  // stated / not a client" — neither may be demoted. One bound value only.
+  assert.deepEqual(sinkKey!.params, ["active"]);
+  assert.match(sinkKey!.sql, /case when "company"."client_status" = \$\d+ then 1 else 0 end/i);
 });
 
 test("companyListOrderBy is pure: two calls render identically", () => {

@@ -52,9 +52,12 @@ export interface CompanyListPage {
  * `/contacts`'s `getContactListPage`: one bounded page at a time (14,240
  * companies total — never a full scan), a batched contacts-per-company
  * count for exactly this page's company keys (never one query per row).
- * Rows are ordered by last activity (direct or via contacts), most recent
- * first, blanks last, with display_name/company_key tiebreaks — see
- * lastActivitySignal.ts.
+ * Rows are ordered with declared active clients LAST, then by last activity
+ * (direct or via contacts) most recent first, blanks last, with
+ * display_name/company_key tiebreaks — see `companyListOrderBy` in
+ * lastActivitySignal.ts, which explains why an active client has to sink: this
+ * is a prospecting list, and an active client is the company the BD emails
+ * most, so activity-first pinned it to the top.
  *
  * `view` narrows the WHERE clause in SQL, not a post-fetch JS filter:
  * - "all": no extra condition.
