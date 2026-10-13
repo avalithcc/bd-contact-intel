@@ -200,3 +200,47 @@ export function buildServerEnv(input: {
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY = input.supabase.anonKey;
   return env;
 }
+
+export interface IsolatedServerInput extends SupabaseInput {
+  /** Names the caller in messages: "e2e", "launch-readiness". */
+  label: string;
+  /** The scratch database for a server this run starts. Undefined: no server is ours. */
+  databaseUrl: string | undefined;
+  /** Every key defined in the dotenv files Next would load; all but the allowlist get blanked. */
+  dotenvKeys: readonly string[];
+}
+
+export interface IsolatedServerPlan {
+  /** Null when refused, or when this run starts no server of its own. */
+  serverEnv: Record<string, string> | null;
+  refusal: string | null;
+  notice: string | null;
+}
+
+/**
+ * The single entry point both Playwright configs use: judge the Supabase
+ * project, then build the explicit server env. Neither config carries its own
+ * copy of these rules. A refusal is meant to be thrown at config load.
+ */
+export function planIsolatedServer(input: IsolatedServerInput): IsolatedServerPlan {
+  const { label, databaseUrl, dotenvKeys, ...supabaseInput } = input;
+  const supabase = resolveSupabase(supabaseInput);
+  if (supabase.refusal) return { serverEnv: null, refusal: `[${label}] ${supabase.refusal}`, notice: null };
+  const notice = supabase.notice ? `[${label}] WARNING ${supabase.notice}` : null;
+  if (!databaseUrl || !supabase.target) return { serverEnv: null, refusal: null, notice };
+  return {
+    serverEnv: buildServerEnv({ databaseUrl, supabase: supabase.target, dotenvKeys }),
+    refusal: null,
+    notice,
+  };
+}
+
+/**
+ * The launch-readiness pass keeps its scratch DATABASE_URL in `.env.e2e.local`
+ * (the shell wins). Only that one non-E2E_ key may come from that file, and
+ * assertScratchDatabaseUrl still judges the result.
+ */
+export function scratchDatabaseUrlFromFile(scratchFile: Env, env: Env): Record<string, string> {
+  const fromFile = scratchFile.DATABASE_URL;
+  return !env.DATABASE_URL && fromFile ? { DATABASE_URL: fromFile } : {};
+}

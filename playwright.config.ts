@@ -1,15 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
-import fs from 'fs';
 import path from 'path';
-import { parseEnv } from 'util';
 import { isCi, skipReason } from './tests/e2e/credentials';
 import { serverPlan } from './tests/e2e/readOnlyGuard';
+import { readDotenvFiles } from './tests/e2e/dotenvFiles';
 import {
   SHARED_SUPABASE_HATCH,
-  buildServerEnv,
   dotenvFilesFor,
   mergeDotenv,
-  resolveSupabase,
+  planIsolatedServer,
   testProcessDotenv,
 } from './tests/e2e/supabaseIsolation';
 
@@ -22,11 +20,7 @@ const hatch = process.env[SHARED_SUPABASE_HATCH];
 // DATABASE_URL is never loaded from a file (only E2E_* is), so the shell value
 // decides whether this is a scratch run before any dotenv file is read.
 const scratchRun = serverPlan(process.env.DATABASE_URL, isCi()).env !== undefined;
-const dotenvFiles = dotenvFilesFor(scratchRun).map((name) => {
-  const file = path.join(__dirname, name);
-  return fs.existsSync(file) ? parseEnv(fs.readFileSync(file, 'utf8')) : {};
-});
-const dotenv = mergeDotenv(dotenvFiles);
+const dotenv = mergeDotenv(readDotenvFiles(__dirname, dotenvFilesFor(scratchRun)));
 Object.assign(process.env, testProcessDotenv(dotenv, process.env));
 
 const STORAGE_STATE = path.join(__dirname, 'tests/.auth/state.json');
@@ -53,25 +47,20 @@ if (skipReason() && process.env.TEST_WORKER_INDEX === undefined) {
 // A refusal throws at config load: the run fails before any server boots.
 let serverEnv: Record<string, string> | undefined;
 if (!skipReason()) {
-  const supabase = resolveSupabase({
+  const isolated = planIsolatedServer({
+    label: 'e2e',
+    databaseUrl: plan.env?.DATABASE_URL,
     e2eUrl: process.env.E2E_SUPABASE_URL,
     e2eAnonKey: process.env.E2E_SUPABASE_ANON_KEY,
     appUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? dotenv.NEXT_PUBLIC_SUPABASE_URL,
     appAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? dotenv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     hatch,
     serverIsOurs: plan.env !== undefined,
+    dotenvKeys: Object.keys(dotenv),
   });
-  if (supabase.refusal) throw new Error(`[e2e] ${supabase.refusal}`);
-  if (supabase.notice && process.env.TEST_WORKER_INDEX === undefined) {
-    console.warn(`\n[e2e] WARNING ${supabase.notice}\n`);
-  }
-  if (plan.env && supabase.target) {
-    serverEnv = buildServerEnv({
-      databaseUrl: plan.env.DATABASE_URL,
-      supabase: supabase.target,
-      dotenvKeys: Object.keys(dotenv),
-    });
-  }
+  if (isolated.refusal) throw new Error(isolated.refusal);
+  if (isolated.notice && process.env.TEST_WORKER_INDEX === undefined) console.warn(`\n${isolated.notice}\n`);
+  serverEnv = isolated.serverEnv ?? undefined;
 }
 
 export default defineConfig({
