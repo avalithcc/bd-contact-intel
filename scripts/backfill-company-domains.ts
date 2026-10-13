@@ -67,9 +67,10 @@
  * Defaults to `--dry-run` (no writes) and REQUIRES `--execute --actor=<bd
  * id>` to actually write. Requires DATABASE_URL to be set (see .env).
  *
- * Usage:
- *   npx tsx scripts/backfill-company-domains.ts --csv=<path-to-companies.csv>                               # dry run (default)
- *   npx tsx scripts/backfill-company-domains.ts --csv=<path-to-companies.csv> --execute --actor=<bd id>      # writes
+ * Usage — `--env-file` is REQUIRED: src/db/index.ts:5 reads process.env.DATABASE_URL
+ * directly and loads no dotenv, so without it the run dies on a missing DATABASE_URL.
+ *   npx tsx --env-file=.env.local scripts/backfill-company-domains.ts --csv=<path-to-companies.csv>                          # dry run (default)
+ *   npx tsx --env-file=.env.local scripts/backfill-company-domains.ts --csv=<path-to-companies.csv> --execute --actor=<bd id> # writes
  */
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../src/db";
