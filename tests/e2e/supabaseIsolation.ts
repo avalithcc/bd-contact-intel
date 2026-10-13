@@ -43,6 +43,30 @@ export const DOTENV_FILES_BY_PRECEDENCE = [
   '.env',
 ] as const;
 
+/**
+ * The dotenv file for scratch e2e runs: the settings that only make sense
+ * against a throwaway stack (local Supabase URL, anon key, test credentials).
+ * It is gitignored (`.env*`) and read only when DATABASE_URL is a scratch
+ * database, so a read-only run against the dev server on :3000 never meets
+ * E2E_SUPABASE_URL (which resolveSupabase refuses there).
+ */
+export const SCRATCH_DOTENV_FILE = '.env.e2e.local';
+
+/** Dotenv files for this run, first wins. Returns a new array every call. */
+export function dotenvFilesFor(scratch: boolean): string[] {
+  return scratch ? [SCRATCH_DOTENV_FILE, ...DOTENV_FILES_BY_PRECEDENCE] : [...DOTENV_FILES_BY_PRECEDENCE];
+}
+
+/** True only for a loopback Supabase URL (the local `supabase start` stack). */
+export function isLocalSupabaseUrl(url: string | undefined): boolean {
+  try {
+    const host = new URL((url ?? '').trim()).hostname;
+    return host === '127.0.0.1' || host === 'localhost' || host === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 /** Merge parsed dotenv files given in precedence order (first wins). */
 export function mergeDotenv(filesByPrecedence: Array<Env>): Record<string, string> {
   const merged: Record<string, string> = {};

@@ -64,26 +64,29 @@ scratch `DATABASE_URL` it keeps the old behaviour: it reuses a server on
 `:3000`, which is safe because the request guard blocks writes.
 
 To use it, build a scratch database from the migration chain (so row-level
-security matches production; `db:push` leaves it off), seed it, and run:
+security matches production; `db:push` leaves it off), seed it, bring up the
+local Supabase stack ("Local Supabase" below) and run:
 
 ```bash
 dropdb --if-exists bd_contact_intel_e2e && createdb bd_contact_intel_e2e
 DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npm run db:migrate
 DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e \
-  E2E_EMAIL=<test account email> npx tsx scripts/seed-launch-readiness.ts --execute
-E2E_ALLOW_SHARED_SUPABASE=1 DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npx playwright test
+  npx tsx scripts/seed-launch-readiness.ts --execute   # reads E2E_EMAIL from .env.e2e.local
+DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npm run test:e2e
 ```
 
-`E2E_ALLOW_SHARED_SUPABASE=1` is explained in "Supabase isolation" below; without
-it (and without a throwaway project) the run refuses to start.
+No `E2E_ALLOW_SHARED_SUPABASE` is needed: with the local stack named in
+`.env.e2e.local` the login never leaves your machine. Without it (and without a
+throwaway project) the run refuses to start, see "Supabase isolation".
 
 Always pass `DATABASE_URL` explicitly: `.env` and drizzle-kit load the
-production URL. `.env.e2e.local` (gitignored) may hold the scratch
-`DATABASE_URL` and `E2E_EMAIL` for the seed script; never put a production
-credential in it. `E2E_PASSWORD` stays in `.env.local`, which
-`playwright.config.ts` loads without overriding variables already set (only
-`E2E_*` keys are loaded from dotenv files, see below). The shell variable wins
-over `.env.local`. The filter specs also pass on the tiny seed (the second BD
+production URL. `.env.e2e.local` (gitignored) holds the scratch settings: the scratch
+`DATABASE_URL` for the seed script and the `E2E_*` values of the local Supabase
+stack. `playwright.config.ts` reads it FIRST, and only when the shell
+`DATABASE_URL` is a scratch database, so a read-only run against `:3000` never
+sees `E2E_SUPABASE_URL`. Only `E2E_*` keys are loaded from dotenv files, never
+overriding variables already set (the shell wins, then `.env.e2e.local`, then
+`.env.local`). Never put a production credential in it. The filter specs also pass on the tiny seed (the second BD
 has one contact with a phone and one without, which the "responsable + Tiene
 teléfono" spec needs to narrow); read-only mode against a dev server whose
 database is the scratch one runs them too (start `DATABASE_URL=<scratch>
@@ -99,11 +102,12 @@ reaches the server alongside the marker (`route.fallback({headers})` keeps it).
 
 ## Supabase isolation
 
-Only the database is isolated today. **The Supabase project is still shared**:
-`auth.setup.ts` fills `#password` and logs in through the real Supabase Auth
-project that `.env.local` points at. That is production auth, so a test run can
-lock out, rate-limit or otherwise touch real auth users. The scratch database
-does not change that.
+The database and the login are both isolated when the local stack is used.
+`auth.setup.ts` fills `#password` and logs in through whatever Supabase project
+the app server is given. Left to `.env.local` that is production auth, so a
+test run could lock out, rate-limit or otherwise touch real auth users; the
+guard below refuses that unless you acknowledge it. The scratch database alone
+does not change it.
 
 ### Env contract
 
@@ -144,7 +148,7 @@ used silently only if you NAME it for e2e. Otherwise the run refuses to start
 - No credentials means every test is skipped and nothing logs in, so the guard
   does not run.
 
-### Pointing the suite at a throwaway Supabase project (one step)
+### Pointing the suite at a throwaway hosted project (alternative)
 
 Create the project, create the e2e user in it **with a password** (the same
 email as `E2E_EMAIL` and a matching `bd` row in the scratch database), then add
@@ -157,7 +161,53 @@ E2E_EMAIL=<that user's email>
 E2E_PASSWORD=<its password>
 ```
 
-Drop `E2E_ALLOW_SHARED_SUPABASE=1` from the command. Nothing else changes.
+Prefer the local stack below: it needs no hosted project at all.
+
+## Local Supabase (auth for the scratch run)
+
+Local Supabase provides AUTH only. The test database stays
+`bd_contact_intel_e2e` in your system Postgres; Supabase's own Postgres
+(`:54322`) holds nothing of ours.
+
+### Why Colima and not Docker Desktop
+
+`supabase start` needs a Docker-compatible runtime. We use **Colima**
+(open source, free for any company size). Docker Desktop requires a paid
+subscription for companies above 250 employees or $10M revenue. Do not
+"simplify" this back to Docker Desktop.
+
+### From nothing to a running suite
+
+```bash
+brew install colima docker supabase/tap/supabase
+colima start                      # once per boot
+supabase start                    # from the repo root; config is supabase/config.toml
+cp tests/e2e/local-supabase.env.example .env.e2e.local   # or append it, see below
+# add DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e to that file
+npx tsx scripts/create-e2e-auth-user.ts --execute
+```
+
+If `.env.e2e.local` already exists (it holds the scratch `DATABASE_URL`), append
+the `E2E_*` lines of `tests/e2e/local-supabase.env.example` instead of copying.
+Services: Auth/API `http://127.0.0.1:54321`, Studio `:54323`, Mailpit (auth
+mail) `:54324`. The anon key in the example is the public demo key every local
+Supabase install ships with (issuer `supabase-demo`), so it is safe to track;
+it is why the template is a tracked file. Never paste a production value there.
+
+`scripts/create-e2e-auth-user.ts` creates the `E2E_EMAIL` user with
+`E2E_PASSWORD`, email pre-confirmed (the app signs out unconfirmed accounts).
+It is idempotent (an existing user gets its password reset), is a dry run
+without `--execute`, prints no secret, and refuses any `E2E_SUPABASE_URL` that
+is not loopback. Re-run it after every `supabase stop --no-backup`. The `bd`
+row for the same email comes from `scripts/seed-launch-readiness.ts`
+(`role = 'bd'`); the two must use the same `E2E_EMAIL`.
+
+Prove a run used the local stack: `psql
+postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "select
+payload->>'action', payload->>'actor_username', created_at from
+auth.audit_log_entries order by created_at desc limit 3"` shows a `login` row
+for the e2e user, and `docker logs supabase_auth_bd-contact-intel` shows
+`POST /token` with `grant_type=password` and status 200.
 
 ## One-time setup
 

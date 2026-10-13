@@ -5,9 +5,9 @@ import { parseEnv } from 'util';
 import { isCi, skipReason } from './tests/e2e/credentials';
 import { serverPlan } from './tests/e2e/readOnlyGuard';
 import {
-  DOTENV_FILES_BY_PRECEDENCE,
   SHARED_SUPABASE_HATCH,
   buildServerEnv,
+  dotenvFilesFor,
   mergeDotenv,
   resolveSupabase,
   testProcessDotenv,
@@ -19,7 +19,10 @@ import {
 // Supabase hatch is read from the shell BEFORE any file is consulted and is
 // never loaded from a file. See tests/e2e/supabaseIsolation.ts.
 const hatch = process.env[SHARED_SUPABASE_HATCH];
-const dotenvFiles = DOTENV_FILES_BY_PRECEDENCE.map((name) => {
+// DATABASE_URL is never loaded from a file (only E2E_* is), so the shell value
+// decides whether this is a scratch run before any dotenv file is read.
+const scratchRun = serverPlan(process.env.DATABASE_URL, isCi()).env !== undefined;
+const dotenvFiles = dotenvFilesFor(scratchRun).map((name) => {
   const file = path.join(__dirname, name);
   return fs.existsSync(file) ? parseEnv(fs.readFileSync(file, 'utf8')) : {};
 });

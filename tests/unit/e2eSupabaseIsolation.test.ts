@@ -1,9 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  DOTENV_FILES_BY_PRECEDENCE,
   SERVER_ENV_ALLOWLIST,
   SHARED_SUPABASE_HATCH,
   buildServerEnv,
+  dotenvFilesFor,
+  isLocalSupabaseUrl,
   mergeDotenv,
   resolveSupabase,
   testProcessDotenv,
@@ -132,4 +135,36 @@ test("the test process takes E2E_* from dotenv, never the hatch, never an app se
     { E2E_EMAIL: "from-shell@b.c" },
   );
   assert.deepEqual(out, { E2E_PASSWORD: "pw", E2E_SUPABASE_URL: E2E, E2E_PASSWORD_EXTRA: "x" });
+});
+
+test("the e2e dotenv file is read first in a scratch run and never otherwise", () => {
+  const scratch = dotenvFilesFor(true);
+  assert.equal(scratch[0], ".env.e2e.local");
+  assert.deepEqual(scratch.slice(1), [...DOTENV_FILES_BY_PRECEDENCE]);
+  assert.deepEqual(dotenvFilesFor(false), [...DOTENV_FILES_BY_PRECEDENCE]);
+});
+
+test("dotenvFilesFor returns a fresh array and leaves the shared list alone", () => {
+  const before = [...DOTENV_FILES_BY_PRECEDENCE];
+  const a = dotenvFilesFor(true);
+  a.push("mutated");
+  assert.deepEqual(dotenvFilesFor(true).slice(1), before);
+  assert.deepEqual([...DOTENV_FILES_BY_PRECEDENCE], before);
+});
+
+test("isLocalSupabaseUrl accepts only loopback hosts", () => {
+  for (const ok of ["http://127.0.0.1:54321", "http://localhost:54321/", "http://[::1]:54321"]) {
+    assert.equal(isLocalSupabaseUrl(ok), true, ok);
+  }
+  for (const bad of [
+    "https://abcdefgh.supabase.co",
+    "http://127.0.0.1.evil.example",
+    "http://localhost.evil.example",
+    "http://10.0.0.5:54321",
+    "not a url",
+    "",
+    undefined,
+  ]) {
+    assert.equal(isLocalSupabaseUrl(bad), false, String(bad));
+  }
 });
