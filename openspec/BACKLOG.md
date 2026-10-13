@@ -959,6 +959,34 @@ may be working on this right now". The rule is exported as `pickEmailWinner`
 (2026-09-30) and never reconciled here; `tests/unit/pickEmailWinner.test.ts`
 pins that the two call sites agree by construction.) Nothing outstanding.
 
+### 04-tasks launch-readiness failures were stale selectors, not a /tasks error — fixed (2026-10-13)
+(Corrected 2026-10-13: `tests/launch-readiness/04-tasks.spec.ts` failed 5 tests
+on a fresh seed and the cause was reported as a "Maximum array nesting exceeded"
+on `/tasks`. That was wrong. Measured 2026-10-13 against a scratch database
+`bd_tasks_bug_e2e` with a dev server whose log was captured: every `GET /tasks`
+(and `?view=all`) answered 200, the log held zero error lines, and the seven task
+queries the page calls (`getTaskViewCounts`, `listOwnerOptions`,
+`getOpenTasks`, `getAllOpenTasks`, `getOverdueTasks`, `getAllOverdueTasks`,
+`getCompletedTasks`) all returned rows when called directly. The string
+"Maximum array nesting exceeded" belongs to the unrelated 1.1 MB-note case in
+finding F1, `openspec/changes/launch-readiness-pass/README.md:31`.)
+The real cause: `ffe2edd` (2026-10-03) replaced the complete-task checkbox with
+`DoneButton` (`src/components/DoneButton.tsx`, `aria-pressed`, `disabled` when
+done), but five specs still looked for `getByRole('checkbox')`
+(`04-tasks.spec.ts` at the lines for complete, other-BD complete, double-click,
+Completadas, stale click), and `tests/e2e/phase1.spec.ts:28` and `:40` did the
+same. Fixed by selecting `getByRole('button', { name: 'Completar', exact: true })`
+and asserting `aria-pressed` instead of `toBeChecked`. No app code changed.
+Result 2026-10-13: `04-tasks.spec.ts` 5 failed / 11 passed before (setup project included), 16 passed
+after; `phase1.spec.ts` "Tasks page" 2 failed / 0 passed before (against a
+database that has tasks), 2 passed after.
+Latent until now: `phase1.spec.ts` only asserts the control when the list is
+non-empty, so it passed on the empty `bd_contact_intel_e2e` but would have
+failed on any database with open tasks, production included (unverified: not run
+against production, which had 24 task rows on 2026-10-01).
+Not measured: no production query was run, because there is no data-shaped
+trigger to look for.
+
 ### task.lead_id and task.contact_id — dead legacy columns, recommendation: drop both
 Same shape for both columns, no user can reach either. `task.contact_id`
 (`src/db/schema.ts:1175`, indexed as `task_contact_idx` at `schema.ts:1198`) and

@@ -7,6 +7,10 @@
 import { expect, type Page } from '@playwright/test';
 import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, otherBdId, sql, tasksFor, test } from './helpers';
 
+// The complete control is a DoneButton (ffe2edd), not a checkbox. `exact` keeps
+// "Deshacer completar" and "Completada en otra pestaña" from matching.
+const COMPLETE_CONTROL = { name: 'Completar', exact: true } as const;
+
 async function createTaskOnRecord(
   page: Page,
   fields: { title: string; due?: string; description?: string; assignee?: string },
@@ -52,7 +56,7 @@ test('complete from /tasks: status, toast, an activity that names the actor, and
 
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
-  await page.locator('tr', { hasText: p.name }).getByRole('checkbox').click();
+  await page.locator('tr', { hasText: p.name }).getByRole('button', COMPLETE_CONTROL).click();
   await expect(page.locator('tr', { hasText: p.name })).toHaveCount(0);
 
   expect((await tasksFor(p.id))[0]!.status).toBe('done');
@@ -95,7 +99,7 @@ test('any BD may complete a task assigned to someone else, and the activity name
   await expect(page.getByRole('link', { name: /Mis tareas abiertas/ })).toBeVisible();
   await page.getByRole('link', { name: /Todas abiertas/ }).click();
   await page.waitForLoadState('networkidle');
-  await page.locator('tr', { hasText: p.name }).getByRole('checkbox').click();
+  await page.locator('tr', { hasText: p.name }).getByRole('button', COMPLETE_CONTROL).click();
   await expect(page.locator('tr', { hasText: p.name })).toHaveCount(0);
   const done = (await activitiesFor(p.id)).find((a) => a.type === 'task_completed');
   expect(done!.actor_bd_id).toBe(await meId());
@@ -168,14 +172,14 @@ test('double-clicking "Crear tarea" creates ONE task', async ({ page }) => {
   expect(await tasksFor(p.id)).toHaveLength(1);
 });
 
-test('double-clicking the completion checkbox does not log two completions', async ({ page }) => {
+test('double-clicking the completion button does not log two completions', async ({ page }) => {
   const p = await newPerson('TaskDoubleDone');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Completar dos veces' });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
-  await page.locator('tr', { hasText: p.name }).getByRole('checkbox').dblclick();
+  await page.locator('tr', { hasText: p.name }).getByRole('button', COMPLETE_CONTROL).dblclick();
   await page.waitForTimeout(2500);
   const completions = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed');
   const reopens = (await activitiesFor(p.id)).filter((a) => a.type === 'task_reopened');
@@ -227,15 +231,15 @@ test('a done task in Completadas shows as done and cannot log a second completio
   await expect(page.getByText('Tarea creada.')).toBeVisible();
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
-  await page.locator('tr', { hasText: p.name }).getByRole('checkbox').click();
+  await page.locator('tr', { hasText: p.name }).getByRole('button', COMPLETE_CONTROL).click();
   await expect(page.locator('tr', { hasText: p.name })).toHaveCount(0);
   await page.getByRole('link', { name: /^Completadas/ }).click();
   await page.waitForLoadState('networkidle');
   const row = page.locator('tr', { hasText: p.name });
   await expect(row).toBeVisible();
-  const cb = row.getByRole('checkbox');
-  // A done task must look done: a checked box that no longer invites a click.
-  await expect(cb).toBeChecked();
+  const cb = row.getByRole('button', COMPLETE_CONTROL);
+  // A done task must look done: a pressed button that no longer invites a click.
+  await expect(cb).toHaveAttribute('aria-pressed', 'true');
   await expect(cb).toBeDisabled();
   const before = (await activitiesFor(p.id)).filter((a) => a.type === 'task_completed').length;
   await cb.click({ force: true });
@@ -245,14 +249,14 @@ test('a done task in Completadas shows as done and cannot log a second completio
   expect((await tasksFor(p.id))[0]!.status).toBe('done');
 });
 
-test('a stale checkbox on a task that is already done changes nothing and logs no second completion', async ({ page }) => {
+test('a stale completion button on a task that is already done changes nothing and logs no second completion', async ({ page }) => {
   const p = await newPerson('TaskStale');
   await openContact(page, p.id);
   await createTaskOnRecord(page, { title: 'Completada en otra pestaña', due: argDate(2) });
   await expect(page.getByText('Tarea creada.')).toBeVisible();
   await page.goto('/tasks');
   await page.waitForLoadState('networkidle');
-  const cb = page.locator('tr', { hasText: p.name }).getByRole('checkbox');
+  const cb = page.locator('tr', { hasText: p.name }).getByRole('button', COMPLETE_CONTROL);
   await expect(cb).toBeEnabled();
   // Someone else finishes the task while this page is still showing it open.
   await sql`update task set status = 'done' where person_id = ${p.id}`;

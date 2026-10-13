@@ -24,8 +24,8 @@ test.describe('Phase 1: Core CRM Tracking', () => {
       await expect(page.getByText(es.tasksPage.emptyState)).toBeVisible();
       return;
     }
-    // The complete control is a checkbox. Only assert it; never tick it (that completes a real task).
-    await expect(rows.first().getByRole('checkbox', { name: es.tasksPage.completeAria })).toBeVisible();
+    // The complete control is a button (DoneButton). Only assert it; never tick it (that completes a real task).
+    await expect(rows.first().getByRole('button', { name: es.tasksPage.completeAria, exact: true })).toBeVisible();
   });
 
   test('Tasks page "all open" view renders rows with a complete control', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('Phase 1: Core CRM Tracking', () => {
       await expect(page.getByText(es.tasksPage.emptyStateAll)).toBeVisible();
       return;
     }
-    await expect(rows.first().getByRole('checkbox', { name: es.tasksPage.completeAria })).toBeVisible();
+    await expect(rows.first().getByRole('button', { name: es.tasksPage.completeAria, exact: true })).toBeVisible();
   });
 
   test('Kanban board renders every pipeline column', async ({ page }) => {
