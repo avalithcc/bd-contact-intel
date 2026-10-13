@@ -32,6 +32,20 @@
  * as 0039 do not), with or without `public.`; names in other schemas are
  * ignored. Within one statement it replays events in source order, so a
  * reference before its own CREATE is caught and a DROP TABLE un-creates.
+ *
+ * KNOWN LIMITS, documented rather than fixed (this is a tripwire, not a SQL parser):
+ * - It scans string literals and dollar-quoted bodies as if they were SQL, so
+ *   `DEFAULT 'please update later'` reports `later` and `$$ select 'truncate table z' $$`
+ *   reports `z`. Only comment detection knows about quotes.
+ * - `::regclass` casts are not read (0039 has one, but that table is also altered there).
+ * - Unchecked table positions: `CREATE POLICY ... ON`, `CREATE/DROP TRIGGER ... ON`,
+ *   `LOCK TABLE`, `COPY`, `INHERITS`, `PARTITION OF`, `GRANT/REVOKE ... ON TABLE`,
+ *   `COMMENT ON COLUMN/CONSTRAINT`, `CREATE TABLE ... AS SELECT ... FROM`, a view body.
+ * - After `RENAME TO` the old name stays "existing" and the new one is unknown.
+ * - Rare false positives: `FOR NO KEY UPDATE OF a` reports `of`, `ALTER TABLE ALL IN ...`
+ *   reports `all`, and inside an INSERT/UPDATE/DELETE statement any `FROM x` reports `x`,
+ *   including `EXTRACT(epoch FROM col)` and a CTE name (`IS DISTINCT FROM` and `FROM f(...)`
+ *   are skipped).
  */
 
 /** One journal entry's SQL, in journal order. */
@@ -55,32 +69,73 @@ const TABLE = `(${NAME}(?:\\s*\\.\\s*${NAME})?)`;
 
 const CREATES = new RegExp(`\\bCREATE\\s+(?:UNLOGGED\\s+)?TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${TABLE}`, "gi");
 
-/** `DROP TABLE [IF EXISTS] a, b`: group 1 is the IF EXISTS clause, group 2 the name list. */
-const DROPS = new RegExp(`\\bDROP\\s+TABLE\\s+(IF\\s+EXISTS\\s+)?(${NAME}(?:\\s*\\.\\s*${NAME})?(?:\\s*,\\s*${NAME}(?:\\s*\\.\\s*${NAME})?)*)`, "gi");
+/** A comma-separated list of optionally schema-qualified names, captured whole. */
+const NAME_LIST_ITEM = `${NAME}(?:\\s*\\.\\s*${NAME})?`;
+const NAME_LIST = `(${NAME_LIST_ITEM}(?:\\s*,\\s*${NAME_LIST_ITEM})*)`;
 
-/** Every shape that requires the table to exist already. Capture group 1 is the table. */
+/** `DROP TABLE [IF EXISTS] a, b`: group 1 is the IF EXISTS clause, group 2 the name list. */
+const DROPS = new RegExp(`\\bDROP\\s+TABLE\\s+(IF\\s+EXISTS\\s+)?${NAME_LIST}`, "gi");
+
+/** `TRUNCATE [TABLE] [ONLY] a, b`: group 1 is the name list. `TRUNCATE ON` is a privilege or trigger event. */
+const TRUNCATES = new RegExp(`\\bTRUNCATE\\s+(?!ON\\b)(?:TABLE\\s+)?(?:ONLY\\s+)?${NAME_LIST}`, "gi");
+
+/** A `FROM`/`USING` source: not `IS DISTINCT FROM`, not a function call or a subquery. */
+const SOURCE = new RegExp(`(?<!\\bDISTINCT\\s+)\\b(?:FROM|USING)\\s+(?:ONLY\\s+)?${TABLE}(?![\\w"(]|\\s*\\()`, "gi");
+
+/** Data-changing statements. Their `FROM`/`USING` sources must exist too; see `SOURCE`. Group 1 is the table. */
+const WRITES = [
+  // `ON UPDATE no action` and `DO UPDATE SET` are clauses, not statements; `UPDATE ON` is a privilege.
+  new RegExp(`(?<!\\b(?:ON|DO|FOR|OF|OR|BEFORE|AFTER)\\s+)\\bUPDATE\\s+(?:ONLY\\s+)?(?!SET\\b|ON\\b)${TABLE}`, "gi"),
+  new RegExp(`\\bINSERT\\s+INTO\\s+${TABLE}`, "gi"),
+  new RegExp(`\\bDELETE\\s+FROM\\s+(?:ONLY\\s+)?${TABLE}`, "gi"),
+];
+
+/** Every other shape that requires the table to exist already. Capture group 1 is the table. */
 const REFERENCES = [
   new RegExp(`\\bALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:ONLY\\s+)?${TABLE}`, "gi"),
   new RegExp(`\\bCREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+(?:CONCURRENTLY\\s+)?(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:${NAME}\\s+)?ON\\s+(?:ONLY\\s+)?${TABLE}`, "gi"),
-  new RegExp(`\\bREFERENCES\\s+${TABLE}`, "gi"),
-  // `ON UPDATE no action` and `DO UPDATE SET` are clauses, not statements.
-  new RegExp(`(?<!\\b(?:ON|DO|FOR|OF|OR|BEFORE|AFTER)\\s+)\\bUPDATE\\s+(?:ONLY\\s+)?(?!SET\\b)${TABLE}`, "gi"),
-  new RegExp(`\\bINSERT\\s+INTO\\s+${TABLE}`, "gi"),
-  new RegExp(`\\bDELETE\\s+FROM\\s+(?:ONLY\\s+)?${TABLE}`, "gi"),
-  new RegExp(`\\bTRUNCATE\\s+(?:TABLE\\s+)?(?:ONLY\\s+)?${TABLE}`, "gi"),
+  // `GRANT REFERENCES ON TABLE t` is a privilege, not a foreign key.
+  new RegExp(`\\bREFERENCES\\s+(?!ON\\b)${TABLE}`, "gi"),
   new RegExp(`\\bCOMMENT\\s+ON\\s+TABLE\\s+${TABLE}`, "gi"),
 ];
 
 /** drizzle-kit's own splitter: the marker may end a line or stand alone on one. */
 const BREAKPOINT = "--> statement-breakpoint";
 
-/** Line and block comments carry table names in prose; they are not statements. */
+/**
+ * Line and block comments carry table names in prose; they are not statements.
+ * One left-to-right pass, because the order decides what is a comment: a `/*` inside a
+ * `--` line is prose, and a `--` inside a `/* *` block (or a quoted string or identifier)
+ * is not a line comment. Block comments nest, as in Postgres. Quoted text is kept as is.
+ */
 function stripComments(sql: string): string {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
-    .map((line) => (line.trimStart().startsWith("--") ? "" : line))
-    .join("\n");
+  let out = "";
+  let i = 0;
+  while (i < sql.length) {
+    const two = sql.slice(i, i + 2);
+    const ch = sql[i];
+    if (two === "--") {
+      while (i < sql.length && sql[i] !== "\n") i++;
+    } else if (two === "/*") {
+      let depth = 0;
+      do {
+        const pair = sql.slice(i, i + 2);
+        if (pair === "/*") { depth++; i += 2; }
+        else if (pair === "*/") { depth--; i += 2; }
+        else i++;
+      } while (depth > 0 && i < sql.length);
+      out += " ";
+    } else if (ch === "'" || ch === '"') {
+      const close = sql.indexOf(ch, i + 1);
+      const end = close === -1 ? sql.length : close + 1;
+      out += sql.slice(i, end);
+      i = end;
+    } else {
+      out += ch;
+      i++;
+    }
+  }
+  return out;
 }
 
 /**
@@ -115,15 +170,30 @@ function eventsOf(statement: string): TableEvent[] {
   };
   for (const match of statement.matchAll(CREATES)) add(match.index, "create", match[1]);
   for (const match of statement.matchAll(DROPS)) {
-    // `DROP TABLE x` (no IF EXISTS) fails when x is absent, so it also needs x to exist. The sort is\n    // stable, so a touch pushed before its drop at the same position is replayed first.
+    // `DROP TABLE x` (no IF EXISTS) fails when x is absent, so it also needs x to exist. The sort is
+    // stable, so a touch pushed before its drop at the same position is replayed first.
     const kind = match[1] ? "drop" : "touch";
-    for (const raw of match[2].match(new RegExp(`${NAME}(?:\\s*\\.\\s*${NAME})?`, "gi")) ?? []) {
+    for (const raw of match[2].match(new RegExp(NAME_LIST_ITEM, "gi")) ?? []) {
       add(match.index, kind, raw);
       if (kind === "touch") add(match.index, "drop", raw);
     }
   }
+  for (const match of statement.matchAll(TRUNCATES)) {
+    for (const raw of match[1].match(new RegExp(NAME_LIST_ITEM, "gi")) ?? []) add(match.index, "touch", raw);
+  }
+  let writes = false;
+  for (const pattern of WRITES) {
+    for (const match of statement.matchAll(pattern)) {
+      writes = true;
+      add(match.index, "touch", match[1]);
+    }
+  }
   for (const pattern of REFERENCES) {
     for (const match of statement.matchAll(pattern)) add(match.index, "touch", match[1]);
+  }
+  // `INSERT INTO a SELECT ... FROM g`, `UPDATE a SET ... FROM g`, `DELETE FROM a USING g`.
+  if (writes) {
+    for (const match of statement.matchAll(SOURCE)) add(match.index, "touch", match[1]);
   }
   return events.sort((a, b) => a.at - b.at);
 }

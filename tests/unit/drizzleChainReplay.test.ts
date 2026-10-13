@@ -166,3 +166,51 @@ test("the planner is pure: same input twice gives the same result and the input 
   assert.equal(JSON.stringify(input), frozen);
   assert.deepEqual(first.map((ref) => ref.table), ["ghost", "a"]);
 });
+
+const withA = (sql: string) => `CREATE TABLE "a" (id uuid);\n--> statement-breakpoint\n${sql}`;
+
+test("a privilege list or trigger event followed by ON is not a table named `on`", () => {
+  assert.deepEqual(refs(withA("GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE a TO anon;")), []);
+  assert.deepEqual(refs(withA("REVOKE UPDATE ON TABLE a FROM anon;")), []);
+  assert.deepEqual(refs(withA("GRANT REFERENCES, TRUNCATE ON TABLE a TO anon;")), []);
+  assert.deepEqual(refs(withA("CREATE TRIGGER t AFTER TRUNCATE ON a FOR EACH STATEMENT EXECUTE FUNCTION f();")), []);
+});
+
+test("a trailing `-- comment` carries no table names", () => {
+  assert.deepEqual(refs('CREATE TABLE "a" (id uuid, company_id uuid, -- references company\n  x int);'), []);
+  assert.deepEqual(refs(withA("ALTER TABLE a ADD y int; -- ALTER TABLE ghost")), []);
+});
+
+test("comment stripping is a single left-to-right pass, so `/*` inside a line comment opens nothing", () => {
+  assert.deepEqual(refs("-- see /* below\nALTER TABLE ghost ADD x int;\n-- end */"), ["ghost"]);
+  assert.deepEqual(refs("/* a -- b */ ALTER TABLE ghost ADD x int;"), ["ghost"]);
+  assert.deepEqual(refs("/* outer /* inner */ still comment ALTER TABLE hidden ADD x int; */ ALTER TABLE ghost ADD x int;"), ["ghost"]);
+});
+
+test("`--` inside a string literal or a quoted identifier does not hide the rest of the line", () => {
+  assert.deepEqual(refs("ALTER TABLE a ADD x text DEFAULT '--'; ALTER TABLE ghost ADD y int;"), ["a", "ghost"]);
+  assert.deepEqual(refs('ALTER TABLE "we--ird" ADD x int;'), ["we--ird"]);
+});
+
+test("TRUNCATE takes a comma list like DROP TABLE does", () => {
+  assert.deepEqual(refs(withA("TRUNCATE a, b;")), ["b"]);
+  assert.deepEqual(refs("TRUNCATE TABLE ONLY g1, public.g2 RESTART IDENTITY CASCADE;"), ["g1", "g2"]);
+});
+
+test("a table read through FROM / USING inside INSERT, UPDATE or DELETE is checked", () => {
+  assert.deepEqual(refs(withA("INSERT INTO a SELECT x FROM ghost;")), ["ghost"]);
+  assert.deepEqual(refs(withA("UPDATE a SET x = g.x FROM ghost g WHERE g.id = a.id;")), ["ghost"]);
+  assert.deepEqual(refs(withA("DELETE FROM a USING ghost WHERE ghost.id = a.id;")), ["ghost"]);
+  assert.deepEqual(refs(withA("INSERT INTO a SELECT x FROM b JOIN c ON true, d;")), ["b"]);
+});
+
+test("FROM that is not a table read stays quiet", () => {
+  assert.deepEqual(refs(withA("UPDATE a SET x = 1 WHERE y IS DISTINCT FROM z;")), []);
+  assert.deepEqual(refs(withA("INSERT INTO a SELECT * FROM generate_series(1, 3);")), []);
+  assert.deepEqual(refs(withA("INSERT INTO a SELECT * FROM (SELECT 1) s;")), []);
+  assert.deepEqual(refs("SELECT 1 FROM ghost;"), []);
+});
+
+test("a table that exists is not reported when read through FROM", () => {
+  assert.deepEqual(refs(`CREATE TABLE "b" (id uuid);\n--> statement-breakpoint\n${withA("INSERT INTO a SELECT x FROM public.b;")}`), []);
+});

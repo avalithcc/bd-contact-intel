@@ -115,7 +115,8 @@ export function isFreeMailDomain(domain: string): boolean {
 // broad list only or to this one only, and the subset test fails for a root
 // here that the broad list lacks. Adding a root to both lists passes. Left out
 // on purpose: terra, uol, bol, speedy, fibertel, arnet, LATAM ISPs/portals
-// whose first label a real company can share (terra*). They stay free mail for matching, just not for validation.
+// whose first label a real company can share (terra*). They stay free mail
+// for matching, just not for validation.
 export const UNOWNABLE_MAIL_ROOTS: ReadonlySet<string> = new Set([
   "gmail",
   "googlemail",
