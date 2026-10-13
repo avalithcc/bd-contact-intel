@@ -1120,10 +1120,175 @@ at production), and `E2E_EMAIL` lives in `.env.local`, not the `.env.e2e.local`
 the seed auto-loads — pass it on the command line rather than sourcing
 `.env.local`, which would bring the production `DATABASE_URL` with it.
 
-Worth fixing properly (a squashed baseline migration, or repairing the early
-entry that assumes `contact`) because the failure surfaces exactly when someone
-is trying to stand up a new environment or join the project. Not urgent: nothing
-in day-to-day work replays the chain.
+**Fixed 2026-10-13 (`main`, work units `fix(db): create bd and contact…` and
+`fix(db): guard the Supabase-role revoke…`).** `npm run db:migrate` now builds
+the schema from an empty database, proven by running it, and `db:migrate` — not
+`db:push` — is what a new environment should use (`README.md`, "Standing up a
+new environment").
+
+**The framing in this entry was wrong.** It is not that an early entry assumes a
+table a later migration creates: **no migration in the chain ever creates `bd`
+or `contact`** (re-checked 2026-10-13: `rg -i 'create table (if not exists )?"(contact|bd)"' drizzle/`
+returns nothing). Both tables were created by `drizzle-kit push` before the
+chain existed, as `drizzle/0000_crazy_wind_dancer.sql:1-7` said all along, so
+the chain had no genesis at all. A static replay of the chain found exactly
+**27 statements** across 16 files touching a missing table, and exactly **two**
+distinct missing tables — `bd` and `contact`, nothing else.
+
+Two root causes, both fixed by editing already-applied files:
+1. `drizzle/0000_crazy_wind_dancer.sql:22-57` — added the genesis
+   `CREATE TABLE IF NOT EXISTS "bd"` / `"contact"`, their FK, unique
+   constraints and four indexes, transcribed from
+   `drizzle/meta/0000_snapshot.json` (the recorded schema state at idx 0) minus
+   `role_group` and its index, which 0000 adds itself. Every statement is
+   `IF NOT EXISTS` / `duplicate_object`-guarded.
+2. `drizzle/0019_enable_rls.sql:86-90` — the final
+   `ALTER DEFAULT PRIVILEGES … REVOKE ALL ON TABLES FROM anon, authenticated`
+   raised `role "anon" does not exist` (`42704`) on a plain Postgres, because
+   `postgres`, `anon` and `authenticated` are Supabase roles (measured
+   2026-10-13: local PostgreSQL 16.14 has none of the three). It is now wrapped
+   in a `DO` block that runs it only when all three roles exist.
+
+A squashed baseline migration was **rejected**. Placed first it would be
+followed by the existing chain re-running its ALTERs over a complete schema,
+and several of those are not idempotent (`drizzle/0012_fantastic_iceman.sql:72`
+is a bare `ALTER TABLE "contact" ADD COLUMN "email_status"`, which raises
+`42701`). Making it the *only* journal entry would instead strand
+`drizzle/meta/*_snapshot.json` and the `idx`-to-snapshot invariants that
+`tests/unit/drizzleJournal.test.ts:50-66` enforces. Prepending a new entry was
+also rejected: `drizzle/meta/_journal.json` `idx` values must stay sequential
+(`tests/unit/drizzleJournal.test.ts:33`) and each `idx` must have a matching
+`NNNN_snapshot.json` whose `prevId` chains, so inserting at the front means
+renumbering all 41 entries and renaming 34 snapshots. Repairing the files in
+place needs no journal change at all.
+
+### Production-safety proof for the two edited migration files
+
+**The migrator's real rule, read from source (2026-10-13).** `npm run db:migrate`
+is `drizzle-kit migrate`. `node_modules/drizzle-kit/bin.cjs:88508`/`:88542-88543` hands
+off to `preparePostgresDB`, which at `:76402-76409` picks
+`drizzle-orm/postgres-js/migrator` because `pg` is not installed and `postgres`
+is (confirmed by the run's own line, `Using 'postgres' driver for database
+querying`). That migrator is three lines: `readMigrationFiles` then
+`db.dialect.migrate`. The decision lives in
+`node_modules/drizzle-orm/pg-core/dialect.js:44-71`:
+
+```js
+const dbMigrations = await session.all(
+  sql`select id, hash, created_at from drizzle.__drizzle_migrations order by created_at desc limit 1`);
+const lastDbMigration = dbMigrations[0];
+await session.transaction(async (tx) => {
+  for await (const migration of migrations) {
+    if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis) { …apply… }
+```
+
+So, precisely:
+- **The hash is written but never compared.** It is `insert`ed at `:67-69` and
+  the only column read back is `created_at`. Changing a `.sql` file's contents
+  cannot change what any existing database replays. (`folderMillis` is the
+  journal `when`, `node_modules/drizzle-orm/migrator.js:22`.)
+- **The gate is a single high-water mark**, `max(created_at)`, read once before
+  the loop: an entry applies iff its journal `when` is strictly greater.
+- **On an empty database `lastDbMigration` is undefined, so every entry applies,
+  in journal array order** — `when` is irrelevant there. That asymmetry is why
+  the chain must be dependency-ordered even though the `when` values are
+  hand-set.
+- The whole run is one transaction, so a failed replay leaves nothing behind.
+
+**Therefore both edits are no-ops in production.** `0000` (`when`
+1789503871556) and `0019` (`when` 1791145471556) are below production's latest
+applied `created_at` of **1792959871556** (41 rows, measured read-only
+2026-10-13, recorded in the entry above), so `db:migrate` skips both files
+without reading them, and their changed hashes are never compared against the
+ledger rows already stored. No `CREATE TABLE` can reach the live database. The
+journal itself is **untouched**: same 41 entries, same `idx`, same `when`,
+`git diff` on `drizzle/meta/` is empty.
+
+**The no-op was then rehearsed, not just argued (2026-10-13).** Replaying the
+fixed chain onto an empty database produces a `drizzle.__drizzle_migrations` of
+**41 rows, min `created_at` 1789503871556, max 1792959871556** — the same row
+count and the same high-water mark production records, so that scratch database
+is a faithful stand-in for production's ledger. Running `npm run db:migrate`
+against it a **second** time, with the edited `0000` and `0019` on disk,
+applied nothing:
+
+- ledger before and after: 41 rows, max `created_at` 1792959871556, and
+  `md5(string_agg(hash||':'||created_at order by id))` =
+  `fdf6bf8cc47bc4fd5940a4a0149eeb71` **both times**. The stored hashes did not
+  change even though the two files' contents did, which is the "hash is never
+  compared and never updated" claim, measured.
+- total server output of the repeat run: two notices,
+  `42P06 schema "drizzle" already exists, skipping` and
+  `42P07 relation "__drizzle_migrations" already exists, skipping`. Those come
+  from the two unconditional statements at
+  `node_modules/drizzle-orm/pg-core/dialect.js:51-55`. **No migration SQL ran
+  at all.**
+
+I did not read production myself in this pass (production is read-only for this
+task and I did not open `.env`/`.env.local`): the 41-row / 1792959871556 figures
+are the ones measured read-only on 2026-10-13 and recorded in the entry above,
+so for this entry they are **unverified by me**. The proof depends on exactly
+one property of production — that its `max(created_at)` is at least
+1792959871556 — and that is worth re-reading before the first `db:migrate`
+against production after this change. If it were somehow *lower*, the effect
+would still not be a `CREATE TABLE` over live data: every statement in the
+genesis block is `IF NOT EXISTS` / `duplicate_object`-guarded.
+
+### What was measured (2026-10-13)
+
+Before: `DATABASE_URL='postgres://localhost:5432/bd_contact_intel_migrate_check' npm run db:migrate`
+on a freshly created database → `PostgresError: relation "contact" does not
+exist` (`42P01`) on the first statement; 0 tables created (one transaction).
+After the genesis fix → `role "anon" does not exist` (`42704`). After both
+fixes → `[✓] migrations applied successfully!`, 41 ledger rows.
+
+The result was diffed against a second scratch database built with
+`npm run db:push` from `src/db/schema.ts`:
+
+| Catalog comparison | migrate vs push |
+| --- | --- |
+| `information_schema.tables` | **37 = 37, identical** |
+| `information_schema.columns` (name, type, nullability, default, length, precision) | **identical** |
+| `pg_indexes` (name + full `indexdef`) | **133 = 133, identical** |
+| `pg_constraint` (name + `pg_get_constraintdef`) | **9 differences, all pre-existing** |
+| `pg_class.relrowsecurity` | migrate 37 on / push 0 on |
+
+The 9 constraint differences are drift between the hand-written migrations and
+`src/db/schema.ts`; they are not introduced by this fix and the migrate-built
+side is the one that matches production, because production was built by these
+same files:
+- **5 foreign keys are named by Postgres, not by drizzle** —
+  `conversation_bd_id_fkey`, `message_bd_id_fkey`,
+  `message_conversation_id_fkey`, `job_posting_company_key_fkey`,
+  `sync_run_company_key_fkey` (vs `conversation_bd_id_bd_id_fk` etc. from
+  push). The hand-written `0002`/`0004` declared those FKs inline without a
+  name.
+- **4 uniques are plain unique indexes instead of unique constraints** —
+  `board_candidate_ats_slug_unique`, `conversation_bd_external_unique`,
+  `job_posting_company_external_unique`, `message_bd_content_hash_unique`.
+  Same name, same columns, same unique btree index in both databases; only the
+  `pg_constraint` row is absent. Uniqueness and `ON CONFLICT (cols)` behave
+  identically, and nothing in `src/`, `scripts/` or `tests/` uses
+  `ON CONFLICT ON CONSTRAINT` or references a constraint name (re-checked
+  2026-10-13).
+- RLS: `db:migrate` ends with row-level security **on for all 37 tables**, and
+  `db:push` leaves it **off on all 37**, because `src/db/schema.ts` declares no
+  RLS. So on this axis the migrate path is the production-like one and `db:push`
+  silently reopens the hole `0019` closed. Good news checked while measuring
+  this and worth recording, because the opposite was the obvious guess: the
+  chain does cover the tables created after `0019`. The 31 tables in
+  `drizzle/0019_enable_rls.sql` plus `task_digest_send`
+  (`drizzle/0020_task_digest_send.sql:28`), `follow_up_queue_item`
+  (`0023_follow_up_queue.sql`), the three email tables
+  (`0025_email_message_tables.sql`) and `company_absorption_proposal`
+  (`0040_company_absorption_proposal.sql`) make exactly 37.
+
+Regression guard: `tests/unit/drizzleChainReplay.test.ts` replays the chain
+statement by statement and fails if any statement touches a table no earlier
+statement created (`src/lib/migration/chainReplay.ts`). It was RED at 27
+findings before the fix. Suites after the fix: `test:unit` 3037/3037 pass,
+`test:db` 6/6 pass against a migrate-built database, `typecheck` clean,
+`npx next build` compiles through page-data collection.
 
 ### e2e suite runs against production
 Found while reconciling #287: the revived e2e suite logs in as a test account

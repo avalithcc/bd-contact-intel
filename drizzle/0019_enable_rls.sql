@@ -15,6 +15,12 @@
 --
 -- Revert, per table: ALTER TABLE public.<name> DISABLE ROW LEVEL SECURITY;
 -- and: ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+--
+-- The default-privileges revoke is guarded on the three Supabase roles
+-- existing. Unguarded it raised `role "anon" does not exist` (42704) on a
+-- plain Postgres, which blocked `npm run db:migrate` from building the schema
+-- from empty. On Supabase all three roles exist, so the guard changes nothing
+-- there; off Supabase the revoke has nothing to revoke.
 ALTER TABLE "public"."activity" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE "public"."audit_log" ENABLE ROW LEVEL SECURITY;
@@ -77,4 +83,8 @@ ALTER TABLE "public"."target_company" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE "public"."task" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+DO $$ BEGIN
+ IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('postgres', 'anon', 'authenticated')) = 3 THEN
+  EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated';
+ END IF;
+END $$;

@@ -13,9 +13,37 @@ Next.js (App Router) + TypeScript · Postgres (Supabase) · Drizzle ORM.
 ```bash
 npm install
 cp .env.example .env      # set DATABASE_URL (Supabase → Database → Connection string)
-npm run db:push           # create tables
+npm run db:migrate        # replay the migration chain onto an empty database
 npm run dev               # http://localhost:3000
 ```
+
+### Standing up a new environment
+
+Use `npm run db:migrate`, not `db:push`. Replaying the chain is the only path
+that reproduces what production actually has (constraint names included) and it
+leaves `drizzle.__drizzle_migrations` correctly populated, so the next migration
+applies instead of being silently skipped. Verified 2026-10-13 from an empty
+local database: 41 ledger rows, 37 tables, 133 indexes.
+
+**Always pass `DATABASE_URL` explicitly.** drizzle-kit auto-loads `.env`, where
+the production URL lives, so a bare `npm run db:migrate` or `db:push` points at
+production:
+
+```bash
+createdb my_scratch_db
+DATABASE_URL='postgres://localhost:5432/my_scratch_db' npm run db:migrate
+```
+
+Two harmless things to expect: a `42622` NOTICE about a constraint identifier
+truncated to Postgres's 63-character limit, and — off Supabase — the
+`anon`/`authenticated` privilege revoke in `0019_enable_rls.sql` skipping itself
+because those roles only exist on Supabase.
+
+`npm run db:push` still works and syncs `src/db/schema.ts` directly, but it
+writes no ledger rows, names five foreign keys differently from production, and
+leaves row-level security **off** on every table — `src/db/schema.ts` declares
+no RLS, so push undoes what `0019_enable_rls.sql` closed. Prefer it only for
+throwaway schema experiments. Details in `openspec/BACKLOG.md`.
 
 Also set `CRON_SECRET` (a random string) as an env var in the deployment
 environment (e.g. Vercel project settings) — it authenticates the
