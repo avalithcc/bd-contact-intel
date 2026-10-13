@@ -109,7 +109,7 @@ export function isFreeMailDomain(domain: string): boolean {
 // This is the globally unambiguous subset: providers no company could
 // legitimately own. It is a literal, not "FREE_MAIL_ROOTS minus the ISPs", so
 // a root added to the broad list does not silently start blocking company
-// edits. Two tests in freeMailSplit.test.ts keep the lists in step, and a root
+// edits. Tests in freeMailSplit.test.ts keep the lists in step, and a root
 // added to EITHER list alone fails the suite: the "exactly" test (broad roots
 // minus the six ISPs below must equal this set) fails for a root added to the
 // broad list only or to this one only, and the subset test fails for a root
@@ -134,15 +134,62 @@ export const UNOWNABLE_MAIL_ROOTS: ReadonlySet<string> = new Set([
   "yandex",
 ]);
 
+// The roots above cover every FREE_MAIL_DOMAINS entry whose first label is
+// itself the provider's brand (gmail.com, outlook.com, proton.me...). Four
+// entries are NOT covered that way, because their first label is an ordinary
+// word rather than the brand: me.com, mac.com, mail.com and zoho.com. Reusing
+// the broad exact set for them had the SAME asymmetry the roots literal exists
+// to avoid, just one level down — it quietly made the validator refuse a domain
+// the broad list only ever meant to exclude from matching.
+//
+// READ THIS BEFORE APPLYING THE REASONING BELOW TO ANYTHING ELSE: it decides
+// those FOUR entries and nothing more. For every other domain the first-label
+// roots rule above already decides, and it is coarser than any criterion stated
+// here. proton.me, yandex.com, aol.com, outlook.com and icloud.com are also
+// their operators' own domains, and they stay refused purely because their
+// first label is in UNOWNABLE_MAIL_ROOTS. That inconsistency is known and
+// deliberate — widening it would stop those providers' contacts being matched
+// at all, which is a measured cost and a separate decision. Do NOT re-open them
+// on the strength of the three bullets below.
+//
+//  - me.com / mac.com — Apple's consumer iCloud aliases. No known company is
+//    recorded as "me.com"; Apple is apple.com. Still refused.
+//  - mail.com — a consumer webmail brand (operated by 1&1 Mail & Media, a
+//    United Internet subsidiary). Kept refused as the CONSERVATIVE DEFAULT, not
+//    because anyone measured it: a company record carrying it is far more likely
+//    to be a personal mailbox leaking in than a real counterpart. Reverse it if
+//    a real one ever shows up.
+//  - zoho.com — deliberately absent from this set, and the only input whose
+//    behaviour this change altered. Zoho Corporation is a live company whose own
+//    domain is zoho.com, so refusing it blocked a legitimate record (and for a
+//    CRM vendor, a plausible counterpart) with a "free mail" message that would
+//    make no sense to the BD typing it. It stays free mail for MATCHING —
+//    isFreeMailDomain still refuses it, which is where the real damage would be,
+//    since Zoho Mail also hosts consumer mailboxes and matching on the domain
+//    would attach every one of them to a single company.
+//
+// Same reasoning as the roots literal: spelled out rather than derived from
+// FREE_MAIL_DOMAINS, so adding an exact domain to the broad list cannot
+// silently start blocking company edits. freeMailSplit.test.ts pins both
+// directions — an exact domain added to the broad list whose root the narrow
+// roots do not already cover fails the suite until it is classified here or
+// listed as provider-owned.
+export const UNOWNABLE_MAIL_DOMAINS: ReadonlySet<string> = new Set([
+  "me.com",
+  "mac.com",
+  "mail.com",
+]);
+
 /**
  * True when no company could legitimately own this domain because it is a
  * global consumer mailbox provider (country variants included). Used ONLY by
  * the company-domain validator; identity matching and pattern inference keep
- * the broader isFreeMailDomain. Exact-domain entries are shared with it.
+ * the broader isFreeMailDomain. Both the roots and the exact domains are this
+ * predicate's own literals — nothing is inherited from the broad sets.
  */
 export function isUnownableMailDomain(domain: string): boolean {
   const lowered = domain.trim().toLowerCase();
-  if (FREE_MAIL_DOMAINS.has(lowered)) return true;
+  if (UNOWNABLE_MAIL_DOMAINS.has(lowered)) return true;
   const firstLabel = lowered.split(".")[0] ?? "";
   return UNOWNABLE_MAIL_ROOTS.has(firstLabel);
 }

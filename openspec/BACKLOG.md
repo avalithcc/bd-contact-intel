@@ -1384,8 +1384,9 @@ opposite prices for being wrong:
 - `isFreeMailDomain` (`src/lib/emailPatterns.ts:92`, broad) — pattern inference,
   identity matching, merge ranking. A false negative **merges two strangers** who
   both used an ISP mailbox, so it stays aggressive.
-- `isUnownableMailDomain` (`src/lib/emailPatterns.ts:143`, narrow, backed by the
-  literal `UNOWNABLE_MAIL_ROOTS` at `:120`) — used only by the company-domain
+- `isUnownableMailDomain` (`src/lib/emailPatterns.ts:190`, narrow, backed by the
+  literals `UNOWNABLE_MAIL_ROOTS` at `:120` and `UNOWNABLE_MAIL_DOMAINS` at `:177`)
+  — used only by the company-domain
   validator (`src/lib/companies/domain.ts:117`). A false positive **blocks a
   legitimate BD edit**, so it is narrow.
 
@@ -1396,12 +1397,57 @@ in this file): **0 companies** with a domain on any of the six roots; exactly
 **1 person** with an `@fibertel.com.ar` address. `test:unit` was 3037 pass / 0 fail
 on that commit (measured 2026-10-13).
 
-**Still open — owner has NOT decided.** The narrow predicate reuses the
-exact-domain set `FREE_MAIL_DOMAINS` (`src/lib/emailPatterns.ts:39`) unchanged, so
-the validator still refuses `zoho.com` (`:56`, Zoho Corporation's real domain) and
-`mail.com` (`:53`). It is the same asymmetry the ISP roots had, left in place on
-purpose until someone with the call says whether a company may own those. Until
-then a BD who types `zoho.com` on Zoho's own company record is told it is free mail.
+**CLOSED — the exact-domain half is split too.** The narrow predicate used to reuse
+the exact-domain set `FREE_MAIL_DOMAINS`, which carried the SAME asymmetry the roots
+literal exists to avoid, one level down: an entry meant only to be excluded from
+*matching* silently started blocking *company edits*. `isUnownableMailDomain` now has
+its own `UNOWNABLE_MAIL_DOMAINS` literal and inherits nothing.
+
+Four `FREE_MAIL_DOMAINS` entries are not covered by `UNOWNABLE_MAIL_ROOTS`, because
+their first label is an ordinary word and not the provider's brand:
+- `me.com`, `mac.com` — Apple's consumer iCloud aliases. No known company is
+  recorded as "me.com"; Apple is `apple.com`. Still refused.
+- `mail.com` — a consumer webmail brand (operated by 1&1 Mail & Media, a United
+  Internet subsidiary). Kept refused as the **conservative default**, not because
+  anyone measured it. Reverse it if a real counterpart ever shows up.
+- `zoho.com` — **no longer refused.** Zoho Corporation is a live company whose own
+  domain is zoho.com. It stays free mail for MATCHING (`isFreeMailDomain` still
+  refuses it), which is where the damage would be, since Zoho Mail also hosts
+  consumer mailboxes.
+
+**Known inconsistency, named rather than hidden (raised by the pre-push review,
+2026-10-13).** The reasoning above decides those four entries and NOTHING else.
+`proton.me` (Proton AG), `yandex.com` (Yandex), `aol.com`, `outlook.com` and
+`icloud.com` are also their operators' own domains, and they stay refused purely
+because their first label is in `UNOWNABLE_MAIL_ROOTS` — the roots rule is coarser
+than any criterion the comment states, and it wins. So `zoho.com` is permitted by
+an accident of the first-label rule, not by a principled test applied across the
+board. **Open, no owner decision yet:** whether the validator should also stop
+refusing `proton.me` and `yandex.com`. Widening it has a measured cost on the
+matching side and is a separate call — do not re-open them on the strength of the
+zoho.com reasoning alone.
+
+Behaviour changed for exactly one input: `zoho.com`. Only one caller reads the narrow
+predicate (`src/lib/companies/domain.ts:117`), so the blast radius is that validator
+alone; the HubSpot import deliberately uses the broad one.
+
+Both tripwires in `tests/unit/freeMailSplit.test.ts` were verified to FAIL by
+temporarily adding `tutanota.com` to one list at a time (2026-10-13): added to the
+broad set alone, "every broad exact domain the narrow roots miss is classified on
+purpose" fails (1 of 9 failing); added to the narrow set alone, BOTH that test and
+"the narrow set is a subset of the broad one" fail (2 of 9). The probe was reverted
+and `rg -c tutanota src/ tests/` returns nothing.
+
+**Not measured:** how many production companies carry `zoho.com`, `me.com`,
+`mac.com` or `mail.com` as their domain. No agent in that session had a
+`DATABASE_URL`, and `.env*` is blocked by design. The read-only query is
+`select domain, count(*) from company where domain in ('zoho.com','me.com','mac.com','mail.com') group by domain;`
+
+**Pre-existing gap in the BROAD list, found while doing this and deliberately NOT
+widened:** `zoho` is not in `FREE_MAIL_ROOTS`, so the broad predicate only ever
+caught `zoho.com` exactly — `zoho.eu` and the other country variants already slip
+through identity matching. Adding the root would have a measurable cost (it would
+stop Zoho-hosted contacts from being matched at all) and is a separate decision.
 
 **Worry checked, first answer WRONG, corrected 2026-10-13: "a company on
 `fibertel.com.ar` would swallow every Fibertel customer."** An earlier version of
