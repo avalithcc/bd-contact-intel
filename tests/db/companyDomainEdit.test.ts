@@ -17,10 +17,23 @@
  * write under test nests as a savepoint.
  */
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { assertScratchDatabaseUrl } from "../launch-readiness/scratchDbGuard";
 
 assertScratchDatabaseUrl(process.env.DATABASE_URL);
+
+/**
+ * postgres-js holds its pool open and node:test waits for the event loop to
+ * drain, so the process only exits once `idle_timeout: 20` (src/db/index.ts)
+ * expires: measured 22s wall clock for assertions that finish in well under a
+ * second. Closing the pool makes the suite return a prompt immediately, which
+ * is the difference between a suite people run and one they avoid.
+ * `node --test` gives each file its own process, so each closes its own pool.
+ */
+after(async () => {
+  const { db } = await import("@/db");
+  await db.$client.end();
+});
 
 const ROLLBACK = new Error("rollback");
 const BD_ID = "00000000-0000-0000-0000-00000000d0d0";
