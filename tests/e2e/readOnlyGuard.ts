@@ -89,6 +89,26 @@ export function serverPlan(databaseUrl: string | undefined, ci: boolean): Server
   return { port: 3000, reuseExistingServer: !ci };
 }
 
+/**
+ * Only `next dev` serves this file (a production server 404s it), so a 200
+ * is the cheapest observable proof that the server honors the read-only
+ * marker (src/lib/auth/bdProvisioning.ts ignores it when NODE_ENV is
+ * "production"). Fail closed: anything but 200 counts as a production-mode
+ * server.
+ */
+export const DEV_SERVER_PROBE_PATH = '/_next/static/development/_buildManifest.js';
+
+/** Null when the probe status shows a dev server, otherwise why read-only mode must not run. */
+export function devServerRefusal(probeStatus: number | undefined): string | null {
+  if (probeStatus === 200) return null;
+  return (
+    `Read-only e2e mode needs a \`next dev\` server, but ${DEV_SERVER_PROBE_PATH} answered ` +
+    `${probeStatus ?? 'nothing'}. A production-mode server (\`next start\`) ignores the x-e2e-read-only ` +
+    'marker, so a first visit by an account with no bd row would INSERT one. Stop that server and ' +
+    'run \`npm run dev\` (or point DATABASE_URL at a scratch database, which starts its own server).'
+  );
+}
+
 export function describeViolations(violations: SeenRequest[]): string {
   return [
     'The e2e suite is read-only against this database, but the page sent write requests (blocked, nothing reached the app):',

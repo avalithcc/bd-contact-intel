@@ -2,6 +2,7 @@
 // layout, which is where getCurrentBd would insert a missing `bd` row.
 import { test as setup, expect } from './fixtures';
 import path from 'path';
+import { DEV_SERVER_PROBE_PATH, devServerRefusal, writesAllowed } from './readOnlyGuard';
 import { missingCredentialsMessage, readE2eCredentials, skipReason } from './credentials';
 
 export const STORAGE_STATE = path.join(__dirname, '../.auth/state.json');
@@ -17,6 +18,14 @@ setup('authenticate', async ({ page }) => {
   const creds = readE2eCredentials();
   if (!creds) throw new Error(missingCredentialsMessage());
   const { email, password } = creds;
+
+  // Before the login: the post-login landing is the first render that could
+  // provision a bd row, and only a dev server honors the read-only marker.
+  if (!writesAllowed(process.env.DATABASE_URL)) {
+    const probe = await page.request.get(DEV_SERVER_PROBE_PATH).catch(() => undefined);
+    const refusal = devServerRefusal(probe?.status());
+    if (refusal) throw new Error(refusal);
+  }
 
   await page.goto('/login');
   await page.fill('#email', email);

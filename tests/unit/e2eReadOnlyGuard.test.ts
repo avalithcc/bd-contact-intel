@@ -6,6 +6,7 @@ import {
   writeSkipReason,
   describeViolations,
   serverPlan,
+  devServerRefusal,
 } from "../e2e/readOnlyGuard";
 
 const APP = "http://localhost:3000";
@@ -89,5 +90,13 @@ test("server plan: writes allowed means a dedicated port, never reused, with an 
     assert.notEqual(plan.port, 3000);
     assert.equal(plan.reuseExistingServer, false);
     assert.deepEqual(plan.env, { DATABASE_URL: url });
+  }
+});
+
+test("read-only mode proceeds only against a dev server (probe 200), fails closed otherwise", () => {
+  assert.equal(devServerRefusal(200), null);
+  for (const status of [404, 500, 301, undefined]) {
+    const msg = devServerRefusal(status);
+    assert.ok(msg && /next dev/.test(msg) && /INSERT/.test(msg), String(status));
   }
 });

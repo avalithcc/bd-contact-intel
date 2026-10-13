@@ -24,7 +24,9 @@ production too (fail closed). In that mode:
 - Today those are: the duplicate-merge test (`phase7.spec.ts`, additionally
   gated by `E2E_ALLOW_DESTRUCTIVE=1`), the CSV import (`phase14.spec.ts`) and
   the admin conversation tests (`phase11.spec.ts`, whose audit row is written
-  by the `revealAdminConversationAction` server action; they also read
+  by the `revealAdminConversationAction` server action; they flip the e2e
+  account's role to admin and restore it to the hard-coded `bd` baseline, and
+  the seed resets it on conflict, so a hard kill is repaired by a rebuild; they also read
   `audit_log` directly, which is safe because they only run on a scratch
   database). All skip on production.
 - The setup project logs in through Supabase Auth (a session in Supabase's own
@@ -38,6 +40,18 @@ production too (fail closed). In that mode:
   marker is ignored when `NODE_ENV` is `production`, so a real BD's first visit
   always provisions their row. `auth.setup.ts` uses the guarded `test` for the
   same reason (the post-login landing renders the layout).
+  **So read-only mode assumes a `next dev` server.** In read-only mode
+  `playwright.config.ts` reuses whatever is listening on :3000; if that is
+  `next start`, `NODE_ENV` is `production`, the marker is ignored, and a first
+  visit by an account with no `bd` row inserts one. The suite therefore
+  refuses: `auth.setup.ts` probes `/_next/static/development/_buildManifest.js`
+  (only `next dev` serves it) before logging in and throws on anything but 200
+  (`devServerRefusal` in `readOnlyGuard.ts`). Scratch mode starts its own dev
+  server, so it is not affected. Vercel is not affected either: the project
+  defines no `NODE_ENV`, so Next's default applies (`development` for `next
+  dev`, `production` for every other command, `node_modules/next/dist/bin/next`);
+  previews run `next build` and serve the build, so they are `production` and
+  ignore the marker.
 
 ## Writing mode (scratch database only)
 
@@ -67,9 +81,19 @@ credential in it. `E2E_PASSWORD` stays in `.env.local`, which
 `playwright.config.ts` loads without overriding variables already set. The shell
 variable wins over `.env.local`. The login still goes to the Supabase Auth
 project configured in `.env.local`; whether that is acceptable for a scratch
-run is unverified. The filter specs assert against production-scale data (real
-BDs with phones, contact types), so the tiny seed does not satisfy them; run
-them read-only against production.
+run is unverified. The filter specs also pass on the tiny seed (the second BD
+has one contact with a phone and one without, which the "responsable + Tiene
+teléfono" spec needs to narrow); read-only mode against a dev server whose
+database is the scratch one runs them too (start `DATABASE_URL=<scratch>
+npx next dev -p 3000`, then run Playwright with a non-scratch `DATABASE_URL`).
+
+Manual proof that the first-visit guard works end to end (2026-10-13, scratch
+database): log in once so the e2e account has a `bd` row, rename that row's
+email, then load a page with the marker header and without it. With the marker
+the layout answers 500 ("No bd row for this session, and first-visit
+provisioning is disabled for a read-only e2e request") and no row is inserted;
+without it the page answers 200 and a row is inserted. The session cookie
+reaches the server alongside the marker (`route.fallback({headers})` keeps it).
 
 ## One-time setup
 
