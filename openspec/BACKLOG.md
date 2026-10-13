@@ -1068,12 +1068,15 @@ and after screenshots byte-identical in a standalone harness). Drift found: the
 used by `admin/rfc-backfill` and `admin/migration`.
 
 ### drizzle journal is future-dated to 2026-10-20 — every new migration needs a hand-set `when`
-`drizzle/meta/_journal.json` has 36 entries. The timestamptz chain was
+`drizzle/meta/_journal.json` has 41 entries (re-counted 2026-10-13; this said
+36, measured 2026-10-01, before 0036-0040 landed). The timestamptz chain was
 future-dated on purpose (one day per slice), and the last entry —
 `0035_bd_signature_html` — has `when` = 1792527871556 = **2026-10-20T20:24:31Z**.
 Production's latest applied migration `created_at` is the same value (measured
 2026-10-01: `drizzle.__drizzle_migrations` holds 36 rows, max `created_at`
-1792527871556). `drizzle-kit migrate` compares each entry's `when` with the
+1792527871556; re-measured 2026-10-13: **41 rows**, max `created_at`
+**1792959871556**, so the journal and production are in sync and later entries
+were hand-stamped past the 2026-10-20 value as this entry instructs). `drizzle-kit migrate` compares each entry's `when` with the
 latest applied `created_at` and **silently skips any entry that is earlier** —
 that is how 0012 and 0013 were skipped once. So until the real clock passes
 2026-10-20, a new migration's `when` must be set by hand to something greater
@@ -1081,6 +1084,46 @@ than 1792527871556; `drizzle-kit generate` stamps the current time and would be
 skipped. `tests/unit/drizzleJournal.test.ts` enforces strictly increasing `when`
 and its failure message says how to fix it (`src/lib/migration/journalWhen.ts`,
 #279). Nothing to fix; recorded so nobody rediscovers it by losing a migration.
+
+### `db:migrate` cannot build the database from empty — use `db:push` (2026-10-13)
+Found while rebuilding `bd_contact_intel_e2e`. Against a **freshly created empty
+database**, `npm run db:migrate` fails with `PostgresError: relation "contact"
+does not exist` (`42P01`): an early entry in the chain assumes a table a later
+migration creates, so the chain is no longer replayable in order. This is the
+same root cause area as the entry above — the `when` values were hand-set per
+slice, so the journal's order is artificial and no longer reflects the SQL's
+dependency order.
+
+**There is therefore no tested path from an empty database to the current
+schema.** Nobody noticed because production grew one migration at a time and
+never replayed the chain, and because the e2e scratch database had **0 rows** in
+`drizzle.__drizzle_migrations` — it had been built with `db:push` from the start.
+The two facts hid each other.
+
+`npm run db:push` works and is what to use: it syncs `src/db/schema.ts` directly
+and produced 37 tables matching production table-for-table, including the
+post-0039 `company_alias.company_key -> company` FK. Its only output is a
+harmless `42622` NOTICE about a constraint identifier truncated to Postgres's
+63-character limit.
+
+Recipe that works (2026-10-13):
+```
+dropdb bd_contact_intel_e2e && createdb bd_contact_intel_e2e
+DATABASE_URL='postgres://localhost:5432/bd_contact_intel_e2e' npm run db:push
+DATABASE_URL='postgres://localhost:5432/bd_contact_intel_e2e' \
+  E2E_EMAIL="$(grep -o 'E2E_EMAIL=.*' .env.local | cut -d= -f2-)" \
+  npx tsx scripts/seed-launch-readiness.ts --execute
+```
+Two traps: **always pass `DATABASE_URL` explicitly** (drizzle-kit auto-loads
+`.env`, where the production URL lives, so a bare `db:push`/`db:migrate` points
+at production), and `E2E_EMAIL` lives in `.env.local`, not the `.env.e2e.local`
+the seed auto-loads — pass it on the command line rather than sourcing
+`.env.local`, which would bring the production `DATABASE_URL` with it.
+
+Worth fixing properly (a squashed baseline migration, or repairing the early
+entry that assumes `contact`) because the failure surfaces exactly when someone
+is trying to stand up a new environment or join the project. Not urgent: nothing
+in day-to-day work replays the chain.
 
 ### e2e suite runs against production
 Found while reconciling #287: the revived e2e suite logs in as a test account
@@ -1109,6 +1152,20 @@ rewrite or deletion; (3) the guard has not been exercised at runtime by a
 Playwright run (none was possible: no `.env.e2e.local`), only by unit tests,
 typecheck and `playwright test --list`: unverified; (4) whether the rows
 created by the 2026-10-01 runs were ever cleaned up is still unverified.
+
+Update 2026-10-13. Gap (4) is **answered: the e2e account has no footprint in
+production.** Measured read-only against production for
+`ZZ E2E (no asignar) <e2e-bot@avalith.net>`: 0 persons with it as
+`updated_by_bd_id`, 0 `activity` rows as actor, 0 `task` rows as actor or
+assignee, 0 `audit_log` rows, 0 `person_property_history` rows, 0 contacts owned.
+Either the runs wrote nothing durable or it was cleaned up; nothing is left.
+Gap (3) is now reachable: `bd_contact_intel_e2e` was rebuilt the same day and
+matches production (37 tables, the post-0039 FK), with a seed of 9 companies /
+38 people / 2 BDs. A Playwright run against it is still outstanding — what HAS
+run against it is `npm run test:db` (6 pass), so the scratch database itself is
+proven, not the Playwright guard. The old scratch database held 43 person rows
+where the seed produces 38; the extra 5 were residue from the 2026-10-01 runs,
+which is consistent with those runs writing only to the scratch database.
 
 ### task creation writes no activity row
 `createTask` and `bulkCreateTasks` write **no** `task_created` activity —
