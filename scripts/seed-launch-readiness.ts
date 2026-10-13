@@ -32,19 +32,22 @@ const COMPANIES = [
   { key: "initech-sintetica", name: "Initech Sintetica" },
 ];
 
-// [first, last, companyKey, title, ownedByE2e, hasEmail]
-const PEOPLE: Array<[string, string, string, string, boolean, boolean]> = [
-  ["Ada", "Calls", "acme-pruebas", "CTO", true, true],
-  ["Bruno", "Meets", "acme-pruebas", "VP Engineering", true, true],
-  ["Carla", "Tasks", "globex-demo", "Head of Product", true, true],
-  ["Dario", "Discards", "globex-demo", "Engineering Manager", true, true],
-  ["Elena", "Double", "initech-sintetica", "CEO", true, true],
-  ["Fabio", "Whitespace", "initech-sintetica", "CTO", true, false],
-  ["Gala", "Longnote", "acme-pruebas", "Director", true, true],
-  ["Hugo", "Bulk", "globex-demo", "Tech Lead", true, true],
-  ["Ines", "Bulk", "globex-demo", "Tech Lead", true, true],
-  ["Julian", "Otro", "acme-pruebas", "CTO", false, true],
-  ["Karina", "Otro", "initech-sintetica", "CTO", false, true],
+// [first, last, companyKey, title, ownedByE2e, hasEmail, hasPhone]
+// Karina is the other BD's contact WITHOUT a phone: the Responsable + "Tiene
+// teléfono" filter spec picks the first non-e2e BD, and needs a contact the
+// phone filter can drop from that BD's list.
+const PEOPLE: Array<[string, string, string, string, boolean, boolean, boolean]> = [
+  ["Ada", "Calls", "acme-pruebas", "CTO", true, true, true],
+  ["Bruno", "Meets", "acme-pruebas", "VP Engineering", true, true, true],
+  ["Carla", "Tasks", "globex-demo", "Head of Product", true, true, true],
+  ["Dario", "Discards", "globex-demo", "Engineering Manager", true, true, true],
+  ["Elena", "Double", "initech-sintetica", "CEO", true, true, true],
+  ["Fabio", "Whitespace", "initech-sintetica", "CTO", true, false, true],
+  ["Gala", "Longnote", "acme-pruebas", "Director", true, true, true],
+  ["Hugo", "Bulk", "globex-demo", "Tech Lead", true, true, true],
+  ["Ines", "Bulk", "globex-demo", "Tech Lead", true, true, true],
+  ["Julian", "Otro", "acme-pruebas", "CTO", false, true, true],
+  ["Karina", "Otro", "initech-sintetica", "CTO", false, true, false],
 ];
 
 // Mariel's cohort: a call-first list. 6 hotels x 4 contacts, all `status = new`
@@ -75,21 +78,23 @@ async function main() {
   try {
     await sql.begin(async (tx) => {
       await tx`truncate table activity, task, person_property_history, person_bd_connection, person_id_map, audit_log, person, company restart identity cascade`;
+      // `role = 'bd'` on conflict: phase11.spec.ts flips the e2e account to admin
+      // and a hard kill can leave it there; a rebuild must repair that.
       const [me] = await tx`
         insert into bd (name, email) values ('ZZ E2E (no asignar)', ${email!})
-        on conflict (email) do update set name = excluded.name returning id`;
+        on conflict (email) do update set name = excluded.name, role = 'bd' returning id`;
       const [other] = await tx`
         insert into bd (name, email) values ('ZZ Otro BD', 'otro-bd-e2e@avalith.net')
-        on conflict (email) do update set name = excluded.name returning id`;
+        on conflict (email) do update set name = excluded.name, role = 'bd' returning id`;
       for (const c of COMPANIES) {
         await tx`insert into company (company_key, display_name, created_by_bd_id) values (${c.key}, ${c.name}, ${me!.id})`;
       }
-      for (const [first, last, companyKey, title, mine, hasEmail] of PEOPLE) {
+      for (const [first, last, companyKey, title, mine, hasEmail, hasPhone] of PEOPLE) {
         const mail = hasEmail ? `${first}.${last}@example.com`.toLowerCase() : null;
         const company = COMPANIES.find((c) => c.key === companyKey)!;
         await tx`
           insert into person (first_name, last_name, email, email_normalized, phone, company, company_key, job_title, owner_bd_id, status)
-          values (${first}, ${last}, ${mail}, ${mail}, '+1 555 010 0100', ${company.name}, ${companyKey}, ${title}, ${mine ? me!.id : other!.id}, 'new')`;
+          values (${first}, ${last}, ${mail}, ${mail}, ${hasPhone ? "+1 555 010 0100" : null}, ${company.name}, ${companyKey}, ${title}, ${mine ? me!.id : other!.id}, 'new')`;
       }
       for (const h of HOTELS) {
         await tx`insert into company (company_key, display_name, created_by_bd_id) values (${h.key}, ${h.name}, ${me!.id})`;
