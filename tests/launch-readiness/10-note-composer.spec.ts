@@ -3,12 +3,8 @@
  * the quickest way Mariel can leave "call me back" behind. It is two writes
  * (note, then task) from the browser, so the seam between them matters.
  */
-import { expect, test } from '@playwright/test';
-import { activitiesFor, argDate, newPerson, openContact, personStatus, sql, tasksFor } from './helpers';
-
-test.afterAll(async () => {
-  await sql.end();
-});
+import { expect } from '@playwright/test';
+import { activitiesFor, argDate, newPerson, openContact, personStatus, tasksFor, test } from './helpers';
 
 test('note + follow-up task: both saved, the task is due tomorrow by default, and it shows up on /tasks under its date', async ({ page }) => {
   const p = await newPerson('NoteTask');

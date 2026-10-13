@@ -187,7 +187,8 @@ npx tsx scripts/seed-launch-readiness.ts           # dry run
 npx tsx scripts/seed-launch-readiness.ts --execute # wipes and reseeds the SCRATCH db only
 # (the pass originally used a hand-started server on :3100; the config now starts its own, see tests/e2e/README.md)
 npx playwright test -c playwright.launch-readiness.config.ts 01- --reporter=line --timeout=45000
-# repeat per file: 01, 02, 03, 04, 05, 06, 08, 09, 10
+# several files can share one run (05- 09- 10-); the pool is closed once per worker, see tests/e2e/README.md
+# (06- fails when run after 05-: see the limits listed there)
 LR_SHOW_FINDINGS=1 ...                             # un-wrap the confirmed defects to see the raw failure
 ```
 

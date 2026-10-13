@@ -3,17 +3,13 @@
  * every call she logs must visibly retire its card and move the sidebar
  * badge, without a manual reload. State is serial and shared on purpose.
  */
-import { expect, test, type Page } from '@playwright/test';
-import { sql } from './helpers';
+import { expect, type Page } from '@playwright/test';
+import { sql, test } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   await sql`delete from follow_up_queue_item`;
-});
-
-test.afterAll(async () => {
-  await sql.end();
 });
 
 async function badge(page: Page): Promise<number> {

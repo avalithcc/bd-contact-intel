@@ -3,8 +3,8 @@
  * Mariel is on page 2 of 3, narrows by company, and expects to see results,
  * not "page 2 of 1".
  */
-import { expect, test } from '@playwright/test';
-import { meId, sql } from './helpers';
+import { expect } from '@playwright/test';
+import { meId, sql, test } from './helpers';
 
 const COHORT = 'refiltro-e2e';
 const BIG = 'Hotel Refiltro Grande';
@@ -27,7 +27,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await sql`delete from person where source_key = ${COHORT}`;
   await sql`delete from company where company_key in (${COHORT + '-g'}, ${COHORT + '-c'})`;
-  await sql.end();
 });
 
 test('narrowing the filters while on page 3 does not strand her on an empty page', async ({ page }) => {

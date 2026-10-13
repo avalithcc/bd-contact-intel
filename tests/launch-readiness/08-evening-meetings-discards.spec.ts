@@ -3,12 +3,8 @@
  * be run in the evening too, when Argentina (UTC-3) is still on today while
  * UTC is already tomorrow.
  */
-import { expect, test } from '@playwright/test';
-import { activitiesFor, argDate, newPerson, openContact, openQuickAction, personStatus, sql, tasksFor } from './helpers';
-
-test.afterAll(async () => {
-  await sql.end();
-});
+import { expect } from '@playwright/test';
+import { activitiesFor, argDate, newPerson, openContact, openQuickAction, personStatus, sql, tasksFor, test } from './helpers';
 
 test('a task due TODAY (Argentina date) is in "Hoy", not in "Vencidas"', async ({ page }) => {
   const p = await newPerson('TaskToday');

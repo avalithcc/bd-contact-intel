@@ -1,11 +1,35 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test as base, type Page } from '@playwright/test';
 import postgres from 'postgres';
 import { assertScratchDatabaseUrl } from './scratchDbGuard';
 
 // Every spec imports this file, so the guard runs before any query is made.
 assertScratchDatabaseUrl(process.env.DATABASE_URL);
 
+/**
+ * One pool per Playwright worker process. This config runs every spec file in
+ * the SAME worker (workers: 1), so they share this module instance: a spec
+ * must never call `sql.end()` itself, or every spec after it fails with
+ * CONNECTION_ENDED. The pool is closed once, by the `test` below, when the
+ * worker is torn down.
+ */
 export const sql = postgres(process.env.DATABASE_URL!, { max: 2, onnotice: () => {} });
+
+/**
+ * Specs import `test` from here instead of '@playwright/test'. The automatic,
+ * worker-scoped fixture ends the pool after the last spec the worker ran, so
+ * the process can exit instead of idling on an open pool (the same reason
+ * tests/db closes its pool in `after()`). A global teardown cannot do this: it
+ * runs in a different process and would only end a second, empty pool.
+ */
+export const test = base.extend<object, { closeSharedPool: void }>({
+  closeSharedPool: [
+    async ({}, use) => {
+      await use();
+      await sql.end();
+    },
+    { scope: 'worker', auto: true },
+  ],
+});
 
 export const E2E_EMAIL = process.env.E2E_EMAIL!;
 

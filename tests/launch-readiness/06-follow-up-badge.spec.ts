@@ -4,12 +4,8 @@
  * (src/lib/shell/readBadgeRowEnsuringQueue.ts), so the sidebar badge shows
  * the number without Mariel having to open Seguimientos first.
  */
-import { expect, test } from '@playwright/test';
-import { sql } from './helpers';
-
-test.afterAll(async () => {
-  await sql.end();
-});
+import { expect } from '@playwright/test';
+import { sql, test } from './helpers';
 
 test('the sidebar badge shows today\'s follow-ups on the first page of the day, before she opens the queue', async ({ page }) => {
   await sql`delete from follow_up_queue_item`;

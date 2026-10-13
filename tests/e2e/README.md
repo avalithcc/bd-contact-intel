@@ -162,9 +162,16 @@ every other dotenv key blanked, and the same refusal and
 `[launch-readiness]`). Its pass never needs the shared project, so there is no
 other opt-in. It always starts its own server on :3100 and never reuses one: a
 server started by hand (`nohup next dev -p 3100`) would not carry this env.
-Run it one spec file at a time: `helpers.ts` shares one `sql` pool per worker
-and each spec ends it in `afterAll`, so two files in one run can fail with
-`CONNECTION_ENDED`.
+Several spec files can run in one invocation (`... 05- 09- 10-`). The config
+uses one worker, so every file shares the single `sql` pool in `helpers.ts`;
+specs must not call `sql.end()` and must import `test` from `./helpers` (not
+from `@playwright/test`): that `test` closes the pool once, when the worker
+ends (`tests/unit/launchReadinessPool.test.ts` enforces both). What still
+limits a multi-file run is shared data, not the pool: the files are not fully
+independent (`06-` fails when run after `05-` because the shell builds the
+day's follow-up queue once per server instance, so reseed and run `06-`
+without `05-`), and `04-`, `03-` and `08-` have failures unrelated to the pool
+(see the launch-readiness README).
 
 ### Pointing the suite at a throwaway hosted project (alternative)
 

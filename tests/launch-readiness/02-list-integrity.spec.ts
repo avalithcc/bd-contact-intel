@@ -3,8 +3,8 @@
  * (`status = new`, no activity). Everything here is about whether the list
  * can be trusted over many pages and many reloads.
  */
-import { expect, test, type Page } from '@playwright/test';
-import { meId, sql } from './helpers';
+import { expect, type Page } from '@playwright/test';
+import { meId, sql, test } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -33,7 +33,6 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await sql`delete from person where source_key = ${COHORT}`;
-  await sql.end();
 });
 
 test('walking every page of an untouched cohort yields each contact exactly once', async ({ page }) => {

@@ -1,10 +1,6 @@
 /** "Registrar llamada": the obvious wrong things a BD does with the form. */
-import { expect, test } from '@playwright/test';
-import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, personStatus, sql } from './helpers';
-
-test.afterAll(async () => {
-  await sql.end();
-});
+import { expect } from '@playwright/test';
+import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, personStatus, sql, test } from './helpers';
 
 test('the submit button stays disabled until an outcome is chosen', async ({ page }) => {
   const p = await newPerson('CallNoOutcome');

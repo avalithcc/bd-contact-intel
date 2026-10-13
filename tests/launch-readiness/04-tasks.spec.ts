@@ -4,12 +4,8 @@
  * owner's standing rule under test: any BD may edit any task, but every
  * change logs an activity naming who did it.
  */
-import { expect, test, type Page } from '@playwright/test';
-import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, otherBdId, sql, tasksFor } from './helpers';
-
-test.afterAll(async () => {
-  await sql.end();
-});
+import { expect, type Page } from '@playwright/test';
+import { activitiesFor, argDate, meId, newPerson, openContact, openQuickAction, otherBdId, sql, tasksFor, test } from './helpers';
 
 async function createTaskOnRecord(
   page: Page,
