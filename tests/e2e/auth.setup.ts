@@ -1,4 +1,6 @@
-import { test as setup, expect } from '@playwright/test';
+// The guarded `test`, not Playwright's: the post-login landing renders the app
+// layout, which is where getCurrentBd would insert a missing `bd` row.
+import { test as setup, expect } from './fixtures';
 import path from 'path';
 import { missingCredentialsMessage, readE2eCredentials, skipReason } from './credentials';
 

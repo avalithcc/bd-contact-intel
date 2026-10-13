@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { withReadOnlyMarker } from '../../src/lib/auth/bdProvisioning';
 import {
   describeViolations,
   isWriteRequest,
@@ -11,9 +12,11 @@ import {
  * aborts every write request the app would receive and fails the test if any
  * was attempted, unless DATABASE_URL is a scratch database. Read-only is
  * therefore enforced by the harness, not by reviewer discipline. Server-side
- * writes triggered by a plain GET render are invisible here (known gap: the
- * first-visit `bd` upsert in getCurrentBd, src/lib/queries.ts:80). Writing
- * specs also skip via `skipUnlessWritesAllowed()` in helpers.ts.
+ * writes triggered by a plain GET render are invisible to a request guard, so
+ * the one known case (the first-visit `bd` insert in getCurrentBd) is closed
+ * by marking every allowed request with a header the server honors outside
+ * production (src/lib/auth/bdProvisioning.ts). Writing specs also skip via
+ * `skipUnlessWritesAllowed()` in helpers.ts.
  */
 export const test = base.extend<{ readOnlyGuard: void }>({
   readOnlyGuard: [
@@ -30,7 +33,13 @@ export const test = base.extend<{ readOnlyGuard: void }>({
           violations.push({ method, url });
           await route.abort('blockedbyclient');
         } else {
-          await route.fallback();
+          // Mark what gets through to the APP so the server can refuse the one
+          // write this request-level guard cannot see: getCurrentBd's
+          // first-visit `bd` insert (src/lib/auth/bdProvisioning.ts; ignored
+          // in production). Other origins (Supabase, fonts) get no extra
+          // header: a custom one would force a CORS preflight on them.
+          const toApp = new URL(url).origin === new URL(appOrigin).origin;
+          await route.fallback(toApp ? { headers: withReadOnlyMarker(route.request().headers()) } : {});
         }
       });
       await use();

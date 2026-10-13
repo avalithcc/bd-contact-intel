@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { and, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -31,6 +32,7 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/lib/identity/resolveDb";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import { isAllowedWorkEmail } from "@/lib/auth/allowedEmail";
+import { mayProvisionBd } from "@/lib/auth/bdProvisioning";
 import {
   buildMessageImportStatsQuery,
   toMessageImportStats,
@@ -78,6 +80,14 @@ export const getCurrentBd = cache(async function getCurrentBd() {
     where: eq(bd.email, user.email),
   });
   if (existing) return existing;
+  // A read-only e2e request (marked by tests/e2e/fixtures.ts) must not insert:
+  // the request-level guard cannot see this write. Ignored in production, so
+  // a real BD's first visit always provisions their row. See bdProvisioning.ts.
+  if (!mayProvisionBd(await headers(), process.env.NODE_ENV)) {
+    throw new Error(
+      "No bd row for this session, and first-visit provisioning is disabled for a read-only e2e request",
+    );
+  }
   // A first visit renders several server components that each call this
   // concurrently, so two of them can miss the lookup above and race to
   // insert. The no-op upsert makes the loser return the winner's row
