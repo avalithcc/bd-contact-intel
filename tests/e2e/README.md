@@ -23,18 +23,21 @@ production too (fail closed). In that mode:
   It skips outside a scratch database.
 - Today those are: the duplicate-merge test (`phase7.spec.ts`, additionally
   gated by `E2E_ALLOW_DESTRUCTIVE=1`), the CSV import (`phase14.spec.ts`) and
-  the admin conversation test (`phase11.spec.ts`, whose audit row is written by
-  the `revealAdminConversationAction` server action). All skip on production.
-  `phase11.spec.ts` is also stale: it targets a deleted route (see the comment
-  at the top of that file) and needs rewriting or deleting.
+  the admin conversation tests (`phase11.spec.ts`, whose audit row is written
+  by the `revealAdminConversationAction` server action; they also read
+  `audit_log` directly, which is safe because they only run on a scratch
+  database). All skip on production.
 - The setup project logs in through Supabase Auth (a session in Supabase's own
   `auth` schema, outside the app guard). It does not write app tables.
-- **Known gap:** server-side writes during a plain GET render are invisible to
-  the request guard. The one known case is `getCurrentBd`
-  (`src/lib/queries.ts:80`, called from the app layout on every render), which
-  inserts a `bd` row the first time a session email has none. A seeded e2e
-  account already has its row, so this should not fire, but read-only is not
-  strictly "by construction" until that write is gone or tested.
+- **Server-side writes during a plain GET render** are invisible to a request
+  guard. The one known case, `getCurrentBd` (`src/lib/queries.ts`, called from
+  the app layout on every render) inserting a `bd` row on a session's first
+  visit, is closed another way: the guard adds an `x-e2e-read-only: 1` header
+  to every request it lets through to the app, and `getCurrentBd` throws
+  instead of inserting when it sees it (`src/lib/auth/bdProvisioning.ts`). The
+  marker is ignored when `NODE_ENV` is `production`, so a real BD's first visit
+  always provisions their row. `auth.setup.ts` uses the guarded `test` for the
+  same reason (the post-login landing renders the layout).
 
 ## Writing mode (scratch database only)
 
@@ -46,9 +49,22 @@ server on `:3000` normally loads `.env.local`, i.e. production). Without a
 scratch `DATABASE_URL` it keeps the old behaviour: it reuses a server on
 `:3000`, which is safe because the request guard blocks writes.
 
-To use it, seed a scratch database (`scripts/seed-launch-readiness.ts`, see
-`tests/launch-readiness`) and run
-`DATABASE_URL=postgres://localhost/x_e2e npx playwright test`. The shell
+To use it, build a scratch database from the migration chain (so row-level
+security matches production; `db:push` leaves it off), seed it, and run:
+
+```bash
+dropdb --if-exists bd_contact_intel_e2e && createdb bd_contact_intel_e2e
+DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npm run db:migrate
+DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e \
+  E2E_EMAIL=<test account email> npx tsx scripts/seed-launch-readiness.ts --execute
+DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npx playwright test
+```
+
+Always pass `DATABASE_URL` explicitly: `.env` and drizzle-kit load the
+production URL. `.env.e2e.local` (gitignored) may hold the scratch
+`DATABASE_URL` and `E2E_EMAIL` for the seed script; never put a production
+credential in it. `E2E_PASSWORD` stays in `.env.local`, which
+`playwright.config.ts` loads without overriding variables already set. The shell
 variable wins over `.env.local`. The login still goes to the Supabase Auth
 project configured in `.env.local`; whether that is acceptable for a scratch
 run is unverified. The filter specs assert against production-scale data (real
