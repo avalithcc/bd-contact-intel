@@ -46,8 +46,9 @@ const RULES: Record<Exclude<MemberTrigger, "auto_reply">, Rule> = {
   genuine_reply: { from: ["sent", "no_reply"], to: "replied" },
   discard: { from: ["drafted", "approved"], to: "discarded" },
   readmit: { from: ["discarded"], to: "drafted" },
-  // Unsubscribe stops every membership that can still send or be followed up.
-  opt_out: { from: ["drafted", "approved", "sent", "no_reply"], to: "discarded" },
+  // Unsubscribe reaches every live membership, including `replied`: that member
+  // is a warm lead in Seguimientos and a BD could otherwise email them by hand.
+  opt_out: { from: ["drafted", "approved", "sent", "no_reply", "replied"], to: "discarded" },
 };
 
 export function canTransition(
