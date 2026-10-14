@@ -1887,7 +1887,7 @@ export type FollowUpQueueItem = typeof followUpQueueItem.$inferSelect;
 export type NewFollowUpQueueItem = typeof followUpQueueItem.$inferInsert;
 
 // Lusha reveal ledger (lusha-reveal, PR 3): one row per paid or attempted Lusha event. It is the never-pay-twice cache,
-// the input to the daily credit cap (sum(credits_charged) over `at`, never Lusha's eventually consistent balance) and
+// the input to the daily credit cap (sum(coalesce(credits_charged, credits_reserved)) over `at`, never Lusha's eventually consistent balance) and
 // the spend audit trail. `field` 'search' | 'emails' | 'phones'; `state` 'reserved' (in flight) | 'settled' | 'failed'
 // (a failed row keeps its reserved amount counting); `outcome` is null while reserved, then for a search row
 // 'matched' | 'no_match' | 'match_rejected' and for a reveal row 'revealed' | 'no_value' | 'compliance_restricted'.

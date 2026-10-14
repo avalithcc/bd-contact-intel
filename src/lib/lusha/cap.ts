@@ -2,6 +2,9 @@
 // place. Pure: callers pass the credits already spent today (summed from our
 // own ledger, never from Lusha's eventually-consistent usage endpoint).
 
+import { addDaysToDateString, argentinaCalendarDate, argentinaInstantBoundary } from "@/lib/tasks/argentinaDate";
+import { SEARCH_COST, expectedCost, type CanRevealEntry, type LushaField } from "./pricing";
+
 export const DEFAULT_DAILY_CREDIT_CAP = 12;
 
 export type CapSource = "default" | "env" | "invalid";
@@ -64,4 +67,32 @@ export function evaluateCap({ spentToday, cap, expected }: CapInput): CapDecisio
     allowed: spentToday + expected <= cap,
     remaining: Math.max(0, cap - spentToday),
   };
+}
+
+/**
+ * The Argentina business day containing `now`, as real UTC instants [start, end). The ledger's `at` is a
+ * real timestamp, so this uses argentinaInstantBoundary; argentinaDayBoundaries is naive 00:00 UTC and only
+ * valid for task.due_at (argentinaDayBoundariesUsage.test.ts). Not Lusha's resetsAt, which tracks requests.
+ */
+export function artDayWindow(now: Date): { start: Date; end: Date } {
+  const today = argentinaCalendarDate(now);
+  return { start: argentinaInstantBoundary(today), end: argentinaInstantBoundary(addDaysToDateString(today, 1)) };
+}
+
+export type Reservation =
+  | { ok: true; credits: number }
+  | { ok: false; reason: "cap_exceeded"; remaining: number }
+  | { ok: false; reason: "no_price_list" | "not_revealable" };
+
+/**
+ * What to reserve, and whether the cap allows it. `canReveal` MUST be the price list read in the same
+ * transaction as the reservation. A price of 0 still reserves one credit, so a stale or free-looking
+ * price can never bypass the cap (nor the cap-0 kill switch); the settle reconciles to what Lusha billed.
+ */
+export function planReservation(input: { field: LushaField; canReveal: readonly CanRevealEntry[] | null | undefined; spentToday: number; cap: number }): Reservation {
+  const price = expectedCost(input.field, input.canReveal);
+  if (!price.ok) return price;
+  const credits = Math.max(SEARCH_COST, price.credits);
+  const decision = evaluateCap({ spentToday: input.spentToday, cap: input.cap, expected: credits });
+  return decision.allowed ? { ok: true, credits } : { ok: false, reason: "cap_exceeded", remaining: decision.remaining };
 }

@@ -96,3 +96,13 @@ export function resolveRevealState(
   if (!price.ok) return { kind: "unavailable", reason: "not_revealable", retry: false };
   return gate(price.credits, { kind: "revealable", price: price.credits });
 }
+
+/** A ledger row as the reader selects it: LedgerRow plus the per-contact compliance flag. */
+export type ReadRow = LedgerRow & { blocked: boolean };
+
+/** Folds the reader's rows (one per field, latest) into resolveRevealState's input. */
+export function toLatestRows(rows: readonly ReadRow[]): LatestRows {
+  const out: LatestRows = { complianceBlocked: rows.some((r) => r.blocked) };
+  for (const { blocked: _blocked, ...row } of rows) out[row.field] = row;
+  return out;
+}
