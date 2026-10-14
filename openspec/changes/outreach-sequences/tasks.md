@@ -219,13 +219,13 @@ Commits:
 
 Reachable: nothing. Approval actions are imported by no page.
 
-- [ ] 7.1 RED/GREEN: `bulkApprovalGate.ts`: "N de M" gate; cases 1-of-3 (disabled), 3-of-3 (enabled), 3-of-4 after selection change (disabled).
-- [ ] 7.2 Action `markDraftReviewed` (called when the dialog opens; passive listing never marks).
-- [ ] 7.3 Actions `approveMember` (single approve is not gated by the counter) and `approveBulk` (server re-asserts the gate; rejects the whole request naming any unreviewed member; forged request approves none). Approval records actor and time, binds to current content, computes `scheduled_for` via `step1DueAt`.
-- [ ] 7.4 RED/GREEN: reject a step 1 subject beginning with `Re:` or `Fwd:` at approval, with an explanation.
-- [ ] 7.5 Action `cancelApproval` ("Cancelar envio"): back to `drafted`, `approved_at` cleared.
-- [ ] 7.6 RED/GREEN: reminder approval is independent of step 1; reminder release instant is the first run at or after BOTH 7 days after the send and the next 09:00 Miami after approval (cases: approved 08:00 on due day releases that day; approved 10:00 waits for the next day); "Adelantar recordatorio" moves the due date but never bypasses approval, the reply check, or the cap. Extends `schedule.ts` from PR 2.
-- [ ] 7.7 Every approve, cancel, discard, re-admit and regenerate writes the actor BD and timestamp (test per action).
+- [x] 7.1 RED/GREEN: `bulkApprovalGate.ts`: "N de M" gate; cases 1-of-3 (disabled), 3-of-3 (enabled), 3-of-4 after selection change (disabled).
+- [x] 7.2 Action `markDraftReviewed` (called when the dialog opens; passive listing never marks).
+- [x] 7.3 Actions `approveMember` (single approve is not gated by the counter) and `approveBulk` (server re-asserts the gate; rejects the whole request naming any unreviewed member; forged request approves none). Approval records actor and time, binds to current content, computes `scheduled_for` via `step1DueAt`.
+- [x] 7.4 RED/GREEN: reject a step 1 subject beginning with `Re:` or `Fwd:` at approval, with an explanation.
+- [x] 7.5 Action `cancelApproval` ("Cancelar envio"): back to `drafted`, `approved_at` cleared.
+- [x] 7.6 RED/GREEN: reminder approval is independent of step 1; reminder release instant is the first run at or after BOTH 7 days after the send and the next 09:00 Miami after approval (cases: approved 08:00 on due day releases that day; approved 10:00 waits for the next day); "Adelantar recordatorio" moves the due date but never bypasses approval, the reply check, or the cap. Extends `schedule.ts` from PR 2.
+- [x] 7.7 Every approve, cancel, discard, re-admit and regenerate writes the actor BD and timestamp (test per action).
 
 Commits:
 - `feat(sequences): add review tracking and server-enforced bulk approval gate`
@@ -235,8 +235,8 @@ Commits:
 
 Reachable: nothing new. Existing callers of `sendGmailMessage({ bdId })` must see identical behavior.
 
-- [ ] 8.1 RED: characterization tests pinning today's `sendGmailMessage` behavior (token refresh, error classification, `recordSentEmail`) BEFORE refactoring.
-- [ ] 8.2 REFACTOR: extract the body into `sendFromAccountRow(account, input)` (D4); `sendGmailMessage({ bdId })` becomes a thin wrapper loading by `bdId`. Characterization tests stay green.
+- [x] 8.1 RED: characterization tests pinning today's `sendGmailMessage` behavior (token refresh, error classification, `recordSentEmail`) BEFORE refactoring.
+- [x] 8.2 REFACTOR: extract the body into `sendFromAccountRow(account, input)` (D4); `sendGmailMessage({ bdId })` becomes a thin wrapper loading by `bdId`. Characterization tests stay green.
 - [ ] 8.3 GREEN: `sendGmailMessageFromAccount({ accountId, ... })` loads by `email_account.id`; sender address comes from the row, never a literal.
 - [ ] 8.4 RED/GREEN: `buildRawMessage` gains `extraHeaders?: string[]`, each value through `assertSafeHeaderValue` (header-injection test with CR/LF).
 - [ ] 8.5 Sequence metadata (Sequence id, step) flows into the `email_sent` activity metadata through the existing `recordSentEmail` path; reminder threading uses the stored `In-Reply-To`/`References`/`threadId` inputs.

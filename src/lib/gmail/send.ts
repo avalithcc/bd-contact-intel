@@ -13,8 +13,7 @@ import { assertSafeHeaderValue, buildSendPayload, type MessageContent, type Repl
 // `bodyHtml` (the text/plain alternative is derived from it). The union makes
 // "both" and "neither" unrepresentable, so nobody writes the body twice or
 // lets the two parts drift apart.
-type SendGmailInput = {
-  bdId: string;
+type SendGmailBody = {
   to: string;
   subject: string;
   leadId?: string;
@@ -25,20 +24,37 @@ type SendGmailInput = {
   reply?: ReplyTarget;
 } & MessageContent;
 
-export async function sendGmailMessage(input: SendGmailInput) {
-  const { bdId, to, subject, leadId, companyKey, personId, reply } = input;
-  // Fail fast on the untrusted recipient, before any DB read or token refresh.
+type SendGmailInput = { bdId: string } & SendGmailBody;
+
+type EmailAccountRow = typeof emailAccount.$inferSelect;
+
+// Fail fast on the untrusted recipient, before any DB read or token refresh.
+function assertSafeSendInput({ to, reply }: SendGmailBody) {
   assertSafeHeaderValue("To", to);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
   }
-  const content: MessageContent =
-    input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
+}
+
+export async function sendGmailMessage(input: SendGmailInput) {
+  const { bdId, ...body } = input;
+  assertSafeSendInput(body);
   const [account] = await db
     .select()
     .from(emailAccount)
     .where(eq(emailAccount.bdId, bdId));
+  return sendFromAccountRow(account, body);
+}
+
+// The one send body (design D4): token refresh, error classification, the Gmail
+// call and `recordSentEmail`. Every entry point loads an account row and lands
+// here, so there is a single copy of this logic. The sender is always the
+// row's own address, never a literal.
+async function sendFromAccountRow(account: EmailAccountRow | undefined, input: SendGmailBody) {
+  const { to, subject, leadId, companyKey, personId, reply } = input;
+  const content: MessageContent =
+    input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
 
   if (!account || account.status !== "connected" || !account.refreshTokenEncrypted) {
     throw new GmailSendError(
@@ -54,7 +70,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
       .set({
         lastErrorMessage: `Gmail is not configured on the server (missing: ${configResult.missing.join(", ")}).`,
       })
-      .where(eq(emailAccount.bdId, bdId));
+      .where(eq(emailAccount.bdId, account.bdId));
     throw new GmailSendError(
       "not_configured",
       "Gmail is not configured on the server. Contact an admin.",
@@ -88,7 +104,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
         ...(classification.kind === "revoked" ? { status: "error" as const } : {}),
         lastErrorMessage: classification.message,
       })
-      .where(eq(emailAccount.bdId, bdId));
+      .where(eq(emailAccount.bdId, account.bdId));
 
     if (classification.kind === "config") {
       throw new GmailSendError(
@@ -124,7 +140,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
     await db
       .update(emailAccount)
       .set({ lastErrorMessage: `Gmail send failed: ${detail.slice(0, 300)}` })
-      .where(eq(emailAccount.bdId, bdId));
+      .where(eq(emailAccount.bdId, account.bdId));
     throw new GmailSendError("send_failed", `Gmail send failed: ${detail}`);
   }
 
@@ -133,7 +149,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
   await db
     .update(emailAccount)
     .set({ lastErrorMessage: null })
-    .where(eq(emailAccount.bdId, bdId));
+    .where(eq(emailAccount.bdId, account.bdId));
 
   // One metadata read for the Message-ID Gmail assigned (needed by "Responder").
   // Null on any failure — never fails the send; the sync fills the column later.
@@ -144,7 +160,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
   });
 
   await recordSentEmail({
-    bdId,
+    bdId: account.bdId,
     message: {
       bdEmail: account.emailAddress,
       to,
@@ -159,7 +175,7 @@ export async function sendGmailMessage(input: SendGmailInput) {
       leadId,
       companyKey,
       personId,
-      actorBdId: bdId,
+      actorBdId: account.bdId,
       metadata: { to, subject, gmailMessageId: sent.id, gmailThreadId: sent.threadId },
     } as NewActivity,
   });
