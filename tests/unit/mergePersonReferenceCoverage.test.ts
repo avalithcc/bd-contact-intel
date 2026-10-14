@@ -56,6 +56,10 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
     excluded:
       "person_id here is a convenience first-match column only; email_message_person is the authoritative source and IS repointed (this fix) — see email_message's doc comment in schema.ts",
   },
+  sequence_member: {
+    excluded:
+      "outreach-sequences PR 1 adds the table inert: no row exists until the chain's final PR, so a merge has nothing to repoint today. Deciding repoint vs. refuse-while-member-exists (unique(sequence_id, person_id) can collide on repoint) is OPEN and must be settled in a later PR of that chain before any sequence_member row is created",
+  },
   linkedin_scrape_job: {
     excluded: "one-off Apify scrape run bookkeeping, not read through personId for any live feature",
   },
