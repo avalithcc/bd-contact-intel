@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusión con secuencia · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+</head>
+<body>
+<main class="page">
+
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Panel de aviso que aparece <strong>dentro de <span class="mono">/admin/duplicates</span></strong> (cambio <span class="mono">outreach-sequences</span>, capacidad <span class="mono">sequence-roster</span>) cuando una de las dos personas a fusionar está en una secuencia. Se muestra sin la barra lateral a propósito: es la decisión de un panel, no una pantalla nueva — en la app vive debajo de la tabla <span class="mono">.compare</span> que ya existe en <a href="../../crm-hubspot-ux/mockups/duplicates.html">duplicates.html</a>. Hoy la app bloquea la fusión con un cartel genérico; esto es lo que falta para cumplir el requisito "avisa y deja cancelar el envío". Vista de escritorio únicamente.</div><span class="tag tag-scope">En alcance: outreach-sequences</span></div>
+
+<div class="page-header"><div class="titles"><div class="eyebrow">Duplicados · fusión bloqueada</div><h1>uno de los dos está en una secuencia<span class="dot">.</span></h1>
+<p class="meta">La fusión no se aplica sola cuando hay una membresía de secuencia de por medio. Primero se ve qué está en juego, y recién después se confirma.</p></div></div>
+
+<h2 class="mb-lg">1. Hay un envío programado — el caso urgente</h2>
+
+<div class="card mb-lg">
+<div class="card-header"><h3>Brian Casteel &nbsp;·&nbsp; Brian C. Casteel</h3><span class="badge badge-warn">Fusión bloqueada</span></div>
+<div class="card-body">
+
+<div class="alert alert-warn mb-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4M12 17h.01"/></svg><div><span class="title">Hay un correo aprobado esperando salir.</span> Si fusionás ahora, ese correo se manda bajo una identidad que acabás de cambiar. Cancelalo primero, o esperá a que salga.</div></div>
+
+<div class="assoc">
+<div class="assoc-row"><span class="avatar avatar-sm a1">BC</span><span class="grow"><strong>Brian Casteel</strong> &nbsp;en&nbsp; <span class="mono">Florida + US · octubre</span></span><span class="badge badge-brand">Aprobado</span><span class="meta">sale mañana 09:00</span><a class="btn btn-danger btn-sm" href="#">Cancelar envío</a></div>
+<div class="assoc-row"><span class="avatar avatar-sm a3">BC</span><span class="grow"><strong>Brian C. Casteel</strong> &nbsp;·&nbsp; sin membresías</span><span class="badge badge-none">—</span></div>
+</div>
+
+<p class="help mt-lg">Al cancelar, ese miembro vuelve a <span class="mono">drafted</span> y la secuencia se detiene para él. No se borra nada: el borrador queda, y lo podés volver a aprobar después de fusionar.</p>
+
+</div>
+<div class="card-footer row between">
+<span class="meta">La fusión se habilita cuando no quede ningún envío programado.</span>
+<span class="row" style="gap:var(--space-sm)">
+<a class="btn btn-secondary btn-sm" href="#">Volver a duplicados</a>
+<button class="btn btn-primary btn-sm" disabled>Fusionar</button>
+</span>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">2. Cancelado — ahora sí se puede fusionar</h2>
+
+<div class="card mb-lg">
+<div class="card-header"><h3>Brian Casteel &nbsp;·&nbsp; Brian C. Casteel</h3><span class="badge badge-success">Lista para fusionar</span></div>
+<div class="card-body">
+<div class="alert alert-success mb-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg><div>Envío cancelado. La membresía se repunta al sobreviviente y queda en <span class="mono">drafted</span>, lista para que la apruebes de nuevo cuando quieras.</div></div>
+<div class="assoc">
+<div class="assoc-row"><span class="avatar avatar-sm a1">BC</span><span class="grow"><strong>Brian Casteel</strong> &nbsp;en&nbsp; <span class="mono">Florida + US · octubre</span></span><span class="badge badge-info">Borrador</span><span class="meta">se repunta al sobreviviente</span></div>
+</div>
+</div>
+<div class="card-footer row between">
+<span class="meta">Sobrevive <strong>Brian Casteel</strong>.</span>
+<span class="row" style="gap:var(--space-sm)">
+<a class="btn btn-secondary btn-sm" href="#">Volver a duplicados</a>
+<a class="btn btn-primary btn-sm" href="#">Fusionar</a>
+</span>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">3. Ya se le envió — nunca se borra</h2>
+
+<div class="card mb-lg">
+<div class="card-header"><h3>Kevin Harris &nbsp;·&nbsp; K. Harris</h3><span class="badge badge-info">Se repunta</span></div>
+<div class="card-body">
+<div class="alert alert-info mb-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><span class="title">Esta membresía se repunta, no se elimina.</span> Ya se le mandó un correo, y ese registro es lo único que impide volver a mandárselo. Borrarlo dejaría al sobreviviente re-enrolable y la misma persona recibiría el mismo correo dos veces, sin rastro del primero.</div></div>
+<div class="assoc">
+<div class="assoc-row"><span class="avatar avatar-sm a1">KH</span><span class="grow"><strong>Kevin Harris</strong> &nbsp;en&nbsp; <span class="mono">Florida + US · octubre</span></span><span class="badge badge-replied">Respondió</span><span class="meta">enviado hace 4 d · se conserva</span></div>
+</div>
+</div>
+<div class="card-footer row between">
+<span class="meta">No hay nada programado. El historial de envío viaja con el sobreviviente.</span>
+<span class="row" style="gap:var(--space-sm)">
+<a class="btn btn-secondary btn-sm" href="#">Volver a duplicados</a>
+<a class="btn btn-primary btn-sm" href="#">Fusionar</a>
+</span>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">4. Los dos en la MISMA secuencia — hay que elegir</h2>
+
+<div class="card mb-lg">
+<div class="card-header"><h3>Saumya Jossy &nbsp;·&nbsp; S. Jossy</h3><span class="badge badge-warn">Requiere confirmación</span></div>
+<div class="card-body">
+<div class="alert alert-warn mb-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4M12 17h.01"/></svg><div><span class="title">Las dos personas están en la misma secuencia.</span> Una sola membresía puede sobrevivir. Era una inscripción duplicada: eran la misma persona cargada dos veces.</div></div>
+<div class="assoc">
+<div class="assoc-row"><span class="avatar avatar-sm a4">SJ</span><span class="grow"><strong>Saumya Jossy</strong> &nbsp;en&nbsp; <span class="mono">Florida + US · octubre</span></span><span class="badge badge-success">Sobrevive</span><span class="meta">borrador editado a mano</span></div>
+<div class="assoc-row"><span class="avatar avatar-sm a2">SJ</span><span class="grow"><strong>S. Jossy</strong> &nbsp;en&nbsp; <span class="mono">Florida + US · octubre</span></span><span class="badge badge-discarded">Se descarta</span><span class="meta">motivo: <span class="mono">merge_duplicate</span></span></div>
+</div>
+<p class="help mt-lg">Sobrevive la que tiene el borrador editado a mano, porque es la que lleva trabajo tuyo adentro. El descarte queda registrado con su motivo, no se borra la fila.</p>
+</div>
+<div class="card-footer row between">
+<span class="meta">Se te dice cuál sobrevive <strong>antes</strong> de confirmar.</span>
+<span class="row" style="gap:var(--space-sm)">
+<a class="btn btn-secondary btn-sm" href="#">Volver a duplicados</a>
+<a class="btn btn-primary btn-sm" href="#">Fusionar y descartar la duplicada</a>
+</span>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">Estado: ninguno está en una secuencia</h2>
+<p class="meta mb-lg">El caso normal. El panel no aparece y la fusión sigue su camino de siempre — mismo componente <span class="mono">.empty</span> del sistema de diseño, mostrado acá sólo como referencia de que no hay pantalla intermedia.</p>
+<div class="card"><div class="empty"><div class="empty-icon"><svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg></div><h3>Sin secuencias de por medio</h3><p>Ninguna de las dos personas pertenece a una secuencia. La fusión no necesita confirmación extra.</p></div></div>
+
+</main>
+</body>
+</html>
