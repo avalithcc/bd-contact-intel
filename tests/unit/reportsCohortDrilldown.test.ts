@@ -16,6 +16,7 @@ import {
   cohortHasReplyColumns,
   roleGroupCell,
   cohortHasRoleColumn,
+  jobTitleLine,
   isCohortPopulation,
   type CohortRawRow,
 } from "@/lib/reports/cohortDrilldown";
@@ -101,6 +102,7 @@ const RAW: CohortRawRow = {
   ownerBdName: "Cristian Civita",
   status: "replied",
   roleGroup: "c_level_tech",
+  jobTitle: "CTO & Co-Founder",
   createdAt: "2026-10-02 12:00:00+00",
   replyAt: "2026-10-14 13:42:00+00",
   sequenceId: "s1",
@@ -194,4 +196,24 @@ test("cohort rows carry role_group (NULL stays NULL) and only the new population
   for (const p of ["contacted", "replied", "meeting"] as const) assert.equal(cohortHasRoleColumn(p), false);
   const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population: "new" })).sql);
   assert.ok(q.includes("person.role_group as pbc_role_group"));
+});
+
+test("jobTitleLine: a title shows, an absent or blank one yields no line, a long one is kept whole for the tooltip", () => {
+  assert.equal(jobTitleLine("CTO & Co-Founder"), "CTO & Co-Founder");
+  assert.equal(jobTitleLine("  Head of Engineering  "), "Head of Engineering");
+  assert.equal(jobTitleLine(null), null);
+  assert.equal(jobTitleLine(""), null);
+  assert.equal(jobTitleLine("   "), null);
+  const long = "Senior Vice President of Global Engineering, Platform Reliability and Developer Experience ".repeat(4).trim();
+  assert.equal(jobTitleLine(long), long); // truncation is CSS-only; the full text feeds the title attribute
+});
+
+test("every population's rows carry job_title (the line is shown in all four dialogs)", () => {
+  const [a, b] = buildCohortDrilldownRows([RAW, { ...RAW, personId: "p2", jobTitle: null }]);
+  assert.equal(a!.jobTitle, "CTO & Co-Founder");
+  assert.equal(b!.jobTitle, null);
+  for (const population of ["new", "contacted", "replied", "meeting"] as const) {
+    const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population })).sql);
+    assert.ok(q.includes("person.job_title as pbc_job_title"), population);
+  }
 });

@@ -7,7 +7,7 @@ import { ChevronRightIcon } from "@/components/icons";
 import { KpiDrilldownCard, DrilldownDialog, useDrilldown } from "./KpiDrilldownCard";
 import { getCohortDrilldownAction } from "./actions";
 import { drilldownCacheKey } from "@/lib/reports/drilldownCacheKey";
-import { cohortHasReplyColumns, cohortHasRoleColumn, roleGroupCell, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
+import { cohortHasReplyColumns, cohortHasRoleColumn, jobTitleLine, roleGroupCell, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -70,6 +70,17 @@ function CohortSubtitle({ summary, note }: { summary: string; note: string }) {
 
 const dash = <span className="meta">—</span>;
 
+/** Muted job-title line under the name; renders nothing (no empty line, no dash) when there is no title. */
+function ContactTitle({ jobTitle }: { jobTitle: string | null }) {
+  const line = jobTitleLine(jobTitle);
+  if (!line) return null;
+  return (
+    <span className="cell-sub cell-sub-clamp" title={line}>
+      {line}
+    </span>
+  );
+}
+
 /** Unclassified (NULL) is a muted badge, same as the outreach list's unclassified startup badge. */
 function roleCell(roleGroup: string | null, l: CohortDrilldownLabels) {
   const cell = roleGroupCell(roleGroup, l.roleGroups);
@@ -104,6 +115,7 @@ function CohortRowsTable({ population, rows, labels: l }: { population: CohortPo
           <tr key={row.personId}>
             <td>
               <Link href={`/contacts/${row.personId}`}>{row.personName}</Link>
+              <ContactTitle jobTitle={row.jobTitle} />
             </td>
             {withRole && <td>{roleCell(row.roleGroup, l)}</td>}
             <td>{row.companyName ?? "—"}</td>

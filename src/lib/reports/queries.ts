@@ -500,6 +500,7 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
         person.owner_bd_id as pbc_owner_bd_id,
         person.status as pbc_status,
         person.role_group as pbc_role_group,
+        person.job_title as pbc_job_title,
         person.created_at as pbc_created_at
       from ${person}
       where ${cohortScopeSql(params)}${statusFilter}
@@ -512,6 +513,7 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
       bd.name as owner_bd_name,
       rpt_cohort.pbc_status as status,
       rpt_cohort.pbc_role_group as role_group,
+      rpt_cohort.pbc_job_title as job_title,
       rpt_cohort.pbc_created_at as created_at,
       ${replySelect}
     from rpt_cohort
@@ -531,6 +533,7 @@ export type CohortDrilldownRawResultRow = {
   owner_bd_name: string | null;
   status: string;
   role_group: string | null;
+  job_title: string | null;
   created_at: Date | string;
   reply_at: Date | string | null;
   sequence_id: string | null;

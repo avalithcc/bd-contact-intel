@@ -40,6 +40,12 @@ export function cohortHasRoleColumn(population: CohortPopulation): boolean {
   return population === "new";
 }
 
+/** Muted second line under the contact name: the raw job title, or no line at all when absent/blank. */
+export function jobTitleLine(jobTitle: string | null): string | null {
+  const trimmed = jobTitle?.trim();
+  return trimmed ? trimmed : null;
+}
+
 export type RoleGroupCell = { kind: "group"; label: string } | { kind: "unclassified" };
 
 /**
@@ -70,6 +76,7 @@ export interface CohortRawRow {
   ownerBdName: string | null;
   status: string;
   roleGroup: string | null;
+  jobTitle: string | null;
   createdAt: Date | string;
   replyAt: Date | string | null;
   sequenceId: string | null;
@@ -84,6 +91,8 @@ export interface CohortRow {
   status: string;
   /** `person.role_group`; `null` = not classified yet (distinct from `no_position`). */
   roleGroup: string | null;
+  /** Raw `person.job_title` (free text). */
+  jobTitle: string | null;
   createdAt: Date;
   /** `null` for a contact moved to Respondió by hand (no reply event). */
   replyAt: Date | null;
@@ -100,6 +109,7 @@ export function buildCohortDrilldownRows(rows: readonly CohortRawRow[]): CohortR
     ownerBdName: r.ownerBdName,
     status: r.status,
     roleGroup: r.roleGroup,
+    jobTitle: r.jobTitle,
     createdAt: parseDbTimestamp(r.createdAt),
     replyAt: r.replyAt === null ? null : parseDbTimestamp(r.replyAt),
     sequenceId: r.sequenceId,
