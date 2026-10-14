@@ -55,6 +55,27 @@ export interface SeedResolution {
   rejected: { candidate: SeedCandidate; reason: SeedRejection }[];
 }
 
+export interface SeedArgs {
+  apply: boolean;
+  actor: string | null;
+}
+
+/** `--dry-run` is the default. Writing needs BOTH `--apply` and `--actor=<bd id>`; anything unknown is refused. */
+export function parseSeedArgs(argv: readonly string[]): SeedArgs {
+  let apply = false;
+  let dryRun = false;
+  let actor: string | null = null;
+  for (const a of argv) {
+    if (a === "--apply") apply = true;
+    else if (a === "--dry-run") dryRun = true;
+    else if (a.startsWith("--actor=")) actor = a.slice(8).trim() || null;
+    else throw new Error(`Unknown argument: ${a}. Valid: --dry-run (default), --apply, --actor=<bd id>`);
+  }
+  if (apply && dryRun) throw new Error("--apply and --dry-run contradict each other.");
+  if (apply && !actor) throw new Error("--apply requires --actor=<bd id> for the audit log.");
+  return { apply, actor };
+}
+
 export function resolveSeedRoster(candidates: readonly SeedCandidate[], guards: SeedGuards): SeedResolution {
   const out: SeedResolution = { admitted: [], rejected: [] };
   const counts = new Map(guards.activeCountByCompany);

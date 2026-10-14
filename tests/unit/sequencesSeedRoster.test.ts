@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SEED_ROSTER, SEED_SEQUENCE_NAME, resolveSeedRoster, type SeedCandidate, type SeedGuards } from "@/lib/sequences/seedRoster";
+import { SEED_ROSTER, SEED_SEQUENCE_NAME, parseSeedArgs, resolveSeedRoster, type SeedCandidate, type SeedGuards } from "@/lib/sequences/seedRoster";
 
 const candidate = (id: string, over: Partial<SeedCandidate> = {}): SeedCandidate => ({
   label: `Person ${id}`,
@@ -97,6 +97,16 @@ test("is pure: the inputs are left untouched", () => {
   const counts = new Map([["twilio", 1]]);
   resolveSeedRoster([candidate("a", { companyKey: "twilio" })], guards({ activeCountByCompany: counts }));
   assert.deepEqual([...counts], [["twilio", 1]]);
+});
+
+test("parseSeedArgs: dry run is the default and writing needs --apply AND --actor", () => {
+  assert.deepEqual(parseSeedArgs([]), { apply: false, actor: null });
+  assert.deepEqual(parseSeedArgs(["--dry-run", "--actor=abc"]), { apply: false, actor: "abc" });
+  assert.deepEqual(parseSeedArgs(["--apply", "--actor=abc"]), { apply: true, actor: "abc" });
+  assert.throws(() => parseSeedArgs(["--apply"]), /--actor/);
+  assert.throws(() => parseSeedArgs(["--apply", "--actor="]), /--actor/);
+  assert.throws(() => parseSeedArgs(["--apply", "--dry-run", "--actor=abc"]), /contradict/);
+  assert.throws(() => parseSeedArgs(["--execute"]), /Unknown argument/);
 });
 
 test("the hand-picked roster is the owner's ten, in tier order, with at most two per company", () => {
