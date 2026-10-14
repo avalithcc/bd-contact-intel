@@ -194,3 +194,35 @@ The Sequence MUST carry a `daily_send_cap` (positive integer, default 5) and a `
 - GIVEN a BD enters a cap of 12
 - WHEN they save
 - THEN the save succeeds and a warning about domain reputation is shown
+
+### Requirement: Merging a person who is in a Sequence warns and offers to cancel the send
+
+Owner decision 2026-10-14. When a person merge involves either party being a `sequence_member`, the merge flow MUST NOT silently repoint and MUST NOT silently refuse. It MUST stop and show the BD what is at stake, then let them act.
+
+The warning MUST name, for each affected membership: the sequence, the member's `state`, and — the part that matters — whether a send is **scheduled**. A member in state `approved` has an email queued for release; merging underneath it changes who that email reaches. The BD MUST be able to **cancel the scheduled send from the warning itself**, before resolving the merge.
+
+**A member that has already been sent MUST NEVER be deleted by a merge.** `sequence_send_claim` is declared `ON DELETE cascade` against `sequence_member` (migration `0041`), and the partial unique index `(sequence_member_id, step) WHERE outcome <> 'failed'` on that table is the *only* thing preventing a second send of the same step. Deleting a `sent` or `replied` member therefore destroys the claim, leaves the survivor re-enrollable, and the same person receives the same email twice with no record of the first. Such a member MUST be repointed to the survivor, or the merge MUST be refused — never deleted.
+
+The same-sequence collision against `unique(sequence_id, person_id)` is resolved by keeping ONE membership and discarding the other with a reason, and the BD MUST be told which one survives before confirming. A duplicate enrollment is the expected cause, since both rows were the same human.
+
+`tests/unit/mergePersonReferenceCoverage.test.ts` currently lists `sequence_member` as excluded from repointing with the reason "decision still open". That reason is now stale and MUST be replaced with this decision.
+
+#### Scenario: Scheduled send is surfaced and can be cancelled
+
+- GIVEN a merge where one party is a member in state `approved`
+- WHEN the BD opens the merge
+- THEN the merge is blocked and the scheduled send is named
+- AND the BD can cancel that send without leaving the warning
+
+#### Scenario: A sent member is never deleted
+
+- GIVEN a merge where one party is a member in state `sent`
+- WHEN the merge is resolved
+- THEN that member is repointed or the merge is refused
+- AND no `sequence_send_claim` row is destroyed
+
+#### Scenario: Same-sequence collision names the survivor
+
+- GIVEN both parties are members of the SAME sequence
+- WHEN the BD opens the merge
+- THEN they are told which membership survives and which is discarded, before confirming
