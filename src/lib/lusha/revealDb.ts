@@ -30,7 +30,7 @@ export async function getDailySpend(now: Date = new Date(), reader: Reader = db)
 export type ReserveResult =
   | { ok: true; reservationId: string; credits: number; searchId: string | null }
   | { ok: false; reason: "cap_exceeded"; remaining: number }
-  | { ok: false; reason: "busy" | "no_search" | "no_price_list" | "not_revealable" };
+  | { ok: false; reason: "busy" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
 
 /**
  * ONE short transaction: advisory lock, the day's spend, a fresh read of the latest search row (price and
@@ -43,6 +43,19 @@ export async function reserve(
   const now = input.now ?? new Date();
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${LUSHA_CAP_LOCK})`);
+    // FOR SHARE makes mergeContacts' FOR UPDATE wait for this reservation instead of racing it (credits on a tombstone).
+    // The same read answers "do we already own this value": a settled `revealed` row of ANY search blocks a second payment.
+    const [owner] = await tx
+      .select({
+        mergedIntoId: person.mergedIntoId,
+        owned: sql<boolean>`exists(select 1 from lusha_reveal r where r.person_id = ${input.personId} and r.field = ${input.field} and r.state = 'settled' and r.outcome = 'revealed')`,
+      })
+      .from(person)
+      .where(eq(person.id, input.personId))
+      .for("share");
+    if (!owner) return { ok: false, reason: "not_found" };
+    if (owner.mergedIntoId) return { ok: false, reason: "merged" };
+    if (owner.owned) return { ok: false, reason: "already_revealed" };
     const spentToday = await getDailySpend(now, tx);
     let search: { id: string; lushaContactId: string | null; payload: unknown } | null = null;
     if (input.field !== "search") {
@@ -187,18 +200,21 @@ export async function settleReveal(
         await sp.insert(duplicateCandidate).values({ personAId, personBId, reason: "lusha_reveal_email", matchKey: normalized }).onConflictDoNothing();
         result.duplicate = { personId: other.id, name: [other.first, other.last].filter(Boolean).join(" ") };
       });
-    } catch {
+    } catch (e) {
       result.written = null;
       result.duplicate = null;
       result.writeFailed = true;
-      await tx.update(lushaReveal).set({ errorCode: "write_failed" }).where(eq(lushaReveal.id, input.reservationId));
+      // Keep the cause: a programming error must be diagnosable from the ledger, not silent.
+      const cause = JSON.stringify({ writeError: { code: (e as { code?: unknown })?.code ?? null, message: String((e as Error)?.message ?? e).slice(0, 300) } });
+      await tx.update(lushaReveal).set({ errorCode: "write_failed", payload: sql`${lushaReveal.payload} || ${cause}::jsonb` }).where(eq(lushaReveal.id, input.reservationId));
     }
     return result;
   });
 }
 
 /**
- * The latest ledger row per field for the CURRENT search: at most three rows, one scan of
+ * The latest ledger row per field for the CURRENT search, except that a paid (`revealed`) row of any search wins
+ * its field: at most three rows, one scan of
  * (person_id, field, at desc). `complianceBlocked` covers every search of the Contact (D6).
  */
 export async function getRevealState(personId: string, reader: Pick<typeof db, "selectDistinctOn"> = db): Promise<LatestRows> {
@@ -216,7 +232,13 @@ export async function getRevealState(personId: string, reader: Pick<typeof db, "
       blocked: sql<boolean>`exists(select 1 from lusha_reveal c where c.person_id = ${personId} and c.outcome = 'compliance_restricted')`,
     })
     .from(lushaReveal)
-    .where(and(eq(lushaReveal.personId, personId), or(eq(lushaReveal.field, "search"), sql`${lushaReveal.searchId} = ${latestSearch}`)))
-    .orderBy(lushaReveal.field, desc(lushaReveal.at));
+    .where(
+      and(
+        eq(lushaReveal.personId, personId),
+        // The current search's rows, plus any paid value of ANY search: a revealed value is person-level (a merge can leave it on an older search).
+        or(eq(lushaReveal.field, "search"), sql`${lushaReveal.searchId} = ${latestSearch}`, and(eq(lushaReveal.state, "settled"), eq(lushaReveal.outcome, "revealed"))),
+      ),
+    )
+    .orderBy(lushaReveal.field, sql`(${lushaReveal.state} = 'settled' and ${lushaReveal.outcome} = 'revealed') desc`, desc(lushaReveal.at));
   return toLatestRows(rows as Parameters<typeof toLatestRows>[0]);
 }

@@ -76,7 +76,9 @@ export function resolveRevealState(
   if (rows.complianceBlocked || [search, settled(rows.emails), settled(rows.phones)].some((r) => r?.outcome === "compliance_restricted")) {
     return { kind: "blocked" };
   }
-  if (own?.outcome === "revealed") return { kind: "revealed", value: own.value };
+  // A revealed VALUE is person-level: we own it whichever search paid for it. Only negative outcomes are search-scoped.
+  const paid = settled(rows[field]);
+  if (paid?.outcome === "revealed") return { kind: "revealed", value: paid.value };
 
   // Every spend, including a free-looking one and every retry, goes through the cap: a
   // stale price of 0 must never present itself as an uncapped action.

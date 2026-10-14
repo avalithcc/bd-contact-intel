@@ -29,6 +29,13 @@ test("reserve takes the advisory lock before it reads the spend, and claims on t
   assert.match(reserveBody, /onConflictDoNothing\(\{ target: \[lushaReveal\.personId, lushaReveal\.field\], where: sql`state = 'reserved'`/);
 });
 
+test("reserve share-locks the person row and checks for an already revealed value inside the lock", () => {
+  const body = code.slice(code.indexOf("export async function reserve"), code.indexOf("const inFlight"));
+  assert.match(body, /\.for\("share"\)/);
+  assert.match(body, /r\.outcome = 'revealed'/);
+  assert.doesNotMatch(body.slice(body.indexOf("r.outcome = 'revealed'") - 200, body.indexOf("r.outcome = 'revealed'") + 60), /search_id/, "ownership is regardless of search_id");
+});
+
 test("the settle inserts the activity directly and never uses the manual edit path", () => {
   assert.doesNotMatch(code, /createActivityInTx|updateContactProperty|planPropertyEdit/);
   assert.match(code, /insert\(activity\)/);

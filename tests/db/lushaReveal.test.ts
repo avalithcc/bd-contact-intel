@@ -173,6 +173,8 @@ test("a settle whose Contact write fails leaves no person write and keeps the pa
   assert.deepEqual([after.email, after.emailSource], [null, null]);
   const row = (await ledger(p.id)).find((l) => l.field === "emails")!;
   assert.deepEqual([row.state, row.outcome, row.value, row.errorCode], ["settled", "revealed", `rb-${run}@acme.test`, "write_failed"]);
+  const cause = (row.payload as { writeError?: { message?: string } }).writeError;
+  assert.ok(cause?.message, "the cause of the failed write is recorded, not swallowed");
 });
 
 test("a duplicate email is stored, enqueued as a candidate (pair ordered) and named; a merged-away holder is ignored", async () => {
@@ -254,4 +256,67 @@ test("the daily spend window follows the Argentina day: a row reserved at 23:30 
   assert.ok(r.ok);
   assert.equal(await getDailySpend(lateThen), 1);
   assert.equal(await getDailySpend(earlyNext), 0, "the next ART day starts empty");
+});
+
+async function revealEmail(personId: string, email: string) {
+  const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
+  const r = await reserve({ personId, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  return settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email }], creditsCharged: 1 });
+}
+
+test("a value we already own is never paid for twice, even after a re-search (W2)", async () => {
+  const { getDailySpend, getRevealState, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("twice");
+  await matchedSearch(p.id);
+  await revealEmail(p.id, `twice-${run}@acme.test`);
+  await matchedSearch(p.id); // a newer search
+  const spent = await getDailySpend();
+  const again = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.deepEqual(again.ok === false && again.reason, "already_revealed");
+  assert.equal(await getDailySpend(), spent, "nothing was reserved");
+  assert.equal((await getRevealState(p.id)).emails?.outcome, "revealed", "the older search's paid row still wins on the reader (W3)");
+  const phone = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(phone.ok, "the other field is unaffected");
+});
+
+test("after a merge the survivor's newer search does not hide a paid reveal of the merged side (W3)", async () => {
+  const { db } = await import("@/db");
+  const { mergeContacts } = await import("@/lib/identity/mergeDb");
+  const { getRevealState, reserve } = await import("@/lib/lusha/revealDb");
+  const merged = await mkPerson("w3m");
+  await matchedSearch(merged.id);
+  await revealEmail(merged.id, `w3-${run}@acme.test`);
+  const survivor = await mkPerson("w3s");
+  await matchedSearch(survivor.id); // newer than the merged side's search
+  await mergeContacts(db, survivor.id, merged.id, "test", bdId);
+  assert.equal((await getRevealState(survivor.id)).emails?.value, `w3-${run}@acme.test`);
+  const r = await reserve({ personId: survivor.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.deepEqual(r.ok === false && r.reason, "already_revealed");
+});
+
+test("reserve refuses a merged-away or missing Contact, and waits for a merge that holds the person row (W1)", async () => {
+  const { db } = await import("@/db");
+  const { person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { mergeContacts } = await import("@/lib/identity/mergeDb");
+  const { reserve } = await import("@/lib/lusha/revealDb");
+  const survivor = await mkPerson("w1s");
+  const merged = await mkPerson("w1m");
+  await mergeContacts(db, survivor.id, merged.id, "test", bdId);
+  const gone = await reserve({ personId: merged.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  assert.deepEqual(gone.ok === false && gone.reason, "merged");
+  const missing = await reserve({ personId: randomUUID(), field: "search", actorBdId: bdId, cap: 1_000_000 });
+  assert.deepEqual(missing.ok === false && missing.reason, "not_found");
+
+  const p = await mkPerson("w1wait");
+  let settled = false;
+  let pending!: ReturnType<typeof reserve>;
+  await db.transaction(async (tx) => {
+    await tx.select().from(person).where(eq(person.id, p.id)).for("update"); // what mergeContacts does
+    pending = reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 }).finally(() => (settled = true));
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal(settled, false, "the reservation waits for the merge's row lock");
+  });
+  assert.ok((await pending).ok);
 });

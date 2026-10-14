@@ -109,12 +109,10 @@ test("a stored price of 0 still goes through the cap: a stale zero is never an u
   assert.deepEqual(resolveRevealState("emails", rows, { spentToday: 13, cap: 12 }, ok), { kind: "capped", remaining: 0, needed: 0 });
 });
 
-test("a field row from an OLDER search never wins over the current search (re-search stays possible)", () => {
+test("a NEGATIVE field row from an OLDER search never wins over the current search (re-search stays possible)", () => {
   const current = search("matched", { id: "s2", searchId: "s2" });
   const staleNoValue = row("emails", "no_value", { searchId: "s1" });
   assert.deepEqual(resolveRevealState("emails", { search: current, emails: staleNoValue }, open, ok), { kind: "revealable", price: 1 });
-  const staleRevealed = row("emails", "revealed", { searchId: "s1", value: "person-a@x.invalid" });
-  assert.deepEqual(resolveRevealState("emails", { search: current, emails: staleRevealed }, open, ok), { kind: "revealable", price: 1 });
   // the same rows tied to the CURRENT search do count
   assert.equal(resolveRevealState("emails", { search: current, emails: row("emails", "no_value", { searchId: "s2" }) }, open, ok).kind, "unavailable");
 });
@@ -145,4 +143,14 @@ test("a cap of 0 (soft kill switch) caps every spend", () => {
 test("revealState.ts is pure: no IO, no db, no env", () => {
   const src = readFileSync(join(__dirname, "../../src/lib/lusha/revealState.ts"), "utf8").replace(/\/\/.*$/gm, "");
   assert.ok(!/process\.env|@\/db|from "\.\/client"|fetch/.test(src));
+});
+
+test("a revealed VALUE is person-level: a paid row on an older search wins over a newer matched search", () => {
+  const current = search("matched", { id: "s2", searchId: "s2" });
+  const paid = row("emails", "revealed", { searchId: "s1", value: "person-a@x.invalid" });
+  assert.deepEqual(resolveRevealState("emails", { search: current, emails: paid }, open, ok), { kind: "revealed", value: "person-a@x.invalid" });
+  // even with the cap spent, a value we own is served from the ledger
+  assert.equal(resolveRevealState("emails", { search: current, emails: paid }, { spentToday: 12, cap: 12 }, ok).kind, "revealed");
+  // the other field is untouched by it
+  assert.deepEqual(resolveRevealState("phones", { search: current, emails: paid }, open, ok), { kind: "revealable", price: 5 });
 });
