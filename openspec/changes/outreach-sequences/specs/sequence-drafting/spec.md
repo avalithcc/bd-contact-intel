@@ -23,15 +23,27 @@ For each member the system MUST generate a distinct draft (subject and body) usi
 - WHEN it builds a prompt
 - THEN it calls `buildOutreachEmailPrompt` and does not contain its own copy of the ten rules
 
-### Requirement: Drafts are written in English
+### Requirement: Draft language follows the recipient market
 
-Because every recipient is in the US, Sequence drafts MUST be generated with `locale = "en"`. The generator treats any other value as Spanish, so the Sequence code MUST pass `"en"` explicitly rather than rely on the default.
+The draft language MUST be decided by the same market resolution that decides the postal address (`recipientMarket`): `us` -> `"en"`, `latam` -> `"es"`, `other` -> no draft (the member is held with the unmapped-market reason, because no address exists either). The generator treats any language other than `"en"` as Spanish, so the Sequence code MUST pass the language explicitly and MUST NOT let a caller choose it. A US member MUST never be drafted in Spanish. (Supersedes the original "always English" rule, whose premise that every recipient is in the US was wrong: measured 2026-10-14, 77 workable contacts are LATAM and 29 are US.)
 
-#### Scenario: English is explicit
+#### Scenario: Language and address come from one market
 
-- GIVEN a member is being drafted
+- GIVEN a member whose market resolves to `us`
 - WHEN the generator input is built
-- THEN `locale` equals `"en"`
+- THEN the language equals `"en"` and the footer carries the US address
+
+#### Scenario: LATAM is drafted in Spanish
+
+- GIVEN a member whose market resolves to `latam`
+- WHEN the generator input is built
+- THEN the language equals `"es"` and the footer carries the LATAM address
+
+#### Scenario: Unmapped market is held, not drafted
+
+- GIVEN a member whose market resolves to `other`
+- WHEN drafts are generated
+- THEN no generator call is made, no draft is stored, and the member is held
 
 ### Requirement: Signals come from company data and are shown honestly
 

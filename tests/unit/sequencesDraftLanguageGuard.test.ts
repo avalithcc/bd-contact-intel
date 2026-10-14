@@ -14,7 +14,7 @@ import { join } from "node:path";
 const ROOTS = [join("src", "lib", "sequences"), join("src", "app", "(app)", "sequences")];
 
 /** Files allowed to call the generator. Each must ALSO import buildSequenceDraftInput (checked below). */
-const ALLOWED_GENERATOR_CALLERS = new Set<string>();
+const ALLOWED_GENERATOR_CALLERS = new Set<string>([join("src", "lib", "sequences", "draftQueries.ts")]);
 /** The only file allowed to build prompt input or the prompt itself: it derives the language from the recipient market. */
 const INPUT_BUILDER_FILE = join("src", "lib", "sequences", "draftInput.ts");
 
