@@ -204,3 +204,83 @@ test("discard, re-admit and regenerate each write the actor BD and a timestamp",
     assert.ok(rows[0].at instanceof Date, action);
   }
 });
+
+async function mkSent(name: string, over: { reviewed?: boolean; reminderDueAt?: Date | null; noReminder?: boolean } = {}) {
+  const { db } = await import("@/db");
+  const { sequenceDraft, sequenceMember } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const m = await mkMember(name, { state: "sent" });
+  const dueAt = over.reminderDueAt === undefined ? new Date(Date.now() + 7 * 86_400_000) : over.reminderDueAt;
+  await db.update(sequenceMember).set({ sentAt: new Date(), reminderDueAt: dueAt }).where(eq(sequenceMember.id, m.memberId));
+  if (!over.noReminder) {
+    await db.insert(sequenceDraft).values({ sequenceMemberId: m.memberId, step: 2, subject: "Re: Hello", body: "Reminder", reviewedAt: over.reviewed ? new Date() : null });
+  }
+  return m;
+}
+
+test("approving step 1 does not approve the reminder, and the reminder is approved on its own without moving the member", async () => {
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const { reminderReleaseAt } = await import("@/lib/sequences/schedule");
+  const m = await mkSent("reminder");
+  await db.update(sequenceDraft).set({ approvedAt: new Date(), approvedByBdId: bdId }).where(and(eq(sequenceDraft.sequenceMemberId, m.memberId), eq(sequenceDraft.step, 1)));
+  assert.equal((await draftOf(m.memberId, 2)).approvedAt, null, "step 1 approval implies nothing about step 2");
+  assert.deepEqual(await approveMember(bdId, m.memberId, 2), { ok: true, approved: [m.memberId] });
+  const reminder = await draftOf(m.memberId, 2);
+  assert.equal(reminder.approvedByBdId, bdId);
+  const member = await stateOf(m.memberId);
+  assert.equal(member.state, "sent");
+  assert.equal(reminder.scheduledFor?.toISOString(), reminderReleaseAt(member.reminderDueAt!, reminder.approvedAt!)!.toISOString());
+  const audit = await auditFor(m.personId, "sequence_member_approve");
+  assert.deepEqual(audit.map((a) => (a.metadata as { step: number }).step), [2]);
+});
+
+test("a reminder cannot be approved unless the member is sent and the reminder is due-scheduled", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const drafted = await mkMember("rem-drafted");
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  await db.insert(sequenceDraft).values({ sequenceMemberId: drafted.memberId, step: 2, subject: "x", body: "y" });
+  const early = await approveMember(bdId, drafted.memberId, 2);
+  assert.ok(!early.ok && early.rejected[0].reason === "not_approvable");
+  const noDue = await mkSent("rem-nodue", { reminderDueAt: null });
+  const result = await approveMember(bdId, noDue.memberId, 2);
+  assert.ok(!result.ok && result.rejected[0].reason === "not_approvable");
+});
+
+test("reminder bulk approval uses the same review gate", async () => {
+  const { approveBulk } = await import("@/lib/sequences/approvalQueries");
+  const a = await mkSent("rem-bulk-a", { reviewed: true });
+  const b = await mkSent("rem-bulk-b", { reviewed: false });
+  const blocked = await approveBulk(bdId, [a.memberId, b.memberId], 2);
+  assert.ok(!blocked.ok && blocked.rejected.length === 1 && blocked.rejected[0].memberId === b.memberId);
+  assert.equal((await draftOf(a.memberId, 2)).approvedAt, null);
+});
+
+test("advancing the reminder moves the due date only: it stays unapproved and has no release instant", async () => {
+  const { advanceReminder } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkSent("advance");
+  const beforeDue = (await stateOf(m.memberId)).reminderDueAt!;
+  assert.deepEqual(await advanceReminder(otherBdId, m.memberId), { ok: false, error: "not_found" });
+  assert.deepEqual(await advanceReminder(bdId, m.memberId), { ok: true });
+  const after = await stateOf(m.memberId);
+  assert.ok(after.reminderDueAt!.getTime() < beforeDue.getTime());
+  assert.equal(after.state, "sent");
+  assert.equal((await draftOf(m.memberId, 2)).approvedAt, null);
+  assert.equal((await draftOf(m.memberId, 2)).scheduledFor, null);
+});
+
+test("cancelling a reminder approval clears only the reminder and leaves the member sent", async () => {
+  const { approveMember, cancelApproval } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkSent("rem-cancel");
+  assert.deepEqual(await cancelApproval(bdId, m.memberId, 2), { ok: false, error: "not_approved" });
+  await approveMember(bdId, m.memberId, 2);
+  assert.deepEqual(await cancelApproval(bdId, m.memberId, 2), { ok: true });
+  const d = await draftOf(m.memberId, 2);
+  assert.deepEqual([d.approvedAt, d.approvedByBdId, d.scheduledFor], [null, null, null]);
+  assert.equal((await stateOf(m.memberId)).state, "sent");
+  const audit = await auditFor(m.personId, "sequence_member_cancel");
+  assert.deepEqual(audit.map((a) => (a.metadata as { step: number }).step), [2]);
+});

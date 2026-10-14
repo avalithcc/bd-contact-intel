@@ -47,3 +47,19 @@ export function reminderDueAt(step1SentAt: Date, schedule: Schedule = DEFAULT_SC
   const day = addCalendarDays(miamiCalendarDate(step1SentAt), schedule.step2.afterDays);
   return miamiWallClockToUtc(day, schedule.step1.hour);
 }
+
+/** The first release window at or after `instant`: `hour` Miami today if it is still ahead, otherwise tomorrow's. */
+function nextWindowAfter(instant: Date, schedule: Schedule): Date {
+  const today = miamiWallClockToUtc(miamiCalendarDate(instant), schedule.step1.hour);
+  return today.getTime() > instant.getTime() ? today : miamiWallClockToUtc(addCalendarDays(miamiCalendarDate(instant), 1), schedule.step1.hour);
+}
+
+/**
+ * The reminder's release instant: the later of (a) its due date and (b) the next release window after the approval.
+ * No approval, no instant: advancing the due date ("Adelantar recordatorio") can never release an unapproved reminder.
+ */
+export function reminderReleaseAt(dueAt: Date, approvedAt: Date | null, schedule: Schedule = DEFAULT_SCHEDULE): Date | null {
+  if (!approvedAt) return null;
+  const window = nextWindowAfter(approvedAt, schedule);
+  return window.getTime() > dueAt.getTime() ? window : dueAt;
+}

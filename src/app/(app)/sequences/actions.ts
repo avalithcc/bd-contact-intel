@@ -3,7 +3,7 @@
 // Roster, drafting and approval actions. Imported by no page or component until the go-live PR, so none is exposed yet. Every
 // guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
 import { getCurrentBd } from "@/lib/queries";
-import { approveBulk as approveBulkRows, approveMember as approveMemberRow, cancelApproval as cancelApprovalRow, markDraftReviewed as markDraftReviewedRow } from "@/lib/sequences/approvalQueries";
+import { advanceReminder as advanceReminderRow, approveBulk as approveBulkRows, approveMember as approveMemberRow, cancelApproval as cancelApprovalRow, markDraftReviewed as markDraftReviewedRow } from "@/lib/sequences/approvalQueries";
 import {
   generateMissingDrafts,
   regenerateDrafts,
@@ -77,25 +77,31 @@ export async function saveSequenceDraft(memberId: string, input: { subject: stri
 }
 
 /** Called when the review dialog opens ("revisado"). Never from passive listing. */
-export async function markDraftReviewed(memberId: string) {
+export async function markDraftReviewed(memberId: string, step: 1 | 2 = 1) {
   const me = await getCurrentBd();
-  return markDraftReviewedRow(me.id, memberId);
+  return markDraftReviewedRow(me.id, memberId, step);
 }
 
 /** "Aprobar" on one card: not gated by the review counter. */
-export async function approveMember(memberId: string) {
+export async function approveMember(memberId: string, step: 1 | 2 = 1) {
   const me = await getCurrentBd();
-  return approveMemberRow(me.id, memberId);
+  return approveMemberRow(me.id, memberId, step);
 }
 
 /** "Aprobar y programar los M": the server re-asserts the review gate and rejects the whole request on any unreviewed member. */
-export async function approveBulk(memberIds: string[]) {
+export async function approveBulk(memberIds: string[], step: 1 | 2 = 1) {
   const me = await getCurrentBd();
-  return approveBulkRows(me.id, memberIds);
+  return approveBulkRows(me.id, memberIds, step);
 }
 
 /** "Cancelar envio". */
-export async function cancelApproval(memberId: string) {
+export async function cancelApproval(memberId: string, step: 1 | 2 = 1) {
   const me = await getCurrentBd();
-  return cancelApprovalRow(me.id, memberId);
+  return cancelApprovalRow(me.id, memberId, step);
+}
+
+/** "Adelantar recordatorio": moves the due date only; approval and the cap still apply. */
+export async function advanceReminder(memberId: string) {
+  const me = await getCurrentBd();
+  return advanceReminderRow(me.id, memberId);
 }
