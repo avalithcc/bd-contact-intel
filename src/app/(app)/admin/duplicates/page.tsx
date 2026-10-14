@@ -13,6 +13,10 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
+import { db } from "@/db";
+import { buildMergePanel } from "@/lib/sequences/mergePanel";
+import { planSequenceMergeFor } from "@/lib/sequences/mergeQueries";
+import { MergeSequencePanel } from "./MergeSequencePanel";
 import { mergeDuplicateCandidateAction, markNotDuplicateAction, unmergeDuplicateAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +56,7 @@ function personLocation(p: DuplicateCandidateSidePerson): string {
   return [p.city, p.region, p.country].filter(Boolean).join(", ") || dict.noValue;
 }
 
-function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; pairMeta: string }) {
+function ComparePanel({ detail, pairMeta, hasSequencePanel }: { detail: DuplicateCandidateDetail; pairMeta: string; hasSequencePanel: boolean }) {
   const survivorLabel = detail.recommendedSurvivor === "a" ? "A" : "B";
   const update = detail.preview.survivorUpdate;
   const survivor = detail.recommendedSurvivor === "a" ? detail.personA : detail.personB;
@@ -128,10 +132,13 @@ function ComparePanel({ detail, pairMeta }: { detail: DuplicateCandidateDetail; 
             {dict.notDuplicateButton}
           </button>
         </form>
-        <form action={mergeDuplicateCandidateAction}>
-          <input type="hidden" name="candidateId" value={detail.id} />
-          <button type="submit">{dict.mergeButton(survivorLabel)}</button>
-        </form>
+        {/* With a Sequence membership in play the merge button lives in the warning panel below. */}
+        {!hasSequencePanel && (
+          <form action={mergeDuplicateCandidateAction}>
+            <input type="hidden" name="candidateId" value={detail.id} />
+            <button type="submit">{dict.mergeButton(survivorLabel)}</button>
+          </form>
+        )}
       </div>
     </section>
   );
@@ -165,7 +172,7 @@ function UnmergeConfirmPanel({ mergeEventId, survivorName }: { mergeEventId: str
 export default async function DuplicatesAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ candidate?: string; page?: string; actionError?: string; confirmUnmerge?: string }>;
+  searchParams: Promise<{ candidate?: string; page?: string; actionError?: string; confirmUnmerge?: string; sendCancelled?: string }>;
 }) {
   try {
     await requireAdmin();
@@ -181,6 +188,7 @@ export default async function DuplicatesAdminPage({
     page: pageParam,
     actionError,
     confirmUnmerge: confirmUnmergeParam,
+    sendCancelled,
   } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
@@ -196,6 +204,18 @@ export default async function DuplicatesAdminPage({
       : null;
   const selectedId = candidateParam ?? list.items[0]?.id ?? null;
   const detail = selectedId ? await getDuplicateCandidateDetail(selectedId) : null;
+  // Same survivor rule as mergeDuplicateCandidateAction, so the panel describes exactly what Fusionar will do.
+  const survivor = detail ? (detail.recommendedSurvivor === "a" ? detail.personA : detail.personB) : null;
+  const mergedPerson = detail ? (detail.recommendedSurvivor === "a" ? detail.personB : detail.personA) : null;
+  const sequencePanel =
+    detail && survivor && mergedPerson
+      ? buildMergePanel({
+          plan: await planSequenceMergeFor(db, survivor.id, mergedPerson.id),
+          survivor: { id: survivor.id, name: survivor.name },
+          merged: { id: mergedPerson.id, name: mergedPerson.name },
+          justCancelled: sendCancelled === "1",
+        })
+      : null;
   const selectedIndex = detail ? list.items.findIndex((i) => i.id === detail.id) : -1;
   const pairMeta = detail && selectedIndex >= 0 ? dict.pairMeta(list.startIndex + selectedIndex + 1, list.total) : "";
 
@@ -258,7 +278,17 @@ export default async function DuplicatesAdminPage({
         </section>
 
         {detail ? (
-          <ComparePanel detail={detail} pairMeta={pairMeta} />
+          <div>
+            <ComparePanel detail={detail} pairMeta={pairMeta} hasSequencePanel={!!sequencePanel} />
+            {sequencePanel && survivor && mergedPerson && (
+              <MergeSequencePanel
+                panel={sequencePanel}
+                candidateId={detail.id}
+                title={dict.mergePanel.titleJoin(survivor.name, mergedPerson.name)}
+                survivorName={survivor.name}
+              />
+            )}
+          </div>
         ) : (
           <section className="panel">
             <p className="muted">{dict.emptyQueue}</p>

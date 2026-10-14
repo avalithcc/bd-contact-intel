@@ -46,13 +46,22 @@ export async function mergeDuplicateCandidateAction(formData: FormData): Promise
   revalidatePath("/admin/duplicates");
 }
 
-/** "Cancelar envio" for a Sequence member whose scheduled send blocks a merge. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * "Cancelar envio" for a Sequence member whose scheduled send blocks a merge. When the panel passes its candidate, the
+ * BD lands back on it with `sendCancelled=1` so the panel can confirm the cancellation (mockup state 2).
+ */
 export async function cancelScheduledSendAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const memberId = formData.get("memberId");
   if (typeof memberId !== "string" || !memberId) throw new Error("Missing memberId");
-  await cancelScheduledSend(db, memberId);
+  const cancelled = await cancelScheduledSend(db, memberId);
   revalidatePath("/admin/duplicates");
+  const candidateId = formData.get("candidateId");
+  if (typeof candidateId === "string" && UUID_RE.test(candidateId)) {
+    redirect(`/admin/duplicates?candidate=${candidateId}${cancelled ? "&sendCancelled=1" : ""}`);
+  }
 }
 
 /** "No es duplicado" (task 7.2; duplicate-review spec's not-a-duplicate path). */
