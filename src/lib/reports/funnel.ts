@@ -30,7 +30,17 @@ export interface FunnelBreakdown extends FunnelCounts {
   repliedOfContactedPct: number;
   /** Reunión ÷ Respondió-or-further ("% de Respondió" on the funnel's last row). */
   meetingOfRepliedPct: number;
+  /** False when the reply-rate denominator is below MIN_RATE_SAMPLE: the percentage must not be shown as a rate. */
+  replyRateIsRate: boolean;
+  /** "replied / contacted" raw fraction, shown instead of the percentage when `replyRateIsRate` is false. */
+  replyRateFraction: string;
+  /** Same rule for Reunión ÷ Respondió-or-further. */
+  meetingOfRepliedIsRate: boolean;
+  meetingOfRepliedFraction: string;
 }
+
+/** Minimum denominator for a ratio to be presented as a rate (1 of 2 is noise, not 50%). */
+export const MIN_RATE_SAMPLE = 10;
 
 function pct(numerator: number, denominator: number): number {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
@@ -47,5 +57,9 @@ export function buildFunnelBreakdown(counts: FunnelCounts): FunnelBreakdown {
     replyRatePct,
     repliedOfContactedPct: replyRatePct,
     meetingOfRepliedPct: pct(counts.meeting, counts.repliedOrMore),
+    replyRateIsRate: counts.contactedOrMore >= MIN_RATE_SAMPLE,
+    replyRateFraction: `${counts.repliedOrMore} / ${counts.contactedOrMore}`,
+    meetingOfRepliedIsRate: counts.repliedOrMore >= MIN_RATE_SAMPLE,
+    meetingOfRepliedFraction: `${counts.meeting} / ${counts.repliedOrMore}`,
   };
 }
