@@ -453,6 +453,9 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
     COHORT_STATUSES[params.population].map((s) => sql`${s}`),
     sql`, `,
   );
+  // "new" (empty list) is the whole cohort: no status predicate at all.
+  const statusFilter = COHORT_STATUSES[params.population].length > 0 ? sql`
+        and person.status in (${statuses})` : sql``;
   const withReply = cohortHasReplyColumns(params.population);
   const replyCtes = withReply
     ? sql`,
@@ -498,8 +501,7 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
         person.status as pbc_status,
         person.created_at as pbc_created_at
       from ${person}
-      where ${cohortScopeSql(params)}
-        and person.status in (${statuses})
+      where ${cohortScopeSql(params)}${statusFilter}
     )${replyCtes}
     select
       rpt_cohort.pbc_id as person_id,

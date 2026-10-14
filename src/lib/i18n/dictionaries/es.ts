@@ -1843,6 +1843,7 @@ export const es: typeof en = {
     cohortPeriodWeek: (from: string, to: string) => `del ${from} al ${to}`,
     cohortHeaderContacted: (count: string, base: string, period: string) =>
       `${count} de ${base} contactos nuevos · creados ${period} · hoy en Contactado, Respondió o Reunión`,
+    cohortHeaderNew: (count: string, period: string) => `${count} contactos nuevos · creados ${period} · en cualquier estado`,
     cohortHeaderReplied: (count: string, base: string, period: string) => `${count} de ${base} contactados · creados ${period}`,
     cohortHeaderMeeting: (count: string, base: string, period: string) => `${count} de ${base} que respondieron · creados ${period} · hoy en Reunión`,
     cohortNote: "Estado actual de cada contacto, no la actividad del período.",
@@ -1855,6 +1856,7 @@ export const es: typeof en = {
     cohortColCreated: "Creado",
     cohortColReplyAt: "Respuesta recibida",
     cohortColSequence: "Secuencia",
+    cohortEmptyNew: "No hay contactos nuevos para este filtro.",
     cohortEmptyContacted: "No hay contactos contactados para este filtro.",
     cohortEmptyReplied: "No hay contactos que hayan respondido para este filtro.",
     cohortEmptyMeeting: "No hay contactos en reunión para este filtro.",

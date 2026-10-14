@@ -40,7 +40,7 @@ test("COHORT_STATUSES: each population is exactly the status list the funnel cou
 
 test("cohort query scopes persons with the SAME predicates as rpt_person_scope (merged, period, owner)", () => {
   const agg = norm(dialect.sqlToQuery(buildReportAggregatesQuery({ fromIso: FROM, toIso: TO, bdId: BD })).sql);
-  for (const population of ["contacted", "replied", "meeting"] as const) {
+  for (const population of ["new", "contacted", "replied", "meeting"] as const) {
     const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: BD, population })).sql);
     const scope =
       "person.merged_into_id is null and person.created_at >= $?::timestamptz and person.created_at < $?::timestamptz and ($?::uuid is null or person.owner_bd_id = $?::uuid)";
@@ -84,7 +84,7 @@ test("the count behind each tile/row is the funnel number, independent of the ra
 
 test("population guards", () => {
   assert.equal(isCohortPopulation("replied"), true);
-  assert.equal(isCohortPopulation("new"), false);
+  assert.equal(isCohortPopulation("bogus"), false);
   assert.equal(isCohortPopulation(undefined), false);
   assert.equal(cohortHasReplyColumns("contacted"), false);
   assert.equal(cohortHasReplyColumns("replied"), true);
@@ -150,4 +150,27 @@ test("cohortHeaderLines states the population in words (mockup copy)", () => {
 test("cohortHeaderLines keeps the true total with thousands separators", () => {
   const big = { ...FUNNEL, newTotal: 1250, contactedOrMore: 612 };
   assert.equal(cohortHeaderLines("contacted", big, "en el 4.º trimestre 2026", w).summary.startsWith("612 de 1.250 contactos nuevos"), true);
+});
+
+test("new population: whole cohort, no status predicate, same count as the Contactos nuevos tile", () => {
+  const agg = norm(dialect.sqlToQuery(buildReportAggregatesQuery({ fromIso: FROM, toIso: TO, bdId: BD })).sql);
+  assert.ok(agg.includes("count(*)::int as pbc_new_total"), "tile count must stay a bare count(*) over the cohort scope");
+  const { sql, params } = dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population: "new" }));
+  assert.doesNotMatch(sql, /person\.status in/);
+  assert.ok(!params.some((p) => ["contacted", "replied", "meeting", "discarded"].includes(p as string)));
+  assert.equal(params[params.length - 1], DRILLDOWN_ROW_LIMIT);
+  assert.doesNotMatch(norm(sql), /rpt_cohort_reply|sequence_member/);
+  assert.deepEqual(COHORT_STATUSES.new, []);
+  assert.equal(isCohortPopulation("new"), true);
+  assert.equal(cohortHasReplyColumns("new"), false);
+  const f = { newTotal: 118, contactedOrMore: 43, repliedOrMore: 12, meeting: 4, discarded: 6 };
+  assert.equal(cohortCount(f, "new"), 118);
+  assert.equal(cohortBase(f, "new"), 118);
+});
+
+test("cohortHeaderLines states the new-contacts population in words", () => {
+  assert.deepEqual(cohortHeaderLines("new", FUNNEL, "en octubre 2026", w), {
+    summary: "118 contactos nuevos · creados en octubre 2026 · en cualquier estado",
+    note: "Estado actual de cada contacto, no la actividad del período.",
+  });
 });

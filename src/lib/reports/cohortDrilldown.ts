@@ -12,9 +12,15 @@
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { FunnelCounts } from "./funnel";
 
-export type CohortPopulation = "contacted" | "replied" | "meeting";
+export type CohortPopulation = "new" | "contacted" | "replied" | "meeting";
 
+/**
+ * Status list per population. An EMPTY list means "any status": "new" is the
+ * whole cohort (the "Contactos nuevos" tile = rpt_funnel's pbc_new_total, a
+ * bare count(*) over the cohort scope), so the query must add no status filter.
+ */
 export const COHORT_STATUSES: Record<CohortPopulation, readonly string[]> = {
+  new: [],
   contacted: ["contacted", "replied", "meeting"],
   replied: ["replied", "meeting"],
   meeting: ["meeting"],
@@ -24,19 +30,19 @@ export function isCohortPopulation(value: unknown): value is CohortPopulation {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(COHORT_STATUSES, value);
 }
 
-/** Contactado has no reply columns: nobody in it has to have replied. */
+/** Nuevos and Contactado have no reply columns: nobody in them has to have replied. */
 export function cohortHasReplyColumns(population: CohortPopulation): boolean {
-  return population !== "contacted";
+  return population !== "contacted" && population !== "new";
 }
 
 /** The funnel number the list must equal. */
 export function cohortCount(funnel: FunnelCounts, population: CohortPopulation): number {
-  return population === "contacted" ? funnel.contactedOrMore : population === "replied" ? funnel.repliedOrMore : funnel.meeting;
+  return population === "new" ? funnel.newTotal : population === "contacted" ? funnel.contactedOrMore : population === "replied" ? funnel.repliedOrMore : funnel.meeting;
 }
 
 /** The funnel number the population is "N de ..." of (the header's denominator). */
 export function cohortBase(funnel: FunnelCounts, population: CohortPopulation): number {
-  return population === "contacted" ? funnel.newTotal : population === "replied" ? funnel.contactedOrMore : funnel.repliedOrMore;
+  return population === "new" || population === "contacted" ? funnel.newTotal : population === "replied" ? funnel.contactedOrMore : funnel.repliedOrMore;
 }
 
 export interface CohortRawRow {

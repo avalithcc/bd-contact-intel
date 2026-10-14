@@ -17,6 +17,7 @@ export interface CohortHeaderWords {
   cohortPeriodMonth: (monthName: string, year: number) => string;
   cohortPeriodQuarter: (quarter: number, year: number) => string;
   cohortPeriodWeek: (from: string, to: string) => string;
+  cohortHeaderNew: (count: string, period: string) => string;
   cohortHeaderContacted: (count: string, base: string, period: string) => string;
   cohortHeaderReplied: (count: string, base: string, period: string) => string;
   cohortHeaderMeeting: (count: string, base: string, period: string) => string;
@@ -48,6 +49,7 @@ export function cohortHeaderLines(
 ): { summary: string; note: string } {
   const count = cohortCount(funnel, population).toLocaleString(w.numberLocale);
   const base = cohortBase(funnel, population).toLocaleString(w.numberLocale);
+  if (population === "new") return { summary: w.cohortHeaderNew(count, periodPhrase), note: w.cohortNote };
   if (population === "contacted") return { summary: w.cohortHeaderContacted(count, base, periodPhrase), note: w.cohortNote };
   if (population === "replied") return { summary: w.cohortHeaderReplied(count, base, periodPhrase), note: w.cohortNoteReplied(periodPhrase) };
   return { summary: w.cohortHeaderMeeting(count, base, periodPhrase), note: w.cohortNote };

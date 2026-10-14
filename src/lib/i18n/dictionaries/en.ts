@@ -1872,6 +1872,7 @@ export const en = {
     cohortPeriodWeek: (from: string, to: string) => `from ${from} to ${to}`,
     cohortHeaderContacted: (count: string, base: string, period: string) =>
       `${count} of ${base} new contacts · created ${period} · now Contacted, Replied or Meeting`,
+    cohortHeaderNew: (count: string, period: string) => `${count} new contacts · created ${period} · any status`,
     cohortHeaderReplied: (count: string, base: string, period: string) => `${count} of ${base} contacted · created ${period}`,
     cohortHeaderMeeting: (count: string, base: string, period: string) => `${count} of ${base} who replied · created ${period} · now in Meeting`,
     cohortNote: "Current status of each contact, not the period's activity.",
@@ -1884,6 +1885,7 @@ export const en = {
     cohortColCreated: "Created",
     cohortColReplyAt: "Reply received",
     cohortColSequence: "Sequence",
+    cohortEmptyNew: "No new contacts for this filter.",
     cohortEmptyContacted: "No contacted contacts for this filter.",
     cohortEmptyReplied: "No contacts have replied for this filter.",
     cohortEmptyMeeting: "No contacts in a meeting for this filter.",

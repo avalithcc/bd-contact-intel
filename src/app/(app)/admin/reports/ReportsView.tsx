@@ -56,6 +56,7 @@ const meetingsKpiLabels: MeetingsKpiCardLabels = {
   numberLocale: dict.numberLocale,
 };
 const cohortLabels: CohortDrilldownLabels = {
+  kpiNewContacts: dict.kpiNewContacts,
   funnelContacted: dict.funnelContacted,
   funnelReplied: dict.funnelReplied,
   funnelMeeting: dict.funnelMeeting,
@@ -66,6 +67,7 @@ const cohortLabels: CohortDrilldownLabels = {
   cohortColCreated: dict.cohortColCreated,
   cohortColReplyAt: dict.cohortColReplyAt,
   cohortColSequence: dict.cohortColSequence,
+  cohortEmptyNew: dict.cohortEmptyNew,
   cohortEmptyContacted: dict.cohortEmptyContacted,
   cohortEmptyReplied: dict.cohortEmptyReplied,
   cohortEmptyMeeting: dict.cohortEmptyMeeting,
@@ -232,11 +234,13 @@ export function ReportsView({
       </div>
 
       <div className="grid-4 mb-lg">
-        <div className="stat neutral">
-          <div className="label">{dict.kpiNewContacts}</div>
-          <div className="value">{funnel.newTotal}</div>
-          <div className="foot">{dict.kpiNewContactsFoot}</div>
-        </div>
+        <CohortTile
+          {...cohortQuery("new")}
+          toneClass="neutral"
+          label={dict.kpiNewContacts}
+          count={cohortCount(aggregates.funnel, "new")}
+          foot={dict.kpiNewContactsFoot}
+        />
         <CohortTile
           {...cohortQuery("replied")}
           toneClass={funnel.replyRateIsRate ? "info" : "neutral"}

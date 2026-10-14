@@ -18,6 +18,7 @@ import type { Dictionary } from "@/lib/i18n/dictionaries";
 export type CohortDrilldownLabels = ClientStrings<
   Pick<
     Dictionary["reports"],
+    | "kpiNewContacts"
     | "funnelContacted"
     | "funnelReplied"
     | "funnelMeeting"
@@ -28,6 +29,7 @@ export type CohortDrilldownLabels = ClientStrings<
     | "cohortColCreated"
     | "cohortColReplyAt"
     | "cohortColSequence"
+    | "cohortEmptyNew"
     | "cohortEmptyContacted"
     | "cohortEmptyReplied"
     | "cohortEmptyMeeting"
@@ -50,8 +52,8 @@ interface CohortQuery {
   labels: CohortDrilldownLabels;
 }
 
-const TITLE_KEY = { contacted: "funnelContacted", replied: "funnelReplied", meeting: "funnelMeeting" } as const;
-const EMPTY_KEY = { contacted: "cohortEmptyContacted", replied: "cohortEmptyReplied", meeting: "cohortEmptyMeeting" } as const;
+const TITLE_KEY = { new: "kpiNewContacts", contacted: "funnelContacted", replied: "funnelReplied", meeting: "funnelMeeting" } as const;
+const EMPTY_KEY = { new: "cohortEmptyNew", contacted: "cohortEmptyContacted", replied: "cohortEmptyReplied", meeting: "cohortEmptyMeeting" } as const;
 
 function CohortSubtitle({ summary, note }: { summary: string; note: string }) {
   return (
@@ -147,9 +149,10 @@ function CohortDialog({
 }
 
 /**
- * "Tasa de respuesta" tile (reports-kpi-drilldown): opens the Respondió
- * population — the rate's numerator — via the shared KpiDrilldownCard.
- * `count` (not the displayed "28%"/"3 / 7") decides clickability.
+ * KPI tile that opens a cohort list via the shared KpiDrilldownCard:
+ * "Tasa de respuesta" (replied — the rate's numerator) and "Contactos nuevos"
+ * (new — the whole cohort). `count` (not the displayed "28%"/"3 / 7") decides
+ * clickability.
  */
 export function CohortTile({
   toneClass,
@@ -158,11 +161,11 @@ export function CohortTile({
   displayValue,
   foot,
   ...query
-}: Omit<CohortQuery, "population"> & {
+}: CohortQuery & {
   toneClass: string;
   label: string;
   count: number;
-  displayValue: string;
+  displayValue?: string;
   foot: React.ReactNode;
 }) {
   const l = query.labels;
@@ -173,16 +176,16 @@ export function CohortTile({
       value={count}
       displayValue={displayValue}
       foot={foot}
-      dialogTitle={l.funnelReplied}
+      dialogTitle={l[TITLE_KEY[query.population]]}
       dialogSubtitle={<CohortSubtitle summary={query.summary} note={query.note} />}
       xwide
       truncation={{ template: l.dialogTruncated, numberLocale: l.numberLocale }}
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}
-      cacheKey={drilldownCacheKey({ kind: "replied", fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
-      fetchRows={() => getCohortDrilldownAction({ population: "replied", fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
-      renderList={(rows) => <CohortRowsTable population="replied" rows={rows} labels={l} />}
+      cacheKey={drilldownCacheKey({ kind: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
+      fetchRows={() => getCohortDrilldownAction({ population: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
+      renderList={(rows) => <CohortRowsTable population={query.population} rows={rows} labels={l} />}
     />
   );
 }
