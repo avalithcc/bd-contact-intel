@@ -23,12 +23,19 @@ function walk(dir: string): string[] {
 }
 
 const rel = (p: string) => relative(ROOT, p);
-const sourceFiles = walk(APP).filter((f) => /\.(ts|tsx)$/.test(f));
+const EXTRA = ["middleware.ts", "instrumentation.ts"].map((n) => join(ROOT, "src", n)).filter(existsSync);
+const sourceFiles = [...walk(APP), ...EXTRA].filter((f) => /\.(ts|tsx)$/.test(f));
+// Any quoted path into the lusha library: static, dynamic import(), require() or bare import.
+const LUSHA_LIB_PATH = /["'`][^"'`]*\/lib\/lusha(\/[^"'`]*)?["'`]/;
+
+test("the scan covers a non-trivial set of source files", () => {
+  assert.ok(sourceFiles.length > 0);
+});
 
 test("no file under src/app other than lushaActions.ts imports from the lusha library", () => {
   const offenders = sourceFiles
     .filter((f) => rel(f) !== ACTIONS_FILE)
-    .filter((f) => /from\s+["'][^"']*\/lib\/lusha(\/|["'])/.test(readFileSync(f, "utf8")))
+    .filter((f) => LUSHA_LIB_PATH.test(readFileSync(f, "utf8")))
     .map(rel);
   assert.deepEqual(offenders, []);
 });
@@ -61,4 +68,16 @@ test('no "use client" file references lushaActions', () => {
 test("vercel.json contains no lusha entry", () => {
   const raw = readFileSync(join(ROOT, "vercel.json"), "utf8");
   assert.doesNotMatch(raw, /lusha/i);
+});
+
+test("the lusha path matcher catches every import form", () => {
+  const forms = [
+    'import { x } from "@/lib/lusha/cap";',
+    'const m = await import("@/lib/lusha/cap");',
+    'const m = require("../../lib/lusha/cap");',
+    'import "@/lib/lusha/cap";',
+    "import { y } from '@/lib/lusha';",
+  ];
+  for (const f of forms) assert.ok(LUSHA_LIB_PATH.test(f), f);
+  assert.ok(!LUSHA_LIB_PATH.test('import { z } from "@/lib/lushaless/x";'));
 });

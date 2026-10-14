@@ -55,11 +55,13 @@ export function kindFromHttpStatus(status: number): LushaErrorKind | null {
  * success on the free plan) and unknown codes are not errors.
  */
 export function kindFromContactCode(code: string | undefined | null): LushaErrorKind | null {
-  switch (code) {
+  const upper = typeof code === "string" ? code.trim().toUpperCase() : "";
+  // Anything that smells of compliance is permanent: a new or lowercase code
+  // must never read as "no value" and invite a re-spend on a protected person.
+  if (upper.includes("COMPLIANCE")) return "compliance_restricted";
+  switch (upper) {
     case "NOT_FOUND":
       return "not_found";
-    case "COMPLIANCE_RESTRICTED":
-      return "compliance_restricted";
     case "ENRICH_FAILED":
       return "enrich_failed";
     default:
@@ -104,7 +106,9 @@ export function isPermanent(kind: LushaErrorKind): boolean {
   return PERMANENT[kind];
 }
 
-/** Whether a BD may deliberately try again (manual, never automatic). */
-export function isRetryableByBd(kind: LushaErrorKind): boolean {
+/** Whether a BD may deliberately try again (manual, never automatic). Pass the HTTP status when known. */
+export function isRetryableByBd(kind: LushaErrorKind, httpStatus?: number): boolean {
+  // A 4xx other than 429 is a deterministic request bug: retrying repeats it.
+  if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429) return false;
   return RETRYABLE_BY_BD[kind];
 }

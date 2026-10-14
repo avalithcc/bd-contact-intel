@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SEARCH_COST, expectedCost, type CanRevealEntry } from "../../src/lib/lusha/pricing";
+import { SEARCH_COST, expectedCost, expectedCostFirstReveal, type CanRevealEntry } from "../../src/lib/lusha/pricing";
 
 const probe: CanRevealEntry[] = [
   { field: "emails", credits: 1 },
@@ -47,6 +47,48 @@ test("a malformed price is refused, not coerced", () => {
       reason: "not_revealable",
     });
   }
+});
+
+test("the same field listed twice takes the maximum price", () => {
+  const dup = [
+    { field: "phones", credits: 2 },
+    { field: "phones", credits: 5 },
+    { field: "phones", credits: 3 },
+  ];
+  assert.deepEqual(expectedCost("phones", dup), { ok: true, credits: 5 });
+});
+
+test("a malformed duplicate entry is refused", () => {
+  const dup = [
+    { field: "emails", credits: 1 },
+    { field: "emails", credits: -1 },
+  ];
+  assert.deepEqual(expectedCost("emails", dup), { ok: false, reason: "not_revealable" });
+});
+
+test("a first reveal adds the search to the field price", () => {
+  const first = (field: "emails" | "phones", hasStoredSearch: boolean) =>
+    expectedCostFirstReveal({ field, canReveal: probe, hasStoredSearch });
+  assert.deepEqual(first("emails", false), { ok: true, credits: 2 });
+  assert.deepEqual(first("phones", false), { ok: true, credits: 6 });
+});
+
+test("with a stored search only the field price applies", () => {
+  assert.deepEqual(expectedCostFirstReveal({ field: "emails", canReveal: probe, hasStoredSearch: true }), {
+    ok: true,
+    credits: 1,
+  });
+});
+
+test("a first reveal inherits the refusals of the field price", () => {
+  assert.deepEqual(expectedCostFirstReveal({ field: "emails", canReveal: null, hasStoredSearch: false }), {
+    ok: false,
+    reason: "no_price_list",
+  });
+  assert.deepEqual(expectedCostFirstReveal({ field: "emails", canReveal: [], hasStoredSearch: false }), {
+    ok: false,
+    reason: "not_revealable",
+  });
 });
 
 test("pricing.ts hardcodes no price: the only price literal is the search's 1", () => {

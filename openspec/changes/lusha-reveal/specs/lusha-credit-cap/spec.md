@@ -16,6 +16,15 @@ The system MUST enforce a single global ceiling on credits charged per business 
 - WHEN the cap is evaluated
 - THEN the daily ceiling is 12 credits
 
+#### Scenario: Unset or unparsable configuration
+
+- GIVEN the ceiling variable is unset or blank
+- WHEN the cap is evaluated
+- THEN the daily ceiling is the default 12 credits
+- GIVEN the variable is set but is not a plain non-negative integer (for example `abc`, `5.0`, `-1`)
+- WHEN the cap is evaluated
+- THEN the daily ceiling is 0 and the reason is reported as invalid configuration (never the raw value), so the feature is visibly off rather than silently permissive
+
 #### Scenario: No per-BD split
 
 - GIVEN BD Mariel has used 10 of 12 credits today and BD Cristian has used 0

@@ -51,7 +51,7 @@ test("per-contact body codes map to their kind", () => {
   assert.equal(kindFromContactCode("ENRICH_FAILED"), "enrich_failed");
 });
 
-test("WATERFALL_NOT_IN_PLAN and unknown codes are not errors", () => {
+test("WATERFALL_NOT_IN_PLAN and unrelated unknown codes are not errors", () => {
   assert.equal(kindFromContactCode("WATERFALL_NOT_IN_PLAN"), null);
   assert.equal(kindFromContactCode("SOMETHING_NEW"), null);
   assert.equal(kindFromContactCode(undefined), null);
@@ -101,4 +101,28 @@ test("LushaError carries the kind and exposes no retry or backoff field", () => 
 
 test("LushaError defaults its message to the kind, never to request data", () => {
   assert.equal(new LushaError("bad_key").message, "bad_key");
+});
+
+test("any compliance-looking code is permanent, whatever its case or spelling", () => {
+  for (const code of ["compliance_restricted", "Compliance_Restricted", "COMPLIANCE_BLOCKED", " COMPLIANCE_NEW ", "CONTACT_COMPLIANCE"]) {
+    assert.equal(kindFromContactCode(code), "compliance_restricted", code);
+  }
+});
+
+test("known codes are matched case-insensitively", () => {
+  assert.equal(kindFromContactCode("not_found"), "not_found");
+  assert.equal(kindFromContactCode("enrich_failed"), "enrich_failed");
+});
+
+test("a 4xx other than 429 is not retryable by the BD, whatever the kind", () => {
+  for (const status of [400, 404, 418]) {
+    const kind = kindFromHttpStatus(status);
+    assert.ok(kind);
+    assert.equal(isRetryableByBd(kind, status), false, String(status));
+  }
+});
+
+test("429 and 5xx keep their retry decision when the status is passed", () => {
+  assert.equal(isRetryableByBd("rate_limited", 429), true);
+  assert.equal(isRetryableByBd("unavailable", 503), true);
 });

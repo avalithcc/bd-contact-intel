@@ -1,15 +1,38 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_DAILY_CREDIT_CAP, evaluateCap, getDailyCreditCap, parseDailyCreditCap } from "../../src/lib/lusha/cap";
+import {
+  DEFAULT_DAILY_CREDIT_CAP,
+  evaluateCap,
+  getDailyCreditCap,
+  getDailyCreditCapResolution,
+  parseDailyCreditCap,
+  resolveDailyCreditCap,
+} from "../../src/lib/lusha/cap";
 
 test("the default ceiling is 12", () => {
   assert.equal(DEFAULT_DAILY_CREDIT_CAP, 12);
 });
 
-test("unusable raw values fall back to the default", () => {
-  for (const raw of [undefined, "", "   ", "abc", "-1", "NaN", "Infinity", "-Infinity", "1.5", "12abc"]) {
+test("unset or blank resolves to the default 12", () => {
+  for (const raw of [undefined, "", "   "]) {
     assert.equal(parseDailyCreditCap(raw), 12, `raw=${String(raw)}`);
+    assert.equal(resolveDailyCreditCap(raw).source, "default");
   }
+});
+
+test("a value that is set but unparsable resolves to 0, not the default", () => {
+  for (const raw of ["abc", "-1", "NaN", "Infinity", "-Infinity", "1.5", "5.0", "1O", "12abc", "1e999"]) {
+    assert.equal(parseDailyCreditCap(raw), 0, `raw=${raw}`);
+    assert.equal(resolveDailyCreditCap(raw).source, "invalid", `raw=${raw}`);
+  }
+});
+
+test("the invalid resolution carries a reason but never the raw value", () => {
+  const r = resolveDailyCreditCap("secret-ish-1O");
+  assert.deepEqual(r, { cap: 0, source: "invalid" });
+  assert.ok(!JSON.stringify(r).includes("secret"));
+  assert.deepEqual(getDailyCreditCapResolution({ LUSHA_DAILY_CREDIT_CAP: "abc" }), { cap: 0, source: "invalid" });
+  assert.deepEqual(getDailyCreditCapResolution({}), { cap: 12, source: "default" });
 });
 
 test("zero is a valid soft kill switch", () => {
@@ -22,7 +45,7 @@ test("a valid integer is honoured", () => {
 });
 
 test("a parsed cap is always finite", () => {
-  for (const raw of ["Infinity", "NaN", "1e999", "9".repeat(400)]) {
+  for (const raw of [undefined, "Infinity", "NaN", "1e999", "9".repeat(400)]) {
     assert.ok(Number.isFinite(parseDailyCreditCap(raw)), raw);
   }
 });
@@ -82,5 +105,16 @@ test("getDailyCreditCap reads LUSHA_DAILY_CREDIT_CAP from the given env", () => 
   assert.equal(getDailyCreditCap({}), 12);
   assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "30" }), 30);
   assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "0" }), 0);
-  assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "oops" }), 12);
+  assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "oops" }), 0);
+});
+
+test("evaluateCap fails closed on inputs that are not non-negative safe integers", () => {
+  const bad: unknown[] = [null, undefined, "3", "0", -1, Number.NaN, 1.5, Number.POSITIVE_INFINITY];
+  const closed = { allowed: false, remaining: 0 };
+  for (const v of bad) {
+    const ctx = String(v);
+    assert.deepEqual(evaluateCap({ spentToday: v as number, cap: 12, expected: 2 }), closed, `spentToday=${ctx}`);
+    assert.deepEqual(evaluateCap({ spentToday: 0, cap: v as number, expected: 2 }), closed, `cap=${ctx}`);
+    assert.deepEqual(evaluateCap({ spentToday: 0, cap: 12, expected: v as number }), closed, `expected=${ctx}`);
+  }
 });
