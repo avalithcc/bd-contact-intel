@@ -20,7 +20,7 @@ let sequenceId: string;
 const personIds: string[] = [];
 const companyKeys: string[] = [];
 
-type Input = { language: string; channel: string; contact: { firstName: string | null } };
+type Input = { language: string; channel: string; purpose?: string; contact: { firstName: string | null } };
 const calls: Input[] = [];
 const generator =
   (failFor: string[] = []) =>
@@ -238,4 +238,118 @@ test("save rejects empty text and a sent member; another BD cannot draft or edit
   assert.deepEqual(await saveDraftEdit(otherBdId, m, { subject: "s", body: "b" }), { ok: false, error: "not_found" });
   assert.deepEqual(await generateMissingDrafts(otherBdId, sequenceId, deps()), { ok: false, error: "not_found" });
   assert.deepEqual(await regenerateDrafts(otherBdId, sequenceId, [m], deps()), { ok: false, error: "not_found" });
+});
+
+async function stepDraft(memberId: string, step: number) {
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+  return (await db.select().from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step))))[0];
+}
+
+async function tokenCount(memberId: string) {
+  const { db } = await import("@/db");
+  const { sequenceUnsubscribeToken } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  return (await db.select().from(sequenceUnsubscribeToken).where(eq(sequenceUnsubscribeToken.sequenceMemberId, memberId))).length;
+}
+
+/** A member whose step 1 went out: state sent with a step 1 draft on file. */
+async function mkSentMember(name: string, over: { country?: string } = {}) {
+  const m = await mkMember(name, { ...over, state: "sent" });
+  await setDraft(m, { body: "what was sent" });
+  return m;
+}
+
+test("a reminder is drafted for a sent member: own prompt purpose, market language, footer, a NEW token, state untouched", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
+  const m = await mkSentMember("remus");
+  const tokensBefore = await tokenCount(m);
+  calls.length = 0;
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps()), "generated");
+  assert.deepEqual(calls.map((c) => [c.language, c.channel, c.purpose]), [["en", "email", "reminder"]]);
+  const d = await stepDraft(m, 2);
+  assert.match(d.body, /^Hi remus,/);
+  assert.ok(d.body.includes(COMPLIANCE_CONFIG.us!.postalAddress));
+  assert.match(d.body, /https:\/\/example\.test\/api\/unsubscribe\?t=\S+$/);
+  assert.equal(await tokenCount(m), tokensBefore + 1);
+  assert.equal((await stepDraft(m, 1)).body, "what was sent");
+  assert.equal((await memberOf(m)).state, "sent");
+});
+
+test("a LATAM reminder is drafted in Spanish with the Argentina footer, never the Florida address", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
+  const m = await mkSentMember("remlatam", { country: "Argentina" });
+  calls.length = 0;
+  await generateReminderDraft(bdId, sequenceId, m, deps());
+  assert.deepEqual(calls.map((c) => [c.language, c.purpose]), [["es", "reminder"]]);
+  const d = await stepDraft(m, 2);
+  assert.ok(d.body.includes(COMPLIANCE_CONFIG.latam!.postalAddress));
+  assert.ok(!d.body.includes(COMPLIANCE_CONFIG.us!.postalAddress));
+});
+
+test("each reminder issues its own token; a second missing run neither regenerates nor adds a token", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const m = await mkSentMember("remtok");
+  await generateReminderDraft(bdId, sequenceId, m, deps());
+  const afterFirst = await tokenCount(m);
+  calls.length = 0;
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps()), "skipped");
+  assert.equal(calls.length, 0);
+  assert.equal(await tokenCount(m), afterFirst);
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps(), "regenerate"), "generated");
+  assert.equal(await tokenCount(m), afterFirst + 1);
+});
+
+test("an edited reminder survives a missing run; regenerate replaces it and clears review and approval", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const m = await mkSentMember("remedit");
+  const stamp = new Date();
+  await setDraft(m, { step: 2, subject: "Mine", body: "My own nudge", editedAt: stamp, editedByBdId: bdId, reviewedAt: stamp, approvedAt: stamp, approvedByBdId: bdId });
+  const before = await stepDraft(m, 2);
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps()), "skipped");
+  assert.deepEqual(await stepDraft(m, 2), before);
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps(), "regenerate"), "generated");
+  const d = await stepDraft(m, 2);
+  assert.match(d.body, /^Hi remedit,/);
+  assert.deepEqual([d.editedAt, d.editedByBdId, d.reviewedAt, d.approvedAt, d.approvedByBdId], [null, null, null, null, null]);
+  assert.equal((await memberOf(m)).state, "sent");
+});
+
+test("no reminder without a sent step 1: drafted, replied and no_reply members, a member with no step 1 draft, and strangers are skipped", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const drafted = await mkMember("remdrafted");
+  await setDraft(drafted, {});
+  const replied = await mkMember("remreplied", { state: "replied" });
+  await setDraft(replied, {});
+  const done = await mkMember("remdone", { state: "no_reply" });
+  await setDraft(done, {});
+  const noStep1 = await mkMember("remnostep1", { state: "sent" });
+  const owned = await mkSentMember("remstranger");
+  calls.length = 0;
+  for (const id of [drafted, replied, done, noStep1]) assert.equal(await generateReminderDraft(bdId, sequenceId, id, deps()), "skipped");
+  assert.equal(await generateReminderDraft(otherBdId, sequenceId, owned, deps()), "skipped");
+  assert.equal(calls.length, 0);
+  for (const id of [drafted, replied, done, noStep1, owned]) assert.equal(await stepDraft(id, 2), undefined);
+});
+
+test("a reminder for an unmapped market is held, never generated", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const m = await mkSentMember("remspain", { country: "Spain" });
+  calls.length = 0;
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps()), "skipped");
+  assert.equal(calls.length, 0);
+  assert.equal(await stepDraft(m, 2), undefined);
+  assert.equal((await memberOf(m)).holdReason, "unmapped_market");
+});
+
+test("a failed generation throws, leaves no reminder and issues no token, so the runner can retry", async () => {
+  const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const m = await mkSentMember("remfail");
+  const before = await tokenCount(m);
+  await assert.rejects(generateReminderDraft(bdId, sequenceId, m, deps(["remfail"])), /generation failed/);
+  assert.equal(await stepDraft(m, 2), undefined);
+  assert.equal(await tokenCount(m), before);
 });

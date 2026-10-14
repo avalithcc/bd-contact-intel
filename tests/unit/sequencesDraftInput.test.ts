@@ -53,6 +53,22 @@ test("a LATAM member gets the neutral professional Spanish instruction, not the 
   assert.doesNotMatch(system, /Rioplatense tone \(voseo/);
 });
 
+test("the reminder purpose flows into the input and the language still comes only from the market", () => {
+  assert.equal(buildSequenceDraftInput(base, "us")!.purpose, "first");
+  const reminder = buildSequenceDraftInput(base, "us", "reminder")!;
+  assert.deepEqual([reminder.purpose, reminder.language, reminder.channel], ["reminder", "en", "email"]);
+  assert.equal(buildSequenceDraftInput(base, "latam", "reminder")?.language, "es");
+  assert.equal(buildSequenceDraftInput(base, "other", "reminder"), null);
+});
+
+test("a reminder for a US member is an English short nudge with the shared guardrails", () => {
+  const { system } = buildOutreachMessagePrompt(buildSequenceDraftInput(base, "us", "reminder")!);
+  assert.match(system, /25-50 words/);
+  assert.match(system, /Write in natural, professional English/);
+  assert.match(system, /Never invent facts, numbers, client names/);
+  assert.doesNotMatch(system, /Hola Gonzalo/);
+});
+
 test("chips come from the generator input: no signal that was not handed to the prompt", () => {
   assert.deepEqual(draftSignals(buildSequenceDraftInput(base, "us")!), []);
   const withNote = buildSequenceDraftInput({ ...base, signalBodies: ["Promoted to VP in May"] }, "us")!;
