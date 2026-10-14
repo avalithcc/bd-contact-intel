@@ -2,7 +2,7 @@
 
 Design-only. No application code changed. Open `lusha-reveal.html` in a browser (desktop only, checked at 1280px and 1024px with no horizontal scroll). It links the shared `../../crm-hubspot-ux/mockups/styles.css` and draws the "Sobre este contacto" pane (`PropertyList`) with the Lusha reveal control.
 
-**Decision needed (gate 0.3):** approve the 10 states below. The three earlier open questions were answered by the owner and applied (see Decisions applied). Approval date: _pending_.
+**Decision needed (gate 0.3):** approve the 10 states below. The three earlier open questions were answered by the owner and applied (see Decisions applied). Approved by the owner on 2026-10-14 ("esta ok el mockup"), with accent-insensitive comparison applied.
 
 ## States
 
