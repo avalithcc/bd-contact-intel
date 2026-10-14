@@ -1,8 +1,15 @@
 "use server";
 
-// Roster actions. Imported by no page or component until the go-live PR, so none is exposed yet. Every guard is
-// enforced in src/lib/sequences/rosterQueries.ts; these only resolve the signed-in BD.
+// Roster and drafting actions. Imported by no page or component until the go-live PR, so none is exposed yet. Every
+// guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
 import { getCurrentBd } from "@/lib/queries";
+import {
+  generateMissingDrafts,
+  regenerateDrafts,
+  saveDraftEdit,
+  type DraftBatchResult,
+  type SaveEditResult,
+} from "@/lib/sequences/draftQueries";
 import {
   addMembersToSequence,
   createSequenceRow,
@@ -40,4 +47,22 @@ export async function reinstateMember(memberId: string): Promise<ReinstateResult
 export async function updateSequenceSettings(sequenceId: string, patch: { name?: string; dailySendCap?: number }): Promise<UpdateSettingsResult> {
   const me = await getCurrentBd();
   return updateSequenceSettingsRow(me.id, sequenceId, patch);
+}
+
+/** "Generar borradores faltantes": members with no draft only; an existing draft is never touched. */
+export async function generateMissingSequenceDrafts(sequenceId: string): Promise<DraftBatchResult> {
+  const me = await getCurrentBd();
+  return generateMissingDrafts(me.id, sequenceId);
+}
+
+/** "Regenerar" (single or bulk): explicit replacement, clears review and approval. */
+export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[]): Promise<DraftBatchResult> {
+  const me = await getCurrentBd();
+  return regenerateDrafts(me.id, sequenceId, memberIds);
+}
+
+/** "Guardar sin aprobar". */
+export async function saveSequenceDraft(memberId: string, input: { subject: string; body: string }): Promise<SaveEditResult> {
+  const me = await getCurrentBd();
+  return saveDraftEdit(me.id, memberId, input);
 }
