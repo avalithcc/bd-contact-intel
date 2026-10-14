@@ -7,8 +7,7 @@ const ROOT = join(__dirname, "..", "..");
 const source = readFileSync(join(ROOT, "src", "components", "sequences", "UnsubscribePages.tsx"), "utf8");
 const css = ["design-system.css", "globals.css"]
   .map((f) => readFileSync(join(ROOT, "src", "app", f), "utf8"))
-  .join("
-");
+  .join("\n");
 
 test("the unsubscribe pages use only classes that exist in the design system", () => {
   const used = new Set<string>();
