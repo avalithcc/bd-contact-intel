@@ -13,7 +13,7 @@
  */
 import type { MarketKey } from "@/lib/hiring/markets";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
-import type { BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
+import type { BuildOutreachMessagePromptInput, OutreachPurpose } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
 import { buildPersonMessageInput, type BuildPersonMessageInputArgs } from "@/lib/outreach/personMessageInput";
 
@@ -25,15 +25,19 @@ export function draftLanguageForMarket(market: MarketKey): MessageLanguage | nul
 
 export type SequenceDraftInputArgs = Omit<BuildPersonMessageInputArgs, "language" | "channel">;
 
-/** Null when the market has no draft language: the caller must hold the member instead of generating. */
+/**
+ * Null when the market has no draft language: the caller must hold the member instead of generating. `purpose` picks
+ * the first email or the step 2 reminder; it never touches the language, which only the market decides.
+ */
 export function buildSequenceDraftInput(
   args: SequenceDraftInputArgs,
   market: MarketKey,
+  purpose: OutreachPurpose = "first",
 ): BuildOutreachMessagePromptInput | null {
   const language = draftLanguageForMarket(market);
   if (!language) return null;
   // Spread first so a stray `language`/`channel` on the args can never win.
-  return buildPersonMessageInput({ ...args, language, channel: "email" });
+  return { ...buildPersonMessageInput({ ...args, language, channel: "email" }), purpose };
 }
 
 /** The "Señales usadas" chips, derived from the SAME input the generator gets and never from model output. */

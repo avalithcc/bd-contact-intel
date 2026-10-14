@@ -22,9 +22,12 @@ import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
 
 const STEP = 1;
+const REMINDER_STEP = 2;
 const MAX_SIGNALS = 10;
 export const UNMAPPED_MARKET_HOLD = "unmapped_market";
 const EDITABLE: readonly string[] = ["drafted", "approved"];
+// A reminder is drafted for a member whose step 1 went out and whose reminder has not: "sent". Releasing it moves the member on.
+const REMINDER_ELIGIBLE: readonly string[] = ["sent"];
 
 export interface DraftDeps {
   generate: typeof runGenerateOutreachMessage;
@@ -47,7 +50,8 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
                 or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1) as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp
                 where jp.is_it = true and jp.closed_at is null and ${sameCompany}), '[]'::json) as posting_markets,
-             exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft
+             exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
+             exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft
       from sequence_member sm
       join sequence s on s.id = sm.sequence_id and s.owner_bd_id = ${bdId}::uuid
       join bd b on b.id = s.owner_bd_id
@@ -60,7 +64,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
     companyCountry: r.company_country as string | null,
     postingMarkets: r.posting_markets as string[],
   });
-  return { r, market, state: r.state as string, hasDraft: r.has_draft as boolean };
+  return { r, market, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean };
 }
 
 /** Everything the model may see, loaded as the signed-in owner (R6: counts and shared notes only, never messages). */
@@ -86,15 +90,21 @@ async function loadPromptArgs(bdId: string, r: Row) {
   };
 }
 
-/** Generates (or regenerates) one member's step 1 draft. Throws on a generator failure so the batch records it. */
-async function draftMember(bdId: string, sequenceId: string, memberId: string, mode: Mode, deps: DraftDeps, held: string[]) {
+/**
+ * Generates (or regenerates) one member's step 1 draft, or its step 2 reminder when `step` is REMINDER_STEP. Throws on a
+ * generator failure so the batch records it. A reminder needs a step 1 draft and a "sent" member and never changes the
+ * member's state: same language, footer, fresh unsubscribe token and edit protection as step 1.
+ */
+async function draftMember(bdId: string, sequenceId: string, memberId: string, mode: Mode, deps: DraftDeps, held: string[], step = STEP) {
+  const reminder = step === REMINDER_STEP;
+  const editable = reminder ? REMINDER_ELIGIBLE : EDITABLE;
   const facts = await loadFacts(bdId, memberId, sequenceId);
-  if (!facts || !EDITABLE.includes(facts.state)) return "skipped";
-  if (mode === "missing" && (facts.state !== "drafted" || facts.hasDraft)) return "skipped";
+  if (!facts || !editable.includes(facts.state)) return "skipped";
+  if (reminder ? !facts.hasDraft || (mode === "missing" && facts.hasReminderDraft) : mode === "missing" && (facts.state !== "drafted" || facts.hasDraft)) return "skipped";
   const { r, market } = facts;
 
   const language = draftLanguageForMarket(market);
-  const input = language && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", language) }, market);
+  const input = language && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", language) }, market, reminder ? "reminder" : "first");
   if (!input) {
     // No language means no postal address either: hold, do not draft. The reason is a code; the UI words it.
     await db.update(sequenceMember).set({ holdReason: UNMAPPED_MARKET_HOLD, holdAt: new Date() }).where(and(eq(sequenceMember.id, memberId), sql`${sequenceMember.holdReason} is distinct from ${UNMAPPED_MARKET_HOLD}`));
@@ -110,8 +120,8 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
 
   return db.transaction(async (tx) => {
     const [m] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
-    if (!m || !EDITABLE.includes(m.state) || (mode === "missing" && m.state !== "drafted")) return "skipped";
-    const values = { sequenceMemberId: memberId, step: STEP, ...draft };
+    if (!m || !editable.includes(m.state) || (!reminder && mode === "missing" && m.state !== "drafted")) return "skipped";
+    const values = { sequenceMemberId: memberId, step, ...draft };
     if (mode === "missing") {
       if (!(await tx.insert(sequenceDraft).values(values).onConflictDoNothing().returning({ id: sequenceDraft.id })).length) return "skipped";
     } else {
@@ -120,6 +130,7 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
         set: { ...draft, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null },
       });
     }
+    if (reminder) return "generated";
     if (m.state === "approved") assertTransition("approved", "drafted", "regenerate");
     const clearHold = (col: typeof sequenceMember.holdReason | typeof sequenceMember.holdAt) =>
       sql`case when ${sequenceMember.holdReason} = ${UNMAPPED_MARKET_HOLD} then null else ${col} end`;
@@ -151,6 +162,14 @@ export const generateMissingDrafts = (bdId: string, sequenceId: string, deps: Pa
 /** "Regenerar" (one or many): explicit, replaces the draft even if edited, clears review and approval. */
 export const regenerateDrafts = (bdId: string, sequenceId: string, memberIds: readonly string[], deps: Partial<DraftDeps> = {}) =>
   runForOwner(bdId, sequenceId, "regenerate", memberIds, deps);
+
+/**
+ * The step 2 reminder for one member, called by the release runner right after a step 1 send. "missing" never touches an
+ * existing reminder (edited or not); "regenerate" replaces it and clears its review and approval. Ownership is checked
+ * by loadFacts (the sequence must belong to bdId). Throws on a generator failure.
+ */
+export const generateReminderDraft = (bdId: string, sequenceId: string, memberId: string, deps: Partial<DraftDeps> = {}, mode: Mode = "missing") =>
+  draftMember(bdId, sequenceId, memberId, mode, { ...liveDeps(), ...deps }, [], REMINDER_STEP) as Promise<"generated" | "skipped">;
 
 export type SaveEditResult = { ok: true; footerWarning: boolean } | { ok: false; error: "empty" | "not_found" | "not_editable" };
 

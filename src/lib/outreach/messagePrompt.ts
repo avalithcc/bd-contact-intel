@@ -124,7 +124,13 @@ export interface BuildOutreachMessagePromptInput {
   // call — never the full conversation over LinkedIn, which is never
   // stored (see the "generate" action callers).
   channel: OutreachChannel;
+  // What this email is for. Omitted means "first": exactly the behaviour every existing caller has. "reminder" is
+  // the step-2 nudge of a Sequence, sent as a reply on the step-1 thread; it changes ONLY rule 1 (length) and rule 3
+  // (goal) of the system prompt, so every guardrail stays one shared copy. Email only: a LinkedIn DM ignores it.
+  purpose?: OutreachPurpose;
 }
+
+export type OutreachPurpose = "first" | "reminder";
 
 // How many of the most recent messages get fed into the prompt — enough to
 // establish tone/topic continuity without ballooning prompt size or letting
@@ -261,10 +267,28 @@ function languageInstruction(channel: OutreachChannel, language: MessageLanguage
   return "Write in natural, professional English, warm but not overly casual — a peer writing to a peer, not a cold sales pitch.";
 }
 
+// Reference style (rule-free tone exemplar at the end of the system prompt). Spanish keeps the original example,
+// which is correct for the existing Spanish callers; any other language gets an English one instead of a Spanish
+// exemplar that would pull the draft toward Spanish phrasing.
+function referenceStyleFor(isEmail: boolean, language: MessageLanguage): string {
+  if (language === "es") {
+    return isEmail
+      ? `Reference style (do not copy verbatim, tone example only, in Spanish, for a FIRST email with no prior history):
+{"subject": "Squads senior nearshore para Affirm", "body": "Hola Gonzalo,\\n\\nVi que Affirm tiene varias búsquedas abiertas de backend senior en Card, Fraud, Identity y Payments, casi todas remotas en US y Europa. En Avalith armamos squads de ingenieros senior en timezone alineado a US, integrados en días, para dar capacidad extra mientras se cubren esos roles — no competimos con el proceso de contratación.\\n\\nTe cierra una llamada de 20 minutos la semana que viene para ver si tiene sentido?\\n\\nCristian Civita, COO de Avalith"}`
+      : `Reference style (do not copy verbatim, this is a tone example only, in Spanish, for a FIRST outreach with no prior history):
+"Hola Gonzalo, cómo va? Soy Cristian Civita, COO de Avalith. Estuve mirando las búsquedas de Affirm y vi que están sumando bastante gente senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos chicos de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. Te copa charlar 20 minutos la semana que viene?"`;
+  }
+  return isEmail
+    ? `Reference style (do not copy verbatim, tone example only, in English, for a FIRST email with no prior history):
+{"subject": "Senior nearshore squads for Affirm", "body": "Hi Gonzalo,\\n\\nI saw Affirm has several open senior backend roles across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. At Avalith we build squads of senior engineers in US-aligned timezones, embedded within days, to add capacity while those roles get filled — we do not compete with your hiring process.\\n\\nWould a 20-minute call next week make sense?\\n\\nCristian Civita, COO at Avalith"}`
+    : `Reference style (do not copy verbatim, this is a tone example only, in English, for a FIRST outreach with no prior history):
+"Hi Gonzalo, how's it going? I'm Cristian Civita, COO at Avalith. I was looking at Affirm's open roles and saw you're adding a lot of senior backend people across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. Since 2011 we've been building small teams of senior engineers in US-aligned timezones, embedded within days. It's not meant to replace your hiring, just extra capacity while those roles get filled. Open to a 20-minute chat next week?"`;
+}
+
 export function buildOutreachMessagePrompt(
   input: BuildOutreachMessagePromptInput,
 ): OutreachMessagePrompt {
-  const { contact, company, history, notes = [], senderName, senderTitle, language, channel } = input;
+  const { contact, company, history, notes = [], senderName, senderTitle, language, channel, purpose = "first" } = input;
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "the contact";
   const firstName = contact.firstName || fullName;
   const roleLabel = contact.roleGroup ? ROLE_GROUP_LABELS[contact.roleGroup] : "unknown";
@@ -274,12 +298,17 @@ export function buildOutreachMessagePrompt(
   const notesText = summarizeNotes(notes);
   const hasNotes = notesText !== null;
   const isEmail = channel === "email";
+  const isReminder = isEmail && purpose === "reminder";
 
-  const lengthRule = isEmail
+  const lengthRule = isReminder
+    ? "Length: roughly 25-50 words for the body, one short paragraph. This is a reminder sent as a reply on the first email's thread, so that email is directly above it: a short nudge, not a new pitch. Do not re-explain Avalith or repeat the hook beyond a few words, and ignore the length of the reference style below, which is a tone example only."
+    : isEmail
     ? "Length: roughly 90-150 words for the body. One or two short paragraphs — this is a professional email, not a LinkedIn DM. No filler, no repeated self-presentation."
     : "Length: roughly 60-100 words. One short paragraph — this is a DM, not an email. No filler, no repeated self-presentation.";
 
-  const goalRule = isEmail
+  const goalRule = isReminder
+    ? "Goal: this is a follow-up on the same email thread, to someone who has not replied to your first email. Bring the thread back to the top and restate one clear, low-pressure next step. Do not apologize, guilt-trip, or imply they owe an answer."
+    : isEmail
     ? "Goal: start a real conversation by email and propose a short call. This is a first professional email, not a sales blast — one clear, low-pressure next step."
     : "Goal: this DM's explicit purpose is to move the conversation off LinkedIn — get the contact's email address, or get them to agree to a short call. Never try to have the entire sales conversation inside LinkedIn DMs.";
 
@@ -291,14 +320,10 @@ export function buildOutreachMessagePrompt(
     ? 'Return ONLY a JSON object with exactly two string fields, "subject" and "body" — no markdown, no code fences, no preamble or explanation outside the JSON. "subject" is short (under ~60 characters) and specific to the hiring hook. "body" is plain text (no markdown), the message itself, ending with the sign-off.'
     : "Return ONLY the message text — no preamble, no explanation, no markdown, no quotation marks around it.";
 
-  const referenceStyle = isEmail
-    ? `Reference style (do not copy verbatim, tone example only, in Spanish, for a FIRST email with no prior history):
-{"subject": "Squads senior nearshore para Affirm", "body": "Hola Gonzalo,\\n\\nVi que Affirm tiene varias búsquedas abiertas de backend senior en Card, Fraud, Identity y Payments, casi todas remotas en US y Europa. En Avalith armamos squads de ingenieros senior en timezone alineado a US, integrados en días, para dar capacidad extra mientras se cubren esos roles — no competimos con el proceso de contratación.\\n\\nTe cierra una llamada de 20 minutos la semana que viene para ver si tiene sentido?\\n\\nCristian Civita, COO de Avalith"}`
-    : `Reference style (do not copy verbatim, this is a tone example only, in Spanish, for a FIRST outreach with no prior history):
-"Hola Gonzalo, cómo va? Soy Cristian Civita, COO de Avalith. Estuve mirando las búsquedas de Affirm y vi que están sumando bastante gente senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos chicos de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. Te copa charlar 20 minutos la semana que viene?"`;
+  const referenceStyle = referenceStyleFor(isEmail, language);
 
   const system = `
-You write ${isEmail ? "professional, peer-to-peer first-touch emails" : "short, natural, peer-to-peer LinkedIn outreach messages"} on behalf of a Business Developer at Avalith, a software engineering company. Follow these rules exactly:
+You write ${isReminder ? "short, peer-to-peer follow-up emails that continue an existing email thread" : isEmail ? "professional, peer-to-peer first-touch emails" : "short, natural, peer-to-peer LinkedIn outreach messages"} on behalf of a Business Developer at Avalith, a software engineering company. Follow these rules exactly:
 
 1. ${lengthRule}
 2. Language and tone: ${languageInstruction(channel, language)}
