@@ -1,0 +1,12 @@
+{
+  "_note": "SYNTHETIC: a deliberately wrong phone shape, used to prove pickPhone fails closed.",
+  "requestId": "req-synthetic-0010",
+  "results": [
+    {
+      "id": "lusha-contact-111",
+      "emails": [],
+      "phones": [{ "value": 123456789 }, "not-an-object", { "number": "" }]
+    }
+  ],
+  "billing": { "creditsCharged": 5, "resultsReturned": 1 }
+}

@@ -1,0 +1,17 @@
+{
+  "requestId": "req-redacted-0001",
+  "results": [
+    {
+      "clientReferenceId": "person-aaa",
+      "id": "lusha-contact-111",
+      "company": { "name": "Example Co", "domain": "example.com" },
+      "socialLinks": { "linkedin": "https://www.linkedin.com/in/example-person" },
+      "name": "Example Person",
+      "canReveal": [
+        { "field": "emails", "credits": 1 },
+        { "field": "phones", "credits": 5 }
+      ]
+    }
+  ],
+  "billing": { "creditsCharged": 1, "resultsReturned": 1 }
+}

@@ -1,0 +1,15 @@
+{
+  "_note": "SYNTHETIC and UNVERIFIED: the phone response shape was never measured (D17). Replace with the real payload once the first production phone reveal is stored on the ledger.",
+  "requestId": "req-synthetic-0009",
+  "results": [
+    {
+      "id": "lusha-contact-111",
+      "emails": [],
+      "phones": [
+        { "number": "+10000000001", "type": "work", "confidence": 50 },
+        { "number": "+10000000002", "type": "mobile", "confidence": 90 }
+      ]
+    }
+  ],
+  "billing": { "creditsCharged": 5, "resultsReturned": 1 }
+}

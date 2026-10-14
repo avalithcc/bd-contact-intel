@@ -1,0 +1,9 @@
+{
+  "requestId": "req-redacted-0005",
+  "status": "partial",
+  "statusReason": "WATERFALL_NOT_IN_PLAN",
+  "results": [
+    { "id": "lusha-contact-111", "emails": [], "phones": [] }
+  ],
+  "billing": { "creditsCharged": 0, "resultsReturned": 0 }
+}

@@ -1,0 +1,9 @@
+{
+  "requestId": "req-redacted-0003",
+  "results": [
+    {
+      "clientReferenceId": "person-aaa",
+      "error": { "code": "COMPLIANCE_RESTRICTED", "message": "Contact is restricted" }
+    }
+  ]
+}

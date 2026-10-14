@@ -1,0 +1,10 @@
+{
+  "requestId": "req-redacted-0002",
+  "results": [
+    {
+      "clientReferenceId": "person-aaa",
+      "error": { "code": "NOT_FOUND", "message": "Contact not found" }
+    }
+  ],
+  "billing": { "creditsCharged": 0, "resultsReturned": 0 }
+}
