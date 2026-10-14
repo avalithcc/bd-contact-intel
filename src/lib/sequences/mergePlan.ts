@@ -7,7 +7,8 @@
  *  - a membership with send history (sent / replied / no_reply) is NEVER deleted: sequence_send_claim cascades from
  *    sequence_member, and that claim is the only thing stopping a second send of the same step. It is repointed to
  *    the survivor, or the merge is refused;
- *  - a same-sequence collision (unique(sequence_id, person_id)) keeps ONE membership and tells the BD which.
+ *  - a same-sequence collision (unique(sequence_id, person_id)) keeps ONE membership and tells the BD which: the one
+ *    with a hand-edited draft, else the survivor's.
  */
 import { SENT_STATES } from "./memberState";
 
@@ -17,6 +18,11 @@ export interface MergeMembership {
   sequenceId: string;
   sequenceName: string;
   state: string;
+  /** Any draft of this member was edited by a BD (edited_at set): human judgement that cannot be regenerated. */
+  handEdited?: boolean;
+  /** When the approved draft is due out (approved members only). */
+  scheduledFor?: Date | null;
+  sentAt?: Date | null;
 }
 
 export interface MergeAffected {
@@ -26,6 +32,9 @@ export interface MergeAffected {
   side: "survivor" | "merged";
   state: string;
   scheduledSend: boolean;
+  scheduledFor: Date | null;
+  sentAt: Date | null;
+  handEdited: boolean;
 }
 
 export type MergeBlocker = "scheduled_send" | "send_history_collision";
@@ -58,6 +67,9 @@ export function planSequenceMerge(
       side: x.personId === survivorId ? "survivor" : "merged",
       state: x.state,
       scheduledSend: x.state === "approved",
+      scheduledFor: x.scheduledFor ?? null,
+      sentAt: x.sentAt ?? null,
+      handEdited: x.handEdited ?? false,
     });
   }
   if (memberships.some((x) => x.state === "approved")) plan.blockers.push("scheduled_send");
@@ -81,7 +93,8 @@ export function planSequenceMerge(
       refused = true;
       continue;
     }
-    const keepMerged = s.state === "discarded" && m.state !== "discarded";
+    // Owner decision 2026-10-14: the hand-edited draft survives; otherwise the survivor's membership, unless it was discarded.
+    const keepMerged = m.state !== "discarded" && (s.state === "discarded" || (!!m.handEdited && !s.handEdited));
     plan.survivingMembers.push({ sequenceId: s.sequenceId, sequenceName: s.sequenceName, keep: keepMerged ? "merged" : "survivor" });
     if (keepMerged) {
       plan.deleteMembers.push(s.memberId);
