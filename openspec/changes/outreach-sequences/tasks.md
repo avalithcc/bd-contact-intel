@@ -121,10 +121,10 @@ Commits:
 
 Reachable: nothing. Inert: four pure modules imported only by tests.
 
-- [ ] 2.1 RED/GREEN: `src/lib/sequences/miamiTime.ts` (`miamiCalendarDate`, `miamiWallClockToUtc`, `nextMiamiNineAm`) using `Intl.DateTimeFormat` with `America/New_York` (D8). Required cases: `2026-11-01` approval gives `2026-11-02 09:00 Miami = 14:00 UTC` (not 13:00); both 2026 transitions (March 8 spring-forward, November 1 fall-back); approval at `23:50` Miami still schedules the next calendar day. The file states the opposite assumption to `argentinaDate.ts` in its doc comment; do not touch `argentinaDate.ts`.
-- [ ] 2.2 RED/GREEN: `src/lib/sequences/schedule.ts`: `step1DueAt(approvedAt)`, `reminderDueAt(step1SentAt)` (7 days after the actual send, so a cap-delayed send pushes the reminder), and `parseSchedule()` reading the `schedule` jsonb with the spec's values as the fallback.
-- [ ] 2.3 RED/GREEN: `src/lib/sequences/memberState.ts`: `canTransition(from, to, trigger)` encoding the `sequence-approval` table exactly. Required rejections: `sent -> approved`, `replied -> sent`, any exit from `sent` caused by an auto-reply, re-admit of an `opt_out` discard.
-- [ ] 2.4 RED/GREEN: `src/lib/sequences/capValidation.ts`: `validateDailySendCap` accepts 1-15 integers, rejects `0`, `-3`, `2.5`, `500`, returns a warning flag above 8, default 5.
+- [x] 2.1 RED/GREEN: `src/lib/sequences/miamiTime.ts` (`miamiCalendarDate`, `miamiWallClockToUtc`, `nextMiamiNineAm`) using `Intl.DateTimeFormat` with `America/New_York` (D8). Required cases: `2026-11-01` approval gives `2026-11-02 09:00 Miami = 14:00 UTC` (not 13:00); both 2026 transitions (March 8 spring-forward, November 1 fall-back); approval at `23:50` Miami still schedules the next calendar day. The file states the opposite assumption to `argentinaDate.ts` in its doc comment; do not touch `argentinaDate.ts`.
+- [x] 2.2 RED/GREEN: `src/lib/sequences/schedule.ts`: `step1DueAt(approvedAt)`, `reminderDueAt(step1SentAt)` (7 days after the actual send, so a cap-delayed send pushes the reminder), and `parseSchedule()` reading the `schedule` jsonb with the spec's values as the fallback.
+- [x] 2.3 RED/GREEN: `src/lib/sequences/memberState.ts`: `canTransition(from, to, trigger)` encoding the `sequence-approval` table exactly. Required rejections: `sent -> approved`, `replied -> sent`, any exit from `sent` caused by an auto-reply, re-admit of an `opt_out` discard.
+- [x] 2.4 RED/GREEN: `src/lib/sequences/capValidation.ts`: `validateDailySendCap` accepts 1-15 integers, rejects `0`, `-3`, `2.5`, `500`, returns a warning flag above 8, default 5.
 
 Commits:
 - `feat(sequences): add DST-correct Miami schedule calculations`
