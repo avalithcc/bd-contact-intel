@@ -327,3 +327,32 @@ test("header injection: an extra header containing CR, LF or NUL is rejected, no
     );
   }
 });
+
+test("extra header shape: an empty string, a leading-space continuation and a non-header line are rejected", () => {
+  for (const bad of ["", " folded", "\tfolded", "no colon here", "X-A:nospace", "X-A: ", "Bad Name: v"]) {
+    assert.throws(
+      () => buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" }, undefined, undefined, [bad]),
+      (e: unknown) => e instanceof GmailSendError && e.kind === "invalid_header",
+      JSON.stringify(bad),
+    );
+  }
+});
+
+test("extra header names: a reserved header (Bcc, To, From, Content-Type, any case) is rejected", () => {
+  for (const bad of ["Bcc: x", "bcc: x", "To: evil@x.test", "From: evil@x.test", "Content-Type: text/html", "Subject: x", "Message-ID: <a@b>"]) {
+    assert.throws(
+      () => buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" }, undefined, undefined, [bad]),
+      (e: unknown) => e instanceof GmailSendError && e.kind === "invalid_header",
+      bad,
+    );
+  }
+});
+
+test("the Sequence unsubscribe header shapes still pass the extra header guard", () => {
+  assert.doesNotThrow(() =>
+    buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" }, undefined, undefined, [
+      "List-Unsubscribe: <https://x.test/u?t=1>, <mailto:a@x.test?subject=unsubscribe>",
+      "List-Unsubscribe-Post: List-Unsubscribe=One-Click",
+    ]),
+  );
+});

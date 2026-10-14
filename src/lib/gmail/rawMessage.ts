@@ -68,6 +68,29 @@ export function assertSafeHeaderValue(name: string, value: string): void {
   }
 }
 
+// Headers the builder owns. An extra line may never repeat one: a forged Bcc/To/From or a second Content-Type
+// would reach the recipient as a duplicate of a real header.
+const RESERVED_HEADER_NAMES = new Set([
+  "from", "to", "cc", "bcc", "subject", "mime-version", "content-type", "content-transfer-encoding",
+  "in-reply-to", "references", "reply-to", "sender", "date", "message-id",
+]);
+
+/**
+ * Guard for a caller-supplied complete header line. Beyond CR/LF/NUL (assertSafeHeaderValue) the line must be
+ * structurally a single new header: `Name: value`. An empty string would end the header block, a leading space or
+ * tab would fold into the previous header, and a reserved name would duplicate one the builder writes itself.
+ */
+export function assertSafeExtraHeader(line: string): void {
+  assertSafeHeaderValue("Extra header", line);
+  if (!/^[A-Za-z0-9-]+: \S/.test(line)) {
+    throw new GmailSendError("invalid_header", "An extra header must have the shape 'Name: value'", "Extra header");
+  }
+  const name = line.slice(0, line.indexOf(":")).toLowerCase();
+  if (RESERVED_HEADER_NAMES.has(name)) {
+    throw new GmailSendError("invalid_header", `The ${name} header is set by the sender and cannot be added as an extra header`, "Extra header");
+  }
+}
+
 /**
  * Threading headers of a reply. Both values come from mail someone else sent
  * (a Message-ID is chosen by the sender), so they are attacker-influenced and
@@ -120,7 +143,7 @@ export function buildRawMessage(
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
   }
-  for (const line of extraHeaders) assertSafeHeaderValue("Extra header", line);
+  for (const line of extraHeaders) assertSafeExtraHeader(line);
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
   const threading = reply
     ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
