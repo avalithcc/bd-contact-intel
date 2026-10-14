@@ -127,6 +127,17 @@ export function startupLabel(signal: StartupSignal | null, yesLabel: string, noL
   return signal.startupReason ? `${base} · ${signal.startupReason}` : base;
 }
 
+/**
+ * Contacts-list counterpart of `startupLabel`: `target_company.is_startup` is
+ * three-valued, and the list must not collapse "classified as not a startup"
+ * (false) and "not classified yet" (null) into the same blank cell. `null`
+ * return means render nothing (confirmed not a startup).
+ */
+export function startupListBadge(isStartup: boolean | null): "startup" | "unclassified" | null {
+  if (isStartup === null) return "unclassified";
+  return isStartup ? "startup" : null;
+}
+
 export interface CompanyPropertyHistoryRow {
   property: string;
   bdName: string | null;

@@ -364,6 +364,11 @@ export const es: typeof en = {
     excludeNeverMessaged: "Excluir nunca contactados",
     startupsOnlyLabel: "Solo startups",
     startupBadge: "startup",
+    // Muted badge when `is_startup` is NULL (not classified yet), so it reads
+    // differently from a company confirmed not a startup (no badge).
+    startupUnclassifiedBadge: "sin clasificar",
+    startupUnclassifiedHint:
+      "Todavía sin clasificar como startup o no startup; el clasificador lo completa con el tiempo.",
     candidatesEyebrow: "// candidatos",
     noHiringCompaniesPrefix:
       "Todavía no hay empresas contratando sincronizadas. Carga las empresas objetivo y ejecuta una sincronización (ver ",

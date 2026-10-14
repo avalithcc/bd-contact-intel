@@ -14,6 +14,7 @@ import {
   latestEditByProperty,
   resolveCompanyScopeRows,
   startupLabel,
+  startupListBadge,
   type CompanyTimelineFilterCounts,
 } from "@/lib/companies/recordMappers";
 
@@ -138,4 +139,10 @@ test("isCompanyActivityFilter: accepts the 4 known filter keys, rejects everythi
   assert.equal(isCompanyActivityFilter("status_backfill"), false);
   assert.equal(isCompanyActivityFilter(undefined), false);
   assert.equal(isCompanyActivityFilter(""), false);
+});
+
+test("startupListBadge: three-valued, so 'not a startup' and 'never classified' are distinguishable", () => {
+  assert.equal(startupListBadge(true), "startup");
+  assert.equal(startupListBadge(false), null);
+  assert.equal(startupListBadge(null), "unclassified");
 });

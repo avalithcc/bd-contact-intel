@@ -383,6 +383,11 @@ export const en = {
     // src/lib/hiring/startupClassification.ts) — the row's `title`
     // attribute carries the model's own short justification as a tooltip.
     startupBadge: "startup",
+    // Muted badge when `is_startup` is NULL (not classified yet), so it reads
+    // differently from a company confirmed not a startup (no badge).
+    startupUnclassifiedBadge: "unclassified",
+    startupUnclassifiedHint:
+      "Not classified as startup or non-startup yet; the classifier fills this in over time.",
     candidatesEyebrow: "// candidates",
     noHiringCompaniesPrefix: "No hiring companies synced yet. Seed target companies and run a sync (see ",
     noHiringCompaniesLinkText: "open roles",

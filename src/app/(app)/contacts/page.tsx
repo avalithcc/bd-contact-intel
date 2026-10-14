@@ -10,6 +10,7 @@ import { whatsappLinkFor } from "@/lib/whatsapp";
 import { PhoneValue } from "@/components/PhoneValue";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
+import { startupListBadge } from "@/lib/companies/recordMappers";
 import { listSavedViews } from "@/lib/contacts/savedViews";
 import {
   getContactBoardColumns,
@@ -934,9 +935,14 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                     <td>{r.position ?? "—"}</td>
                     <td className="nowrap">
                       {r.company ?? "—"}
-                      {r.isStartup && (
+                      {startupListBadge(r.isStartup) === "startup" && (
                         <span className="badge badge-brand" title={r.startupReason ?? undefined}>
                           {dict.outreach.startupBadge}
+                        </span>
+                      )}
+                      {startupListBadge(r.isStartup) === "unclassified" && (
+                        <span className="badge badge-none" title={dict.outreach.startupUnclassifiedHint}>
+                          {dict.outreach.startupUnclassifiedBadge}
                         </span>
                       )}
                       {r.offshoreHeavy && (
