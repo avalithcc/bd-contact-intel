@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildFunnelBreakdown } from "@/lib/reports/funnel";
+import { MIN_RATE_SAMPLE, buildFunnelBreakdown } from "@/lib/reports/funnel";
 
 test("buildFunnelBreakdown computes each stage's percentage of the funnel's own 'new' total", () => {
   const b = buildFunnelBreakdown({ newTotal: 184, contactedOrMore: 96, repliedOrMore: 41, meeting: 12, discarded: 15 });
@@ -46,4 +46,32 @@ test("buildFunnelBreakdown never mutates its input", () => {
   const clone = { ...input };
   buildFunnelBreakdown(input);
   assert.deepEqual(input, clone);
+});
+
+test("MIN_RATE_SAMPLE is 10", () => {
+  assert.equal(MIN_RATE_SAMPLE, 10);
+});
+
+test("production case 1 of 2 is NOT presented as a rate", () => {
+  const b = buildFunnelBreakdown({ newTotal: 200, contactedOrMore: 2, repliedOrMore: 1, meeting: 0, discarded: 0 });
+  assert.equal(b.replyRatePct, 50); // maths unchanged
+  assert.equal(b.replyRateIsRate, false);
+  assert.equal(b.replyRateFraction, "1 / 2");
+  assert.equal(b.meetingOfRepliedIsRate, false);
+  assert.equal(b.meetingOfRepliedFraction, "0 / 1");
+});
+
+test("rate is presented at exactly MIN_RATE_SAMPLE, not below", () => {
+  const at = buildFunnelBreakdown({ newTotal: 50, contactedOrMore: 10, repliedOrMore: 10, meeting: 5, discarded: 0 });
+  assert.equal(at.replyRateIsRate, true);
+  assert.equal(at.meetingOfRepliedIsRate, true);
+  const below = buildFunnelBreakdown({ newTotal: 50, contactedOrMore: 9, repliedOrMore: 9, meeting: 5, discarded: 0 });
+  assert.equal(below.replyRateIsRate, false);
+  assert.equal(below.meetingOfRepliedIsRate, false);
+});
+
+test("zero denominator is not a rate and yields a 0 / 0 fraction", () => {
+  const b = buildFunnelBreakdown({ newTotal: 0, contactedOrMore: 0, repliedOrMore: 0, meeting: 0, discarded: 0 });
+  assert.equal(b.replyRateIsRate, false);
+  assert.equal(b.replyRateFraction, "0 / 0");
 });

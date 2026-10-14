@@ -197,10 +197,14 @@ export function ReportsView({
           <div className="value">{funnel.newTotal}</div>
           <div className="foot">{dict.kpiNewContactsFoot}</div>
         </div>
-        <div className="stat info">
+        <div className={funnel.replyRateIsRate ? "stat info" : "stat neutral"}>
           <div className="label">{dict.kpiReplyRate}</div>
-          <div className="value">{funnel.replyRatePct}%</div>
-          <div className="foot">{dict.kpiReplyRateFoot}</div>
+          <div className="value">{funnel.replyRateIsRate ? `${funnel.replyRatePct}%` : funnel.replyRateFraction}</div>
+          <div className="foot">
+            {funnel.replyRateIsRate
+              ? dict.kpiReplyRateFoot(funnel.repliedOrMore, funnel.contactedOrMore)
+              : dict.kpiReplyRateSmallFoot(funnel.repliedOrMore, funnel.contactedOrMore)}
+          </div>
         </div>
         {/* Bug fix: this KPI used to reuse `funnel.meeting` (persons whose
             CURRENT status is "meeting", scoped by person.owner_bd_id) —
@@ -315,7 +319,9 @@ export function ReportsView({
                 <span className="num">
                   {funnel.repliedOrMore}{" "}
                   <span className="soft small">
-                    ({funnel.repliedOfContactedPct}% {dict.funnelOfContacted})
+                    {funnel.replyRateIsRate
+                      ? `(${funnel.repliedOfContactedPct}% ${dict.funnelOfContacted} · ${funnel.replyRateFraction})`
+                      : `(${funnel.replyRateFraction} ${dict.funnelOfContacted} · ${dict.funnelSmallSample})`}
                   </span>
                 </span>
               </div>
@@ -327,7 +333,9 @@ export function ReportsView({
                 <span className="num">
                   {funnel.meeting}{" "}
                   <span className="soft small">
-                    ({funnel.meetingOfRepliedPct}% {dict.funnelOfReplied})
+                    {funnel.meetingOfRepliedIsRate
+                      ? `(${funnel.meetingOfRepliedPct}% ${dict.funnelOfReplied} · ${funnel.meetingOfRepliedFraction})`
+                      : `(${funnel.meetingOfRepliedFraction} ${dict.funnelOfReplied} · ${dict.funnelSmallSample})`}
                   </span>
                 </span>
               </div>

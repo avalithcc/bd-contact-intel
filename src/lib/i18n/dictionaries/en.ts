@@ -1783,7 +1783,9 @@ export const en = {
     kpiNewContacts: "New contacts",
     kpiNewContactsFoot: "people who entered the funnel in the period",
     kpiReplyRate: "Reply rate",
-    kpiReplyRateFoot: "Replied ÷ Contacted",
+    kpiReplyRateFoot: (replied: number, contacted: number) => `Replied ${replied} ÷ Contacted ${contacted}`,
+    kpiReplyRateSmallFoot: (replied: number, contacted: number) =>
+      `Replied ${replied} ÷ Contacted ${contacted} · sample too small to be a rate`,
     kpiMeetings: "Meetings scheduled",
     kpiMeetingsFoot: "in the period",
     kpiMeetingsEmptyFoot: "No meetings recorded yet",
@@ -1804,6 +1806,7 @@ export const en = {
     funnelMeeting: "Meeting",
     funnelOfContacted: "of Contacted",
     funnelOfReplied: "of Replied",
+    funnelSmallSample: "small sample",
     funnelDiscardedFoot: (count: number, pct: number) =>
       `Besides the funnel: ${count} discarded (${pct}% of New) — not a forward stage.`,
     pipelineTitle: "Company pipeline",
