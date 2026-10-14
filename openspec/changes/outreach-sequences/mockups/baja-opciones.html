@@ -10,8 +10,6 @@
 <link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
 </head>
 <body>
-<div class="app">
-<div class="main">
 <main class="page">
 
 <div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Comparación de las DOS opciones para cumplir el requisito de baja (cambio <span class="mono">outreach-sequences</span>, capacidad <span class="mono">sequence-compliance</span>). No es una pantalla de la app: es material de decisión. Muestra lo que ve <strong>el destinatario</strong>, que es donde las dos opciones se diferencian. Sin barra lateral, porque el destinatario no está logueado. Las páginas de baja reales viven dentro de <span class="mono">.auth</span> (centrado a pantalla completa, como el login); acá la <span class="mono">.auth-card</span> se muestra acotada para que las dos opciones entren en un scroll. El cuerpo de los correos está <strong>en inglés</strong> a propósito: todos los destinatarios son de Estados Unidos.</div><span class="tag tag-scope">En alcance: outreach-sequences</span></div>
@@ -90,21 +88,23 @@ Don't want to hear from me again? Just reply <strong>STOP</strong> and I'll take
 
 <h3 class="mb-lg">2. Aprieta el link: página de confirmación</h3>
 <p class="meta mb-lg">Un <span class="mono">GET</span> que da de baja al instante es una trampa: los escáneres de seguridad corporativos abren todos los links de los correos entrantes y te darían de baja gente que nunca tocó nada. Por eso el <span class="mono">GET</span> sólo <strong>muestra</strong>, y el botón hace <span class="mono">POST</span>. Los escáneres no hacen POST.</p>
-<div class="card auth-card mb-lg" id="confirmar"><div class="card-body">
+<div class="auth-card mb-lg" id="confirmar" style="margin-inline:auto">
 <div class="auth-brand"><span class="logo">avalith<span class="dot">.</span></span></div>
+<div class="card"><div class="card-body">
 <h3 class="center">Unsubscribe?</h3>
 <p class="meta center mt-md">We'll stop emailing <span class="mono">brian.casteel@upshop.com</span> about engineering capacity. This takes effect right away.</p>
 <form class="form-actions mt-xl"><button class="btn btn-primary btn-block" type="button">Yes, unsubscribe me</button></form>
 <p class="help center mt-md">Avalith &middot; Bolívar 2975, Mar del Plata, Argentina</p>
-</div></div>
+</div></div></div>
 
 <h3 class="mb-lg">3. Listo</h3>
-<div class="card auth-card mb-lg"><div class="card-body">
+<div class="auth-card mb-lg" style="margin-inline:auto">
 <div class="auth-brand"><span class="logo">avalith<span class="dot">.</span></span></div>
+<div class="card"><div class="card-body">
 <div class="empty"><div class="empty-icon"><svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg></div>
 <h3>You're unsubscribed</h3><p>We won't email <span class="mono">brian.casteel@upshop.com</span> again. Nothing else is needed from you.</p></div>
 <p class="help center">Avalith &middot; Bolívar 2975, Mar del Plata, Argentina</p>
-</div></div>
+</div></div></div>
 
 <h3 class="mb-lg">4. Lo que hay que construir</h3>
 <div class="card mb-lg"><div class="card-body"><div class="assoc">
@@ -135,6 +135,5 @@ Don't want to hear from me again? Just reply <strong>STOP</strong> and I'll take
 </div></div>
 
 </main>
-</div></div>
 </body>
 </html>
