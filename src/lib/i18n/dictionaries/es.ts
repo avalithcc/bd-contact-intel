@@ -1882,6 +1882,7 @@ export const es: typeof en = {
       not_found: "No se encontró el par o la fusión indicada.",
       already_resolved: "Este par ya fue resuelto por otra persona.",
       unexpected: "La acción no se pudo completar. Intenta de nuevo.",
+      sequence_blocked: "Uno de los dos contactos está en una Secuencia. Cancela el envío programado y confirma la fusión.",
     },
   },
 

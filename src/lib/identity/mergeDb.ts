@@ -27,6 +27,7 @@ import {
 import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
 import { readManualOwnerPersonIds, readOwnerTouches } from "@/lib/identity/ownerRuleDb";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
+import { applySequenceMerge } from "@/lib/sequences/mergeQueries";
 import {
   parseMergeSnapshot,
   planMerge,
@@ -272,6 +273,7 @@ export async function mergeContacts(
   mergedId: string,
   reason: string,
   actorBdId: string,
+  options: { acknowledgeSequences?: boolean } = {},
 ): Promise<{ mergeEventId: string }> {
   if (survivorId === mergedId) throw new Error("Cannot merge a person into itself");
 
@@ -286,6 +288,9 @@ export async function mergeContacts(
     if (!survivorRow || !mergedRow) throw new Error("Merge refused: survivor or merged person not found");
     if (survivorRow.mergedIntoId) throw new Error("Merge refused: survivor is already merged into another person");
     if (mergedRow.mergedIntoId) throw new Error("Merge refused: merged person is already merged into another person");
+
+    // Sequence memberships: stops (throws SequenceMergeBlockedError, rolling back) unless acknowledged and unblocked.
+    await applySequenceMerge(tx, survivorId, mergedId, actorBdId, options.acknowledgeSequences ?? false);
 
     const [
       survivorConnections,

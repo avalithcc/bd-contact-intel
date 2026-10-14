@@ -1913,6 +1913,7 @@ export const en = {
       not_found: "The pair or merge could not be found.",
       already_resolved: "This pair was already resolved by someone else.",
       unexpected: "The action could not be completed. Please try again.",
+      sequence_blocked: "One of the two Contacts is in a Sequence. Cancel the scheduled send and confirm the merge.",
     },
   },
 

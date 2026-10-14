@@ -6,8 +6,9 @@ import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { db } from "@/db";
 import { mergeContacts, unmergeContact, markNotDuplicate } from "@/lib/identity/mergeDb";
 import { getDuplicateCandidateDetail } from "@/lib/identity/duplicateReviewQueries";
+import { cancelScheduledSend, SequenceMergeBlockedError } from "@/lib/sequences/mergeQueries";
 
-type ActionError = "not_found" | "already_resolved" | "unexpected";
+type ActionError = "not_found" | "already_resolved" | "unexpected" | "sequence_blocked";
 
 function redirectWithError(err: ActionError): never {
   redirect(`/admin/duplicates?actionError=${err}`);
@@ -33,11 +34,24 @@ export async function mergeDuplicateCandidateAction(formData: FormData): Promise
   const mergedId = detail.recommendedSurvivor === "a" ? detail.personB.id : detail.personA.id;
 
   try {
-    await mergeContacts(db, survivorId, mergedId, detail.reason, admin.id);
+    await mergeContacts(db, survivorId, mergedId, detail.reason, admin.id, {
+      acknowledgeSequences: formData.get("acknowledgeSequences") === "on",
+    });
   } catch (err) {
     unstable_rethrow(err);
+    // Sequence memberships stop the merge (scheduled send, or unacknowledged); see src/lib/sequences/mergePlan.ts.
+    if (err instanceof SequenceMergeBlockedError) redirectWithError("sequence_blocked");
     redirectWithError("unexpected");
   }
+  revalidatePath("/admin/duplicates");
+}
+
+/** "Cancelar envio" for a Sequence member whose scheduled send blocks a merge. */
+export async function cancelScheduledSendAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const memberId = formData.get("memberId");
+  if (typeof memberId !== "string" || !memberId) throw new Error("Missing memberId");
+  await cancelScheduledSend(db, memberId);
   revalidatePath("/admin/duplicates");
 }
 

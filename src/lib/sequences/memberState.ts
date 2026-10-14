@@ -14,6 +14,9 @@ export const MEMBER_STATES = [
 ] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
 
+/** States that mean an email has gone out: a sequence_send_claim exists and must never be destroyed. */
+export const SENT_STATES = ["sent", "replied", "no_reply"] as const;
+
 export type MemberTrigger =
   | "approve"
   | "cancel"
