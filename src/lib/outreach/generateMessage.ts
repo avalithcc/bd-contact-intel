@@ -33,9 +33,13 @@ const OUTREACH_MODEL = "anthropic/claude-sonnet-5";
 // the LinkedIn DM's (60-100 words) and also carries a subject line and JSON
 // framing overhead — a higher ceiling avoids truncating a valid response
 // mid-JSON, while still bounding a misbehaving/looping generation.
-const MAX_OUTPUT_TOKENS: Record<OutreachChannel, number> = {
-  email: 500,
-  linkedin: 350,
+//
+// The cap counts REASONING tokens too: claude-sonnet-5 spends 190-500 tokens thinking before the ~300-token answer, so
+// the old 500/350 cut the JSON off (finishReason "length", truncated or empty text) for roughly half the members of a
+// Sequence. The headroom below leaves room for the thinking and the answer; the prompt still bounds the answer length.
+export const MAX_OUTPUT_TOKENS: Record<OutreachChannel, number> = {
+  email: 2000,
+  linkedin: 1500,
 };
 
 export type GenerateOutreachMessageResult =
@@ -60,17 +64,21 @@ export type GenerateOutreachMessageResult =
 export async function runGenerateOutreachMessage(
   input: BuildOutreachMessagePromptInput,
   historyCount: number,
+  generate: typeof generateText = generateText,
 ): Promise<GenerateOutreachMessageResult> {
   const { system, prompt } = buildOutreachMessagePrompt(input);
   const signals = extractOutreachSignals(input);
 
   try {
-    const { text } = await generateText({
+    const { text, finishReason } = await generate({
       model: OUTREACH_MODEL,
       system,
       prompt,
       maxOutputTokens: MAX_OUTPUT_TOKENS[input.channel],
     });
+
+    // A cut-off answer is never usable, even when the truncated text happens to parse.
+    if (finishReason === "length") return { ok: false, errorKey: "invalidModelOutput" };
 
     if (input.channel === "email") {
       const parsed = parseEmailModelOutput(text);
