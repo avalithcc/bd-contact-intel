@@ -10,7 +10,7 @@ import {
   type LushaErrorKind,
 } from "../../src/lib/lusha/errors";
 
-test("the taxonomy lists exactly the thirteen kinds of the design", () => {
+test("the taxonomy lists exactly the fourteen kinds of the design", () => {
   assert.deepEqual([...LUSHA_ERROR_KINDS].sort(), [
     "async_unsupported",
     "bad_key",
@@ -21,6 +21,7 @@ test("the taxonomy lists exactly the thirteen kinds of the design", () => {
     "enrich_failed",
     "no_credits",
     "not_found",
+    "outcome_unknown",
     "plan_denied",
     "rate_limited",
     "unavailable",
@@ -72,6 +73,7 @@ const DECISIONS: Record<LushaErrorKind, { permanent: boolean; retryableByBd: boo
   unparsable_value: { permanent: false, retryableByBd: false },
   cap_exceeded: { permanent: false, retryableByBd: false },
   busy: { permanent: false, retryableByBd: true },
+  outcome_unknown: { permanent: false, retryableByBd: false },
 };
 
 test("every kind has an explicit permanence and retry decision", () => {

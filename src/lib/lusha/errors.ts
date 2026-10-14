@@ -16,6 +16,9 @@ export const LUSHA_ERROR_KINDS = [
   "unparsable_value",
   "cap_exceeded",
   "busy",
+  // The request was sent and answered 2xx but the body could not be read: the credit may
+  // already be spent, so a manual retry could double-charge. Never retryable.
+  "outcome_unknown",
 ] as const;
 
 export type LushaErrorKind = (typeof LUSHA_ERROR_KINDS)[number];
@@ -86,6 +89,7 @@ const PERMANENT: Record<LushaErrorKind, boolean> = {
   unparsable_value: false,
   cap_exceeded: false,
   busy: false,
+  outcome_unknown: false,
 };
 
 const RETRYABLE_BY_BD: Record<LushaErrorKind, boolean> = {
@@ -102,6 +106,7 @@ const RETRYABLE_BY_BD: Record<LushaErrorKind, boolean> = {
   unparsable_value: false,
   cap_exceeded: false,
   busy: true,
+  outcome_unknown: false,
 };
 
 /** Only a compliance outcome is permanent (D6): protected today, protected tomorrow. */

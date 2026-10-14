@@ -48,7 +48,7 @@ test("rate-limit headers are surfaced", async () => {
 test("an email reveal always sends reveal:[\"emails\"] and a phone reveal [\"phones\"], never both or none", async () => {
   for (const field of ["emails", "phones"] as const) {
     const { fn, calls } = fakeFetch(() => json(fixture("unverified-enrich-emails.json")));
-    await enrichContact(KEY, fn, ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"], field);
+    await enrichContact(KEY, fn, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA", field);
     assert.equal(calls[0].url, "https://api.lusha.com/v3/contacts/enrich");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), { ids: ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"], reveal: [field] });
   }
@@ -57,15 +57,15 @@ test("an email reveal always sends reveal:[\"emails\"] and a phone reveal [\"pho
 test("reveal is a required parameter: omitting it is a type error and a runtime refusal", async () => {
   const { fn, calls } = fakeFetch(() => json("{}"));
   // @ts-expect-error reveal is required (omitting it makes Lusha return both fields and spend 5 extra credits)
-  const attempt = enrichContact(KEY, fn, ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"]);
-  await assert.rejects(attempt, (e: unknown) => e instanceof LushaError);
+  const attempt = enrichContact(KEY, fn, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
+  await assert.rejects(attempt, TypeError);
   assert.equal(calls.length, 0, "nothing is sent without an explicit field");
 });
 
 for (const status of [401, 402, 403, 429, 451, 500, 503]) {
   test(`HTTP ${status} is called exactly once (no retry) and carries its status`, async () => {
     const { fn, calls } = fakeFetch(() => json(fixture("unverified-http-451.json"), status));
-    await assert.rejects(enrichContact(KEY, fn, ["id"], "emails"), (e: unknown) => {
+    await assert.rejects(enrichContact(KEY, fn, "id", "emails"), (e: unknown) => {
       assert.ok(e instanceof LushaError);
       assert.equal(e.httpStatus, status);
       assert.ok(!e.message.includes(KEY));
@@ -104,9 +104,31 @@ test("a transport error or timeout maps to unavailable, is called once, and neve
   assert.equal(n, 1);
 });
 
-test("a 200 with an unreadable body is unavailable", async () => {
-  const { fn } = fakeFetch(() => json("<html>"));
-  await assert.rejects(searchContact(KEY, fn, person), (e: unknown) => e instanceof LushaError && e.kind === "unavailable");
+test("a 200 with an unreadable body is outcome_unknown and NOT retryable (the credit may be spent)", async () => {
+  const { fn, calls } = fakeFetch(() => json("<html>"));
+  await assert.rejects(searchContact(KEY, fn, person), (e: unknown) => {
+    assert.ok(e instanceof LushaError);
+    assert.equal(e.kind, "outcome_unknown");
+    assert.equal(e.httpStatus, 200);
+    assert.equal(isRetryableByBd(e.kind, e.httpStatus), false);
+    return true;
+  });
+  assert.equal(calls.length, 1);
+});
+
+test("redirects are refused so the api_key header is never forwarded cross-origin", async () => {
+  const { fn, calls } = fakeFetch(() => json("{}"));
+  await searchContact(KEY, fn, person);
+  assert.equal(calls[0].init.redirect, "error");
+});
+
+test("exactly one id per enrich: empty, blank, non-string or array ids are refused before any request", async () => {
+  const { fn, calls } = fakeFetch(() => json("{}"));
+  for (const bad of ["", "  ", ["a", "b"], null, undefined, 5]) {
+    await assert.rejects(enrichContact(KEY, fn, bad as never, "phones"), TypeError);
+  }
+  await assert.rejects(enrichContact(KEY, fn, "id", "both" as never), TypeError);
+  assert.equal(calls.length, 0);
 });
 
 test("getAccountUsage is free, non-blocking and never throws", async () => {

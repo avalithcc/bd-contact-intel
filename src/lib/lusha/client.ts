@@ -50,6 +50,8 @@ async function call(apiKey: string, fetchFn: FetchFn, method: "GET" | "POST", pa
       method,
       headers: { api_key: apiKey, "Content-Type": "application/json", Accept: "application/json" },
       body: payload === undefined ? undefined : JSON.stringify(payload),
+      // A redirect would forward the custom api_key header cross-origin.
+      redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch {
@@ -61,7 +63,8 @@ async function call(apiKey: string, fetchFn: FetchFn, method: "GET" | "POST", pa
   try {
     return { body: await res.json(), rateLimit: readRateLimit(res.headers) };
   } catch {
-    throw new LushaError("unavailable", "Lusha response was not readable", res.status);
+    // Sent and answered 2xx: the credit may already be spent, so this must not read as retryable.
+    throw new LushaError("outcome_unknown", "Lusha response was not readable", res.status);
   }
 }
 
@@ -75,9 +78,12 @@ export function searchContact(apiKey: string, fetchFn: FetchFn, input: SearchInp
  * `reveal` is REQUIRED and always sent: omitting it makes Lusha return both
  * fields and spend 5 extra credits.
  */
-export function enrichContact(apiKey: string, fetchFn: FetchFn, ids: string[], reveal: RevealField): Promise<LushaResponse> {
-  if (reveal !== "emails" && reveal !== "phones") return Promise.reject(new LushaError("unavailable", "reveal field is required"));
-  return call(apiKey, fetchFn, "POST", "/v3/contacts/enrich", { ids, reveal: [reveal] });
+export async function enrichContact(apiKey: string, fetchFn: FetchFn, lushaId: string, reveal: RevealField): Promise<LushaResponse> {
+  // Programmer errors, not Lusha outcomes: nothing is sent. Exactly one id per request, so
+  // a bug can never spend the price per contact.
+  if (typeof lushaId !== "string" || lushaId.trim() === "") throw new TypeError("enrichContact needs exactly one non-empty lushaId");
+  if (reveal !== "emails" && reveal !== "phones") throw new TypeError("enrichContact needs reveal to be emails or phones");
+  return call(apiKey, fetchFn, "POST", "/v3/contacts/enrich", { ids: [lushaId], reveal: [reveal] });
 }
 
 /** Free and eventually consistent: display only, never enforcement. Never throws. */
