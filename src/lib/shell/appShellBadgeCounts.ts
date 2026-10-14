@@ -17,6 +17,8 @@ import { deriveSyncHealth } from "@/lib/gmail/syncHealth";
 export interface AppShellBadgeCounts {
   taskCount: number;
   followUpCount: number;
+  /** Open absorption proposals, team-wide (not per-BD). */
+  absorptionCount: number;
   /** email-sync.html screen 4 — see reconnectBannerState.ts. */
   needsReconnectBanner: boolean;
   /** Connected and readonly-scoped, but not syncing (syncHealth.ts); null when healthy or not applicable. */
@@ -68,12 +70,13 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
     )) as unknown as {
       task_count: number;
       follow_up_count: number;
+      absorption_count: number;
       queue_built: boolean;
       email_account_banner_state: EmailAccountBannerState | null;
     }[];
     // An empty result cannot happen (scalar subqueries), but keep the old
     // `row?.` tolerance rather than throwing in the shell.
-    return r ?? { task_count: 0, follow_up_count: 0, queue_built: true, email_account_banner_state: null };
+    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, queue_built: true, email_account_banner_state: null };
   };
   // F5: build today's queue on the first page of the day — see
   // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
@@ -100,6 +103,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
   return {
     taskCount: Number(row?.task_count ?? 0),
     followUpCount: Number(row?.follow_up_count ?? 0),
+    absorptionCount: Number(row?.absorption_count ?? 0),
     needsReconnectBanner: shouldShowReconnectBanner({
       accountStatus: bannerState?.status ?? null,
       grantedScopes: bannerState?.grantedScopes ?? null,

@@ -120,11 +120,13 @@ export function Sidebar({
   labels,
   taskCount,
   followUpCount,
+  absorptionCount,
   isAdmin,
 }: {
   labels: NavLabels;
   taskCount?: number;
   followUpCount?: number;
+  absorptionCount?: number;
   // Admin-only "Administración" section (admin-conversation-access mockup,
   // screen 1: admin-conversation.html:57-61) — "Registro de auditoría" and
   // "Reportes" (owner-reporting decision 1/5) are wired here; see
@@ -149,9 +151,10 @@ export function Sidebar({
   }, [pathname]);
 
   const isActive = (href: string) => pathname.startsWith(href);
-  // "Tareas"/"Seguimientos" are the only two items with a cheap badge count
-  // today (see the comment above NAVIGATION) — both riding the pill-count
-  // class the mockup already ships.
+  // "Tareas"/"Seguimientos" are the NAVIGATION items with a cheap badge count
+  // (see the comment above NAVIGATION), riding the pill-count class the
+  // mockup already ships. "Absorciones" is a hardcoded admin entry outside
+  // that loop, so it renders its own pill-count inline below.
   const pillCountByLabelKey: Partial<Record<SidebarItem["labelKey"], number | undefined>> = {
     tasks: taskCount,
     followUps: followUpCount,
@@ -231,6 +234,7 @@ export function Sidebar({
           >
             <AbsorbIcon className="icon" />
             {labels.absorptions}
+            {!!absorptionCount && <span className="pill-count">{absorptionCount}</span>}
           </Link>
           <Link
             href="/admin/duplicates"

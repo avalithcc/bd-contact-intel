@@ -88,3 +88,11 @@ test("buildAppShellBadgeCountsQuery: worked-today redirects email_sent/reply_rec
     /when activity\.type in \('email_sent', 'reply_received'\) and \(activity\.metadata->>'occurredAt'\) ~ '[^']+' then \(activity\.metadata->>'occurredAt'\)::timestamptz/i,
   );
 });
+
+test("buildAppShellBadgeCountsQuery: absorption_count counts open proposals team-wide (no bd filter)", () => {
+  const { sql } = render();
+  const match = sql.match(/select count\(\*\)::int\s+from "company_absorption_proposal"[\s\S]*?\)\s+as absorption_count/i);
+  assert.ok(match, "expected an absorption_count scalar subquery over company_absorption_proposal");
+  assert.match(match[0], /company_absorption_proposal\.status = 'open'/i);
+  assert.doesNotMatch(match[0], /bd_id|\$\d+::uuid/i);
+});

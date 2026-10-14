@@ -43,7 +43,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, emailAccount, followUpQueueItem, person, task } from "@/db/schema";
+import { activity, companyAbsorptionProposal, emailAccount, followUpQueueItem, person, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 
 /** Raw-SQL-text twin of queueSelection.ts#workedTodayAtSql() — see this file's doc comment for why it can't reuse that helper via interpolation here. */
@@ -123,6 +123,16 @@ export function buildAppShellBadgeCountsQuery({
               and ${sql.raw(WORKED_TODAY_AT_SQL_TEXT)} < ${workedTodayToIso}::timestamptz
           )
       ) as follow_up_count,
+      (
+        -- Team-wide on purpose: unlike task_count/follow_up_count (per-BD),
+        -- an absorption proposal is proposed by one BD and resolved by any
+        -- BD, so every BD sees the same pending total. No bd filter.
+        -- Backed by company_absorption_proposal_open_absorbed_idx (partial,
+        -- WHERE status = 'open').
+        select count(*)::int
+        from ${companyAbsorptionProposal}
+        where company_absorption_proposal.status = 'open'
+      ) as absorption_count,
       -- F5: has today's queue been built for this BD? The shell builds it
       -- when false (readBadgeRowEnsuringQueue.ts). Index-friendly: hits the
       -- (bd_id, queue_date, person_id) unique key.
