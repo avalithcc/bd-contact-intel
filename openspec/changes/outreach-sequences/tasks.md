@@ -39,6 +39,7 @@ Chain strategy: stacked-to-main
 | 4 | Unsubscribe core: token, queries, GET/POST handlers, pages (no route file) | C | `main` | ~240 | TDD |
 | 5 | Roster: picker SQL builder, `rosterGuards`, create/add/remove/re-admit actions | D | `main` | ~320 | TDD |
 | 6 | Drafting: `draftInput` (+ two `"en"` guards), batch/regenerate/edit, footer wiring | E | `main` | ~300 | TDD |
+| 6b | Seed the first real sequence: owner-gated script, the 10 hand-picked contacts, re-validated | E | `main` | ~150 | TDD; **writes prod data, owner-gated** |
 | 7 | Approval: review tracking, single + bulk approve with server gate, cancel, reminder approval | E | `main` | ~290 | TDD |
 | 8 | Send path: `sendFromAccountRow`, `sendGmailMessageFromAccount`, `extraHeaders` | F | `main` | ~150 | TDD; **touches live send path** |
 | 9 | Runner core: `releasePlan`, `preSendChecks`, claim, `runSequenceRelease` (no route, no cron) | F | `main` | ~310 | TDD |
@@ -81,10 +82,11 @@ Required by the owner for every PR. "Reachable" = a user or the internet can tri
 | 4 | Nothing. There is deliberately **no** `route.ts`, so no URL serves the handlers. | Token, queries, handlers, confirmation pages. |
 | 5 | Nothing. Server actions are imported by no component, so they are not exposed. | Picker query, guards, actions. |
 | 6 | Nothing. The generator is called only by actions that nothing imports. | Drafting actions. |
+| 6b | Nothing. The script is run by hand, never imported, and has no route or cron. It writes 10 `sequence_member` rows in state `drafted` — approved by nobody, sent by nothing. | The seeded sequence and its drafts. |
 | 7 | Nothing. | Approval actions, schedule extension. |
 | 8 | Nothing new. `sendGmailMessage({ bdId })` keeps its exact behavior as a wrapper. | `sendGmailMessageFromAccount` has no caller. |
-| 9 | Nothing. The runner is a library function with no route and no cron entry; with an empty `sequence_member` table there is also nothing to release. | `runSequenceRelease` and every pure module. |
-| 10 | Nothing new for users. The sync additionally stores `is_automatic` and calls `applySequenceReplies`, which is a no-op while `sequence_member` is empty. | Reply, opt-out and phrase logic. |
+| 9 | Nothing. The runner is a library function with no route and no cron entry. **Note: after 6b, `sequence_member` is no longer empty** — the runner stays inert because nothing invokes it, and because `releasePlan` only releases `approved` members while all seeded rows are `drafted`. Both guarantees must hold; neither alone is sufficient. | `runSequenceRelease` and every pure module. |
+| 10 | Nothing new for users. The sync additionally stores `is_automatic` and calls `applySequenceReplies`. **After 6b this no longer no-ops because the table is empty** — it no-ops because no seeded member has a `sent_at`, so there is no sent message for a reply to match. A task in 10 MUST assert that explicitly against seeded rows, not against an empty table. | Reply, opt-out and phrase logic. |
 | 11 | Nothing. No `page.tsx` imports the components. | All components and the detail query. |
 | 12 | Nothing. Not mounted anywhere, including the Contact record. | All components. |
 | 13 | **The whole feature**: `/sequences`, `/sequences/new`, `/sequences/[id]`, `/api/unsubscribe`, `/api/sequences/run`, the two crons, the "Secuencias" nav entry and badge, the Contact-record block. | Nothing; gated by Phase 0 gates, not by code. |
@@ -189,6 +191,29 @@ Reachable: nothing. The generator is called only by actions that nothing imports
 Commits:
 - `feat(sequences): pin draft language to English behind guarded input builder`
 - `feat(sequences): add batch, regenerate and edit-protected draft actions`
+
+## Phase 6b: Seed the first real sequence (PR 6b, base: main)
+
+Reachable: nothing. Inert: the seeded sequence and its drafts — 10 members in state `drafted`, approved by nobody, sent by nothing.
+
+**Why here and not later**: by PR 6 the tables (1), the roster guards (5) and the draft generator (6) all exist. Seeding at this point exercises the whole A→E pipeline against production data before a single screen exists, and it means PR 13's preview shows the owner's real list instead of an empty state. Owner decision 2026-10-14.
+
+**Why its own PR**: PR 6 is already forecast at ~300 code lines with a flagged risk; folding ~150 more in would breach the 400-line budget.
+
+The roster is the 10 contacts the owner approved on 2026-10-14 (see `mockups/README.md`), in tier order: Brian Casteel and Saumya Jossy (Upshop), Adrian Pulido (Nubank), Joe Dilaura and Melissa Dominguez (Snowflake), Kevin Harris and Stefano Fontanelli (Twilio), Jose Velez and Anderson Romero (Bold), Andy Ellis (Cint).
+
+- [ ] 6b.1 RED/GREEN: pure `resolveSeedRoster(candidates, guards)` in `src/lib/sequences/seedRoster.ts` — takes the hand-picked list plus live row state and returns `{ admitted, rejected }` with a reason per rejection. Unit-tested over every rejection path. No DB access.
+- [ ] 6b.2 `scripts/seed-outreach-sequence.ts`, following the owner-gated convention of `scripts/clear-non-company-employers.ts`: `--dry-run` is the default and prints the full plan; `--apply --actor=<bd id>` is required to write; one `audit_log` row per applied run, never on a no-op; the whole write in one `db.transaction`.
+- [ ] 6b.3 **Re-validate every candidate at run time; never substitute silently.** The hand-picked list was measured on 2026-10-14 and this runs weeks later. Each member is admitted only if, at run time: the person is non-merged and still has a non-empty `email`; their company still has an open IT posting; `company.client_status` IS NULL (owner decision: `inactive` is a past client and gets no cold outreach); the address is not in `email_suppression`; and the max-2-per-company cap still holds. Anyone who drops off is **reported by name with the reason** and left out — the script must not quietly pick a replacement to reach 10.
+- [ ] 6b.4 Idempotent: a second run against the same sequence name adds nothing and writes no audit row. Re-running after a member was removed by hand does NOT re-add them.
+- [ ] 6b.5 Create the sequence named `Florida + US · octubre` (the mockup's name), owned by the owner's bd id, `sending_account_id` referencing their connected `email_account`, `daily_send_cap` 5, and the two-step schedule from `sequence-scheduling`.
+- [ ] 6b.6 Generate each member's draft through the real PR 6 path, so the seeded drafts are the genuine article — English (`"en"`), market-keyed footer, real signals. Do NOT hand-write draft text.
+- [ ] 6b.7 Every member lands in state `drafted`. The script MUST NOT set `approved_at`, `sent_at`, or anything that could be released. Assert this in the test.
+- [ ] 6b.8 Verification: run `--dry-run` against production and show the owner the admitted/rejected split BEFORE `--apply`. Then `npm run test:unit` and `npm run typecheck` green.
+
+Commits:
+- `feat(sequences): add pure seed-roster resolution with per-candidate rejection reasons`
+- `feat(sequences): add owner-gated script seeding the first real sequence`
 
 ## Phase 7: Approval (PR 7, base: main)
 
@@ -318,6 +343,7 @@ Estimates are lines changed. "Code" counts against the 400 budget; tests and doc
 | 4 | ~240 | ~200 | ~10 | Yes | Low (the design's ~260 minus the route file, which moved to PR 13) |
 | 5 | ~320 | ~280 | ~5 | Yes | **At risk**: picker builder + four actions; the audited admin read was moved to PR 11 to keep it down |
 | 6 | ~300 | ~300 | ~10 | Yes | **At risk**: the reminder-prompt question (6.7) is unresolved and could add lines |
+| 6b | ~150 | ~160 | ~10 | Yes | Low on size; **writes production data**, so it is owner-gated with a dry run shown before `--apply` |
 | 7 | ~290 | ~280 | ~5 | Yes | Low |
 | 8 | ~150 | ~150 | ~5 | Yes | Low on size; **high consequence** (live send path), mitigated by characterization tests first |
 | 9 | ~310 | ~420 | ~10 | Yes | **At risk**: gained the unmapped-market check; densest logic in the chain |
@@ -325,7 +351,7 @@ Estimates are lines changed. "Code" counts against the 400 budget; tests and doc
 | 11 | ~360 | ~220 | ~5 | Yes (90%) | **At risk**: closest to the ceiling. Fallback: move the empty and finished states to PR 12, which has ~100 lines of slack |
 | 12 | ~300 | ~120 | ~5 | Yes | Medium |
 | 13 | ~340 | ~140 | ~10 | Yes | **At risk**: cannot be split without making something reachable early. Fallback: move the `sequence_count` subquery (~40 lines, harmless unused scalar) into PR 12 |
-| **Total** | **~3,745** | **~3,080** | **~100** | | |
+| **Total** | **~3,895** | **~3,240** | **~110** | | |
 
 If any code estimate exceeds 400 during apply, apply stops and asks the owner; the pre-agreed fallbacks above are the first options to offer. No `size:exception` is requested or recorded at planning time.
 
