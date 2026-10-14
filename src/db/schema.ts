@@ -286,14 +286,18 @@ export const jobPosting = pgTable(
     // added column doesn't require a same-transaction backfill; a null
     // value is functionally "other" (unclassified) until backfilled.
     market: text("market"),
-    // Miami-metro sub-filter within the "us" market, per
-    // src/lib/hiring/markets.ts#isMiamiArea (Miami/Miami Beach/Fort
-    // Lauderdale/Coral Gables/Doral/Hialeah — NOT all of Florida; e.g.
-    // Orlando/Tampa are "us" but not `is_miami`). Computed at sync time
-    // (see src/lib/hiring/sync.ts) alongside `market`, and backfilled for
-    // older rows via scripts/backfill-posting-miami.ts. Not nullable —
-    // unlike `market`, false is already the correct "unknown/not Miami"
-    // default, so newly added rows don't need a NULL sentinel.
+    // Florida sub-filter within the "us" market. The NAME is historical: this
+    // began as a Miami-metro cut, but that matched too few postings, so
+    // src/lib/hiring/markets.ts#isMiamiArea now matches ALL of Florida
+    // (Orlando, Tampa, Jacksonville, ... and the bare "FL" token). The column
+    // and its callers (e.g. the `miamiOnly` param) keep the old name on
+    // purpose so the persisted data and call sites stay stable; the label
+    // shown to users says Florida. markets.ts is authoritative for what
+    // counts — do not infer the geography from this column's name. Computed
+    // at sync time (see src/lib/hiring/sync.ts) alongside `market`, and
+    // backfilled for older rows via scripts/backfill-posting-miami.ts. Not
+    // nullable — unlike `market`, false is already the correct "unknown/not
+    // Florida" default, so newly added rows don't need a NULL sentinel.
     isMiami: boolean("is_miami").notNull().default(false),
     // Whether this posting is in an offshore delivery hub (India,
     // Philippines, Vietnam, Sri Lanka, Bangladesh, Pakistan — see
