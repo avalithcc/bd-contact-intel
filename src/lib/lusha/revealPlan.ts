@@ -1,0 +1,77 @@
+// Pure planners for writing a revealed value onto a Contact. They produce the shape
+// planPropertyEdit produces ({ personUpdate, historyRows }) plus the activity row, but
+// never go through the manual edit path: that path hardcodes emailStatus='none' /
+// emailSource='manual', which isReachable rejects. Inputs are never mutated.
+
+import type { NewActivity, NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
+import { isValidPhoneFormat } from "@/lib/phone";
+import { isReachable } from "@/lib/sequences/rosterGuards";
+import type { Pick as Picked } from "./parse";
+
+export type RevealPerson = Pick<Person, "id" | "email" | "emailNormalized" | "emailStatus" | "emailSource" | "emailConfidence" | "mergedIntoId" | "phone" | "mobilePhone">;
+
+export interface RevealMeta {
+  actorBdId: string;
+  lushaId: string;
+  /** billing.creditsCharged; null when Lusha did not report it. */
+  creditsCharged: number | null;
+}
+
+type HistoryRow = Omit<NewPersonPropertyHistory, "id" | "at">;
+type RevealActivity = Omit<NewActivity, "metadata"> & { metadata: { field: "emails" | "phones"; creditsCharged: number | null; lushaId: string } };
+
+export interface RevealWritePlan {
+  personUpdate: Partial<NewPerson> | null;
+  historyRows: HistoryRow[];
+  /** Null when nothing was revealed. A phone that could not be placed is still an activity. */
+  activity: RevealActivity | null;
+}
+
+const NOTHING: RevealWritePlan = { personUpdate: null, historyRows: [], activity: null };
+
+const activityOf = (p: RevealPerson, field: "emails" | "phones", m: RevealMeta): RevealActivity => ({
+  type: "lusha_reveal",
+  personId: p.id,
+  actorBdId: m.actorBdId,
+  metadata: { field, creditsCharged: m.creditsCharged, lushaId: m.lushaId },
+});
+
+function changes(p: RevealPerson, m: RevealMeta, next: Record<string, string | number | null>): HistoryRow[] {
+  const current = p as unknown as Record<string, string | number | null>;
+  return Object.entries(next)
+    .filter(([k, v]) => k !== "emailConfidence" && (current[k] ?? null) !== v)
+    .map(([k, v]) => ({
+      personId: p.id,
+      property: k,
+      oldValue: current[k] == null ? null : String(current[k]),
+      newValue: v == null ? null : String(v),
+      changedByBdId: m.actorBdId,
+      source: "lusha_reveal",
+    }));
+}
+
+/** Eligible only when the Sequence roster guard would refuse the current email (D10). */
+export function planRevealedEmailWrite(person: RevealPerson, pick: Picked, meta: RevealMeta): RevealWritePlan {
+  const reachable = isReachable({ personId: person.id, email: person.email, emailStatus: person.emailStatus, emailSource: person.emailSource, mergedIntoId: person.mergedIntoId, companyKey: null, clientStatus: null });
+  if (!pick.ok || person.mergedIntoId || reachable) return NOTHING;
+  const next = { email: pick.value, emailNormalized: pick.value.trim().toLowerCase(), emailStatus: "probable", emailSource: "lusha", emailConfidence: pick.confidence };
+  return {
+    personUpdate: { ...next, updatedAt: new Date(), updatedByBdId: meta.actorBdId },
+    historyRows: changes(person, meta, next),
+    activity: activityOf(person, "emails", meta),
+  };
+}
+
+/** D11: mobile -> mobilePhone, else phone; the occupied target falls back to the other column; both occupied writes nothing. */
+export function planRevealedPhoneWrite(person: RevealPerson, pick: Picked, meta: RevealMeta): RevealWritePlan {
+  if (!pick.ok || person.mergedIntoId || !isValidPhoneFormat(pick.value)) return NOTHING;
+  const [first, other] = pick.type === "mobile" ? (["mobilePhone", "phone"] as const) : (["phone", "mobilePhone"] as const);
+  const column = !person[first] ? first : !person[other] ? other : null;
+  const activity = activityOf(person, "phones", meta);
+  if (!column) return { personUpdate: null, historyRows: [], activity };
+  return {
+    personUpdate: { [column]: pick.value, updatedAt: new Date(), updatedByBdId: meta.actorBdId },
+    historyRows: changes(person, meta, { [column]: pick.value }),
+    activity,
+  };
+}

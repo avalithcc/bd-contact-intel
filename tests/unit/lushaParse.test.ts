@@ -186,9 +186,10 @@ test("parseEnrichResponse maps per-contact errors and the async job", () => {
 test("pickEmail prefers work, then highest confidence, never blindly element zero", () => {
   const raw = fixture("unverified-enrich-emails.json").results[0].emails;
   const out = pickEmail(raw);
-  assert.deepEqual(out, { ok: true, value: "redacted-work@example.invalid", type: "work", raw });
+  assert.deepEqual(out, { ok: true, value: "redacted-work@example.invalid", type: "work", confidence: 80, raw });
   const first = pickEmail([{ email: "a@x.invalid" }, { email: "b@x.invalid" }]);
   assert.equal(first.ok && first.value, "a@x.invalid");
+  assert.equal(first.ok && first.confidence, null, "no confidence reported is null, never -Infinity");
 });
 
 test("pickEmail returns an empty outcome for [] and fails closed on a wrong shape", () => {
@@ -201,7 +202,7 @@ test("pickEmail returns an empty outcome for [] and fails closed on a wrong shap
 test("pickPhone is deterministic over the synthetic (unverified) phone fixture", () => {
   const raw = fixture("synthetic-unverified-enrich-phones.json").results[0].phones;
   const out = pickPhone(raw);
-  assert.deepEqual(out, { ok: true, value: "+10000000001", type: "work", raw });
+  assert.deepEqual(out, { ok: true, value: "+10000000001", type: "work", confidence: 50, raw });
 });
 
 test("pickPhone fails closed with unparsable_value and keeps the raw payload", () => {

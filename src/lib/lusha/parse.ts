@@ -140,7 +140,7 @@ export function parseEnrichResponse(body: unknown, lushaId: string): EnrichOutco
 }
 
 export type Pick =
-  | { ok: true; value: string; type: string | null; raw: unknown }
+  | { ok: true; value: string; type: string | null; confidence: number | null; raw: unknown }
   | { ok: false; reason: "empty" | "unparsable_value"; raw: unknown };
 
 interface Candidate {
@@ -170,7 +170,7 @@ function choose(raw: unknown, valueKey: string, valid: (v: string) => boolean): 
     const bw = best.type === "work" ? 1 : 0;
     if (cw > bw || (cw === bw && c.confidence > best.confidence)) best = c;
   }
-  return { ok: true, value: best.value, type: best.type, raw };
+  return { ok: true, value: best.value, type: best.type, confidence: Number.isFinite(best.confidence) ? best.confidence : null, raw };
 }
 
 export const pickEmail = (raw: unknown): Pick => choose(raw, "email", (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v));
