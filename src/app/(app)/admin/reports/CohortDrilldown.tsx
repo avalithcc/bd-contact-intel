@@ -6,6 +6,7 @@ import { es } from "date-fns/locale";
 import { ChevronRightIcon } from "@/components/icons";
 import { KpiDrilldownCard, DrilldownDialog, useDrilldown } from "./KpiDrilldownCard";
 import { getCohortDrilldownAction } from "./actions";
+import { drilldownCacheKey } from "@/lib/reports/drilldownCacheKey";
 import { cohortHasReplyColumns, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
@@ -115,7 +116,7 @@ function CohortRowsTable({ population, rows, labels: l }: { population: CohortPo
 }
 
 function useCohortList({ population, fromIso, toIso, bdId }: CohortQuery) {
-  return useDrilldown<CohortRow>(() => getCohortDrilldownAction({ population, fromIso, toIso, bdId }));
+  return useDrilldown<CohortRow>(drilldownCacheKey({ kind: population, fromIso, toIso, bdId }), () => getCohortDrilldownAction({ population, fromIso, toIso, bdId }));
 }
 
 function CohortDialog({
@@ -179,6 +180,7 @@ export function CohortTile({
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}
+      cacheKey={drilldownCacheKey({ kind: "replied", fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
       fetchRows={() => getCohortDrilldownAction({ population: "replied", fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
       renderList={(rows) => <CohortRowsTable population="replied" rows={rows} labels={l} />}
     />

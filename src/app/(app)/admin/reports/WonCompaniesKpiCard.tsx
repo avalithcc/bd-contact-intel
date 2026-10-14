@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { drilldownCacheKey } from "@/lib/reports/drilldownCacheKey";
 import { KpiDrilldownCard } from "./KpiDrilldownCard";
 import { getWonCompaniesDrilldownAction } from "./actions";
 import type { WonCompanyDrilldownRow } from "@/lib/reports/wonCompaniesDrilldown";
@@ -72,6 +73,7 @@ export function WonCompaniesKpiCard({
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}
+      cacheKey={drilldownCacheKey({ kind: "won", bdId })}
       fetchRows={() => getWonCompaniesDrilldownAction(bdId)}
       renderList={(rows) =>
         rows.length === 0 ? (

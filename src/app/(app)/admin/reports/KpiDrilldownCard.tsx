@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { drilldownTruncation, fillTruncationNote } from "@/lib/reports/drilldownLimit";
 
 export type DrilldownFetchResult<T> = { ok: true; rows: T[] } | { ok: false };
 
 type LoadState<T> = { status: "idle" | "loading" | "error" | "ready"; rows: T[] };
+type KeyedState<T> = LoadState<T> & { key: string };
 
 /** Plain strings only (ClientStrings): `template` carries `{shown}`/`{total}`. */
 export type TruncationLabels = { template: string; numberLocale: string };
@@ -14,21 +15,34 @@ export type TruncationLabels = { template: string; numberLocale: string };
 /**
  * Open/closed + on-demand list state shared by every drill-down trigger on
  * /admin/reports (tiles and funnel rows). The list is fetched via `fetchRows`
- * (a server action) only the FIRST time the dialog opens — cached in state
- * afterward — so this never adds a round trip to the page's own load
- * (PERFORMANCE.md).
+ * (a server action) only when the dialog opens, so this never adds a round
+ * trip to the page's own load (PERFORMANCE.md).
+ *
+ * Rows are cached ONLY for the given `cacheKey` (see drilldownCacheKey): when
+ * the period or BD filter changes the key changes, the cached rows are
+ * dropped and the next open refetches. A response that arrives after the key
+ * moved on is discarded.
  */
-export function useDrilldown<T>(fetchRows: () => Promise<DrilldownFetchResult<T>>) {
+export function useDrilldown<T>(cacheKey: string, fetchRows: () => Promise<DrilldownFetchResult<T>>) {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<LoadState<T>>({ status: "idle", rows: [] });
+  const [keyed, setKeyed] = useState<KeyedState<T>>({ key: cacheKey, status: "idle", rows: [] });
+  const latestKey = useRef(cacheKey);
+  latestKey.current = cacheKey;
+
+  // Rows fetched under a different key are never exposed.
+  const state: LoadState<T> = keyed.key === cacheKey ? keyed : { status: "idle", rows: [] };
 
   function openDialog() {
     setOpen(true);
     if (state.status === "ready" || state.status === "loading") return;
-    setState({ status: "loading", rows: [] });
+    const key = cacheKey;
+    const settle = (next: LoadState<T>) => {
+      if (latestKey.current === key) setKeyed({ key, ...next });
+    };
+    setKeyed({ key, status: "loading", rows: [] });
     fetchRows()
-      .then((res) => setState(res.ok ? { status: "ready", rows: res.rows } : { status: "error", rows: [] }))
-      .catch(() => setState({ status: "error", rows: [] }));
+      .then((res) => settle(res.ok ? { status: "ready", rows: res.rows } : { status: "error", rows: [] }))
+      .catch(() => settle({ status: "error", rows: [] }));
   }
 
   return { open, openDialog, close: () => setOpen(false), state };
@@ -119,6 +133,7 @@ export function KpiDrilldownCard<T>({
   closeLabel,
   loadingLabel,
   errorLabel,
+  cacheKey,
   fetchRows,
   renderList,
 }: {
@@ -134,10 +149,12 @@ export function KpiDrilldownCard<T>({
   closeLabel: string;
   loadingLabel: string;
   errorLabel: string;
+  /** Required: everything `fetchRows` depends on (see drilldownCacheKey). */
+  cacheKey: string;
   fetchRows: () => Promise<DrilldownFetchResult<T>>;
   renderList: (rows: T[]) => React.ReactNode;
 }) {
-  const { open, openDialog, close, state } = useDrilldown(fetchRows);
+  const { open, openDialog, close, state } = useDrilldown(cacheKey, fetchRows);
   const clickable = value >= 1;
 
   const body = (
