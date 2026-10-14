@@ -8,12 +8,13 @@
  */
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { personBdConnection, sequence, sequenceDraft, sequenceMember, signal } from "@/db/schema";
+import { auditLog, personBdConnection, sequence, sequenceDraft, sequenceMember, signal } from "@/db/schema";
 import type { MarketKey } from "@/lib/hiring/markets";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { getSiteUrl } from "@/lib/config/siteUrl";
 import { runGenerateOutreachMessage } from "@/lib/outreach/generateMessage";
 import type { RoleGroupKey } from "@/lib/roleGroups";
+import { sequenceAuditRow } from "./approvalAudit";
 import { composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult } from "./draftCompose";
 import { buildSequenceDraftInput, draftLanguageForMarket, senderIdentity } from "@/lib/sequences/draftInput";
 import { assertTransition, type MemberState } from "./memberState";
@@ -129,6 +130,7 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
         target: [sequenceDraft.sequenceMemberId, sequenceDraft.step],
         set: { ...draft, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null },
       });
+      await tx.insert(auditLog).values(sequenceAuditRow("regenerate", { actorBdId: bdId, personId: r.person_id as string, memberId, sequenceId, step }));
     }
     if (reminder) return "generated";
     if (m.state === "approved") assertTransition("approved", "drafted", "regenerate");

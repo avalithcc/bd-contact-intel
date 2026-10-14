@@ -4,7 +4,8 @@
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { emailAccount, sequence, sequenceDraft, sequenceMember } from "@/db/schema";
+import { auditLog, emailAccount, sequence, sequenceDraft, sequenceMember } from "@/db/schema";
+import { sequenceAuditRow } from "./approvalAudit";
 import { validateDailySendCap, type CapRejection } from "./capValidation";
 import { canTransition, type MemberState } from "./memberState";
 import { DEFAULT_SCHEDULE } from "./schedule";
@@ -124,7 +125,7 @@ export async function removeMembersFromSequence(bdId: string, sequenceId: string
   if (!memberIds.length) return { ok: true, removed: [], rejected: [] };
   return db.transaction(async (tx) => {
     if (!(await lockOwnedSequence(tx, bdId, sequenceId))) return { ok: false, error: "not_found" } as const;
-    const rows = await tx.select({ id: sequenceMember.id, state: sequenceMember.state }).from(sequenceMember).where(and(eq(sequenceMember.sequenceId, sequenceId), inArray(sequenceMember.id, [...memberIds])));
+    const rows = await tx.select({ id: sequenceMember.id, state: sequenceMember.state, personId: sequenceMember.personId }).from(sequenceMember).where(and(eq(sequenceMember.sequenceId, sequenceId), inArray(sequenceMember.id, [...memberIds])));
     const byId = new Map(rows.map((r) => [r.id, r.state]));
     const removed: string[] = [];
     const rejected: { memberId: string; reason: "not_found" | "not_removable" }[] = [];
@@ -137,6 +138,8 @@ export async function removeMembersFromSequence(bdId: string, sequenceId: string
     if (removed.length) {
       await tx.update(sequenceMember).set({ state: "discarded", discardReason: why, discardedByBdId: bdId, discardedAt: new Date() }).where(inArray(sequenceMember.id, removed));
       await clearApprovals(tx, removed);
+      const personOf = new Map(rows.map((r) => [r.id, r.personId]));
+      await tx.insert(auditLog).values(removed.map((id) => sequenceAuditRow("discard", { actorBdId: bdId, personId: personOf.get(id)!, memberId: id, sequenceId })));
     }
     return { ok: true, removed, rejected } as const;
   });
@@ -161,6 +164,7 @@ export async function reinstateSequenceMember(bdId: string, memberId: string): P
     if (decision.rejected.length) return { ok: false, error: decision.rejected[0].reason } as const;
     await tx.update(sequenceMember).set({ state: "drafted", discardReason: null, discardedByBdId: null, discardedAt: null, holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
     await clearApprovals(tx, [memberId]);
+    await tx.insert(auditLog).values(sequenceAuditRow("readmit", { actorBdId: bdId, personId: fresh.personId, memberId, sequenceId: fresh.sequenceId }));
     return { ok: true } as const;
   });
 }

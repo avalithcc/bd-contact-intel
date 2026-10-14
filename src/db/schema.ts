@@ -1021,6 +1021,10 @@ export const auditLog = pgTable(
     // owner's first Sequence and added its hand-picked members in state
     // 'drafted'; metadata lists the sequence id, added person ids and the
     // rejected ones with their reasons. Never written on a no-op run)
+    // 'sequence_member_approve' | 'sequence_member_cancel' | 'sequence_member_discard' |
+    // 'sequence_member_readmit' | 'sequence_member_regenerate' (the approval-side
+    // actions on a Sequence member; person_id is the member's Contact, metadata
+    // carries memberId, sequenceId and the step)
     // 'apply_resolved_phones' (scripts/apply-resolved-phones.ts wrote the
     // numbers a human picked for the people whose signatures disagreed and
     // extract-signature-phones.ts therefore left alone; history rows carry

@@ -1,8 +1,9 @@
 "use server";
 
-// Roster and drafting actions. Imported by no page or component until the go-live PR, so none is exposed yet. Every
+// Roster, drafting and approval actions. Imported by no page or component until the go-live PR, so none is exposed yet. Every
 // guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
 import { getCurrentBd } from "@/lib/queries";
+import { approveBulk as approveBulkRows, approveMember as approveMemberRow, cancelApproval as cancelApprovalRow, markDraftReviewed as markDraftReviewedRow } from "@/lib/sequences/approvalQueries";
 import {
   generateMissingDrafts,
   regenerateDrafts,
@@ -73,4 +74,28 @@ export async function regenerateSequenceDrafts(sequenceId: string, memberIds: st
 export async function saveSequenceDraft(memberId: string, input: { subject: string; body: string }): Promise<SaveEditResult> {
   const me = await getCurrentBd();
   return saveDraftEdit(me.id, memberId, input);
+}
+
+/** Called when the review dialog opens ("revisado"). Never from passive listing. */
+export async function markDraftReviewed(memberId: string) {
+  const me = await getCurrentBd();
+  return markDraftReviewedRow(me.id, memberId);
+}
+
+/** "Aprobar" on one card: not gated by the review counter. */
+export async function approveMember(memberId: string) {
+  const me = await getCurrentBd();
+  return approveMemberRow(me.id, memberId);
+}
+
+/** "Aprobar y programar los M": the server re-asserts the review gate and rejects the whole request on any unreviewed member. */
+export async function approveBulk(memberIds: string[]) {
+  const me = await getCurrentBd();
+  return approveBulkRows(me.id, memberIds);
+}
+
+/** "Cancelar envio". */
+export async function cancelApproval(memberId: string) {
+  const me = await getCurrentBd();
+  return cancelApprovalRow(me.id, memberId);
 }
