@@ -173,12 +173,44 @@ A `GET` of the unsubscribe URL MUST NOT write a suppression entry. It MUST only 
 - WHEN the link is opened
 - THEN a generic response is returned and no suppression is written
 
-### Requirement: [Both] Postal address is configuration
+### Requirement: [Both] Postal address is configuration, keyed by recipient market
 
-The postal address and opt-out text MUST come from a single configuration source, not from copy scattered in prompts or components, so that the later migration to a sending subdomain or a different office address is a configuration change.
+The postal address and opt-out text MUST come from a single configuration source, not from copy scattered in prompts or components, so that a later change of office or sending subdomain is a configuration change.
+
+Owner decision 2026-10-14: the address is **not a scalar — it is selected by the recipient's market**, and the selection is mandatory, not a default.
+
+| Recipient market | Address that MUST be used |
+|---|---|
+| `us` | Avalith Corporation, 470 Ansin Blvd Ste G, Hallandale, FL 33009, USA |
+| `latam` | Avalith, Formosa 2531, B7600 Mar del Plata, Buenos Aires, Argentina |
+
+`AVALITH CORPORATION` is a live Florida entity, document number `P18000083350`, status Active, whose registered-agent, principal and mailing addresses are all the Hallandale one.
+
+**Two open items that MUST be closed before the first real send:**
+
+1. **The suite letter is unconfirmed.** OpenCorporates reports `Ste G`; commercial aggregators (ZoomInfo, Datanyze) report `Ste K`. For a mandatory legal field the primary source governs — verify "Avalith Corporation" on `search.sunbiz.org` and use whatever that record says. Automated fetching of Sunbiz returns HTTP 403, so a human must do this.
+2. **The `other` market bucket has no address assigned.** `classifyMarket` returns `latam` | `us` | `other`, and a sequence member whose market resolves to `other` has no entry in the table above. The system MUST refuse to send rather than silently pick one — a wrong country's address is still a compliance failure.
+
+#### Scenario: US recipient gets the Florida address
+
+- GIVEN a member whose market is `us`
+- WHEN the compliance footer is built
+- THEN it carries the Hallandale address
+
+#### Scenario: Argentine recipient gets the Mar del Plata address
+
+- GIVEN a member whose market is `latam`
+- WHEN the compliance footer is built
+- THEN it carries the Mar del Plata address
+
+#### Scenario: Unmapped market refuses to send
+
+- GIVEN a member whose market resolves to `other`
+- WHEN the scheduler considers that member for release
+- THEN the member is held, not sent, and the reason is surfaced to the BD
 
 #### Scenario: Address changes in one place
 
-- GIVEN the configured address is updated
+- GIVEN a configured address is updated
 - WHEN a new draft is generated
 - THEN the new address appears and no other file needed editing
