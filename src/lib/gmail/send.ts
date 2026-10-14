@@ -22,6 +22,11 @@ type SendGmailBody = {
   personId?: string;
   // Present only when continuing an existing thread (see replyThread.ts).
   reply?: ReplyTarget;
+  // Complete `Name: value` header lines (Sequence List-Unsubscribe pair).
+  extraHeaders?: string[];
+  // Extra keys for the `email_sent` activity (Sequence id + step). Merged
+  // UNDER the standard keys, so a caller can never overwrite them.
+  activityMetadata?: Record<string, unknown>;
 } & MessageContent;
 
 type SendGmailInput = { bdId: string } & SendGmailBody;
@@ -29,8 +34,9 @@ type SendGmailInput = { bdId: string } & SendGmailBody;
 type EmailAccountRow = typeof emailAccount.$inferSelect;
 
 // Fail fast on the untrusted recipient, before any DB read or token refresh.
-function assertSafeSendInput({ to, reply }: SendGmailBody) {
+function assertSafeSendInput({ to, reply, extraHeaders }: SendGmailBody) {
   assertSafeHeaderValue("To", to);
+  for (const line of extraHeaders ?? []) assertSafeHeaderValue("Extra header", line);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
@@ -47,12 +53,24 @@ export async function sendGmailMessage(input: SendGmailInput) {
   return sendFromAccountRow(account, body);
 }
 
+// Entry point of the Sequence runner (design D4): same send body, account
+// loaded by its own `email_account.id`, so the sender is that row's address.
+export async function sendGmailMessageFromAccount(input: { accountId: string } & SendGmailBody) {
+  const { accountId, ...body } = input;
+  assertSafeSendInput(body);
+  const [account] = await db
+    .select()
+    .from(emailAccount)
+    .where(eq(emailAccount.id, accountId));
+  return sendFromAccountRow(account, body);
+}
+
 // The one send body (design D4): token refresh, error classification, the Gmail
 // call and `recordSentEmail`. Every entry point loads an account row and lands
 // here, so there is a single copy of this logic. The sender is always the
 // row's own address, never a literal.
 async function sendFromAccountRow(account: EmailAccountRow | undefined, input: SendGmailBody) {
-  const { to, subject, leadId, companyKey, personId, reply } = input;
+  const { to, subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata } = input;
   const content: MessageContent =
     input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
 
@@ -131,7 +149,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
         Authorization: `Bearer ${access_token}`,
         "Content-Type": "application/json",
       },
-      body: buildSendPayload(account.emailAddress, to, subject, content, reply),
+      body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders),
     },
   );
 
@@ -176,7 +194,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
       companyKey,
       personId,
       actorBdId: account.bdId,
-      metadata: { to, subject, gmailMessageId: sent.id, gmailThreadId: sent.threadId },
+      metadata: { ...activityMetadata, to, subject, gmailMessageId: sent.id, gmailThreadId: sent.threadId },
     } as NewActivity,
   });
 

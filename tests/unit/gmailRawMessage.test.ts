@@ -297,3 +297,33 @@ test("plainTextPart is CRLF-normalised text for plain content and the derived al
   assert.equal(plainTextPart({ body: "a\nb\r\nc" }), "a\r\nb\r\nc");
   assert.equal(plainTextPart({ bodyHtml: "<div>One</div><div>Two</div>" }), "One\r\nTwo");
 });
+
+test("extraHeaders land in the header block, before MIME-Version, in the order given", () => {
+  const raw = Buffer.from(
+    buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" }, undefined, undefined, [
+      "List-Unsubscribe: <https://x.test/u?t=1>",
+      "List-Unsubscribe-Post: List-Unsubscribe=One-Click",
+    ]),
+    "base64url",
+  ).toString("utf8");
+  const headerBlock = raw.split("\r\n\r\n")[0];
+  const lines = headerBlock.split("\r\n");
+  const at = (prefix: string) => lines.findIndex((l) => l.startsWith(prefix));
+  assert.ok(at("Subject:") < at("List-Unsubscribe:"));
+  assert.equal(at("List-Unsubscribe-Post:"), at("List-Unsubscribe:") + 1);
+  assert.ok(at("List-Unsubscribe-Post:") < at("MIME-Version:"));
+});
+
+test("no extraHeaders (or an empty list) leaves the message byte-identical", () => {
+  const plain = buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" });
+  assert.equal(buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" }, undefined, undefined, []), plain);
+});
+
+test("header injection: an extra header containing CR, LF or NUL is rejected, not stripped", () => {
+  for (const evil of ["X-A: ok\r\nBcc: evil@x.test", "X-A: ok\nBcc: evil@x.test", "X-A: ok\rBcc: evil@x.test", "X-A: ok\0"]) {
+    assert.throws(
+      () => buildRawMessage("a@x.test", "b@x.test", "Hi", { body: "x" }, undefined, undefined, ["X-Fine: 1", evil]),
+      (e: unknown) => e instanceof GmailSendError && e.kind === "invalid_header",
+    );
+  }
+});

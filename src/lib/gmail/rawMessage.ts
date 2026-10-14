@@ -101,6 +101,10 @@ function foldIdList(name: string, value: string): string {
   return lines.join(CRLF);
 }
 
+/**
+ * `extraHeaders` are complete `Name: value` lines (e.g. the Sequence List-Unsubscribe pair), appended after the
+ * threading headers. They are unencoded, so each goes through the same CR/LF/NUL guard as To/From.
+ */
 export function buildRawMessage(
   from: string,
   to: string,
@@ -108,6 +112,7 @@ export function buildRawMessage(
   content: MessageContent,
   boundaryRandom?: () => string,
   reply?: ThreadingHeaders,
+  extraHeaders: string[] = [],
 ): string {
   assertSafeHeaderValue("From", from);
   assertSafeHeaderValue("To", to);
@@ -115,11 +120,12 @@ export function buildRawMessage(
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
   }
+  for (const line of extraHeaders) assertSafeHeaderValue("Extra header", line);
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
   const threading = reply
     ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
     : [];
-  const envelope = [`From: ${from}`, `To: ${to}`, `Subject: ${encodedSubject}`, ...threading, "MIME-Version: 1.0"];
+  const envelope = [`From: ${from}`, `To: ${to}`, `Subject: ${encodedSubject}`, ...threading, ...extraHeaders, "MIME-Version: 1.0"];
 
   let message: string;
   if (content.bodyHtml === undefined) {
@@ -159,7 +165,8 @@ export function buildSendPayload(
   subject: string,
   content: MessageContent,
   reply?: ReplyTarget,
+  extraHeaders?: string[],
 ): string {
-  const raw = buildRawMessage(from, to, subject, content, undefined, reply);
+  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders);
   return JSON.stringify(reply ? { raw, threadId: reply.threadId } : { raw });
 }

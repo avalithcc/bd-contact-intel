@@ -237,9 +237,9 @@ Reachable: nothing new. Existing callers of `sendGmailMessage({ bdId })` must se
 
 - [x] 8.1 RED: characterization tests pinning today's `sendGmailMessage` behavior (token refresh, error classification, `recordSentEmail`) BEFORE refactoring.
 - [x] 8.2 REFACTOR: extract the body into `sendFromAccountRow(account, input)` (D4); `sendGmailMessage({ bdId })` becomes a thin wrapper loading by `bdId`. Characterization tests stay green.
-- [ ] 8.3 GREEN: `sendGmailMessageFromAccount({ accountId, ... })` loads by `email_account.id`; sender address comes from the row, never a literal.
-- [ ] 8.4 RED/GREEN: `buildRawMessage` gains `extraHeaders?: string[]`, each value through `assertSafeHeaderValue` (header-injection test with CR/LF).
-- [ ] 8.5 Sequence metadata (Sequence id, step) flows into the `email_sent` activity metadata through the existing `recordSentEmail` path; reminder threading uses the stored `In-Reply-To`/`References`/`threadId` inputs.
+- [x] 8.3 GREEN: `sendGmailMessageFromAccount({ accountId, ... })` loads by `email_account.id`; sender address comes from the row, never a literal.
+- [x] 8.4 RED/GREEN: `buildRawMessage` gains `extraHeaders?: string[]`, each value through `assertSafeHeaderValue` (header-injection test with CR/LF).
+- [x] 8.5 Sequence metadata (Sequence id, step) flows into the `email_sent` activity metadata through the existing `recordSentEmail` path; reminder threading uses the stored `In-Reply-To`/`References`/`threadId` inputs.
 
 Commits:
 - `refactor(gmail): extract send body into sendFromAccountRow behind characterization tests`
