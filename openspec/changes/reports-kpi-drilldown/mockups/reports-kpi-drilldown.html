@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reportes · detalle de KPIs · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions. NOT in crm-hubspot-ux/mockups/styles.css. */
+
+/* Copied verbatim from src/app/design-system.css:699-703 (reports-bd-filter-drilldown).
+   The mockup stylesheet has no button reset, so color is pinned to ink here only. */
+.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; color: var(--color-ink); }
+.stat-clickable:hover, .stat-clickable:focus-visible, .stat-clickable.is-hover { border-color: var(--color-accent-strong); }
+/* Mockup deviation: a native button centers its content vertically, so in the app the
+   clickable tiles drop their label lower than static neighbours whose foot wraps.
+   Pinned to the top here; the same fix is needed on .stat-clickable in the app. */
+.stat-clickable { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }
+
+/* Exists in the app (globals.css) but not in the mockup stylesheet. */
+.mb-md { margin-bottom: var(--space-md); }
+
+/* NEW (proposed for design-system.css): a funnel row that opens a drill-down.
+   The tiles above signal clickability only on hover; funnel rows have no hover
+   precedent, so the count carries a dotted underline and a trailing chevron. */
+.funnel-live {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); width: 100%;
+  margin: 0 calc(var(--space-sm) * -1); width: calc(100% + var(--space-sm) * 2); padding: var(--space-2xs) var(--space-sm); border: 0; border-radius: var(--radius-sm);
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.funnel-live:hover, .funnel-live.is-hover { background: var(--color-row-hover); }
+.funnel-live .live-count { text-decoration: underline dotted; text-underline-offset: 3px; font-weight: 600; }
+.funnel-live:hover .live-count, .funnel-live.is-hover .live-count { color: var(--color-accent-strong); }
+.funnel-live .chev { color: var(--color-ink-subtle); margin-left: var(--space-2xs); }
+.funnel-live .right-side { display: inline-flex; align-items: center; }
+/* Static rows reserve the chevron's width so the numbers stay in one column. */
+.funnel-static { margin: 0 calc(var(--space-sm) * -1); width: calc(100% + var(--space-sm) * 2); padding: var(--space-2xs) calc(var(--space-sm) + 16px + var(--space-2xs)) var(--space-2xs) var(--space-sm); }
+
+/* NEW (proposed): wider dialog for the 7-column list. .dialog.wide is 720px and
+   the Respondió table needs about 920px of body width. 960px still fits 1024px (94vw). */
+.dialog.xwide { width: min(960px, 94vw); }
+
+/* Mockup-only scaffolding: simulates the overlay behind a static dialog. */
+.stage { background: var(--color-overlay); border-radius: var(--radius-md); padding: var(--space-2xl); display: flex; justify-content: center; align-items: flex-start; }
+.stage .dialog { max-height: none; }
+.stage .dialog-body.scroll { max-height: 280px; overflow-y: auto; }
+.captions { margin-top: var(--space-sm); }
+.captions > div { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2xs); font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.cell-sub { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="../../owner-reporting/mockups/reports.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Reportes</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../bd-playbook/mockups/bd-playbook.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Guía de roles</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><span>Administración</span><span class="sep">/</span><span>Reportes</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-primary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/contacts.html#new-contact"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacto</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tarea</a>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+</div>
+</details>
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a3">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">Administrador</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/account.html">Cuenta</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/login.html">Cerrar sesión</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Detalle de KPIs en <span class="mono">/admin/reports</span> (cambio <span class="mono">reports-kpi-drilldown</span>). Los números son <strong>ilustrativos</strong> y coherentes entre sí (118 nuevos → 43 contactados → 12 respondieron → 4 en reunión). Las tarjetas «Reuniones agendadas» y «Empresas ganadas» ya abren un diálogo hoy; se agregan «Tasa de respuesta» y las filas Contactado, Respondió y Reunión del embudo. Ver <code>README.md</code> junto a este archivo. Solo escritorio. <a href="../../owner-reporting/mockups/reports.html">Mockup de reportes aprobado</a></div><span class="tag tag-scope">En alcance: reports-kpi-drilldown</span></div>
+<div class="page-header"><div class="titles"><div class="eyebrow">Administración</div><h1>reportes<span class="dot">.</span></h1>
+<p class="meta">Un mismo período y un mismo BD para todas las tarjetas de esta página.</p></div>
+<div class="actions"><span class="badge badge-neutral no-dot">Solo administradores</span></div></div>
+<div class="row wrap between mb-lg" aria-label="Filtros del reporte">
+<div class="row wrap" style="gap:var(--space-lg)">
+<div class="segmented" role="group" aria-label="Período">
+<a class="" href="#">Esta semana</a><a class="on" href="#" aria-current="page">Este mes</a><a class="" href="#">Este trimestre</a>
+</div>
+<div class="field"><label class="label sr-only" for="bd-filter">Filtrar por BD</label><select class="select input-sm" id="bd-filter"><option>Todos los BDs</option><option>Cristian Civita</option><option>Macarena</option><option>Mariel</option></select></div>
+</div>
+<span class="meta">Período: 1–31 oct 2026 · Todos los BDs</span>
+</div>
+<h2 class="mt-2xl mb-lg">1 · Fila de KPIs, «Tasa de respuesta» clicable </h2>
+<p class="meta mb-lg">Las dos tarjetas que ya abren un diálogo (Reuniones agendadas, Empresas ganadas) y la nueva, con el mismo marcado <span class="mono">button.stat.stat-clickable</span>. Ninguna lleva indicio visual hasta el hover (el borde pasa a rojo de marca); Reuniones agendadas se muestra con el cursor encima.</p>
+<div class="grid-4">
+<div class="stat neutral"><div class="label">Contactos nuevos</div><div class="value">118</div><div class="foot">personas que entraron al embudo en el período</div></div>
+<button type="button" class="stat info stat-clickable"><div class="label">Tasa de respuesta</div><div class="value">28%</div><div class="foot">Respondió 12 ÷ Contactado 43</div></button>
+<button type="button" class="stat success stat-clickable is-hover"><div class="label">Reuniones agendadas</div><div class="value">5</div><div class="foot">en el período</div></button>
+<button type="button" class="stat warn stat-clickable"><div class="label">Empresas ganadas</div><div class="value">2</div><div class="foot">de 831 en Calificada</div></button>
+</div>
+<div class="grid-4 captions mb-lg">
+<div><span class="tag tag-backlog">Estático</span> total del período, sin lista</div>
+<div><span class="tag tag-scope">Nuevo · clic</span> abre «Respondió»</div>
+<div><span class="tag tag-restyle">Ya existe · clic</span> (se muestra con el cursor encima)</div>
+<div><span class="tag tag-restyle">Ya existe · clic</span></div>
+</div>
+
+<h2 class="mt-2xl mb-lg">2 · Diálogo abierto: «Respondió» </h2>
+<p class="meta mb-lg">Se abre desde la tarjeta «Tasa de respuesta» y desde la fila Respondió del embudo (misma población, mismo diálogo). El encabezado dice la población con palabras. Ordenado por respuesta más reciente; sin respuesta registrada van al final.</p>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-resp">
+<div class="dialog-header"><h2 id="dlg-resp">Respondió</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+<div class="dialog-body">
+<p class="meta mb-md">12 de 43 contactados · creados en octubre 2026<br>Estado actual de cada contacto, no la actividad del período: «creados en octubre» es la cohorte, no cuándo respondieron.</p>
+<table class="data compact"><thead><tr><th>Contacto</th><th>Empresa</th><th>BD dueño</th><th>Estado</th><th>Creado</th><th>Respuesta recibida</th><th>Secuencia</th></tr></thead><tbody>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p0">Daniel Ortiz</a></td><td>Nubix Labs</td><td>Cristian Civita</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td><td class="num"><span class="nowrap">14 oct 2026</span><span class="cell-sub">10:42</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p1">Laura Benítez</a></td><td>Grupo Alba</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td><td class="num"><span class="nowrap">13 oct 2026</span><span class="cell-sub">16:05</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p2">Tomás Ferreyra</a></td><td>Vértice Software</td><td>Cristian Civita</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">5 oct 2026</span></td><td class="num"><span class="nowrap">13 oct 2026</span><span class="cell-sub">09:18</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p3">Carolina Ríos</a></td><td>Hostelia</td><td>Mariel</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">6 oct 2026</span></td><td class="num"><span class="nowrap">12 oct 2026</span><span class="cell-sub">17:31</span></td><td class="small"><span class=meta>—</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p4">Ignacio Paz</a></td><td>Nubix Labs</td><td>Cristian Civita</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td><td class="num"><span class="nowrap">12 oct 2026</span><span class="cell-sub">11:02</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p5">Valeria Suárez</a></td><td>Cobalto Pay</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td><td class="num"><span class="nowrap">9 oct 2026</span><span class="cell-sub">15:47</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p6">Esteban Molina</a></td><td>Radar Logística</td><td>Mariel</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">7 oct 2026</span></td><td class="num"><span class="nowrap">9 oct 2026</span><span class="cell-sub">08:55</span></td><td class="small"><span class=meta>—</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p7">Julieta Romero</a></td><td>Grupo Alba</td><td>Macarena</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td><td class="num"><span class="nowrap">8 oct 2026</span><span class="cell-sub">13:20</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p8">Federico Lugo</a></td><td>Cobalto Pay</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">3 oct 2026</span></td><td class="num"><span class="nowrap">7 oct 2026</span><span class="cell-sub">10:09</span></td><td class="small"><span class=meta>—</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p9">Paula Aguirre</a></td><td>Vértice Software</td><td>Cristian Civita</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">5 oct 2026</span></td><td class="num"><span class="nowrap">6 oct 2026</span><span class="cell-sub">18:44</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p10">Nicolás Herrera</a></td><td>Hostelia</td><td>Mariel</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td><td class="num"><span class="meta">—</span></td><td class="small"><span class=meta>—</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p11">Sofía Cabrera</a></td><td>Radar Logística</td><td>Mariel</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">4 oct 2026</span></td><td class="num"><span class="meta">—</span></td><td class="small"><span class=meta>—</span></td></tr>
+</tbody></table>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">2b · Los otros dos diálogos del embudo </h2>
+<p class="meta mb-lg">Contactado (cinco columnas: nadie de esta lista tiene por qué haber respondido) y Reunión (las mismas siete columnas que Respondió).</p>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-cont">
+<div class="dialog-header"><h2 id="dlg-cont">Contactado</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+<div class="dialog-body">
+<p class="meta mb-md">43 de 118 contactos nuevos · creados en octubre 2026 · hoy en Contactado, Respondió o Reunión<br>Estado actual de cada contacto, no la actividad del período.</p>
+<table class="data compact"><thead><tr><th>Contacto</th><th>Empresa</th><th>BD dueño</th><th>Estado</th><th>Creado</th></tr></thead><tbody>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c0">Camila Duarte</a></td><td>Aurora Retail</td><td>Cristian Civita</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">8 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c1">Daniel Ortiz</a></td><td>Nubix Labs</td><td>Cristian Civita</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c2">Rocío Vega</a></td><td>Aurora Retail</td><td>Mariel</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">7 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c3">Laura Benítez</a></td><td>Grupo Alba</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c4">Hernán Díaz</a></td><td>Delta Foods</td><td>Cristian Civita</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">6 oct 2026</span></td></tr>
+</tbody></table><p class="meta mt-md center">… 38 filas más (el mockup muestra 5 de 43)</p>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+<div class="mt-xl"></div>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-meet">
+<div class="dialog-header"><h2 id="dlg-meet">Reunión</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+<div class="dialog-body">
+<p class="meta mb-md">4 de 12 que respondieron · creados en octubre 2026 · hoy en Reunión<br>Estado actual de cada contacto, no la actividad del período.</p>
+<table class="data compact"><thead><tr><th>Contacto</th><th>Empresa</th><th>BD dueño</th><th>Estado</th><th>Creado</th><th>Respuesta recibida</th><th>Secuencia</th></tr></thead><tbody>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p0">Laura Benítez</a></td><td>Grupo Alba</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td><td class="num"><span class="nowrap">13 oct 2026</span><span class="cell-sub">16:05</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p1">Valeria Suárez</a></td><td>Cobalto Pay</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td><td class="num"><span class="nowrap">9 oct 2026</span><span class="cell-sub">15:47</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p2">Federico Lugo</a></td><td>Cobalto Pay</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">3 oct 2026</span></td><td class="num"><span class="nowrap">7 oct 2026</span><span class="cell-sub">10:09</span></td><td class="small"><span class=meta>—</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p3">Nicolás Herrera</a></td><td>Hostelia</td><td>Mariel</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td><td class="num"><span class="meta">—</span></td><td class="small"><span class=meta>—</span></td></tr>
+</tbody></table>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">3 · Muestra baja: «3 / 7» </h2>
+<p class="meta mb-lg">Con menos de 10 contactados la tarjeta muestra la fracción en tono neutral y el porcentaje pasa al pie. Sigue siendo clicable porque hay 3 filas. Sin texto extra sobre la muestra: el pie ya lo dice (decisión del owner, 2026-10-14).</p>
+<div class="grid-4">
+<div class="stat neutral"><div class="label">Contactos nuevos</div><div class="value">19</div><div class="foot">personas que entraron al embudo en el período</div></div>
+<button type="button" class="stat neutral stat-clickable"><div class="label">Tasa de respuesta</div><div class="value">3 / 7</div><div class="foot">43%</div></button>
+<div class="stat success"><div class="label">Reuniones agendadas</div><div class="value">0</div><div class="foot">Todavía no se registraron reuniones</div></div>
+<button type="button" class="stat warn stat-clickable"><div class="label">Empresas ganadas</div><div class="value">2</div><div class="foot">de 831 en Calificada</div></button>
+</div>
+<div class="grid-4 captions mb-lg">
+<div><span class="tag tag-backlog">Estático</span></div>
+<div><span class="tag tag-scope">Nuevo · clic</span> tono neutral (info solo desde 10 contactados)</div>
+<div><span class="tag tag-backlog">Estático · valor 0</span> no se puede hacer clic</div>
+<div><span class="tag tag-restyle">Ya existe · clic</span></div>
+</div>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-low">
+<div class="dialog-header"><h2 id="dlg-low">Respondió</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+<div class="dialog-body">
+<p class="meta mb-md">3 de 7 contactados · creados del 12 al 18 oct 2026<br>Estado actual de cada contacto, no la actividad del período.</p>
+<table class="data compact"><thead><tr><th>Contacto</th><th>Empresa</th><th>BD dueño</th><th>Estado</th><th>Creado</th><th>Respuesta recibida</th><th>Secuencia</th></tr></thead><tbody>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p0">Daniel Ortiz</a></td><td>Nubix Labs</td><td>Cristian Civita</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">12 oct 2026</span></td><td class="num"><span class="nowrap">14 oct 2026</span><span class="cell-sub">10:42</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p1">Carolina Ríos</a></td><td>Hostelia</td><td>Mariel</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">12 oct 2026</span></td><td class="num"><span class="nowrap">13 oct 2026</span><span class="cell-sub">17:31</span></td><td class="small"><span class=meta>—</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#p2">Valeria Suárez</a></td><td>Cobalto Pay</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">13 oct 2026</span></td><td class="num"><span class="nowrap">13 oct 2026</span><span class="cell-sub">15:47</span></td><td class="small"><a href="../../outreach-sequences/mockups/secuencia-detalle.html">Florida + US · octubre</a></td></tr>
+</tbody></table>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">4 · Estado vacío </h2>
+<p class="meta mb-lg">El patrón vigente solo vuelve clicable una tarjeta con valor ≥ 1. Con cero respondidos, el owner ve «0 / 7» como una tarjeta más, sin hover, sin cursor de mano; igual la fila Respondió y la fila Reunión del embudo. El diálogo vacío solo aparece si la lista llega vacía pese a un conteo ≥ 1 (datos que cambian entre la carga de la página y el clic); es el texto del patrón actual.</p>
+<div class="grid-4">
+<div class="stat neutral"><div class="label">Contactos nuevos</div><div class="value">9</div><div class="foot">personas que entraron al embudo en el período</div></div>
+<div class="stat neutral"><div class="label">Tasa de respuesta</div><div class="value">0 / 7</div><div class="foot">0%</div></div>
+<div class="stat success"><div class="label">Reuniones agendadas</div><div class="value">0</div><div class="foot">Todavía no se registraron reuniones</div></div>
+<button type="button" class="stat warn stat-clickable"><div class="label">Empresas ganadas</div><div class="value">2</div><div class="foot">de 831 en Calificada</div></button>
+</div>
+<div class="grid-4 captions mb-lg">
+<div><span class="tag tag-backlog">Estático</span></div>
+<div><span class="tag tag-backlog">Estático · valor 0</span> mismo criterio: clic solo con valor ≥ 1</div>
+<div><span class="tag tag-backlog">Estático · valor 0</span></div>
+<div><span class="tag tag-restyle">Ya existe · clic</span></div>
+</div>
+<div class="grid-2 mb-lg">
+<div class="card"><div class="card-header"><h3>Embudo de contactos</h3><span class="actions"><span class="meta">Nuevo → Contactado → Respondió → Reunión</span></span></div><div class="card-body">
+<div class="stack-sm">
+<div class="row between funnel-static"><span>Nuevo</span><span class="num strong">9</span></div>
+<div class="bar-track"><span class="bar-neutral" style="width:100%"></span></div>
+<button type="button" class="funnel-live mt-md" aria-label="Ver los 7 contactos que están en Contactado o más"><span>Contactado</span><span class="right-side"><span class="num"><span class="live-count">7</span> <span class="soft small">(78%)</span></span><svg class="icon chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+<div class="bar-track"><span class="bar-info" style="width:78%"></span></div>
+<div class="row between mt-md funnel-static"><span>Respondió</span><span class="num">0 <span class="soft small">(0 / 7 de Contactado · 0%)</span></span></div>
+<div class="bar-track"><span class="bar-warn" style="width:0%"></span></div>
+<div class="row between mt-md funnel-static"><span>Reunión</span><span class="num">0 <span class="soft small">(0 / 0 de Respondió · 0%)</span></span></div>
+<div class="bar-track"><span class="bar-success" style="width:0%"></span></div>
+</div>
+<div class="card-footer meta">Aparte del embudo: 1 descartado(s) (11% de Nuevo) — no es una etapa de avance.</div>
+</div></div>
+<div class="card flat"><div class="card-header"><h3>Pipeline de empresas</h3><span class="actions"><span class="meta">Instantánea actual, no cambia con el período</span></span></div><div class="card-body"><p class="meta">Sin cambios en esta tanda: no pertenece a la población de contactos. Se omite el contenido para no distraer.</p></div></div>
+</div>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-empty">
+<div class="dialog-header"><h2 id="dlg-empty">Respondió</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+<div class="dialog-body">
+<p class="meta mb-md">0 de 7 contactados · creados del 12 al 18 oct 2026<br>Estado actual de cada contacto, no la actividad del período.</p>
+<p class="meta">No hay contactos que hayan respondido para este filtro.</p>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">5 · Filas del embudo clicables </h2>
+<p class="meta mb-lg">Contactado, Respondió y Reunión muestran el número con subrayado punteado y una flecha, y se resaltan al pasar el cursor. Nuevo y el pie de descartados siguen estáticos, como las barras. Las barras no cambian.</p>
+<div class="grid-2 mb-lg">
+<div class="card"><div class="card-header"><h3>Embudo de contactos</h3><span class="actions"><span class="meta">Nuevo → Contactado → Respondió → Reunión</span></span></div><div class="card-body">
+<div class="stack-sm">
+<div class="row between funnel-static"><span>Nuevo</span><span class="num strong">118</span></div>
+<div class="bar-track"><span class="bar-neutral" style="width:100%"></span></div>
+<button type="button" class="funnel-live mt-md" aria-label="Ver los 43 contactos que están en Contactado o más"><span>Contactado</span><span class="right-side"><span class="num"><span class="live-count">43</span> <span class="soft small">(36%)</span></span><svg class="icon chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+<div class="bar-track"><span class="bar-info" style="width:36%"></span></div>
+<button type="button" class="funnel-live mt-md" aria-label="Ver los 12 contactos que respondieron"><span>Respondió</span><span class="right-side"><span class="num"><span class="live-count">12</span> <span class="soft small">(28% de Contactado · 12 / 43)</span></span><svg class="icon chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+<div class="bar-track"><span class="bar-warn" style="width:10%"></span></div>
+<button type="button" class="funnel-live mt-md" aria-label="Ver los 4 contactos en Reunión"><span>Reunión</span><span class="right-side"><span class="num"><span class="live-count">4</span> <span class="soft small">(33% de Respondió · 4 / 12)</span></span><svg class="icon chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+<div class="bar-track"><span class="bar-success" style="width:3%"></span></div>
+</div>
+<div class="card-footer meta">Aparte del embudo: 6 descartado(s) (5% de Nuevo) — no es una etapa de avance.</div>
+</div></div>
+<div class="card flat"><div class="card-header"><h3>Pipeline de empresas</h3><span class="actions"><span class="meta">Instantánea actual, no cambia con el período</span></span></div><div class="card-body"><p class="meta">Sin cambios en esta tanda: no pertenece a la población de contactos. Se omite el contenido para no distraer.</p></div></div>
+</div>
+
+<h2 class="mt-2xl mb-lg">6 · Aviso de truncamiento </h2>
+<p class="meta mb-lg">Los diálogos existentes cortan a 500 filas <strong>sin avisar</strong>. Aquí el aviso va en el pie fijo del diálogo (no se pierde al desplazarse) y el encabezado conserva el total real. Con 500 o menos, el pie queda como hoy: solo «Cerrar».</p>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-trunc">
+<div class="dialog-header"><h2 id="dlg-trunc">Contactado</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar">×</button></div>
+<div class="dialog-body scroll">
+<p class="meta mb-md">612 de 1.250 contactos nuevos · creados en el 4.º trimestre 2026 · hoy en Contactado, Respondió o Reunión<br>Estado actual de cada contacto, no la actividad del período.</p>
+<table class="data compact"><thead><tr><th>Contacto</th><th>Empresa</th><th>BD dueño</th><th>Estado</th><th>Creado</th></tr></thead><tbody>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c0">Camila Duarte</a></td><td>Aurora Retail</td><td>Cristian Civita</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">3 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c1">Gonzalo Pérez</a></td><td>Bitácora</td><td>Macarena</td><td><span class="badge badge-replied">Respondió</span></td><td class="num"><span class="nowrap">3 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c2">Rocío Vega</a></td><td>Aurora Retail</td><td>Mariel</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c3">Hernán Díaz</a></td><td>Delta Foods</td><td>Cristian Civita</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c4">Mara Quiroga</a></td><td>Bitácora</td><td>Macarena</td><td><span class="badge badge-meeting">Reunión</span></td><td class="num"><span class="nowrap">2 oct 2026</span></td></tr>
+<tr><td><a href="../../crm-hubspot-ux/mockups/contact-record.html#c5">Pablo Sosa</a></td><td>Delta Foods</td><td>Mariel</td><td><span class="badge badge-contacted">Contactado</span></td><td class="num"><span class="nowrap">1 oct 2026</span></td></tr>
+</tbody></table><p class="meta mt-md center">· · · el diálogo se desplaza; 500 filas en total · · ·</p>
+</div>
+<div class="dialog-footer"><span class="meta left">Se muestran los primeros 500 de 612. Acota el período o filtra por BD para ver el resto.</span><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+
+</main>
+</div>
+</div>
+</body>
+</html>
