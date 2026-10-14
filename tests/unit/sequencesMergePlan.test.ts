@@ -22,7 +22,7 @@ test("a drafted merged-side member is repointed and the merge needs acknowledgem
   assert.deepEqual(p.repoint, ["m1"]);
   assert.deepEqual(p.blockers, []);
   assert.deepEqual(p.affected, [
-    { memberId: "m1", sequenceId: "seq1", sequenceName: "name-seq1", side: "merged", state: "drafted", scheduledSend: false },
+    { memberId: "m1", sequenceId: "seq1", sequenceName: "name-seq1", side: "merged", state: "drafted", scheduledSend: false, scheduledFor: null, sentAt: null, handEdited: false },
   ]);
 });
 
@@ -92,4 +92,33 @@ test("collisions are per sequence: a member in another sequence is simply repoin
   const p = planSequenceMerge(S, M, [m("s1", S, "drafted", "seq1"), m("m2", M, "drafted", "seq2")]);
   assert.deepEqual(p.repoint, ["m2"]);
   assert.deepEqual(p.survivingMembers, []);
+});
+
+test("same-sequence collision: the hand-edited draft survives even when it is on the merged side", () => {
+  const p = planSequenceMerge(S, M, [m("s1", S, "drafted"), { ...m("m1", M, "drafted"), handEdited: true }]);
+  assert.deepEqual(p.survivingMembers, [{ sequenceId: "seq1", sequenceName: "name-seq1", keep: "merged" }]);
+  assert.deepEqual(p.deleteMembers, ["s1"]);
+  assert.deepEqual(p.repoint, ["m1"]);
+  assert.deepEqual(p.discard, []);
+});
+
+test("same-sequence collision: hand-edited on the survivor side, or on both, keeps the survivor and discards the merged one", () => {
+  for (const [sEdited, mEdited] of [[true, false], [true, true], [false, false]]) {
+    const p = planSequenceMerge(S, M, [{ ...m("s1", S, "drafted"), handEdited: sEdited }, { ...m("m1", M, "drafted"), handEdited: mEdited }]);
+    assert.deepEqual(p.survivingMembers[0].keep, "survivor");
+    assert.deepEqual(p.discard, ["m1"]);
+    assert.deepEqual(p.deleteMembers, []);
+  }
+});
+
+test("a discarded hand-edited merged member never beats a live survivor", () => {
+  const p = planSequenceMerge(S, M, [m("s1", S, "drafted"), { ...m("m1", M, "discarded"), handEdited: true }]);
+  assert.equal(p.survivingMembers[0].keep, "survivor");
+});
+
+test("affected carries the draft facts the panel shows", () => {
+  const at = new Date("2026-10-15T12:00:00Z");
+  const p = planSequenceMerge(S, M, [{ ...m("m1", M, "approved"), scheduledFor: at, handEdited: true }]);
+  assert.equal(p.affected[0].scheduledFor, at);
+  assert.equal(p.affected[0].handEdited, true);
 });

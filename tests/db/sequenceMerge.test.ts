@@ -200,3 +200,30 @@ after(async () => {
   const { db } = await import("@/db");
   await db.$client.end();
 });
+
+test("merge plan read: scheduledFor comes back as a Date, handEdited from edited_at, and a hand-edited merged draft survives", async () => {
+  const { mergeContacts } = await import("@/lib/identity/mergeDb");
+  const { planSequenceMergeFor } = await import("@/lib/sequences/mergeQueries");
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { s, m } = await twoPeople("he");
+  const seq = await mkSequence();
+  const survivorMember = await mkMember(seq, s, "drafted");
+  const mergedMember = await mkMember(seq, m, "drafted");
+  const at = new Date("2026-11-02T12:00:00Z");
+  await db.insert(sequenceDraft).values({ sequenceMemberId: survivorMember, step: 1, subject: "a", body: "a", approvedAt: at, scheduledFor: at });
+  await db.insert(sequenceDraft).values({ sequenceMemberId: mergedMember, step: 1, subject: "b", body: "b", editedAt: at, editedByBdId: bdId });
+
+  const plan = await planSequenceMergeFor(db, s, m);
+  const sv = plan.affected.find((a) => a.memberId === survivorMember)!;
+  assert.ok(sv.scheduledFor instanceof Date);
+  assert.equal(sv.scheduledFor.getTime(), at.getTime());
+  assert.equal(sv.handEdited, false);
+  assert.equal(plan.affected.find((a) => a.memberId === mergedMember)!.handEdited, true);
+  assert.deepEqual(plan.survivingMembers.map((x) => x.keep), ["merged"]);
+
+  await mergeContacts(db, s, m, "test", bdId, { acknowledgeSequences: true });
+  const kept = await memberRow(mergedMember);
+  assert.equal(kept.personId, s);
+  assert.equal(kept.state, "drafted");
+});

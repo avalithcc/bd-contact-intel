@@ -2,7 +2,7 @@
  * DB side of the person-merge policy for Sequence memberships (see mergePlan.ts for the rules). Takes a transaction;
  * `db` is a type-only import so mergeDb.ts stays loadable without DATABASE_URL.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { sequence, sequenceDraft, sequenceMember } from "@/db/schema";
 import { planSequenceMerge, type MergeMembership, type SequenceMergePlan } from "./mergePlan";
@@ -29,17 +29,26 @@ export async function planSequenceMergeFor(
   survivorId: string,
   mergedId: string,
 ): Promise<SequenceMergePlan> {
-  const rows: MergeMembership[] = await reader
+  // Draft facts come from correlated subqueries (one round trip). Raw-SQL timestamps are normalised to Date.
+  const rawRows = await reader
     .select({
       memberId: sequenceMember.id,
       personId: sequenceMember.personId,
       sequenceId: sequenceMember.sequenceId,
       sequenceName: sequence.name,
       state: sequenceMember.state,
+      sentAt: sequenceMember.sentAt,
+      handEdited: sql<boolean>`exists (select 1 from sequence_draft d where d.sequence_member_id = ${sequenceMember.id} and d.edited_at is not null)`,
+      scheduledFor: sql<string | Date | null>`(select min(d.scheduled_for) from sequence_draft d where d.sequence_member_id = ${sequenceMember.id} and d.approved_at is not null)`,
     })
     .from(sequenceMember)
     .innerJoin(sequence, eq(sequence.id, sequenceMember.sequenceId))
     .where(inArray(sequenceMember.personId, [survivorId, mergedId]));
+  const rows: MergeMembership[] = rawRows.map((r) => ({
+    ...r,
+    handEdited: Boolean(r.handEdited),
+    scheduledFor: r.scheduledFor ? new Date(r.scheduledFor) : null,
+  }));
   return planSequenceMerge(survivorId, mergedId, rows);
 }
 
