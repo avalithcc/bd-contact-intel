@@ -25,6 +25,8 @@ export type MeetingsKpiCardLabels = ClientStrings<
     | "dialogClose"
     | "dialogLoading"
     | "dialogError"
+    | "dialogTruncated"
+    | "numberLocale"
   >
 >;
 
@@ -58,6 +60,7 @@ export function MeetingsKpiCard({
       value={value}
       foot={foot}
       dialogTitle={l.meetingsDialogTitle}
+      truncation={{ template: l.dialogTruncated, numberLocale: l.numberLocale }}
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}

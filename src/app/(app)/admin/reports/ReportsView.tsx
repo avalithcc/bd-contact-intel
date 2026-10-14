@@ -15,6 +15,9 @@ import { initialsFromName } from "@/components/initials";
 import { BdFilterSelect } from "./BdFilterSelect";
 import { WonCompaniesKpiCard, type WonCompaniesKpiCardLabels } from "./WonCompaniesKpiCard";
 import { MeetingsKpiCard, type MeetingsKpiCardLabels } from "./MeetingsKpiCard";
+import { CohortFunnelRow, CohortTile, type CohortDrilldownLabels } from "./CohortDrilldown";
+import { cohortCount, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
+import { cohortHeaderLines, cohortPeriodPhrase } from "@/lib/reports/cohortHeader";
 
 const dict = es.reports;
 
@@ -35,6 +38,8 @@ const wonCompaniesKpiLabels: WonCompaniesKpiCardLabels = {
   dialogClose: dict.dialogClose,
   dialogLoading: dict.dialogLoading,
   dialogError: dict.dialogError,
+  dialogTruncated: dict.dialogTruncated,
+  numberLocale: dict.numberLocale,
 };
 const meetingsKpiLabels: MeetingsKpiCardLabels = {
   kpiMeetings: dict.kpiMeetings,
@@ -47,6 +52,29 @@ const meetingsKpiLabels: MeetingsKpiCardLabels = {
   dialogClose: dict.dialogClose,
   dialogLoading: dict.dialogLoading,
   dialogError: dict.dialogError,
+  dialogTruncated: dict.dialogTruncated,
+  numberLocale: dict.numberLocale,
+};
+const cohortLabels: CohortDrilldownLabels = {
+  funnelContacted: dict.funnelContacted,
+  funnelReplied: dict.funnelReplied,
+  funnelMeeting: dict.funnelMeeting,
+  cohortColContact: dict.cohortColContact,
+  cohortColCompany: dict.cohortColCompany,
+  cohortColBd: dict.cohortColBd,
+  cohortColStatus: dict.cohortColStatus,
+  cohortColCreated: dict.cohortColCreated,
+  cohortColReplyAt: dict.cohortColReplyAt,
+  cohortColSequence: dict.cohortColSequence,
+  cohortEmptyContacted: dict.cohortEmptyContacted,
+  cohortEmptyReplied: dict.cohortEmptyReplied,
+  cohortEmptyMeeting: dict.cohortEmptyMeeting,
+  dialogClose: dict.dialogClose,
+  dialogLoading: dict.dialogLoading,
+  dialogError: dict.dialogError,
+  dialogTruncated: dict.dialogTruncated,
+  numberLocale: dict.numberLocale,
+  leadStatuses: es.leadStatuses,
 };
 
 const SOURCE_LABEL: Record<SourceBucket, string> = {
@@ -99,6 +127,18 @@ export function ReportsView({
   perBd: ReportPerBdRow[];
 }) {
   const funnel = buildFunnelBreakdown(aggregates.funnel);
+  // Same period + BD as the page's own query, so each dialog lists exactly the
+  // persons its number counted (cohortDrilldown.ts). The header words are
+  // built here because they use dictionary formatters (server-only).
+  const periodPhrase = cohortPeriodPhrase(period, range.fromDate, range.toDateExclusive, dict);
+  const cohortQuery = (population: CohortPopulation) => ({
+    population,
+    fromIso: range.fromIso,
+    toIso: range.toIso,
+    bdId,
+    ...cohortHeaderLines(population, aggregates.funnel, periodPhrase, dict),
+    labels: cohortLabels,
+  });
   const sourceRows = buildSourceConversionRows(aggregates.sourceStatus);
   const sourceTotal = sourceRows.reduce(
     (acc, r) => ({
@@ -197,15 +237,18 @@ export function ReportsView({
           <div className="value">{funnel.newTotal}</div>
           <div className="foot">{dict.kpiNewContactsFoot}</div>
         </div>
-        <div className={funnel.replyRateIsRate ? "stat info" : "stat neutral"}>
-          <div className="label">{dict.kpiReplyRate}</div>
-          <div className="value">{funnel.replyRateIsRate ? `${funnel.replyRatePct}%` : funnel.replyRateFraction}</div>
-          <div className="foot">
-            {funnel.replyRateIsRate
+        <CohortTile
+          {...cohortQuery("replied")}
+          toneClass={funnel.replyRateIsRate ? "info" : "neutral"}
+          label={dict.kpiReplyRate}
+          count={cohortCount(aggregates.funnel, "replied")}
+          displayValue={funnel.replyRateIsRate ? `${funnel.replyRatePct}%` : funnel.replyRateFraction}
+          foot={
+            funnel.replyRateIsRate
               ? dict.kpiReplyRateFoot(funnel.repliedOrMore, funnel.contactedOrMore)
-              : dict.kpiReplyRateSmallFoot(funnel.replyRatePct)}
-          </div>
-        </div>
+              : dict.kpiReplyRateSmallFoot(funnel.replyRatePct)
+          }
+        />
         {/* Bug fix: this KPI used to reuse `funnel.meeting` (persons whose
             CURRENT status is "meeting", scoped by person.owner_bd_id) —
             inconsistent with "Actividad por BD"'s own "Reuniones" column
@@ -298,47 +341,52 @@ export function ReportsView({
           </div>
           <div className="card-body">
             <div className="stack-sm">
-              <div className="row between">
+              <div className="row between funnel-static">
                 <span>{dict.funnelNew}</span>
                 <span className="num strong">{funnel.newTotal}</span>
               </div>
               <div className="bar-track">
                 <span className="bar-neutral" style={{ width: "100%" }} />
               </div>
-              <div className="row between mt-md">
-                <span>{dict.funnelContacted}</span>
-                <span className="num">
-                  {funnel.contactedOrMore} <span className="soft small">({funnel.contactedPct}%)</span>
-                </span>
-              </div>
+              <CohortFunnelRow
+                {...cohortQuery("contacted")}
+                count={funnel.contactedOrMore}
+                label={dict.funnelContacted}
+                ariaLabel={dict.funnelOpenContacted(funnel.contactedOrMore)}
+                detail={<span className="soft small">({funnel.contactedPct}%)</span>}
+              />
               <div className="bar-track">
                 <span className="bar-info" style={{ width: `${funnel.contactedPct}%` }} />
               </div>
-              <div className="row between mt-md">
-                <span>{dict.funnelReplied}</span>
-                <span className="num">
-                  {funnel.repliedOrMore}{" "}
+              <CohortFunnelRow
+                {...cohortQuery("replied")}
+                count={funnel.repliedOrMore}
+                label={dict.funnelReplied}
+                ariaLabel={dict.funnelOpenReplied(funnel.repliedOrMore)}
+                detail={
                   <span className="soft small">
                     {funnel.replyRateIsRate
                       ? `(${funnel.repliedOfContactedPct}% ${dict.funnelOfContacted} · ${funnel.replyRateFraction})`
                       : `(${funnel.replyRateFraction} ${dict.funnelOfContacted} · ${funnel.repliedOfContactedPct}%)`}
                   </span>
-                </span>
-              </div>
+                }
+              />
               <div className="bar-track">
                 <span className="bar-warn" style={{ width: `${funnel.repliedPct}%` }} />
               </div>
-              <div className="row between mt-md">
-                <span>{dict.funnelMeeting}</span>
-                <span className="num">
-                  {funnel.meeting}{" "}
+              <CohortFunnelRow
+                {...cohortQuery("meeting")}
+                count={funnel.meeting}
+                label={dict.funnelMeeting}
+                ariaLabel={dict.funnelOpenMeeting(funnel.meeting)}
+                detail={
                   <span className="soft small">
                     {funnel.meetingOfRepliedIsRate
                       ? `(${funnel.meetingOfRepliedPct}% ${dict.funnelOfReplied} · ${funnel.meetingOfRepliedFraction})`
                       : `(${funnel.meetingOfRepliedFraction} ${dict.funnelOfReplied} · ${funnel.meetingOfRepliedPct}%)`}
                   </span>
-                </span>
-              </div>
+                }
+              />
               <div className="bar-track">
                 <span className="bar-success" style={{ width: `${funnel.meetingPct}%` }} />
               </div>

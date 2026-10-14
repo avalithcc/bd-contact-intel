@@ -39,8 +39,10 @@
  * fast unit test with plain fixtures.
  */
 import { sql } from "drizzle-orm";
-import { activity, bd, company, followUpQueueItem, person, task } from "@/db/schema";
+import { activity, bd, company, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
+import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
 
 /**
  * SQL twin of companyBdAttribution.ts#companyBelongsToBd — see that file's
@@ -84,15 +86,25 @@ export interface ReportAggregatesParams {
   bdId: string | null;
 }
 
+/**
+ * The period's cohort: non-merged persons created in the period, owner-scoped
+ * when a BD is selected. Shared by `rpt_person_scope` (the funnel counts) and
+ * the cohort drill-down list, so a tile and the list behind it can never
+ * disagree about WHO is in scope. Call sites FROM `${person}` un-aliased.
+ */
+function cohortScopeSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
+  return sql`person.merged_into_id is null
+        and person.created_at >= ${fromIso}::timestamptz
+        and person.created_at < ${toIso}::timestamptz
+        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)`;
+}
+
 export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggregatesParams) {
   return sql`
     with rpt_person_scope as (
       select person.id, person.status, person.source_key
       from ${person}
-      where person.merged_into_id is null
-        and person.created_at >= ${fromIso}::timestamptz
-        and person.created_at < ${toIso}::timestamptz
-        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)
+      where ${cohortScopeSql({ fromIso, toIso, bdId })}
     ),
     rpt_funnel as (
       select
@@ -288,8 +300,6 @@ export interface WonCompaniesDrilldownParams {
   bdId: string | null;
 }
 
-const WON_COMPANIES_DRILLDOWN_LIMIT = 500;
-
 /**
  * "Empresas ganadas" KPI drilldown (reports-bd-filter-drilldown). BD-filtered
  * only, deliberately NOT period-filtered — see wonCompaniesDrilldown.ts's
@@ -358,7 +368,7 @@ export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownP
     left join rpt_won_at on rpt_won_at.pbc_company_key = rpt_won_companies.pbc_company_key
     left join ${bd} on bd.id = coalesce(rpt_won_companies.pbc_owner_bd_id, rpt_won_company_person_owner.pbc_owner_bd_id)
     order by won_at desc
-    limit ${WON_COMPANIES_DRILLDOWN_LIMIT}
+    limit ${DRILLDOWN_ROW_LIMIT}
   `;
 }
 
@@ -376,8 +386,6 @@ export interface MeetingsDrilldownParams {
   toIso: string;
   bdId: string | null;
 }
-
-const MEETINGS_DRILLDOWN_LIMIT = 500;
 
 /**
  * "Reuniones agendadas" KPI drilldown (reports-bd-filter-drilldown).
@@ -407,7 +415,7 @@ export function buildMeetingsDrilldownQuery({ fromIso, toIso, bdId }: MeetingsDr
       and ${effectiveActivityAtSql()} >= ${fromIso}::timestamptz
       and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
     order by meeting_at desc
-    limit ${MEETINGS_DRILLDOWN_LIMIT}
+    limit ${DRILLDOWN_ROW_LIMIT}
   `;
 }
 
@@ -422,3 +430,104 @@ export type MeetingDrilldownRawResultRow = {
   bd_name: string | null;
   meeting_at: Date | string;
 }
+
+export interface CohortDrilldownParams extends ReportAggregatesParams {
+  population: CohortPopulation;
+}
+
+/**
+ * Cohort drill-down behind "Tasa de respuesta" and the funnel's Contactado /
+ * Respondió / Reunión rows (reports-kpi-drilldown): the persons `rpt_funnel`
+ * counted for `population`, by CURRENT status, in the same cohort scope.
+ * MIN_RATE_SAMPLE never reaches this query — it is a display rule only.
+ *
+ * Reply populations add two best-effort columns, both LEFT-joined so a missing
+ * value never drops a person: the latest `reply_received` activity's effective
+ * time (`metadata.occurredAt`), and the Sequence of the member's latest
+ * `replied_at` (not populated until outreach-sequences PR 10, so it is null in
+ * production today). A contact moved to Respondió by hand has neither.
+ * Ordered by most recent reply, no-reply last; Contactado by creation date.
+ */
+export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
+  const statuses = sql.join(
+    COHORT_STATUSES[params.population].map((s) => sql`${s}`),
+    sql`, `,
+  );
+  const withReply = cohortHasReplyColumns(params.population);
+  const replyCtes = withReply
+    ? sql`,
+    rpt_cohort_reply as (
+      select distinct on (activity.person_id)
+        activity.person_id as pbc_person_id,
+        ${effectiveActivityAtSql()} as pbc_reply_at
+      from ${activity}
+      where activity.type = 'reply_received'
+        and exists (select 1 from rpt_cohort where rpt_cohort.pbc_id = activity.person_id)
+      order by activity.person_id, ${effectiveActivityAtSql()} desc nulls last
+    ),
+    rpt_cohort_sequence as (
+      select distinct on (sequence_member.person_id)
+        sequence_member.person_id as pbc_person_id,
+        sequence.id as pbc_sequence_id,
+        sequence.name as pbc_sequence_name
+      from ${sequenceMember}
+      join ${sequence} on sequence.id = sequence_member.sequence_id
+      where sequence_member.replied_at is not null
+        and exists (select 1 from rpt_cohort where rpt_cohort.pbc_id = sequence_member.person_id)
+      order by sequence_member.person_id, sequence_member.replied_at desc, sequence_member.id
+    )`
+    : sql``;
+  const replySelect = withReply
+    ? sql`rpt_cohort_reply.pbc_reply_at as reply_at, rpt_cohort_sequence.pbc_sequence_id as sequence_id, rpt_cohort_sequence.pbc_sequence_name as sequence_name`
+    : sql`null::timestamptz as reply_at, null::uuid as sequence_id, null::text as sequence_name`;
+  const replyJoins = withReply
+    ? sql`left join rpt_cohort_reply on rpt_cohort_reply.pbc_person_id = rpt_cohort.pbc_id
+    left join rpt_cohort_sequence on rpt_cohort_sequence.pbc_person_id = rpt_cohort.pbc_id`
+    : sql``;
+  const order = withReply
+    ? sql`rpt_cohort_reply.pbc_reply_at desc nulls last, rpt_cohort.pbc_created_at desc, rpt_cohort.pbc_id`
+    : sql`rpt_cohort.pbc_created_at desc, rpt_cohort.pbc_id`;
+  return sql`
+    with rpt_cohort as (
+      select
+        person.id as pbc_id,
+        person.first_name as pbc_first_name,
+        person.last_name as pbc_last_name,
+        person.company_key as pbc_company_key,
+        person.owner_bd_id as pbc_owner_bd_id,
+        person.status as pbc_status,
+        person.created_at as pbc_created_at
+      from ${person}
+      where ${cohortScopeSql(params)}
+        and person.status in (${statuses})
+    )${replyCtes}
+    select
+      rpt_cohort.pbc_id as person_id,
+      rpt_cohort.pbc_first_name as first_name,
+      rpt_cohort.pbc_last_name as last_name,
+      company.display_name as company_name,
+      bd.name as owner_bd_name,
+      rpt_cohort.pbc_status as status,
+      rpt_cohort.pbc_created_at as created_at,
+      ${replySelect}
+    from rpt_cohort
+    left join ${company} on company.company_key = rpt_cohort.pbc_company_key
+    left join ${bd} on bd.id = rpt_cohort.pbc_owner_bd_id
+    ${replyJoins}
+    order by ${order}
+    limit ${DRILLDOWN_ROW_LIMIT}
+  `;
+}
+
+export type CohortDrilldownRawResultRow = {
+  person_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+  owner_bd_name: string | null;
+  status: string;
+  created_at: Date | string;
+  reply_at: Date | string | null;
+  sequence_id: string | null;
+  sequence_name: string | null;
+};

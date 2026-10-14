@@ -6,10 +6,13 @@
  */
 import { db } from "@/db";
 import {
+  buildCohortDrilldownQuery,
   buildMeetingsDrilldownQuery,
   buildReportAggregatesQuery,
   buildReportPerBdQuery,
   buildWonCompaniesDrilldownQuery,
+  type CohortDrilldownParams,
+  type CohortDrilldownRawResultRow,
   type MeetingDrilldownRawResultRow,
   type MeetingsDrilldownParams,
   type ReportAggregatesParams,
@@ -19,6 +22,7 @@ import {
   type WonCompaniesDrilldownParams,
   type WonCompanyDrilldownRawResultRow,
 } from "@/lib/reports/queries";
+import { buildCohortDrilldownRows, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import { buildMeetingDrilldownRows, type MeetingDrilldownRow } from "@/lib/reports/meetingsDrilldown";
 import { buildWonCompanyDrilldownRows, type WonCompanyDrilldownRow } from "@/lib/reports/wonCompaniesDrilldown";
 
@@ -68,6 +72,25 @@ export async function getMeetingsDrilldown(params: MeetingsDrilldownParams): Pro
       bdId: r.bd_id,
       bdName: r.bd_name,
       meetingAt: r.meeting_at,
+    })),
+  );
+}
+
+/** Cohort drill-down for the funnel/"Tasa de respuesta" — see queries.ts#buildCohortDrilldownQuery. */
+export async function getCohortDrilldown(params: CohortDrilldownParams): Promise<CohortRow[]> {
+  const rows = await db.execute<CohortDrilldownRawResultRow>(buildCohortDrilldownQuery(params));
+  return buildCohortDrilldownRows(
+    rows.map((r) => ({
+      personId: r.person_id,
+      firstName: r.first_name,
+      lastName: r.last_name,
+      companyName: r.company_name,
+      ownerBdName: r.owner_bd_name,
+      status: r.status,
+      createdAt: r.created_at,
+      replyAt: r.reply_at,
+      sequenceId: r.sequence_id,
+      sequenceName: r.sequence_name,
     })),
   );
 }

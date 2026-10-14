@@ -1860,6 +1860,36 @@ export const en = {
     meetingsDialogColBd: "BD",
     meetingsDialogColDate: "Date",
     meetingsDialogEmpty: "No meetings recorded for this filter.",
+    // reports-kpi-drilldown: shared truncation note ({shown}/{total} are filled by
+    // fillTruncationNote) plus the cohort drill-down behind "Reply rate" and the
+    // funnel's Contacted/Replied/Meeting rows.
+    dialogTruncated: "Showing the first {shown} of {total}. Narrow the period or filter by BD to see the rest.",
+    numberLocale: "en-US",
+    cohortMonthNames: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    cohortMonthAbbr: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    cohortPeriodMonth: (monthName: string, year: number) => `in ${monthName} ${year}`,
+    cohortPeriodQuarter: (quarter: number, year: number) => `in Q${quarter} ${year}`,
+    cohortPeriodWeek: (from: string, to: string) => `from ${from} to ${to}`,
+    cohortHeaderContacted: (count: string, base: string, period: string) =>
+      `${count} of ${base} new contacts · created ${period} · now Contacted, Replied or Meeting`,
+    cohortHeaderReplied: (count: string, base: string, period: string) => `${count} of ${base} contacted · created ${period}`,
+    cohortHeaderMeeting: (count: string, base: string, period: string) => `${count} of ${base} who replied · created ${period} · now in Meeting`,
+    cohortNote: "Current status of each contact, not the period's activity.",
+    cohortNoteReplied: (period: string) =>
+      `Current status of each contact, not the period's activity: "created ${period}" is the cohort, not when they replied.`,
+    cohortColContact: "Contact",
+    cohortColCompany: "Company",
+    cohortColBd: "Owner BD",
+    cohortColStatus: "Status",
+    cohortColCreated: "Created",
+    cohortColReplyAt: "Reply received",
+    cohortColSequence: "Sequence",
+    cohortEmptyContacted: "No contacted contacts for this filter.",
+    cohortEmptyReplied: "No contacts have replied for this filter.",
+    cohortEmptyMeeting: "No contacts in a meeting for this filter.",
+    funnelOpenContacted: (count: number) => `View the ${count} contacts who are Contacted or further`,
+    funnelOpenReplied: (count: number) => `View the ${count} contacts who replied`,
+    funnelOpenMeeting: (count: number) => `View the ${count} contacts in Meeting`,
   },
 
   // /admin/duplicates (Phase 7). Same Spanish-only rationale as `migration`

@@ -32,6 +32,8 @@ export type WonCompaniesKpiCardLabels = ClientStrings<
     | "dialogClose"
     | "dialogLoading"
     | "dialogError"
+    | "dialogTruncated"
+    | "numberLocale"
   >
 >;
 
@@ -66,6 +68,7 @@ export function WonCompaniesKpiCard({
       foot={foot}
       dialogTitle={l.wonCompaniesDialogTitle}
       dialogSubtitle={l.wonCompaniesDialogSubtitle}
+      truncation={{ template: l.dialogTruncated, numberLocale: l.numberLocale }}
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}

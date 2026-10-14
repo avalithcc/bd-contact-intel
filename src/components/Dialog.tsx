@@ -12,7 +12,9 @@ const FOCUSABLE_SELECTOR =
  * click on the overlay backdrop, and returns focus to whatever triggered
  * it when it closes.
  *
- * `wide` maps to the mockup's `.dialog.wide` modifier (720px vs 520px).
+ * `wide` maps to the mockup's `.dialog.wide` modifier (720px vs 520px);
+ * `xwide` adds `.dialog.xwide` (960px, still inside 94vw at 1024px) for
+ * 7-column lists — pass it together with `wide`.
  */
 export function Dialog({
   open,
@@ -21,6 +23,7 @@ export function Dialog({
   children,
   footer,
   wide = false,
+  xwide = false,
   closeDisabled = false,
 }: {
   open: boolean;
@@ -33,6 +36,7 @@ export function Dialog({
   children: React.ReactNode;
   footer?: React.ReactNode;
   wide?: boolean;
+  xwide?: boolean;
   // Disables the "×" close button, Escape and the overlay-backdrop click
   // (task-edit change, review fix WARNING #4; mockup's "Guardando…" swatch
   // shows the close button disabled) — every other caller omits this and
@@ -124,7 +128,7 @@ export function Dialog({
     >
       <div
         ref={dialogRef}
-        className={`dialog${wide ? " wide" : ""}`}
+        className={`dialog${wide ? " wide" : ""}${xwide ? " xwide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

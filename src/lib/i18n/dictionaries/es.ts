@@ -1831,6 +1831,36 @@ export const es: typeof en = {
     meetingsDialogColBd: "BD",
     meetingsDialogColDate: "Fecha",
     meetingsDialogEmpty: "No hay reuniones registradas para este filtro.",
+    // reports-kpi-drilldown: shared truncation note ({shown}/{total} are filled by
+    // fillTruncationNote) plus the cohort drill-down behind "Tasa de respuesta"
+    // and the funnel's Contactado/Respondió/Reunión rows.
+    dialogTruncated: "Se muestran los primeros {shown} de {total}. Acota el período o filtra por BD para ver el resto.",
+    numberLocale: "es-AR",
+    cohortMonthNames: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+    cohortMonthAbbr: ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
+    cohortPeriodMonth: (monthName: string, year: number) => `en ${monthName} ${year}`,
+    cohortPeriodQuarter: (quarter: number, year: number) => `en el ${quarter}.º trimestre ${year}`,
+    cohortPeriodWeek: (from: string, to: string) => `del ${from} al ${to}`,
+    cohortHeaderContacted: (count: string, base: string, period: string) =>
+      `${count} de ${base} contactos nuevos · creados ${period} · hoy en Contactado, Respondió o Reunión`,
+    cohortHeaderReplied: (count: string, base: string, period: string) => `${count} de ${base} contactados · creados ${period}`,
+    cohortHeaderMeeting: (count: string, base: string, period: string) => `${count} de ${base} que respondieron · creados ${period} · hoy en Reunión`,
+    cohortNote: "Estado actual de cada contacto, no la actividad del período.",
+    cohortNoteReplied: (period: string) =>
+      `Estado actual de cada contacto, no la actividad del período: «creados ${period}» es la cohorte, no cuándo respondieron.`,
+    cohortColContact: "Contacto",
+    cohortColCompany: "Empresa",
+    cohortColBd: "BD dueño",
+    cohortColStatus: "Estado",
+    cohortColCreated: "Creado",
+    cohortColReplyAt: "Respuesta recibida",
+    cohortColSequence: "Secuencia",
+    cohortEmptyContacted: "No hay contactos contactados para este filtro.",
+    cohortEmptyReplied: "No hay contactos que hayan respondido para este filtro.",
+    cohortEmptyMeeting: "No hay contactos en reunión para este filtro.",
+    funnelOpenContacted: (count: number) => `Ver los ${count} contactos que están en Contactado o más`,
+    funnelOpenReplied: (count: number) => `Ver los ${count} contactos que respondieron`,
+    funnelOpenMeeting: (count: number) => `Ver los ${count} contactos en Reunión`,
   },
 
   duplicates: {
