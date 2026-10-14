@@ -22,11 +22,14 @@ export type LushaErrorKind = (typeof LUSHA_ERROR_KINDS)[number];
 
 export class LushaError extends Error {
   readonly kind: LushaErrorKind;
+  /** HTTP status when the error came from a response; pass it to isRetryableByBd. */
+  readonly httpStatus?: number;
 
-  constructor(kind: LushaErrorKind, message: string = kind) {
+  constructor(kind: LushaErrorKind, message: string = kind, httpStatus?: number) {
     super(message);
     this.name = "LushaError";
     this.kind = kind;
+    this.httpStatus = httpStatus;
   }
 }
 
