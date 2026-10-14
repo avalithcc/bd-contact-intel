@@ -64,3 +64,27 @@ test("the batch never runs two generations at once", async () => {
   });
   assert.equal(peak, 1);
 });
+
+test("a failed member's reason is kept next to its id so a caller can show why", async () => {
+  const result = await runDraftBatch(["a", "b"], async (id) => {
+    if (id === "b") throw new Error("generation failed: gatewayNotConfigured");
+    return "generated";
+  });
+  assert.deepEqual(result.failed, ["b"]);
+  assert.deepEqual(result.reasons, { b: "generation failed: gatewayNotConfigured" });
+});
+
+test("a non-Error throw is recorded as its string form", async () => {
+  const result = await runDraftBatch(["a"], async () => {
+    throw "plain string failure";
+  });
+  assert.deepEqual(result.reasons, { a: "plain string failure" });
+});
+
+test("a long reason is capped and a credential-looking blob is redacted", async () => {
+  const result = await runDraftBatch(["a", "b"], async (id) => {
+    throw new Error(id === "a" ? "x ".repeat(1000) : "auth failed Bearer abcdefghijklmnopqrstuvwxyz0123456789");
+  });
+  assert.ok(result.reasons.a.length <= 300);
+  assert.ok(!result.reasons.b.includes("abcdefghij"));
+});

@@ -209,7 +209,7 @@ The roster is the 10 contacts the owner approved on 2026-10-14 (see `mockups/REA
 - [x] 6b.5 Create the sequence named `Florida + US · octubre` (the mockup's name), owned by the owner's bd id, `sending_account_id` referencing their connected `email_account`, `daily_send_cap` 5, and the two-step schedule from `sequence-scheduling`.
 - [x] 6b.6 Generate each member's draft through the real PR 6 path, so the seeded drafts are the genuine article — English (`"en"`), market-keyed footer, real signals. Do NOT hand-write draft text.
 - [x] 6b.7 Every member lands in state `drafted`. The script MUST NOT set `approved_at`, `sent_at`, or anything that could be released. Assert this in the test.
-- [ ] 6b.8 (dry run done and shown to the owner; `--apply` still pending his approval) Verification: run `--dry-run` against production and show the owner the admitted/rejected split BEFORE `--apply`. Then `npm run test:unit` and `npm run typecheck` green.
+- [x] 6b.8 (applied 2026-10-14 with owner approval: 9 members `drafted`, 9 step-1 drafts; the first apply drafted none because of an expired OIDC token and a 500-token output cap that reasoning consumed) Verification: run `--dry-run` against production and show the owner the admitted/rejected split BEFORE `--apply`. Then `npm run test:unit` and `npm run typecheck` green.
 
 Commits:
 - `feat(sequences): add pure seed-roster resolution with per-candidate rejection reasons`

@@ -45,9 +45,14 @@ function print(r: SeedResult, apply: boolean) {
     console.log(`  - ${x.candidate.label}: ${x.reason}  (market=${line.market}, language=${line.language ?? "none"})`);
   }
   if (!apply) return void console.log("\nNothing written. Re-run with --apply --actor=<bd id> to apply.");
-  if (!r.applied) return void console.log("\nNothing to add. No audit row written.");
-  console.log(`\nDone. ${r.createdSequence ? "Created the Sequence and added" : "Added"} ${r.addedPersonIds.length} member(s), all in state 'drafted'. audit_log id: ${r.auditLogId}`);
-  if (r.drafts) console.log(`Drafts: generated=${r.drafts.generated} failed=${r.drafts.failed} held=${r.drafts.held}`);
+  if (r.applied) console.log(`\nDone. ${r.createdSequence ? "Created the Sequence and added" : "Added"} ${r.addedPersonIds.length} member(s), all in state 'drafted'. audit_log id: ${r.auditLogId}`);
+  else console.log("\nNothing to add. No audit row written.");
+  // Drafting runs even when nothing was added (it fills in members that still have no draft), so always report it.
+  if (!r.drafts) console.log("Drafts: skipped (sequence not found for owner)");
+  else {
+    console.log(`Drafts: generated=${r.drafts.generated} failed=${r.drafts.failed} held=${r.drafts.held}`);
+    for (const f of r.drafts.failures) console.log(`  ! member ${f.memberId}: ${f.reason}`);
+  }
 }
 
 async function main() {

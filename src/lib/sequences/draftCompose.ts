@@ -24,10 +24,21 @@ export function composeDraft(generated: GeneratedEmail, market: MarketKey, unsub
 export const footerRemovedOnSave = (body: string, market: MarketKey): boolean =>
   isMarketMapped(market) && !bodyHasFooter(body, COMPLIANCE_CONFIG, market);
 
+export const MAX_REASON_CHARS = 300;
+
+// sanitizeSendError (tasks) does not fit: its base64 rule would redact the 20-char error keys ("gatewayNotConfigured")
+// that make a reason useful. Here: strip auth headers, then cap.
+export function batchReason(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw.replace(/\b(Basic|Bearer)\s+[A-Za-z0-9+/=._-]+/gi, "[redacted]").slice(0, MAX_REASON_CHARS);
+}
+
 export interface BatchResult {
   generated: string[];
   skipped: string[];
   failed: string[];
+  /** Why each failed member failed, keyed by member id. Sanitized and capped; server-side only, never returned to the client. */
+  reasons: Record<string, string>;
 }
 
 /**
@@ -38,13 +49,14 @@ export async function runDraftBatch(
   memberIds: readonly string[],
   draftOne: (memberId: string) => Promise<"generated" | "skipped">,
 ): Promise<BatchResult> {
-  const result: BatchResult = { generated: [], skipped: [], failed: [] };
+  const result: BatchResult = { generated: [], skipped: [], failed: [], reasons: {} };
   for (const id of memberIds) {
     try {
       result[(await draftOne(id)) === "generated" ? "generated" : "skipped"].push(id);
     } catch (error) {
       console.error("sequence draft failed", id, error);
       result.failed.push(id);
+      result.reasons[id] = batchReason(error);
     }
   }
   return result;

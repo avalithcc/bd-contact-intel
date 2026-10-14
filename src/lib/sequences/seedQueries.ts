@@ -65,7 +65,7 @@ export interface SeedResult {
   createdSequence: boolean;
   addedPersonIds: string[];
   auditLogId: string | null;
-  drafts: { generated: number; failed: number; held: number } | null;
+  drafts: { generated: number; failed: number; held: number; failures: { memberId: string; reason: string }[] } | null;
 }
 
 async function loadOwner(tx: Tx, actor: string | null) {
@@ -186,6 +186,6 @@ export async function seedFirstSequence(opts: SeedOptions): Promise<SeedResult> 
   // The real PR 6 path. On a re-run it finds nothing to draft and makes no model call.
   const { generateMissingDrafts } = await import("./draftQueries");
   const batch = await generateMissingDrafts(written.plan.owner.id, written.sequenceId, opts.draftDeps ?? {});
-  const drafts = batch.ok ? { generated: batch.generated.length, failed: batch.failed.length, held: batch.held.length } : null;
+  const drafts = batch.ok ? { generated: batch.generated.length, failed: batch.failed.length, held: batch.held.length, failures: Object.entries(batch.reasons).map(([memberId, reason]) => ({ memberId, reason })) } : null;
   return { ...written, drafts };
 }

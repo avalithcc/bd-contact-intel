@@ -23,6 +23,14 @@ import {
   type UpdateSettingsResult,
 } from "@/lib/sequences/rosterQueries";
 
+// Failure reasons are for server logs and the seed script; the browser gets the same shape it always did.
+type ClientDraftBatchResult = DraftBatchResult extends infer R ? (R extends { reasons: unknown } ? Omit<R, "reasons"> : R) : never;
+function withoutReasons(result: DraftBatchResult): ClientDraftBatchResult {
+  if (!result.ok) return result;
+  const { reasons: _reasons, ...rest } = result;
+  return rest;
+}
+
 export async function createSequence(input: { name: string; emailAccountId: string; dailySendCap?: number }): Promise<CreateSequenceResult> {
   const me = await getCurrentBd();
   return createSequenceRow(me.id, input);
@@ -50,15 +58,15 @@ export async function updateSequenceSettings(sequenceId: string, patch: { name?:
 }
 
 /** "Generar borradores faltantes": members with no draft only; an existing draft is never touched. */
-export async function generateMissingSequenceDrafts(sequenceId: string): Promise<DraftBatchResult> {
+export async function generateMissingSequenceDrafts(sequenceId: string): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return generateMissingDrafts(me.id, sequenceId);
+  return withoutReasons(await generateMissingDrafts(me.id, sequenceId));
 }
 
 /** "Regenerar" (single or bulk): explicit replacement, clears review and approval. */
-export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[]): Promise<DraftBatchResult> {
+export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[]): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return regenerateDrafts(me.id, sequenceId, memberIds);
+  return withoutReasons(await regenerateDrafts(me.id, sequenceId, memberIds));
 }
 
 /** "Guardar sin aprobar". */
