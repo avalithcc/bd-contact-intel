@@ -19,7 +19,10 @@ export interface SeedRosterEntry {
   readonly company: string;
 }
 
-/** The owner's ten, in tier order. */
+/**
+ * The owner's nine, in tier order. He hand-picked ten on 2026-10-14 and then dropped Andy Ellis (Cint): no country on
+ * the person or the company, conflicting postings, and no job title to personalise from. No tenth is backfilled.
+ */
 export const SEED_ROSTER: readonly SeedRosterEntry[] = [
   { name: "Brian Casteel", company: "Upshop" },
   { name: "Saumya Jossy", company: "Upshop" },
@@ -30,7 +33,6 @@ export const SEED_ROSTER: readonly SeedRosterEntry[] = [
   { name: "Stefano Fontanelli", company: "Twilio" },
   { name: "Jose Velez", company: "Bold" },
   { name: "Anderson Romero", company: "Bold" },
-  { name: "Andy Ellis", company: "Cint" },
 ];
 
 export interface SeedCandidate extends RosterCandidate {

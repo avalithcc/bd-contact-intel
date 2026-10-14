@@ -109,7 +109,7 @@ test("parseSeedArgs: dry run is the default and writing needs --apply AND --acto
   assert.throws(() => parseSeedArgs(["--execute"]), /Unknown argument/);
 });
 
-test("the hand-picked roster is the owner's ten, in tier order, with at most two per company", () => {
+test("the hand-picked roster is the owner's nine, in tier order, with at most two per company", () => {
   assert.equal(SEED_SEQUENCE_NAME, "Florida + US · octubre");
   assert.deepEqual(SEED_ROSTER.map((r) => `${r.name} @ ${r.company}`), [
     "Brian Casteel @ Upshop",
@@ -121,6 +121,6 @@ test("the hand-picked roster is the owner's ten, in tier order, with at most two
     "Stefano Fontanelli @ Twilio",
     "Jose Velez @ Bold",
     "Anderson Romero @ Bold",
-    "Andy Ellis @ Cint",
   ]);
+  assert.equal(SEED_ROSTER.length, 9);
 });

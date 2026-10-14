@@ -1,5 +1,5 @@
 /**
- * Seeds the owner's first real Sequence, "Florida + US · octubre", from the ten Contacts he hand-picked on 2026-10-14.
+ * Seeds the owner's first real Sequence, "Florida + US · octubre", from the nine Contacts left of the ten he hand-picked on 2026-10-14.
  * The roster and every admission rule live in src/lib/sequences/seedRoster.ts; the DB work in seedQueries.ts.
  *
  * THE RULE THAT MATTERS: the list is months-old news by the time this runs, so EVERY candidate is re-validated at run
