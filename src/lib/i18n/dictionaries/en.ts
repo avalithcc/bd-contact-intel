@@ -2312,4 +2312,15 @@ export const en = {
     body: "The page you're looking for doesn't exist or was moved.",
     backHome: "Back to home",
   },
+  // Public unsubscribe pages (recipient-facing, rendered in English like the emails). Not routed until the go-live PR.
+  sequenceUnsubscribe: {
+    confirmTitle: "Unsubscribe?",
+    confirmBody: (email: string) =>
+      `We'll stop emailing ${email} about engineering capacity. This takes effect right away.`,
+    confirmButton: "Yes, unsubscribe me",
+    doneTitle: "You're unsubscribed",
+    doneBody: (email: string) => `We won't email ${email} again. Nothing else is needed from you.`,
+    invalidTitle: "This link is no longer valid",
+    invalidBody: "If you still want to stop receiving our emails, reply to any message with \"unsubscribe\".",
+  },
 };
