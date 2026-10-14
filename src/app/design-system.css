@@ -60,6 +60,8 @@ h4 { font-size: var(--text-base); font-weight: 600; }
 }
 .btn-text-reset:hover { text-decoration: underline; }
 .right { text-align: right; }
+/* `table.data th` (0,1,2) beats a bare .right (0,1,0), so right-aligned date headers sat left of their cells. */
+table.data th.right { text-align: right; }
 .icon { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
 .icon-lg { width: 20px; height: 20px; }
 kbd, .kbd {
@@ -685,6 +687,9 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 /* --------------------------------------------------------------- dialog */
 .overlay.open { display: flex; }
 .dialog.static { position: static; }
+/* Wider dialog for 7-column lists (reports-kpi-drilldown): .dialog.wide is 720px.
+   960px still fits 1024px (94vw). Loaded after globals.css, so it wins over .dialog.wide. */
+.dialog.xwide { width: min(960px, 94vw); }
 
 /* ------------------------------------------------------------ stat tiles */
 .stat { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-lg); }
@@ -699,8 +704,39 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 /* Clickable KPI drilldown (reports-bd-filter-drilldown): a `<button>` reusing
    the exact `.stat` look, reset to remove native button chrome so it stays
    visually identical to every other (non-clickable) stat tile until hovered. */
-.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; }
-.stat-clickable:hover, .stat-clickable:focus-visible { border-color: var(--color-accent-strong); }
+.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; color: var(--color-ink); }
+/* A native button centers its content vertically, which dropped a clickable
+   tile's label below its static neighbours whose foot wraps: pin to the top. */
+.stat-clickable { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }
+/* Hover/focus recolor only the sides and bottom: `border-color` also repainted
+   the tone's 3px top border (.stat.success/warn/info/neutral) brand red. */
+.stat-clickable:hover, .stat-clickable:focus-visible {
+  border-left-color: var(--color-accent-strong); border-right-color: var(--color-accent-strong); border-bottom-color: var(--color-accent-strong);
+}
+
+/* Funnel row that opens a drill-down (reports-kpi-drilldown). The tiles above
+   signal clickability only on hover; funnel rows have no hover precedent, so
+   the count carries a dotted underline and a trailing chevron. margin-inline
+   (not the shorthand) keeps the .mt-md spacing the row is given. */
+.funnel-live {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);
+  margin-inline: calc(var(--space-sm) * -1); width: calc(100% + var(--space-sm) * 2);
+  padding: var(--space-2xs) var(--space-sm); border: 0; border-radius: var(--radius-sm);
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.funnel-live:hover { background: var(--color-row-hover); }
+.funnel-live .live-count { text-decoration: underline dotted; text-underline-offset: 3px; font-weight: 600; }
+.funnel-live:hover .live-count { color: var(--color-accent-strong); }
+.funnel-live .chev { color: var(--color-ink-subtle); margin-left: var(--space-2xs); }
+.funnel-live .right-side { display: inline-flex; align-items: center; }
+/* Static rows reserve the chevron's width so the numbers stay in one column. */
+.funnel-static {
+  margin-inline: calc(var(--space-sm) * -1); width: calc(100% + var(--space-sm) * 2);
+  padding: var(--space-2xs) calc(var(--space-sm) + 16px + var(--space-2xs)) var(--space-2xs) var(--space-sm);
+}
+
+/* Second line of a table cell (a time under its date). */
+.cell-sub { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); }
 .bar-track { height: 8px; border-radius: var(--radius-pill); background: var(--color-surface-sunken); overflow: hidden; display: flex; }
 .bar-track span { display: block; height: 100%; }
 .bar-success { background: var(--color-success); } .bar-warn { background: var(--color-warn); } .bar-info { background: var(--color-info); } .bar-neutral { background: var(--color-ink-muted); }
