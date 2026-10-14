@@ -119,7 +119,9 @@ A Sequence MUST NOT contain more than 2 non-discarded members whose Contacts bel
 
 ### Requirement: Client companies are excluded
 
-A Contact whose company has `company.client_status` set (either `active` or `inactive`) MUST NOT be offered by the picker, MUST be rejected on add, and MUST be re-checked at send time (see `sequence-scheduling`). The exclusion MUST be driven by `client_status` only. Correcting the unmarked clients CookUnity and Mercado Libre is a separate change and out of scope here.
+A Contact whose company has `company.client_status` set (either `active` or `inactive`) MUST NOT be offered by the picker, MUST be rejected on add, and MUST be re-checked at send time (see `sequence-scheduling`). The exclusion MUST be driven by `client_status` only.
+
+Measured against production 2026-10-14: of the eight public clients named in `AVALITH_PROFILE`, six carry `client_status = 'inactive'` (Mercado Libre, Accenture, CookUnity, GlobalLogic, Jampp, Ualá) and two carry `'active'` (Global Hitss, MODO). None is unmarked. Owner decision 2026-10-14, confirming this requirement: an `inactive` client is a past client and MUST NOT receive cold outreach — a re-engagement message is a different message, not this one. CookUnity had three reachable contacts sitting in the candidate pool, so this exclusion is load-bearing, not theoretical.
 
 #### Scenario: Active client excluded
 
