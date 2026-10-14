@@ -64,6 +64,10 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
     excluded:
       "person_id is provenance only (nullable, ON DELETE SET NULL). A suppression is keyed by the normalized address or domain, never by person, so a merge neither strands nor needs to repoint it: the opt-out keeps applying to the address wherever the Contact ends up",
   },
+  lusha_reveal: {
+    excluded:
+      "spend ledger and accountability trail (what was searched, revealed and charged, by whom), like audit_log: a merge neither moves nor deletes it, and the merged Contact stays as a tombstone so its rows keep their history. Known consequence: the surviving Contact has no cached search of its own, so a first reveal there pays one new search credit; whether to repoint is a PR 4 decision, not a data-model one",
+  },
   linkedin_scrape_job: {
     excluded: "one-off Apify scrape run bookkeeping, not read through personId for any live feature",
   },

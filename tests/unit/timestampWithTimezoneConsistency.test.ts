@@ -78,6 +78,7 @@ const CONVERTED_TABLES: readonly string[] = [
   "sequence_send_claim",
   "email_suppression",
   "sequence_unsubscribe_token",
+  "lusha_reveal",
 ];
 
 function withTimezoneFlagsByTable(): Map<string, boolean[]> {

@@ -12,6 +12,7 @@ import {
   jsonb,
   integer,
   smallint,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -859,7 +860,8 @@ export const personPropertyHistory = pgTable(
     // 'company_cleanup' (scripts/clear-non-company-employers.ts cleared a
     // Freelance/Independiente employer) | 'signature_extract'
     // (scripts/extract-signature-phones.ts filled an empty phone from the
-    // sender's own signature in inbound mail).
+    // sender's own signature in inbound mail) | 'lusha_reveal' (a paid Lusha reveal
+    // filled the value; the raw payload lives in lusha_reveal).
     // property 'ownerBdId' + source 'edit' marks a manual owner, sticky against
     // the automatic owner rule (src/lib/identity/ownerRule.ts).
     source: text("source").notNull(),
@@ -1255,7 +1257,8 @@ export const activity = pgTable(
       onDelete: "set null",
     }),
     // Free text: 'note' | 'email_sent' | 'hunter_lookup' | 'status_change' | 'call' |
-    // 'call_attempt' (a tel: click; never moves status or ownership) | etc.
+    // 'call_attempt' (a tel: click; never moves status or ownership) | 'lusha_reveal' (a paid Lusha
+    // reveal; status-neutral, no-progress, like call_attempt) | etc.
     type: text("type").notNull(),
     // Metadata keyed by type: { gmailMessageId, gmailThreadId } for email_sent,
     // { hunterScore, hunterVerified } for hunter_lookup, etc.
@@ -1882,3 +1885,51 @@ export const followUpQueueItem = pgTable(
 
 export type FollowUpQueueItem = typeof followUpQueueItem.$inferSelect;
 export type NewFollowUpQueueItem = typeof followUpQueueItem.$inferInsert;
+
+// Lusha reveal ledger (lusha-reveal, PR 3): one row per paid or attempted Lusha event. It is the never-pay-twice cache,
+// the input to the daily credit cap (sum(credits_charged) over `at`, never Lusha's eventually consistent balance) and
+// the spend audit trail. `field` 'search' | 'emails' | 'phones'; `state` 'reserved' (in flight) | 'settled' | 'failed'
+// (a failed row keeps its reserved amount counting); `outcome` is null while reserved, then for a search row
+// 'matched' | 'no_match' | 'match_rejected' and for a reveal row 'revealed' | 'no_value' | 'compliance_restricted'.
+// Free text everywhere, validated at the write boundary (repo convention, no CHECK). `search_id` ties a field row to the
+// search row that produced it (NULL on a search row; readers use coalesce(search_id, id)), so a re-search never reads
+// a stale row. `payload` keeps the raw Lusha data: canReveal with prices on a search row, the raw emails[]/phones[]
+// arrays on a reveal row. `at` is the RESERVATION time: a settle that crosses midnight never moves a charge.
+export const lushaReveal = pgTable(
+  "lusha_reveal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    searchId: uuid("search_id").references((): AnyPgColumn => lushaReveal.id, { onDelete: "cascade" }),
+    field: text("field").notNull(),
+    state: text("state").notNull().default("reserved"),
+    outcome: text("outcome"),
+    value: text("value"),
+    valueNormalized: text("value_normalized"),
+    creditsReserved: integer("credits_reserved").notNull(),
+    creditsCharged: integer("credits_charged"),
+    lushaContactId: text("lusha_contact_id"),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    rejectedByBdId: uuid("rejected_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    errorCode: text("error_code"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+  },
+  (t) => ({
+    // The double-click guard and nothing else (D4): one in-flight row per (person, field); settled rows are unlimited.
+    inFlightUnique: uniqueIndex("lusha_reveal_in_flight_unique")
+      .on(t.personId, t.field)
+      .where(sql`${t.state} = 'reserved'`),
+    // DISTINCT ON (field) latest-row read.
+    byPersonFieldAt: index("lusha_reveal_person_field_at_idx").on(t.personId, t.field, sql`${t.at} desc`),
+    // The cap's daily sum.
+    byAt: index("lusha_reveal_at_idx").on(t.at),
+  }),
+);
+
+export type LushaReveal = typeof lushaReveal.$inferSelect;
+export type NewLushaReveal = typeof lushaReveal.$inferInsert;

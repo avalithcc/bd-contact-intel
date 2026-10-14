@@ -43,7 +43,7 @@ Chain strategy: stacked-to-main
 | 7 | Approval: review tracking, single + bulk approve with server gate, cancel, reminder approval | E | `main` | ~290 | TDD |
 | 8 | Send path: `sendFromAccountRow`, `sendGmailMessageFromAccount`, `extraHeaders` | F | `main` | ~150 | TDD; **touches live send path** |
 | 9 | Runner core: `releasePlan`, `preSendChecks`, claim, `runSequenceRelease` (no route, no cron) | F | `main` | ~310 | TDD |
-| 10 | Replies: header parsing, `autoReply`, migration `0043`, `applySequenceReplies`, opt-out action | G | `main` | ~340 | **0.1 apply `0043`**; TDD; **touches live sync** |
+| 10 | Replies: header parsing, `autoReply`, migration `0044`, `applySequenceReplies`, opt-out action | G | `main` | ~340 | **0.1 apply `0044`**; TDD; **touches live sync** |
 | 11 | UI detail components (unmounted): view models, cards, stats, states | H | `main` | ~360 | Mockup conformance |
 | 12 | UI dialogs and forms (unmounted): review dialog, bulk bar, list, create, Contact block | H | `main` | ~300 | Mockup conformance |
 | 13 | **GO-LIVE**: pages, routes, cron, middleware, sidebar, badge, Contact mount | H | `main` | ~340 | **0.2-0.6 all ticked**; owner preview review |
@@ -63,7 +63,7 @@ Order is the merge order. "Depends on" means the predecessor must already be mer
 | 7 | `feat/outreach-sequences-07-approval` | review flag, approve/bulk/cancel, reminder approval | 2, 6 | Nothing |
 | 8 | `feat/outreach-sequences-08-send-path` | `sendFromAccountRow`, `sendGmailMessageFromAccount`, `extraHeaders` | 4 | Nothing new; existing `sendGmailMessage` callers see no change |
 | 9 | `feat/outreach-sequences-09-runner-core` | `releasePlan`, `preSendChecks`, claim, orchestration | 3, 7, 8 | Nothing (no route, no cron) |
-| 10 | `feat/outreach-sequences-10-replies` | `0043`, header parsing, `autoReply`, `applySequenceReplies`, "No contactar" action | 4, 9 | Nothing new; existing sync behavior unchanged |
+| 10 | `feat/outreach-sequences-10-replies` | `0044`, header parsing, `autoReply`, `applySequenceReplies`, "No contactar" action | 4, 9 | Nothing new; existing sync behavior unchanged |
 | 11 | `feat/outreach-sequences-11-ui-detail` | view models and detail components under `_components/` | 7, 9 | Nothing (no `page.tsx`) |
 | 12 | `feat/outreach-sequences-12-ui-dialogs` | review dialog, bulk bar, list/create components, Contact block component | 11 | Nothing (no `page.tsx`, not mounted) |
 | 13 | `feat/outreach-sequences-13-go-live` | 3 pages, `/api/unsubscribe`, `/api/sequences/run`, 2 crons, middleware exemption, sidebar + badge, Contact mount | 1-12 | **Everything** (this is the switch) |
@@ -263,9 +263,9 @@ Commits:
 
 ## Phase 10: Replies (PR 10, base: main; touches the live Gmail sync)
 
-Reachable: nothing new for users. **Gate 0.1: apply `0043` to production before merging.** Existing sync behavior for `reply_received` and derived status is unchanged by design.
+Reachable: nothing new for users. **Gate 0.1: apply `0044` (`0043` went to `lusha_reveal` on 2026-10-14) to production before merging.** Existing sync behavior for `reply_received` and derived status is unchanged by design.
 
-- [ ] 10.1 Write `drizzle/0043_email_message_is_automatic.sql` + `_rollback.sql`: `email_message.is_automatic boolean not null default false` (no backfill needed; historical rows default correctly). Mirror in `schema.ts`.
+- [ ] 10.1 Write `drizzle/0044_email_message_is_automatic.sql` + `_rollback.sql`: `email_message.is_automatic boolean not null default false` (no backfill needed; historical rows default correctly). Mirror in `schema.ts`.
 - [ ] 10.2 RED/GREEN: extend `parseGmailMessage` with `autoSubmitted`, `precedence`, `autoreplyHeaderPresent` through the existing `findHeader`.
 - [ ] 10.3 RED/GREEN: `autoReply.ts` `isAutomaticMessage`: `Auto-Submitted` other than `no`; `X-Autoreply`/`X-Autorespond`/`X-Auto-Response-Suppress`; `Precedence` of `auto_reply`/`bulk`/`junk`; mailer-daemon/postmaster sender; subject-prefix fallback. Required cases: `Auto-Submitted: auto-replied`; subject "Out of Office: Re: senior engineers" with no headers is automatic; "Re: senior engineers" with a vacation body is NOT automatic.
 - [ ] 10.4 `classifyGmailMessage` carries `isAutomatic`; the sync persists it to `email_message.is_automatic`. Existing `reply_received` writes are untouched (regression test).
@@ -308,7 +308,7 @@ Commits:
 
 ## Phase 13: GO-LIVE (PR 13, base: main) - the only PR that makes anything reachable
 
-**Merge precondition: gates 0.2, 0.3, 0.4, 0.5, 0.6 are all ticked and 0.1 is satisfied for `0041`-`0043`.** Reverting this single PR takes the entire feature offline. Vercel crons run only on production deployments, so the owner reviews the pages on the PR's preview deployment with no cron in play.
+**Merge precondition: gates 0.2, 0.3, 0.4, 0.5, 0.6 are all ticked and 0.1 is satisfied for `0041`-`0042` and `0044`.** Reverting this single PR takes the entire feature offline. Vercel crons run only on production deployments, so the owner reviews the pages on the PR's preview deployment with no cron in play.
 
 - [ ] 13.1 Pages (thin composition of the existing components): `/sequences`, `/sequences/new`, `/sequences/[id]`; owner-scoped; admin read audited. Route naming stays English with Spanish UI copy (D12); the words "Campana"/"Campaign" appear nowhere.
 - [ ] 13.2 `src/app/api/unsubscribe/route.ts`: `GET` renders only, `POST` suppresses, using the PR 4 handlers and the same Drizzle/`postgres` client (never supabase-js, or RLS would block it).

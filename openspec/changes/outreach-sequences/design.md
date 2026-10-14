@@ -46,7 +46,7 @@ Three additive migrations, each with a `_rollback.sql` twin (the convention sinc
 |---|---|
 | `0041_outreach_sequences` | `sequence`, `sequence_member`, `sequence_draft`, `sequence_send_claim`, and `email_account.id uuid unique not null default gen_random_uuid()` |
 | `0042_email_suppression` | `email_suppression`, `sequence_unsubscribe_token` |
-| `0043_email_message_is_automatic` | `email_message.is_automatic boolean not null default false` |
+| `0044_email_message_is_automatic` | `email_message.is_automatic boolean not null default false` |
 
 `ADD COLUMN id … DEFAULT gen_random_uuid()` is a **volatile** default, so Postgres rewrites the table and evaluates it per row — existing `email_account` rows get distinct ids, not one shared value. `NOT NULL` is added after the backfill in the same migration.
 
@@ -200,7 +200,7 @@ Additive only. Three migrations, three rollbacks, no backfill: every `sequence_m
 | 7 | E approval | Review tracking, single + bulk approve with the server-side gate, cancel | ~280 | Low |
 | 8 | F send path | `sendFromAccountRow` extraction, `sendGmailMessageFromAccount`, `extraHeaders` in `buildRawMessage` | ~150 | Low |
 | 9 | F runner | `/api/sequences/run`, `releasePlan`, `preSendChecks`, `syncFreshness`, `releaseQueries`, `vercel.json` | ~340 | Med |
-| 10 | G replies | `parseMessage` headers, `autoReply`, `classify.isAutomatic`, migration `0043`, `applySequenceReplies` | ~280 | Low |
+| 10 | G replies | `parseMessage` headers, `autoReply`, `classify.isAutomatic`, migration `0044`, `applySequenceReplies` | ~280 | Low |
 | 11 | H UI detail | Detail page, member cards (six states + hold reasons), stat cards, progress, empty + finished states | ~360 | Med |
 | 12 | H UI dialogs | Review dialog, bulk bar, list page, sidebar entry + `sequence_count` subquery | ~340 | Med |
 
