@@ -84,20 +84,46 @@ test("changing a configured address changes the footer with no other edit", () =
   assert.ok(!footer.text.includes("Ansin"));
 });
 
-test("recipientMarket resolves from the Contact country through classifyMarket", () => {
-  assert.equal(recipientMarket({ country: "United States" }), "us");
-  assert.equal(recipientMarket({ country: "USA" }), "us");
-  assert.equal(recipientMarket({ country: "Argentina" }), "latam");
+test("link 1: person.country wins and is classified through classifyMarket", () => {
+  assert.equal(recipientMarket({ personCountry: "United States" }), "us");
+  assert.equal(recipientMarket({ personCountry: "USA" }), "us");
+  assert.equal(recipientMarket({ personCountry: "Argentina" }), "latam");
 });
 
-test("recipientMarket fails safe to other when the country is unknown or unresolvable", () => {
-  assert.equal(recipientMarket({ country: null }), "other");
-  assert.equal(recipientMarket({ country: "" }), "other");
-  assert.equal(recipientMarket({ country: "   " }), "other");
-  assert.equal(recipientMarket({ country: "Spain" }), "other");
+test("link 2: company.country is used when person.country is empty", () => {
+  assert.equal(recipientMarket({ personCountry: null, companyCountry: "United States" }), "us");
+  assert.equal(recipientMarket({ personCountry: "  ", companyCountry: "Argentina" }), "latam");
+});
+
+test("precedence: a person.country that disagrees with company.country wins", () => {
+  assert.equal(recipientMarket({ personCountry: "Argentina", companyCountry: "United States" }), "latam");
+  assert.equal(recipientMarket({ personCountry: "United States", companyCountry: "Argentina" }), "us");
+});
+
+test("link 3: the company's open IT posting markets are used when both countries are empty", () => {
+  assert.equal(recipientMarket({ postingMarkets: ["us"] }), "us");
+  assert.equal(recipientMarket({ postingMarkets: ["latam", "latam"] }), "latam");
+  assert.equal(recipientMarket({ companyCountry: "", postingMarkets: ["us", null, "other"] }), "us");
+});
+
+test("link 3 is not consulted when a country is present, even if postings disagree", () => {
+  assert.equal(recipientMarket({ companyCountry: "Argentina", postingMarkets: ["us"] }), "latam");
+});
+
+test("link 3 refuses to guess when postings are all other, empty, null or conflicting", () => {
+  assert.equal(recipientMarket({ postingMarkets: ["other", "other"] }), "other");
+  assert.equal(recipientMarket({ postingMarkets: [null] }), "other");
+  assert.equal(recipientMarket({ postingMarkets: [] }), "other");
+  assert.equal(recipientMarket({ postingMarkets: ["us", "latam"] }), "other");
+  assert.equal(recipientMarket({ postingMarkets: ["bogus"] }), "other");
+});
+
+test("a country that is present but unmapped (Spain) stays other and does not fall through", () => {
+  assert.equal(recipientMarket({ personCountry: "Spain", companyCountry: "United States", postingMarkets: ["us"] }), "other");
+  assert.equal(recipientMarket({ companyCountry: "Spain", postingMarkets: ["us"] }), "other");
+});
+
+test("all three links absent resolves to other (hold, never send)", () => {
   assert.equal(recipientMarket({}), "other");
-});
-
-test("recipientMarket never guesses from city alone", () => {
-  assert.equal(recipientMarket({ country: null, city: "Miami" } as { country: null }), "other");
+  assert.equal(recipientMarket({ personCountry: null, companyCountry: null, postingMarkets: null }), "other");
 });
