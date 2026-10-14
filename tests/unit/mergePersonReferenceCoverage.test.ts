@@ -60,6 +60,10 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
     excluded:
       "outreach-sequences PR 1 adds the table inert: no row exists until the chain's final PR, so a merge has nothing to repoint today. Deciding repoint vs. refuse-while-member-exists (unique(sequence_id, person_id) can collide on repoint) is OPEN and must be settled in a later PR of that chain before any sequence_member row is created",
   },
+  email_suppression: {
+    excluded:
+      "person_id is provenance only (nullable, ON DELETE SET NULL). A suppression is keyed by the normalized address or domain, never by person, so a merge neither strands nor needs to repoint it: the opt-out keeps applying to the address wherever the Contact ends up",
+  },
   linkedin_scrape_job: {
     excluded: "one-off Apify scrape run bookkeeping, not read through personId for any live feature",
   },

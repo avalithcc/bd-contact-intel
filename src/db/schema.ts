@@ -1683,6 +1683,55 @@ export const sequenceSendClaim = pgTable(
 export type SequenceSendClaim = typeof sequenceSendClaim.$inferSelect;
 export type NewSequenceSendClaim = typeof sequenceSendClaim.$inferInsert;
 
+// Company-wide send suppression (CAN-SPAM opt-out). Deliberately has NO bd_id and is NOT email_never_log: that table
+// is per BD and makes the classifier discard the whole message, which would hide a suppressed person's replies.
+// `kind` 'address' | 'domain'; `value` is always normalized lowercase. `source` 'unsubscribe_link' | 'manual' |
+// 'reply'. person_id / sequence_member_id are provenance only and SET NULL so the opt-out outlives them.
+export const emailSuppression = pgTable(
+  "email_suppression",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull(),
+    value: text("value").notNull(),
+    source: text("source").notNull(),
+    recordedByBdId: uuid("recorded_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    personId: uuid("person_id").references(() => person.id, { onDelete: "set null" }),
+    sequenceMemberId: uuid("sequence_member_id").references(() => sequenceMember.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    kindValueUnique: unique("email_suppression_kind_value_unique").on(t.kind, t.value),
+  }),
+);
+
+export type EmailSuppression = typeof emailSuppression.$inferSelect;
+export type NewEmailSuppression = typeof emailSuppression.$inferInsert;
+
+// Only the SHA-256 of the unsubscribe token is stored, so a database read cannot be turned into working links.
+// Bound to one member and one recipient address; used_at is set by the first confirmed POST.
+export const sequenceUnsubscribeToken = pgTable(
+  "sequence_unsubscribe_token",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull(),
+    sequenceMemberId: uuid("sequence_member_id")
+      .notNull()
+      .references(() => sequenceMember.id, { onDelete: "cascade" }),
+    emailNormalized: text("email_normalized").notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tokenHashUnique: unique("sequence_unsubscribe_token_token_hash_unique").on(t.tokenHash),
+    byMember: index("sequence_unsubscribe_token_member_idx").on(t.sequenceMemberId),
+  }),
+);
+
+export type SequenceUnsubscribeToken = typeof sequenceUnsubscribeToken.$inferSelect;
+export type NewSequenceUnsubscribeToken = typeof sequenceUnsubscribeToken.$inferInsert;
+
 // Generic signal/research data for leads/companies/contacts. Discriminated by
 // source ('linkedin_apify' | 'manual_paste' | 'web_research' | etc.) and a
 // single subject FK (leadId | companyKey | contactId). Same privacy/application-level
