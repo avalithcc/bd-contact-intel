@@ -2286,4 +2286,15 @@ export const es: typeof en = {
     body: "La página que buscás no existe o fue movida.",
     backHome: "Volver al inicio",
   },
+  // Paginas publicas de baja (para el destinatario, se muestran en ingles como los correos). Sin ruta hasta el PR de go-live.
+  sequenceUnsubscribe: {
+    confirmTitle: "Darte de baja?",
+    confirmBody: (email: string) =>
+      `Dejaremos de escribir a ${email} sobre capacidad de ingenieria. Se aplica de inmediato.`,
+    confirmButton: "Si, darme de baja",
+    doneTitle: "Te diste de baja",
+    doneBody: (email: string) => `No volveremos a escribir a ${email}. No necesitas hacer nada mas.`,
+    invalidTitle: "Este enlace ya no es valido",
+    invalidBody: "Si todavia queres dejar de recibir nuestros correos, responde a cualquier mensaje con \"unsubscribe\".",
+  },
 };
