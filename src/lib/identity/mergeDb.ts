@@ -8,7 +8,7 @@
  * ./resolveDb.ts and src/lib/status/recompute.ts; the planner it calls is
  * fully covered by tests/unit/identityMerge.test.ts.
  */
-import { and, eq, gt, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { db } from "@/db";
 import {
   activity,
@@ -16,6 +16,7 @@ import {
   duplicateCandidate,
   emailMessagePerson,
   followUpQueueItem,
+  lushaReveal,
   mergeEvent,
   person,
   personBdConnection,
@@ -89,15 +90,17 @@ export function toMergeConnection(row: typeof personBdConnection.$inferSelect): 
 }
 
 async function readReferencesOnPerson(tx: DbTransaction, personId: string): Promise<MergeReferenceRow[]> {
-  const [activityRows, taskRows, signalRows] = await Promise.all([
+  const [activityRows, taskRows, signalRows, lushaRows] = await Promise.all([
     tx.select({ id: activity.id }).from(activity).where(eq(activity.personId, personId)),
     tx.select({ id: task.id }).from(task).where(eq(task.personId, personId)),
     tx.select({ id: signal.id }).from(signal).where(eq(signal.personId, personId)),
+    tx.select({ id: lushaReveal.id }).from(lushaReveal).where(eq(lushaReveal.personId, personId)),
   ]);
   return [
     ...activityRows.map((r) => ({ table: "activity" as const, id: r.id })),
     ...taskRows.map((r) => ({ table: "task" as const, id: r.id })),
     ...signalRows.map((r) => ({ table: "signal" as const, id: r.id })),
+    ...lushaRows.map((r) => ({ table: "lusha_reveal" as const, id: r.id })),
   ];
 }
 
@@ -211,6 +214,27 @@ async function repointReferences(tx: DbTransaction, refs: readonly MergeReferenc
   if (activityIds.length) await tx.update(activity).set({ personId: toPersonId }).where(inArray(activity.id, activityIds));
   if (taskIds.length) await tx.update(task).set({ personId: toPersonId }).where(inArray(task.id, taskIds));
   if (signalIds.length) await tx.update(signal).set({ personId: toPersonId }).where(inArray(signal.id, signalIds));
+  // The Lusha ledger is a person's spend history: it follows the Contact, so a merge never re-charges a paid search.
+  const lushaIds = refs.filter((r) => r.table === "lusha_reveal").map((r) => r.id);
+  if (lushaIds.length) await tx.update(lushaReveal).set({ personId: toPersonId }).where(inArray(lushaReveal.id, lushaIds));
+}
+
+/**
+ * Two in-flight (`reserved`) Lusha rows for the same field would collide on lusha_reveal_in_flight_unique when the
+ * merged person's rows are repointed. The merged side's row is settled as `failed` (never deleted): it keeps its
+ * reserved amount counting against the day (D8) and its audit trail, and falls out of the partial index.
+ */
+async function failCollidingLushaReservations(tx: DbTransaction, survivorId: string, mergedId: string): Promise<void> {
+  await tx
+    .update(lushaReveal)
+    .set({ state: "failed", errorCode: "merge_collision", settledAt: new Date() })
+    .where(
+      and(
+        eq(lushaReveal.personId, mergedId),
+        eq(lushaReveal.state, "reserved"),
+        sql`exists (select 1 from lusha_reveal s where s.person_id = ${survivorId} and s.state = 'reserved' and s.field = lusha_reveal.field)`,
+      ),
+    );
 }
 
 /** Column set for a connection's mutable (non-identity) fields, used by both merge-time aggregation and unmerge-time restores. */
@@ -291,6 +315,7 @@ export async function mergeContacts(
 
     // Sequence memberships: stops (throws SequenceMergeBlockedError, rolling back) unless acknowledged and unblocked.
     await applySequenceMerge(tx, survivorId, mergedId, actorBdId, options.acknowledgeSequences ?? false);
+    await failCollidingLushaReservations(tx, survivorId, mergedId);
 
     const [
       survivorConnections,

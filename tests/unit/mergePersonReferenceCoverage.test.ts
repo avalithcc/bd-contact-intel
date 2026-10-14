@@ -13,6 +13,7 @@
  * one-line reason — instead of silently repeating this bug.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
@@ -31,6 +32,7 @@ const MERGE_REPOINTED_TABLES = [
   "duplicate_candidate", // special-cased: personAId/personBId pair repoint, not a plain FK column
   "email_message_person", // this bugfix
   "follow_up_queue_item", // this bugfix
+  "lusha_reveal", // lusha-reveal: rides MergeReferenceRow, in-flight collisions are failed first
 ] as const;
 
 const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
@@ -64,10 +66,7 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
     excluded:
       "person_id is provenance only (nullable, ON DELETE SET NULL). A suppression is keyed by the normalized address or domain, never by person, so a merge neither strands nor needs to repoint it: the opt-out keeps applying to the address wherever the Contact ends up",
   },
-  lusha_reveal: {
-    excluded:
-      "spend ledger and accountability trail (what was searched, revealed and charged, by whom), like audit_log: a merge neither moves nor deletes it, and the merged Contact stays as a tombstone so its rows keep their history. Known consequence: the surviving Contact has no cached search of its own, so a first reveal there pays one new search credit; whether to repoint is a PR 4 decision, not a data-model one",
-  },
+  lusha_reveal: "repointed", // spend history of a PERSON: repointed so a merge never re-charges a paid search
   linkedin_scrape_job: {
     excluded: "one-off Apify scrape run bookkeeping, not read through personId for any live feature",
   },
@@ -123,4 +122,13 @@ test("every table marked 'repointed' still actually has a person_id-style FK to 
     const hasPersonFk = config.foreignKeys.some((fk) => fk.reference().foreignTable === schema.person);
     assert.ok(hasPersonFk, `"${name}" is marked "repointed" but no longer has a column referencing person.id — update this guard`);
   }
+});
+
+test("lusha_reveal is wired into the merge: read, repointed both ways, and in-flight collisions settled first", () => {
+  const src = readFileSync("src/lib/identity/mergeDb.ts", "utf8");
+  assert.match(src, /from\(lushaReveal\)\.where\(eq\(lushaReveal\.personId, personId\)\)/, "readReferencesOnPerson must read the ledger");
+  assert.match(src, /r\.table === "lusha_reveal"/, "repointReferences (merge AND unmerge) must update the ledger");
+  const merge = src.slice(src.indexOf("export async function mergeContacts"), src.indexOf("export async function unmergeContact"));
+  const settleAt = merge.indexOf("failCollidingLushaReservations(tx");
+  assert.ok(settleAt >= 0 && settleAt < merge.indexOf("readReferencesOnPerson(tx, mergedId)"), "collisions must be settled before the rows are read and repointed");
 });
