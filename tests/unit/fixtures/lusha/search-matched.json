@@ -1,17 +1,25 @@
 {
-  "requestId": "req-redacted-0001",
+  "requestId": "00000000-0000-4000-8000-000000000001",
   "results": [
     {
       "clientReferenceId": "person-aaa",
-      "id": "lusha-contact-111",
-      "company": { "name": "Example Co", "domain": "example.com" },
+      "id": "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA",
+      "firstName": "Example",
+      "lastName": "Person",
+      "company": {
+        "id": "v1.SYNTHETICcompanyIdBBBBBBBBBBBBBBBBBB",
+        "name": "Example Co",
+        "domain": "www.example.com",
+        "industry": "Technology, Information & Media"
+      },
+      "location": { "country": "Argentina" },
       "socialLinks": { "linkedin": "https://www.linkedin.com/in/example-person" },
-      "name": "Example Person",
+      "has": ["firstName", "lastName", "location", "socialLinks", "phones", "linkedinConnections", "linkedinFollowers", "partialProfile"],
       "canReveal": [
         { "field": "emails", "credits": 1 },
         { "field": "phones", "credits": 5 }
       ]
     }
   ],
-  "billing": { "creditsCharged": 1, "resultsReturned": 1 }
+  "billing": { "creditsCharged": 1, "resultsReturned": 1, "lowBalance": false }
 }

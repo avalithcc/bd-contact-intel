@@ -39,11 +39,11 @@ test("parseSearchResponse finds the match in a reordered results array", () => {
   const out = parseSearchResponse(body, "person-aaa");
   assert.equal(out.outcome, "matched");
   if (out.outcome !== "matched") return;
-  assert.equal(out.lushaId, "lusha-contact-111");
+  assert.equal(out.lushaId, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
   assert.deepEqual(out.identity, {
     name: "Example Person",
     company: "Example Co",
-    domain: "example.com",
+    domain: "www.example.com",
     linkedin: "https://www.linkedin.com/in/example-person",
   });
   assert.deepEqual(out.canReveal, [
@@ -53,38 +53,77 @@ test("parseSearchResponse finds the match in a reordered results array", () => {
 });
 
 test("parseSearchResponse yields no_match for NOT_FOUND and for a missing result", () => {
-  assert.deepEqual(parseSearchResponse(fixture("search-not-found.json"), "person-aaa"), { outcome: "no_match" });
-  assert.deepEqual(parseSearchResponse({ results: [] }, "person-aaa"), { outcome: "no_match" });
+  assert.deepEqual(parseSearchResponse(fixture("unverified-search-not-found.json"), "person-aaa"), { outcome: "no_match", lowBalance: null });
+  assert.deepEqual(parseSearchResponse({ results: [] }, "person-aaa"), { outcome: "no_match", lowBalance: null });
 });
 
 test("parseSearchResponse maps a compliance restriction and an async job to typed errors", () => {
-  assert.equal(kindOf(() => parseSearchResponse(fixture("search-compliance-restricted.json"), "person-aaa")), "compliance_restricted");
-  assert.equal(kindOf(() => parseSearchResponse(fixture("enrich-async-job.json"), "person-aaa")), "async_unsupported");
+  assert.equal(kindOf(() => parseSearchResponse(fixture("unverified-search-compliance-restricted.json"), "person-aaa")), "compliance_restricted");
+  assert.equal(kindOf(() => parseSearchResponse(fixture("unverified-enrich-async-job.json"), "person-aaa")), "async_unsupported");
   assert.equal(kindOf(() => parseSearchResponse(null, "person-aaa")), "unavailable");
 });
 
 test("parseEnrichResponse returns the raw arrays and the billed credits", () => {
-  const out = parseEnrichResponse(fixture("enrich-emails.json"), "lusha-contact-111");
+  const out = parseEnrichResponse(fixture("unverified-enrich-emails.json"), "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
   assert.equal(out.emails.length, 3);
   assert.deepEqual(out.phones, []);
   assert.equal(out.creditsCharged, 1);
 });
 
 test("WATERFALL_NOT_IN_PLAN / partial is a no-value success, not an error", () => {
-  const out = parseEnrichResponse(fixture("enrich-waterfall-partial.json"), "lusha-contact-111");
+  const out = parseEnrichResponse(fixture("enrich-waterfall-partial.json"), "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
   assert.deepEqual(out.emails, []);
   assert.equal(out.creditsCharged, 0);
   assert.equal(out.partial, true);
 });
 
+test("real-shaped enrich result with NO emails key behaves exactly like an empty array", () => {
+  const body = fixture("enrich-waterfall-partial.json");
+  assert.ok(!("emails" in body.results[0]) && !("phones" in body.results[0]));
+  const absent = parseEnrichResponse(body, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
+  body.results[0].emails = [];
+  const empty = parseEnrichResponse(body, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
+  assert.deepEqual(absent, empty);
+  assert.deepEqual(absent.emails, []);
+  assert.deepEqual(pickEmail(absent.emails), { ok: false, reason: "empty", raw: [] });
+});
+
+test("top-level status/statusReason and billing.lowBalance are surfaced; partial stays a no-value success", () => {
+  const out = parseEnrichResponse(fixture("enrich-waterfall-partial.json"), "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
+  assert.equal(out.partial, true);
+  assert.equal(out.statusReason, "WATERFALL_NOT_IN_PLAN");
+  assert.equal(out.lowBalance, false);
+  const search = parseSearchResponse(fixture("search-matched.json"), "person-aaa");
+  assert.equal(search.lowBalance, false);
+  const low = fixture("search-matched.json");
+  low.billing.lowBalance = true;
+  assert.equal(parseSearchResponse(low, "person-aaa").lowBalance, true);
+});
+
+test("v1.<base64-ish> ids are opaque strings, and unknown extra keys change nothing", () => {
+  const base = parseSearchResponse(fixture("search-matched.json"), "person-aaa");
+  const noisy = fixture("search-matched.json");
+  noisy.surprise = { a: 1 };
+  noisy.results[0].futureKey = [1, 2];
+  noisy.results[0].company.futureCompanyKey = "x";
+  noisy.billing.futureBillingKey = 7;
+  assert.deepEqual(parseSearchResponse(noisy, "person-aaa"), base);
+  assert.ok(base.outcome === "matched" && base.lushaId.startsWith("v1."));
+  const e = fixture("enrich-waterfall-partial.json");
+  const before = parseEnrichResponse(e, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA");
+  e.results[0].futureKey = "x";
+  e.futureTopLevel = true;
+  assert.deepEqual(parseEnrichResponse(e, "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"), before);
+});
+
 test("parseEnrichResponse maps per-contact errors and the async job", () => {
-  assert.equal(kindOf(() => parseEnrichResponse(fixture("enrich-failed.json"), "lusha-contact-111")), "enrich_failed");
-  assert.equal(kindOf(() => parseEnrichResponse(fixture("enrich-compliance-restricted.json"), "lusha-contact-111")), "compliance_restricted");
-  assert.equal(kindOf(() => parseEnrichResponse(fixture("enrich-async-job.json"), "lusha-contact-111")), "async_unsupported");
+  assert.equal(kindOf(() => parseEnrichResponse(fixture("unverified-enrich-failed.json"), "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA")), "enrich_failed");
+  assert.equal(kindOf(() => parseEnrichResponse(fixture("unverified-enrich-compliance-restricted.json"), "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA")), "compliance_restricted");
+  assert.equal(kindOf(() => parseEnrichResponse(fixture("unverified-enrich-async-job.json"), "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA")), "async_unsupported");
 });
 
 test("pickEmail prefers work, then highest confidence, never blindly element zero", () => {
-  const raw = fixture("enrich-emails.json").results[0].emails;
+  const raw = fixture("unverified-enrich-emails.json").results[0].emails;
   const out = pickEmail(raw);
   assert.deepEqual(out, { ok: true, value: "redacted-work@example.invalid", type: "work", raw });
   const first = pickEmail([{ email: "a@x.invalid" }, { email: "b@x.invalid" }]);

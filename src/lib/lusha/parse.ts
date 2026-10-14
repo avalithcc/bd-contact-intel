@@ -16,8 +16,8 @@ export interface LushaIdentity {
 }
 
 export type SearchOutcome =
-  | { outcome: "matched"; lushaId: string; identity: LushaIdentity; canReveal: CanRevealEntry[] }
-  | { outcome: "no_match" };
+  | { outcome: "matched"; lushaId: string; identity: LushaIdentity; canReveal: CanRevealEntry[]; lowBalance: boolean | null }
+  | { outcome: "no_match"; lowBalance: boolean | null };
 
 export interface EnrichOutcome {
   emails: unknown[];
@@ -26,7 +26,14 @@ export interface EnrichOutcome {
   creditsCharged: number | null;
   /** status "partial" (e.g. WATERFALL_NOT_IN_PLAN): a no-value outcome, not an error. */
   partial: boolean;
+  /** Top-level status/statusReason (e.g. WATERFALL_NOT_IN_PLAN); informational only. */
+  statusReason: string | null;
+  /** billing.lowBalance: Lusha itself says the balance is low. */
+  lowBalance: boolean | null;
 }
+
+const lowBalanceOf = (body: Record<string, unknown>): boolean | null =>
+  isRecord(body.billing) && typeof body.billing.lowBalance === "boolean" ? body.billing.lowBalance : null;
 
 function assertNotAsync(body: Record<string, unknown>): void {
   if ("job" in body || "jobId" in body) throw new LushaError("async_unsupported");
@@ -45,14 +52,21 @@ export function matchByClientReferenceId(results: unknown, clientReferenceId: st
   return null;
 }
 
+/** Real results carry firstName/lastName (enrich also fullName); older shapes a single name. */
+function personName(entry: Record<string, unknown>): string | null {
+  const full = [str(entry.firstName), str(entry.lastName)].filter(Boolean).join(" ");
+  return full || str(entry.fullName) || str(entry.name);
+}
+
 export function parseSearchResponse(body: unknown, clientReferenceId: string): SearchOutcome {
   if (!isRecord(body)) throw new LushaError("unavailable", "unreadable search response");
   assertNotAsync(body);
+  const lowBalance = lowBalanceOf(body);
   const entry = matchByClientReferenceId(body.results, clientReferenceId);
-  if (!entry) return { outcome: "no_match" };
+  if (!entry) return { outcome: "no_match", lowBalance };
   throwOnContactError(entry);
   const lushaId = str(entry.id);
-  if (!lushaId) return { outcome: "no_match" };
+  if (!lushaId) return { outcome: "no_match", lowBalance };
   const company = isRecord(entry.company) ? entry.company : {};
   const social = isRecord(entry.socialLinks) ? entry.socialLinks : {};
   const canReveal: CanRevealEntry[] = [];
@@ -64,8 +78,9 @@ export function parseSearchResponse(body: unknown, clientReferenceId: string): S
   return {
     outcome: "matched",
     lushaId,
-    identity: { name: str(entry.name), company: str(company.name), domain: str(company.domain), linkedin: str(social.linkedin) },
+    identity: { name: personName(entry), company: str(company.name), domain: str(company.domain), linkedin: str(social.linkedin) },
     canReveal,
+    lowBalance,
   };
 }
 
@@ -80,6 +95,8 @@ export function parseEnrichResponse(body: unknown, lushaId: string): EnrichOutco
     phones: isRecord(entry) && Array.isArray(entry.phones) ? entry.phones : [],
     creditsCharged: typeof billed === "number" && Number.isSafeInteger(billed) && billed >= 0 ? billed : null,
     partial: body.status === "partial",
+    statusReason: str(body.statusReason),
+    lowBalance: lowBalanceOf(body),
   };
 }
 

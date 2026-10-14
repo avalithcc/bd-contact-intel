@@ -3,7 +3,7 @@
   "requestId": "req-synthetic-0009",
   "results": [
     {
-      "id": "lusha-contact-111",
+      "id": "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA",
       "emails": [],
       "phones": [
         { "number": "+10000000001", "type": "work", "confidence": 50 },

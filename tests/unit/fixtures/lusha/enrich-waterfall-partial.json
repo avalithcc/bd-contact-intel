@@ -1,9 +1,20 @@
 {
-  "requestId": "req-redacted-0005",
-  "status": "partial",
-  "statusReason": "WATERFALL_NOT_IN_PLAN",
+  "requestId": "00000000-0000-4000-8000-000000000002",
   "results": [
-    { "id": "lusha-contact-111", "emails": [], "phones": [] }
+    {
+      "id": "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA",
+      "firstName": "Example",
+      "lastName": "Person",
+      "fullName": "Example Person",
+      "linkedinConnections": 3404,
+      "linkedinFollowers": 3420,
+      "partialProfile": true,
+      "location": { "country": "Argentina", "countryIso2": "AR", "continent": "South America", "isEuContact": false },
+      "socialLinks": { "linkedin": "https://www.linkedin.com/in/example-person" }
+    }
   ],
-  "billing": { "creditsCharged": 0, "resultsReturned": 0 }
+  "billing": { "creditsCharged": 0, "resultsReturned": 1, "lowBalance": false },
+  "status": "partial",
+  "statusDescription": "Some data points are missing. Data Waterfall fills missing emails and phones from additional providers. It's not on your plan.",
+  "statusReason": "WATERFALL_NOT_IN_PLAN"
 }

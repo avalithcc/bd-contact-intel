@@ -1,0 +1,17 @@
+{
+  "_note": "UNVERIFIED: this response shape was never observed in a real Lusha call; reconstructed from documentation/brief. Replace once observed.",
+  "requestId": "00000000-0000-4000-8000-00000000010002",
+  "results": [
+    {
+      "clientReferenceId": "person-aaa",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "Contact not found"
+      }
+    }
+  ],
+  "billing": {
+    "creditsCharged": 0,
+    "resultsReturned": 0
+  }
+}

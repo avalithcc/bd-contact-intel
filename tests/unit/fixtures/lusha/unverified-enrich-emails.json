@@ -1,0 +1,31 @@
+{
+  "_note": "UNVERIFIED: this response shape was never observed in a real Lusha call; reconstructed from documentation/brief. Replace once observed.",
+  "requestId": "00000000-0000-4000-8000-00000000010004",
+  "results": [
+    {
+      "id": "v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA",
+      "emails": [
+        {
+          "email": "redacted-personal@example.invalid",
+          "type": "personal",
+          "confidence": 90
+        },
+        {
+          "email": "redacted-work-low@example.invalid",
+          "type": "work",
+          "confidence": 40
+        },
+        {
+          "email": "redacted-work@example.invalid",
+          "type": "work",
+          "confidence": 80
+        }
+      ],
+      "phones": []
+    }
+  ],
+  "billing": {
+    "creditsCharged": 1,
+    "resultsReturned": 1
+  }
+}

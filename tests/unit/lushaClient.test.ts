@@ -35,7 +35,7 @@ test("searchContact posts the contact with clientReferenceId = personId and the 
     contacts: [{ clientReferenceId: "person-aaa", firstName: "Ada", lastName: "Lovelace", companyDomain: "example.com", linkedinUrl: "https://www.linkedin.com/in/ada" }],
   });
   assert.ok(calls[0].init.signal instanceof AbortSignal);
-  assert.equal((res.body as any).requestId, "req-redacted-0001");
+  assert.equal((res.body as any).requestId, "00000000-0000-4000-8000-000000000001");
 });
 
 test("rate-limit headers are surfaced", async () => {
@@ -47,24 +47,24 @@ test("rate-limit headers are surfaced", async () => {
 
 test("an email reveal always sends reveal:[\"emails\"] and a phone reveal [\"phones\"], never both or none", async () => {
   for (const field of ["emails", "phones"] as const) {
-    const { fn, calls } = fakeFetch(() => json(fixture("enrich-emails.json")));
-    await enrichContact(KEY, fn, ["lusha-contact-111"], field);
+    const { fn, calls } = fakeFetch(() => json(fixture("unverified-enrich-emails.json")));
+    await enrichContact(KEY, fn, ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"], field);
     assert.equal(calls[0].url, "https://api.lusha.com/v3/contacts/enrich");
-    assert.deepEqual(JSON.parse(String(calls[0].init.body)), { ids: ["lusha-contact-111"], reveal: [field] });
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), { ids: ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"], reveal: [field] });
   }
 });
 
 test("reveal is a required parameter: omitting it is a type error and a runtime refusal", async () => {
   const { fn, calls } = fakeFetch(() => json("{}"));
   // @ts-expect-error reveal is required (omitting it makes Lusha return both fields and spend 5 extra credits)
-  const attempt = enrichContact(KEY, fn, ["lusha-contact-111"]);
+  const attempt = enrichContact(KEY, fn, ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"]);
   await assert.rejects(attempt, (e: unknown) => e instanceof LushaError);
   assert.equal(calls.length, 0, "nothing is sent without an explicit field");
 });
 
 for (const status of [401, 402, 403, 429, 451, 500, 503]) {
   test(`HTTP ${status} is called exactly once (no retry) and carries its status`, async () => {
-    const { fn, calls } = fakeFetch(() => json(fixture("http-451.json"), status));
+    const { fn, calls } = fakeFetch(() => json(fixture("unverified-http-451.json"), status));
     await assert.rejects(enrichContact(KEY, fn, ["id"], "emails"), (e: unknown) => {
       assert.ok(e instanceof LushaError);
       assert.equal(e.httpStatus, status);
