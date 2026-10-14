@@ -24,6 +24,7 @@ const LEGAL: [MemberState, MemberState, MemberTrigger][] = [
   ["approved", "discarded", "opt_out"],
   ["sent", "discarded", "opt_out"],
   ["no_reply", "discarded", "opt_out"],
+  ["replied", "discarded", "opt_out"],
 ];
 
 test("every transition in the sequence-approval table is allowed", () => {
@@ -78,4 +79,16 @@ test("re-admitting a BD discard is allowed", () => {
 test("assertTransition throws on an illegal transition instead of ignoring it", () => {
   assert.throws(() => assertTransition("sent", "approved", "approve"), /sent -> approved/);
   assert.doesNotThrow(() => assertTransition("drafted", "approved", "approve"));
+});
+
+test("opt_out reaches a replied member so a warm lead cannot be emailed by hand after an unsubscribe", () => {
+  assert.equal(canTransition("replied", "discarded", "opt_out"), true);
+});
+
+test("opt_out is rejected from discarded and cannot target any other state", () => {
+  assert.equal(canTransition("discarded", "discarded", "opt_out"), false);
+  for (const to of MEMBER_STATES) {
+    if (to === "discarded") continue;
+    assert.equal(canTransition("replied", to, "opt_out"), false, `replied -> ${to}`);
+  }
 });
