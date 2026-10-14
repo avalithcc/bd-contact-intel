@@ -87,6 +87,7 @@ export async function getCohortDrilldown(params: CohortDrilldownParams): Promise
       companyName: r.company_name,
       ownerBdName: r.owner_bd_name,
       status: r.status,
+      roleGroup: r.role_group,
       createdAt: r.created_at,
       replyAt: r.reply_at,
       sequenceId: r.sequence_id,

@@ -35,6 +35,23 @@ export function cohortHasReplyColumns(population: CohortPopulation): boolean {
   return population !== "contacted" && population !== "new";
 }
 
+/** Only the "new" list shows the role column (the reply lists already carry seven columns). */
+export function cohortHasRoleColumn(population: CohortPopulation): boolean {
+  return population === "new";
+}
+
+export type RoleGroupCell = { kind: "group"; label: string } | { kind: "unclassified" };
+
+/**
+ * "Grupo de rol" cell. NULL (nobody classified the person yet) and an unknown
+ * key are "unclassified"; `no_position` is a real classification ("Sin cargo")
+ * and renders its own label. The raw key is never shown.
+ */
+export function roleGroupCell(roleGroup: string | null, labels: Readonly<Record<string, string>>): RoleGroupCell {
+  if (roleGroup === null || !Object.prototype.hasOwnProperty.call(labels, roleGroup)) return { kind: "unclassified" };
+  return { kind: "group", label: labels[roleGroup]! };
+}
+
 /** The funnel number the list must equal. */
 export function cohortCount(funnel: FunnelCounts, population: CohortPopulation): number {
   return population === "new" ? funnel.newTotal : population === "contacted" ? funnel.contactedOrMore : population === "replied" ? funnel.repliedOrMore : funnel.meeting;
@@ -52,6 +69,7 @@ export interface CohortRawRow {
   companyName: string | null;
   ownerBdName: string | null;
   status: string;
+  roleGroup: string | null;
   createdAt: Date | string;
   replyAt: Date | string | null;
   sequenceId: string | null;
@@ -64,6 +82,8 @@ export interface CohortRow {
   companyName: string | null;
   ownerBdName: string | null;
   status: string;
+  /** `person.role_group`; `null` = not classified yet (distinct from `no_position`). */
+  roleGroup: string | null;
   createdAt: Date;
   /** `null` for a contact moved to Respondió by hand (no reply event). */
   replyAt: Date | null;
@@ -79,6 +99,7 @@ export function buildCohortDrilldownRows(rows: readonly CohortRawRow[]): CohortR
     companyName: r.companyName,
     ownerBdName: r.ownerBdName,
     status: r.status,
+    roleGroup: r.roleGroup,
     createdAt: parseDbTimestamp(r.createdAt),
     replyAt: r.replyAt === null ? null : parseDbTimestamp(r.replyAt),
     sequenceId: r.sequenceId,

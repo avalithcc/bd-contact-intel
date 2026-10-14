@@ -63,6 +63,9 @@ const cohortLabels: CohortDrilldownLabels = {
   cohortColContact: dict.cohortColContact,
   cohortColCompany: dict.cohortColCompany,
   cohortColBd: dict.cohortColBd,
+  cohortColRoleGroup: dict.cohortColRoleGroup,
+  cohortRoleUnclassified: dict.cohortRoleUnclassified,
+  cohortRoleUnclassifiedHint: dict.cohortRoleUnclassifiedHint,
   cohortColStatus: dict.cohortColStatus,
   cohortColCreated: dict.cohortColCreated,
   cohortColReplyAt: dict.cohortColReplyAt,
@@ -77,6 +80,7 @@ const cohortLabels: CohortDrilldownLabels = {
   dialogTruncated: dict.dialogTruncated,
   numberLocale: dict.numberLocale,
   leadStatuses: es.leadStatuses,
+  roleGroups: es.roleGroups,
 };
 
 const SOURCE_LABEL: Record<SourceBucket, string> = {

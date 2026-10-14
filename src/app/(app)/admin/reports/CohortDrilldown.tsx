@@ -7,7 +7,7 @@ import { ChevronRightIcon } from "@/components/icons";
 import { KpiDrilldownCard, DrilldownDialog, useDrilldown } from "./KpiDrilldownCard";
 import { getCohortDrilldownAction } from "./actions";
 import { drilldownCacheKey } from "@/lib/reports/drilldownCacheKey";
-import { cohortHasReplyColumns, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
+import { cohortHasReplyColumns, cohortHasRoleColumn, roleGroupCell, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -25,6 +25,9 @@ export type CohortDrilldownLabels = ClientStrings<
     | "cohortColContact"
     | "cohortColCompany"
     | "cohortColBd"
+    | "cohortColRoleGroup"
+    | "cohortRoleUnclassified"
+    | "cohortRoleUnclassifiedHint"
     | "cohortColStatus"
     | "cohortColCreated"
     | "cohortColReplyAt"
@@ -39,7 +42,7 @@ export type CohortDrilldownLabels = ClientStrings<
     | "dialogTruncated"
     | "numberLocale"
   >
-> & { leadStatuses: Dictionary["leadStatuses"] };
+> & { leadStatuses: Dictionary["leadStatuses"]; roleGroups: Dictionary["roleGroups"] };
 
 interface CohortQuery {
   population: CohortPopulation;
@@ -67,14 +70,27 @@ function CohortSubtitle({ summary, note }: { summary: string; note: string }) {
 
 const dash = <span className="meta">—</span>;
 
+/** Unclassified (NULL) is a muted badge, same as the outreach list's unclassified startup badge. */
+function roleCell(roleGroup: string | null, l: CohortDrilldownLabels) {
+  const cell = roleGroupCell(roleGroup, l.roleGroups);
+  if (cell.kind === "group") return cell.label;
+  return (
+    <span className="badge badge-none" title={l.cohortRoleUnclassifiedHint}>
+      {l.cohortRoleUnclassified}
+    </span>
+  );
+}
+
 function CohortRowsTable({ population, rows, labels: l }: { population: CohortPopulation; rows: CohortRow[]; labels: CohortDrilldownLabels }) {
   if (rows.length === 0) return <p className="meta">{l[EMPTY_KEY[population]]}</p>;
   const withReply = cohortHasReplyColumns(population);
+  const withRole = cohortHasRoleColumn(population);
   return (
     <table className="data compact">
       <thead>
         <tr>
           <th>{l.cohortColContact}</th>
+          {withRole && <th>{l.cohortColRoleGroup}</th>}
           <th>{l.cohortColCompany}</th>
           <th>{l.cohortColBd}</th>
           <th>{l.cohortColStatus}</th>
@@ -89,6 +105,7 @@ function CohortRowsTable({ population, rows, labels: l }: { population: CohortPo
             <td>
               <Link href={`/contacts/${row.personId}`}>{row.personName}</Link>
             </td>
+            {withRole && <td>{roleCell(row.roleGroup, l)}</td>}
             <td>{row.companyName ?? "—"}</td>
             <td>{row.ownerBdName ?? "—"}</td>
             <td>

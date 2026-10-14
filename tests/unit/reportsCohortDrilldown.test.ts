@@ -14,6 +14,8 @@ import {
   cohortBase,
   cohortCount,
   cohortHasReplyColumns,
+  roleGroupCell,
+  cohortHasRoleColumn,
   isCohortPopulation,
   type CohortRawRow,
 } from "@/lib/reports/cohortDrilldown";
@@ -98,6 +100,7 @@ const RAW: CohortRawRow = {
   companyName: "Nubix Labs",
   ownerBdName: "Cristian Civita",
   status: "replied",
+  roleGroup: "c_level_tech",
   createdAt: "2026-10-02 12:00:00+00",
   replyAt: "2026-10-14 13:42:00+00",
   sequenceId: "s1",
@@ -173,4 +176,22 @@ test("cohortHeaderLines states the new-contacts population in words", () => {
     summary: "118 contactos nuevos · creados en octubre 2026 · en cualquier estado",
     note: "Estado actual de cada contacto, no la actividad del período.",
   });
+});
+
+test("roleGroupCell: a known group renders its label, NULL renders unclassified, no_position stays a real group", () => {
+  const groups = es.roleGroups;
+  assert.deepEqual(roleGroupCell("c_level_tech", groups), { kind: "group", label: groups.c_level_tech });
+  assert.deepEqual(roleGroupCell("no_position", groups), { kind: "group", label: groups.no_position });
+  assert.deepEqual(roleGroupCell(null, groups), { kind: "unclassified" });
+  assert.deepEqual(roleGroupCell("not_a_group", groups), { kind: "unclassified" }); // never the raw key
+});
+
+test("cohort rows carry role_group (NULL stays NULL) and only the new population shows the column", () => {
+  const [a, b] = buildCohortDrilldownRows([RAW, { ...RAW, personId: "p2", roleGroup: null }]);
+  assert.equal(a!.roleGroup, "c_level_tech");
+  assert.equal(b!.roleGroup, null);
+  assert.equal(cohortHasRoleColumn("new"), true);
+  for (const p of ["contacted", "replied", "meeting"] as const) assert.equal(cohortHasRoleColumn(p), false);
+  const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population: "new" })).sql);
+  assert.ok(q.includes("person.role_group as pbc_role_group"));
 });
