@@ -84,7 +84,7 @@ When a stored search exists, the control and dialog MUST use the stored per-fiel
 
 ### Requirement: A transient failure releases the claim; a definitive answer keeps it
 
-The system MUST claim the Contact and field in the ledger before calling Lusha. If the call fails transiently (429, 5xx, timeout, `ENRICH_FAILED`), the claim MUST be released so the BD can try again manually. A no-match MUST persist and MUST NOT be released. A compliance block (451 / `COMPLIANCE_RESTRICTED`) is the only permanent state: it MUST persist and MUST NOT be retried, including by "buscar de nuevo". A rejected match persists as a record but is not permanent.
+The system MUST claim the Contact and field in the ledger before calling Lusha. If the call fails transiently (429, 5xx, timeout, `ENRICH_FAILED`), the claim MUST be released so the BD can try again manually, while the credits reserved for that attempt MUST keep counting against the day's cap until the real charge is known — the cap sums `coalesce(credits_charged, credits_reserved)` — because Lusha may have billed an attempt whose outcome we never read. Releasing the claim and releasing the budget are different things, and over-counting the budget is the safe direction (design D8). A no-match MUST persist and MUST NOT be released. A compliance block (451 / `COMPLIANCE_RESTRICTED`) is the only permanent state: it MUST persist and MUST NOT be retried, including by "buscar de nuevo". A rejected match persists as a record but is not permanent.
 
 #### Scenario: Transient failure is retryable by the BD
 
