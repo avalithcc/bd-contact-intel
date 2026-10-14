@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opciones de baja · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+</head>
+<body>
+<div class="app">
+<div class="main">
+<main class="page">
+
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Comparación de las DOS opciones para cumplir el requisito de baja (cambio <span class="mono">outreach-sequences</span>, capacidad <span class="mono">sequence-compliance</span>). No es una pantalla de la app: es material de decisión. Muestra lo que ve <strong>el destinatario</strong>, que es donde las dos opciones se diferencian. Sin barra lateral, porque el destinatario no está logueado. Las páginas de baja reales viven dentro de <span class="mono">.auth</span> (centrado a pantalla completa, como el login); acá la <span class="mono">.auth-card</span> se muestra acotada para que las dos opciones entren en un scroll. El cuerpo de los correos está <strong>en inglés</strong> a propósito: todos los destinatarios son de Estados Unidos.</div><span class="tag tag-scope">En alcance: outreach-sequences</span></div>
+
+<div class="page-header"><div class="titles"><div class="eyebrow">Decisión pendiente</div><h1>cómo se da de baja alguien<span class="dot">.</span></h1>
+<p class="meta">CAN-SPAM exige dos cosas en todo correo comercial: una <strong>dirección postal física real</strong> y un <strong>mecanismo de baja que funcione</strong>, respetado dentro de 10 días hábiles. La dirección <strong>no tiene que ser de Estados Unidos</strong> — la ley pide la dirección del remitente, y la de Mar del Plata cumple. Lo que sigue abierto es el mecanismo.</p></div></div>
+
+<div class="alert alert-warn"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4M12 17h.01"/></svg><div><span class="title">La tabla de supresión va en las dos opciones.</span> No es un diferencial. Una baja por respuesta también hay que registrarla y respetarla, o no cumplís. Lo único que agrega la Opción B es el token, la ruta pública y la página.</div></div>
+
+<h2 class="mt-2xl mb-lg">Opción A · baja por respuesta</h2>
+
+<h3 class="mb-lg">1. Lo que recibe el destinatario</h3>
+<div class="card mb-lg">
+<div class="card-header"><div class="stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><strong>senior engineers for your open platform role</strong></div>
+<div class="meta">de <span class="mono">cristian@avalith.net</span> &middot; para <span class="mono">brian.casteel@upshop.com</span></div>
+</div><span class="badge badge-neutral no-dot">como lo ve en Gmail</span></div>
+<div class="card-body">
+<p>Hi Brian,</p>
+<p class="mt-md">I saw Upshop has an open platform engineering role in the Tampa area. We run into the same thing with retail-tech teams: the roadmap does not wait for a search to close.</p>
+<p class="mt-md">I am with Avalith — we place pre-vetted senior engineers inside existing teams within days, in US-aligned timezones. This is meant to complement your own hiring, not replace it.</p>
+<p class="mt-md">Worth 20 minutes to see if it fits?</p>
+<p class="mt-md">Cristian Civita</p>
+<hr class="hr">
+<p class="small soft">Avalith &middot; Bolívar 2975, B7600 Mar del Plata, Buenos Aires, Argentina<br>
+Don't want to hear from me again? Just reply <strong>STOP</strong> and I'll take you off my list.</p>
+</div></div>
+
+<h3 class="mb-lg">2. El botón nativo de Gmail</h3>
+<p class="meta mb-lg">El header <span class="mono">List-Unsubscribe: &lt;mailto:...&gt;</span> hace que Gmail muestre su propio enlace de baja al lado del remitente. <strong>Eso no lo dibujamos nosotros</strong> — es chrome de Gmail. La aproximación de abajo es sólo para que veas dónde aparece.</p>
+<div class="card mb-lg"><div class="card-body">
+<div class="row wrap" style="gap:.5rem"><span class="avatar a5">CC</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><strong>Cristian Civita</strong><span class="meta">&lt;cristian@avalith.net&gt;</span><span class="badge badge-info no-dot">Cancelar suscripción</span></div>
+<div class="meta">para mí &middot; 14 oct 2026, 09:00</div>
+</div></div>
+<div class="alert alert-success mt-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg><div><span class="title">Esto es lo que vale.</span> Quien aprieta el botón nativo de Gmail <strong>no te denuncia como spam</strong>. A 15 correos por día sobre tu dominio real, una baja sale gratis y una denuncia te cuesta reputación de dominio.</div></div>
+</div></div>
+
+<h3 class="mb-lg">3. Lo que pasa después, sin que toques nada</h3>
+<div class="card mb-lg"><div class="card-body">
+<div class="assoc">
+<div class="assoc-row"><span class="badge badge-mono">1</span><span class="grow">Brian responde <span class="mono">STOP</span> (o Gmail abre el mailto y manda el correo por él)</span></div>
+<div class="assoc-row"><span class="badge badge-mono">2</span><span class="grow">El sync de Gmail ya lee las respuestas entrantes y la reconoce</span></div>
+<div class="assoc-row"><span class="badge badge-mono">3</span><span class="grow">Se inserta en <span class="mono">email_suppression</span> y la secuencia se detiene para él</span></div>
+<div class="assoc-row"><span class="badge badge-mono">4</span><span class="grow">Nunca más entra a un roster, en ninguna secuencia, de ningún BD</span></div>
+</div>
+<div class="alert alert-warn mt-lg"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div>El sync corre <strong>una vez por día</strong>, así que la baja puede tardar hasta 24 h en registrarse. CAN-SPAM da 10 días hábiles, así que cumple — pero no es instantáneo.</div></div>
+</div></div>
+
+<h3 class="mb-lg">4. Lo que hay que construir</h3>
+<div class="card mb-lg"><div class="card-body"><div class="assoc">
+<div class="assoc-row"><span class="badge badge-neutral no-dot">obligatoria igual</span><span class="grow">Tabla <span class="mono">email_suppression</span> + chequeo antes de cada envío</span></div>
+<div class="assoc-row"><span class="badge badge-success no-dot">1 línea</span><span class="grow">Dirección postal en la firma</span></div>
+<div class="assoc-row"><span class="badge badge-success no-dot">1 línea</span><span class="grow">Header <span class="mono">List-Unsubscribe: &lt;mailto:&gt;</span></span></div>
+<div class="assoc-row"><span class="badge badge-success no-dot">chica</span><span class="grow">Regla que detecta STOP / BAJA / UNSUBSCRIBE en la respuesta</span></div>
+<div class="assoc-row"><span class="badge badge-none">nada</span><span class="grow">Sin ruta pública, sin token, sin página</span></div>
+</div></div></div>
+
+<hr class="hr">
+
+<h2 class="mt-2xl mb-lg">Opción B · link con un clic</h2>
+
+<h3 class="mb-lg">1. El mismo correo, otro pie</h3>
+<div class="card mb-lg">
+<div class="card-header"><div class="stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><strong>senior engineers for your open platform role</strong></div>
+<div class="meta">de <span class="mono">cristian@avalith.net</span> &middot; para <span class="mono">brian.casteel@upshop.com</span></div>
+</div><span class="badge badge-neutral no-dot">como lo ve en Gmail</span></div>
+<div class="card-body">
+<p class="soft">[ …mismo cuerpo que en la Opción A… ]</p>
+<p class="mt-md">Cristian Civita</p>
+<hr class="hr">
+<p class="small soft">Avalith &middot; Bolívar 2975, B7600 Mar del Plata, Buenos Aires, Argentina<br>
+<a href="#confirmar">Unsubscribe</a> &middot; you won't hear from us again.</p>
+</div></div>
+
+<h3 class="mb-lg">2. Aprieta el link: página de confirmación</h3>
+<p class="meta mb-lg">Un <span class="mono">GET</span> que da de baja al instante es una trampa: los escáneres de seguridad corporativos abren todos los links de los correos entrantes y te darían de baja gente que nunca tocó nada. Por eso el <span class="mono">GET</span> sólo <strong>muestra</strong>, y el botón hace <span class="mono">POST</span>. Los escáneres no hacen POST.</p>
+<div class="card auth-card mb-lg" id="confirmar"><div class="card-body">
+<div class="auth-brand"><span class="logo">avalith<span class="dot">.</span></span></div>
+<h3 class="center">Unsubscribe?</h3>
+<p class="meta center mt-md">We'll stop emailing <span class="mono">brian.casteel@upshop.com</span> about engineering capacity. This takes effect right away.</p>
+<form class="form-actions mt-xl"><button class="btn btn-primary btn-block" type="button">Yes, unsubscribe me</button></form>
+<p class="help center mt-md">Avalith &middot; Bolívar 2975, Mar del Plata, Argentina</p>
+</div></div>
+
+<h3 class="mb-lg">3. Listo</h3>
+<div class="card auth-card mb-lg"><div class="card-body">
+<div class="auth-brand"><span class="logo">avalith<span class="dot">.</span></span></div>
+<div class="empty"><div class="empty-icon"><svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg></div>
+<h3>You're unsubscribed</h3><p>We won't email <span class="mono">brian.casteel@upshop.com</span> again. Nothing else is needed from you.</p></div>
+<p class="help center">Avalith &middot; Bolívar 2975, Mar del Plata, Argentina</p>
+</div></div>
+
+<h3 class="mb-lg">4. Lo que hay que construir</h3>
+<div class="card mb-lg"><div class="card-body"><div class="assoc">
+<div class="assoc-row"><span class="badge badge-neutral no-dot">obligatoria igual</span><span class="grow">Tabla <span class="mono">email_suppression</span> + chequeo antes de cada envío</span></div>
+<div class="assoc-row"><span class="badge badge-success no-dot">1 línea</span><span class="grow">Dirección postal en la firma</span></div>
+<div class="assoc-row"><span class="badge badge-warn no-dot">nuevo</span><span class="grow">Token firmado por destinatario (HMAC), que no se pueda falsificar</span></div>
+<div class="assoc-row"><span class="badge badge-warn no-dot">nuevo</span><span class="grow">Ruta pública <span class="mono">/api/unsubscribe</span>, excluida del gate de sesión de Supabase</span></div>
+<div class="assoc-row"><span class="badge badge-warn no-dot">nuevo</span><span class="grow">Dos pantallas públicas: confirmación y listo</span></div>
+<div class="assoc-row"><span class="badge badge-info no-dot">a favor</span><span class="grow">La baja es <strong>instantánea</strong>, no espera al sync diario</span></div>
+</div></div></div>
+
+<hr class="hr">
+
+<h2 class="mt-2xl mb-lg">Lo que ve el BD en el CRM — igual en las dos</h2>
+<p class="meta mb-lg">El contacto queda marcado y sale del roster. Reutiliza <span class="mono">badge-discarded</span>, que ya significa esto en el resto del CRM.</p>
+<div class="card mb-lg"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">BC</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Brian Casteel</a><span class="badge badge-discarded">Pidió la baja</span></div>
+<div class="headline">VP of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Upshop</a></div>
+<div class="meta">Baja registrada el 15/10 &middot; no vuelve a entrar a ninguna secuencia, de ningún BD</div>
+</div></div></div>
+
+<h2 class="mt-2xl mb-lg">La decisión, en una línea</h2>
+<div class="card"><div class="card-body"><div class="assoc">
+<div class="assoc-row"><span class="badge badge-brand no-dot">A</span><span class="grow">Más barata, sin superficie pública nueva, y te da el botón nativo de Gmail. La baja tarda hasta 24 h.</span></div>
+<div class="assoc-row"><span class="badge badge-brand no-dot">B</span><span class="grow">Baja instantánea y experiencia más prolija, a cambio de un token, una ruta pública y dos pantallas que hay que mantener.</span></div>
+</div>
+<p class="help mt-lg">Las dos cumplen CAN-SPAM. La Opción B se puede agregar <strong>encima</strong> de la A más adelante sin migrar nada, porque la tabla de supresión y la firma son las mismas.</p>
+</div></div>
+
+</main>
+</div></div>
+</body>
+</html>
