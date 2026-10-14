@@ -186,10 +186,11 @@ Owner decision 2026-10-14: the address is **not a scalar — it is selected by t
 
 `AVALITH CORPORATION` is a live Florida entity, document number `P18000083350`, status Active, whose registered-agent, principal and mailing addresses are all the Hallandale one.
 
-**Two open items that MUST be closed before the first real send:**
+The suite letter `Ste G` was **confirmed by the owner on 2026-10-14** against the primary Florida record (`search.sunbiz.org`, document `P18000083350`). Commercial aggregators (ZoomInfo, Datanyze) report `Ste K`; they are wrong and MUST NOT be used as a source for this field.
 
-1. **The suite letter is unconfirmed.** OpenCorporates reports `Ste G`; commercial aggregators (ZoomInfo, Datanyze) report `Ste K`. For a mandatory legal field the primary source governs — verify "Avalith Corporation" on `search.sunbiz.org` and use whatever that record says. Automated fetching of Sunbiz returns HTTP 403, so a human must do this.
-2. **The `other` market bucket has no address assigned.** `classifyMarket` returns `latam` | `us` | `other`, and a sequence member whose market resolves to `other` has no entry in the table above. The system MUST refuse to send rather than silently pick one — a wrong country's address is still a compliance failure.
+**One open item remains:**
+
+- **The `other` market bucket has no address assigned.** `classifyMarket` returns `latam` | `us` | `other`, and a sequence member whose market resolves to `other` has no entry in the table above. The system MUST refuse to send rather than silently pick one — a wrong country's address is still a compliance failure.
 
 #### Scenario: US recipient gets the Florida address
 
