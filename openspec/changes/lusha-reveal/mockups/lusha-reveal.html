@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ficha de contacto · revelar con Lusha · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions. NOT in crm-hubspot-ux/mockups/styles.css. */
+
+/* Mockup-only scaffolding: simulates the overlay behind a static dialog (same as reports-kpi-drilldown). */
+.stage { background: var(--color-overlay); border-radius: var(--radius-md); padding: var(--space-2xl); display: flex; justify-content: center; align-items: flex-start; }
+.stage .dialog { max-height: none; max-width: 100%; }
+.captions { margin-top: var(--space-sm); }
+.captions > div { display: flex; align-items: center; gap: var(--space-2xs); font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.captions { display: flex; flex-direction: column; gap: var(--space-2xs); }
+
+/* Mockup-only: the Contact record's left pane (320px) next to the dialog or notes. */
+.case { display: grid; grid-template-columns: calc(var(--record-left) + 2px) minmax(0, 1fr); gap: var(--space-xl); align-items: start; }
+.pane { border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.case-side > * + * { margin-top: 0; }
+
+/* Table cells in these dialogs: wrapping text, row headers styled like data cells. */
+.dialog table.data th[scope="row"] { text-align: left; font-weight: 600; color: var(--color-ink-soft); font-size: var(--text-sm); }
+.dialog table.data td.mono { overflow-wrap: anywhere; }
+.dialog table.data th, .dialog table.data td { padding-left: var(--space-sm); padding-right: var(--space-sm); }
+.dialog table.data td.num { text-align: right; white-space: nowrap; }
+
+/* Exists in the app (globals.css) but not in the mockup stylesheet. */
+.mb-md { margin-bottom: var(--space-md); }
+
+/* Header: the Lusha badge sits right after the title, the close button stays on the right. */
+.dialog-header .badge { margin-left: var(--space-2xs); }
+</style>
+</head>
+<body>
+<main class="page" style="max-width:1200px;margin:0 auto">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Panel «Sobre este contacto» de la ficha con la acción de revelar de Lusha. Solo escritorio. Las cifras (12 créditos al día, 1 de búsqueda, 1 de correo, 5 de teléfono) salen de la especificación; los saldos de los ejemplos son ilustrativos pero consistentes. <a href="README.md">README</a></div><span class="tag tag-scope">En alcance: lusha-reveal</span></div>
+<div class="page-header"><div class="titles"><div class="eyebrow">Ficha de contacto</div><h1>revelar con lusha<span class="dot">.</span></h1>
+<p class="meta">Cada compra es de un solo campo en un solo contacto, se confirma antes de cobrar y deja la insignia «Lusha» junto al valor.</p></div>
+<div class="actions"><span class="badge badge-neutral no-dot">Solo producción</span></div></div>
+<section aria-labelledby="s1">
+<h2 class="mt-2xl mb-lg" id="s1">1 · Ficha, correo y teléfono vacíos, con la oferta de Lusha</h2>
+<p class="meta mb-lg">Contacto sin correo alcanzable. Las dos filas ofrecen su propia compra, a precios distintos. Sin búsqueda previa, el precio que se muestra incluye la búsqueda (1 crédito, una vez por contacto).</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Buscar correo · ~2 créditos</button></dd><dd class="hint">Gasta créditos reales de Lusha: 1 de búsqueda y 1 del correo. Se confirma antes de cobrar.</dd></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Buscar teléfono · ~6 créditos</button></dd><dd class="hint">Gasta créditos reales de Lusha: 1 de búsqueda y 5 del teléfono. Se confirma antes de cobrar.</dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Qué mirar.</strong> El botón es el mismo <span class="mono">btn-secondary btn-sm</span> del resto de la ficha y lleva la insignia «Lusha» antes del texto. El precio está en el propio botón y es distinto en cada fila (~2 y ~6). La línea de ayuda repite que se gastan créditos reales y que se confirma antes de cobrar. El botón ocupa el lugar del lápiz de edición, pero siempre visible: el lápiz solo aparece al pasar el cursor.</div></div>
+<div class="mock-note mt-md" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Teléfono.</strong> Un solo control en la fila «Teléfono»; la fila «Móvil» no lleva botón. Lusha decide la columna destino al revelar (mobile → Móvil, otro tipo → Teléfono), ver README.</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> botón con insignia «Lusha» y precio en cada fila</div><div><span class="tag tag-restyle">Ya existe</span> filas <span class="mono">.prop</span>, <span class="mono">.hint</span>, <span class="mono">.edit</span></div></div>
+</section>
+<section aria-labelledby="s2">
+<h2 class="mt-2xl mb-lg" id="s2">2 · Diálogo 1 · costo, antes de llamar a Lusha</h2>
+<p class="meta mb-lg">Se abre desde «Buscar correo» (arriba) o «Buscar teléfono» (abajo). Cada campo tiene su propio diálogo: confirmar uno no autoriza el otro. El único cobro inmediato es la búsqueda (botón primario: 1 crédito); el total esperado va en la tabla. Cerrar o Cancelar no gasta nada.</p>
+<div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-cost-email">
+<div class="dialog-header"><h2 id="dlg-cost-email">Buscar correo en Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><p>Esta acción <strong>gasta créditos reales</strong> de la cuenta de Lusha, compartida por todo el equipo. No se llama a Lusha hasta confirmar.</p>
+<table class="data compact"><thead><tr><th>Concepto</th><th class="num">Créditos</th><th>Cuándo se cobra</th></tr></thead><tbody>
+<tr><td>Búsqueda del contacto</td><td class="num">1</td><td>Al confirmar. Se paga una sola vez por contacto y puede no encontrar nada.</td></tr>
+<tr><td>Correo electrónico</td><td class="num">1</td><td>Después, y solo si se confirma que es la persona correcta.</td></tr>
+<tr><td><strong>Total esperado</strong></td><td class="num"><strong>hasta 2</strong></td><td></td></tr>
+</tbody></table>
+<p class="meta">Hoy quedan 7 de 12 créditos del equipo.</p></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Buscar · 1 crédito</button></div>
+</div></div><div class="mt-xl"></div><div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-cost-phone">
+<div class="dialog-header"><h2 id="dlg-cost-phone">Buscar teléfono en Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><p>Esta acción <strong>gasta créditos reales</strong> de la cuenta de Lusha, compartida por todo el equipo. No se llama a Lusha hasta confirmar.</p>
+<table class="data compact"><thead><tr><th>Concepto</th><th class="num">Créditos</th><th>Cuándo se cobra</th></tr></thead><tbody>
+<tr><td>Búsqueda del contacto</td><td class="num">1</td><td>Al confirmar. Se paga una sola vez por contacto y puede no encontrar nada.</td></tr>
+<tr><td>Teléfono</td><td class="num">5</td><td>Después, y solo si se confirma que es la persona correcta.</td></tr>
+<tr><td><strong>Total esperado</strong></td><td class="num"><strong>hasta 6</strong></td><td></td></tr>
+</tbody></table>
+<p class="meta">Hoy quedan 7 de 12 créditos del equipo.</p></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Buscar · 1 crédito</button></div>
+</div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> contenido del diálogo</div><div><span class="tag tag-restyle">Ya existe</span> <span class="mono">.dialog</span>, <span class="mono">table.data.compact</span>, <span class="mono">.btn-primary</span>, <span class="mono">.badge-outline</span></div></div>
+</section>
+<section aria-labelledby="s3">
+<h2 class="mt-2xl mb-lg" id="s3">3 · Diálogo 2 · identidad encontrada, antes de cobrar el correo</h2>
+<p class="meta mb-lg">Aparece al terminar la búsqueda y antes de cobrar el correo. Es el caso real de la sonda: el CRM tiene <span class="mono">Aument / aument.io</span> y Lusha devolvió <span class="mono">Aumenta GT / www.aumenta.do</span>, con otro slug de LinkedIn. Los valores se muestran tal cual y una columna neutra marca «Distinto» cuando la comparación simple (minúsculas, sin <span class="mono">www.</span>) no coincide. Es una diferencia, no un juicio de quién tiene razón. Cancelar deja la búsqueda guardada: la ficha de la izquierda ofrece «Revelar» sin pagar la búsqueda otra vez.</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a2">JM</span>
+<div><h1>Julián Marchetti</h1><p class="headline">Director de Tecnología en <a href="../../crm-hubspot-ux/mockups/company-record.html">Aument</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Revelar correo · 1 crédito</button></dd><dd class="hint">Búsqueda ya pagada. Falta confirmar la identidad de Lusha.</dd></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Revelar teléfono · 5 créditos</button></dd><dd class="hint">Búsqueda ya pagada. Falta confirmar la identidad de Lusha.</dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>Director de Tecnología<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="stage"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="dlg-identity">
+<div class="dialog-header"><h2 id="dlg-identity">Confirmar la identidad de Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><div class="alert alert-warn" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">Revisar antes de gastar el crédito del correo</div>Lusha devolvió una coincidencia. Si no es la misma persona, rechazarla: no se cobra el correo.</div></div>
+<table class="data compact"><thead><tr><th scope="col"><span class="sr-only">Dato</span></th><th scope="col">En el CRM</th><th scope="col">Coincidencia de Lusha</th><th scope="col">Comparación</th></tr></thead><tbody><tr><th scope="row">Nombre</th><td>Julián Marchetti</td><td>Julian Marchetti</td><td><span class="badge badge-neutral no-dot">Distinto</span></td></tr><tr><th scope="row">Empresa</th><td>Aument</td><td>Aumenta GT</td><td><span class="badge badge-neutral no-dot">Distinto</span></td></tr><tr><th scope="row">Dominio</th><td class="mono">aument.io</td><td class="mono">www.aumenta.do</td><td><span class="badge badge-neutral no-dot">Distinto</span></td></tr><tr><th scope="row">LinkedIn</th><td class="mono"><a href="#">linkedin.com/in/julian-marchetti-aument</a></td><td class="mono"><a href="#">linkedin.com/in/jmarchetti-gt</a></td><td><span class="badge badge-neutral no-dot">Distinto</span></td></tr></tbody></table>
+<div>
+<p>Revelar el correo cuesta <strong>1 crédito</strong>. La búsqueda de 1 crédito ya se cobró y no se vuelve a cobrar.</p>
+<p class="meta mt-md">Hoy quedan 6 de 12 créditos del equipo.<br>Saldo de la cuenta de Lusha: 37 créditos (puede estar desactualizado).</p>
+</div></div>
+<div class="dialog-footer"><button type="button" class="btn btn-ghost left">Cancelar</button><button type="button" class="btn btn-secondary">No es mi contacto</button><button type="button" class="btn btn-primary">Revelar correo · 1 crédito</button></div>
+</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> comparación CRM / Lusha</div><div><span class="tag tag-restyle">Ya existe</span> <span class="mono">.alert-warn</span>, <span class="mono">table.data.compact</span></div><div><span class="tag tag-scope">Nuevo</span> tres botones en el pie: Cancelar (izquierda), «No es mi contacto» (secundario), acción primaria (único que gasta)</div></div>
+</section>
+<section aria-labelledby="s4">
+<h2 class="mt-2xl mb-lg" id="s4">4 · Valor revelado con la insignia «Lusha»</h2>
+<p class="meta mb-lg">Arriba: correo ya revelado y teléfono con precio 5 (la búsqueda ya está pagada), con su diálogo de confirmación de precio y la identidad guardada solo como referencia. Abajo: ambos revelados. El dominio de Lusha es la variante del caso de la especificación (<span class="mono">careers-meli.mercadolibre.com</span>): también se marca «Distinto», lo cual informa y nunca bloquea.</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>valentina.rojas@mercadolibre.com <span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="hint">Lusha · revelado por Cristian Civita, 14 oct</dd></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Revelar teléfono · 5 créditos</button></dd><dd class="hint">Búsqueda ya pagada y identidad confirmada con el correo.</dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="stage"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="dlg-phone-reveal">
+<div class="dialog-header"><h2 id="dlg-phone-reveal">Revelar teléfono</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><p>La identidad ya se confirmó al revelar el correo. Aquí solo se confirma el precio.</p>
+<table class="data compact"><thead><tr><th scope="col"><span class="sr-only">Dato</span></th><th scope="col">En el CRM</th><th scope="col">Coincidencia de Lusha (ya confirmada)</th><th scope="col">Comparación</th></tr></thead><tbody><tr><th scope="row">Nombre</th><td>Valentina Rojas</td><td>Valentina Rojas</td><td><span class="meta">Igual</span></td></tr><tr><th scope="row">Empresa</th><td>Mercado Libre</td><td>Mercado Libre</td><td><span class="meta">Igual</span></td></tr><tr><th scope="row">Dominio</th><td class="mono">mercadolibre.com</td><td class="mono">careers-meli.mercadolibre.com</td><td><span class="badge badge-neutral no-dot">Distinto</span></td></tr><tr><th scope="row">LinkedIn</th><td class="mono"><a href="#">linkedin.com/in/valentina-rojas</a></td><td class="mono"><a href="#">linkedin.com/in/valentina-rojas</a></td><td><span class="meta">Igual</span></td></tr></tbody></table>
+<div><p>Revelar el teléfono cuesta <strong>5 créditos</strong>. La búsqueda ya está pagada y no se vuelve a cobrar.</p>
+<p class="meta mt-md">Hoy quedan 5 de 12 créditos del equipo.<br>Saldo de la cuenta de Lusha: 35 créditos (puede estar desactualizado).</p></div></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Revelar teléfono · 5 créditos</button></div>
+</div></div></div></div><div class="mt-xl"></div><div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>valentina.rojas@mercadolibre.com <span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="hint">Lusha · revelado por Cristian Civita, 14 oct</dd></div><div class="prop"><dt>Teléfono</dt><dd><a href="tel:+541141234567">+54 11 4123-4567</a> <span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="hint">Lusha · revelado por Cristian Civita, 14 oct</dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>La insignia se queda.</strong> «Lusha» va junto al valor (misma posición que «Verificado» / «Deducido») y la línea de ayuda dice quién lo reveló y cuándo. El correo revelado queda como «probable» en el modelo, por eso no lleva «Verificado». La insignia del teléfono se deriva del registro de Lusha porque el contacto no guarda procedencia del teléfono.</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> insignia «Lusha» junto al valor</div><div><span class="tag tag-restyle">Ya existe</span> <span class="mono">.badge-outline.no-dot</span> (la misma de «LinkedIn»), <span class="mono">.hint</span></div></div>
+</section>
+<section aria-labelledby="s5">
+<h2 class="mt-2xl mb-lg" id="s5">5 · «Lusha no tiene correo»</h2>
+<p class="meta mb-lg">La búsqueda funcionó pero no hay correo disponible. La fila no ofrece ninguna compra automática y dice por qué; solo queda la búsqueda nueva explícita.</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Lusha no tiene un correo para este contacto. No se vuelve a consultar solo.</span></div><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Buscar de nuevo · 1 crédito</button></dd><dd class="hint">Si no cambió ningún dato nuestro (por ejemplo el dominio de la empresa), Lusha devolverá lo mismo y el crédito se pierde.</dd></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Revelar teléfono · 5 créditos</button></dd><dd class="hint">Búsqueda ya pagada. El teléfono sí está disponible.</dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Sin compra automática.</strong> La búsqueda sí encontró a la persona, pero no tiene correo disponible. La razón queda visible con <span class="mono">.locked</span> usado como aviso. Lo único que ofrece la fila es «Buscar de nuevo · 1 crédito», una acción explícita con su costo, igual que tras un rechazo (estado 6): el motivo habitual es un dato nuestro incorrecto y, corregido, el contacto no puede quedar atrapado. La fila del teléfono sigue ofreciendo su propia compra porque la búsqueda ya está pagada.</div></div>
+</div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> aviso de «sin correo» (<span class="mono">.locked</span> como callout) + «Buscar de nuevo»</div></div>
+</section>
+<section aria-labelledby="s6">
+<h2 class="mt-2xl mb-lg" id="s6">6 · Coincidencia rechazada, «Buscar de nuevo»</h2>
+<p class="meta mb-lg">Estado de la ficha tras «No es mi contacto». No hay reintento automático y las dos filas dejan de ofrecer «Revelar». Una única acción explícita, con su costo en el botón, abre el diálogo de búsqueda (misma búsqueda para correo y teléfono). Un límite diario agotado la rechaza antes de llamar a Lusha (estado 7).</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a2">JM</span>
+<div><h1>Julián Marchetti</h1><p class="headline">Director de Tecnología en <a href="../../crm-hubspot-ux/mockups/company-record.html">Aument</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Se rechazó la coincidencia de Lusha (Aumenta GT · www.aumenta.do). No se vuelve a ofrecer de forma automática.</span></div><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Buscar de nuevo · 1 crédito</button></dd></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Se rechazó la coincidencia de Lusha (Aumenta GT · www.aumenta.do). No se vuelve a ofrecer de forma automática.</span></div><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Buscar de nuevo · 1 crédito</button></dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>Director de Tecnología<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-research">
+<div class="dialog-header"><h2 id="dlg-research">Buscar de nuevo en Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><p>La coincidencia anterior (<strong>Aumenta GT</strong>) se rechazó y quedó registrada. Esta es una búsqueda nueva: <strong>se cobra otro crédito</strong> y cuenta para el límite diario.</p>
+<table class="data compact"><thead><tr><th>Concepto</th><th class="num">Créditos</th><th>Cuándo se cobra</th></tr></thead><tbody>
+<tr><td>Búsqueda nueva</td><td class="num">1</td><td>Al confirmar. Puede no encontrar nada.</td></tr>
+<tr><td>Correo o teléfono</td><td class="num">1 o 5</td><td>Después, y solo si se confirma la identidad.</td></tr>
+</tbody></table>
+<p class="meta">Si la coincidencia falló por el dominio de la empresa (CRM: <span class="mono">aument.io</span>), conviene corregirlo antes: <a href="../../crm-hubspot-ux/mockups/company-record.html">abrir la empresa</a>.</p>
+<p class="meta">Hoy quedan 6 de 12 créditos del equipo.</p></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Buscar de nuevo · 1 crédito</button></div>
+</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> aviso de rechazo + botón «Buscar de nuevo · 1 crédito»</div><div><span class="tag tag-scope">Nuevo</span> diálogo de búsqueda nueva (mismo marco que el estado 2)</div></div>
+</section>
+<section aria-labelledby="s7">
+<h2 class="mt-2xl mb-lg" id="s7">7 · Límite diario agotado</h2>
+<p class="meta mb-lg">El límite es global (12 créditos por día para todo el equipo, no por BD), se calcula con el registro propio y se restablece al cambiar el día en hora de Argentina. El aviso nombra el límite y cuándo vuelve; su texto es distinto del de «sin saldo en Lusha» (402, estado 9).</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm" disabled title="Límite diario alcanzado"><span class="badge badge-outline no-dot">Lusha</span>Buscar correo · ~2 créditos</button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Se alcanzó el límite diario de créditos de Lusha del equipo (12 de 12 usados hoy). Se restablece mañana. No es lo mismo que quedarse sin saldo en la cuenta de Lusha.</span></div></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm" disabled title="Límite diario alcanzado"><span class="badge badge-outline no-dot">Lusha</span>Buscar teléfono · ~6 créditos</button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Límite diario de Lusha alcanzado. Se restablece mañana.</span></div></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Arriba.</strong> Con 12 de 12 usados el botón se muestra deshabilitado y el motivo queda escrito en la fila. <strong>Abajo.</strong> Si otro BD gasta el último crédito mientras este diálogo estaba abierto, el servidor lo rechaza antes de llamar a Lusha y el diálogo sigue abierto con el error.</div></div><div class="mt-md"></div><div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-cap">
+<div class="dialog-header"><h2 id="dlg-cap">Buscar correo en Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><div class="alert alert-warn" role="alert"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">Se alcanzó el límite diario de Lusha</div>El equipo ya usó 11 de 12 créditos hoy y este paso necesita hasta 2. No se llamó a Lusha ni se cobró nada. El límite se restablece mañana.</div></div>
+<p class="meta">Hoy queda 1 de 12 créditos del equipo.</p></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> botón deshabilitado + aviso con el límite y el reinicio</div><div><span class="tag tag-restyle">Ya existe</span> <span class="mono">.btn:disabled</span>, <span class="mono">.alert-warn</span></div></div>
+</section>
+<section aria-labelledby="s8">
+<h2 class="mt-2xl mb-lg" id="s8">8 · Correo duplicado</h2>
+<p class="meta mb-lg">El correo revelado ya pertenece a otro contacto no fusionado. El valor se guarda igual, el aviso nombra al otro contacto y lleva a su ficha.</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>valentina.rojas@mercadolibre.com <span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="hint">Lusha · revelado por Cristian Civita, 14 oct</dd><dd class="why"><span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> Este correo también figura en <a href="../../crm-hubspot-ux/mockups/contact-record.html">Vale Rojas · Mercado Libre</a>. Se guardó igual. Se avisó a un administrador para revisar el par.</span></dd></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm"><span class="badge badge-outline no-dot">Lusha</span>Buscar teléfono · ~6 créditos</button></dd><dd class="hint">Gasta créditos reales de Lusha: 1 de búsqueda y 5 del teléfono. Se confirma antes de cobrar.</dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><p class="meta mb-md">Justo después de revelar (aviso temporal):</p>
+<div class="toast inline" role="status"><svg class="icon ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg>Correo revelado. Ya figura en Vale Rojas<a href="../../crm-hubspot-ux/mockups/contact-record.html">Ver contacto</a></div>
+<div class="mock-note mt-xl" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Sin botón de fusionar.</strong> La cola de duplicados (<span class="mono">/admin/duplicates</span>) es solo para administradores, así que un BD no puede abrirla. El aviso dice qué contacto ya tiene el correo, enlaza a su ficha (que cualquier BD puede abrir) y aclara que el par quedó en la cola del administrador. El valor no se bloquea ni se deshace.</div></div>
+<div class="mock-note mt-md" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Sigue visible.</strong> El aviso de la fila (izquierda) permanece al reabrir la ficha; el aviso temporal no.</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> aviso de duplicado en la fila (<span class="mono">dd.why</span>, el mismo bloque que el motivo del estado)</div><div><span class="tag tag-restyle">Ya existe</span> <span class="mono">.toast.inline</span>, <span class="mono">.why</span></div></div>
+</section>
+<section aria-labelledby="s9">
+<h2 class="mt-2xl mb-lg" id="s9">9 · Errores de Lusha</h2>
+<p class="meta mb-lg">Todos dejan el diálogo abierto con el error. Ninguno se reintenta solo: un reintento es una acción nueva del BD que vuelve a pasar por el límite diario. Cada código tiene texto propio. El 451 bloquea a toda la persona: la ficha queda sin ninguna acción de revelar, ni de correo ni de teléfono.</p>
+<h3 class="mb-lg">9a · 402, la cuenta de Lusha sin créditos</h3><div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-402">
+<div class="dialog-header"><h2 id="dlg-402">Revelar correo</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><div class="alert alert-danger" role="alert"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">La cuenta de Lusha se quedó sin créditos</div>Lusha rechazó la solicitud porque la cuenta no tiene saldo. No es el límite diario del equipo. No se guardó ningún resultado para este contacto. Avisar a un administrador para recargar la cuenta.</div></div></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div><h3 class="mt-xl mb-lg">9b · 429, límite de velocidad de Lusha</h3><div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-429">
+<div class="dialog-header"><h2 id="dlg-429">Buscar correo en Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><div class="alert alert-warn" role="alert"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">Lusha recibió demasiadas solicitudes</div>No se cobró nada y no se reintenta solo. Esperar unos minutos y volver a intentar.</div></div></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button><button type="button" class="btn btn-primary">Reintentar búsqueda · 1 crédito</button></div>
+</div></div><h3 class="mt-xl mb-lg">9c · 451, bloqueo de cumplimiento (permanente)</h3><div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Esta persona no se puede revelar en Lusha (restricción de cumplimiento). No hay ninguna acción disponible.</span></div></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Esta persona no se puede revelar en Lusha (restricción de cumplimiento). No hay ninguna acción disponible.</span></div></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-451">
+<div class="dialog-header"><h2 id="dlg-451">Revelar correo</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><div class="alert alert-danger" role="alert"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><div><div class="title">Esta persona no se puede revelar</div>Lusha la excluye por una restricción de cumplimiento normativo. Es permanente y vale para toda la persona (correo y teléfono): no se vuelve a ofrecer ni se reintenta.</div></div></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> textos de error</div><div><span class="tag tag-restyle">Ya existe</span> <span class="mono">.alert-danger</span>, <span class="mono">.alert-warn</span>, <span class="mono">.locked</span></div></div>
+</section>
+<section aria-labelledby="s10">
+<h2 class="mt-2xl mb-lg" id="s10">10 · Sin configurar (extra del plan, tarea M.1)</h2>
+<p class="meta mb-lg">Línea de «sin clave» mencionada en el plan. Retirar este estado no cambia nada más.</p>
+<div class="case"><aside class="record-left pane" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a1">VR</span>
+<div><h1>Valentina Rojas</h1><p class="headline">VP de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Mercado Libre</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm" disabled title="LUSHA_API_KEY no configurada"><span class="badge badge-outline no-dot">Lusha</span>Buscar correo</button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>LUSHA_API_KEY no configurada. Nadie puede usar Lusha hasta configurarla.</span></div></div><div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm" disabled title="LUSHA_API_KEY no configurada"><span class="badge badge-outline no-dot">Lusha</span>Buscar teléfono</button></dd></div><div class="prop"><dt>Móvil</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div><div class="prop"><dt>Cargo</dt><dd>VP de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside><div class="case-side"><div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Solo en producción.</strong> Fuera de producción no se dibuja nada (sin botón ni aviso). En producción sin la variable, el botón queda deshabilitado y la línea nombra solo la variable, nunca su valor. No muestra precio porque no hay nada que cobrar.</div></div></div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> línea de configuración faltante</div></div>
+</section>
+</main>
+</body>
+</html>
