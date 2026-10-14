@@ -4,19 +4,15 @@
 
 Define CAN-SPAM obligations for automated commercial email to US recipients: a valid physical postal address in every message, a working opt-out honoured within 10 business days, and a send-suppression list that the roster and the scheduler both consult. This is a legal requirement the mockup does not yet design.
 
-## Open owner decision (blocking for the opt-out mechanism, not for the rest)
+## Owner decision — RESOLVED 2026-10-14: tracked link (was Option B)
 
-The owner MUST choose one of the two mechanisms below before implementation of that part. Requirements marked **[Both]** apply regardless. Requirements marked **[Option A]** or **[Option B]** apply only to the chosen option.
+The owner chose the **tracked unsubscribe link**: a per-recipient link in the footer, a public route, and an automatic suppression entry. Rationale: the opt-out takes effect immediately instead of waiting up to 24h for the daily Gmail sync, and it does not depend on a BD noticing and recording a reply.
 
-| | Option A: reply-based | Option B: tracked link |
-|---|---|---|
-| Opt-out text | Plain-text line: reply with "unsubscribe" or "no more emails" | Link in the footer |
-| Address | Miami office postal address in the signature | Same |
-| Needs new infrastructure | Little: a BD action to record an opt-out | A public route, per-recipient token, suppression list |
-| Honouring | A reply already stops the sequence; the BD records the opt-out | Automatic on click |
-| Risk | Depends on the BD noticing and recording opt-outs | New public, unauthenticated endpoint to secure |
+The reply-based path is **not** dropped. Recipients reply "unsubscribe" instead of clicking all the time, so the reply-detection and manual-suppression requirements below apply too — they are marked **[Both]**.
 
-The owner must also supply the exact postal address string (the Miami office address is not recorded in the codebase) and confirm with counsel that the advertisement-disclosure and "accurate subject line" obligations are met by the generated copy. This spec does not give legal advice.
+**Correction to an earlier assumption in this spec**: CAN-SPAM requires "a valid physical postal address of the sender". It does **not** require a US address. The owner has no Miami office address, so the Argentine (Mar del Plata) address satisfies the obligation. The owner must still supply the exact address string — it is not in the codebase — and confirm with counsel that the advertisement-disclosure and "accurate subject line" obligations are met by the generated copy. This spec does not give legal advice.
+
+**Related product issue, out of scope here**: `AVALITH_PROFILE` (`src/lib/outreach/messagePrompt.ts`) states Avalith has offices in Miami, so generated drafts already tell recipients so. If that cannot be substantiated it must be corrected in the profile, independently of this change.
 
 ## Requirements
 
@@ -120,9 +116,9 @@ An opt-out MUST stop every active Sequence membership for that address as soon a
 - WHEN the BD tries "Reincorporar"
 - THEN it is rejected
 
-### Requirement: [Option A] Reply-based opt-out is recorded by the BD
+### Requirement: [Both] Reply-based opt-out is recorded by the BD
 
-If Option A is chosen, the member card and the Contact record MUST offer an explicit "No contactar" action that records the suppression entry. A reply already moves the member to `replied` and stops the sequence; the action covers the longer-term suppression. The system SHOULD flag inbound replies containing common opt-out phrases ("unsubscribe", "remove me", "stop emailing", "no more emails") so the BD sees a prompt to record the opt-out. Phrase detection is advisory and MUST NOT be the only path to suppression.
+A tracked link does not stop recipients from simply replying "unsubscribe", so this path is required alongside it. The member card and the Contact record MUST offer an explicit "No contactar" action that records the suppression entry. A reply already moves the member to `replied` and stops the sequence; the action covers the longer-term suppression. The system SHOULD flag inbound replies containing common opt-out phrases ("unsubscribe", "remove me", "stop emailing", "no more emails") so the BD sees a prompt to record the opt-out. Phrase detection is advisory and MUST NOT be the only path to suppression.
 
 #### Scenario: BD records opt-out from a reply
 
@@ -139,24 +135,36 @@ If Option A is chosen, the member card and the Contact record MUST offer an expl
 
 #### Scenario: Opt-out text in footer
 
-- GIVEN Option A
-- WHEN a footer is built
-- THEN it instructs the recipient to reply to opt out
+- GIVEN a footer is built
+- WHEN it is appended to a draft
+- THEN it carries the unsubscribe link
+- AND a reply to the message is still accepted as an opt-out
 
-### Requirement: [Option B] Tracked unsubscribe link
+### Requirement: Tracked unsubscribe link
 
-If Option B is chosen, every message MUST include a per-recipient unsubscribe link carrying an unguessable, non-enumerable token. The public route that serves it MUST accept the opt-out without login, MUST be idempotent, MUST write the suppression entry, and MUST respond with a plain confirmation that reveals nothing about other recipients. The route MUST be excluded from the session gate but MUST NOT be able to perform any other action. Tokens MUST be bound to one recipient and one Sequence member and MUST remain valid for at least 30 days after the send.
+Every message MUST include a per-recipient unsubscribe link carrying an unguessable, non-enumerable token. The public route that serves it MUST accept the opt-out without login, MUST be idempotent, MUST write the suppression entry, and MUST respond with a plain confirmation that reveals nothing about other recipients. The route MUST be excluded from the session gate but MUST NOT be able to perform any other action. Tokens MUST be bound to one recipient and one Sequence member and MUST remain valid for at least 30 days after the send.
 
-#### Scenario: Valid token
+### Requirement: The link suppresses on POST, never on GET
 
-- GIVEN a valid token for a member
-- WHEN the link is opened
+A `GET` of the unsubscribe URL MUST NOT write a suppression entry. It MUST only render a confirmation page whose button issues a `POST`, and only that `POST` suppresses. Corporate mail-security scanners and inbox link-prefetchers open every URL in an inbound message, so a `GET` that acts would unsubscribe recipients who never touched the link — silently shrinking the roster and destroying the opt-out signal's meaning. Scanners do not issue `POST`. This matches the approved mockup (`mockups/baja-opciones.html`, "Opción B" screens 2 and 3).
+
+#### Scenario: Scanner opens the link
+
+- GIVEN a mail-security scanner issues a GET for a valid token
+- WHEN the route responds
+- THEN the confirmation page is rendered
+- AND no suppression entry is written
+
+#### Scenario: Recipient confirms
+
+- GIVEN a valid token
+- WHEN the confirmation page's button issues a POST
 - THEN the address is suppressed and the memberships are discarded
 
-#### Scenario: Repeat click
+#### Scenario: Repeat confirmation
 
 - GIVEN a token already used
-- WHEN the link is opened again
+- WHEN the POST is issued again
 - THEN the same confirmation is shown and nothing changes
 
 #### Scenario: Invalid token
