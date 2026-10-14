@@ -156,7 +156,7 @@ Reachable: nothing. There is intentionally **no** `route.ts`; the handlers exist
 - [x] 4.4 RED/GREEN: `handleUnsubscribePost` accepts both the confirmation-page form and the RFC 8058 one-click body (`List-Unsubscribe=One-Click`, `application/x-www-form-urlencoded`) with no form token or referer check; repeat POST renders the same confirmation.
 - [x] 4.5 Pure `buildUnsubscribeHeaders(url, senderAddress)` returning the `List-Unsubscribe` (https URI first, then `mailto:`) and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` strings consumed by PR 8/9.
 - [x] 4.6 Confirmation, success and invalid page components from `mockups/baja-opciones.html` (Opcion B screens 2 and 3), existing design-system classes only, copy from a dictionary slice. Not routed.
-- [ ] 4.7 Integration script (seeded local DB, not the unit suite): two concurrent POSTs for one token yield one suppression row; GET writes nothing.
+- [x] 4.7 Integration script (seeded local DB, not the unit suite): two concurrent POSTs for one token yield one suppression row; GET writes nothing.
 
 Commits:
 - `feat(sequences): add hashed unsubscribe tokens and idempotent suppression write`

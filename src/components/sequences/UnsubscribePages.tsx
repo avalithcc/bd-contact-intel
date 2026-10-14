@@ -21,7 +21,7 @@ function Shell({ postalAddress, children }: { postalAddress?: string; children: 
         <div className="card">
           <div className="card-body">
             {children}
-            {postalAddress ? <p className="help center mt-lg">{postalAddress}</p> : null}
+            {postalAddress ? <p className="help center mt-md">{postalAddress}</p> : null}
           </div>
         </div>
       </div>
@@ -42,7 +42,7 @@ export function UnsubscribeConfirm({
   return (
     <Shell postalAddress={postalAddress}>
       <h3 className="center">{copy.confirmTitle}</h3>
-      <p className="meta center mt-lg">{copy.confirmBody(email)}</p>
+      <p className="meta center mt-md">{copy.confirmBody(email)}</p>
       <form className="form-actions mt-xl" method="post" action="/api/unsubscribe">
         <input type="hidden" name="t" value={token} />
         <button className="btn btn-primary btn-block" type="submit">
