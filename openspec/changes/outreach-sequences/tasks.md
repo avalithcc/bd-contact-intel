@@ -150,12 +150,12 @@ Commits:
 
 Reachable: nothing. There is intentionally **no** `route.ts`; the handlers exist but no URL serves them until PR 13.
 
-- [ ] 4.1 RED/GREEN: `unsubscribeToken.ts`: `generateUnsubscribeToken` (`randomBytes(32).toString("base64url")`), `hashUnsubscribeToken` (sha256); the hash differs from the token and is deterministic; malformed input is rejected before any lookup.
-- [ ] 4.2 RED/GREEN: pure `handleUnsubscribeGet` decision: valid token -> `confirm` view model; unknown or malformed -> generic `invalid` view model that names no address; **performs zero writes** (asserted with a fake port that throws on any write).
-- [ ] 4.3 GREEN: `unsubscribeQueries.ts`: lookup by `token_hash` (one indexed read); `ensureTokenForMember` (one row per member, reused by the reminder footer); `suppressByToken` in **one transaction**: insert `email_suppression` `ON CONFLICT (kind, value) DO NOTHING`, set `used_at` if null, move every non-terminal membership for that address to `discarded` with reason `opt_out` and a null actor (using `canTransition`). The repeat POST changes nothing.
-- [ ] 4.4 RED/GREEN: `handleUnsubscribePost` accepts both the confirmation-page form and the RFC 8058 one-click body (`List-Unsubscribe=One-Click`, `application/x-www-form-urlencoded`) with no form token or referer check; repeat POST renders the same confirmation.
-- [ ] 4.5 Pure `buildUnsubscribeHeaders(url, senderAddress)` returning the `List-Unsubscribe` (https URI first, then `mailto:`) and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` strings consumed by PR 8/9.
-- [ ] 4.6 Confirmation, success and invalid page components from `mockups/baja-opciones.html` (Opcion B screens 2 and 3), existing design-system classes only, copy from a dictionary slice. Not routed.
+- [x] 4.1 RED/GREEN: `unsubscribeToken.ts`: `generateUnsubscribeToken` (`randomBytes(32).toString("base64url")`), `hashUnsubscribeToken` (sha256); the hash differs from the token and is deterministic; malformed input is rejected before any lookup.
+- [x] 4.2 RED/GREEN: pure `handleUnsubscribeGet` decision: valid token -> `confirm` view model; unknown or malformed -> generic `invalid` view model that names no address; **performs zero writes** (asserted with a fake port that throws on any write).
+- [x] 4.3 GREEN: `unsubscribeQueries.ts`: lookup by `token_hash` (one indexed read); `ensureTokenForMember` (one row per member, reused by the reminder footer); `suppressByToken` in **one transaction**: insert `email_suppression` `ON CONFLICT (kind, value) DO NOTHING`, set `used_at` if null, move every non-terminal membership for that address to `discarded` with reason `opt_out` and a null actor (using `canTransition`). The repeat POST changes nothing.
+- [x] 4.4 RED/GREEN: `handleUnsubscribePost` accepts both the confirmation-page form and the RFC 8058 one-click body (`List-Unsubscribe=One-Click`, `application/x-www-form-urlencoded`) with no form token or referer check; repeat POST renders the same confirmation.
+- [x] 4.5 Pure `buildUnsubscribeHeaders(url, senderAddress)` returning the `List-Unsubscribe` (https URI first, then `mailto:`) and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` strings consumed by PR 8/9.
+- [x] 4.6 Confirmation, success and invalid page components from `mockups/baja-opciones.html` (Opcion B screens 2 and 3), existing design-system classes only, copy from a dictionary slice. Not routed.
 - [ ] 4.7 Integration script (seeded local DB, not the unit suite): two concurrent POSTs for one token yield one suppression row; GET writes nothing.
 
 Commits:
