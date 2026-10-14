@@ -1738,7 +1738,9 @@ export const es: typeof en = {
     kpiNewContacts: "Contactos nuevos",
     kpiNewContactsFoot: "personas que entraron al embudo en el período",
     kpiReplyRate: "Tasa de respuesta",
-    kpiReplyRateFoot: "Respondió ÷ Contactado",
+    kpiReplyRateFoot: (replied: number, contacted: number) => `Respondió ${replied} ÷ Contactado ${contacted}`,
+    kpiReplyRateSmallFoot: (replied: number, contacted: number) =>
+      `Respondió ${replied} ÷ Contactado ${contacted} · muestra demasiado pequeña para ser una tasa`,
     kpiMeetings: "Reuniones agendadas",
     kpiMeetingsFoot: "en el período",
     // Prod (2026-09-30): 0 meeting_logged rows exist in the whole DB today
@@ -1767,6 +1769,7 @@ export const es: typeof en = {
     funnelMeeting: "Reunión",
     funnelOfContacted: "de Contactado",
     funnelOfReplied: "de Respondió",
+    funnelSmallSample: "muestra pequeña",
     funnelDiscardedFoot: (count: number, pct: number) =>
       `Aparte del embudo: ${count} descartado(s) (${pct}% de Nuevo) — no es una etapa de avance.`,
     pipelineTitle: "Pipeline de empresas",
