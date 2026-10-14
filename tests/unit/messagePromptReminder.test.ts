@@ -33,8 +33,26 @@ test("a reminder is a follow-up on the same thread, never a first professional e
   assert.match(rule3, /not replied/i);
 });
 
-test("every line except rules 1 and 3 is byte-identical between a first email and a reminder", () => {
-  const strip = (system: string) => lines(system).filter((l) => !l.startsWith("1. ") && !l.startsWith("3. "));
+const preamble = (system: string) => lines(system).find((l) => l.startsWith("You write ")) ?? "";
+
+test("the reminder preamble describes a follow-up on an existing thread, never a first-touch email", () => {
+  const first = preamble(buildOutreachMessagePrompt(BASE).system);
+  const reminder = preamble(buildOutreachMessagePrompt({ ...BASE, purpose: "reminder" }).system);
+  assert.match(first, /first-touch emails/);
+  assert.doesNotMatch(reminder, /first-touch/);
+  assert.match(reminder, /short, peer-to-peer follow-up emails/);
+  assert.match(reminder, /existing email thread/);
+  assert.match(reminder, /on behalf of a Business Developer at Avalith, a software engineering company\. Follow these rules exactly:$/);
+});
+
+test("the LinkedIn preamble is the same whatever the purpose", () => {
+  const dm = CASES["linkedin-es-full"];
+  assert.equal(preamble(buildOutreachMessagePrompt({ ...dm, purpose: "reminder" }).system), preamble(buildOutreachMessagePrompt(dm).system));
+});
+
+test("every line except the preamble and rules 1 and 3 is byte-identical between a first email and a reminder", () => {
+  const strip = (system: string) =>
+    lines(system).filter((l) => !l.startsWith("You write ") && !l.startsWith("1. ") && !l.startsWith("3. "));
   const first = strip(buildOutreachMessagePrompt(BASE).system);
   const reminder = strip(buildOutreachMessagePrompt({ ...BASE, purpose: "reminder" }).system);
   assert.deepEqual(reminder, first);

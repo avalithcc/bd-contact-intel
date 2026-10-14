@@ -323,7 +323,7 @@ export function buildOutreachMessagePrompt(
   const referenceStyle = referenceStyleFor(isEmail, language);
 
   const system = `
-You write ${isEmail ? "professional, peer-to-peer first-touch emails" : "short, natural, peer-to-peer LinkedIn outreach messages"} on behalf of a Business Developer at Avalith, a software engineering company. Follow these rules exactly:
+You write ${isReminder ? "short, peer-to-peer follow-up emails that continue an existing email thread" : isEmail ? "professional, peer-to-peer first-touch emails" : "short, natural, peer-to-peer LinkedIn outreach messages"} on behalf of a Business Developer at Avalith, a software engineering company. Follow these rules exactly:
 
 1. ${lengthRule}
 2. Language and tone: ${languageInstruction(channel, language)}
