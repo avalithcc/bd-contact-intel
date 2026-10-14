@@ -66,13 +66,13 @@ A 451 or `COMPLIANCE_RESTRICTED` outcome MUST be shown as "this person cannot be
 
 ### Requirement: Per-contact NOT_FOUND is a free, persisted no-match
 
-A `NOT_FOUND` outcome MUST be treated as a no-match: persisted, billing 0 credits when Lusha bills 0, and never re-queried.
+A `NOT_FOUND` outcome MUST be treated as a no-match: persisted, billing 0 credits when Lusha bills 0, and never re-queried automatically. It is NOT permanent: an explicit manual re-search MUST remain available, paying a new search credit against the daily cap, because the usual cause is wrong data on our side (a wrong company domain) and a corrected Contact must not stay unqueryable. Only 451 / `COMPLIANCE_RESTRICTED` is permanent.
 
 #### Scenario: NOT_FOUND
 
 - GIVEN Lusha returns `NOT_FOUND` for the Contact
 - WHEN the attempt settles
-- THEN the ledger holds a no-match and the control reads that Lusha has nothing for this contact
+- THEN the ledger holds a no-match, the control reads that Lusha has nothing for this contact, offers no automatic retry, and exposes an explicit re-search that costs a new search credit
 
 ### Requirement: ENRICH_FAILED and 5xx are transient and keep any paid search
 
