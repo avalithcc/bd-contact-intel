@@ -11,6 +11,7 @@ import {
   boolean,
   jsonb,
   integer,
+  smallint,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -1332,6 +1333,11 @@ export const emailAccount = pgTable(
     bdId: uuid("bd_id")
       .primaryKey()
       .references(() => bd.id, { onDelete: "cascade" }),
+    // Referenceable identity of the sending mailbox (outreach-sequences D3).
+    // bd_id stays the primary key; a UNIQUE column is a legal FK target, so
+    // sequence.email_account_id points here without touching any existing
+    // eq(emailAccount.bdId, ...) call site.
+    id: uuid("id").notNull().defaultRandom().unique("email_account_id_unique"),
     emailAddress: text("email_address").notNull(),
     // Encrypted refresh token — never decrypt unless sending; always
     // re-encrypt on update.
@@ -1550,6 +1556,132 @@ export const taskDigestSend = pgTable(
 
 export type TaskDigestSend = typeof taskDigestSend.$inferSelect;
 export type NewTaskDigestSend = typeof taskDigestSend.$inferInsert;
+
+// Outreach Sequences (openspec/changes/outreach-sequences). Data model only:
+// nothing reads or writes these tables until later PRs of the chain.
+// `state`, `outcome` and similar status columns are free text validated at the
+// write boundary, the repo convention (client_status, contact_type): no CHECK.
+export const sequence = pgTable("sequence", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  ownerBdId: uuid("owner_bd_id")
+    .notNull()
+    .references(() => bd.id),
+  // The mailbox this Sequence sends from (D3). No is_active column: "active"
+  // is derived from members and drafts.
+  emailAccountId: uuid("email_account_id")
+    .notNull()
+    .references(() => emailAccount.id),
+  dailySendCap: integer("daily_send_cap").notNull().default(5),
+  // { step1: { hour, timezone, offsetDays }, step2: { afterDays } }, read via parseSchedule().
+  schedule: jsonb("schedule").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Sequence = typeof sequence.$inferSelect;
+export type NewSequence = typeof sequence.$inferInsert;
+
+export const sequenceMember = pgTable(
+  "sequence_member",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sequenceId: uuid("sequence_id")
+      .notNull()
+      .references(() => sequence.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id),
+    state: text("state").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    reminderDueAt: timestamp("reminder_due_at", { withTimezone: true }),
+    discardReason: text("discard_reason"),
+    discardedByBdId: uuid("discarded_by_bd_id").references(() => bd.id),
+    discardedAt: timestamp("discarded_at", { withTimezone: true }),
+    holdReason: text("hold_reason"),
+    holdAt: timestamp("hold_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // "At most once per Sequence", enforced by the database.
+    sequencePersonUnique: unique("sequence_member_sequence_person_unique").on(
+      t.sequenceId,
+      t.personId,
+    ),
+    bySequenceState: index("sequence_member_sequence_state_idx").on(t.sequenceId, t.state),
+    byPerson: index("sequence_member_person_idx").on(t.personId),
+  }),
+);
+
+export type SequenceMember = typeof sequenceMember.$inferSelect;
+export type NewSequenceMember = typeof sequenceMember.$inferInsert;
+
+// One row per (member, step). edited_at not null is the "BD owns this text"
+// marker that every batch job must skip.
+export const sequenceDraft = pgTable(
+  "sequence_draft",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sequenceMemberId: uuid("sequence_member_id")
+      .notNull()
+      .references(() => sequenceMember.id, { onDelete: "cascade" }),
+    step: smallint("step").notNull(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    editedByBdId: uuid("edited_by_bd_id").references(() => bd.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedByBdId: uuid("reviewed_by_bd_id").references(() => bd.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedByBdId: uuid("approved_by_bd_id").references(() => bd.id),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+  },
+  (t) => ({
+    memberStepUnique: unique("sequence_draft_member_step_unique").on(t.sequenceMemberId, t.step),
+  }),
+);
+
+export type SequenceDraft = typeof sequenceDraft.$inferSelect;
+export type NewSequenceDraft = typeof sequenceDraft.$inferInsert;
+
+// At-most-once send claim (D10), inserted ON CONFLICT DO NOTHING before the
+// Gmail call. 'pending' (claimed) | 'sent' | 'failed'. A failed claim stays as
+// history and the partial unique index lets a later run claim the step again.
+export const sequenceSendClaim = pgTable(
+  "sequence_send_claim",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sequenceMemberId: uuid("sequence_member_id")
+      .notNull()
+      .references(() => sequenceMember.id, { onDelete: "cascade" }),
+    step: smallint("step").notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+    outcome: text("outcome").notNull().default("pending"),
+    sendingAccountId: uuid("sending_account_id")
+      .notNull()
+      .references(() => emailAccount.id),
+    // Set only on 'sent'; backs the daily cap count in one indexed read.
+    miamiSendDate: date("miami_send_date"),
+    gmailMessageId: text("gmail_message_id"),
+    rfcMessageId: text("rfc_message_id"),
+    gmailThreadId: text("gmail_thread_id"),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => ({
+    activeClaimUnique: uniqueIndex("sequence_send_claim_active_idx")
+      .on(t.sequenceMemberId, t.step)
+      .where(sql`${t.outcome} <> 'failed'`),
+    sentByAccountDate: index("sequence_send_claim_sent_account_date_idx")
+      .on(t.sendingAccountId, t.miamiSendDate)
+      .where(sql`${t.outcome} = 'sent'`),
+  }),
+);
+
+export type SequenceSendClaim = typeof sequenceSendClaim.$inferSelect;
+export type NewSequenceSendClaim = typeof sequenceSendClaim.$inferInsert;
 
 // Generic signal/research data for leads/companies/contacts. Discriminated by
 // source ('linkedin_apify' | 'manual_paste' | 'web_research' | etc.) and a

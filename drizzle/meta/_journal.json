@@ -288,6 +288,13 @@
       "when": 1792959871556,
       "tag": "0040_company_absorption_proposal",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793046271556,
+      "tag": "0041_outreach_sequences",
+      "breakpoints": true
     }
   ]
 }
