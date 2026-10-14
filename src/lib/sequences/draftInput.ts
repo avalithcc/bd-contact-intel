@@ -1,0 +1,52 @@
+/**
+ * The ONE place the language of a Sequence draft is decided, and the only function the drafting code may use to build
+ * generator input. The live generator (runGenerateOutreachMessage) writes Spanish unless told "en"
+ * (DEFAULT_MESSAGE_LANGUAGE is "es"), so the language is never a caller choice: it is derived here from the recipient
+ * market, the SAME value that picks the postal address in the footer (config.ts). A US member therefore can never be
+ * drafted in Spanish, and a Florida address can never sit under a Spanish email.
+ *
+ *   us -> "en"   latam -> "es"   other -> null (no draft: the market has no postal address either, so it is held)
+ *
+ * tests/unit/sequencesDraftLanguageGuard.test.ts fails the build if any other file under src/lib/sequences or the
+ * sequence actions reaches the generator or the prompt builders. Pure: no DB. The prompt (buildOutreachMessagePrompt)
+ * is reused untouched, so its anti-hallucination and prompt-injection rules apply to Sequence drafts as everywhere.
+ */
+import type { MarketKey } from "@/lib/hiring/markets";
+import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
+import type { BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
+import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
+import { buildPersonMessageInput, type BuildPersonMessageInputArgs } from "@/lib/outreach/personMessageInput";
+
+export function draftLanguageForMarket(market: MarketKey): MessageLanguage | null {
+  if (market === "us") return "en";
+  if (market === "latam") return "es";
+  return null;
+}
+
+export type SequenceDraftInputArgs = Omit<BuildPersonMessageInputArgs, "language" | "channel">;
+
+/** Null when the market has no draft language: the caller must hold the member instead of generating. */
+export function buildSequenceDraftInput(
+  args: SequenceDraftInputArgs,
+  market: MarketKey,
+): BuildOutreachMessagePromptInput | null {
+  const language = draftLanguageForMarket(market);
+  if (!language) return null;
+  // Spread first so a stray `language`/`channel` on the args can never win.
+  return buildPersonMessageInput({ ...args, language, channel: "email" });
+}
+
+/** The "Señales usadas" chips, derived from the SAME input the generator gets and never from model output. */
+export function draftSignals(input: BuildOutreachMessagePromptInput): OutreachSignal[] {
+  return extractOutreachSignals(input);
+}
+
+/** Sign-off identity, in the draft's own language. Only the owner has a title on file. */
+export function senderIdentity(
+  name: string,
+  language: MessageLanguage,
+): { senderName: string; senderTitle: string | undefined } {
+  const senderName = name.trim() || "Cristian Civita";
+  if (senderName !== "Cristian Civita") return { senderName, senderTitle: undefined };
+  return { senderName, senderTitle: language === "es" ? "COO de Avalith" : "COO at Avalith" };
+}
