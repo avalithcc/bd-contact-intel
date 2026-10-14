@@ -1739,8 +1739,11 @@ export const es: typeof en = {
     kpiNewContactsFoot: "personas que entraron al embudo en el período",
     kpiReplyRate: "Tasa de respuesta",
     kpiReplyRateFoot: (replied: number, contacted: number) => `Respondió ${replied} ÷ Contactado ${contacted}`,
-    kpiReplyRateSmallFoot: (replied: number, contacted: number) =>
-      `Respondió ${replied} ÷ Contactado ${contacted} · muestra demasiado pequeña para ser una tasa`,
+    // Below MIN_RATE_SAMPLE the tile inverts: the fraction is the value and
+    // the percentage drops to the foot. Owner direction 2026-10-14 — the
+    // explanatory "sample too small" copy was dropped once the hierarchy
+    // itself carries the message.
+    kpiReplyRateSmallFoot: (pct: number) => `${pct}%`,
     kpiMeetings: "Reuniones agendadas",
     kpiMeetingsFoot: "en el período",
     // Prod (2026-09-30): 0 meeting_logged rows exist in the whole DB today
@@ -1769,7 +1772,6 @@ export const es: typeof en = {
     funnelMeeting: "Reunión",
     funnelOfContacted: "de Contactado",
     funnelOfReplied: "de Respondió",
-    funnelSmallSample: "muestra pequeña",
     funnelDiscardedFoot: (count: number, pct: number) =>
       `Aparte del embudo: ${count} descartado(s) (${pct}% de Nuevo) — no es una etapa de avance.`,
     pipelineTitle: "Pipeline de empresas",

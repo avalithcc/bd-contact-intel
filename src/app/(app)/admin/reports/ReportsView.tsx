@@ -203,7 +203,7 @@ export function ReportsView({
           <div className="foot">
             {funnel.replyRateIsRate
               ? dict.kpiReplyRateFoot(funnel.repliedOrMore, funnel.contactedOrMore)
-              : dict.kpiReplyRateSmallFoot(funnel.repliedOrMore, funnel.contactedOrMore)}
+              : dict.kpiReplyRateSmallFoot(funnel.replyRatePct)}
           </div>
         </div>
         {/* Bug fix: this KPI used to reuse `funnel.meeting` (persons whose
@@ -321,7 +321,7 @@ export function ReportsView({
                   <span className="soft small">
                     {funnel.replyRateIsRate
                       ? `(${funnel.repliedOfContactedPct}% ${dict.funnelOfContacted} · ${funnel.replyRateFraction})`
-                      : `(${funnel.replyRateFraction} ${dict.funnelOfContacted} · ${dict.funnelSmallSample})`}
+                      : `(${funnel.replyRateFraction} ${dict.funnelOfContacted} · ${funnel.repliedOfContactedPct}%)`}
                   </span>
                 </span>
               </div>
@@ -335,7 +335,7 @@ export function ReportsView({
                   <span className="soft small">
                     {funnel.meetingOfRepliedIsRate
                       ? `(${funnel.meetingOfRepliedPct}% ${dict.funnelOfReplied} · ${funnel.meetingOfRepliedFraction})`
-                      : `(${funnel.meetingOfRepliedFraction} ${dict.funnelOfReplied} · ${dict.funnelSmallSample})`}
+                      : `(${funnel.meetingOfRepliedFraction} ${dict.funnelOfReplied} · ${funnel.meetingOfRepliedPct}%)`}
                   </span>
                 </span>
               </div>

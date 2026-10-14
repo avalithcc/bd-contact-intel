@@ -1784,8 +1784,11 @@ export const en = {
     kpiNewContactsFoot: "people who entered the funnel in the period",
     kpiReplyRate: "Reply rate",
     kpiReplyRateFoot: (replied: number, contacted: number) => `Replied ${replied} ÷ Contacted ${contacted}`,
-    kpiReplyRateSmallFoot: (replied: number, contacted: number) =>
-      `Replied ${replied} ÷ Contacted ${contacted} · sample too small to be a rate`,
+    // Below MIN_RATE_SAMPLE the tile inverts: the fraction is the value and
+    // the percentage drops to the foot. Owner direction 2026-10-14 — the
+    // explanatory "sample too small" copy was dropped once the hierarchy
+    // itself carries the message.
+    kpiReplyRateSmallFoot: (pct: number) => `${pct}%`,
     kpiMeetings: "Meetings scheduled",
     kpiMeetingsFoot: "in the period",
     kpiMeetingsEmptyFoot: "No meetings recorded yet",
@@ -1806,7 +1809,6 @@ export const en = {
     funnelMeeting: "Meeting",
     funnelOfContacted: "of Contacted",
     funnelOfReplied: "of Replied",
-    funnelSmallSample: "small sample",
     funnelDiscardedFoot: (count: number, pct: number) =>
       `Besides the funnel: ${count} discarded (${pct}% of New) — not a forward stage.`,
     pipelineTitle: "Company pipeline",
