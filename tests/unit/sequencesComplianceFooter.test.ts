@@ -123,6 +123,24 @@ test("a country that is present but unmapped (Spain) stays other and does not fa
   assert.equal(recipientMarket({ companyCountry: "Spain", postingMarkets: ["us"] }), "other");
 });
 
+test("Canada resolves to the us posture (address and English draft) from the person or the company country", () => {
+  assert.equal(recipientMarket({ personCountry: "Canada" }), "us");
+  assert.equal(recipientMarket({ personCountry: "  canada ", companyCountry: "Argentina" }), "us");
+  assert.equal(recipientMarket({ companyCountry: "Canada" }), "us");
+  assert.equal(recipientMarket({ personCountry: "Canada", companyCountry: "Spain", postingMarkets: ["latam"] }), "us");
+});
+
+test("the Canada rule is exact: look-alikes and other unmapped countries still refuse", () => {
+  assert.equal(recipientMarket({ personCountry: "Canada Bay, Australia" }), "other");
+  assert.equal(recipientMarket({ personCountry: "Spain" }), "other");
+  assert.equal(recipientMarket({ postingMarkets: ["other"] }), "other");
+});
+
+test("the Canada rule lives in the sequences layer: classifyMarket still calls Canada other", async () => {
+  const { classifyMarket } = await import("../../src/lib/hiring/markets");
+  assert.equal(classifyMarket("Canada"), "other");
+});
+
 test("all three links absent resolves to other (hold, never send)", () => {
   assert.equal(recipientMarket({}), "other");
   assert.equal(recipientMarket({ personCountry: null, companyCountry: null, postingMarkets: null }), "other");

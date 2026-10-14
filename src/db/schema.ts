@@ -1017,6 +1017,10 @@ export const auditLog = pgTable(
     // 'delete_nameless_imported_contacts' (scripts/delete-nameless-imported-contacts.ts
     // deleted the untouched contacts of the commercial-contacts import that
     // have neither first nor last name; metadata holds the deleted rows)
+    // 'seed_outreach_sequence' (scripts/seed-outreach-sequence.ts created the
+    // owner's first Sequence and added its hand-picked members in state
+    // 'drafted'; metadata lists the sequence id, added person ids and the
+    // rejected ones with their reasons. Never written on a no-op run)
     // 'apply_resolved_phones' (scripts/apply-resolved-phones.ts wrote the
     // numbers a human picked for the people whose signatures disagreed and
     // extract-signature-phones.ts therefore left alone; history rows carry

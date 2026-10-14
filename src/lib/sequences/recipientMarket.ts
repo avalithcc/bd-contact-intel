@@ -21,6 +21,20 @@ export interface MarketInputs {
   readonly postingMarkets?: readonly (string | null)[] | null;
 }
 
+/**
+ * Canada resolves to the `us` bucket because the sender's US entity and an English draft are the correct posture
+ * for a Canadian recipient. This key selects a compliance posture and a draft language, not a nationality; it is not
+ * a claim that Canada is the United States. The rule lives here, NOT in classifyMarket, because classifyMarket also
+ * feeds the hiring signal and Canadian job postings must stay out of the `us` hiring market. Exact match on the
+ * country field only, so a look-alike never rides along; every other unmapped country still resolves to `other`.
+ */
+const CANADA = /^canada$/i;
+
+function fromCountry(country: string): MarketKey {
+  const market = classifyMarket(country);
+  return market === "other" && CANADA.test(country) ? "us" : market;
+}
+
 function fromPostings(markets: readonly (string | null)[] | null | undefined): MarketKey {
   const known = new Set<MarketKey>();
   for (const m of markets ?? []) {
@@ -31,8 +45,8 @@ function fromPostings(markets: readonly (string | null)[] | null | undefined): M
 
 export function recipientMarket(input: MarketInputs): MarketKey {
   const person = input.personCountry?.trim();
-  if (person) return classifyMarket(person);
+  if (person) return fromCountry(person);
   const company = input.companyCountry?.trim();
-  if (company) return classifyMarket(company);
+  if (company) return fromCountry(company);
   return fromPostings(input.postingMarkets);
 }
