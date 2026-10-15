@@ -133,6 +133,8 @@ export async function searchLushaContact(input: { personId: string; field: Revea
       if (state.reason === "not_revealable") return no("lusha_not_eligible");
       break;
     case "revealable": {
+      // The paid call for this field may already have been billed (outcome_unknown): only a new, paid search reopens it.
+      if (rows[input.field]?.errorCode === "outcome_unknown") break;
       // A valid stored match: serve it, no network, no charge.
       const stored = payloadOf(rows.search);
       return { ok: true, outcome: "matched", identity: stored.identity as LushaIdentity, price: state.price, reused: true };

@@ -382,6 +382,20 @@ test("a replayed reveal after outcome_unknown is refused server-side with no res
   assert.equal((await revealLushaField(input(), other.p)).ok, true);
 });
 
+test("after outcome_unknown the field can only be reopened by an explicit new (paid) search, never by serving the stored match", async () => {
+  const unknown = row({ id: "r2", field: "emails", state: "failed", errorCode: "outcome_unknown", searchId: "s1" });
+  const f = fake({ rows: { ...WITH_SEARCH, emails: unknown } });
+  const r = await searchLushaContact(input(), f.p);
+  assert.deepEqual([r.ok, r.ok && r.outcome === "matched" && r.reused], [true, false]);
+  assert.deepEqual(spends(f.calls), ["reserve", "searchContact"]);
+  // Without the unknown row the stored match is still served for free.
+  const free = fake({ rows: WITH_SEARCH });
+  assert.deepEqual(spends(free.calls), []);
+  const served = await searchLushaContact(input(), free.p);
+  assert.equal(served.ok && served.outcome === "matched" && served.reused, true);
+  assert.deepEqual(spends(free.calls), []);
+});
+
 test("a phone Lusha returned that we already held is reported as already_held, not as a successful reveal", async () => {
   const f = fake({
     rows: WITH_SEARCH,
