@@ -15,6 +15,16 @@ import { planRevealedEmailWrite, planRevealedPhoneWrite } from "./revealPlan";
 import type { Subject } from "./reveal";
 import { toLatestRows, type LatestRows } from "./revealState";
 
+/**
+ * How old a `reserved` row must be before it is definitively stranded. A reservation is only ever settled by the function
+ * that made it: the fetch gives up after 8 s (client.ts TIMEOUT_MS) and the settle follows at once, and the hosting page is
+ * killed at maxDuration = 60 s (contacts/[id]/page.tsx). So nothing still `reserved` after 60 s can be in flight. Five times
+ * that is the margin for clock skew between app instances (`at` is the app's clock) and for a long wait on the lock, and is
+ * still minutes, not hours. Pinned against the page's maxDuration by tests/db/lushaReveal.test.ts.
+ */
+export const FUNCTION_MAX_DURATION_MS = 60_000;
+export const STRANDED_AFTER_MS = 5 * FUNCTION_MAX_DURATION_MS;
+
 /** Serializes every reservation: a unique index cannot bound a sum() over rows that do not exist yet. */
 export const LUSHA_CAP_LOCK = 0x4c55_5348; // "LUSH"
 
@@ -46,6 +56,10 @@ export async function reserve(
   const now = input.now ?? new Date();
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${LUSHA_CAP_LOCK})`);
+    // Reap before anything is read: a killed function leaves its row `reserved`, which answers "busy" forever. Under the lock, so two reserves cannot both release the same row. The row is FAILED
+    // with its credits_reserved untouched: the cap keeps counting what may have been billed, and the field takes the
+    // outcome_unknown guard (isOutcomeUnknown). This also cures the single-row wart without the manual release SQL.
+    await tx.execute(sql`update lusha_reveal set state = 'failed', error_code = 'reaped', settled_at = ${now.toISOString()}::timestamptz where state = 'reserved' and at < ${new Date(now.getTime() - STRANDED_AFTER_MS).toISOString()}::timestamptz`);
     // FOR SHARE makes mergeContacts' FOR UPDATE wait for this reservation instead of racing it (credits on a tombstone).
     // The same read answers "do we already own this value": a settled `revealed` row of ANY search blocks a second payment.
     const [owner] = await tx

@@ -6,7 +6,7 @@ import type { IdentityFields } from "@/lib/contacts/identityDiff";
 import { isReachable } from "@/lib/sequences/rosterGuards";
 import type { LushaConfigResult } from "./config";
 import { SEARCH_COST } from "./pricing";
-import { resolveRevealState, type LatestRows, type RevealState } from "./revealState";
+import { isOutcomeUnknown, resolveRevealState, type LatestRows, type RevealState } from "./revealState";
 
 /** Shown before any search exists, labelled "~"; the real price comes from the search's own canReveal list afterwards. */
 const ESTIMATED_FIELD_PRICE = { emails: 1, phones: 5 } as const;
@@ -88,7 +88,7 @@ export function buildLushaView(i: {
 
     // A capped action keeps its priced control, disabled: describe what is open without the cap, then close it.
     const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, cap: Number.MAX_SAFE_INTEGER }, i.config) : live;
-    const unknownOutcome = open.kind === "revealable" && own?.errorCode === "outcome_unknown";
+    const unknownOutcome = open.kind === "revealable" && isOutcomeUnknown(own?.errorCode);
     const control = (kind: "search" | "reveal" | "research", price: number | null) => ({ kind, price, disabled: live.kind === "capped" || !i.config.ok });
     switch (open.kind) {
       case "unconfigured":

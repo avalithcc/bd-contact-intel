@@ -40,3 +40,12 @@ test("the settle inserts the activity directly and never uses the manual edit pa
   assert.doesNotMatch(code, /createActivityInTx|updateContactProperty|planPropertyEdit/);
   assert.match(code, /insert\(activity\)/);
 });
+
+test("reserve reaps stranded rows under the lock and before the spend is read; the reaper fails the row and never frees credits", () => {
+  const body = code.slice(code.indexOf("export async function reserve"), code.indexOf("const inFlight"));
+  const [lock, reap, spend] = [body.indexOf("pg_advisory_xact_lock"), body.indexOf("error_code = 'reaped'"), body.indexOf("getDailySpend(")];
+  assert.ok(lock >= 0 && lock < reap && reap < spend);
+  const stmt = body.slice(reap - 80, reap + 260);
+  assert.match(stmt, /state = 'failed'/);
+  assert.doesNotMatch(stmt, /credits_reserved|credits_charged/, "the reserved amount is left exactly as it was");
+});

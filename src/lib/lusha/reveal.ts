@@ -11,7 +11,7 @@ import { expectedCost, type CanRevealEntry } from "./pricing";
 import { reasonForKind, type LushaReason } from "./reasons";
 import type { LushaResponse, RevealField, SearchInput } from "./client";
 import type { RevealSettlement, ReserveResult } from "./revealDb";
-import { resolveRevealState, type LatestRows } from "./revealState";
+import { isOutcomeUnknown, resolveRevealState, type LatestRows } from "./revealState";
 
 export interface Subject {
   id: string;
@@ -135,7 +135,7 @@ export async function searchLushaContact(input: { personId: string; field: Revea
       break;
     case "revealable": {
       // The paid call for this field may already have been billed (outcome_unknown): only a new, paid search reopens it.
-      if (rows[input.field]?.errorCode === "outcome_unknown") break;
+      if (isOutcomeUnknown(rows[input.field]?.errorCode)) break;
       // A valid stored match: serve it, no network, no charge.
       const stored = payloadOf(rows.search);
       return { ok: true, outcome: "matched", identity: stored.identity as LushaIdentity, price: state.price, reused: true, searchId: rows.search!.id };
@@ -215,7 +215,7 @@ export async function revealLushaField(input: { personId: string; field: RevealF
       return no("lusha_cap_reached", { remaining: state.remaining });
     case "revealable":
       // outcome_unknown may already have been billed: only an explicit new search (a conscious spend) reopens the field.
-      if (rows[field]?.errorCode === "outcome_unknown") return no("lusha_outcome_unknown");
+      if (isOutcomeUnknown(rows[field]?.errorCode)) return no("lusha_outcome_unknown");
       // A paid value parked by a failed settle is applied for free (task 6.11), never bought again.
       if (rows[field]?.errorCode === "settle_failed") return no("lusha_not_eligible");
       if (rows.search?.id !== input.expect.searchId || state.price !== input.expect.price) return no("lusha_stale");

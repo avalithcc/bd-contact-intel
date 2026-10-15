@@ -55,6 +55,12 @@ export type RevealState =
   | { kind: "revealed"; value: string | null }
   | { kind: "capped"; remaining: number; needed: number };
 
+/**
+ * A failed row whose charge we cannot rule out: the call may have been billed. `reaped` (a reservation swept after its
+ * function could no longer be alive) is the same situation as a timeout, so it takes the same guard.
+ */
+export const isOutcomeUnknown = (code: string | null | undefined): boolean => code === "outcome_unknown" || code === "reaped";
+
 const settled = (r: LedgerRow | null | undefined): LedgerRow | null => (r && r.state === "settled" ? r : null);
 
 function canRevealOf(payload: unknown): CanRevealEntry[] | null {

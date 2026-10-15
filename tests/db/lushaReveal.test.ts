@@ -559,3 +559,48 @@ test("a paid value parked by a failed settle blocks a second purchase and is app
   assert.deepEqual([row.state, row.outcome, row.creditsCharged, row.errorCode, row.value], ["settled", "revealed", 1, null, email]);
   assert.equal((await personRow(p.id)).email, email);
 });
+
+// --- reaping stranded reservations; failed searches are refillable ------------------------------------------------
+
+const MIN = 60_000;
+const BIG = 1_000_000;
+
+test("the stranded threshold is longer than the longest a function can live", async () => {
+  const { STRANDED_AFTER_MS } = await import("@/lib/lusha/revealDb");
+  const maxDuration = Number(/export const maxDuration = (\d+)/.exec(readFileSync(join(process.cwd(), "src/app/(app)/contacts/[id]/page.tsx"), "utf8"))?.[1]);
+  assert.ok(maxDuration > 0 && STRANDED_AFTER_MS > maxDuration * 1000);
+});
+
+test("a reservation older than the threshold is reaped: failed, credits still counted, and the person is reservable again", async () => {
+  const { STRANDED_AFTER_MS, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("reap");
+  const old = new Date(Date.now() - STRANDED_AFTER_MS - MIN);
+  const stuck = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: old });
+  assert.ok(stuck.ok);
+  assert.deepEqual((await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(old.getTime() + MIN) })).ok, false, "still in flight at that moment");
+  const again = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG });
+  assert.ok(again.ok, "reaped, so no longer busy");
+  const [reaped] = (await ledger(p.id)).filter((r) => r.id === stuck.reservationId);
+  assert.deepEqual([reaped.state, reaped.errorCode, reaped.creditsReserved, reaped.creditsCharged, reaped.settledAt instanceof Date], ["failed", "reaped", 1, null, true]);
+  assert.ok((await getDailySpend(old)) >= 1, "the reaped credit still counts in its own day");
+});
+
+test("a reservation inside the window may be in flight and is left alone", async () => {
+  const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("fresh");
+  const first = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS + MIN) });
+  assert.ok(first.ok);
+  const second = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG });
+  assert.deepEqual(second.ok === false && second.reason, "busy");
+  assert.equal((await ledger(p.id)).filter((r) => r.id === (first.ok ? first.reservationId : "")).map((r) => r.state)[0], "reserved");
+});
+
+test("two concurrent reserves over one stranded row: one wins, the other is busy, and the winner's fresh row is never reaped", async () => {
+  const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("reaprace");
+  await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
+  const out = await Promise.all([1, 2].map(() => reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG })));
+  assert.deepEqual(out.map((r) => r.ok).sort(), [false, true]);
+  const rows = await ledger(p.id);
+  assert.deepEqual(rows.map((r) => r.state).sort(), ["failed", "reserved"]);
+});
