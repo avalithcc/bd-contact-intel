@@ -28,7 +28,7 @@ function candidate(over: Partial<ReleaseCandidate> = {}): ReleaseCandidate {
     dueAt: new Date(NINE_AM.getTime() + n * 1000), approvedAt: new Date("2026-10-14T20:00:00Z"),
     memberState: "approved", draftApproved: true, merged: false, email: `person${n}@acme.test`, hasClientStatus: false,
     market: "us", body: footed.status === "ok" ? footed.body : "", accountStatus: "connected", activeClaim: null,
-    repliedAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, ownerBdId: "bd-1",
+    repliedAt: null, inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, ownerBdId: "bd-1",
     personId: `p-${n}`, subject: "Hi", accountEmail: "sender@mailbox.test", holdReason: null, schedule: DEFAULT_SCHEDULE,
     ...over,
   };

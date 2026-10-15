@@ -286,6 +286,43 @@ test("a step 2 claim needs replied_at null AND a sent step 1 claim", async () =>
   assert.ok(await claimStep(byId.get(good.memberId)!));
 });
 
+/** An email_message row (and its person link) as the sync stores it; `sentAt` is relative to step 1 going out on 2026-10-08T13:00Z. */
+async function insertMail(a: Acct, personId: string, email: string, o: { direction?: "inbound" | "outbound"; auto?: boolean; confidence?: string; sentAt: string }) {
+  const { db } = await import("@/db");
+  const { emailMessage, emailMessagePerson } = await import("@/db/schema");
+  const [row] = await db.insert(emailMessage).values({
+    bdId: a.bdId, gmailMessageId: `g-${run}-${Math.random().toString(36).slice(2)}`, gmailThreadId: `t-${run}`, direction: o.direction ?? "inbound",
+    personId, fromAddress: email, matchedEmail: email, matchConfidence: o.confidence ?? "exact", isAutomatic: o.auto ?? false, sentAt: new Date(o.sentAt),
+  }).returning();
+  await db.insert(emailMessagePerson).values({ emailMessageId: row.id, personId, matchedEmail: email, matchConfidence: o.confidence ?? "exact" });
+}
+
+test("a reminder is HELD when email_message shows a genuine post-send reply, although replied_at was never written (the hook failed)", async () => {
+  const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
+  const { claimStep, listReleaseCandidates } = await import("@/lib/sequences/releaseQueries");
+  const a = await mkAccount("srcoftruth");
+  const answered = await mkMember(a, "sot-answered", { state: "sent", step: 2 });
+  const control = { auto: await mkMember(a, "sot-auto", { state: "sent", step: 2 }), thread: await mkMember(a, "sot-thread", { state: "sent", step: 2 }), before: await mkMember(a, "sot-before", { state: "sent", step: 2 }), out: await mkMember(a, "sot-out", { state: "sent", step: 2 }) };
+  for (const [i, m] of [answered, ...Object.values(control)].entries()) await insertClaim(m.memberId, a, { outcome: "sent", step: 1, date: "2026-10-08", rfc: `<s${i}@x.test>`, thread: `t-s${i}` });
+  await insertMail(a, answered.personId, answered.email, { sentAt: "2026-10-09T09:00:00Z" });
+  await insertMail(a, control.auto.personId, control.auto.email, { sentAt: "2026-10-09T09:00:00Z", auto: true });
+  await insertMail(a, control.thread.personId, control.thread.email, { sentAt: "2026-10-09T09:00:00Z", confidence: "thread" });
+  await insertMail(a, control.before.personId, control.before.email, { sentAt: "2026-10-07T09:00:00Z" });
+  await insertMail(a, control.out.personId, control.out.email, { sentAt: "2026-10-09T09:00:00Z", direction: "outbound" });
+  assert.equal((await memberRow(answered.memberId)).repliedAt, null, "precondition: the derived column was never written");
+
+  const byId = new Map((await listReleaseCandidates(NOW)).map((c) => [c.id, c]));
+  assert.ok(byId.get(answered.memberId)!.inboundReplyAt, "the candidate read carries the source-of-truth fact");
+  for (const m of Object.values(control)) assert.equal(byId.get(m.memberId)!.inboundReplyAt, null, "automatic, thread-attributed, pre-send and outbound mail are not replies");
+  // The claim is independent of preSendChecks: a forged candidate that says "no reply" still cannot claim the answered member.
+  assert.equal(await claimStep({ ...byId.get(answered.memberId)!, inboundReplyAt: null }), null);
+
+  const { ports, sends } = await portsFor([a]);
+  assert.deepEqual(await runSequenceRelease(ports), { released: 4, held: 1, deferred: 0, failed: 0 });
+  assert.ok(!sends.some((s) => s.to === answered.email));
+  assert.equal((await memberRow(answered.memberId)).holdReason, "replied");
+});
+
 test("holds are persisted: an unmapped market and a suppressed address are not sent and say why", async () => {
   const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
   const { insertSuppression } = await import("@/lib/sequences/suppressionQueries");

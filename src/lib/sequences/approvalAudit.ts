@@ -10,6 +10,8 @@ export const SEQUENCE_AUDIT_ACTIONS = {
   discard: "sequence_member_discard",
   readmit: "sequence_member_readmit",
   regenerate: "sequence_member_regenerate",
+  // A BD pressed "No contactar": the address is suppressed and this membership was discarded with reason opt_out.
+  opt_out: "sequence_member_opt_out",
 } as const;
 
 export type SequenceAuditVerb = keyof typeof SEQUENCE_AUDIT_ACTIONS;

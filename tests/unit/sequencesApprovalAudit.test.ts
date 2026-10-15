@@ -15,6 +15,6 @@ for (const verb of ["approve", "cancel", "discard", "readmit", "regenerate"] as 
   });
 }
 
-test("the five actions map to distinct audit actions", () => {
-  assert.equal(new Set(Object.values(SEQUENCE_AUDIT_ACTIONS)).size, 5);
+test("the six actions map to distinct audit actions", () => {
+  assert.equal(new Set(Object.values(SEQUENCE_AUDIT_ACTIONS)).size, 6);
 });

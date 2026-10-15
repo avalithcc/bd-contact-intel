@@ -8,8 +8,9 @@
  *  - A market with no compliance entry (`other`) HOLDS as `unmapped_market`. There is no default address (config.ts).
  *  - Any existing non-failed claim holds as `manual_check`: a `pending` claim is the crash case (Gmail may or may not
  *    have accepted the message) and is NEVER auto-resent; at-most-once beats at-least-once.
- * The "no genuine reply" check reads `repliedAt`, which only the reply handling of PR 10 writes. Until then nothing sets
- * it, which is safe only because the runner is not reachable.
+ * The "no genuine reply" check reads TWO facts. `repliedAt` is derived and written only by the best-effort sync hook
+ * (applyReplies.ts), which is swallowed on failure so mail sync survives. `inboundReplyAt` comes from email_message, the
+ * source of truth, so a hook that failed costs nothing here: the last line of defence never depends on an optional step.
  */
 import type { MarketKey } from "@/lib/hiring/markets";
 import { bodyHasFooter } from "./complianceFooter";
@@ -48,6 +49,8 @@ export interface PreSendFacts {
   /** Outcome of the member's non-failed claim for THIS step, if any. */
   activeClaim: "pending" | "sent" | null;
   repliedAt: Date | null;
+  /** Earliest genuine inbound message from the Contact after step 1's send, from email_message (see genuineReplyAfterSend). */
+  inboundReplyAt: Date | null;
   lastSyncedAt: Date | null;
   /** Step 1's stored RFC Message-ID and Gmail thread: what a reminder threads against. */
   step1RfcMessageId: string | null;
@@ -80,7 +83,7 @@ export function evaluatePreSendChecks(
   if (!bodyHasFooter(f.body, config, f.market) || !extractUnsubscribeUrl(f.body)) return hold("missing_footer");
   if (f.accountStatus !== "connected") return hold("account_not_connected");
   if (f.step === 2) {
-    if (f.repliedAt) return hold("replied");
+    if (f.repliedAt || f.inboundReplyAt) return hold("replied");
     if (!isSyncFreshEnough({ lastSyncedAt: f.lastSyncedAt, now: ctx.now, staleAfterMs: ctx.staleAfterMs ?? SEQUENCE_SYNC_STALE_MS })) return hold("sync_stale");
     if (!f.step1RfcMessageId || !f.step1ThreadId) return hold("no_thread_headers");
   }

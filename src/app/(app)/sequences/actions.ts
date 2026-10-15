@@ -11,6 +11,7 @@ import {
   type DraftBatchResult,
   type SaveEditResult,
 } from "@/lib/sequences/draftQueries";
+import { recordOptOutForMember, type OptOutResult } from "@/lib/sequences/optOutQueries";
 import {
   addMembersToSequence,
   createSequenceRow,
@@ -104,4 +105,10 @@ export async function cancelApproval(memberId: string, step: 1 | 2 = 1) {
 export async function advanceReminder(memberId: string) {
   const me = await getCurrentBd();
   return advanceReminderRow(me.id, memberId);
+}
+
+/** "No contactar": suppresses the member's address and discards every live membership of it (reason opt_out). */
+export async function recordOptOut(memberId: string): Promise<OptOutResult> {
+  const me = await getCurrentBd();
+  return recordOptOutForMember(me.id, memberId);
 }

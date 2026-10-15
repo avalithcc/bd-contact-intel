@@ -1459,6 +1459,10 @@ export const emailMessage = pgTable(
     // 'exact' | 'inferred' — 'inferred' when matchedEmail came from a
     // pattern-deduced person email (`person.email_source = 'pattern_inferred'`).
     matchConfidence: text("match_confidence").notNull(),
+    // Machine-generated (out-of-office, bounce, delivery report), by automatedMessage.ts at sync time. Sequence reply
+    // handling ignores these; the reply_received activity does NOT (existing behavior, unchanged). Rows synced before
+    // 0044 default to false, which is the same as "never classified".
+    isAutomatic: boolean("is_automatic").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

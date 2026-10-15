@@ -33,6 +33,7 @@ function facts(over: Partial<PreSendFacts> = {}): PreSendFacts {
     accountStatus: "connected",
     activeClaim: null,
     repliedAt: null,
+    inboundReplyAt: null,
     lastSyncedAt: new Date(NOW.getTime() - 3 * 3600_000),
     step1RfcMessageId: "<abc@mail.gmail.test>",
     step1ThreadId: "thread-1",
@@ -101,6 +102,15 @@ test("an account that is not connected is held", () => {
 test("an existing claim is never re-sent: pending (crash, outcome unknown) and sent both surface as manual_check", () => {
   assert.deepEqual(check(facts({ activeClaim: "pending" })), held("manual_check"));
   assert.deepEqual(check(facts({ activeClaim: "sent" })), held("manual_check"));
+});
+
+// replied_at is DERIVED and only the best-effort sync hook writes it; inboundReplyAt is read from email_message, the
+// source of truth. A hook that failed (and was swallowed so mail sync survives) must cost nothing here.
+test("reminders only: a genuine inbound message after the send holds the reminder even though replied_at was never written", () => {
+  const reply = new Date("2026-10-14T10:00:00Z");
+  assert.deepEqual(check(reminder({ repliedAt: null, inboundReplyAt: reply })), held("replied"));
+  assert.deepEqual(check(facts({ inboundReplyAt: reply })), { ok: true }, "step 1 does not apply the reply check");
+  assert.deepEqual(check(reminder({ repliedAt: null, inboundReplyAt: null })), { ok: true });
 });
 
 test("reminders only: a recorded reply holds the reminder", () => {

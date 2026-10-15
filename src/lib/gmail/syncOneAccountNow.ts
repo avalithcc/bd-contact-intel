@@ -26,6 +26,9 @@ import {
   writeSyncedMessages,
   type SyncableAccount,
 } from "./syncQueries";
+import { withSequenceReplies } from "./withSequenceReplies";
+import { applySequenceReplies } from "@/lib/sequences/applyReplies";
+import { liveReplyPorts } from "@/lib/sequences/replyQueries";
 
 export const PER_BD_BUDGET_MS = 20_000;
 
@@ -62,8 +65,11 @@ export async function syncOneAccountNow(account: SyncableAccount, now: Date = ne
       getOutboundThreadRefs: (q: ThreadRefQuery) => getOutboundThreadRefs(account.bdId, q),
       getOwnMailboxAddresses,
     },
-    writeMessages: (classified: Parameters<typeof writeSyncedMessages>[1]) =>
-      writeSyncedMessages(account.bdId, classified),
+    // Sequence reply handling rides on the write, behind its own try/catch (withSequenceReplies.ts).
+    writeMessages: withSequenceReplies(
+      (classified) => writeSyncedMessages(account.bdId, classified),
+      (messages) => applySequenceReplies(messages, liveReplyPorts),
+    ),
   };
 
   if (!account.historyId) {

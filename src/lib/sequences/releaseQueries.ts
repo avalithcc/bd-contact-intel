@@ -34,6 +34,15 @@ const rowsOf = <T>(r: unknown) => r as T[];
 const toDate = (v: unknown): Date | null => (v === null || v === undefined ? null : v instanceof Date ? v : new Date(v as string));
 const sameCompany = sql`(c.company_key = p.company_key or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
+/**
+ * THE definition of "a genuine reply after step 1" for the runner, read from email_message (the source of truth) and used
+ * by BOTH the candidate read and the claim, so they cannot disagree. Inbound, not automatic, and the link is not a
+ * thread attribution (the sender is an address we do not hold). Any BD's mailbox counts, as in applyReplies.ts. Uses
+ * email_message_person_person_idx. Rows synced before 0044 default is_automatic to false, which fails toward holding.
+ */
+const genuineReplyAfterSend = sql`select em.sent_at from email_message_person emp join email_message em on em.id = emp.email_message_id
+  where emp.person_id = sm.person_id and em.direction = 'inbound' and em.is_automatic = false and emp.match_confidence <> 'thread' and em.sent_at > sm.sent_at`;
+
 function toCandidate(r: Row): ReleaseCandidate {
   const step = Number(r.step) as 1 | 2;
   const schedule = parseSchedule(r.schedule);
@@ -46,7 +55,7 @@ function toCandidate(r: Row): ReleaseCandidate {
   return {
     id: r.member_id as string, sequenceId: r.sequence_id as string, ownerBdId: r.owner_bd_id as string, personId: r.person_id as string,
     accountId: r.account_id as string, dailyCap: Number(r.daily_send_cap), step, dueAt, approvedAt, schedule,
-    memberState: r.state as string, draftApproved: true, repliedAt: toDate(r.replied_at), holdReason: (r.hold_reason ?? null) as HoldReason | null,
+    memberState: r.state as string, draftApproved: true, repliedAt: toDate(r.replied_at), inboundReplyAt: toDate(r.inbound_reply_at), holdReason: (r.hold_reason ?? null) as HoldReason | null,
     email: (r.email ?? null) as string | null, merged: Boolean(r.merged), hasClientStatus: Boolean(r.has_client_status),
     market: recipientMarket({ personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] }),
     subject: r.subject as string, body: r.body as string, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
@@ -62,7 +71,7 @@ export async function listReleaseCandidates(now: Date): Promise<ReleaseCandidate
     await db.execute(sql`
       select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
              s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
-             sm.state, sm.replied_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country,
+             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country,
              (select c.country from company c where ${sameCompany} limit 1) as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and jp.closed_at is null
                 and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets,
@@ -134,7 +143,7 @@ const REQUIRED_STATE = { 1: "approved", 2: "sent" } as const;
 export async function claimStep(c: ReleaseCandidate): Promise<string | null> {
   const reminderOnly =
     c.step === 2
-      ? sql`and sm.replied_at is null and exists (select 1 from sequence_send_claim s1 where s1.sequence_member_id = sm.id and s1.step = 1 and s1.outcome = 'sent')`
+      ? sql`and sm.replied_at is null and not exists (${genuineReplyAfterSend}) and exists (select 1 from sequence_send_claim s1 where s1.sequence_member_id = sm.id and s1.step = 1 and s1.outcome = 'sent')`
       : sql``;
   const [row] = rowsOf<{ id: string }>(
     await db.execute(sql`

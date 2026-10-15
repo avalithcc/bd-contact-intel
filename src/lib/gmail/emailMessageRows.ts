@@ -28,6 +28,8 @@ export function buildEmailMessageRow(bdId: string, c: ClassifiedMessage): NewEma
     rfcReferences: c.references,
     matchedEmail: primary.matchedEmail,
     matchConfidence: primary.matchConfidence,
+    // The classifier calls it `automated`; the column is `is_automatic`. This is the only place the two names meet.
+    isAutomatic: c.automated ?? false,
   };
 }
 
