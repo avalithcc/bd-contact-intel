@@ -1852,7 +1852,6 @@ export const es: typeof en = {
     cohortColContact: "Contacto",
     cohortColCompany: "Empresa",
     cohortColBd: "BD dueño",
-    cohortColRoleGroup: "Grupo de rol",
     cohortRoleUnclassified: "sin clasificar",
     cohortRoleUnclassifiedHint: "Todavía no se clasificó el cargo de este contacto.",
     cohortColStatus: "Estado",

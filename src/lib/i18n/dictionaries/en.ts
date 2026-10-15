@@ -1881,7 +1881,6 @@ export const en = {
     cohortColContact: "Contact",
     cohortColCompany: "Company",
     cohortColBd: "Owner BD",
-    cohortColRoleGroup: "Role group",
     cohortRoleUnclassified: "unclassified",
     cohortRoleUnclassifiedHint: "This contact's role has not been classified yet.",
     cohortColStatus: "Status",

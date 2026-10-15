@@ -63,7 +63,6 @@ const cohortLabels: CohortDrilldownLabels = {
   cohortColContact: dict.cohortColContact,
   cohortColCompany: dict.cohortColCompany,
   cohortColBd: dict.cohortColBd,
-  cohortColRoleGroup: dict.cohortColRoleGroup,
   cohortRoleUnclassified: dict.cohortRoleUnclassified,
   cohortRoleUnclassifiedHint: dict.cohortRoleUnclassifiedHint,
   cohortColStatus: dict.cohortColStatus,

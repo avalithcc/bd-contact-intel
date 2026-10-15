@@ -7,7 +7,7 @@ import { ChevronRightIcon } from "@/components/icons";
 import { KpiDrilldownCard, DrilldownDialog, useDrilldown } from "./KpiDrilldownCard";
 import { getCohortDrilldownAction } from "./actions";
 import { drilldownCacheKey } from "@/lib/reports/drilldownCacheKey";
-import { cohortHasReplyColumns, cohortHasRoleColumn, jobTitleLine, roleGroupCell, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
+import { cohortHasReplyColumns, contactSubline, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -25,7 +25,6 @@ export type CohortDrilldownLabels = ClientStrings<
     | "cohortColContact"
     | "cohortColCompany"
     | "cohortColBd"
-    | "cohortColRoleGroup"
     | "cohortRoleUnclassified"
     | "cohortRoleUnclassifiedHint"
     | "cohortColStatus"
@@ -70,24 +69,23 @@ function CohortSubtitle({ summary, note }: { summary: string; note: string }) {
 
 const dash = <span className="meta">—</span>;
 
-/** Muted job-title line under the name; renders nothing (no empty line, no dash) when there is no title. */
-function ContactTitle({ jobTitle }: { jobTitle: string | null }) {
-  const line = jobTitleLine(jobTitle);
+/**
+ * Muted second line of the Contacto cell, `title · group`, same in every
+ * population (no per-population column). The title is clamped to one line with
+ * an ellipsis; the group sits in its own non-shrinking span so a long title can
+ * never cut it off. Nothing is rendered when there is nothing to say.
+ */
+function ContactSubline({ jobTitle, roleGroup, l }: { jobTitle: string | null; roleGroup: string | null; l: CohortDrilldownLabels }) {
+  const line = contactSubline(jobTitle, roleGroup, l.roleGroups);
   if (!line) return null;
+  const group = line.group.kind === "group" ? line.group.label : l.cohortRoleUnclassified;
   return (
-    <span className="cell-sub cell-sub-clamp" title={line}>
-      {line}
-    </span>
-  );
-}
-
-/** Unclassified (NULL) is a muted badge, same as the outreach list's unclassified startup badge. */
-function roleCell(roleGroup: string | null, l: CohortDrilldownLabels) {
-  const cell = roleGroupCell(roleGroup, l.roleGroups);
-  if (cell.kind === "group") return cell.label;
-  return (
-    <span className="badge badge-none" title={l.cohortRoleUnclassifiedHint}>
-      {l.cohortRoleUnclassified}
+    <span className="cell-sub cell-sub-split" title={[line.title, group].filter(Boolean).join(" · ")}>
+      {line.title && <span className="clamp">{line.title}</span>}
+      {line.title && <span aria-hidden="true">·</span>}
+      <span className="group" title={line.group.kind === "unclassified" ? l.cohortRoleUnclassifiedHint : undefined}>
+        {group}
+      </span>
     </span>
   );
 }
@@ -95,13 +93,11 @@ function roleCell(roleGroup: string | null, l: CohortDrilldownLabels) {
 function CohortRowsTable({ population, rows, labels: l }: { population: CohortPopulation; rows: CohortRow[]; labels: CohortDrilldownLabels }) {
   if (rows.length === 0) return <p className="meta">{l[EMPTY_KEY[population]]}</p>;
   const withReply = cohortHasReplyColumns(population);
-  const withRole = cohortHasRoleColumn(population);
   return (
     <table className="data compact">
       <thead>
         <tr>
           <th>{l.cohortColContact}</th>
-          {withRole && <th>{l.cohortColRoleGroup}</th>}
           <th>{l.cohortColCompany}</th>
           <th>{l.cohortColBd}</th>
           <th>{l.cohortColStatus}</th>
@@ -115,9 +111,8 @@ function CohortRowsTable({ population, rows, labels: l }: { population: CohortPo
           <tr key={row.personId}>
             <td>
               <Link href={`/contacts/${row.personId}`}>{row.personName}</Link>
-              <ContactTitle jobTitle={row.jobTitle} />
+              <ContactSubline jobTitle={row.jobTitle} roleGroup={row.roleGroup} l={l} />
             </td>
-            {withRole && <td>{roleCell(row.roleGroup, l)}</td>}
             <td>{row.companyName ?? "—"}</td>
             <td>{row.ownerBdName ?? "—"}</td>
             <td>

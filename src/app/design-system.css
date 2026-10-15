@@ -737,9 +737,10 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 
 /* Second line of a table cell (a time under its date). */
 .cell-sub { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); }
-/* Free-text second line (job title): one line with an ellipsis, the full text goes in the title attribute.
-   Same treatment as .cell-person .sub. */
-.cell-sub.cell-sub-clamp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+/* Title · group line: the title shrinks with an ellipsis, the group label never does. */
+.cell-sub.cell-sub-split { display: flex; gap: var(--space-2xs); max-width: 340px; white-space: nowrap; }
+.cell-sub-split .clamp { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cell-sub-split .group { flex: none; }
 .bar-track { height: 8px; border-radius: var(--radius-pill); background: var(--color-surface-sunken); overflow: hidden; display: flex; }
 .bar-track span { display: block; height: 100%; }
 .bar-success { background: var(--color-success); } .bar-warn { background: var(--color-warn); } .bar-info { background: var(--color-info); } .bar-neutral { background: var(--color-ink-muted); }

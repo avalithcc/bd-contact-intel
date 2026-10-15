@@ -35,11 +35,6 @@ export function cohortHasReplyColumns(population: CohortPopulation): boolean {
   return population !== "contacted" && population !== "new";
 }
 
-/** Only the "new" list shows the role column (the reply lists already carry seven columns). */
-export function cohortHasRoleColumn(population: CohortPopulation): boolean {
-  return population === "new";
-}
-
 /** Muted second line under the contact name: the raw job title, or no line at all when absent/blank. */
 export function jobTitleLine(jobTitle: string | null): string | null {
   const trimmed = jobTitle?.trim();
@@ -56,6 +51,25 @@ export type RoleGroupCell = { kind: "group"; label: string } | { kind: "unclassi
 export function roleGroupCell(roleGroup: string | null, labels: Readonly<Record<string, string>>): RoleGroupCell {
   if (roleGroup === null || !Object.prototype.hasOwnProperty.call(labels, roleGroup)) return { kind: "unclassified" };
   return { kind: "group", label: labels[roleGroup]! };
+}
+
+export interface ContactSubline {
+  title: string | null;
+  /** Unclassified is shown (muted) only next to a title; on its own it carries nothing. */
+  group: RoleGroupCell;
+}
+
+/**
+ * Second line of the Contacto cell, identical in all four cohort dialogs:
+ * `title · group`. Neither a title nor a classified group → no line at all
+ * (null). `no_position` is a real group and shows without a title; a NULL or
+ * unknown group shows as "unclassified" only when there is a title to sit next to.
+ */
+export function contactSubline(jobTitle: string | null, roleGroup: string | null, labels: Readonly<Record<string, string>>): ContactSubline | null {
+  const title = jobTitleLine(jobTitle);
+  const group = roleGroupCell(roleGroup, labels);
+  if (title === null && group.kind === "unclassified") return null;
+  return { title, group };
 }
 
 /** The funnel number the list must equal. */

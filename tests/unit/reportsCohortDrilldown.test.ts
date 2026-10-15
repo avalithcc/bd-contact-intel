@@ -15,7 +15,7 @@ import {
   cohortCount,
   cohortHasReplyColumns,
   roleGroupCell,
-  cohortHasRoleColumn,
+  contactSubline,
   jobTitleLine,
   isCohortPopulation,
   type CohortRawRow,
@@ -188,14 +188,14 @@ test("roleGroupCell: a known group renders its label, NULL renders unclassified,
   assert.deepEqual(roleGroupCell("not_a_group", groups), { kind: "unclassified" }); // never the raw key
 });
 
-test("cohort rows carry role_group (NULL stays NULL) and only the new population shows the column", () => {
+test("cohort rows carry role_group (NULL stays NULL) for every population", () => {
   const [a, b] = buildCohortDrilldownRows([RAW, { ...RAW, personId: "p2", roleGroup: null }]);
   assert.equal(a!.roleGroup, "c_level_tech");
   assert.equal(b!.roleGroup, null);
-  assert.equal(cohortHasRoleColumn("new"), true);
-  for (const p of ["contacted", "replied", "meeting"] as const) assert.equal(cohortHasRoleColumn(p), false);
-  const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population: "new" })).sql);
-  assert.ok(q.includes("person.role_group as pbc_role_group"));
+  for (const population of ["new", "contacted", "replied", "meeting"] as const) {
+    const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population })).sql);
+    assert.ok(q.includes("person.role_group as pbc_role_group"), population);
+  }
 });
 
 test("jobTitleLine: a title shows, an absent or blank one yields no line, a long one is kept whole for the tooltip", () => {
@@ -216,4 +216,24 @@ test("every population's rows carry job_title (the line is shown in all four dia
     const q = norm(dialect.sqlToQuery(buildCohortDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: null, population })).sql);
     assert.ok(q.includes("person.job_title as pbc_job_title"), population);
   }
+});
+
+test("contactSubline: title only, group only, both, neither", () => {
+  const g = es.roleGroups;
+  assert.deepEqual(contactSubline("CTO & Co-Founder", null, g), { title: "CTO & Co-Founder", group: { kind: "unclassified" } });
+  assert.deepEqual(contactSubline(null, "c_level_tech", g), { title: null, group: { kind: "group", label: g.c_level_tech } });
+  assert.deepEqual(contactSubline("CTO & Co-Founder", "c_level_tech", g), { title: "CTO & Co-Founder", group: { kind: "group", label: g.c_level_tech } });
+  assert.equal(contactSubline(null, null, g), null);
+  assert.equal(contactSubline("  ", null, g), null);
+  assert.equal(contactSubline("", "not_a_group", g), null); // unknown key behaves like NULL, never shown raw
+});
+
+test("contactSubline: no_position is a real group and shows even without a title", () => {
+  const g = es.roleGroups;
+  assert.deepEqual(contactSubline(null, "no_position", g), { title: null, group: { kind: "group", label: g.no_position } });
+});
+
+test("contactSubline keeps a very long title whole (the clamp is CSS-only)", () => {
+  const long = "Senior Vice President of Global Engineering, Platform Reliability and Developer Experience ".repeat(4).trim();
+  assert.equal(contactSubline(long, "c_level_tech", es.roleGroups)!.title, long);
 });
