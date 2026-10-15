@@ -31,26 +31,13 @@ import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
 import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
 import {
-  contactActionErrorReason,
+  actionFailure,
   contactLocationActionErrorReason,
   OwnerValueInvalidError,
   PropertyNotEditableError,
   type ContactActionResult,
   type ContactLocationActionResult,
 } from "./actionErrors";
-
-// Unclassified errors reach the client only as "unexpected"; log them here so
-// a real failure (DB, schema drift) still leaves a server-side trace.
-function actionFailure(err: unknown): { ok: false; reason: ReturnType<typeof contactActionErrorReason> } {
-  // A redirect()/notFound() thrown inside the try (e.g. getCurrentBd()'s
-  // defense-in-depth auth redirect) must reach Next's router, not be
-  // swallowed into a generic `{ ok: false }` result — see
-  // tests/unit/rethrowNavigationErrors.test.ts.
-  unstable_rethrow(err);
-  const reason = contactActionErrorReason(err);
-  if (reason === "unexpected") console.error("[contacts] unexpected action error", err);
-  return { ok: false, reason };
-}
 
 /**
  * Server action behind the About pane's per-property inline edit (task 9.2,

@@ -9,6 +9,7 @@
  * `src/lib/contacts/labels.ts#contactActionErrorMessage` maps a reason to
  * the Spanish string to display.
  */
+import { unstable_rethrow } from "next/navigation";
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
 import { CompanyNotFoundError } from "@/lib/companies/errors";
@@ -165,4 +166,17 @@ export function contactLocationActionErrorReason(
 export function contactActionErrorHref(reason: ContactActionErrorReason): string | undefined {
   if (reason === "gmail_not_connected" || reason === "gmail_reauth") return "/account/email";
   return undefined;
+}
+
+// Unclassified errors reach the client only as "unexpected"; log them here so
+// a real failure (DB, schema drift) still leaves a server-side trace.
+export function actionFailure(err: unknown): { ok: false; reason: ContactActionErrorReason } {
+  // A redirect()/notFound() thrown inside the try (e.g. getCurrentBd()'s
+  // defense-in-depth auth redirect) must reach Next's router, not be
+  // swallowed into a generic `{ ok: false }` result — see
+  // tests/unit/rethrowNavigationErrors.test.ts.
+  unstable_rethrow(err);
+  const reason = contactActionErrorReason(err);
+  if (reason === "unexpected") console.error("[contacts] unexpected action error", err);
+  return { ok: false, reason };
 }
