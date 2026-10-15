@@ -11,6 +11,7 @@ import { activity, emailAccount, emailMessage, emailMessagePerson, person } from
 import { needsReconnectForSync } from "./needsReconnectForSync";
 import { getNeverLogRules } from "./neverLog";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
+import { verifyRepliedAddressesInTx } from "./inboundReplyVerificationDb";
 import { executeSyncedMessageWrite, type SyncWriteStore } from "./syncWriteCore";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import { buildAfterSyncSet, type AfterSyncPatch } from "./afterSyncPatch";
@@ -217,5 +218,6 @@ function txSyncStore(tx: SyncTransaction): SyncWriteStore {
         .returning({ personId: activity.personId });
       await recomputePersonStatuses(tx, inserted.map((r) => r.personId!));
     },
+    verifyRepliedAddresses: (candidates) => verifyRepliedAddressesInTx(tx, candidates),
   };
 }

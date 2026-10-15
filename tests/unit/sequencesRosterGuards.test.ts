@@ -38,11 +38,23 @@ test("unreachable: merged, empty email, email_status none, pattern_inferred", ()
       candidate("merged", { mergedIntoId: "x" }),
       candidate("blank", { email: "  " }),
       candidate("none", { emailStatus: "none" }),
-      candidate("guess", { emailSource: "pattern_inferred" }),
+      candidate("guess", { emailSource: "pattern_inferred", emailStatus: "probable" }),
     ],
     ctx(),
   );
   assert.deepEqual(reasons(r), { merged: "unreachable", blank: "unreachable", none: "unreachable", guess: "unreachable" });
+});
+
+test("pattern_inferred is reachable once the address is verified (a reply from that exact mailbox beats the label)", () => {
+  const r = evaluateRosterAdds(
+    [
+      candidate("verifiedGuess", { emailSource: "pattern_inferred", emailStatus: "verified" }),
+      candidate("noneGuess", { emailSource: "pattern_inferred", emailStatus: "none" }),
+    ],
+    ctx(),
+  );
+  assert.deepEqual(r.accepted, ["verifiedGuess"]);
+  assert.deepEqual(reasons(r), { noneGuess: "unreachable" });
 });
 
 test("client exclusion covers BOTH active and inactive; NULL and empty mean not a client", () => {

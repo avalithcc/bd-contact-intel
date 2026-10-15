@@ -39,7 +39,7 @@ export function buildRosterCandidatesQuery(opts: { limit: number; search?: strin
     where p.merged_into_id is null
       and btrim(coalesce(p.email, '')) <> ''
       and p.email_status <> 'none'
-      and p.email_source is distinct from 'pattern_inferred'
+      and (p.email_source is distinct from 'pattern_inferred' or p.email_status = 'verified')
       and ${clientStatusSql} is null
       and not exists (
         select 1 from email_suppression s

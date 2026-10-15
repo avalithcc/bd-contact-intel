@@ -42,6 +42,14 @@ export interface SyncWriteStore {
   linkPlatformActivity(bdId: string, row: InsertedMessageRow): Promise<void>;
   /** Inserts activities and recomputes the touched persons' statuses. */
   insertActivities(bdId: string, rows: SyncedActivityRow[]): Promise<void>;
+  /** Re-reads the Contacts and promotes email_status via planInboundReplyBatch; same transaction as the activities. */
+  verifyRepliedAddresses(candidates: ReplyCandidate[]): Promise<void>;
+}
+
+/** An inbound sender matched to a Contact; the store decides from the Contact's CURRENT row. */
+export interface ReplyCandidate {
+  personId: string;
+  fromAddress: string;
 }
 
 /** Messages that carry a Message-ID, one per gmail id. Pure; never mutates `classified`. */
@@ -93,6 +101,15 @@ export async function executeSyncedMessageWrite(
     });
   });
   if (activityRows.length > 0) await store.insertActivities(bdId, activityRows);
+
+  // Inbound matches are the sender only (classify.ts), and only newly inserted messages get here,
+  // so a re-synced message cannot re-promote. match_confidence is ignored on purpose: see
+  // inboundReplyVerification.ts.
+  const replied = insertedRows.flatMap((row) => {
+    const c = classifiedByGmailId.get(row.gmailMessageId)!;
+    return c.direction === "inbound" ? c.matches.map((m) => ({ personId: m.personId, fromAddress: c.fromAddress })) : [];
+  });
+  if (replied.length > 0) await store.verifyRepliedAddresses(replied);
 
   return { inserted: insertedRows.length };
 }

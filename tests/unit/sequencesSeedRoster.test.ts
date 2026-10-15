@@ -38,7 +38,7 @@ test("every rejection path carries its own reason", () => {
       candidate("noemail", { email: "  " }),
       candidate("nullemail", { email: null }),
       candidate("none", { emailStatus: "none" }),
-      candidate("pattern", { emailSource: "pattern_inferred" }),
+      candidate("pattern", { emailSource: "pattern_inferred", emailStatus: "probable" }),
       candidate("closed", { hasOpenItPosting: false }),
       candidate("active", { clientStatus: "active" }),
       candidate("inactive", { clientStatus: "inactive" }),

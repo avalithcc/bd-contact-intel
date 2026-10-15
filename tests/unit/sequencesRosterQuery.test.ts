@@ -11,7 +11,8 @@ test("excludes merged, empty email, status none and pattern-inferred emails", ()
   assert.match(sql, /p\.merged_into_id is null/);
   assert.match(sql, /btrim\(coalesce\(p\.email, ''\)\) <> ''/);
   assert.match(sql, /p\.email_status <> 'none'/);
-  assert.match(sql, /p\.email_source is distinct from 'pattern_inferred'/);
+  // Same rule as isReachable: pattern_inferred only counts once the status is verified.
+  assert.match(sql, /\(p\.email_source is distinct from 'pattern_inferred' or p\.email_status = 'verified'\)/);
 });
 
 test("requires an open US IT posting, matched directly or through a company alias", () => {

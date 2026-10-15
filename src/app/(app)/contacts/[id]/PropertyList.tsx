@@ -64,8 +64,10 @@ export interface PropertyListProps {
   canReassignOwner: boolean;
   emailVerified: boolean;
   // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — renders
-  // "Deducido" next to the value, same spot as the verified badge (mutually
-  // exclusive: email_status is one of 'verified'/'probable'/'none').
+  // "Deducido" next to the value, same spot as the verified badge. Both can
+  // now coexist in the data (email_source 'pattern_inferred' + email_status
+  // 'verified', after an inbound reply from that exact address), so verified
+  // wins in the UI: a confirmed reply must not be shown as a guess.
   emailInferred: boolean;
   hunterHint: string | null;
   sourceText: string | null;
@@ -411,7 +413,7 @@ function PropertyRow({
           (prop.value ?? l.emptyValue)
         )}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
-        {emailInferred && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
+        {emailInferred && !emailVerified && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
         {prop.value && lushaBadgeFor(lusha, prop.key) && <LushaBadge l={l} />}
         {roleGroupHint && (
           <details className="dropdown">

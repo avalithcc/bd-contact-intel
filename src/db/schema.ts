@@ -861,7 +861,9 @@ export const personPropertyHistory = pgTable(
     // Freelance/Independiente employer) | 'signature_extract'
     // (scripts/extract-signature-phones.ts filled an empty phone from the
     // sender's own signature in inbound mail) | 'lusha_reveal' (a paid Lusha reveal
-    // filled the value; the raw payload lives in lusha_reveal).
+    // filled the value; the raw payload lives in lusha_reveal) | 'inbound_reply'
+    // (an inbound reply from the exact stored address promoted emailStatus to
+    // 'verified'; src/lib/gmail/inboundReplyVerification.ts). Free text: no code validates this set.
     // property 'ownerBdId' + source 'edit' marks a manual owner, sticky against
     // the automatic owner rule (src/lib/identity/ownerRule.ts).
     source: text("source").notNull(),

@@ -70,6 +70,7 @@ function fakeDb() {
     async insertActivities(_bdId, rows) {
       activities.push(...rows);
     },
+    async verifyRepliedAddresses() {},
   };
   return { messages, links, activities, sent, sync };
 }
