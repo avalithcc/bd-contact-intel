@@ -788,6 +788,46 @@ decision on the brief (unverified).
   recommendation for both is to keep them; the free-tier terms it cites were
   not re-verified: unverified.
 
+### Scheduled send: let a BD write an email now and have it leave later
+
+Owner ask, 2026-10-15: "cuando se mande un correo, me de la posibilidad a cada
+BD que pueda programarse cuando salga el mismo. Por ahi lo redacta y hace en ese
+momento, pero quiere que salga mas tarde por algun motivo." Every BD, on a
+single manual email — not a Sequence step.
+
+**The blocker is infrastructure, not UI.** All five crons in `vercel.json:11-31`
+fire ONCE A DAY at a fixed hour (`/api/hiring/sync` 09:00, `/api/hiring/discover`
+Mondays 07:00, `/api/tasks/digest` 11:30, `/api/gmail/sync` 12:00,
+`/api/owners/recompute` 06:00, all UTC — read 2026-10-15). There is no
+sub-daily job, so a "send at 15:00" cannot be honoured by the machinery that
+exists: the finest grain available today is one fixed sweep per day. Before any
+of this is designed, decide how the due time is reached. Whether the Vercel plan
+allows a more frequent cron was NOT checked: unverified. Whether the Gmail API
+can accept a send-at time at all (as opposed to Gmail's UI "Schedule send") was
+NOT checked: unverified — if it cannot, the delay has to be ours.
+
+What exists to build on:
+- The send itself is `sendGmailMessageFromAccount` in `src/lib/gmail/send.ts`,
+  which sends through the BD's own connected Gmail account. A deferred send
+  therefore depends on that BD's OAuth token still working at due time, and on
+  the account still being connected — a failure mode that does not exist for a
+  send the BD watches happen.
+- Sequences already schedule, but on a different clock and a different shape:
+  `src/lib/sequences/schedule.ts:3` says "Only America/New_York is supported"
+  and it is built on `./miamiTime`, while the rest of the CRM reasons in
+  Argentina time. A single scheduled send needs an explicit answer on whose
+  clock the BD is picking a time in.
+
+Product decisions to settle before implementing (none of these are decided):
+- Can the BD edit or cancel a scheduled email before it leaves, and from where?
+- If the contact replies before the due time, does the queued email still go
+  out? HubSpot's behaviour here is the reference (repo convention).
+- What happens when the due time passes while the Gmail account is
+  disconnected, the token is dead, or the address has since been suppressed —
+  silent drop, retry, or a task for the BD?
+- Does a scheduled email occupy the outbox visibly (so a BD does not write a
+  second one), and does it count as a touch before it is actually sent?
+
 ## Known defects
 
 ### contact-names
