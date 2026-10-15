@@ -126,6 +126,38 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorAdminRequired;
     case "company_not_found":
       return l.errorCompanyNotFound;
+    case "lusha_off":
+      return l.errorLushaOff;
+    case "lusha_unconfigured":
+      return l.errorLushaUnconfigured;
+    case "lusha_plan_denied":
+      return l.errorLushaPlanDenied;
+    case "lusha_no_credits":
+      return l.errorLushaNoCredits;
+    case "lusha_rate_limited":
+      return l.errorLushaRateLimited;
+    case "lusha_protected":
+      return l.errorLushaProtected;
+    case "lusha_unavailable":
+      return l.errorLushaUnavailable;
+    case "lusha_no_match":
+      return l.errorLushaNoMatch;
+    case "lusha_enrich_failed":
+      return l.errorLushaEnrichFailed;
+    case "lusha_async":
+      return l.errorLushaAsync;
+    case "lusha_unreadable":
+      return l.errorLushaUnreadable;
+    case "lusha_outcome_unknown":
+      return l.errorLushaOutcomeUnknown;
+    case "lusha_cap_reached":
+      return l.errorLushaCapReached;
+    case "lusha_busy":
+      return l.errorLushaBusy;
+    case "lusha_not_eligible":
+      return l.errorLushaNotEligible;
+    case "lusha_insufficient_data":
+      return l.errorLushaInsufficientData;
     case "unexpected":
       return l.genericError;
     case "unconfirmed":

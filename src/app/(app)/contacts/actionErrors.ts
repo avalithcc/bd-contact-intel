@@ -60,6 +60,24 @@ export type ContactActionErrorReason =
   | "owner_invalid"
   | "admin_required"
   | "company_not_found"
+  // Lusha reveal outcomes. Mirrors LUSHA_REASONS (reasons.ts in the Lusha library), which this file cannot import
+  // while the inert guard holds; tests/unit/lushaReasons.test.ts pins that the two lists agree.
+  | "lusha_off"
+  | "lusha_unconfigured"
+  | "lusha_plan_denied"
+  | "lusha_no_credits"
+  | "lusha_rate_limited"
+  | "lusha_protected"
+  | "lusha_unavailable"
+  | "lusha_no_match"
+  | "lusha_enrich_failed"
+  | "lusha_async"
+  | "lusha_unreadable"
+  | "lusha_outcome_unknown"
+  | "lusha_cap_reached"
+  | "lusha_busy"
+  | "lusha_not_eligible"
+  | "lusha_insufficient_data"
   | "unexpected"
   // Client-side only: the request threw (dropped connection, HTTP 500), so
   // whether the write landed is unknown. See contacts/actionOutcome.ts.
