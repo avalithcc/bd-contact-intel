@@ -828,6 +828,49 @@ Product decisions to settle before implementing (none of these are decided):
 - Does a scheduled email occupy the outbox visibly (so a BD does not write a
   second one), and does it count as a touch before it is actually sent?
 
+### Admins read another BD's conversation inline, with no click and no audit row
+
+Owner ask, 2026-10-15: an admin should see the conversation content in a
+contact's timeline "directo, sin que quede en auditoria ni tampoco presionar un
+boton para ver, debe ser visibile de inicio". Today that timeline entry renders
+a locked card instead (`lockedConversationText`,
+`src/app/(app)/contacts/[id]/Timeline.tsx:294`, from
+`timelineLockedThreadBelongsTo` / `timelineLockedThreadPrivacyPrefix` /
+`timelineLockedThreadPrivacySuffix`, `src/lib/i18n/dictionaries/es.ts:857-858`)
+with a "Ver conversación" link (`es.ts:761`).
+
+**The click and the audit row are coupled, which is why both asks arrive
+together.** An admin read goes through `getConversationForAdmin`
+(`src/lib/activity/getConversationForAdmin.ts:96`), which writes an `audit_log`
+row when `shouldAuditConversationView(actorBdId, targetBdId)` is true
+(`:110`; pure rule at `src/lib/activity/conversationAudit.ts:8`). One
+deliberate click is one row. Render the content inline and that write becomes
+one row per contact-page view, which would bury `/admin/audit-log` in noise —
+so "inline" and "no audit" are one decision, not two.
+
+What this does and does not change:
+- It breaks no promise made to the BD. The existing copy already says the
+  content is private "para {BD} (y los administradores)", so admin visibility
+  is already disclosed; the ask only removes the click.
+- It DOES remove the only record of which admin read which BD's private
+  conversation. `view_conversation` is a documented audit action
+  (`src/db/schema.ts:990`) with a screen built on it (`/admin/audit-log`, nav
+  entry at `src/app/contacts/Sidebar.tsx:137`), and the requirement is recorded
+  as the admin-access-audit spec's "Admins can always read any BD's
+  conversations" (`src/lib/contacts/connectionTimelineEntries.ts:52`).
+- Middle path worth a decision rather than assuming all-or-nothing: keep the
+  content inline and keep accountability, but AGGREGATE it — one row per
+  (admin, contact, day) instead of one per render. Noise gone, record kept.
+
+Open before implementing:
+- Inline content means loading message bodies for every thread on the page
+  instead of on demand. How heavy that is was NOT measured: unverified
+  (`email_message.body_text` is free text and `body_truncated` exists, so some
+  rows are already large enough to have been cut).
+- Whether the locked card should disappear entirely for admins, or stay as a
+  header over the now-visible content so it is still obvious whose thread it
+  is.
+
 ## Known defects
 
 ### contact-names
