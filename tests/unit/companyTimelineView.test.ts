@@ -22,6 +22,8 @@ const labels = {
   atEmailSent: "Correo",
   atReplyReceived: "Respuesta recibida",
   atReplyReceivedDefault: "Respuesta recibida.",
+  atAutoReply: "Respuesta automática",
+  atAutoReplyDefault: "Respuesta automática.",
   atStatusChange: "Cambio de etapa",
   atMeetingLogged: "Reunión",
   atCall: "Llamada",

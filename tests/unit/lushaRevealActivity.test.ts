@@ -94,14 +94,14 @@ test("a reveal after a reply leaves the stage where the reply put it", () => {
 });
 
 test("the owner rule and the follow-up clock read the shared no-progress list, which carries the reveal", () => {
-  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], [ATTEMPT, REVEAL]);
+  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], [ATTEMPT, REVEAL, "auto_reply_received"]);
   const dialect = new PgDialect();
   const { sql: text, params } = dialect.sqlToQuery(buildFollowUpVerificationQuery());
   const cte = text.slice(text.indexOf("fuq_activity as ("), text.indexOf("fuq_connection as ("));
   const match = cte.match(/activity\.type not in \(([^)]*)\)/);
   assert.ok(match);
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
-  assert.deepEqual(bound, [ATTEMPT, REVEAL]);
+  assert.deepEqual(bound, [ATTEMPT, REVEAL, "auto_reply_received"]);
   const ownerSource = readFileSync(join(__dirname, "..", "..", "src", "lib", "identity", "ownerRuleDb.ts"), "utf8");
   assert.match(ownerSource, /notInArray\(activity\.type, \[\.\.\.NO_PROGRESS_ACTIVITY_TYPES\]\)/);
 });

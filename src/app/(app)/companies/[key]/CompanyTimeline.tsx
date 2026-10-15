@@ -47,6 +47,7 @@ const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactEl
   // Synced Gmail reply (email-sync brief) — same icon as email_sent, no new
   // visual design for this entry type yet.
   reply_received: MailIcon,
+  auto_reply_received: MailIcon,
   status_change: HistoryIcon,
   status_backfill: HistoryIcon,
   meeting_logged: MeetingIcon,

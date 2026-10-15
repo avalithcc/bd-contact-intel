@@ -72,6 +72,9 @@ export function formatLastActivityLabel(
     // uses below, since both mean the same thing to a BD scanning the list.
     case "reply_received":
       return l.lastActivityReplyReceived;
+    // An out-of-office is not "Respuesta recibida": the list must not read as if the Contact answered.
+    case "auto_reply_received":
+      return l.lastActivityAutoReply;
     case "meeting_logged":
       return l.lastActivityMeetingLogged;
     case "discarded":

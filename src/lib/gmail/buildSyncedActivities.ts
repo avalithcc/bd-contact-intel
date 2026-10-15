@@ -37,7 +37,15 @@
  */
 import type { ClassifiedMatch, MatchConfidence } from "./classify";
 
-export type SyncedActivityType = "email_sent" | "reply_received";
+// `auto_reply_received` is an inbound message the detector (automatedMessage.ts) flagged as machine-generated, e.g. an
+// out-of-office. It is its own type so the stage derivation stays neutral to it by construction: the Contact has not
+// answered, and must stay in the follow-up cadence. It carries the same metadata as `reply_received`.
+// It also covers bounces and delivery failures (the detector flags those `automated` too). ONE label,
+// "Respuesta automática", was considered and kept on purpose: both are mail a system wrote, neither
+// is an answer, and the card shows the subject and sender ("Undeliverable: ...", mailer-daemon), which
+// says what happened. A second type or label would add a branch in every registry for no decision a BD
+// takes differently. (A bounce only reaches this type when its sender matches a Contact, which is rare.)
+export type SyncedActivityType = "email_sent" | "reply_received" | "auto_reply_received";
 
 export interface SyncedActivityMetadata {
   gmailMessageId: string;
@@ -66,6 +74,8 @@ export interface BuildSyncedActivityRowsInput {
   subject: string | null;
   sentAt: Date;
   isPlatformSent: boolean;
+  /** `email_message.is_automatic` for this message. Required, not optional: a forgotten flag would fail open to `reply_received`. */
+  isAutomatic: boolean;
   matches: readonly ClassifiedMatch[];
 }
 
@@ -73,7 +83,9 @@ export interface BuildSyncedActivityRowsInput {
 export function buildSyncedActivityRows(input: BuildSyncedActivityRowsInput): SyncedActivityRow[] {
   if (input.isPlatformSent) return [];
 
-  const type: SyncedActivityType = input.direction === "inbound" ? "reply_received" : "email_sent";
+  // Direction decides first: only INBOUND mail can be an auto-reply. Our own outbound is never reclassified.
+  const type: SyncedActivityType =
+    input.direction === "inbound" ? (input.isAutomatic ? "auto_reply_received" : "reply_received") : "email_sent";
   const occurredAt = input.sentAt.toISOString();
   const addressField = input.direction === "inbound" ? { from: input.fromAddress } : { to: [...input.toAddresses] };
 

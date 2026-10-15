@@ -12,6 +12,10 @@
  * `lusha_reveal` rides the same list (D15): buying an email is work on the Contact but not
  * progress, so it must not transfer ownership or reset the clock. It is deliberately NOT in
  * NON_TOUCH_ACTIVITY_TYPES, so it still counts as "ultima actividad".
+ * `auto_reply_received` (an inbound out-of-office) rides it too: it is the machine answering, not us
+ * touching the Contact. If it reset the clock, every auto-reply would push the follow-up another 7
+ * days away, and a robot would decide when we come back. It must not transfer ownership either.
+ * It still counts as "ultima actividad" (not a non-touch): it is real, visible mail.
  * Adding a type here changes BOTH at once. If they ever need to differ, split
  * the list then, on purpose, not by editing one consumer's copy.
  *
@@ -24,4 +28,4 @@
  * queue fills with people who never answer, build a real retry cadence (back
  * in 2 days, not 7 or never); that needs attempt data, which did not exist yet.
  */
-export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal"] as const;
+export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal", "auto_reply_received"] as const;

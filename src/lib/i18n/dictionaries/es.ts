@@ -767,6 +767,9 @@ export const es: typeof en = {
     // Synced Gmail reply (email-sync brief) — grouped under the "Correos"
     // pill with email_sent (timelinePills.ts), own label for its headline.
     timelineFilterReplyReceived: "Respuesta recibida",
+    // Out-of-office and other machine-generated inbound mail (activity type auto_reply_received): not an answer.
+    // One label also covers bounces / delivery failures: see the note in gmail/buildSyncedActivities.ts.
+    timelineFilterAutoReply: "Respuesta automática",
     timelineFilterHunter: "Búsqueda de correo",
     timelineFilterStatusChange: "Cambio de estado",
     timelineFilterMeeting: "Reunión",
@@ -796,6 +799,7 @@ export const es: typeof en = {
     // address available (should be rare — every synced message carries at
     // least the sender).
     timelineReplyReceivedDefault: "Respuesta recibida.",
+    timelineAutoReplyDefault: "Respuesta automática.",
     timelineHunterPrefix: "Correo encontrado por Hunter",
     timelineLushaRevealEmail: "Correo revelado con Lusha",
     timelineLushaRevealPhone: "Teléfono revelado con Lusha",
@@ -1629,6 +1633,8 @@ export const es: typeof en = {
     // Synced Gmail reply (email-sync brief), company timeline headline.
     atReplyReceived: "Respuesta recibida",
     atReplyReceivedDefault: "Respuesta recibida.",
+    atAutoReply: "Respuesta automática",
+    atAutoReplyDefault: "Respuesta automática.",
     atStatusChange: "Cambio de etapa",
     atMeetingLogged: "Reunión registrada",
     atCall: "Llamada registrada",
@@ -2238,6 +2244,7 @@ export const es: typeof en = {
     lastActivityMeetingLogged: "Reunión registrada",
     lastActivityDiscarded: "Descartado",
     lastActivityReplyReceived: "Respuesta recibida",
+    lastActivityAutoReply: "Respuesta automática",
     lastActivityNote: "Nota registrada",
     lastActivityHunterLookup: "Búsqueda de correo",
     lastActivityLushaReveal: "Revelado con Lusha",

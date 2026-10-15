@@ -35,6 +35,24 @@ const SYSTEM_SENDER_LOCAL_PART = new Set(["mailer-daemon", "postmaster"]);
 const AUTOMATIC_SUBJECT_PREFIX =
   /^\s*(out of (the )?office|automatic reply|auto[- ]?reply|autoreply|undeliverable|undelivered mail|delivery status notification|mail delivery (failed|failure))\b|^\s*auto:/i;
 
+/**
+ * The subject-prefix rule on its own. Exported so the historical-damage measurement
+ * (autoReplyBackfill.ts) judges a stored subject by the very same rule the live detector uses.
+ */
+export function hasAutomaticSubjectPrefix(subject: string | null | undefined): boolean {
+  return AUTOMATIC_SUBJECT_PREFIX.test(subject ?? "");
+}
+
+/**
+ * The matched prefix alone, lower-cased ("out of office", "automatic reply", "auto:"), or null. It
+ * comes from a fixed vocabulary, so it is safe to print: the rest of a subject is arbitrary text that
+ * usually echoes the original subject and can carry a person's name.
+ */
+export function automaticSubjectPrefix(subject: string | null | undefined): string | null {
+  const match = AUTOMATIC_SUBJECT_PREFIX.exec(subject ?? "");
+  return match ? match[0].trim().toLowerCase().replace(/\s+/g, " ") : null;
+}
+
 export function isAutomatedMessage(headers: readonly GmailApiHeader[] | undefined, topLevelMimeType: string | undefined): boolean {
   const autoSubmitted = header(headers, "auto-submitted").toLowerCase();
   if (autoSubmitted !== "" && autoSubmitted !== "no") return true;
@@ -45,5 +63,5 @@ export function isAutomatedMessage(headers: readonly GmailApiHeader[] | undefine
   if (contentType.startsWith("multipart/report")) return true;
   const senderLocalPart = (extractEmailAddresses(header(headers, "from"))[0] ?? "").split("@")[0] ?? "";
   if (SYSTEM_SENDER_LOCAL_PART.has(senderLocalPart)) return true;
-  return AUTOMATIC_SUBJECT_PREFIX.test(header(headers, "subject"));
+  return hasAutomaticSubjectPrefix(header(headers, "subject"));
 }

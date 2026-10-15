@@ -45,7 +45,9 @@ test("the stored row carries the detector's verdict: true for an auto-reply, fal
   assert.equal(buildEmailMessageRow(BD_ID, outbound).isAutomatic, false);
 });
 
-test("REGRESSION: an auto-reply from a known Contact still writes reply_received and still verifies the address", async () => {
+// Superseded on purpose (auto-reply-status change): the activity is now auto_reply_received, so it cannot move the stage.
+// Address verification is unchanged: a message from the exact stored address still proves the mailbox exists.
+test("an auto-reply from a known Contact writes auto_reply_received (not reply_received) and still verifies the address", async () => {
   const c = classifiedFrom("Jane <jane@prospect.com>", AUTO);
   const rows: NewEmailMessage[] = [];
   const activities: SyncedActivityRow[] = [];
@@ -59,7 +61,7 @@ test("REGRESSION: an auto-reply from a known Contact still writes reply_received
     async verifyRepliedAddresses(c2) { verified += c2.length; },
   };
   await executeSyncedMessageWrite(store, BD_ID, [c]);
-  assert.deepEqual(activities.map((a) => [a.personId, a.type]), [[PERSON.personId, "reply_received"]]);
+  assert.deepEqual(activities.map((a) => [a.personId, a.type]), [[PERSON.personId, "auto_reply_received"]]);
   assert.equal(verified, 1);
   assert.equal(rows[0]!.isAutomatic, true);
 });

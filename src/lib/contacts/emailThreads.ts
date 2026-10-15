@@ -11,7 +11,7 @@
  * card), matching the mockup's OWN thread example only having a badge when
  * there is more than one message.
  */
-const THREADABLE_TYPES = new Set(["email_sent", "reply_received"]);
+const THREADABLE_TYPES = new Set(["email_sent", "reply_received", "auto_reply_received"]);
 export interface EmailThreadableEntry {
   id: string;
   type: string;
@@ -122,6 +122,7 @@ export interface ThreadContextSummary {
 export function threadContextSummary<T extends EmailThreadableEntry>(group: EmailThreadGroup<T>): ThreadContextSummary {
   const latest = group.messages[group.messages.length - 1];
   const matchedEmail = typeof latest?.metadata?.matchedEmail === "string" ? latest.metadata.matchedEmail : null;
-  const direction: ThreadContextSummary["direction"] = latest?.type === "reply_received" ? "inbound" : "outbound";
+  const direction: ThreadContextSummary["direction"] =
+    latest?.type === "reply_received" || latest?.type === "auto_reply_received" ? "inbound" : "outbound";
   return { matchedEmail, direction };
 }

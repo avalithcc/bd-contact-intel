@@ -97,6 +97,7 @@ export async function executeSyncedMessageWrite(
       subject: c.subject,
       sentAt: row.sentAt,
       isPlatformSent: c.isPlatformSent,
+      isAutomatic: c.automated === true,
       matches: c.matches,
     });
   });

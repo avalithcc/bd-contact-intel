@@ -113,8 +113,13 @@ export interface DiscardCandidate {
  * this list, so a passing test is not proof the list is needed. It is a guard
  * for the next person who adds a `case` that matches on metadata (direction,
  * outcome) rather than on the type.
+ *
+ * `auto_reply_received` is an out-of-office or other machine-generated inbound message: the
+ * Contact did not answer, so it must not become `replied` (it stays `contacted` and keeps
+ * its place in the follow-up cadence). It is a separate type rather than a branch inside
+ * `reply_received` so that neutrality is structural, not a special case.
  */
-export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal"] as const;
+export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal", "auto_reply_received"] as const;
 
 export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
   if ((STATUS_NEUTRAL_ACTIVITY_TYPES as readonly string[]).includes(event.type)) return null;
@@ -235,7 +240,7 @@ export interface ActivityRowForStatus {
  * twin `effectiveActivityAtSql()` (src/lib/contacts/effectiveActivityTime.ts)
  * so the two can never drift on which types get this treatment.
  */
-export const OCCURRED_AT_ACTIVITY_TYPES = ["call", "email_sent", "reply_received"] as const;
+export const OCCURRED_AT_ACTIVITY_TYPES = ["call", "email_sent", "reply_received", "auto_reply_received"] as const;
 
 /**
  * Builds one activity row's status event (task 5.2) — the type/metadata

@@ -37,6 +37,8 @@ export interface ActivityStageRow {
 export const ACTIVITY_STAGE_ROWS: readonly ActivityStageRow[] = [
   { activity: "Correo enviado", stage: "contacted" },
   { activity: "Respuesta recibida", stage: "replied" },
+  // An out-of-office is not an answer (auto_reply_received, deriveStatus.ts#STATUS_NEUTRAL_ACTIVITY_TYPES).
+  { activity: "Respuesta automática (fuera de oficina)", resultText: "No cambia el estado" },
   { activity: "Reunión registrada", stage: "meeting" },
   // `callStage` (deriveStatus.ts): connected -> replied (either direction);
   // outbound not connected -> contacted; inbound not connected -> no stage.

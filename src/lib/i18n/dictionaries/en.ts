@@ -838,6 +838,7 @@ export const en = {
     // Synced Gmail reply (email-sync brief) — grouped under the "Emails"
     // pill with email_sent (timelinePills.ts), own label for its headline.
     timelineFilterReplyReceived: "Reply received",
+    timelineFilterAutoReply: "Automatic reply",
     timelineFilterHunter: "Email lookup",
     timelineFilterStatusChange: "Status change",
     timelineFilterMeeting: "Meeting",
@@ -867,6 +868,7 @@ export const en = {
     // address available (should be rare — every synced message carries at
     // least the sender).
     timelineReplyReceivedDefault: "Reply received.",
+    timelineAutoReplyDefault: "Automatic reply.",
     timelineHunterPrefix: "Email found by Hunter",
     timelineLushaRevealEmail: "Email revealed with Lusha",
     timelineLushaRevealPhone: "Phone revealed with Lusha",
@@ -1667,6 +1669,8 @@ export const en = {
     // Synced Gmail reply (email-sync brief), company timeline headline.
     atReplyReceived: "Reply received",
     atReplyReceivedDefault: "Reply received.",
+    atAutoReply: "Automatic reply",
+    atAutoReplyDefault: "Automatic reply.",
     atStatusChange: "Stage changed",
     atMeetingLogged: "Meeting logged",
     atCall: "Call logged",
@@ -2262,6 +2266,7 @@ export const en = {
     lastActivityMeetingLogged: "Meeting logged",
     lastActivityDiscarded: "Discarded",
     lastActivityReplyReceived: "Reply received",
+    lastActivityAutoReply: "Automatic reply",
     lastActivityNote: "Note logged",
     lastActivityHunterLookup: "Email lookup",
     lastActivityLushaReveal: "Lusha reveal",

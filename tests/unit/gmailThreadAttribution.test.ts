@@ -282,7 +282,7 @@ test("a thread-attributed message is stored as thread confidence with the real s
   assert.equal(row.matchedEmail, "jonathan.p@otherdomain.com");
   assert.equal(row.personId, JONATHAN);
   assert.equal(buildEmailMessagePersonRows("m", out!.matches)[0]?.matchConfidence, "thread");
-  const [activity] = buildSyncedActivityRows({ ...out!, isPlatformSent: false });
+  const [activity] = buildSyncedActivityRows({ ...out!, isPlatformSent: false, isAutomatic: out!.automated === true });
   assert.equal(activity?.type, "reply_received");
   assert.equal(activity?.personId, JONATHAN);
 });

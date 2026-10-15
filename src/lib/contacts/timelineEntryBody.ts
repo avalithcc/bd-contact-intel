@@ -120,6 +120,14 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
       const parts = [subject, from].filter((v): v is string => Boolean(v));
       return parts.length > 0 ? parts.join(" · ") : l.timelineReplyReceivedDefault;
     }
+    // An out-of-office or other machine-generated inbound message: same layout as a reply (subject and sender),
+    // but its own default copy, so the card never claims the Contact answered.
+    case "auto_reply_received": {
+      const subject = typeof metadata.subject === "string" ? metadata.subject : null;
+      const from = typeof metadata.from === "string" ? metadata.from : null;
+      const parts = [subject, from].filter((v): v is string => Boolean(v));
+      return parts.length > 0 ? parts.join(" · ") : l.timelineAutoReplyDefault;
+    }
     case "hunter_lookup":
       return typeof metadata.hunterScore === "number"
         ? `${l.timelineHunterPrefix} · ${metadata.hunterScore}`

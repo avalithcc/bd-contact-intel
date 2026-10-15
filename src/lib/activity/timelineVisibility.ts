@@ -19,7 +19,7 @@
  */
 
 /** Activity types this pane can carry per-BD conversation content for. */
-const CONVERSATION_CONTENT_TYPES = new Set(["email_sent", "reply_received"]);
+const CONVERSATION_CONTENT_TYPES = new Set(["email_sent", "reply_received", "auto_reply_received"]);
 
 export interface TimelineVisibilityInput {
   type: string;

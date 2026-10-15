@@ -17,6 +17,9 @@ export interface CompanyTimelineViewLabels {
   // is the body fallback when neither subject nor sender is available.
   atReplyReceived: string;
   atReplyReceivedDefault: string;
+  // Out-of-office / machine-generated inbound mail (auto_reply_received).
+  atAutoReply: string;
+  atAutoReplyDefault: string;
   atStatusChange: string;
   atMeetingLogged: string;
   atCall: string;
@@ -69,6 +72,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atEmailSent;
     case "reply_received":
       return l.atReplyReceived;
+    case "auto_reply_received":
+      return l.atAutoReply;
     case "status_change":
       return l.atStatusChange;
     case "status_backfill":
@@ -105,11 +110,11 @@ const TASK_ACTIVITY_TYPES_SET = new Set<string>(ALL_TASK_ACTIVITY_TYPES);
  * case (src/lib/contacts/timelineEntryBody.ts) — subject and sender
  * address, never the body (full-thread UI is a later slice).
  */
-function replyReceivedBody(metadata: Record<string, unknown>, l: CompanyTimelineViewLabels): string {
+function replyReceivedBody(metadata: Record<string, unknown>, l: CompanyTimelineViewLabels, fallback: string = l.atReplyReceivedDefault): string {
   const subject = typeof metadata.subject === "string" ? metadata.subject : null;
   const from = typeof metadata.from === "string" ? metadata.from : null;
   const parts = [subject, from].filter((v): v is string => Boolean(v));
-  return parts.length > 0 ? parts.join(" · ") : l.atReplyReceivedDefault;
+  return parts.length > 0 ? parts.join(" · ") : fallback;
 }
 
 function taskActivityViewBody(
@@ -202,9 +207,11 @@ export function buildCompanyTimelineViewRows(
         ? metadata.note
         : row.type === "reply_received"
           ? replyReceivedBody(metadata, labels)
-          : TASK_ACTIVITY_TYPES_SET.has(row.type)
-            ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
-            : null;
+          : row.type === "auto_reply_received"
+            ? replyReceivedBody(metadata, labels, labels.atAutoReplyDefault)
+            : TASK_ACTIVITY_TYPES_SET.has(row.type)
+              ? taskActivityViewBody(row.type, metadata, row.actorName, labels)
+              : null;
     return { ...row, what, body, visible, metadata: visible ? row.metadata : null };
   });
 }

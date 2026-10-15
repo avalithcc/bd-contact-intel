@@ -50,6 +50,7 @@ function baseInput(overrides: Partial<BuildSyncedActivityRowsInput> = {}): Build
     subject: "Re: intro",
     sentAt: new Date("2026-07-01T12:00:00.000Z"),
     isPlatformSent: false,
+    isAutomatic: false,
     matches: [{ personId: "person-1", matchedEmail: "jane@prospect.com", matchConfidence: "exact" }],
     ...overrides,
   };
@@ -132,6 +133,7 @@ test("regression (2026-09-30 misattributed inbound sender match): a CRM contact 
     direction: classified.direction,
     fromAddress: classified.fromAddress,
     toAddresses: classified.toAddresses,
+    isAutomatic: classified.automated === true,
     subject: classified.subject,
     sentAt: classified.sentAt,
     isPlatformSent: classified.isPlatformSent,
@@ -162,6 +164,7 @@ test("inbound from a CRM contact with another CRM contact in cc: only the sender
     direction: classified.direction,
     fromAddress: classified.fromAddress,
     toAddresses: classified.toAddresses,
+    isAutomatic: classified.automated === true,
     subject: classified.subject,
     sentAt: classified.sentAt,
     isPlatformSent: classified.isPlatformSent,
