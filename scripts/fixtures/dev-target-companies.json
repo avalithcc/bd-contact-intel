@@ -1,0 +1,4 @@
+[
+  { "companyKey": "acmepruebas", "displayName": "Acme Pruebas", "ats": "lever", "config": { "slug": "acme-demo" }, "countryFilter": "AR" },
+  { "companyKey": "globexdemo", "displayName": "Globex Demo", "ats": "lever", "config": { "slug": "globex-demo" } }
+]

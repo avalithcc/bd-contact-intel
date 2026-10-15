@@ -7,7 +7,7 @@
  *   npx tsx scripts/seed-launch-readiness.ts --execute  # wipes + reseeds the scratch DB
  *
  * Synthetic data only (invented names, example.com emails, 555 phones).
- * Refuses to run unless DATABASE_URL is local and ends in `_e2e`
+ * Refuses to run unless DATABASE_URL is local and is `bd_contact_intel_dev` or ends in `_e2e`
  * (tests/launch-readiness/scratchDbGuard.ts). `--execute` TRUNCATES the
  * person/company/task/activity tables first, which is only acceptable on that
  * scratch database; the guard is what makes it safe.
@@ -15,13 +15,14 @@
 import postgres from "postgres";
 import path from "path";
 import fs from "fs";
-import { assertScratchDatabaseUrl } from "../tests/launch-readiness/scratchDbGuard";
+import { assertLocalSeedDatabaseUrl } from "../tests/launch-readiness/scratchDbGuard";
+import { truncateStatement } from "../src/lib/dev/seedTables";
 
 const envFile = path.join(__dirname, "..", ".env.e2e.local");
 if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
 
 const url = process.env.DATABASE_URL;
-assertScratchDatabaseUrl(url);
+assertLocalSeedDatabaseUrl(url);
 const email = process.env.E2E_EMAIL;
 if (!email) throw new Error("E2E_EMAIL is required (the account the specs log in as)");
 const execute = process.argv.includes("--execute");
@@ -77,7 +78,7 @@ async function main() {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
   try {
     await sql.begin(async (tx) => {
-      await tx`truncate table activity, task, person_property_history, person_bd_connection, person_id_map, audit_log, person, company restart identity cascade`;
+      await tx.unsafe(truncateStatement());
       // `role = 'bd'` on conflict: phase11.spec.ts flips the e2e account to admin
       // and a hard kill can leave it there; a rebuild must repair that.
       const [me] = await tx`

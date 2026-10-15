@@ -6,7 +6,10 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx scripts/dev.ts",
+    "dev:stack": "bash scripts/dev-stack.sh",
+    "dev:setup": "tsx scripts/dev-setup.ts",
+    "dev:reset": "tsx scripts/dev-setup.ts --reset",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -46,6 +49,7 @@
     "@types/react-dom": "^19.0.2",
     "@types/sanitize-html": "2.16.2",
     "drizzle-kit": "^0.28.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2"
   }
 }
