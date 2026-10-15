@@ -828,6 +828,28 @@ Product decisions to settle before implementing (none of these are decided):
 - Does a scheduled email occupy the outbox visibly (so a BD does not write a
   second one), and does it count as a touch before it is actually sent?
 
+### Lusha per BD: enable/disable from admin, and a consumption report
+
+Owner decision, 2026-10-15: **a new BD starts DISABLED.** Access to a paid
+endpoint is granted deliberately, never inherited by existing by default.
+Mariel is expected to be the heaviest user.
+
+Most of the data already exists. Every `lusha_reveal` row carries
+`actor_bd_id` and both `credits_reserved` and `credits_charged`
+(`drizzle/0043_lusha_reveal.sql`), so a per-BD consumption report is a query
+over rows we already write, not new instrumentation. What is missing is the
+per-BD switch itself and the admin screen to flip it.
+
+Two things to settle when this is picked up:
+- Where the switch lives. The daily cap is a module constant today
+  (`src/lib/lusha/cap.ts`, default 12, changing it needs a redeploy), so a
+  per-BD flag kept the same way would need a deploy per BD — almost certainly
+  wrong. A column on `bd`, or a small settings table, is the obvious
+  alternative; unverified which fits the existing admin screens better.
+- Whether the cap is global (as today) or per BD too. The owner has not been
+  asked. Note that a per-BD cap and a global cap answer different questions:
+  one stops a person, the other stops the invoice.
+
 ### Admins read another BD's conversation inline, with no click and no audit row
 
 Owner ask, 2026-10-15: an admin should see the conversation content in a
