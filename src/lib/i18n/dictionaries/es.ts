@@ -2658,6 +2658,43 @@ export const es: typeof en = {
     bulkRemoveReason: "Motivo",
     bulkRemoveConfirm: "Quitar",
     bulkRemoveCancel: "Cancelar",
+    // Contact-record block (contactContext.ts). The opt-out line is the mockup's ("baja-opciones", what the BD sees).
+    // `discarded` is worded two ways because only sentAt tells "never went out" from "went out, then dropped"; neither
+    // says WHO removed it, which the read does not fetch.
+    contextTitle: "Secuencias",
+    contextOptedOut: "Baja registrada el {date} · no vuelve a entrar a ninguna secuencia, de ningún BD",
+    contextOptedOutNoDate: "Baja registrada · no vuelve a entrar a ninguna secuencia, de ningún BD",
+    contextRemoved: "Se quitó hace {ago}",
+    contextNeverSent: "nunca se envió ningún correo",
+    optOutAction: "No contactar",
+    optOutPromptTitle: "¿Pidió la baja?",
+    optOutPromptBody: "En su respuesta aparece «{phrase}». Es sólo un aviso: la dirección no se suprime hasta que la registres vos.",
+    optOutTitle: "No contactar",
+    optOutLead: "Vas a registrar que {email} no quiere recibir más correos.",
+    optOutLeadNoEmail: "Vas a registrar que este contacto no quiere recibir más correos.",
+    optOutScope: "Esto no afecta sólo a esta secuencia: la dirección se suprime para toda la empresa y se descartan todas sus membresías vigentes, en todas las secuencias y de todos los BDs. Los correos aprobados que todavía no salieron se cancelan.",
+    // "Acá ves", not "tenés": the count comes from THIS Contact's memberships, but the suppression matches by email
+    // address. If the same address also lives on another Contact row, those memberships are discarded too and are not
+    // in {n}. The wording must not let the reader take {n} for their complete total.
+    optOutOwnLive: "Acá ves {n} membresías vigentes tuyas. Se descartan esas y cualquier otra de la misma dirección, tuya o de otro BD.",
+    optOutOwnLiveOne: "Acá ves 1 membresía vigente tuya. Se descarta esa y cualquier otra de la misma dirección, tuya o de otro BD.",
+    optOutOwnLiveNone: "Acá no ves membresías vigentes, pero igual se descartan todas las de esa dirección, tuyas o de otro BD.",
+    optOutReplied: "Si ya respondió y figura en Seguimientos, su membresía también pasa a descartada.",
+    optOutIrreversible: "Después no puede reincorporarse a ninguna secuencia y no se puede deshacer desde acá.",
+    optOutConfirm: "Sí, no contactar",
+    optOutCancel: "Cancelar",
+    optOutErrorNotFound: "No encontramos esa membresía entre tus secuencias, así que no se registró nada.",
+    optOutErrorNoEmail: "Este contacto no tiene correo, así que no hay dirección para suprimir. No se registró nada.",
+    contextBadges: {
+      drafted: "Borrador",
+      approved: "Aprobado",
+      sent: "Enviado",
+      noReply: "Sin respuesta",
+      replied: "Respondió",
+      discardedUnsent: "Descartado",
+      discardedSent: "Descartado",
+      optedOut: "Pidió la baja",
+    },
     badges: {
       draft: "Borrador listo",
       noDraft: "Sin borrador",
@@ -2681,6 +2718,7 @@ export const es: typeof en = {
       regenerate: "Regenerar borrador",
       openContact: "Abrir ficha",
       remove: "Quitar de la secuencia",
+      optOut: "No contactar",
     },
     // One entry per HoldReason (src/lib/sequences/preSendChecks.ts): a test fails if one is missing.
     holdReasons: {

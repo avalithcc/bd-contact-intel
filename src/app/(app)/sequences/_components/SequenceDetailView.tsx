@@ -10,6 +10,7 @@ import { EmptyState, FinishedState } from "./StateCards";
 import { StatCards } from "./StatCards";
 
 /**
+ * `optOutPhrases` maps memberId to the advisory phrase the container found in that member's reply (detectOptOutPhrase); a replied card with an entry shows the "No contactar" prompt.
  * Presentational and unrouted: it reports intent through `onAction` and holds no state, so the container that mounts it
  * (go-live PR) owns dialogs and server actions. Which blocks show follows `sequenceStats(...).view`:
  *  - empty: header, cadence and the empty state; no member cards (sequence-detail-view "Freshly created").
@@ -17,7 +18,7 @@ import { StatCards } from "./StatCards";
  *    click away). Showing the cards here is NOT in the mockup; flagged in the checklist as an owner decision.
  *  - live: header, stat cards, progress, cadence, cards.
  */
-export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId }: { detail: SequenceDetail; labels: SequenceLabels; now: Date; onAction: OnAction; viewerBdId: string }) {
+export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, optOutPhrases = {} }: { detail: SequenceDetail; labels: SequenceLabels; now: Date; onAction: OnAction; viewerBdId: string; optOutPhrases?: Readonly<Record<string, string>> }) {
   // An admin reads another BD's Sequence (audited): the cards must not word its approvals as the reader's own.
   const ownView = viewerBdId === detail.ownerBdId;
   const stats = sequenceStats(detail.members.map((m) => ({ state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null })));
@@ -34,7 +35,7 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId }
         <>
           <h2 className={stats.view === "finished" ? "mt-2xl mb-lg" : "mb-lg"}>{labels.membersTitle}</h2>
           <div className="stack">
-            {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} />)}
+            {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} optOutPhrase={optOutPhrases[m.memberId] ?? null} />)}
           </div>
         </>
       )}

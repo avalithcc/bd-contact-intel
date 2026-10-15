@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { MoreIcon } from "@/components/icons";
 import { initialsFromName } from "@/components/initials";
+import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { mapMemberCard, type CardActionId, type CardKind, type CardView } from "@/lib/sequences/memberCard";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
@@ -79,7 +80,7 @@ function Actions({ card, m, l, onAction }: { card: CardView; m: DetailMember; l:
   );
 }
 
-export function MemberCard({ member: m, now, labels: l, onAction, ownView }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean }) {
+export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOutPhrase = null }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; optOutPhrase?: string | null }) {
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;
@@ -107,6 +108,14 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView }: { m
         </div>
         <Actions card={card} m={m} l={l} onAction={onAction} />
       </div>
+      {showOptOutPrompt(card.kind, optOutPhrase) && (
+        <div className="card-body">
+          <div className="alert alert-warn" role="note">
+            <div className="grow"><span className="title">{l.optOutPromptTitle}</span> {fill(l.optOutPromptBody, { phrase: optOutPhrase ?? "" })}</div>
+            <button type="button" className="btn btn-danger btn-sm" onClick={() => onAction({ type: "optOut", memberId: m.memberId })}>{l.optOutAction}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

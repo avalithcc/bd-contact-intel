@@ -76,11 +76,13 @@ test("a sent member with no reminder date is never 'Recordatorio hoy'", () => {
   assert.equal(mapMemberCard(facts({ state: "sent", reminderDueAt: null }), NOW).kind, "sent");
 });
 
-test("replied: replied badge, only the conversation; no approve, no reminder, no menu", () => {
+test("replied: replied badge, only the conversation; no approve, no reminder", () => {
   const c = mapMemberCard(facts({ state: "replied", reminderDueAt: new Date("2026-10-15T13:00:00Z") }), NOW);
   assert.deepEqual([c.kind, c.tone], ["replied", "replied"]);
   assert.deepEqual(c.actions, [{ id: "openConversation", style: "primary" }]);
-  assert.deepEqual(c.menu, []);
+  // sequence-compliance: the card MUST offer "No contactar", and phrase detection "MUST NOT be the only path to
+  // suppression" — so this cannot depend on the advisory prompt, which only appears when a phrase is detected.
+  assert.deepEqual(c.menu, ["optOut", "openContact"]);
 });
 
 test("discarded: discarded badge and 'Reincorporar'", () => {

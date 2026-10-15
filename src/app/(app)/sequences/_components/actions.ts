@@ -6,7 +6,9 @@ import type { CardActionId } from "@/lib/sequences/memberCard";
  */
 export type DetailAction =
   | { type: "editSequence" | "generateMissing" | "approveReady" | "changeCadence" | "createNext" }
-  | { type: CardActionId; memberId: string };
+  | { type: CardActionId; memberId: string }
+  /** Only asks to start: the confirmation is `OptOutDialog`, which states the scope before anything is recorded. */
+  | { type: "optOut"; memberId: string };
 export type OnAction = (action: DetailAction) => void;
 
 /**
@@ -22,3 +24,7 @@ export type OnReviewAction = (action: ReviewAction) => void;
 /** What the bulk bar asks for. `remove` only asks to start: the reason is collected by `RemoveReasonDialog`. */
 export type BulkAction = { type: "regenerate" | "approve" | "remove"; memberIds: string[] };
 export type OnBulkAction = (action: BulkAction) => void;
+
+/** What the Contact-record block asks for. Same rule as `optOut` above: the container opens `OptOutDialog`, then calls recordOptOutForMember. */
+export type ContactContextAction = { type: "optOut"; memberId: string };
+export type OnContactContextAction = (action: ContactContextAction) => void;

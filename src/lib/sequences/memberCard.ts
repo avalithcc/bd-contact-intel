@@ -20,7 +20,7 @@ export type CardKind = "draft" | "noDraft" | "approved" | "sent" | "reminderToda
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
   | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
-  | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove";
+  | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
 export type CardFacts = {
@@ -64,7 +64,10 @@ export function mapMemberCard(f: CardFacts, now: Date): CardView {
     case "no_reply":
       return { ...base, kind: "noReply", tone: "contacted", actions: [act("viewSent", "ghost")] };
     case "replied":
-      return { ...base, kind: "replied", tone: "replied", actions: [act("openConversation", "primary")] };
+      // "No contactar" is in the menu, NOT only behind the detected-phrase prompt: sequence-compliance says the member
+      // card MUST offer it and that phrase detection "MUST NOT be the only path to suppression". Someone who asks to be
+      // removed in words the detector misses still has to be removable.
+      return { ...base, kind: "replied", tone: "replied", actions: [act("openConversation", "primary")], menu: ["optOut", "openContact"] };
     case "discarded":
       return { ...base, kind: "discarded", tone: "discarded", actions: canTransition("discarded", "drafted", "readmit", { discardReason: f.discardReason }) ? [act("readmit", "ghost")] : [] };
   }
