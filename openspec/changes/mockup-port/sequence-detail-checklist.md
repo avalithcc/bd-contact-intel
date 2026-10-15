@@ -93,3 +93,50 @@ C = `src/app/(app)/sequences/_components`
    and stays quiet about who, rather than crediting the reader with someone else's approval.
 3. `/admin/audit-log` now shows `view_sequence` rows (new "Qué se vio" column, Sequence name in the Contact column; src/lib/activity/auditLogQueries.ts, app/(app)/admin/audit-log/page.tsx).
 4. Kept: "Sin respuesta" / "Ver correo enviado" and "Sin borrador" wordings, cards under the finished state, admin intro copy, `.headline`, `readAudit.ts:14` swap point.
+
+## PR 12 (first half): review dialog and bulk bar, unmounted (tasks 12.1, 12.2, 12.5)
+
+C = `src/app/(app)/sequences/_components`, L = `src/lib/sequences`. Tests: `tests/unit/sequencesReviewDialog.test.ts`, `tests/unit/sequencesBulkBar.test.ts`.
+Components report intent through `OnReviewAction` / `OnBulkAction` (C/actions.ts); the container (PR 13) owns the server actions.
+
+| element | mockup ref | status | evidence | notes |
+|---|---|---|---|---|
+| one dialog for Revisar borrador / Ver correo / Ver correo enviado / Revisar recordatorio | dialog gallery | done | C/ReviewDialog.tsx; L/reviewDialog.ts:27 | variant from state + step; null when no draft |
+| title "name · title en Company" | dialog-header | done | C/ReviewDialog.tsx:51 | shared `Dialog` (close "×", Esc, focus return) |
+| info alert "Leelo antes de aprobar" | alert-info | done | C/ReviewDialog.tsx:83 | |
+| "Señales usadas" chips + help | field | done | C/ReviewDialog.tsx:92 | chips passed in by the container, worded from the generator input; empty list says so, never invented |
+| "Para" read-only + "Desde" + activity line | field | done | C/ReviewDialog.tsx:98 | |
+| "Asunto" / "Cuerpo" editable, footer included in the body | field | done | C/ReviewDialog.tsx:103-107 | body is stored with the footer appended |
+| help "Editalo libremente..." | help | done | C/ReviewDialog.tsx:107 | hidden when read-only |
+| "Cadencia para este contacto" Paso 1 / Paso 2 | assoc | done | C/ReviewDialog.tsx:110-113; L/reviewDialog.ts:31 | |
+| footer Regenerar (sparkle) / Guardar sin aprobar / Aprobar y programar | dialog-footer | done | C/ReviewDialog.tsx:72-77 | |
+| read-only for sent / replied / no_reply, only Cerrar | spec | done | L/reviewDialog.ts:22; C/ReviewDialog.tsx:81 | |
+| reminder variant: intro date + "no vimos ninguna respuesta" | spec | done | C/ReviewDialog.tsx:85 | |
+| opening reports "markReviewed" | spec | done | C/ReviewDialog.tsx:44-47 | intent only, once per open, only for an unopened draft |
+| "3 seleccionados" / counter / "Regenerar los N" / "Quitar de la secuencia" / "Aprobar y programar los N" | bulk-bar | done | C/BulkBar.tsx:16-26 | gate from `bulkApprovalGate` via L/bulkBar.ts |
+| approve disabled until N = M, with the blocked help text | bulk-bar | done | C/BulkBar.tsx:24,28 | |
+| bulk remove asks one reason for all | spec | done | C/BulkBar.tsx:32 `RemoveReasonDialog` | copy invented (mockup has none): see deviations |
+
+### Deviations and decisions for the owner
+
+| item | status | notes |
+|---|---|---|
+| Cadence line for an unapproved draft | deviation | mockup shows "Sale el 15/10 09:00" as fact; a draft has no send time yet, so it reads "Si lo aprobás ahora, sale el ..." (projection from the Sequence's schedule). The approved variant shows the stored time as the mockup does |
+| Notice tail "sale bajo tu nombre" | deviation | verbatim for the Sequence owner only; any other reader sees "sale desde la cuenta remitente". The same ownership rule as "aprobado por vos" on the card |
+| Approved variant notice | decision | "Aprobado hace {ago}": says when, never who (the read does not fetch the approver) |
+| Counter wording | spec vs mockup | the mockup words the complete bar "ya revisados" and the partial one "revisados"; the spec says "revisados" for both. Mockup kept, so the spec scenario "3 de 3 borradores revisados" is satisfied only up to the word "ya" |
+| Singular bar copy ("1 seleccionado", "Regenerar el borrador") | addition | mockup only draws N=3 |
+| Reason dialog copy (`bulkRemove*`) | addition | the mockup does not draw it; spec requires a reason for all |
+| Blocked help text under the bar | kept | drawn under the bar in the mockup, reads like an annotation; shown only while the button is disabled |
+| Approved member in the dialog | decision | editable, footer Regenerar + Guardar sin aprobar (no Aprobar on what is approved); saving withdraws the approval, as the spec says |
+| Warning before an approval is withdrawn | addition | `reviewApprovedEditWarning`, shown only on the approved variant. `saveDraftEdit` (draftQueries.ts:188) clears `approved_at` and `scheduled_for` and moves the member back to `drafted` — correct, since an approval binds to the exact content, but the mockup lets the BD cancel a scheduled send with no notice. Rendered as plain `help`: the mockup draws no warning, so there is no approved emphasis style, and `help-warn` (which exists in the shipped CSS) would fail the mockup class guard. **Owner: is plain help text enough emphasis, or should PR 13 style it?** |
+| `stopped` variant (new, not in the mockup) | addition | The mockup draws one read-only dialog. But `discarded` covers two different facts: dropped BEFORE step 1 released (the common roster case, `sent_at` null) and dropped after. The first was being shown the sent dialog — "este correo ya salió" plus a projected send time for a mail that will never go out, two falsehoods on one screen. `stopped` says the mail was never sent and shows NO cadence rows |
+
+### PR 13 obligations this slice cannot satisfy by itself
+
+The components report intent and hold no state, so the container owns these. None is a defect here; each is a way PR 13 could misuse them.
+
+1. **Refresh the member after `markReviewed` succeeds.** The dialog reports the intent once per open, from an effect. The server side is idempotent (`markDraftReviewed` updates only `where reviewed_at is null`, owner- and state-scoped), so a repeat is harmless — but until the container refetches, `BulkBar`'s "N de M revisados" counter and its approve gate stay stale.
+2. **Never approve after a failed save.** The dialog reports `save` and `approve` with the subject and body it holds. An approval binds to the exact content, so the container must save first and approve only once the save succeeded.
+3. **Mounting the dialog already open fires `markReviewed` on mount.** That is intended (opening IS the review), but a container that mounts it open for a member nobody chose would record a review nobody did.
+4. **Surface the `empty` error.** The fields carry `required`, which stops a blank submit in the browser, but `saveDraftEdit` also refuses whitespace-only content; that error reaches the user only if the container maps it into the dialog's `error` prop.
