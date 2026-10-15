@@ -34,3 +34,12 @@ export const COMPLIANCE_CONFIG: ComplianceConfig = {
     optOutText: OPT_OUT_TEXT,
   },
 };
+
+/**
+ * How old `email_account.last_synced_at` may be before a REMINDER is held instead of sent (reply detection needs the
+ * Gmail sync to have seen any reply). 26h = the 24h daily Vercel safety net (`/api/gmail/sync` in vercel.json, the only
+ * cadence this repo itself guarantees) + the spec's 2h grace. The real cadence is pg_cron every 2 minutes, but pinning
+ * the check to that would hold nearly every reminder whenever pg_cron is paused; pinning it to the guarantee holds only
+ * when the guarantee is actually missed. If the daily net ever stops being the floor, drop this to 2min + 2h.
+ */
+export const SEQUENCE_SYNC_STALE_MS = 26 * 60 * 60 * 1000;
