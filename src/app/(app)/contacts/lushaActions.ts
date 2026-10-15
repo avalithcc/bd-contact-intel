@@ -34,12 +34,17 @@ export async function searchLushaContactAction(personId: string, field: Field) {
   }
 }
 
-export async function revealLushaFieldAction(personId: string, field: Field) {
+const isExpect = (v: unknown): v is { searchId: string; price: number } =>
+  typeof v === "object" && v !== null && isUuid((v as { searchId?: unknown }).searchId as string) && Number.isSafeInteger((v as { price?: unknown }).price);
+
+/** `expect` is what the BD confirmed on screen (the search and the price); the server refuses anything else. */
+export async function revealLushaFieldAction(personId: string, field: Field, expect: { searchId: string; price: number }) {
   try {
     const me = await getCurrentBd(); // authenticate first, then validate
     if (!isUuid(personId)) return rejected("not_found");
     if (!isField(field)) return rejected("lusha_not_eligible");
-    const result = await revealLushaField({ personId, field, actorBdId: me.id }, livePorts());
+    if (!isExpect(expect)) return rejected("lusha_stale");
+    const result = await revealLushaField({ personId, field, actorBdId: me.id, expect }, livePorts());
     revalidatePath(`/contacts/${personId}`);
     return result;
   } catch (err) {

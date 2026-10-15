@@ -379,7 +379,7 @@ test("search then reveal through the real ports: one search call, one enrich cal
   assert.equal(found.ok && found.outcome, "matched");
   assert.equal(fetchSpy.requests.length, 1);
 
-  const revealed = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
+  const revealed = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId, expect: { searchId: found.ok && found.outcome === "matched" ? found.searchId : "", price: 1 } }, ports);
   assert.equal(revealed.ok && revealed.outcome, "revealed");
   assert.equal(fetchSpy.requests.length, 2);
   assert.deepEqual(fetchSpy.requests[1].body, { ids: ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"], reveal: ["emails"] });
@@ -388,7 +388,7 @@ test("search then reveal through the real ports: one search call, one enrich cal
   const acts = await db.select().from(activity).where(eq(activity.personId, p.id));
   assert.deepEqual(acts.map((a) => a.type), ["lusha_reveal"]);
 
-  const again = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
+  const again = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId, expect: { searchId: "x", price: 1 } }, ports);
   // Now reachable, so the email is no longer offered at all: refused with no call and no charge.
   assert.deepEqual([again.ok, !again.ok && again.reason, fetchSpy.requests.length], [false, "lusha_not_eligible", 2]);
 });
@@ -418,7 +418,7 @@ test("the closed gate never reaches the client or the ledger", async () => {
   const { eq } = await import("drizzle-orm");
   const p = await mkPerson("act");
   const spy = fakeFetch({});
-  const r = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId }, livePorts({}, spy.fn));
+  const r = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId, expect: { searchId: "x", price: 1 } }, livePorts({}, spy.fn));
   assert.deepEqual([r.ok, !r.ok && r.reason, spy.requests.length], [false, "lusha_off", 0]);
   assert.equal((await db.select().from(lushaReveal).where(eq(lushaReveal.personId, p.id))).length, 0);
 });
@@ -522,4 +522,40 @@ test("getRevealState also returns who paid, when it settled and the live holder 
   assert.ok(state.emails?.settledAt instanceof Date);
   assert.deepEqual(state.emails?.twin, { id: holder.id, name: `metaholder ${run}` });
   assert.equal(state.search?.twin ?? null, null);
+});
+
+// --- review fixes: a failed search never hides the settled one; a parked paid value is never bought again --------
+
+test("a failed search after a settled match leaves the match, its field rows and the reveal intact", async () => {
+  const { failReservation, getRevealState, rejectMatch, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("hide");
+  const searchId = await matchedSearch(p.id);
+  const unknown = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(unknown.ok);
+  await failReservation(unknown.reservationId, "outcome_unknown");
+  const failedSearch = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(failedSearch.ok);
+  await failReservation(failedSearch.reservationId, "rate_limited");
+  const state = await getRevealState(p.id);
+  assert.deepEqual([state.search?.id, state.search?.outcome, state.phones?.errorCode], [searchId, "matched", "outcome_unknown"]);
+  const again = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.deepEqual([again.ok, again.ok && again.searchId], [true, searchId], "reserve reads the same settled search");
+  assert.equal(await rejectMatch(p.id, bdId), true, "reject targets the settled match, not the failed attempt");
+});
+
+test("a paid value parked by a failed settle blocks a second purchase and is applied for free", async () => {
+  const { applyStoredReveal, failReservation, getRevealState, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("parked");
+  await matchedSearch(p.id);
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  const email = `parked-${run}@acme.test`;
+  await failReservation(r.reservationId, "settle_failed", { emails: [{ email, confidence: 60 }], creditsCharged: 1 });
+  assert.equal((await getRevealState(p.id)).emails?.errorCode, "settle_failed");
+  assert.deepEqual((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 })).ok, false, "never bought twice");
+  const out = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
+  assert.deepEqual([out.ok, out.ok && out.written], [true, "email"]);
+  const [row] = (await ledger(p.id)).filter((x) => x.field === "emails");
+  assert.deepEqual([row.state, row.outcome, row.creditsCharged, row.errorCode, row.value], ["settled", "revealed", 1, null, email]);
+  assert.equal((await personRow(p.id)).email, email);
 });

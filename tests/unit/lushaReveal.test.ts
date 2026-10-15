@@ -82,7 +82,7 @@ function fake(over: Partial<RevealPorts> & { rows?: LatestRows; subject?: Subjec
 }
 
 const spends = (calls: string[]) => calls.filter((c) => c === "reserve" || c === "searchContact" || c === "enrichContact");
-const input = (field: "emails" | "phones" = "emails") => ({ personId: SUBJECT.id, field, actorBdId: "bd-1" });
+const input = (field: "emails" | "phones" = "emails") => ({ personId: SUBJECT.id, field, actorBdId: "bd-1", expect: { searchId: "s1", price: field === "emails" ? 1 : 5 } });
 const ACCOUNT_CALLS = ["searchContact", "enrichContact"];
 
 // --- gates ---------------------------------------------------------------------------------
@@ -394,6 +394,38 @@ test("after outcome_unknown the field can only be reopened by an explicit new (p
   const served = await searchLushaContact(input(), free.p);
   assert.equal(served.ok && served.outcome === "matched" && served.reused, true);
   assert.deepEqual(spends(free.calls), []);
+});
+
+test("a reveal confirmed against another search or another price is refused before anything is reserved (two tabs, two BDs)", async () => {
+  for (const expect of [{ searchId: "s-other", price: 1 }, { searchId: "s1", price: 5 }]) {
+    const f = fake({ rows: WITH_SEARCH });
+    const r = await revealLushaField({ ...input(), expect }, f.p);
+    assert.deepEqual([r.ok, !r.ok && r.reason], [false, "lusha_stale"]);
+    assert.deepEqual(spends(f.calls), []);
+  }
+});
+
+test("a search never proceeds to a paid call for a field the UI deliberately offers no search for", async () => {
+  const held = row({ id: "p1", field: "phones", outcome: "already_held", searchId: "s1" });
+  const f = fake({ rows: { ...WITH_SEARCH, phones: held } });
+  const r = await searchLushaContact(input("phones"), f.p);
+  assert.deepEqual([r.ok, !r.ok && r.reason], [false, "lusha_not_eligible"]);
+  assert.deepEqual(spends(f.calls), []);
+});
+
+test("a paid value parked by a failed settle is never bought again", async () => {
+  const parked = row({ id: "r2", field: "emails", state: "failed", errorCode: "settle_failed", searchId: "s1", payload: { emails: [{ email: "a@b.co" }] } });
+  const f = fake({ rows: { ...WITH_SEARCH, emails: parked } });
+  const r = await revealLushaField(input(), f.p);
+  assert.deepEqual([r.ok, !r.ok && r.reason], [false, "lusha_not_eligible"]);
+  assert.deepEqual(spends(f.calls), []);
+});
+
+test("a matched search reports the id of the row that holds it, new or reused", async () => {
+  const fresh = await searchLushaContact(input(), fake().p);
+  assert.equal(fresh.ok && fresh.outcome === "matched" && fresh.searchId, "res-1");
+  const reused = await searchLushaContact(input(), fake({ rows: WITH_SEARCH }).p);
+  assert.equal(reused.ok && reused.outcome === "matched" && reused.searchId, "s1");
 });
 
 test("a phone Lusha returned that we already held is reported as already_held, not as a successful reveal", async () => {

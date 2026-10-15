@@ -50,7 +50,7 @@ export async function reserve(
     const [owner] = await tx
       .select({
         mergedIntoId: person.mergedIntoId,
-        owned: sql<boolean>`exists(select 1 from lusha_reveal r where r.person_id = ${input.personId} and r.field = ${input.field} and r.state = 'settled' and r.outcome = 'revealed')`,
+        owned: sql<boolean>`exists(select 1 from lusha_reveal r where r.person_id = ${input.personId} and r.field = ${input.field} and ((r.state = 'settled' and r.outcome = 'revealed') or (r.state = 'failed' and r.error_code = 'settle_failed')))`,
       })
       .from(person)
       .where(eq(person.id, input.personId))
@@ -64,10 +64,11 @@ export async function reserve(
       const [s] = await tx
         .select()
         .from(lushaReveal)
-        .where(and(eq(lushaReveal.personId, input.personId), eq(lushaReveal.field, "search")))
+        // The latest SETTLED search: a failed attempt (429, timeout) must never hide the paid match it followed.
+        .where(and(eq(lushaReveal.personId, input.personId), eq(lushaReveal.field, "search"), eq(lushaReveal.state, "settled")))
         .orderBy(desc(lushaReveal.at))
         .limit(1);
-      if (!s || s.state !== "settled" || s.outcome !== "matched") return { ok: false, reason: "no_search" };
+      if (!s || s.outcome !== "matched") return { ok: false, reason: "no_search" };
       search = s;
     }
     const list = (search?.payload as { canReveal?: CanRevealEntry[] } | null)?.canReveal ?? null;
@@ -125,7 +126,7 @@ export async function failReservation(reservationId: string, errorCode: string, 
 
 /** "No es mi contacto": marks the latest matched search rejected. Charges nothing and never touches credits_charged (D5). */
 export async function rejectMatch(personId: string, bdId: string, database: typeof db = db): Promise<boolean> {
-  const latest = sql`(select s.id from lusha_reveal s where s.person_id = ${personId} and s.field = 'search' order by s.at desc limit 1)`;
+  const latest = sql`(select s.id from lusha_reveal s where s.person_id = ${personId} and s.field = 'search' and s.state = 'settled' order by s.at desc limit 1)`;
   const rows = await database
     .update(lushaReveal)
     .set({ outcome: "match_rejected", rejectedByBdId: bdId, rejectedAt: new Date() })
@@ -240,19 +241,41 @@ export async function applyStoredReveal(
   database: typeof db = db,
 ): Promise<{ ok: true; value: string | null; written: RevealSettlement["written"]; duplicate: RevealSettlement["duplicate"] } | { ok: false; reason: "not_applicable" }> {
   return database.transaction(async (tx) => {
+    // Two parked shapes: a settled `revealed` row whose Contact write failed, and a `failed` row whose settle itself failed
+    // (reveal keeps the raw paid value in its payload). Both hold a value that was already paid for.
     const [row] = await tx
       .select()
       .from(lushaReveal)
-      .where(and(eq(lushaReveal.personId, input.personId), eq(lushaReveal.field, input.field), eq(lushaReveal.state, "settled"), eq(lushaReveal.outcome, "revealed"), eq(lushaReveal.errorCode, "write_failed")))
+      .where(
+        and(
+          eq(lushaReveal.personId, input.personId),
+          eq(lushaReveal.field, input.field),
+          or(
+            and(eq(lushaReveal.state, "settled"), eq(lushaReveal.outcome, "revealed"), eq(lushaReveal.errorCode, "write_failed")),
+            and(eq(lushaReveal.state, "failed"), eq(lushaReveal.errorCode, "settle_failed")),
+          ),
+        ),
+      )
       .orderBy(desc(lushaReveal.at))
       .limit(1)
       .for("update");
-    const raw = (row?.payload as Record<string, unknown> | null)?.[input.field];
-    const pick = input.field === "emails" ? pickEmail(raw) : pickPhone(raw);
-    if (!row || !pick.ok) return { ok: false, reason: "not_applicable" } as const;
-    const applied = await writeToContact(tx, { ledgerId: row.id, personId: row.personId, field: input.field, pick, normalized: row.valueNormalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: row.creditsCharged });
+    const payload = (row?.payload as Record<string, unknown> | null) ?? {};
+    const pick = input.field === "emails" ? pickEmail(payload[input.field]) : pickPhone(payload[input.field]);
+    if (!row) return { ok: false, reason: "not_applicable" } as const;
+    let value = row.value;
+    let normalized = row.valueNormalized;
+    let charged = row.creditsCharged;
+    if (row.state === "failed") {
+      // Settle it now, from what was parked: the charge Lusha reported (else the reserved amount keeps counting) and the value.
+      value = pick.ok ? pick.value : null;
+      normalized = value === null ? null : input.field === "emails" ? value.trim().toLowerCase() : value.replace(/\D/g, "");
+      charged = typeof payload.creditsCharged === "number" ? payload.creditsCharged : null;
+      await tx.update(lushaReveal).set({ state: "settled", outcome: pick.ok ? "revealed" : "no_value", value, valueNormalized: normalized, creditsCharged: charged, errorCode: pick.ok ? null : "unparsable_value", settledAt: new Date() }).where(eq(lushaReveal.id, row.id));
+    }
+    if (!pick.ok) return { ok: false, reason: "not_applicable" } as const;
+    const applied = await writeToContact(tx, { ledgerId: row.id, personId: row.personId, field: input.field, pick, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: charged });
     await tx.update(lushaReveal).set({ errorCode: applied.alreadyHeld ? "phone_already_held" : null, payload: sql`${lushaReveal.payload} - 'writeError'` }).where(eq(lushaReveal.id, row.id));
-    return { ok: true, value: row.value, written: applied.written, duplicate: applied.duplicate } as const;
+    return { ok: true, value, written: applied.written, duplicate: applied.duplicate } as const;
   });
 }
 
@@ -262,7 +285,7 @@ export async function applyStoredReveal(
  * (person_id, field, at desc). `complianceBlocked` covers every search of the Contact (D6).
  */
 export async function getRevealState(personId: string, reader: Pick<typeof db, "selectDistinctOn"> = db): Promise<LatestRows> {
-  const latestSearch = sql`(select s.id from lusha_reveal s where s.person_id = ${personId} and s.field = 'search' order by s.at desc limit 1)`;
+  const latestSearch = sql`(select s.id from lusha_reveal s where s.person_id = ${personId} and s.field = 'search' and s.state = 'settled' order by s.at desc limit 1)`;
   const rows = await reader
     .selectDistinctOn([lushaReveal.field], {
       id: lushaReveal.id,
@@ -285,10 +308,15 @@ export async function getRevealState(personId: string, reader: Pick<typeof db, "
       and(
         eq(lushaReveal.personId, personId),
         // The current search's rows, plus any paid value of ANY search: a revealed value is person-level (a merge can leave it on an older search).
-        or(eq(lushaReveal.field, "search"), sql`${lushaReveal.searchId} = ${latestSearch}`, and(eq(lushaReveal.state, "settled"), eq(lushaReveal.outcome, "revealed"))),
+        or(eq(lushaReveal.field, "search"), sql`${lushaReveal.searchId} = ${latestSearch}`, and(eq(lushaReveal.state, "settled"), eq(lushaReveal.outcome, "revealed")), and(eq(lushaReveal.state, "failed"), eq(lushaReveal.errorCode, "settle_failed"))),
       ),
     )
-    .orderBy(lushaReveal.field, sql`(${lushaReveal.state} = 'settled' and ${lushaReveal.outcome} = 'revealed') desc`, desc(lushaReveal.at));
+    .orderBy(
+      lushaReveal.field,
+      // A paid value first; for `search`, a settled row before any failed attempt, so a 429 never hides the last settled search.
+      sql`((${lushaReveal.state} = 'settled' and (${lushaReveal.outcome} = 'revealed' or ${lushaReveal.field} = 'search')) or ${lushaReveal.errorCode} = 'settle_failed') desc`,
+      desc(lushaReveal.at),
+    );
   return toLatestRows(rows as Parameters<typeof toLatestRows>[0]);
 }
 

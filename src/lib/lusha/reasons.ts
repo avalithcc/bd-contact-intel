@@ -21,6 +21,7 @@ export const LUSHA_REASONS = [
   "lusha_busy",
   "lusha_not_eligible",
   "lusha_insufficient_data",
+  "lusha_stale",
 ] as const;
 
 export type LushaReason = (typeof LUSHA_REASONS)[number];

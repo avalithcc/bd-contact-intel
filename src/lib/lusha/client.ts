@@ -7,7 +7,9 @@
 import { LushaError, kindFromHttpStatus } from "./errors";
 
 const BASE_URL = "https://api.lusha.com";
-const TIMEOUT_MS = 15_000;
+// Must stay well below the contact page's maxDuration (it hosts the server actions): the fetch has to lose before the function is
+// killed, otherwise a reservation is stranded `reserved` and answers busy forever. Pinned by tests/unit/lushaInert.test.ts.
+const TIMEOUT_MS = 8_000;
 
 export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
 export type RevealField = "emails" | "phones";

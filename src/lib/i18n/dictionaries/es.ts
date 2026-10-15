@@ -980,7 +980,7 @@ export const es: typeof en = {
     errorLushaUnconfigured: "Lusha no está configurado correctamente. Avisá a un administrador.",
     errorLushaPlanDenied: "El plan de Lusha no permite esta consulta.",
     errorLushaNoCredits: "Lusha rechazó la solicitud porque la cuenta no tiene saldo. No es el límite diario del equipo. No se guardó ningún resultado para este contacto. Avisar a un administrador para recargar la cuenta.",
-    errorLushaRateLimited: "No se cobró nada y no se reintenta solo. Esperar unos minutos y volver a intentar.",
+    errorLushaRateLimited: "Lusha rechazó la solicitud por exceso de pedidos; normalmente no se cobra. No se reintenta solo. Esperar unos minutos y volver a intentar.",
     errorLushaProtected: "Lusha la excluye por una restricción de cumplimiento normativo. Es permanente y vale para toda la persona (correo y teléfono): no se vuelve a ofrecer ni se reintenta.",
     errorLushaUnavailable: "Lusha no respondió. Probá de nuevo más tarde.",
     errorLushaNoMatch: "Lusha no tiene datos de este contacto.",
@@ -992,6 +992,7 @@ export const es: typeof en = {
     errorLushaBusy: "Ya hay una revelación en curso para este dato.",
     errorLushaNotEligible: "Este dato no se puede revelar con Lusha para este contacto.",
     errorLushaInsufficientData: "Faltan datos del contacto (nombre y empresa o LinkedIn) para buscarlo en Lusha.",
+    errorLushaStale: "Los datos de Lusha cambiaron desde que se abrió este diálogo (otra pestaña u otro usuario). No se cobró nada: cerrar y revisar la ficha.",
     // Lusha reveal control and dialogs (lusha-reveal PR 6; mockups/lusha-reveal.html). `{x}` placeholders are filled and
     // `**bold**` rendered by LushaReveal.tsx. Neutral Spanish, as drawn in the approved mockup.
     lushaBadge: "Lusha",
@@ -1012,7 +1013,7 @@ export const es: typeof en = {
     lushaHintPaidConfirmed: "Búsqueda ya pagada e identidad ya confirmada.",
     lushaHintPaidAvailable: "Búsqueda ya pagada. Lusha sí tiene este dato.",
     lushaHeldTitle: "Este contacto ya tiene un teléfono",
-    lushaHeldBody: "Lusha puede devolver el mismo número y se cobran los 5 créditos igual. Si coincide, no se guarda nada nuevo.",
+    lushaHeldBody: "Lusha puede devolver el mismo número y se cobra el precio del teléfono ({credits}) igual. Si coincide, no se guarda nada nuevo.",
     lushaHintSame: "Si no cambió ningún dato nuestro (por ejemplo el dominio de la empresa), Lusha devolverá lo mismo y el crédito se pierde.",
     lushaRevealedHint: "Lusha · revelado por {name}, {date}",
     lushaNoteNoValue: "Lusha no tiene {field} para este contacto. No se vuelve a consultar solo.",

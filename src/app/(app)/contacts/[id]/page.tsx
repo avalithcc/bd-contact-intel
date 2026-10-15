@@ -34,7 +34,7 @@ import { whatsappLink } from "@/lib/whatsapp";
 import { getDailyCreditCap } from "@/lib/lusha/cap";
 import { getLushaConfig } from "@/lib/lusha/config";
 import { getDailySpend, getRevealState } from "@/lib/lusha/revealDb";
-import { buildLushaView } from "@/lib/lusha/revealView";
+import { buildLushaView, type LushaView } from "@/lib/lusha/revealView";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
@@ -75,6 +75,9 @@ function pickEditTaskLabels(l: ReturnType<typeof pickContactRecordLabels>): Edit
 }
 
 export const dynamic = "force-dynamic";
+// The Lusha server actions run under this route's limit. The Lusha fetch times out at 8 s (src/lib/lusha/client.ts), so it
+// always loses before the function is killed; otherwise a paid call leaves a `reserved` row that answers busy forever.
+export const maxDuration = 60;
 
 interface ContactRecordPageProps {
   params: Promise<{ id: string }>;
@@ -271,19 +274,26 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // Free text wins when present; canonical `company.display_name` only
   // fills in the null case.
   const companyDisplayName = resolveCompanyDisplayName(record.person.company, companyRow?.displayName);
-  // Lusha reveal control (lusha-reveal PR 6): resolved here so no client component decides what a reveal costs.
-  // Outside production the gate is closed and this reads nothing; in production it is two small reads (ledger rows, day's spend).
-  const lushaConfig = getLushaConfig();
-  const lusha = buildLushaView({
-    config: lushaConfig,
-    rows: lushaConfig.ok ? await getRevealState(record.person.id) : {},
-    spentToday: lushaConfig.ok ? await getDailySpend() : 0,
-    cap: getDailyCreditCap(),
-    person: record.person,
-    crm: { name, company: companyDisplayName, domain: companyRow?.domain ?? null, linkedin: linkedinProfileHref(record.person.profileKey) },
-    companyHref: employerHref,
-    formatDay: formatArgentinaDayMonth,
-  });
+  // Lusha reveal control (lusha-reveal PR 6): resolved here so no client component decides what a reveal costs. Outside
+  // production the gate is closed and this reads nothing. A read failure must never take the whole record page down: the
+  // control simply does not render (logged).
+  let lusha: LushaView | null = null;
+  try {
+    const lushaConfig = getLushaConfig();
+    const [rows, spentToday] = lushaConfig.ok ? await Promise.all([getRevealState(record.person.id), getDailySpend()]) : [{}, 0];
+    lusha = buildLushaView({
+      config: lushaConfig,
+      rows,
+      spentToday,
+      cap: getDailyCreditCap(),
+      person: record.person,
+      crm: { name, company: companyDisplayName, domain: companyRow?.domain ?? null, linkedin: linkedinProfileHref(record.person.profileKey) },
+      companyHref: employerHref,
+      formatDay: formatArgentinaDayMonth,
+    });
+  } catch (err) {
+    console.error("lusha reveal control unavailable", err);
+  }
   const stageLabels: Record<string, string> = {
     prospect: dict.companiesPage.stageProspect,
     qualified: dict.companiesPage.stageQualified,

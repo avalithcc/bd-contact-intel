@@ -21,3 +21,18 @@ Paths: `LR` = `src/app/(app)/contacts/[id]/LushaReveal.tsx`, `RV` = `src/lib/lus
 | - | `already_held`, `outcome_unknown`, `write_failed` rows | done | RV, LR `noteText` | Not drawn in the mockup; copy is new and needs owner eye |
 | - | Task 6.11 free "Aplicar valor guardado" | done | `applyStoredReveal`, `applyStoredLushaValueAction`, LR `apply` | Not drawn in the mockup |
 | - | Header: close button, focus trap, focus return | done | shared `Dialog` | |
+
+## Operations: releasing a stranded reservation
+
+The Lusha fetch times out at 8 s and the contact page allows 60 s, so a reservation should never be left `reserved`. If one ever is
+(for example the platform killed the function anyway), that row answers `busy` for its person and field forever and no UI can clear it.
+Release it by hand (the reserved credits keep counting toward today's cap, as for any failed row):
+
+```sql
+update lusha_reveal set state = 'failed', error_code = 'stranded', settled_at = now()
+where state = 'reserved' and at < now() - interval '5 minutes';
+```
+
+## Review round 2 (go-live blockers)
+
+C1 reader/reserve/reject read the latest SETTLED search; C2 maxDuration 60 + 8 s fetch timeout (pinned); W3 page reads wrapped, fall back to no control; W4 `settle_failed` rows are never re-purchasable and are applied for free; W5 unconfirmed on a dead request, busy guard on apply; W6/W7 reveal is confirmed against the search id and price shown, searches for fields with no offer are refused, no blind reveal over a blank identity; W8 balance shown only when total - used = remaining.

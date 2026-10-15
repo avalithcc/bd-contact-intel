@@ -158,6 +158,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorLushaNotEligible;
     case "lusha_insufficient_data":
       return l.errorLushaInsufficientData;
+    case "lusha_stale":
+      return l.errorLushaStale;
     case "unexpected":
       return l.genericError;
     case "unconfirmed":

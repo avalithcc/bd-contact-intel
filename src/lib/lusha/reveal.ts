@@ -57,7 +57,7 @@ export interface RevealFailure {
   remaining?: number;
 }
 
-export type SearchResult = RevealFailure | { ok: true; outcome: "no_match" | "compliance_restricted" } | { ok: true; outcome: "matched"; identity: LushaIdentity; price: number | null; reused: boolean };
+export type SearchResult = RevealFailure | { ok: true; outcome: "no_match" | "compliance_restricted" } | { ok: true; outcome: "matched"; identity: LushaIdentity; price: number | null; reused: boolean; /** The ledger row holding the match: a reveal is confirmed against it. */ searchId: string };
 
 export type RevealResult =
   | RevealFailure
@@ -130,14 +130,15 @@ export async function searchLushaContact(input: { personId: string; field: Revea
     case "revealed":
       return no("lusha_not_eligible");
     case "unavailable":
-      if (state.reason === "not_revealable") return no("lusha_not_eligible");
+      // Only a no-match / no-value re-search is ever offered; already_held and not_revealable never reach a paid call.
+      if (!state.retry) return no("lusha_not_eligible");
       break;
     case "revealable": {
       // The paid call for this field may already have been billed (outcome_unknown): only a new, paid search reopens it.
       if (rows[input.field]?.errorCode === "outcome_unknown") break;
       // A valid stored match: serve it, no network, no charge.
       const stored = payloadOf(rows.search);
-      return { ok: true, outcome: "matched", identity: stored.identity as LushaIdentity, price: state.price, reused: true };
+      return { ok: true, outcome: "matched", identity: stored.identity as LushaIdentity, price: state.price, reused: true, searchId: rows.search!.id };
     }
   }
   const { firstName, lastName } = subject;
@@ -161,7 +162,7 @@ export async function searchLushaContact(input: { personId: string; field: Revea
     const payload = { lushaContactId: out.lushaId, identity: out.identity, canReveal: out.canReveal, lowBalance: out.lowBalance };
     await settleOrBusy(p.settleSearch({ reservationId: id, outcome: "matched", creditsCharged: out.creditsCharged, lushaContactId: out.lushaId, payload }), id, p);
     const price = expectedCost(input.field, out.canReveal as CanRevealEntry[]);
-    return { ok: true, outcome: "matched", identity: out.identity, price: price.ok ? price.credits : null, reused: false };
+    return { ok: true, outcome: "matched", identity: out.identity, price: price.ok ? price.credits : null, reused: false, searchId: id };
   } catch (err) {
     if (err instanceof SettleLostError) return no("lusha_busy", { retryable: true });
     return failFrom(err, id, p, () => p.settleSearch({ reservationId: id, outcome: "compliance_restricted", creditsCharged: null, payload: {} }));
@@ -196,7 +197,8 @@ function reserveFailure(r: Extract<ReserveResult, { ok: false }>): RevealFailure
   }
 }
 
-export async function revealLushaField(input: { personId: string; field: RevealField; actorBdId: string }, p: RevealPorts): Promise<RevealResult> {
+/** `expect` is what the BD confirmed on screen: the search the match belongs to and the price shown. Anything else is refused. */
+export async function revealLushaField(input: { personId: string; field: RevealField; actorBdId: string; expect: { searchId: string; price: number } }, p: RevealPorts): Promise<RevealResult> {
   const { personId, field, actorBdId } = input;
   const prep = await prepare(personId, field, p);
   if ("ok" in prep) return prep;
@@ -214,6 +216,9 @@ export async function revealLushaField(input: { personId: string; field: RevealF
     case "revealable":
       // outcome_unknown may already have been billed: only an explicit new search (a conscious spend) reopens the field.
       if (rows[field]?.errorCode === "outcome_unknown") return no("lusha_outcome_unknown");
+      // A paid value parked by a failed settle is applied for free (task 6.11), never bought again.
+      if (rows[field]?.errorCode === "settle_failed") return no("lusha_not_eligible");
+      if (rows.search?.id !== input.expect.searchId || state.price !== input.expect.price) return no("lusha_stale");
       break;
     default: // searchable, rejected, unavailable, off, unconfigured: there is no valid stored match to reveal against
       return no("lusha_not_eligible");

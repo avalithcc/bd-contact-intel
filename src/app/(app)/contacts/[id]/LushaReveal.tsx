@@ -17,13 +17,12 @@ import type { ContactActionErrorReason } from "../actionErrors";
 import { applyStoredLushaValueAction, getLushaAccountUsageAction, rejectLushaMatchAction, revealLushaFieldAction, searchLushaContactAction } from "../lushaActions";
 
 type Failure = { reason: ContactActionErrorReason; retryable: boolean };
-type Step = { kind: "cost" } | { kind: "identity"; match: IdentityFields; price: number | null } | null;
+type Step = { kind: "cost" } | { kind: "identity"; match: IdentityFields; price: number | null; searchId: string } | null;
 
 const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ""));
 const rich = (t: string) => t.split("**").map((s, i) => (i % 2 ? <strong key={i}>{s}</strong> : s));
 const TITLE: Partial<Record<ContactActionErrorReason, keyof ContactRecordLabels>> = { lusha_cap_reached: "lushaTitleCapReached", lusha_no_credits: "lushaTitleNoCredits", lusha_rate_limited: "lushaTitleRateLimited", lusha_protected: "lushaTitleProtected" };
 const DANGER: ContactActionErrorReason[] = ["lusha_no_credits", "lusha_protected", "lusha_outcome_unknown", "lusha_unreadable"];
-const NO_MATCH: IdentityFields = { name: null, company: null, domain: null, linkedin: null };
 const LushaBadge = ({ l }: { l: ContactRecordLabels }) => <span className="badge badge-outline no-dot">{l.lushaBadge}</span>;
 
 export function LushaRow({ personId, field, column, fieldLabel, view, labels: l }: { personId: string; field: LushaField; column: "email" | "phone" | "mobilePhone"; fieldLabel: string; view: LushaView; labels: ContactRecordLabels }) {
@@ -42,6 +41,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
   const close = () => {
     setStep(null);
     setError(null);
+    setBalance(null); // a reopened dialog must never show the previous figure
   };
 
   // The free balance call, once per open identity dialog; a failure here never blocks the reveal.
@@ -49,7 +49,14 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
   useEffect(() => {
     if (!identityOpen) return;
     let live = true;
-    getLushaAccountUsageAction().then((r) => live && r.ok && "usage" in r && setBalance(r.usage.remaining));
+    // The usage body shape is unmeasured: show a figure only when it is internally consistent (total - used = remaining), else nothing.
+    getLushaAccountUsageAction()
+      .then((r) => {
+        if (!live || !r.ok || !("usage" in r)) return;
+        const { total, used, remaining } = r.usage;
+        if (total !== null && used !== null && remaining !== null && remaining >= 0 && total - used === remaining) setBalance(remaining);
+      })
+      .catch(() => undefined);
     return () => {
       live = false;
     };
@@ -75,12 +82,16 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
 
   /** Runs one action: a failure keeps the dialog open with the error; success hands the result to `onOk`. */
   async function run<T extends { ok: boolean }>(action: () => Promise<T>, onOk: (r: Extract<T, { ok: true }>) => void) {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
       const r = await action();
       if (r.ok) onOk(r as Extract<T, { ok: true }>);
       else setError(r as unknown as Failure);
+    } catch {
+      // The request died after a paid action may have landed: say "unconfirmed", never invite a blind second click.
+      setError({ reason: "unconfirmed", retryable: false });
     } finally {
       setBusy(false);
     }
@@ -101,19 +112,33 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
 
   const search = () =>
     run(() => searchLushaContactAction(personId, field), (r) => {
-      if (r.outcome === "matched" && r.price !== null) return setStep({ kind: "identity", match: r.identity, price: r.price });
+      if (r.outcome === "matched" && r.price !== null) return setStep({ kind: "identity", match: r.identity, price: r.price, searchId: r.searchId });
       close();
       showToast(noteText(r.outcome === "matched" ? "not_revealable" : r.outcome === "no_match" ? "no_match" : "blocked"), "error");
     });
-  const reveal = () => run(() => revealLushaFieldAction(personId, field), (r) => (close(), announce(r)));
+  const reveal = (s: { price: number | null; searchId: string }) =>
+    run(() => revealLushaFieldAction(personId, field, { searchId: s.searchId, price: s.price ?? -1 }), (r) => (close(), announce(r)));
   const reject = () => run(() => rejectLushaMatchAction(personId), () => (close(), showToast(l.lushaToastRejected, "success")));
   const apply = async () => {
-    const r = await applyStoredLushaValueAction(personId, field);
-    if (r.ok) announce(r, true);
-    else showToast(contactActionErrorMessage(l, r.reason as ContactActionErrorReason), "error");
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await applyStoredLushaValueAction(personId, field);
+      if (r.ok) announce(r, true);
+      else showToast(contactActionErrorMessage(l, r.reason as ContactActionErrorReason), "error");
+    } catch {
+      showToast(l.errorUnconfirmed, "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const onControl = () => (c?.kind === "apply" ? apply() : c?.kind === "reveal" ? setStep({ kind: "identity", match: view.match ?? NO_MATCH, price: c.price }) : setStep({ kind: "cost" }));
+  const onControl = () => {
+    if (c?.kind === "apply") return apply();
+    if (c?.kind !== "reveal") return setStep({ kind: "cost" });
+    // Never open a paid reveal over a blank identity: the view only offers it with a readable match and its search id.
+    if (view.match && view.matchSearchId) setStep({ kind: "identity", match: view.match, price: c.price, searchId: view.matchSearchId });
+  };
   const title = (t: string) => (
     <>
       {t} <LushaBadge l={l} />
@@ -136,12 +161,12 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
 
   const fieldPrice = c?.kind === "search" && c.price !== null ? c.price - 1 : (c?.price ?? 0);
   // The 5-credit phone reveal can come back as a number the Contact already has: the human decides, but not blindly.
-  const heldWarning = field === "phones" && view.holdsPhone && (
+  const held = (amount: string) => field === "phones" && view.holdsPhone && (
     <div className="alert alert-warn" role="note">
       <WarningIcon className="icon" />
       <div>
         <div className="title">{l.lushaHeldTitle}</div>
-        {l.lushaHeldBody}
+        {fill(l.lushaHeldBody, { credits: amount })}
       </div>
     </div>
   );
@@ -175,7 +200,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
             </thead>
             <tbody>
               <tr><td>{l.lushaRowResearch}</td><td className="right">1</td><td>{l.lushaWhenResearch}</td></tr>
-              <tr><td>{l.lushaRowEither}</td><td className="right">1 / 5</td><td>{l.lushaWhenEither}</td></tr>
+              <tr><td>{l.lushaRowEither}</td><td className="right">~1 / ~5</td><td>{l.lushaWhenEither}</td></tr>
             </tbody>
           </table>
           {view.matchLabel && view.crm.domain && view.companyHref && (
@@ -185,7 +210,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
       ) : (
         <>
           <p>{rich(l.lushaDlgIntro)}</p>
-          {heldWarning}
+          {held(fill(l.lushaCreditApprox, { n: fieldPrice }))}
           <table className="data compact">
             <thead>
               <tr><th>{l.lushaColConcept}</th><th className="right">{l.lushaColCredits}</th><th>{l.lushaColWhen}</th></tr>
@@ -218,7 +243,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
           <>
             <button type="button" className={`btn ${f.confirmed ? "btn-secondary" : "btn-ghost left"}`} onClick={close} disabled={busy}>{l.cancel}</button>
             {!f.confirmed && <button type="button" className="btn btn-secondary" onClick={reject} disabled={busy}>{l.lushaNotMine}</button>}
-            <button type="button" className="btn btn-primary" onClick={reveal} disabled={busy}>{fill(l.lushaConfirmReveal, { field: noun, credits: credits(price) })}</button>
+            <button type="button" className="btn btn-primary" onClick={() => reveal(identity)} disabled={busy}>{fill(l.lushaConfirmReveal, { field: noun, credits: credits(price) })}</button>
           </>
         )
       }
@@ -263,7 +288,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
               })}
             </tbody>
           </table>
-          {heldWarning}
+          {held(credits(price))}
           <div>
             <p>{rich(fill(l.lushaRevealCost, { field: noun, credits: credits(price) }))}</p>
             <p className="meta mt-md">

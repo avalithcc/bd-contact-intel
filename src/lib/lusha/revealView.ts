@@ -30,6 +30,8 @@ export interface LushaView {
   phones: LushaFieldView;
   /** The stored match, when there is a valid one to confirm. */
   match: IdentityFields | null;
+  /** The search row the stored match belongs to: a reveal is confirmed against it. */
+  matchSearchId: string | null;
   /** "Company · domain" of the match, for the rejection notice. */
   matchLabel: string | null;
   crm: IdentityFields;
@@ -61,6 +63,7 @@ export function buildLushaView(i: {
   const { rows, person } = i;
   if (!i.config.ok && i.config.reason === "not_production") return null;
   const search = rows.search?.state === "settled" ? rows.search : null;
+  const stored = rows.search?.outcome === "matched" ? identityOf(rows.search) : null;
   const tied = (r: LedgerRowLike) => r?.state === "settled" && !!search && r.searchId === search.id;
   const reachable = isReachable({ personId: "", email: person.email, emailStatus: person.emailStatus, emailSource: person.emailSource, mergedIntoId: null, companyKey: null, clientStatus: null });
 
@@ -71,6 +74,10 @@ export function buildLushaView(i: {
     const out: LushaFieldView = { control: null, note: null, hint: null, confirmed, revealed: null, twin: own?.twin ?? null };
     const live = resolveRevealState(field, rows, { spentToday: i.spentToday, cap: i.cap }, i.config);
 
+    // A paid value parked by a failed settle (state failed, payload keeps it): apply it for free, never buy it again.
+    if (live.kind !== "revealed" && own?.state === "failed" && own.errorCode === "settle_failed") {
+      return { ...out, twin: null, control: { kind: "apply", price: null, disabled: false }, note: "write_failed" };
+    }
     if (live.kind === "revealed") {
       if (own?.errorCode === "write_failed") return { ...out, twin: null, control: { kind: "apply", price: null, disabled: false }, note: "write_failed" };
       const column = field === "emails" ? (person.emailSource === "lusha" && person.email?.trim().toLowerCase() === live.value?.trim().toLowerCase() ? "email" : null) : digits(person.phone) !== "" && digits(person.phone) === digits(live.value) ? "phone" : digits(person.mobilePhone) !== "" && digits(person.mobilePhone) === digits(live.value) ? "mobilePhone" : null;
@@ -93,6 +100,11 @@ export function buildLushaView(i: {
         out.hint = "search";
         break;
       case "revealable":
+        // Without a readable identity there is nothing for the BD to confirm: never offer a blind paid reveal.
+        if (!unknownOutcome && !stored) {
+          out.note = "not_revealable";
+          break;
+        }
         out.control = unknownOutcome ? control("research", SEARCH_COST) : control("reveal", open.price);
         out.note = unknownOutcome ? "outcome_unknown" : null;
         out.hint = unknownOutcome ? null : confirmed ? "paidConfirmed" : tied(otherRow) && otherRow?.outcome === "no_value" ? "paidAvailable" : "paid";
@@ -119,13 +131,13 @@ export function buildLushaView(i: {
 
   const emails = fieldView("emails");
   const phones = fieldView("phones");
-  const stored = rows.search?.outcome === "matched" ? identityOf(rows.search) : null;
   const rejected = rows.search?.outcome === "match_rejected" ? identityOf(rows.search) : null;
   const usable = [emails, phones].some((f) => f.control?.kind === "reveal");
   return {
     emails,
     phones,
     match: usable ? stored : null,
+    matchSearchId: usable && stored ? (rows.search?.id ?? null) : null,
     matchLabel: rejected ? [rejected.company, rejected.domain].filter(Boolean).join(" · ") || null : null,
     crm: i.crm,
     companyHref: i.companyHref,

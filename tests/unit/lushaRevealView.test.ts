@@ -107,6 +107,18 @@ test("task 6.11: a paid value the Contact never received offers the free apply, 
   assert.deepEqual([ctl(v, "emails"), v.emails.note, v.emails.revealed], [["apply", null, false], "write_failed", null]);
 });
 
+test("a paid value parked by a failed settle offers the free apply, never a second purchase", () => {
+  const parked = row({ id: "e1", field: "emails", state: "failed", errorCode: "settle_failed", payload: { emails: [{ email: "v@x.co" }] } });
+  const v = build({ search: SEARCH, emails: parked });
+  assert.deepEqual([ctl(v, "emails"), v.emails.note], [["apply", null, false], "write_failed"]);
+});
+
+test("a match with no readable identity is never offered for a paid reveal, and the confirmed search id is exposed", () => {
+  const blank = build({ search: { ...SEARCH, payload: { canReveal: SEARCH.payload && (SEARCH.payload as { canReveal: unknown }).canReveal } } });
+  assert.deepEqual([blank.emails.control, blank.emails.note], [null, "not_revealable"]);
+  assert.equal(build({ search: SEARCH }).matchSearchId, "s1");
+});
+
 test("a revealed value whose column no longer holds it shows no Lusha badge", () => {
   const email = row({ id: "e1", field: "emails", outcome: "revealed", value: "v@x.co" });
   assert.equal(build({ search: SEARCH, emails: email }, { person: { email: "other@x.co", emailStatus: "verified", emailSource: "manual" } }).emails.revealed, null);

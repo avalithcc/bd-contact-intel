@@ -88,6 +88,12 @@ test("the API key is read in one place, by server code, and is never public", ()
   assert.deepEqual(importers(/lusha\/config$/, outside.filter(isClient), true), []);
 });
 
+test("the Lusha fetch always times out before the function that hosts the actions is killed", () => {
+  const timeout = Number(/TIMEOUT_MS = ([\d_]+)/.exec(read(`${LIBRARY_DIR}client.ts`))?.[1].replace(/_/g, ""));
+  const maxDuration = Number(/export const maxDuration = (\d+)/.exec(read(PAGE))?.[1]);
+  assert.ok(timeout > 0 && maxDuration >= 30 && timeout * 2 <= maxDuration * 1000, `${timeout} ms vs ${maxDuration} s`);
+});
+
 test("nothing registers Lusha as a route, a page or a cron", () => {
   const appFiles = walk(join(SRC, "app")).map(rel);
   assert.deepEqual(appFiles.filter((f) => /(^|\/)(page\.tsx|route\.ts)$/.test(f) && /lusha/i.test(f)), []);
