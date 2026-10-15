@@ -17,7 +17,8 @@ import { toTelHref, type WhatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
 import type { LushaView } from "@/lib/lusha/revealView";
-import { LushaBadge, LushaRow, lushaBadgeFor } from "./LushaReveal";
+import { doNotCallWarning } from "@/lib/contacts/doNotCallWarning";
+import { DoNotCallBadge, LushaBadge, LushaRow, doNotCallFor, lushaBadgeFor } from "./LushaReveal";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 
 export interface AboutPaneProperty {
@@ -406,7 +407,13 @@ function PropertyRow({
       <dt>{prop.label}</dt>
       <dd>
         {isPhoneProp && prop.value ? (
-          <PhoneValue value={prop.value} whatsappUrl={prop.whatsapp?.url} labels={l} call={call} />
+          <PhoneValue
+            value={prop.value}
+            whatsappUrl={prop.whatsapp?.url}
+            labels={l}
+            call={call}
+            doNotCall={doNotCallFor(lusha, prop.key) ? doNotCallWarning(l, prop.value) : undefined}
+          />
         ) : prop.key === "contactType" ? (
           contactTypeLabel(prop.value, l.emptyValue)
         ) : (
@@ -415,6 +422,7 @@ function PropertyRow({
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
         {emailInferred && !emailVerified && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
         {prop.value && lushaBadgeFor(lusha, prop.key) && <LushaBadge l={l} />}
+        {prop.value && doNotCallFor(lusha, prop.key) && <DoNotCallBadge l={l} />}
         {roleGroupHint && (
           <details className="dropdown">
             <summary className="btn btn-ghost btn-sm btn-icon" aria-label={l.jobTitleHintLabel} title={l.jobTitleHintLabel}>

@@ -62,8 +62,14 @@ export function toTelHref(raw: string): string | null {
  * for a row that filter keeps.
  */
 export function pickListPhone(phone: string | null, mobilePhone: string | null): string | null {
+  const stored = pickListPhoneStored(phone, mobilePhone);
+  return stored === null ? null : formatPhoneForDisplay(stored);
+}
+
+/** The same choice as pickListPhone, as STORED: what a ledger comparison must use, since display formatting can rewrite digits. */
+export function pickListPhoneStored(phone: string | null, mobilePhone: string | null): string | null {
   for (const candidate of [phone, mobilePhone]) {
-    if (candidate && candidate.trim() !== "") return formatPhoneForDisplay(candidate);
+    if (candidate && candidate.trim() !== "") return candidate;
   }
   return null;
 }

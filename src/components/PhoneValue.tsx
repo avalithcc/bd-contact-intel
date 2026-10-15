@@ -1,6 +1,6 @@
 import { safeWhatsappHref, toTelHref } from "@/lib/phone";
 import { WhatsAppIcon } from "@/components/icons";
-import { PhoneCallLink } from "@/components/PhoneCallLink";
+import { PhoneCallLink, type DoNotCallWarning } from "@/components/PhoneCallLink";
 
 export interface PhoneValueLabels {
   whatsappTitle: string;
@@ -35,11 +35,14 @@ export function PhoneValue({
   whatsappUrl,
   labels,
   call,
+  doNotCall,
 }: {
   value: string;
   whatsappUrl?: string | null;
   labels: PhoneValueLabels;
   call?: { personId: string; personName: string };
+  /** Present only for a number Lusha flagged; the contacts list passes none (it does not load the Lusha ledger). */
+  doNotCall?: DoNotCallWarning;
 }) {
   const telHref = toTelHref(value);
   if (!telHref) {
@@ -52,7 +55,7 @@ export function PhoneValue({
   const waHref = safeWhatsappHref(whatsappUrl);
   return (
     <>
-      <PhoneCallLink href={telHref} value={value} personId={call?.personId} personName={call?.personName} />
+      <PhoneCallLink href={telHref} value={value} personId={call?.personId} personName={call?.personName} warn={doNotCall} />
       {waHref && (
         <a
           className="wa-btn"

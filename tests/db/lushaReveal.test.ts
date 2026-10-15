@@ -565,12 +565,6 @@ test("a paid value parked by a failed settle blocks a second purchase and is app
 const MIN = 60_000;
 const BIG = 1_000_000;
 
-test("the stranded threshold is longer than the longest a function can live", async () => {
-  const { STRANDED_AFTER_MS } = await import("@/lib/lusha/revealDb");
-  const maxDuration = Number(/export const maxDuration = (\d+)/.exec(readFileSync(join(process.cwd(), "src/app/(app)/contacts/[id]/page.tsx"), "utf8"))?.[1]);
-  assert.ok(maxDuration > 0 && STRANDED_AFTER_MS > maxDuration * 1000);
-});
-
 test("a reservation older than the threshold is reaped: failed, credits still counted, and the person is reservable again", async () => {
   const { STRANDED_AFTER_MS, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("reap");
@@ -603,4 +597,107 @@ test("two concurrent reserves over one stranded row: one wins, the other is busy
   assert.deepEqual(out.map((r) => r.ok).sort(), [false, true]);
   const rows = await ledger(p.id);
   assert.deepEqual(rows.map((r) => r.state).sort(), ["failed", "reserved"]);
+});
+
+test("a stranded REVEAL reservation is reaped and then REFUSED, never re-claimed: the paid call may already have been billed", async () => {
+  const { STRANDED_AFTER_MS, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("reapreveal");
+  await matchedSearch(p.id);
+  const old = new Date(Date.now() - STRANDED_AFTER_MS - MIN);
+  const stuck = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG, now: old });
+  assert.ok(stuck.ok && stuck.credits === 5);
+  const again = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG });
+  assert.deepEqual(again.ok === false && again.reason, "outcome_unknown");
+  const rows = (await ledger(p.id)).filter((r) => r.field === "phones");
+  assert.deepEqual(rows.map((r) => [r.state, r.errorCode, r.creditsReserved]), [["failed", "reaped", 5]], "reaped and counted, and no second reservation was written");
+  assert.ok((await getDailySpend(old)) >= 5);
+});
+
+test("reaping a row of another field or person does not refuse a reveal of this one", async () => {
+  const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
+  const [a, b] = [await mkPerson("reap-a"), await mkPerson("reap-b")];
+  await matchedSearch(b.id);
+  await reserve({ personId: a.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
+  const r = await reserve({ personId: b.id, field: "emails", actorBdId: bdId, cap: BIG });
+  assert.ok(r.ok, "only the target (person, field) refuses");
+});
+
+// --- the refusal decides from STATE read inside the lock, never from "I reaped it" -------------------------------------------
+
+test("INTERLEAVING: another reserve reaps the stranded reveal row first; this reserve still refuses, because the state says unknown", async () => {
+  const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("interleave");
+  await matchedSearch(p.id);
+  const stuck = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
+  assert.ok(stuck.ok);
+  // Someone else's reserve takes the lock after the threshold and sweeps the row (the sweep is global): it is not ours.
+  const other = await mkPerson("interleave-other");
+  assert.ok((await reserve({ personId: other.id, field: "search", actorBdId: bdId, cap: BIG })).ok);
+  assert.equal((await ledger(p.id)).find((r) => r.id === stuck.reservationId)?.errorCode, "reaped", "the other call did the reaping");
+  // Our reserve reaps nothing itself, yet must refuse: a paid call may already be billed.
+  const mine = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG });
+  assert.deepEqual(mine.ok === false && mine.reason, "outcome_unknown");
+  assert.equal((await ledger(p.id)).filter((r) => r.field === "phones").length, 1, "no second reservation was written");
+});
+
+test("the same hole before any reaper: a reveal that timed out between prepare() and reserve() is refused for the same search", async () => {
+  const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("unknown-between");
+  await matchedSearch(p.id);
+  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  assert.ok(first.ok);
+  await failReservation(first.reservationId, "outcome_unknown");
+  const second = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  assert.deepEqual(second.ok === false && second.reason, "outcome_unknown");
+});
+
+test("an explicit NEW search reopens the field: the unknown outcome belonged to the old search", async () => {
+  const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("reopen");
+  await matchedSearch(p.id);
+  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  assert.ok(first.ok);
+  await failReservation(first.reservationId, "outcome_unknown");
+  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG })).ok, false);
+  await matchedSearch(p.id); // a conscious, paid re-search: a new search id
+  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG })).ok, true);
+});
+
+test("a failure that is NOT an unknown outcome never blocks a later reveal", async () => {
+  const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("plainfail");
+  await matchedSearch(p.id);
+  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  assert.ok(first.ok);
+  await failReservation(first.reservationId, "rate_limited");
+  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG })).ok, true);
+});
+
+// --- the contacts list: ONE query says which listed Contacts hold a flagged number ---------------------------------------------
+
+test("flaggedPhonePersonIds resolves a whole page in one call and flags only a number that is still the one the list shows", async () => {
+  const { flaggedPhonePersonIds } = await import("@/lib/lusha/doNotCallDb");
+  const { db } = await import("@/db");
+  const { lushaReveal } = await import("@/db/schema");
+  const NUM = "+54 9 11 3026-1031";
+  const reveal = async (personId: string, phones: unknown[], over: Record<string, unknown> = {}) => {
+    const search = await matchedSearch(personId);
+    await db.insert(lushaReveal).values({ personId, searchId: search, field: "phones", state: "settled", outcome: "revealed", value: NUM, creditsReserved: 5, creditsCharged: 5, payload: { phones }, ...over });
+  };
+  const flagged = await mkPerson("dnc-flagged", { mobilePhone: NUM });
+  const dup = await mkPerson("dnc-dup", { mobilePhone: NUM });
+  const clear = await mkPerson("dnc-clear", { mobilePhone: NUM });
+  const edited = await mkPerson("dnc-edited", { mobilePhone: "+54 9 11 5555-0000" });
+  const otherCol = await mkPerson("dnc-other", { phone: "+54 11 4000-0001", mobilePhone: NUM });
+  const failedRow = await mkPerson("dnc-failed", { mobilePhone: NUM });
+  await reveal(flagged.id, [{ number: NUM, doNotCall: true }]);
+  await reveal(dup.id, [{ number: NUM, doNotCall: false }, { number: "+5491130261031", doNotCall: true }]);
+  await reveal(clear.id, [{ number: NUM, doNotCall: false }]);
+  await reveal(edited.id, [{ number: NUM, doNotCall: true }]);
+  await reveal(otherCol.id, [{ number: NUM, doNotCall: true }]);
+  await reveal(failedRow.id, [{ number: NUM, doNotCall: true }], { state: "failed", outcome: null });
+  const page = [flagged, dup, clear, edited, otherCol, failedRow].map((p) => ({ id: p.id, phone: p.phone, mobilePhone: p.mobilePhone }));
+  const out = await flaggedPhonePersonIds(page);
+  assert.deepEqual([...out].sort(), [flagged.id, dup.id].sort(), "edited-away, unflagged, a flag on the other column and a non-settled row are all excluded");
+  assert.deepEqual([...(await flaggedPhonePersonIds([]))], []);
 });

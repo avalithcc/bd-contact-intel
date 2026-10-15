@@ -225,3 +225,20 @@ export const pickEmail = (raw: unknown, companyDomains: readonly string[] = []):
   choose(raw, "email", (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), companyDomains);
 /** Fails closed: the phone shape was never measured, so an unexpected entry writes nothing. */
 export const pickPhone = (raw: unknown): Pick => choose(raw, "number", (v) => /^\+?[\d\s().-]+$/.test(v) && v.replace(/\D/g, "").length >= 7);
+
+const digitsOf = (x: unknown): string => (typeof x === "string" ? x.replace(/\D/g, "") : "");
+
+/**
+ * Whether Lusha flagged `doNotCall: true` on the number we HOLD. ANY entry whose digits equal the held number and carries a
+ * literal `true` flags it: Lusha may list one number twice (once unflagged, once flagged), and which of the two a tie-break
+ * picked is arbitrary, so reading the flag off a single chosen entry could lose it. Erring toward flagging is the only safe
+ * direction. `false`, a missing field and any non-boolean are NOT a clearance: Lusha's lists cover the UK and the US only
+ * (and hiding is a Scale-plan feature), so nothing here ever concludes "safe to call"; the caller draws something for true
+ * and nothing otherwise. The flag of a different number is never attributed to the held one. ONE copy of this rule, used by the
+ * contact record and by the contacts list.
+ */
+export function isNumberFlagged(entries: unknown, heldNumber: string | null | undefined): boolean {
+  const held = digitsOf(heldNumber);
+  if (held === "" || !Array.isArray(entries)) return false;
+  return entries.some((e) => isRecord(e) && e.doNotCall === true && digitsOf(e.number) === held);
+}

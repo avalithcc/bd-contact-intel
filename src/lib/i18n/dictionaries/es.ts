@@ -1001,6 +1001,12 @@ export const es: typeof en = {
     // Lusha reveal control and dialogs (lusha-reveal PR 6; mockups/lusha-reveal.html). `{x}` placeholders are filled and
     // `**bold**` rendered by LushaReveal.tsx. Neutral Spanish, as drawn in the approved mockup.
     lushaBadge: "Lusha",
+    // Solo se muestra cuando Lusha marca el número revelado (doNotCall: true). El alcance es parte del mensaje a propósito: fuera del Reino Unido y Estados Unidos, la ausencia de esta marca no demuestra nada.
+    lushaDncBadge: "En registro de no llamar",
+    lushaDncTitle: "Lusha marca este número como inscrito en un registro de no llamar; llamarlo puede acarrear multas significativas. Las listas de Lusha cubren solo el Reino Unido y Estados Unidos, por lo que para cualquier otro país la ausencia de esta marca no demuestra nada.",
+    lushaDncConfirmTitle: "¿Llamar a un número de un registro de no llamar?",
+    lushaDncConfirmBody: "Lusha marca {number} como inscrito en un registro de no llamar, y llamarlo puede acarrear multas significativas. Seguir solo si hay un motivo para llamar a esta persona. No se registra nada hasta confirmar.",
+    lushaDncConfirmCall: "Llamar igualmente",
     lushaFieldEmail: "correo",
     lushaFieldPhone: "teléfono",
     lushaBtnSearch: "Buscar {field}",

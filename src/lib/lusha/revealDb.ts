@@ -13,17 +13,9 @@ import { pickEmail, pickPhone } from "./parse";
 import type { CanRevealEntry, LushaField } from "./pricing";
 import { planRevealedEmailWrite, planRevealedPhoneWrite } from "./revealPlan";
 import type { Subject } from "./reveal";
-import { toLatestRows, type LatestRows } from "./revealState";
+import { STRANDED_AFTER_MS, toLatestRows, type LatestRows } from "./revealState";
 
-/**
- * How old a `reserved` row must be before it is definitively stranded. A reservation is only ever settled by the function
- * that made it: the fetch gives up after 8 s (client.ts TIMEOUT_MS) and the settle follows at once, and the hosting page is
- * killed at maxDuration = 60 s (contacts/[id]/page.tsx). So nothing still `reserved` after 60 s can be in flight. Five times
- * that is the margin for clock skew between app instances (`at` is the app's clock) and for a long wait on the lock, and is
- * still minutes, not hours. Pinned against the page's maxDuration by tests/db/lushaReveal.test.ts.
- */
-export const FUNCTION_MAX_DURATION_MS = 60_000;
-export const STRANDED_AFTER_MS = 5 * FUNCTION_MAX_DURATION_MS;
+export { FUNCTION_MAX_DURATION_MS, STRANDED_AFTER_MS } from "./revealState";
 
 /** Serializes every reservation: a unique index cannot bound a sum() over rows that do not exist yet. */
 export const LUSHA_CAP_LOCK = 0x4c55_5348; // "LUSH"
@@ -43,7 +35,7 @@ export async function getDailySpend(now: Date = new Date(), reader: Reader = db)
 export type ReserveResult =
   | { ok: true; reservationId: string; credits: number; searchId: string | null }
   | { ok: false; reason: "cap_exceeded"; remaining: number }
-  | { ok: false; reason: "busy" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
+  | { ok: false; reason: "busy" | "outcome_unknown" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
 
 /**
  * ONE short transaction: advisory lock, the day's spend, a fresh read of the latest search row (price and
@@ -56,15 +48,23 @@ export async function reserve(
   const now = input.now ?? new Date();
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${LUSHA_CAP_LOCK})`);
-    // Reap before anything is read: a killed function leaves its row `reserved`, which answers "busy" forever. Under the lock, so two reserves cannot both release the same row. The row is FAILED
-    // with its credits_reserved untouched: the cap keeps counting what may have been billed, and the field takes the
-    // outcome_unknown guard (isOutcomeUnknown). This also cures the single-row wart without the manual release SQL.
-    await tx.execute(sql`update lusha_reveal set state = 'failed', error_code = 'reaped', settled_at = ${now.toISOString()}::timestamptz where state = 'reserved' and at < ${new Date(now.getTime() - STRANDED_AFTER_MS).toISOString()}::timestamptz`);
+    // Reap before anything is read: a killed function leaves its row `reserved`, which used to answer "busy" forever. Under the
+    // lock, so two reserves cannot both release the same row. The row is FAILED with its credits_reserved untouched: the cap
+    // keeps counting what may have been billed (in its own Argentina day), and the field takes the outcome_unknown guard.
+    const reaped = (await tx.execute(sql`update lusha_reveal set state = 'failed', error_code = 'reaped', settled_at = ${now.toISOString()}::timestamptz where state = 'reserved' and at < ${new Date(now.getTime() - STRANDED_AFTER_MS).toISOString()}::timestamptz returning field as rp_field`)) as unknown as { rp_field: string }[];
+    // A stranded row is invisible otherwise: say so.
+    if (reaped.length) console.warn(`[lusha] reaped ${reaped.length} stranded reservation(s): ${reaped.map((r) => r.rp_field).join(",")}`);
     // FOR SHARE makes mergeContacts' FOR UPDATE wait for this reservation instead of racing it (credits on a tombstone).
     // The same read answers "do we already own this value": a settled `revealed` row of ANY search blocks a second payment.
     const [owner] = await tx
       .select({
         mergedIntoId: person.mergedIntoId,
+        // THE AUTHORITY IS THE STATE READ HERE, INSIDE THE LOCK, never a fact carried in from outside it. prepare() ran earlier and
+        // outside the lock: by now the row it saw may have been reaped by ANY other reserve (the sweep is global), or failed as
+        // outcome_unknown by its own function. "Did I reap it?" would miss both, and a second paid call would go out. So a reveal
+        // is refused whenever the ledger says a failed, possibly-billed attempt exists for this field of the CURRENT search (the
+        // same scope getRevealState reads). An explicit new search has a new id and reopens the field.
+        unknown: sql<boolean>`exists(select 1 from lusha_reveal r where r.person_id = ${input.personId} and r.field = ${input.field} and r.state = 'failed' and r.error_code in ('outcome_unknown', 'reaped') and r.search_id = (select s.id from lusha_reveal s where s.person_id = ${input.personId} and s.field = 'search' and s.state = 'settled' order by s.at desc limit 1))`,
         owned: sql<boolean>`exists(select 1 from lusha_reveal r where r.person_id = ${input.personId} and r.field = ${input.field} and ((r.state = 'settled' and r.outcome = 'revealed') or (r.state = 'failed' and r.error_code = 'settle_failed')))`,
       })
       .from(person)
@@ -73,6 +73,7 @@ export async function reserve(
     if (!owner) return { ok: false, reason: "not_found" };
     if (owner.mergedIntoId) return { ok: false, reason: "merged" };
     if (owner.owned) return { ok: false, reason: "already_revealed" };
+    if (input.field !== "search" && owner.unknown) return { ok: false, reason: "outcome_unknown" };
     const spentToday = await getDailySpend(now, tx);
     let search: { id: string; lushaContactId: string | null; payload: unknown } | null = null;
     if (input.field !== "search") {

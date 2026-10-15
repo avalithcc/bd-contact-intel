@@ -348,4 +348,17 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
 }
 
 export const lushaBadgeFor = (view: LushaView | null, key: string) => !!view && (key === "email" ? view.emails.revealed?.column === "email" : (key === "phone" || key === "mobilePhone") && view.phones.revealed?.column === key);
+/**
+ * Drawn ONLY when Lusha flagged the number (`doNotCall: true`). Never render anything for false or missing: Lusha checks the
+ * UK and US registries only, so "not flagged" over an Argentine number would read as "safe to call", which nobody can say.
+ * Same badge class as the Lusha badge; the country scope lives in the tooltip.
+ */
+/** Same shape as lushaBadgeFor: the flag counts only for the column that still holds the revealed number (the view already enforces it). */
+export const doNotCallFor = (view: LushaView | null, key: string) => !!view && (key === "phone" || key === "mobilePhone") && view.phones.revealed?.column === key && view.phones.revealed.doNotCall === true;
+
+export const DoNotCallBadge = ({ l }: { l: ContactRecordLabels }) => (
+  <span className="badge badge-outline no-dot" title={l.lushaDncTitle}>
+    {l.lushaDncBadge}
+  </span>
+);
 export { LushaBadge };

@@ -1059,6 +1059,12 @@ export const en = {
     errorLushaStale: "The Lusha data changed since this dialog was opened (another tab or user). Nothing was charged: close it and review the record.",
     // Lusha reveal control and dialogs (lusha-reveal PR 6). English mirror for type parity with `es`.
     lushaBadge: "Lusha",
+    // Shown only when Lusha flags the revealed number (doNotCall: true). The scope is part of the message on purpose: the absence of this mark proves nothing outside the UK and the US.
+    lushaDncBadge: "On a do-not-call registry",
+    lushaDncTitle: "Lusha marks this number as listed on a do-not-call registry. Calling it may bring significant fines. Lusha's lists cover the United Kingdom and the United States only, so for any other country the absence of this mark proves nothing.",
+    lushaDncConfirmTitle: "Call a number on a do-not-call registry?",
+    lushaDncConfirmBody: "Lusha marks {number} as listed on a do-not-call registry, and calling it may bring significant fines. Continue only if you have a reason to call this person. Nothing is logged unless you confirm.",
+    lushaDncConfirmCall: "Call anyway",
     lushaFieldEmail: "email",
     lushaFieldPhone: "phone",
     lushaBtnSearch: "Find {field}",

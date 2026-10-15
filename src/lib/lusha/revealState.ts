@@ -56,10 +56,27 @@ export type RevealState =
   | { kind: "capped"; remaining: number; needed: number };
 
 /**
- * A failed row whose charge we cannot rule out: the call may have been billed. `reaped` (a reservation swept after its
- * function could no longer be alive) is the same situation as a timeout, so it takes the same guard.
+ * How old a `reserved` row must be before it is definitively stranded. A reservation is only ever settled by the function
+ * that made it: the HTTP call gives up after 8 s (client.ts TIMEOUT_MS) and the settle follows at once, and the hosting page is
+ * killed at maxDuration = 60 s (contacts/[id]/page.tsx). So nothing still `reserved` after 60 s can be in flight. Five times
+ * that is the margin for clock skew between app instances (`at` is the app's clock) and for a long wait on the lock, and is
+ * still minutes, not hours. Pinned against every route that can reach lushaActions by tests/unit/lushaStranded.test.ts.
  */
-export const isOutcomeUnknown = (code: string | null | undefined): boolean => code === "outcome_unknown" || code === "reaped";
+export const FUNCTION_MAX_DURATION_MS = 60_000;
+export const STRANDED_AFTER_MS = 5 * FUNCTION_MAX_DURATION_MS;
+
+/**
+ * A row whose charge we cannot rule out: the paid call may have been billed. Two shapes:
+ *  - FAILED with `outcome_unknown` (a timeout) or `reaped` (a reservation swept after its function could no longer be alive);
+ *  - still RESERVED but older than STRANDED_AFTER_MS: reserve() has not swept it yet, but it cannot be in flight. The read
+ *    side must say so too, or the field looks like a plain priced reveal until some other reserve() happens to reap it.
+ * Callers take the same guard for both: only an explicit new search (a conscious spend) reopens the field.
+ */
+export const isOutcomeUnknown = (row: { state?: string | null; errorCode?: string | null; at?: Date | string | null } | null | undefined, now: Date = new Date()): boolean => {
+  if (!row) return false;
+  if (row.state === "reserved") return row.at != null && new Date(row.at).getTime() < now.getTime() - STRANDED_AFTER_MS;
+  return row.errorCode === "outcome_unknown" || row.errorCode === "reaped";
+};
 
 const settled = (r: LedgerRow | null | undefined): LedgerRow | null => (r && r.state === "settled" ? r : null);
 

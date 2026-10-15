@@ -5,6 +5,7 @@
 import type { IdentityFields } from "@/lib/contacts/identityDiff";
 import { isReachable } from "@/lib/sequences/rosterGuards";
 import type { LushaConfigResult } from "./config";
+import { isNumberFlagged } from "./parse";
 import { SEARCH_COST } from "./pricing";
 import { isOutcomeUnknown, resolveRevealState, type LatestRows, type RevealState } from "./revealState";
 
@@ -21,7 +22,8 @@ export interface LushaFieldView {
   hint: "search" | "paid" | "paidConfirmed" | "paidAvailable" | "same" | null;
   /** The identity was already confirmed with the other field: the reveal dialog only confirms the price. */
   confirmed: boolean;
-  revealed: { by: string | null; at: string | null; column: "email" | "phone" | "mobilePhone" } | null;
+  /** `doNotCall` is present ONLY when it is true (see doNotCallOf): there is no "clear" state to draw. */
+  revealed: { by: string | null; at: string | null; column: "email" | "phone" | "mobilePhone"; doNotCall?: true } | null;
   twin: { id: string; name: string } | null;
 }
 
@@ -81,14 +83,16 @@ export function buildLushaView(i: {
     if (live.kind === "revealed") {
       if (own?.errorCode === "write_failed") return { ...out, twin: null, control: { kind: "apply", price: null, disabled: false }, note: "write_failed" };
       const column = field === "emails" ? (person.emailSource === "lusha" && person.email?.trim().toLowerCase() === live.value?.trim().toLowerCase() ? "email" : null) : digits(person.phone) !== "" && digits(person.phone) === digits(live.value) ? "phone" : digits(person.mobilePhone) !== "" && digits(person.mobilePhone) === digits(live.value) ? "mobilePhone" : null;
-      return { ...out, revealed: column ? { by: own?.actorName ?? null, at: own?.settledAt ? i.formatDay(new Date(own.settledAt)) : null, column } : null };
+      // `column` is non-null only while the record still holds the revealed value, so an edited number never keeps a flag that described the old one.
+      const dnc = column !== null && field === "phones" && isNumberFlagged((typeof own?.payload === "object" && own.payload !== null ? (own.payload as { phones?: unknown }) : {}).phones, live.value);
+      return { ...out, revealed: column ? { by: own?.actorName ?? null, at: own?.settledAt ? i.formatDay(new Date(own.settledAt)) : null, column, ...(dnc ? { doNotCall: true as const } : {}) } : null };
     }
     // Never offered: a Contact that can already be sequenced, or one with no phone column left to place a number in.
     if (field === "emails" ? reachable : !!(person.phone && person.mobilePhone)) return out;
 
     // A capped action keeps its priced control, disabled: describe what is open without the cap, then close it.
     const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, cap: Number.MAX_SAFE_INTEGER }, i.config) : live;
-    const unknownOutcome = open.kind === "revealable" && isOutcomeUnknown(own?.errorCode);
+    const unknownOutcome = open.kind === "revealable" && isOutcomeUnknown(own);
     const control = (kind: "search" | "reveal" | "research", price: number | null) => ({ kind, price, disabled: live.kind === "capped" || !i.config.ok });
     switch (open.kind) {
       case "unconfigured":

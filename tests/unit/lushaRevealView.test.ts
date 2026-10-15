@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LushaConfigResult } from "@/lib/lusha/config";
+import { STRANDED_AFTER_MS } from "@/lib/lusha/revealState";
 import { buildLushaView, type ViewPerson } from "@/lib/lusha/revealView";
 import type { LatestRows, LedgerRow } from "@/lib/lusha/revealState";
 
@@ -122,4 +123,55 @@ test("a match with no readable identity is never offered for a paid reveal, and 
 test("a revealed value whose column no longer holds it shows no Lusha badge", () => {
   const email = row({ id: "e1", field: "emails", outcome: "revealed", value: "v@x.co" });
   assert.equal(build({ search: SEARCH, emails: email }, { person: { email: "other@x.co", emailStatus: "verified", emailSource: "manual" } }).emails.revealed, null);
+});
+
+// --- a reservation stranded by a killed function must not read as a plain priced reveal ----------------------------------
+
+test("a stranded phones reservation renders the re-search control, never a priced reveal; a fresh one is untouched", () => {
+  const at = (ms: number) => new Date(Date.now() - ms);
+  const stranded = row({ id: "p1", field: "phones", state: "reserved", at: at(STRANDED_AFTER_MS + 60_000) });
+  const v = build({ search: SEARCH, phones: stranded });
+  assert.deepEqual([ctl(v, "phones"), v.phones.note], [["research", 1, false], "outcome_unknown"]);
+  const fresh = build({ search: SEARCH, phones: row({ id: "p2", field: "phones", state: "reserved", at: at(1000) }) });
+  assert.deepEqual(ctl(fresh, "phones"), ["reveal", 5, false], "it may be in flight: unchanged");
+});
+
+// --- doNotCall: shown only when the flag is a literal true AND the number on the record is still the revealed one ---------
+
+const PHONE = "+54 9 11 3026-1031";
+const phoneRow = (entries: unknown[], value = PHONE) => row({ id: "p1", field: "phones", outcome: "revealed", value, payload: { phones: entries } });
+const entry = (over: Record<string, unknown> = {}) => ({ type: "mobile", number: PHONE, ...over });
+const flagged = (entries: unknown[], person: Partial<ViewPerson>, value = PHONE) => build({ search: SEARCH, phones: phoneRow(entries, value) }, { person }).phones.revealed;
+
+test("a revealed number flagged doNotCall:true carries the flag while the record still holds it", () => {
+  assert.deepEqual(flagged([entry({ doNotCall: true })], { mobilePhone: PHONE })?.doNotCall, true);
+});
+
+test("false, a missing field or a non-boolean carry nothing: `false` is not a clearance and nothing is drawn for it", () => {
+  for (const odd of [false, undefined, "true", 1, null]) {
+    const r = flagged([entry(odd === undefined ? {} : { doNotCall: odd })], { mobilePhone: PHONE });
+    assert.ok(r && !("doNotCall" in r), `no key for ${JSON.stringify(odd)}`);
+  }
+});
+
+test("once a BD edits the number away, the flag no longer describes the record and is not shown", () => {
+  const edited = build({ search: SEARCH, phones: phoneRow([entry({ doNotCall: true })]) }, { person: { mobilePhone: "+54 9 11 5555-0000" } });
+  assert.equal(edited.phones.revealed, null);
+});
+
+test("a number Lusha lists twice, once unflagged and once flagged, is flagged in either order", () => {
+  for (const entries of [[entry({ doNotCall: false }), entry({ doNotCall: true })], [entry({ doNotCall: true }), entry({ doNotCall: false })]]) {
+    assert.equal(flagged(entries, { mobilePhone: PHONE })?.doNotCall, true);
+  }
+});
+
+test("the flag of another entry is not borrowed when the ledger value is a different number", () => {
+  const other = entry({ number: "+54 11 4000-0001", type: "work", doNotCall: true });
+  const r = flagged([other, entry({ doNotCall: false })], { mobilePhone: PHONE });
+  assert.ok(r && !("doNotCall" in r), "the held number is the unflagged mobile");
+});
+
+test("a flag is exposed for the phone column that holds the number and never for an email", () => {
+  const v = build({ search: SEARCH, phones: phoneRow([entry({ doNotCall: true })]) }, { person: { mobilePhone: PHONE } });
+  assert.deepEqual([v.phones.revealed?.column, v.phones.revealed?.doNotCall, v.emails.revealed], ["mobilePhone", true, null]);
 });

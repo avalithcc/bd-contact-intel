@@ -460,3 +460,21 @@ test("a throw while persisting a compliance block still releases the reservation
   await assert.rejects(() => revealLushaField(input(), f.p), /db down/);
   assert.deepEqual(failed, [["res-1", "compliance_blocked"]]);
 });
+
+// --- stranded reservations ------------------------------------------------------------------------------------------------
+
+test("a reveal over a stranded reservation is refused before any reserve or call: it may already have been billed", async () => {
+  const { STRANDED_AFTER_MS } = await import("@/lib/lusha/revealState");
+  const stranded = row({ id: "p1", field: "phones", state: "reserved", at: new Date(Date.now() - STRANDED_AFTER_MS - 60_000) });
+  const f = fake({ rows: { search: MATCHED, phones: stranded } });
+  const r = await revealLushaField(input("phones"), f.p);
+  assert.deepEqual([r.ok, !r.ok && r.reason], [false, "lusha_outcome_unknown"]);
+  assert.deepEqual(spends(f.calls), []);
+});
+
+test("when reserve() itself reaped the row it refuses, and that maps to the outcome-unknown reason with no Lusha call", async () => {
+  const f = fake({ rows: WITH_SEARCH, reserve: async () => ({ ok: false as const, reason: "outcome_unknown" as const }) });
+  const r = await revealLushaField(input("phones"), f.p);
+  assert.deepEqual([r.ok, !r.ok && r.reason], [false, "lusha_outcome_unknown"]);
+  assert.equal(f.calls.includes("enrichContact"), false);
+});

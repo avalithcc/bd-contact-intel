@@ -19,6 +19,8 @@ const REVEAL_UI = `${CONTACTS}[id]/LushaReveal.tsx`;
 const ROW = `${CONTACTS}[id]/PropertyList.tsx`;
 const PANE = `${CONTACTS}[id]/AboutPane.tsx`;
 const PAGE = `${CONTACTS}[id]/page.tsx`;
+// The contacts LIST reads the ledger once per page to warn before dialling a number Lusha flagged: a read only, no spend, no client.
+const LIST = `${CONTACTS}page.tsx`;
 const LIBRARY_DIR = "src/lib/lusha/";
 const CONFIG = `${LIBRARY_DIR}config.ts`;
 
@@ -71,8 +73,8 @@ test("only the actions file can reach the network client or the real ports", () 
   assert.deepEqual(importers(/lib\/lusha\/(client|ports)$/, outside, true), [ACTIONS]);
 });
 
-test("outside the library, only the actions and the page resolving the control state import it at runtime", () => {
-  assert.deepEqual(importers(LIB), [ACTIONS, PAGE].sort());
+test("outside the library, only the actions, the record page and the list (a read-only flag lookup) import it at runtime", () => {
+  assert.deepEqual(importers(LIB), [ACTIONS, PAGE, LIST].sort());
   // Client code may only use the library's TYPES; a runtime import would ship ledger or client code to the browser.
   const clientRuntime = importers(LIB, outside.filter(isClient));
   assert.deepEqual(clientRuntime, []);

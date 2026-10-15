@@ -8,6 +8,7 @@ import {
   parseEnrichResponse,
   parseSearchResponse,
   pickEmail,
+  isNumberFlagged,
   pickPhone,
 } from "../../src/lib/lusha/parse";
 
@@ -275,4 +276,33 @@ test("pickPhone fails closed with unparsable_value and keeps the raw payload", (
   assert.deepEqual(pickPhone(raw), { ok: false, reason: "unparsable_value", raw });
   assert.deepEqual(pickPhone([]), { ok: false, reason: "empty", raw: [] });
   assert.deepEqual(pickPhone("+10000000001"), { ok: false, reason: "unparsable_value", raw: "+10000000001" });
+});
+
+// --- doNotCall: a flag belongs to a number, only a literal `true` counts, and a duplicate can never hide it --------------------
+
+const num = (over: Record<string, unknown>) => ({ type: "mobile", number: "+54 9 11 3026-1031", ...over });
+const HELD = "+54 9 11 3026-1031";
+
+test("isNumberFlagged is true only for a literal true on an entry for the held number", () => {
+  assert.equal(isNumberFlagged([num({ doNotCall: true })], HELD), true);
+  assert.equal(isNumberFlagged([num({ doNotCall: false })], HELD), false);
+  assert.equal(isNumberFlagged([num({})], HELD), false, "missing is unknown, never a clearance and never a flag");
+  for (const odd of ["true", 1, "yes", null, {}, []]) assert.equal(isNumberFlagged([num({ doNotCall: odd })], HELD), false, `non-boolean ${JSON.stringify(odd)}`);
+});
+
+test("the flag of a DIFFERENT number is never attributed to the held one", () => {
+  assert.equal(isNumberFlagged([num({ number: "+54 11 4000-0001", doNotCall: true }), num({ doNotCall: false })], HELD), false);
+});
+
+test("a number listed twice is flagged when ANY of its entries is, whichever order and whichever one a tie-break would pick", () => {
+  const clear = num({ doNotCall: false });
+  const flagged = num({ number: "+5491130261031", doNotCall: true }); // same digits, other formatting
+  assert.equal(isNumberFlagged([clear, flagged], HELD), true);
+  assert.equal(isNumberFlagged([flagged, clear], HELD), true);
+  assert.equal(isNumberFlagged([clear, num({})], HELD), false);
+});
+
+test("nothing is flagged without a held number or without a list", () => {
+  for (const held of [null, undefined, "", "n/a"]) assert.equal(isNumberFlagged([num({ doNotCall: true })], held), false);
+  for (const list of [undefined, null, "x", {}]) assert.equal(isNumberFlagged(list, HELD), false);
 });

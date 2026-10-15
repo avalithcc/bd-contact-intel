@@ -8,6 +8,8 @@ import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { pickListPhone, toTelHref } from "@/lib/phone";
 import { whatsappLinkFor } from "@/lib/whatsapp";
 import { PhoneValue } from "@/components/PhoneValue";
+import { doNotCallWarning } from "@/lib/contacts/doNotCallWarning";
+import { flaggedPhonePersonIds } from "@/lib/lusha/doNotCallDb";
 import { relativeTime } from "@/lib/i18n/format";
 import { getHiringCompanyKeys } from "@/lib/hiring/queries";
 import { startupListBadge } from "@/lib/companies/recordMappers";
@@ -188,6 +190,7 @@ function columnCell(
   dict: Awaited<ReturnType<typeof getDictionary>>,
   relTime: (d: Date) => string,
   hiringCompanyKeys: Set<string>,
+  doNotCallIds: Set<string>,
 ) {
   const l = dict.contactList;
   switch (key) {
@@ -253,6 +256,7 @@ function columnCell(
             whatsappUrl={whatsappLinkFor(value)}
             labels={l}
             call={{ personId: row.id, personName: [row.firstName, row.lastName].filter(Boolean).join(" ") || value }}
+            doNotCall={doNotCallIds.has(row.id) ? doNotCallWarning(dict.contactRecord, value) : undefined}
           />
         </div>
       );
@@ -448,6 +452,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     totalPages: 1,
     page: 1,
   };
+
+  // ONE query for the whole page (never per row): which listed Contacts hold a number Lusha flagged, so the list warns before dialling.
+  const doNotCallIds = await flaggedPhonePersonIds(rows);
 
   const from = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const to = Math.min(currentPage * PAGE_SIZE, total);
@@ -1096,7 +1103,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                     </td>
                     {visibleColumns.map((key) => (
                       <td key={key} className={key === "created" ? "nowrap meta" : undefined}>
-                        {columnCell(key, row, dict, relTime, hiringCompanyKeysForBadge)}
+                        {columnCell(key, row, dict, relTime, hiringCompanyKeysForBadge, doNotCallIds)}
                       </td>
                     ))}
                   </tr>
