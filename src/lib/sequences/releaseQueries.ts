@@ -1,5 +1,5 @@
 /**
- * DB layer and the REAL ports of the release runner. Library code: nothing under src/app imports it until PR 13.
+ * DB layer and the REAL ports of the release runner. Library code: the only file under src/app that imports it is the cron route (src/app/api/sequences/run/route.ts).
  *
  * Reads are bounded and index-friendly: ONE statement for every candidate (approved + due, with the facts every
  * pre-send check needs as correlated subqueries, so there is no per-row query), ONE indexed count of today's recorded

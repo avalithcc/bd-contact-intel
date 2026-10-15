@@ -1,0 +1,71 @@
+/**
+ * The decisions the Sequence detail screen's container makes, as pure functions over injected effects. The components
+ * only REPORT intent (see _components/actions.ts); this is where an intent becomes a sequence of server calls, so the
+ * rules that protect the BD are tested without a browser:
+ *
+ *  - An approval binds to the exact text, so "Aprobar y programar" SAVES what the form holds and approves only if that
+ *    save succeeded. A failed or thrown save must never fall through to an approval.
+ *  - The bulk gate and the "Aprobar los N listos" selection are computed from the rows the page was last given, so a
+ *    refetch (after the dialog reports "reviewed") is what moves the "N de M revisados" counter.
+ */
+import type { ApproveResult } from "./approvalQueries";
+import type { DetailMember } from "./detailQueries";
+import type { GateRow } from "./bulkApprovalGate";
+import type { SaveEditResult } from "./draftQueries";
+import { mapMemberCard, type CardActionId } from "./memberCard";
+
+export type ReviewText = { subject: string; body: string };
+export type ReviewFlowError = Extract<SaveEditResult, { ok: false }>["error"] | Extract<ApproveResult, { ok: false }>["rejected"][number]["reason"] | "failed";
+/** `persisted`: the server now holds the text the form held, so the page should refetch even when the intent failed. */
+export type ReviewFlowResult = { ok: true; persisted: boolean } | { ok: false; error: ReviewFlowError; persisted: boolean };
+
+export interface ReviewPorts {
+  save: () => Promise<SaveEditResult>;
+  approve: () => Promise<ApproveResult>;
+}
+
+export const sameContent = (a: ReviewText, b: ReviewText) => a.subject === b.subject && a.body === b.body;
+
+export async function runReviewIntent(intent: "save" | "approve", input: { stored: ReviewText; text: ReviewText }, ports: ReviewPorts): Promise<ReviewFlowResult> {
+  // "Guardar" always goes to the server. "Aprobar" skips the save for untouched text: saving would clear the review and
+  // the approval for nothing, and there is nothing new to bind the approval to.
+  let persisted = false;
+  if (intent === "save" || !sameContent(input.stored, input.text)) {
+    try {
+      const saved = await ports.save();
+      if (!saved.ok) return { ok: false, error: saved.error, persisted: false };
+      persisted = true;
+    } catch {
+      return { ok: false, error: "failed", persisted: false };
+    }
+  }
+  if (intent === "save") return { ok: true, persisted };
+  try {
+    const approved = await ports.approve();
+    if (approved.ok) return { ok: true, persisted };
+    return { ok: false, error: approved.rejected[0]?.reason ?? "failed", persisted };
+  } catch {
+    return { ok: false, error: "failed", persisted };
+  }
+}
+
+/** "Aprobar los N listos": N = drafted members with a draft, the same set the header counts. */
+export const readyMemberIds = (members: readonly DetailMember[]): string[] => members.filter((m) => m.state === "drafted" && m.draft !== null).map((m) => m.memberId);
+
+/** Bulk-bar rows for the selected ids. An id that left the roster or stopped being a drafted member is dropped, not counted. */
+export function gateRows(members: readonly DetailMember[], selected: readonly string[]): GateRow[] {
+  const byId = new Map(members.map((m) => [m.memberId, m]));
+  return selected.flatMap((id) => {
+    const m = byId.get(id);
+    return m && m.state === "drafted" && m.draft ? [{ id, reviewed: m.draft.reviewedAt !== null }] : [];
+  });
+}
+
+/** Which draft a card action refers to: only the reminder action means step 2. */
+export const cardStep = (action: CardActionId): 1 | 2 => (action === "reviewReminder" ? 2 : 1);
+
+/** "Aprobar" on a card: the reminder when the card is the reminder-due-today card, step 1 otherwise. */
+export function approveStep(m: DetailMember, now: Date): 1 | 2 {
+  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now);
+  return card.kind === "reminderToday" ? 2 : 1;
+}

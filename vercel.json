@@ -28,6 +28,14 @@
     {
       "path": "/api/owners/recompute",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/sequences/run",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/sequences/run",
+      "schedule": "0 14 * * *"
     }
   ]
 }

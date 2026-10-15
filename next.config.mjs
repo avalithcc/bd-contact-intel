@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // /api/unsubscribe is a route handler (it cannot sit inside the root layout), so it inlines the design system
+  // stylesheets by reading them at runtime. Vercel only ships files it can trace to an import: name them here.
+  outputFileTracingIncludes: {
+    "/api/unsubscribe": ["./src/app/design-system.css", "./src/app/globals.css"],
+  },
   experimental: {
     serverActions: {
       // Connections.csv is uploaded straight through a server action. The

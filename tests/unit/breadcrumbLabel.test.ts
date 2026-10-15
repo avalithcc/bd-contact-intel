@@ -23,6 +23,8 @@ test("keeps the sections that already worked", () => {
   assert.equal(resolveBreadcrumbKey("/companies/acme"), "companies");
   assert.equal(resolveBreadcrumbKey("/tasks"), "tasks");
   assert.equal(resolveBreadcrumbKey("/follow-ups"), "followUps");
+  assert.equal(resolveBreadcrumbKey("/sequences"), "sequences");
+  assert.equal(resolveBreadcrumbKey("/sequences/new"), "sequences");
   assert.equal(resolveBreadcrumbKey("/hiring"), "hiring");
   assert.equal(resolveBreadcrumbKey("/whats-new"), "whatsNew");
   assert.equal(resolveBreadcrumbKey("/discovery"), "discovery");

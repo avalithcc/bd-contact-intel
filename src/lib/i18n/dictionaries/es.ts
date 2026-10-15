@@ -213,6 +213,7 @@ export const es: typeof en = {
     companies: "Empresas",
     tasks: "Tareas",
     followUps: "Seguimientos",
+    sequences: "Secuencias",
     outreach: "Outreach",
     hiring: "Vacantes abiertas",
     whatsNew: "Novedades",
@@ -2506,7 +2507,7 @@ export const es: typeof en = {
     body: "La página que buscás no existe o fue movida.",
     backHome: "Volver al inicio",
   },
-  // Paginas publicas de baja (para el destinatario, se muestran en ingles como los correos). Sin ruta hasta el PR de go-live.
+  // Paginas publicas de baja (para el destinatario, se muestran en ingles como los correos). Servidas por /api/unsubscribe.
   sequenceUnsubscribe: {
     confirmTitle: "Darte de baja?",
     confirmBody: (email: string) =>
@@ -2518,7 +2519,7 @@ export const es: typeof en = {
     invalidBody: "Si todavia queres dejar de recibir nuestros correos, responde a cualquier mensaje con \"unsubscribe\".",
   },
   // Sequence detail screen (mockups/secuencia-detalle.html). Plain strings with {n} placeholders: the slice is passed to
-  // client components (ClientStrings), so it cannot hold functions. Not routed until the go-live PR.
+  // client components (ClientStrings), so it cannot hold functions. Routed (go-live).
   sequences: {
     eyebrow: "Secuencia",
     introLead: "{n} contactos elegidos a mano, con vacantes IT abiertas y correo verificado. El sistema redacta cada borrador por separado usando las señales de la empresa;",
@@ -2658,6 +2659,54 @@ export const es: typeof en = {
     bulkRemoveReason: "Motivo",
     bulkRemoveConfirm: "Quitar",
     bulkRemoveCancel: "Cancelar",
+    // Container copy for the routed pages (go-live): toasts, errors, the edit dialog. Plain strings with {n} placeholders.
+    selectMember: "Elegir a {name}",
+    actionFailed: "No se pudo completar la acción. Probá de nuevo.",
+    reviewErrors: {
+      empty: "El asunto y el cuerpo no pueden estar vacíos.",
+      not_found: "No encontramos este borrador entre tus secuencias.",
+      not_editable: "Este borrador ya no se puede editar.",
+      not_approvable: "Este contacto ya no está en un estado que se pueda aprobar.",
+      no_draft: "Este contacto no tiene un borrador para aprobar.",
+      unreviewed: "Abrí cada borrador antes de aprobarlo en bloque.",
+      reply_prefix_subject: "Un primer correo no puede empezar con «Re:» ni «Fwd:», porque simula una conversación que no existió. Reescribí el asunto.",
+      failed: "No se pudo completar la acción. Probá de nuevo.",
+    },
+    reinstateErrors: {
+      not_found: "No encontramos a este contacto entre tus secuencias.",
+      not_discarded: "Este contacto ya no está quitado de la secuencia.",
+      opt_out: "Pidió no ser contactado: no puede volver a ninguna secuencia.",
+      unreachable: "Ya no tiene un correo al que se pueda escribir.",
+      company_limit: "La empresa ya tiene 2 contactos activos en esta secuencia.",
+      client: "La empresa figura como cliente.",
+      suppressed: "La dirección está en la lista de no contactar.",
+      duplicate: "Este contacto ya está en la secuencia.",
+    },
+    toastSaved: "Borrador guardado. Hay que abrirlo de nuevo para revisarlo.",
+    toastApproved: "Aprobado. Sale en el próximo envío.",
+    toastApprovedMany: "{n} borradores aprobados y programados.",
+    toastCancelled: "Envío cancelado. El contacto volvió a borradores.",
+    toastAdvanced: "El recordatorio queda listo para el próximo envío, si está aprobado.",
+    toastReadmitted: "Contacto reincorporado como borrador.",
+    toastRegenerated: "Borrador regenerado.",
+    toastRegeneratedMany: "{n} borradores regenerados.",
+    toastGenerated: "Se generaron {n} borradores.",
+    toastGeneratedOne: "Se generó 1 borrador.",
+    toastGeneratedNone: "No había borradores por generar.",
+    toastGenerateFailed: "{n} no se pudieron generar. Probá de nuevo.",
+    toastRemoved: "Se quitaron {n} contactos.",
+    toastRemovedOne: "Se quitó 1 contacto.",
+    toastRemovedSome: "Se quitaron {n}; {skipped} no se pudieron quitar.",
+    toastOptOut: "Baja registrada. Se descartaron {n} membresías.",
+    toastOptOutOne: "Baja registrada. Se descartó 1 membresía.",
+    toastCadenceFixed: "Por ahora la cadencia es la misma para todas las secuencias: primer correo a las 09:00 y recordatorio a los {n} días.",
+    toastEdited: "Secuencia actualizada.",
+    editTitle: "Editar secuencia",
+    editSave: "Guardar",
+    editCancel: "Cancelar",
+    createdPartial: "Secuencia creada, pero {n} contactos no se pudieron agregar.",
+    createdPartialOne: "Secuencia creada, pero 1 contacto no se pudo agregar.",
+    createErrorAccount: "No encontramos tu cuenta de Gmail conectada. Revisala en Cuenta.",
     // Contact-record block (contactContext.ts). The opt-out line is the mockup's ("baja-opciones", what the BD sees).
     // `discarded` is worded two ways because only sentAt tells "never went out" from "went out, then dropped"; neither
     // says WHO removed it, which the read does not fetch.
@@ -2685,7 +2734,7 @@ export const es: typeof en = {
     optOutCancel: "Cancelar",
     optOutErrorNotFound: "No encontramos esa membresía entre tus secuencias, así que no se registró nada.",
     optOutErrorNoEmail: "Este contacto no tiene correo, así que no hay dirección para suprimir. No se registró nada.",
-    // List and create form (mockups/secuencias-lista.html, mockups/secuencia-nueva.html). Not routed until the go-live PR.
+    // List and create form (mockups/secuencias-lista.html, mockups/secuencia-nueva.html). Routed (go-live).
     dateLocale: "es",
     unitContactOne: "contacto",
     unitContactMany: "contactos",

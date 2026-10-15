@@ -14,6 +14,9 @@ export const MEMBER_STATES = [
 ] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
 
+/** States with nothing left to do for the BD: a Sequence whose members are ALL in these no longer counts as in progress. */
+export const CLOSED_STATES = ["replied", "no_reply", "discarded"] as const;
+
 /** States that mean an email has gone out: a sequence_send_claim exists and must never be destroyed. */
 export const SENT_STATES = ["sent", "replied", "no_reply"] as const;
 

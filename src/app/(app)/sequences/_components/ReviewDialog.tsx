@@ -16,8 +16,8 @@ type Props = {
   step: 1 | 2;
   fromAddress: string;
   schedule: Schedule;
-  /** The "Señales usadas" chips, already worded by the container from the generator input (never from model output). */
-  signals: string[];
+  /** The "Señales usadas" chips, already worded by the container from the generator input (never from model output). Null when they cannot be known (an admin reading another BD's Sequence): the block is then left out, because "none registered" would be false. */
+  signals: string[] | null;
   now: Date;
   labels: SequenceLabels;
   /** The viewer owns the Sequence: only then may the notice say the email leaves under THEIR name. */
@@ -75,7 +75,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
             {(view.kind === "draft" || view.kind === "reminder") && <> {l.reviewNotice} <strong>{l.reviewNoticeStrong}</strong> {ownView ? l.reviewNoticeTail : l.reviewNoticeTailOther}</>}
           </div>
         </div>
-        {!view.readOnly && (
+        {!view.readOnly && signals && (
           <div className="field"><span className="label">{l.reviewSignals}</span>
             {signals.length > 0 ? <div className="row wrap row-xs">{signals.map((s) => <span key={s} className="chip">{s}</span>)}</div> : <p className="help">{l.reviewSignalsNone}</p>}
             <p className="help">{l.reviewSignalsHelp}</p>

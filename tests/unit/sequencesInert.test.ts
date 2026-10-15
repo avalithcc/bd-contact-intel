@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { isSessionExemptPath } from "@/lib/auth/sessionExemptRoutes";
+import { NAVIGATION } from "@/app/contacts/Sidebar";
+import { t } from "@/lib/i18n/dictionaries";
 
-// Mechanical form of the two hard safety rules of the outreach-sequences chain:
-// nothing may send and nothing may be reachable until the final PR (13). Every
-// assertion here is inverted in task 13.7, the PR that deliberately wires it up.
+// Go-live (task 13.7). Until PR 13 this file asserted the opposite of everything below: it was the mechanical form of
+// the two hard safety rules of the outreach-sequences chain (nothing sends, nothing is reachable). PR 13 deliberately
+// wires it up, so the same facts are now pinned as positive assertions: the cron exists exactly where it should, the
+// pages and routes exist, both routes bypass the session gate, and the runner is reachable from exactly ONE file.
 
 const ROOT = join(__dirname, "..", "..");
 const APP = join(ROOT, "src", "app");
@@ -24,34 +28,56 @@ function walk(dir: string): string[] {
 const rel = (p: string) => relative(ROOT, p);
 const appFiles = walk(APP);
 
-test("vercel.json registers no cron whose path mentions sequences", () => {
-  const config = JSON.parse(readFileSync(join(ROOT, "vercel.json"), "utf8")) as {
-    crons?: { path: string }[];
-  };
-  const offenders = (config.crons ?? []).filter((c) => /sequences/i.test(c.path));
-  assert.deepEqual(offenders, []);
+const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8");
+
+test("vercel.json registers the sequence runner exactly twice, at 13:00 and 14:00 UTC", () => {
+  const config = JSON.parse(read("vercel.json")) as { crons?: { path: string; schedule: string }[] };
+  const sequenceCrons = (config.crons ?? []).filter((c) => /sequences/i.test(c.path));
+  assert.deepEqual(sequenceCrons, [
+    { path: "/api/sequences/run", schedule: "0 13 * * *" },
+    { path: "/api/sequences/run", schedule: "0 14 * * *" },
+  ]);
 });
 
-test("no page.tsx or route.ts exists under a sequences directory in src/app", () => {
-  const offenders = appFiles
-    .map(rel)
-    .filter((f) => /(^|\/)sequences\//.test(f) && /(^|\/)(page\.tsx|route\.ts)$/.test(f));
-  assert.deepEqual(offenders, []);
+test("the sequence pages and both routes exist", () => {
+  for (const file of ["sequences/page.tsx", "sequences/new/page.tsx", "sequences/[id]/page.tsx"]) {
+    assert.ok(existsSync(join(APP, "(app)", file)), file);
+  }
+  for (const file of ["api/sequences/run/route.ts", "api/unsubscribe/route.ts"]) assert.ok(existsSync(join(APP, file)), file);
 });
 
-test("no page.tsx or route.ts exists under src/app/api/unsubscribe", () => {
-  const dir = join(APP, "api", "unsubscribe");
-  const offenders = walk(dir)
-    .map(rel)
-    .filter((f) => /(^|\/)(page\.tsx|route\.ts)$/.test(f));
-  assert.deepEqual(offenders, []);
+test("both routes bypass the session gate, and their siblings do not", () => {
+  assert.equal(isSessionExemptPath("/api/sequences/run"), true);
+  assert.equal(isSessionExemptPath("/api/unsubscribe"), true);
+  assert.equal(isSessionExemptPath("/api/unsubscribe-admin"), false);
+  assert.equal(isSessionExemptPath("/sequences"), false);
 });
 
-test("the sidebar nav source has no Secuencias entry", () => {
-  const navFiles = appFiles.filter((f) => /(^|\/)Sidebar\.tsx$/.test(f));
-  assert.ok(navFiles.length > 0, "expected to find the sidebar nav source");
-  const offenders = navFiles.filter((f) => /Secuencias/.test(readFileSync(f, "utf8"))).map(rel);
-  assert.deepEqual(offenders, []);
+test("the runner route is GET-only, dynamic, 300s, and carries no session code", () => {
+  const route = read("src", "app", "api", "sequences", "run", "route.ts");
+  assert.match(route, /export const dynamic = "force-dynamic"/);
+  assert.match(route, /export const maxDuration = 300/);
+  assert.match(route, /export async function GET/);
+  assert.doesNotMatch(route, /export (async function|const) (POST|PUT|PATCH|DELETE)/);
+  assert.match(route, /process\.env\.CRON_SECRET/);
+  assert.doesNotMatch(route, /getCurrentBd|from ["'][^"']*supabase/i);
+});
+
+test("the unsubscribe route serves GET and POST through the Drizzle client, never supabase-js", () => {
+  const route = read("src", "app", "api", "unsubscribe", "route.ts");
+  assert.match(route, /export const GET\b/);
+  assert.match(route, /export const POST\b/);
+  assert.doesNotMatch(route, /from ["'][^"']*supabase/i);
+  assert.match(route, /unsubscribeQueries/);
+});
+
+test("the sidebar has a Secuencias entry directly below Seguimientos", () => {
+  const items = NAVIGATION.flatMap((section) => section.items);
+  const at = items.findIndex((item) => item.labelKey === "followUps");
+  assert.ok(at >= 0);
+  assert.equal(items[at + 1]?.labelKey, "sequences");
+  assert.equal(items[at + 1]?.href, "/sequences");
+  assert.equal(t("es").nav.sequences, "Secuencias");
 });
 
 // The runner and its real ports. The original `run\b` matched only a module literally named `run`, so the actual
@@ -91,20 +117,33 @@ test("the runner import guard matches the real runner modules, and not the pure 
   }
 });
 
-test("no file under src/app imports the sequence runner", () => {
-  const offenders = appFiles
+test("exactly one file under src/app imports the sequence runner: the cron route", () => {
+  const importers = walk(APP)
     .filter((f) => /\.(ts|tsx)$/.test(f))
     .filter((f) => RUNNER_IMPORT.test(readFileSync(f, "utf8")))
     .map(rel);
-  assert.deepEqual(offenders, []);
+  assert.deepEqual(importers, ["src/app/api/sequences/run/route.ts"]);
 });
 
-test("no file in src outside the runner itself imports the runner or its ports (no indirect path to a send)", () => {
-  const allowed = new Set(["src/lib/sequences/runSequenceRelease.ts", "src/lib/sequences/releaseQueries.ts"]);
+test("no other file in src imports the runner or its ports (no indirect path to a send)", () => {
+  const allowed = new Set([
+    "src/lib/sequences/runSequenceRelease.ts",
+    "src/lib/sequences/releaseQueries.ts",
+    "src/app/api/sequences/run/route.ts",
+    // Names the RunSummary TYPE only (asserted below): erased at compile time, so it is no path to a send.
+    "src/lib/sequences/runHandler.ts",
+  ]);
   const offenders = walk(join(ROOT, "src"))
     .filter((f) => /\.(ts|tsx)$/.test(f))
     .filter((f) => !allowed.has(rel(f)))
     .filter((f) => RUNNER_IMPORT.test(readFileSync(f, "utf8")))
     .map(rel);
   assert.deepEqual(offenders, []);
+});
+
+test("the one other allowed importer, the run handler, imports the runner as a type only", () => {
+  const handler = read("src", "lib", "sequences", "runHandler.ts");
+  const imports = [...handler.matchAll(/^import .*["']\.\/(?:runSequenceRelease|releaseQueries)["'];?$/gm)].map((m) => m[0]);
+  assert.ok(imports.length > 0);
+  for (const line of imports) assert.match(line, /^import type /, line);
 });

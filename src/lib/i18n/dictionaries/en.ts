@@ -240,6 +240,7 @@ export const en = {
     companies: "Companies",
     tasks: "Tasks",
     followUps: "Follow-ups",
+    sequences: "Sequences",
     outreach: "Outreach",
     hiring: "Hiring",
     whatsNew: "What's New",
@@ -2527,7 +2528,7 @@ export const en = {
     body: "The page you're looking for doesn't exist or was moved.",
     backHome: "Back to home",
   },
-  // Public unsubscribe pages (recipient-facing, rendered in English like the emails). Not routed until the go-live PR.
+  // Public unsubscribe pages (recipient-facing, rendered in English like the emails). Routed (go-live).
   sequenceUnsubscribe: {
     confirmTitle: "Unsubscribe?",
     confirmBody: (email: string) =>
@@ -2539,7 +2540,7 @@ export const en = {
     invalidBody: "If you still want to stop receiving our emails, reply to any message with \"unsubscribe\".",
   },
   // Sequence detail screen (mockups/secuencia-detalle.html). Plain strings with {n} placeholders: the slice is passed to
-  // client components (ClientStrings), so it cannot hold functions. Not routed until the go-live PR.
+  // client components (ClientStrings), so it cannot hold functions. Routed (go-live).
   sequences: {
     eyebrow: "Sequence",
     introLead: "{n} hand-picked contacts with open IT postings and a verified email. The system drafts each message separately from the company's signals;",
@@ -2672,6 +2673,54 @@ export const en = {
     bulkRemoveReason: "Reason",
     bulkRemoveConfirm: "Remove",
     bulkRemoveCancel: "Cancel",
+    // Container copy for the routed pages (go-live): toasts, errors, the edit dialog. Plain strings with {n} placeholders.
+    selectMember: "Select {name}",
+    actionFailed: "The action could not be completed. Try again.",
+    reviewErrors: {
+      empty: "The subject and body cannot be empty.",
+      not_found: "We could not find this draft among your sequences.",
+      not_editable: "This draft can no longer be edited.",
+      not_approvable: "This contact is no longer in a state that can be approved.",
+      no_draft: "This contact has no draft to approve.",
+      unreviewed: "Open every draft before approving them in bulk.",
+      reply_prefix_subject: "A first email cannot start with \"Re:\" or \"Fwd:\" because it pretends to continue a conversation that never happened. Rewrite the subject.",
+      failed: "The action could not be completed. Try again.",
+    },
+    reinstateErrors: {
+      not_found: "We could not find this contact among your sequences.",
+      not_discarded: "This contact is no longer removed from the sequence.",
+      opt_out: "They asked not to be contacted: they cannot return to any sequence.",
+      unreachable: "They no longer have an address we can write to.",
+      company_limit: "The company already has 2 active contacts in this sequence.",
+      client: "The company is listed as a client.",
+      suppressed: "The address is on the do-not-contact list.",
+      duplicate: "This contact is already in the sequence.",
+    },
+    toastSaved: "Draft saved. Open it again to review it.",
+    toastApproved: "Approved. It goes out in the next send.",
+    toastApprovedMany: "{n} drafts approved and scheduled.",
+    toastCancelled: "Send cancelled. The contact is back in drafts.",
+    toastAdvanced: "The reminder is ready for the next send, if approved.",
+    toastReadmitted: "Contact re-added as a draft.",
+    toastRegenerated: "Draft regenerated.",
+    toastRegeneratedMany: "{n} drafts regenerated.",
+    toastGenerated: "{n} drafts generated.",
+    toastGeneratedOne: "1 draft generated.",
+    toastGeneratedNone: "There were no drafts to generate.",
+    toastGenerateFailed: "{n} could not be generated. Try again.",
+    toastRemoved: "{n} contacts removed.",
+    toastRemovedOne: "1 contact removed.",
+    toastRemovedSome: "{n} removed; {skipped} could not be removed.",
+    toastOptOut: "Opt-out recorded. {n} memberships were discarded.",
+    toastOptOutOne: "Opt-out recorded. 1 membership was discarded.",
+    toastCadenceFixed: "For now the cadence is the same for every sequence: first email at 09:00 and a reminder after {n} days.",
+    toastEdited: "Sequence updated.",
+    editTitle: "Edit sequence",
+    editSave: "Save",
+    editCancel: "Cancel",
+    createdPartial: "Sequence created, but {n} contacts could not be added.",
+    createdPartialOne: "Sequence created, but 1 contact could not be added.",
+    createErrorAccount: "We could not find your connected Gmail account. Check it in Account.",
     // Contact-record block (contactContext.ts). The opt-out line mirrors the mockup. `discarded` is worded two ways
     // because only sentAt tells "never went out" from "went out, then dropped"; neither says WHO removed it.
     contextTitle: "Sequences",
@@ -2695,7 +2744,7 @@ export const en = {
     optOutCancel: "Cancel",
     optOutErrorNotFound: "We could not find that membership among your sequences, so nothing was recorded.",
     optOutErrorNoEmail: "This contact has no email, so there is no address to suppress. Nothing was recorded.",
-    // List and create form (mockups/secuencias-lista.html, mockups/secuencia-nueva.html). Not routed until the go-live PR.
+    // List and create form (mockups/secuencias-lista.html, mockups/secuencia-nueva.html). Routed (go-live).
     dateLocale: "en-US",
     unitContactOne: "contact",
     unitContactMany: "contacts",

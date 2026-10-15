@@ -16,7 +16,8 @@ import { runGenerateOutreachMessage } from "@/lib/outreach/generateMessage";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import { sequenceAuditRow } from "./approvalAudit";
 import { composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult } from "./draftCompose";
-import { buildSequenceDraftInput, draftLanguageForMarket, senderIdentity } from "@/lib/sequences/draftInput";
+import { buildSequenceDraftInput, draftLanguageForMarket, draftSignals, senderIdentity } from "@/lib/sequences/draftInput";
+import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
 import { recipientMarket } from "./recipientMarket";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
@@ -141,9 +142,24 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   });
 }
 
+/**
+ * The "Señales usadas" chips of the review dialog: derived from the SAME input the generator gets (buildSequenceDraftInput
+ * over loadPromptArgs), never from model output and never from the card's own facts, so the chips describe what the
+ * model was actually shown. Owner-only (loadFacts joins the Sequence on the owner): null for anyone else, [] when the
+ * market has no draft language (a member that can have no draft). Read-only, no generator call.
+ */
+export async function memberDraftSignals(bdId: string, memberId: string, step: 1 | 2 = STEP): Promise<OutreachSignal[] | null> {
+  const facts = await loadFacts(bdId, memberId);
+  if (!facts) return null;
+  const language = draftLanguageForMarket(facts.market);
+  if (!language) return [];
+  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.market, step === REMINDER_STEP ? "reminder" : "first");
+  return input ? draftSignals(input) : [];
+}
+
 export type DraftBatchResult = ({ ok: true; held: string[] } & BatchResult) | { ok: false; error: "not_found" };
 
-async function runForOwner(bdId: string, sequenceId: string, mode: Mode, memberIds: readonly string[] | null, overrides: Partial<DraftDeps>): Promise<DraftBatchResult> {
+async function runForOwner(bdId: string, sequenceId: string, mode: Mode, memberIds: readonly string[] | null, overrides: Partial<DraftDeps>, step = STEP): Promise<DraftBatchResult> {
   const [owned] = await db.select({ id: sequence.id }).from(sequence).where(and(eq(sequence.id, sequenceId), eq(sequence.ownerBdId, bdId)));
   if (!owned) return { ok: false, error: "not_found" };
   const ids = memberIds ?? (await db
@@ -153,7 +169,7 @@ async function runForOwner(bdId: string, sequenceId: string, mode: Mode, memberI
     .orderBy(sequenceMember.createdAt)).map((m) => m.id);
   const deps = { ...liveDeps(), ...overrides };
   const held: string[] = [];
-  const result = await runDraftBatch([...new Set(ids)], (id) => draftMember(bdId, sequenceId, id, mode, deps, held) as Promise<"generated" | "skipped">);
+  const result = await runDraftBatch([...new Set(ids)], (id) => draftMember(bdId, sequenceId, id, mode, deps, held, step) as Promise<"generated" | "skipped">);
   return { ok: true, held, ...result };
 }
 
@@ -165,6 +181,10 @@ export const generateMissingDrafts = (bdId: string, sequenceId: string, deps: Pa
 export const regenerateDrafts = (bdId: string, sequenceId: string, memberIds: readonly string[], deps: Partial<DraftDeps> = {}) =>
   runForOwner(bdId, sequenceId, "regenerate", memberIds, deps);
 
+/** "Regenerar" in the reminder dialog: replaces the step 2 draft of ONE member, clears its review and approval. Owner-checked. */
+export const regenerateReminderDraft = (bdId: string, sequenceId: string, memberId: string, deps: Partial<DraftDeps> = {}) =>
+  runForOwner(bdId, sequenceId, "regenerate", [memberId], deps, REMINDER_STEP);
+
 /**
  * The step 2 reminder for one member, called by the release runner right after a step 1 send. "missing" never touches an
  * existing reminder (edited or not); "regenerate" replaces it and clears its review and approval. Ownership is checked
@@ -175,18 +195,23 @@ export const generateReminderDraft = (bdId: string, sequenceId: string, memberId
 
 export type SaveEditResult = { ok: true; footerWarning: boolean } | { ok: false; error: "empty" | "not_found" | "not_editable" };
 
-/** "Guardar sin aprobar": persists the BD's text, marks it BD-owned, withdraws review and approval. Never approves. */
-export async function saveDraftEdit(bdId: string, memberId: string, input: { subject: string; body: string }): Promise<SaveEditResult> {
+/**
+ * "Guardar sin aprobar": persists the BD's text, marks it BD-owned, withdraws review and approval. Never approves.
+ * `step` 2 edits the reminder of a `sent` member: it never moves the member (an approval of step 1 implies nothing about
+ * it), and only a member whose reminder has not been released can be edited.
+ */
+export async function saveDraftEdit(bdId: string, memberId: string, input: { subject: string; body: string }, step: 1 | 2 = STEP): Promise<SaveEditResult> {
   const subject = input.subject?.trim();
   if (!subject || !input.body?.trim()) return { ok: false, error: "empty" };
   const facts = await loadFacts(bdId, memberId);
-  if (!facts || !facts.hasDraft) return { ok: false, error: "not_found" };
-  if (!EDITABLE.includes(facts.state)) return { ok: false, error: "not_editable" };
+  if (!facts || !(step === REMINDER_STEP ? facts.hasReminderDraft : facts.hasDraft)) return { ok: false, error: "not_found" };
+  const editable = step === REMINDER_STEP ? REMINDER_ELIGIBLE : EDITABLE;
+  if (!editable.includes(facts.state)) return { ok: false, error: "not_editable" };
   const saved = await db.transaction(async (tx) => {
     const [m] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
-    if (!m || !EDITABLE.includes(m.state)) return false;
-    await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: new Date(), editedByBdId: bdId, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null }).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
-    if (m.state === "approved") {
+    if (!m || !editable.includes(m.state)) return false;
+    await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: new Date(), editedByBdId: bdId, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null }).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step)));
+    if (step === STEP && m.state === "approved") {
       assertTransition("approved", "drafted", "edit");
       await tx.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
     }

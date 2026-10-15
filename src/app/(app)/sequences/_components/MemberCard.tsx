@@ -80,7 +80,10 @@ function Actions({ card, m, l, onAction }: { card: CardView; m: DetailMember; l:
   );
 }
 
-export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOutPhrase = null }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; optOutPhrase?: string | null }) {
+/** `selection` makes a draft card selectable for the bulk bar (the spec's "selecting rows"); a card in any other state has nothing to select. */
+export type CardSelection = { selected: boolean; onToggle: () => void };
+
+export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOutPhrase = null, selection }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; optOutPhrase?: string | null; selection?: CardSelection }) {
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;
@@ -92,6 +95,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOu
   return (
     <div className="card">
       <div className="card-body row row-lg">
+        {selection && card.kind === "draft" && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} aria-label={fill(l.selectMember, { name })} />}
         <Avatar id={m.personId} initials={initialsFromName(name)} />
         <div className="grow stack-sm">
           <div className="row wrap">
