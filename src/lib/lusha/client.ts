@@ -29,8 +29,9 @@ export interface SearchInput {
   personId: string;
   firstName: string;
   lastName: string;
-  companyDomain: string;
-  linkedinUrl: string;
+  // Either may be absent; JSON.stringify drops an undefined key, so an unknown value is never sent as "".
+  companyDomain?: string;
+  linkedinUrl?: string;
 }
 
 const num = (v: string | null): number | null => (v !== null && /^\d+$/.test(v.trim()) ? Number(v) : null);

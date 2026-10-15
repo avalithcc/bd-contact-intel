@@ -5,11 +5,13 @@
 
 import { and, desc, eq, gte, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, duplicateCandidate, lushaReveal, person, personPropertyHistory } from "@/db/schema";
+import { activity, company, duplicateCandidate, lushaReveal, person, personPropertyHistory } from "@/db/schema";
+import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { artDayWindow, planReservation } from "./cap";
 import { pickEmail, pickPhone } from "./parse";
 import type { CanRevealEntry, LushaField } from "./pricing";
 import { planRevealedEmailWrite, planRevealedPhoneWrite } from "./revealPlan";
+import type { Subject } from "./reveal";
 import { toLatestRows, type LatestRows } from "./revealState";
 
 /** Serializes every reservation: a unique index cannot bound a sum() over rows that do not exist yet. */
@@ -241,4 +243,28 @@ export async function getRevealState(personId: string, reader: Pick<typeof db, "
     )
     .orderBy(lushaReveal.field, sql`(${lushaReveal.state} = 'settled' and ${lushaReveal.outcome} = 'revealed') desc`, desc(lushaReveal.at));
   return toLatestRows(rows as Parameters<typeof toLatestRows>[0]);
+}
+
+/** What a search and the eligibility checks need about one Contact: names, held contact values, LinkedIn and the company domain. */
+export async function loadRevealSubject(personId: string, reader: Pick<typeof db, "select"> = db): Promise<Subject | null> {
+  const [row] = await reader
+    .select({
+      id: person.id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      email: person.email,
+      emailStatus: person.emailStatus,
+      emailSource: person.emailSource,
+      phone: person.phone,
+      mobilePhone: person.mobilePhone,
+      mergedIntoId: person.mergedIntoId,
+      profileKey: person.profileKey,
+      companyDomain: company.domain,
+    })
+    .from(person)
+    .leftJoin(company, eq(company.companyKey, person.companyKey))
+    .where(eq(person.id, personId));
+  if (!row) return null;
+  const { profileKey, ...rest } = row;
+  return { ...rest, linkedinUrl: linkedinProfileHref(profileKey) };
 }

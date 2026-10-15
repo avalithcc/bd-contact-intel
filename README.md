@@ -263,6 +263,29 @@ Response (`200`):
 `leads`, or a batch where every lead was skipped), with an `error` message
 and, where applicable, the same `skipped` array.
 
+## Lusha reveal
+
+A BD can reveal a Contact's email or phone through Lusha from the Contact record. Every reveal spends real
+credits from one shared pool, so the feature is gated and capped server-side.
+
+| Variable | Where | Meaning |
+| --- | --- | --- |
+| `LUSHA_API_KEY` | **Vercel production only** | The on-switch. Without it (or outside `VERCEL_ENV=production`) the feature is off: no control, no request, no ledger row. Removing it is the kill switch. Never set it in Preview or Development. |
+| `LUSHA_DAILY_CREDIT_CAP` | production, optional | Credits the team may spend per Argentina business day. Default `12`. `0` is a soft kill switch (every spend is refused). An unparsable value fails closed to `0`. |
+
+Changing either variable needs **one Vercel variable edit plus a redeploy**: Vercel applies environment
+changes only to new deployments.
+
+- The cap counts credits charged (or reserved, while unknown) in our own `lusha_reveal` ledger. Lusha's
+  `/v3/account/usage` is eventually consistent and is shown for information only.
+- Nothing is retried automatically. A failed or unreadable response keeps its reserved credits in the day's
+  total; a manual retry goes through the cap again.
+- Tests never call Lusha: they use fakes and the fixtures in `tests/unit/fixtures/lusha/`.
+- **First phone reveal is the measurement.** The shape of Lusha's `phones[]` was never observed. The raw array is
+  stored on the ledger row (`payload`), and the parser writes nothing to the Contact if it does not recognise
+  the entry. After the first real phone reveal, check the stored payload and open a parser follow-up if needed;
+  no second 5-credit reveal is required.
+
 ## Deployments and branches
 
 Only two kinds of branch build on Vercel:

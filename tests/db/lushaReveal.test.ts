@@ -1,5 +1,5 @@
 /**
- * DB-backed tests for the Lusha ledger (lusha-reveal PR 4): the advisory-locked reservation, the settles, the
+ * DB-backed tests for the Lusha ledger (lusha-reveal PR 4, plus the PR 5 orchestration at the end): the advisory-locked reservation, the settles, the
  * duplicate enqueue and the merge repoint. Opt-in and fail-closed like the other files here: `npm run test:db`,
  * DATABASE_URL pointing at a local database whose name ends in `_e2e` that has migration 0043. NEVER calls Lusha:
  * the HTTP step is simulated by handing the settles hand-built bodies. Rows are created under a per-run token and
@@ -7,6 +7,8 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { assertScratchDatabaseUrl } from "../launch-readiness/scratchDbGuard";
 
@@ -319,4 +321,104 @@ test("reserve refuses a merged-away or missing Contact, and waits for a merge th
     assert.equal(settled, false, "the reservation waits for the merge's row lock");
   });
   assert.ok((await pending).ok);
+});
+
+// --- PR 5: the orchestration through the REAL ports (fake fetch serving recorded fixtures: no network, no credit) ---
+// Same file as the ledger tests on purpose: node:test runs files in parallel and the cap tests above read the
+// day's global spend, which these would move.
+const ENV = { VERCEL_ENV: "production", LUSHA_API_KEY: "sk-test-never-sent", LUSHA_DAILY_CREDIT_CAP: "1000000" };
+const companyKeys: string[] = [];
+
+const fixture = (name: string) => readFileSync(join(__dirname, "..", "unit", "fixtures", "lusha", name), "utf8");
+
+/** A fetch that serves a fixture per endpoint and records every request. */
+function fakeFetch(bodies: { search?: string; enrich?: string }) {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  const fn = async (url: string, init: RequestInit) => {
+    requests.push({ url, body: init.body ? JSON.parse(String(init.body)) : null });
+    const text = url.endsWith("/contacts/search") ? bodies.search : bodies.enrich;
+    assert.ok(text, `unexpected request to ${url}`);
+    return new Response(text, { status: 200, headers: { "content-type": "application/json" } });
+  };
+  return { fn, requests };
+}
+
+after(async () => {
+  const { db } = await import("@/db");
+  const { company } = await import("@/db/schema");
+  const { inArray } = await import("drizzle-orm");
+  if (companyKeys.length) await db.delete(company).where(inArray(company.companyKey, companyKeys));
+});
+
+test("loadRevealSubject joins the company domain and rebuilds the LinkedIn URL from the profile key", async () => {
+  const { db } = await import("@/db");
+  const { company } = await import("@/db/schema");
+  const { loadRevealSubject } = await import("@/lib/lusha/revealDb");
+  const key = `zz-lusha-${run}`;
+  companyKeys.push(key);
+  await db.insert(company).values({ companyKey: key, displayName: "ZZ Co", domain: `zz-${run}.example.test` });
+  const p = await mkPerson("act", { companyKey: key, profileKey: `linkedin.com/in/zz-${run}` });
+  const s = await loadRevealSubject(p.id);
+  assert.deepEqual([s?.companyDomain, s?.linkedinUrl], [`zz-${run}.example.test`, `https://linkedin.com/in/zz-${run}`]);
+  assert.equal(await loadRevealSubject(randomUUID()), null);
+});
+
+test("search then reveal through the real ports: one search call, one enrich call, the value on the Contact, a repeat refused for free", async () => {
+  const { db } = await import("@/db");
+  const { activity, person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { livePorts } = await import("@/lib/lusha/ports");
+  const { revealLushaField, searchLushaContact } = await import("@/lib/lusha/reveal");
+  const p = await mkPerson("act", { profileKey: `linkedin.com/in/e2e-${run}` });
+  // The fixture answers for clientReferenceId "person-aaa"; point it at this Contact.
+  const search = fixture("search-matched.json").replace("person-aaa", p.id);
+  const fetchSpy = fakeFetch({ search, enrich: fixture("unverified-enrich-emails.json") });
+  const ports = livePorts(ENV, fetchSpy.fn);
+
+  const found = await searchLushaContact({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
+  assert.equal(found.ok && found.outcome, "matched");
+  assert.equal(fetchSpy.requests.length, 1);
+
+  const revealed = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
+  assert.equal(revealed.ok && revealed.outcome, "revealed");
+  assert.equal(fetchSpy.requests.length, 2);
+  assert.deepEqual(fetchSpy.requests[1].body, { ids: ["v1.SYNTHETICcontactIdAAAAAAAAAAAAAAAAAAAA"], reveal: ["emails"] });
+  const [after] = await db.select().from(person).where(eq(person.id, p.id));
+  assert.deepEqual([after.emailSource, after.emailStatus, after.email], ["lusha", "probable", "redacted-work@example.invalid"]);
+  const acts = await db.select().from(activity).where(eq(activity.personId, p.id));
+  assert.deepEqual(acts.map((a) => a.type), ["lusha_reveal"]);
+
+  const again = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
+  // Now reachable, so the email is no longer offered at all: refused with no call and no charge.
+  assert.deepEqual([again.ok, !again.ok && again.reason, fetchSpy.requests.length], [false, "lusha_not_eligible", 2]);
+});
+
+test("a 2xx with an unreadable body fails the reservation as outcome_unknown and keeps the reserved credits counting", async () => {
+  const { getDailySpend } = await import("@/lib/lusha/revealDb");
+  const { livePorts } = await import("@/lib/lusha/ports");
+  const { searchLushaContact } = await import("@/lib/lusha/reveal");
+  const { db } = await import("@/db");
+  const { lushaReveal } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const p = await mkPerson("act", { profileKey: `linkedin.com/in/unk-${run}` });
+  const before = await getDailySpend();
+  const ports = livePorts(ENV, async () => new Response("<html>gateway</html>", { status: 200 }));
+  const r = await searchLushaContact({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
+  assert.deepEqual([r.ok, !r.ok && r.reason, !r.ok && r.retryable], [false, "lusha_outcome_unknown", false]);
+  const rows = await db.select().from(lushaReveal).where(eq(lushaReveal.personId, p.id));
+  assert.deepEqual([rows[0].state, rows[0].errorCode, rows[0].creditsCharged], ["failed", "outcome_unknown", null]);
+  assert.equal((await getDailySpend()) - before, 1);
+});
+
+test("the closed gate never reaches the client or the ledger", async () => {
+  const { livePorts } = await import("@/lib/lusha/ports");
+  const { revealLushaField } = await import("@/lib/lusha/reveal");
+  const { db } = await import("@/db");
+  const { lushaReveal } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const p = await mkPerson("act");
+  const spy = fakeFetch({});
+  const r = await revealLushaField({ personId: p.id, field: "emails", actorBdId: bdId }, livePorts({}, spy.fn));
+  assert.deepEqual([r.ok, !r.ok && r.reason, spy.requests.length], [false, "lusha_off", 0]);
+  assert.equal((await db.select().from(lushaReveal).where(eq(lushaReveal.personId, p.id))).length, 0);
 });
