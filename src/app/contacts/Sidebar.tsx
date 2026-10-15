@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ComponentType } from "react";
+import { Suspense, useEffect, useState, type ComponentType, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -9,6 +9,7 @@ import {
   contactsListHref,
   listQueryToRemember,
 } from "@/lib/contacts/listMemory";
+import { isNavItemActive, shouldSetPending } from "@/lib/nav/pendingNav";
 import type { NavLabels } from "@/lib/i18n/navLabels";
 import {
   ContactsIcon,
@@ -27,6 +28,9 @@ import {
   ReportsIcon,
   AbsorbIcon,
 } from "@/components/icons";
+
+/** Longest a clicked item stays highlighted without the route committing. */
+const PENDING_TIMEOUT_MS = 10_000;
 
 export interface SidebarItem {
   labelKey: Exclude<
@@ -152,7 +156,24 @@ export function Sidebar({
     }
   }, [pathname]);
 
-  const isActive = (href: string) => pathname.startsWith(href);
+  // Optimistic highlight: the item clicked (by its NAVIGATION href) until the
+  // pathname confirms the navigation. A pathname change of any kind clears it
+  // (that covers redirects landing elsewhere); the timeout covers a navigation
+  // that never commits (aborted, errored), so the sidebar cannot lie forever.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+  useEffect(() => {
+    if (pendingHref === null) return;
+    const timer = setTimeout(() => setPendingHref(null), PENDING_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pendingHref]);
+  const markPending = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (shouldSetPending(event, pathname, href)) setPendingHref(href);
+  };
+
+  const isActive = (href: string) => isNavItemActive(pathname, pendingHref, href);
   // "Tareas"/"Seguimientos" are the NAVIGATION items with a cheap badge count
   // (see the comment above NAVIGATION), riding the pill-count class the
   // mockup already ships. "Absorciones" is a hardcoded admin entry outside
@@ -180,6 +201,7 @@ export function Sidebar({
               href={item.href === CONTACTS_LIST_PATH ? contactsHref : item.href}
               className={`nav-item${isActive(item.href) ? " active" : ""}`}
               aria-current={isActive(item.href) ? "page" : undefined}
+              onClick={markPending(item.href)}
             >
               <item.icon className="icon" />
               {labels[item.labelKey]}
@@ -204,6 +226,7 @@ export function Sidebar({
           href="/playbook"
           className={`nav-item${isActive("/playbook") ? " active" : ""}`}
           aria-current={isActive("/playbook") ? "page" : undefined}
+          onClick={markPending("/playbook")}
         >
           <PlaybookIcon className="icon" />
           {labels.playbook}
@@ -212,6 +235,7 @@ export function Sidebar({
           href="/contact-status"
           className={`nav-item${isActive("/contact-status") ? " active" : ""}`}
           aria-current={isActive("/contact-status") ? "page" : undefined}
+          onClick={markPending("/contact-status")}
         >
           <StatusGuideIcon className="icon" />
           {labels.contactStatusGuide}
@@ -225,6 +249,7 @@ export function Sidebar({
             href="/admin/reports"
             className={`nav-item${isActive("/admin/reports") ? " active" : ""}`}
             aria-current={isActive("/admin/reports") ? "page" : undefined}
+            onClick={markPending("/admin/reports")}
           >
             <ReportsIcon className="icon" />
             {labels.reports}
@@ -233,6 +258,7 @@ export function Sidebar({
             href="/admin/absorptions"
             className={`nav-item${isActive("/admin/absorptions") ? " active" : ""}`}
             aria-current={isActive("/admin/absorptions") ? "page" : undefined}
+            onClick={markPending("/admin/absorptions")}
           >
             <AbsorbIcon className="icon" />
             {labels.absorptions}
@@ -242,6 +268,7 @@ export function Sidebar({
             href="/admin/duplicates"
             className={`nav-item${isActive("/admin/duplicates") ? " active" : ""}`}
             aria-current={isActive("/admin/duplicates") ? "page" : undefined}
+            onClick={markPending("/admin/duplicates")}
           >
             <PersonIcon className="icon" />
             {labels.duplicates}
@@ -251,6 +278,7 @@ export function Sidebar({
             href="/admin/audit-log"
             className={`nav-item${isActive("/admin/audit-log") ? " active" : ""}`}
             aria-current={isActive("/admin/audit-log") ? "page" : undefined}
+            onClick={markPending("/admin/audit-log")}
           >
             <EyeIcon className="icon" />
             {labels.auditLog}
