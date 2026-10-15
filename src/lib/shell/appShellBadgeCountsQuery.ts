@@ -43,7 +43,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, companyAbsorptionProposal, emailAccount, followUpQueueItem, person, task } from "@/db/schema";
+import { activity, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 
 /** Raw-SQL-text twin of queueSelection.ts#workedTodayAtSql() — see this file's doc comment for why it can't reuse that helper via interpolation here. */
@@ -75,6 +75,11 @@ export interface AppShellBadgeCountsQueryParams {
    */
   workedTodayFromIso: string;
   workedTodayToIso: string;
+  /**
+   * Only admins see (and can open) /admin/duplicates, so only they pay for
+   * the `duplicate_count` subquery; everyone else gets a literal 0.
+   */
+  isAdmin?: boolean;
 }
 
 export function buildAppShellBadgeCountsQuery({
@@ -83,6 +88,7 @@ export function buildAppShellBadgeCountsQuery({
   tomorrowStartUtcIso,
   workedTodayFromIso,
   workedTodayToIso,
+  isAdmin = false,
 }: AppShellBadgeCountsQueryParams) {
   const workedTypes = sql.join(
     [...WORKED_ACTIVITY_TYPES].map((t) => sql`${t}`),
@@ -133,6 +139,18 @@ export function buildAppShellBadgeCountsQuery({
         from ${companyAbsorptionProposal}
         where company_absorption_proposal.status = 'open'
       ) as absorption_count,
+      ${
+        isAdmin
+          ? sql`(
+        -- Exactly the /admin/duplicates queue (listOpenDuplicateCandidates):
+        -- status = 'open'. Team-wide, admin-only. Backed by
+        -- duplicate_candidate_status_idx.
+        select count(*)::int
+        from ${duplicateCandidate}
+        where duplicate_candidate.status = 'open'
+      )`
+          : sql`0`
+      } as duplicate_count,
       -- F5: has today's queue been built for this BD? The shell builds it
       -- when false (readBadgeRowEnsuringQueue.ts). Index-friendly: hits the
       -- (bd_id, queue_date, person_id) unique key.

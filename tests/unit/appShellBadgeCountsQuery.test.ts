@@ -19,7 +19,7 @@ import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 
 const dialect = new PgDialect();
 
-function render() {
+function render(isAdmin = false) {
   return dialect.sqlToQuery(
     buildAppShellBadgeCountsQuery({
       bdId: "00000000-0000-0000-0000-000000000001",
@@ -27,6 +27,7 @@ function render() {
       tomorrowStartUtcIso: "2026-09-30T00:00:00.000Z",
       workedTodayFromIso: "2026-09-29T03:00:00.000Z",
       workedTodayToIso: "2026-09-30T03:00:00.000Z",
+      isAdmin,
     }),
   );
 }
@@ -95,4 +96,18 @@ test("buildAppShellBadgeCountsQuery: absorption_count counts open proposals team
   assert.ok(match, "expected an absorption_count scalar subquery over company_absorption_proposal");
   assert.match(match[0], /company_absorption_proposal\.status = 'open'/i);
   assert.doesNotMatch(match[0], /bd_id|\$\d+::uuid/i);
+});
+
+test("buildAppShellBadgeCountsQuery: duplicate_count counts open duplicate candidates team-wide for admins", () => {
+  const { sql } = render(true);
+  const match = sql.match(/select count\(\*\)::int\s+from "duplicate_candidate"[\s\S]*?\)\s+as duplicate_count/i);
+  assert.ok(match, "expected a duplicate_count scalar subquery over duplicate_candidate");
+  assert.match(match[0], /duplicate_candidate\.status = 'open'/i);
+  assert.doesNotMatch(match[0], /bd_id|\$\d+::uuid/i);
+});
+
+test("buildAppShellBadgeCountsQuery: non-admins get a literal 0 and never touch duplicate_candidate", () => {
+  const { sql } = render(false);
+  assert.match(sql, /0\s+as duplicate_count/i);
+  assert.doesNotMatch(sql, /duplicate_candidate/i);
 });

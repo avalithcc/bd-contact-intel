@@ -19,6 +19,8 @@ export interface AppShellBadgeCounts {
   followUpCount: number;
   /** Open absorption proposals, team-wide (not per-BD). */
   absorptionCount: number;
+  /** Open duplicate candidates, team-wide; always 0 for non-admins (query skipped). */
+  duplicateCount: number;
   /** email-sync.html screen 4 — see reconnectBannerState.ts. */
   needsReconnectBanner: boolean;
   /** Connected and readonly-scoped, but not syncing (syncHealth.ts); null when healthy or not applicable. */
@@ -47,7 +49,7 @@ const toDate = (iso: string | null | undefined): Date | null => (iso ? new Date(
  * `email_account_banner_state` column for why the reconnect banner rides
  * along here instead of a second query.
  */
-export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<AppShellBadgeCounts> {
+export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = false): Promise<AppShellBadgeCounts> {
   const queueDate = argentinaCalendarDate(now);
   // `due_at` bound (task_count) — naive 00:00-UTC scheme, unrelated to real
   // instants.
@@ -66,17 +68,19 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
         tomorrowStartUtcIso: tomorrowStartUtc.toISOString(),
         workedTodayFromIso: workedTodayFrom.toISOString(),
         workedTodayToIso: workedTodayTo.toISOString(),
+        isAdmin,
       }),
     )) as unknown as {
       task_count: number;
       follow_up_count: number;
       absorption_count: number;
+      duplicate_count: number;
       queue_built: boolean;
       email_account_banner_state: EmailAccountBannerState | null;
     }[];
     // An empty result cannot happen (scalar subqueries), but keep the old
     // `row?.` tolerance rather than throwing in the shell.
-    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, queue_built: true, email_account_banner_state: null };
+    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, queue_built: true, email_account_banner_state: null };
   };
   // F5: build today's queue on the first page of the day — see
   // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
@@ -104,6 +108,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date): Promise<A
     taskCount: Number(row?.task_count ?? 0),
     followUpCount: Number(row?.follow_up_count ?? 0),
     absorptionCount: Number(row?.absorption_count ?? 0),
+    duplicateCount: Number(row?.duplicate_count ?? 0),
     needsReconnectBanner: shouldShowReconnectBanner({
       accountStatus: bannerState?.status ?? null,
       grantedScopes: bannerState?.grantedScopes ?? null,

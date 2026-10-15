@@ -48,7 +48,7 @@ export default async function AppLayout({
   const searchLabels = pickTopBarSearchLabels(dict);
   const me = await getCurrentBd();
   const now = new Date();
-  const { taskCount, followUpCount, absorptionCount, needsReconnectBanner, syncBanner } = await getAppShellBadgeCounts(me.id, now);
+  const { taskCount, followUpCount, absorptionCount, duplicateCount, needsReconnectBanner, syncBanner } = await getAppShellBadgeCounts(me.id, now, me.role === "admin");
 
   return (
     <ToastProvider>
@@ -59,6 +59,7 @@ export default async function AppLayout({
             taskCount={taskCount}
             followUpCount={followUpCount}
             absorptionCount={absorptionCount}
+            duplicateCount={duplicateCount}
             isAdmin={me.role === "admin"}
           />
           <div className="main">

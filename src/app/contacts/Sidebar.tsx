@@ -121,12 +121,14 @@ export function Sidebar({
   taskCount,
   followUpCount,
   absorptionCount,
+  duplicateCount,
   isAdmin,
 }: {
   labels: NavLabels;
   taskCount?: number;
   followUpCount?: number;
   absorptionCount?: number;
+  duplicateCount?: number;
   // Admin-only "Administración" section (admin-conversation-access mockup,
   // screen 1: admin-conversation.html:57-61) — "Registro de auditoría" and
   // "Reportes" (owner-reporting decision 1/5) are wired here; see
@@ -243,6 +245,7 @@ export function Sidebar({
           >
             <PersonIcon className="icon" />
             {labels.duplicates}
+            {!!duplicateCount && <span className="pill-count">{duplicateCount}</span>}
           </Link>
           <Link
             href="/admin/audit-log"
