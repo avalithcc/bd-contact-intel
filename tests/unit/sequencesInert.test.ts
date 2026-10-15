@@ -54,10 +54,34 @@ test("the sidebar nav source has no Secuencias entry", () => {
   assert.deepEqual(offenders, []);
 });
 
+// The runner and its real ports. The original `run\b` matched only a module literally named `run`, so the actual
+// runner (`runSequenceRelease`, task 9.5) and its DB ports (`releaseQueries`) slipped past it; the task 1.1 wording is
+// "@/lib/sequences/run*".
+const RUNNER_IMPORT = /@\/lib\/sequences\/(run\w*|releaseQueries)\b/;
+
+test("the runner import guard matches the real runner modules, and not the pure planning ones", () => {
+  for (const hit of ["@/lib/sequences/run", "@/lib/sequences/runSequenceRelease", "@/lib/sequences/releaseQueries"]) {
+    assert.match(hit, RUNNER_IMPORT, hit);
+  }
+  for (const miss of ["@/lib/sequences/releasePlan", "@/lib/sequences/preSendChecks", "@/lib/sequences/memberState"]) {
+    assert.doesNotMatch(miss, RUNNER_IMPORT, miss);
+  }
+});
+
 test("no file under src/app imports the sequence runner", () => {
   const offenders = appFiles
     .filter((f) => /\.(ts|tsx)$/.test(f))
-    .filter((f) => /@\/lib\/sequences\/run\b/.test(readFileSync(f, "utf8")))
+    .filter((f) => RUNNER_IMPORT.test(readFileSync(f, "utf8")))
+    .map(rel);
+  assert.deepEqual(offenders, []);
+});
+
+test("no file in src outside the runner itself imports the runner or its ports (no indirect path to a send)", () => {
+  const allowed = new Set(["src/lib/sequences/runSequenceRelease.ts", "src/lib/sequences/releaseQueries.ts"]);
+  const offenders = walk(join(ROOT, "src"))
+    .filter((f) => /\.(ts|tsx)$/.test(f))
+    .filter((f) => !allowed.has(rel(f)))
+    .filter((f) => RUNNER_IMPORT.test(readFileSync(f, "utf8")))
     .map(rel);
   assert.deepEqual(offenders, []);
 });
