@@ -121,3 +121,20 @@ test("a reminder continues the step 1 thread: stored In-Reply-To / References / 
     w.restore();
   }
 });
+
+test("a rejected Gmail send carries the HTTP status on the error, with the existing kind and message untouched", async () => {
+  for (const status of [400, 429, 503]) {
+    const w = await installFakeWorld({ accountRows: [await makeAccountRow()], token: OK_TOKEN, send: { ok: false, status, body: "nope" } });
+    try {
+      await assert.rejects(sendFromAccount(), (e: unknown) => {
+        assert.ok(e instanceof GmailSendError);
+        assert.equal(e.kind, "send_failed");
+        assert.equal(e.message, "Gmail send failed: nope");
+        assert.equal(e.status, status);
+        return true;
+      });
+    } finally {
+      w.restore();
+    }
+  }
+});

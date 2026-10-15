@@ -159,7 +159,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
       .update(emailAccount)
       .set({ lastErrorMessage: `Gmail send failed: ${detail.slice(0, 300)}` })
       .where(eq(emailAccount.bdId, account.bdId));
-    throw new GmailSendError("send_failed", `Gmail send failed: ${detail}`);
+    throw new GmailSendError("send_failed", `Gmail send failed: ${detail}`, undefined, sendRes.status);
   }
 
   const sent = await sendRes.json();

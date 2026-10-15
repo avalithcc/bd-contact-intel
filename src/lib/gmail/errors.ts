@@ -62,6 +62,9 @@ export class GmailSendError extends Error {
     message: string,
     // For `invalid_header`: WHICH header was rejected (To, From, In-Reply-To, References).
     public readonly header?: string,
+    // For `send_failed`: the HTTP status Gmail answered with. Additive and optional, so every existing caller and
+    // message is unchanged; the Sequence runner needs it because a 5xx may arrive AFTER Gmail accepted the message.
+    public readonly status?: number,
   ) {
     super(message);
     this.name = "GmailSendError";
