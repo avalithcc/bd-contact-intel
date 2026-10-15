@@ -181,32 +181,10 @@ export async function settleReveal(
     if (!pick?.ok) return result;
     try {
       await tx.transaction(async (sp) => {
-        const [p] = await sp.select().from(person).where(eq(person.id, row.personId)).for("update");
-        if (!p) throw new Error("person not found");
-        const plan = (input.field === "emails" ? planRevealedEmailWrite : planRevealedPhoneWrite)(p, pick, {
-          actorBdId: input.actorBdId,
-          lushaId: row.lushaContactId ?? "",
-          creditsCharged: input.creditsCharged,
-        });
-        if (plan.alreadyHeld) {
-          result.outcome = "already_held";
-          await sp.update(lushaReveal).set({ outcome: "already_held", errorCode: "phone_already_held" }).where(eq(lushaReveal.id, input.reservationId));
-        }
-        if (plan.personUpdate) await sp.update(person).set(plan.personUpdate).where(eq(person.id, p.id));
-        if (plan.historyRows.length) await sp.insert(personPropertyHistory).values(plan.historyRows);
-        // Direct insert, not createActivityInTx: the type is status-neutral by construction (D15).
-        if (plan.activity) await sp.insert(activity).values(plan.activity);
-        result.written = !plan.personUpdate ? null : input.field === "emails" ? "email" : "mobilePhone" in plan.personUpdate ? "mobilePhone" : "phone";
-        if (result.written !== "email" || !normalized) return;
-        const [other] = await sp
-          .select({ id: person.id, first: person.firstName, last: person.lastName })
-          .from(person)
-          .where(and(eq(person.emailNormalized, normalized), ne(person.id, p.id), isNull(person.mergedIntoId)))
-          .limit(1);
-        if (!other) return;
-        const [personAId, personBId] = [p.id, other.id].sort();
-        await sp.insert(duplicateCandidate).values({ personAId, personBId, reason: "lusha_reveal_email", matchKey: normalized }).onConflictDoNothing();
-        result.duplicate = { personId: other.id, name: [other.first, other.last].filter(Boolean).join(" ") };
+        const applied = await writeToContact(sp, { ledgerId: input.reservationId, personId: row.personId, field: input.field, pick, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: input.creditsCharged });
+        if (applied.alreadyHeld) result.outcome = "already_held";
+        result.written = applied.written;
+        result.duplicate = applied.duplicate;
       });
     } catch (e) {
       result.written = null;
@@ -217,6 +195,64 @@ export async function settleReveal(
       await tx.update(lushaReveal).set({ errorCode: "write_failed", payload: sql`${lushaReveal.payload} || ${cause}::jsonb` }).where(eq(lushaReveal.id, input.reservationId));
     }
     return result;
+  });
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * The Contact side of a paid reveal, shared by the settle and by the no-Lusha recovery: person, history, activity
+ * and duplicate candidate. Runs inside the caller's (savepoint) transaction and throws when it cannot write.
+ */
+async function writeToContact(
+  sp: Tx,
+  i: { ledgerId: string; personId: string; field: "emails" | "phones"; pick: Extract<ReturnType<typeof pickEmail>, { ok: true }>; normalized: string | null; actorBdId: string; lushaId: string; creditsCharged: number | null },
+): Promise<{ alreadyHeld: boolean; written: RevealSettlement["written"]; duplicate: RevealSettlement["duplicate"] }> {
+  const [p] = await sp.select().from(person).where(eq(person.id, i.personId)).for("update");
+  if (!p) throw new Error("person not found");
+  const plan = (i.field === "emails" ? planRevealedEmailWrite : planRevealedPhoneWrite)(p, i.pick, { actorBdId: i.actorBdId, lushaId: i.lushaId, creditsCharged: i.creditsCharged });
+  if (plan.alreadyHeld) await sp.update(lushaReveal).set({ outcome: "already_held", errorCode: "phone_already_held" }).where(eq(lushaReveal.id, i.ledgerId));
+  if (plan.personUpdate) await sp.update(person).set(plan.personUpdate).where(eq(person.id, p.id));
+  if (plan.historyRows.length) await sp.insert(personPropertyHistory).values(plan.historyRows);
+  // Direct insert, not createActivityInTx: the type is status-neutral by construction (D15).
+  if (plan.activity) await sp.insert(activity).values(plan.activity);
+  const written: RevealSettlement["written"] = !plan.personUpdate ? null : i.field === "emails" ? "email" : "mobilePhone" in plan.personUpdate ? "mobilePhone" : "phone";
+  const out = { alreadyHeld: plan.alreadyHeld === true, written, duplicate: null as RevealSettlement["duplicate"] };
+  if (written !== "email" || !i.normalized) return out;
+  const [other] = await sp
+    .select({ id: person.id, first: person.firstName, last: person.lastName })
+    .from(person)
+    .where(and(eq(person.emailNormalized, i.normalized), ne(person.id, p.id), isNull(person.mergedIntoId)))
+    .limit(1);
+  if (!other) return out;
+  const [personAId, personBId] = [p.id, other.id].sort();
+  await sp.insert(duplicateCandidate).values({ personAId, personBId, reason: "lusha_reveal_email", matchKey: i.normalized }).onConflictDoNothing();
+  return { ...out, duplicate: { personId: other.id, name: [other.first, other.last].filter(Boolean).join(" ") } };
+}
+
+/**
+ * Task 6.11: the credit was spent and the Contact write failed, so the value sits on the ledger and reserve() will
+ * (correctly) never pay for it again. This applies THAT value with no Lusha call, no reservation and no change to
+ * credits_charged, in one transaction, then clears the error. Refused for a row that did not fail to write.
+ */
+export async function applyStoredReveal(
+  input: { personId: string; field: "emails" | "phones"; actorBdId: string },
+  database: typeof db = db,
+): Promise<{ ok: true; value: string | null; written: RevealSettlement["written"]; duplicate: RevealSettlement["duplicate"] } | { ok: false; reason: "not_applicable" }> {
+  return database.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(lushaReveal)
+      .where(and(eq(lushaReveal.personId, input.personId), eq(lushaReveal.field, input.field), eq(lushaReveal.state, "settled"), eq(lushaReveal.outcome, "revealed"), eq(lushaReveal.errorCode, "write_failed")))
+      .orderBy(desc(lushaReveal.at))
+      .limit(1)
+      .for("update");
+    const raw = (row?.payload as Record<string, unknown> | null)?.[input.field];
+    const pick = input.field === "emails" ? pickEmail(raw) : pickPhone(raw);
+    if (!row || !pick.ok) return { ok: false, reason: "not_applicable" } as const;
+    const applied = await writeToContact(tx, { ledgerId: row.id, personId: row.personId, field: input.field, pick, normalized: row.valueNormalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: row.creditsCharged });
+    await tx.update(lushaReveal).set({ errorCode: applied.alreadyHeld ? "phone_already_held" : null, payload: sql`${lushaReveal.payload} - 'writeError'` }).where(eq(lushaReveal.id, row.id));
+    return { ok: true, value: row.value, written: applied.written, duplicate: applied.duplicate } as const;
   });
 }
 
@@ -238,6 +274,10 @@ export async function getRevealState(personId: string, reader: Pick<typeof db, "
       outcome: lushaReveal.outcome,
       value: lushaReveal.value,
       payload: lushaReveal.payload,
+      // Display-only columns, in the same statement (no extra round trip). Table-qualified as literal text: see PERFORMANCE.md.
+      actorName: sql<string | null>`(select b.name from bd b where b.id = lusha_reveal.actor_bd_id)`,
+      settledAt: lushaReveal.settledAt,
+      twin: sql<{ id: string; name: string } | null>`(select json_build_object('id', p.id, 'name', btrim(concat_ws(' ', p.first_name, p.last_name))) from person p where lusha_reveal.field = 'emails' and lusha_reveal.state = 'settled' and lusha_reveal.outcome = 'revealed' and p.email_normalized = lusha_reveal.value_normalized and p.id <> lusha_reveal.person_id and p.merged_into_id is null limit 1)`,
       blocked: sql<boolean>`exists(select 1 from lusha_reveal c where c.person_id = ${personId} and c.outcome = 'compliance_restricted')`,
     })
     .from(lushaReveal)

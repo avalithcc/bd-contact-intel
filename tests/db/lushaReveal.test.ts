@@ -452,3 +452,74 @@ test("failReservation can keep a paid raw value on the row, merged into the payl
   assert.deepEqual([row.state, row.errorCode, row.creditsCharged], ["failed", "settle_failed", null]);
   assert.deepEqual((row.payload as { emails: unknown[] }).emails, [{ email: `k-${run}@x.test` }]);
 });
+
+// --- PR 6, task 6.11: recovery from write_failed with no Lusha call ------------------------------
+
+/** A paid email whose Contact write failed (a bad actor id makes the savepoint roll back), then the stored value is applied. */
+async function paidButUnwritten(name: string, personOver: Record<string, unknown> = {}) {
+  const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson(name, personOver);
+  await matchedSearch(p.id);
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  const email = `Apply-${name}-${run}@Acme.test`;
+  const out = await settleReveal({ reservationId: r.reservationId, actorBdId: randomUUID(), field: "emails", emails: [{ email, confidence: 80 }], creditsCharged: 1 });
+  assert.equal(out?.writeFailed, true);
+  return { p, email };
+}
+
+test("applying a stored value writes the Contact once, clears the error, adds no spend, and a second call is refused", async () => {
+  const { applyStoredReveal, getDailySpend } = await import("@/lib/lusha/revealDb");
+  const { db } = await import("@/db");
+  const { activity, personPropertyHistory } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { p, email } = await paidButUnwritten("apply");
+  const spentBefore = await getDailySpend();
+  const rowsBefore = await ledger(p.id);
+  const out = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
+  assert.deepEqual([out.ok, out.ok && out.written, out.ok && out.value], [true, "email", email]);
+  const after = await personRow(p.id);
+  assert.deepEqual([after.email, after.emailNormalized, after.emailStatus, after.emailSource], [email, email.toLowerCase(), "probable", "lusha"]);
+  assert.ok((await db.select().from(personPropertyHistory).where(eq(personPropertyHistory.personId, p.id))).some((h) => h.property === "email" && h.source === "lusha_reveal"));
+  assert.equal((await db.select().from(activity).where(eq(activity.personId, p.id))).filter((a) => a.type === "lusha_reveal").length, 1);
+  const rows = await ledger(p.id);
+  assert.equal(rows.length, rowsBefore.length, "no reservation was created");
+  const row = rows.find((l) => l.field === "emails")!;
+  assert.deepEqual([row.errorCode, row.creditsCharged, row.state, row.outcome], [null, 1, "settled", "revealed"]);
+  assert.equal("writeError" in (row.payload as object), false);
+  assert.equal(await getDailySpend(), spentBefore, "applying a stored value adds nothing to the day's spend");
+  const again = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
+  assert.deepEqual([again.ok, !again.ok && again.reason], [false, "not_applicable"]);
+});
+
+test("applying refuses a row that never failed to write, and records a duplicate holder", async () => {
+  const { applyStoredReveal, reserve, settleReveal } = await import("@/lib/lusha/revealDb");
+  const clean = await mkPerson("clean");
+  await matchedSearch(clean.id);
+  const r = await reserve({ personId: clean.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email: `clean-${run}@acme.test` }], creditsCharged: 1 });
+  assert.deepEqual((await applyStoredReveal({ personId: clean.id, field: "emails", actorBdId: bdId })).ok, false);
+  const nothing = await mkPerson("nothing");
+  assert.deepEqual((await applyStoredReveal({ personId: nothing.id, field: "phones", actorBdId: bdId })).ok, false);
+  const { p, email } = await paidButUnwritten("dupe");
+  const holder = await mkPerson("holder", { email, emailNormalized: email.toLowerCase(), emailStatus: "verified" });
+  const out = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
+  assert.deepEqual([out.ok, out.ok && out.duplicate?.personId], [true, holder.id]);
+});
+
+test("getRevealState also returns who paid, when it settled and the live holder of a duplicate email, in the same read", async () => {
+  const { getRevealState, reserve, settleReveal } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("meta");
+  await matchedSearch(p.id);
+  const email = `meta-${run}@acme.test`;
+  const holder = await mkPerson("metaholder", { email, emailNormalized: email, emailStatus: "verified" });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email }], creditsCharged: 1 });
+  const state = await getRevealState(p.id);
+  assert.equal(state.emails?.actorName, "ZZ Lusha");
+  assert.ok(state.emails?.settledAt instanceof Date);
+  assert.deepEqual(state.emails?.twin, { id: holder.id, name: `metaholder ${run}` });
+  assert.equal(state.search?.twin ?? null, null);
+});

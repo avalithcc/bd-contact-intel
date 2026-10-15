@@ -26,6 +26,10 @@ export interface LedgerRow {
   errorCode?: string | null;
   value: string | null;
   payload: unknown;
+  /** Display-only, read with the row: who paid, when it settled, and a live Contact that already holds the revealed email. */
+  actorName?: string | null;
+  settledAt?: Date | string | null;
+  twin?: { id: string; name: string } | null;
 }
 
 export interface LatestRows {
