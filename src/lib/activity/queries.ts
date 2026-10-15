@@ -33,6 +33,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "meeting_logged",
   "call",
   "call_attempt",
+  "lusha_reveal",
   "discarded",
   "status_backfill",
   "task_created",

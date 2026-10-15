@@ -55,7 +55,7 @@ export const TIMELINE_PILL_GROUPS: Record<TimelinePillKey, readonly string[]> = 
   // to a BD reading the timeline.
   email_sent: ["email_sent", "reply_received"],
   meeting_logged: ["meeting_logged"],
-  system: ["hunter_lookup", "status_change", "discarded", "status_backfill"],
+  system: ["hunter_lookup", "status_change", "discarded", "status_backfill", "lusha_reveal"],
 };
 
 export function isTimelinePillKey(value: string): value is TimelinePillKey {

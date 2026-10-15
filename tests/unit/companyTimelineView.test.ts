@@ -26,6 +26,7 @@ const labels = {
   atMeetingLogged: "Reunión",
   atCall: "Llamada",
   atCallAttempt: "Intento de llamada",
+  atLushaReveal: "Revelado con Lusha",
   atDiscarded: "Descartado",
   atHunterLookup: "Búsqueda",
   atStatusBackfill: "Historial",

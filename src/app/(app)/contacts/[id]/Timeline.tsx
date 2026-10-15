@@ -200,6 +200,7 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   meeting_logged: "timelineFilterMeeting",
   call: "timelineFilterCall",
   call_attempt: "timelineFilterCallAttempt",
+  lusha_reveal: "timelineFilterLushaReveal",
   discarded: "timelineFilterDiscarded",
   status_backfill: "timelineFilterStatusBackfill",
   task_created: "timelineFilterTaskCreated",
@@ -222,6 +223,8 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   call: CallIcon,
   // Rendered by the dashed attempt row below, which draws its own icon.
   call_attempt: CallIcon,
+  // A paid enrichment lookup: same icon as the Hunter email lookup it most resembles.
+  lusha_reveal: SearchIcon,
   discarded: DiscardIcon,
   status_backfill: HistoryIcon,
   // Uses the existing system/status-change entry layout (owner spec) — same

@@ -80,6 +80,8 @@ export function formatLastActivityLabel(
       return l.lastActivityNote;
     case "hunter_lookup":
       return l.lastActivityHunterLookup;
+    case "lusha_reveal":
+      return l.lastActivityLushaReveal;
     case "status_change":
     case "status_backfill": {
       const status = metadataStatus(row.metadata);

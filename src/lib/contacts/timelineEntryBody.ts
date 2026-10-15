@@ -124,6 +124,8 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
       return typeof metadata.hunterScore === "number"
         ? `${l.timelineHunterPrefix} · ${metadata.hunterScore}`
         : l.timelineHunterPrefix;
+    case "lusha_reveal":
+      return metadata.field === "phones" ? l.timelineLushaRevealPhone : l.timelineLushaRevealEmail;
     case "status_change": {
       const status = typeof metadata.status === "string" ? metadata.status : null;
       const label = status ? (l.leadStatuses[status as keyof typeof l.leadStatuses] ?? status) : "";

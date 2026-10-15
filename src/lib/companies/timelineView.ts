@@ -21,6 +21,7 @@ export interface CompanyTimelineViewLabels {
   atMeetingLogged: string;
   atCall: string;
   atCallAttempt: string;
+  atLushaReveal: string;
   atDiscarded: string;
   atHunterLookup: string;
   atStatusBackfill: string;
@@ -82,6 +83,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atDiscarded;
     case "hunter_lookup":
       return l.atHunterLookup;
+    case "lusha_reveal":
+      return l.atLushaReveal;
     case "task_created":
       return l.atTaskCreated;
     case "task_updated":

@@ -126,7 +126,7 @@ test("buildFollowUpInsertQuery: renders identically on repeated calls (no shared
 
 // An unanswered dial must not reset the cadence clock (owner decision, call-logging W5).
 // The clock's `where` is the only place that list is bound, and its value is the shared
-// list: ONLY call_attempt, so a call, a reply and a status change still move the clock.
+// list: ONLY call_attempt and lusha_reveal, so a call, a reply and a status change still move the clock.
 test("fuq_activity excludes exactly the shared no-progress types from the last-touch clock", () => {
   const { sql: text, params } = dialect.sqlToQuery(buildFollowUpVerificationQuery());
   const cte = text.slice(text.indexOf("fuq_activity as ("), text.indexOf("fuq_connection as ("));
@@ -134,5 +134,5 @@ test("fuq_activity excludes exactly the shared no-progress types from the last-t
   assert.ok(match, "the clock filters by type");
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
   assert.deepEqual(bound, [...NO_PROGRESS_ACTIVITY_TYPES]);
-  assert.deepEqual(bound, ["call_attempt"]);
+  assert.deepEqual(bound, ["call_attempt", "lusha_reveal"]);
 });

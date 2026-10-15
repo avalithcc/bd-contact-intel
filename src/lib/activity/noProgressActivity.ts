@@ -9,6 +9,9 @@
  *    actividad", which is why this is NOT NON_TOUCH_ACTIVITY_TYPES;
  *  - the follow-up clock (followUp/candidateQuery.ts#fuq_activity): an
  *    unanswered dial must not buy a week of silence.
+ * `lusha_reveal` rides the same list (D15): buying an email is work on the Contact but not
+ * progress, so it must not transfer ownership or reset the clock. It is deliberately NOT in
+ * NON_TOUCH_ACTIVITY_TYPES, so it still counts as "ultima actividad".
  * Adding a type here changes BOTH at once. If they ever need to differ, split
  * the list then, on purpose, not by editing one consumer's copy.
  *
@@ -21,4 +24,4 @@
  * queue fills with people who never answer, build a real retry cadence (back
  * in 2 days, not 7 or never); that needs attempt data, which did not exist yet.
  */
-export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt"] as const;
+export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal"] as const;

@@ -114,7 +114,7 @@ export interface DiscardCandidate {
  * for the next person who adds a `case` that matches on metadata (direction,
  * outcome) rather than on the type.
  */
-export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt"] as const;
+export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal"] as const;
 
 export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
   if ((STATUS_NEUTRAL_ACTIVITY_TYPES as readonly string[]).includes(event.type)) return null;
