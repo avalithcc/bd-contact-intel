@@ -151,10 +151,12 @@ export interface RevealSettlement {
 const searchRow = alias(lushaReveal, "search_row");
 
 /**
- * The company domains a revealed email of this Contact should be on: ours (what the search asked Lusha
- * about) and the one Lusha matched. Read from the ledger row itself rather than taken from the caller,
- * so the recovery path (applyStoredReveal, days later) chooses exactly like the live settle. Empty for a
- * Contact with no company domain, which only restores the previous order-of-arrival behaviour.
+ * The company domains a revealed email of this Contact should be on, STRONGEST FIRST: ours (what the
+ * search asked Lusha about), then the one Lusha matched, which is Lusha's opinion of the employer and
+ * must not outrank ours when they disagree (pickEmail ranks by this position). Read from the ledger row
+ * itself rather than taken from the caller, so the recovery path (applyStoredReveal, days later) chooses
+ * exactly like the live settle. Empty for a Contact with no company domain, which only restores the
+ * previous order-of-arrival behaviour.
  */
 async function companyDomainsOf(reader: Reader, ledgerId: string): Promise<string[]> {
   const [row] = await reader
@@ -287,19 +289,20 @@ export async function applyStoredReveal(
     if (!row) return { ok: false, reason: "not_applicable" } as const;
     const payload = (row.payload as Record<string, unknown> | null) ?? {};
     const pick = input.field === "emails" ? pickEmail(payload[input.field], await companyDomainsOf(tx, row.id)) : pickPhone(payload[input.field]);
-    let value = row.value;
-    let normalized = row.valueNormalized;
-    let charged = row.creditsCharged;
+    // The pick is the single source of truth for what gets written, and the row is updated to match it
+    // below: a row settled before the company-domain ranking existed re-picks differently, and a ledger
+    // that disagreed with the Contact (and with the duplicate check, which runs on `normalized`) would
+    // be an audit trail of a value nobody holds.
+    const value = pick.ok ? pick.value : null;
+    const normalized = value === null ? null : input.field === "emails" ? value.trim().toLowerCase() : value.replace(/\D/g, "");
+    // A failed row is settled now, from what was parked: the charge Lusha reported (else the reserved amount keeps counting).
+    const charged = row.state === "failed" ? (typeof payload.creditsCharged === "number" ? payload.creditsCharged : null) : row.creditsCharged;
     if (row.state === "failed") {
-      // Settle it now, from what was parked: the charge Lusha reported (else the reserved amount keeps counting) and the value.
-      value = pick.ok ? pick.value : null;
-      normalized = value === null ? null : input.field === "emails" ? value.trim().toLowerCase() : value.replace(/\D/g, "");
-      charged = typeof payload.creditsCharged === "number" ? payload.creditsCharged : null;
       await tx.update(lushaReveal).set({ state: "settled", outcome: pick.ok ? "revealed" : "no_value", value, valueNormalized: normalized, creditsCharged: charged, errorCode: pick.ok ? null : "unparsable_value", settledAt: new Date() }).where(eq(lushaReveal.id, row.id));
     }
     if (!pick.ok) return { ok: false, reason: "not_applicable" } as const;
     const applied = await writeToContact(tx, { ledgerId: row.id, personId: row.personId, field: input.field, pick, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: charged });
-    await tx.update(lushaReveal).set({ errorCode: applied.alreadyHeld ? "phone_already_held" : null, payload: sql`${lushaReveal.payload} - 'writeError'` }).where(eq(lushaReveal.id, row.id));
+    await tx.update(lushaReveal).set({ value, valueNormalized: normalized, errorCode: applied.alreadyHeld ? "phone_already_held" : null, payload: sql`${lushaReveal.payload} - 'writeError'` }).where(eq(lushaReveal.id, row.id));
     return { ok: true, value, written: applied.written, duplicate: applied.duplicate } as const;
   });
 }

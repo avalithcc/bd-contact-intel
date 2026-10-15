@@ -222,6 +222,17 @@ test("pickEmail prefers the company's own domain over Lusha's arrival order", ()
   assert.equal(chosen(personalAtCompany, ["example.invalid"]), "b@example.invalid");
 });
 
+test("our own company domain outranks the one Lusha matched", () => {
+  // Lusha matched the person at a different employer than the one we hold. Treating both domains as
+  // equal would hand the decision back to arrival order, which is the incident this ranking exists for.
+  const domains = ["example.invalid", "other-company.invalid"]; // ours first, Lusha's second
+  assert.equal(chosen(TWO_A_PLUS, domains), "someone@example.invalid");
+  assert.equal(chosen([...TWO_A_PLUS].reverse(), domains), "someone@example.invalid", "arrival order must not decide");
+  // Only Lusha's domain has a candidate: it still beats an address on neither domain.
+  const onlyMatched = [{ type: "work", email: "a@third.invalid", confidence: "A+" }, { type: "work", email: "b@other-company.invalid", confidence: "A+" }];
+  assert.equal(chosen(onlyMatched, domains), "b@other-company.invalid");
+});
+
 test("pickEmail knows no company domain and falls back to the previous order", () => {
   assert.equal(chosen(TWO_A_PLUS), "someone@other-company.invalid");
   assert.equal(chosen(TWO_A_PLUS, []), "someone@other-company.invalid");

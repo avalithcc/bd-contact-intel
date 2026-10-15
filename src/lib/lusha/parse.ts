@@ -147,8 +147,8 @@ interface Candidate {
   value: string;
   type: string | null;
   confidence: number;
-  /** On one of the Contact's company domains. Always false for a phone and when no domain is known. */
-  onCompanyDomain: boolean;
+  /** Rank of the company domain this value is on, 0 when on none of them (always 0 for a phone). */
+  companyDomain: number;
 }
 
 /**
@@ -178,7 +178,7 @@ const hostOf = (email: string): string => email.slice(email.lastIndexOf("@") + 1
 
 /** Lexicographic over the criteria below; a tie keeps the candidate already held, i.e. the earlier one. */
 const outranks = (c: Candidate, best: Candidate): boolean => {
-  const score = (x: Candidate): readonly number[] => [x.onCompanyDomain ? 1 : 0, x.type === "work" ? 1 : 0, x.confidence];
+  const score = (x: Candidate): readonly number[] => [x.companyDomain, x.type === "work" ? 1 : 0, x.confidence];
   const [a, b] = [score(c), score(best)];
   const i = a.findIndex((v, n) => v !== b[n]);
   return i >= 0 && a[i] > b[i];
@@ -192,17 +192,26 @@ const outranks = (c: Candidate, best: Candidate): boolean => {
  * "work" and both "A+", for a Contact whose company is alephee.com — order of arrival decided it and
  * picked the other company's domain. The address at the company we are prospecting is the one that has
  * to reach them, so it wins; `companyDomains` is empty for a phone and the order is unchanged there.
+ *
+ * `companyDomains` is ordered STRONGEST FIRST and ranked by that position, because the domain Lusha
+ * matched is Lusha's own opinion of the employer, not confirmation of ours: when the two disagree, an
+ * address on the domain WE hold has to beat one on the domain Lusha picked, or the incident above just
+ * repeats with the two domains swapped (fresh-review warning 1).
  */
 function choose(raw: unknown, valueKey: string, valid: (v: string) => boolean, companyDomains: readonly string[] = []): Pick {
   // An absent key (undefined) is a real no-value, same as []; any other non-array is unparsable.
   if (raw === undefined || (Array.isArray(raw) && raw.length === 0)) return { ok: false, reason: "empty", raw };
-  const wanted = new Set(companyDomains.map(normalizeDomain).filter((d): d is string => d !== null));
+  const ranked = new Map<string, number>();
+  companyDomains.forEach((d, i) => {
+    const domain = normalizeDomain(d);
+    if (domain !== null && !ranked.has(domain)) ranked.set(domain, companyDomains.length - i);
+  });
   const candidates: Candidate[] = [];
   if (Array.isArray(raw)) {
     for (const e of raw) {
       const value = isRecord(e) ? str(e[valueKey]) : null;
       if (!isRecord(e) || !value || !valid(value)) continue;
-      candidates.push({ value, type: str(e.type), confidence: confidenceOf(e.confidence), onCompanyDomain: wanted.has(hostOf(value)) });
+      candidates.push({ value, type: str(e.type), confidence: confidenceOf(e.confidence), companyDomain: ranked.get(hostOf(value)) ?? 0 });
     }
   }
   if (candidates.length === 0) return { ok: false, reason: "unparsable_value", raw };
@@ -211,7 +220,7 @@ function choose(raw: unknown, valueKey: string, valid: (v: string) => boolean, c
   return { ok: true, value: best.value, type: best.type, confidence: Number.isFinite(best.confidence) ? best.confidence : null, raw };
 }
 
-/** `companyDomains`: the Contact's company domain on our side and the one Lusha matched (see choose). */
+/** `companyDomains`: strongest first — the Contact's company domain on OUR side, then Lusha's (see choose). */
 export const pickEmail = (raw: unknown, companyDomains: readonly string[] = []): Pick =>
   choose(raw, "email", (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), companyDomains);
 /** Fails closed: the phone shape was never measured, so an unexpected entry writes nothing. */
