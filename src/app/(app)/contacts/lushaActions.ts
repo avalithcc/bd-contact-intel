@@ -5,7 +5,6 @@
 // PR 5 ships these unreferenced; no component imports them until the UI PR.
 
 import { revalidatePath } from "next/cache";
-import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { isUuid } from "@/lib/uuid";
 import { livePorts } from "@/lib/lusha/ports";
@@ -15,49 +14,48 @@ import { actionFailure } from "./actionErrors";
 type Field = "emails" | "phones";
 type Failure = { ok: false; reason: ReturnType<typeof actionFailure>["reason"]; retryable: boolean; permanent: boolean; remaining?: number };
 
-// Unclassified errors (and redirect()/notFound()) go through actionFailure: rethrown or typed, never a raw message.
-const failure = (err: unknown): Failure => ({ ...actionFailure(err), retryable: false, permanent: false });
+// Unclassified errors (and redirect()/notFound()) go through actionFailure, which rethrows Next's control-flow errors first.
 const rejected = (reason: Failure["reason"]): Failure => ({ ok: false, reason, retryable: false, permanent: false });
 const isField = (v: unknown): v is Field => v === "emails" || v === "phones";
 
 export async function searchLushaContactAction(personId: string, field: Field) {
   try {
+    const me = await getCurrentBd(); // authenticate first, then validate
     if (!isUuid(personId)) return rejected("not_found");
     if (!isField(field)) return rejected("lusha_not_eligible");
-    const me = await getCurrentBd();
     const result = await searchLushaContact({ personId, field, actorBdId: me.id }, livePorts());
     revalidatePath(`/contacts/${personId}`);
     return result;
   } catch (err) {
-    unstable_rethrow(err);
-    return failure(err);
+    const failed = actionFailure(err);
+    return { ...failed, retryable: false, permanent: false };
   }
 }
 
 export async function revealLushaFieldAction(personId: string, field: Field) {
   try {
+    const me = await getCurrentBd(); // authenticate first, then validate
     if (!isUuid(personId)) return rejected("not_found");
     if (!isField(field)) return rejected("lusha_not_eligible");
-    const me = await getCurrentBd();
     const result = await revealLushaField({ personId, field, actorBdId: me.id }, livePorts());
     revalidatePath(`/contacts/${personId}`);
     return result;
   } catch (err) {
-    unstable_rethrow(err);
-    return failure(err);
+    const failed = actionFailure(err);
+    return { ...failed, retryable: false, permanent: false };
   }
 }
 
 export async function rejectLushaMatchAction(personId: string) {
   try {
+    const me = await getCurrentBd(); // authenticate first, then validate
     if (!isUuid(personId)) return rejected("not_found");
-    const me = await getCurrentBd();
     const result = await rejectLushaMatch({ personId, actorBdId: me.id }, livePorts());
     revalidatePath(`/contacts/${personId}`);
     return result;
   } catch (err) {
-    unstable_rethrow(err);
-    return failure(err);
+    const failed = actionFailure(err);
+    return { ...failed, retryable: false, permanent: false };
   }
 }
 
@@ -67,7 +65,7 @@ export async function getLushaAccountUsageAction() {
     await getCurrentBd();
     return await getLushaUsage(livePorts());
   } catch (err) {
-    unstable_rethrow(err);
-    return failure(err);
+    const failed = actionFailure(err);
+    return { ...failed, retryable: false, permanent: false };
   }
 }

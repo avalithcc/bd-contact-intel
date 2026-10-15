@@ -9,7 +9,11 @@ import { join, relative } from "node:path";
 
 const ROOT = join(__dirname, "..", "..");
 const APP = join(ROOT, "src", "app");
+const SRC = join(ROOT, "src");
 const ACTIONS_FILE = "src/app/(app)/contacts/lushaActions.ts";
+// The ONLY file outside the library allowed to import it. It must not grow quietly.
+const ALLOWLIST = [ACTIONS_FILE];
+const LIBRARY_DIR = "src/lib/lusha/";
 
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -25,6 +29,9 @@ function walk(dir: string): string[] {
 const rel = (p: string) => relative(ROOT, p);
 const EXTRA = ["middleware.ts", "instrumentation.ts"].map((n) => join(ROOT, "src", n)).filter(existsSync);
 const sourceFiles = [...walk(APP), ...EXTRA].filter((f) => /\.(ts|tsx)$/.test(f));
+// Everything under src/ (components, lib, db...) except the library itself: a client component outside src/app
+// importing the actions would make the feature reachable with a src/app-only scan still green.
+const allSrc = walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f) && !rel(f).startsWith(LIBRARY_DIR));
 // Any quoted path into the lusha library: static, dynamic import(), require() or bare import.
 const LUSHA_LIB_PATH = /["'`][^"'`]*\/lib\/lusha(\/[^"'`]*)?["'`]/;
 
@@ -32,18 +39,24 @@ test("the scan covers a non-trivial set of source files", () => {
   assert.ok(sourceFiles.length > 0);
 });
 
-test("no file under src/app other than lushaActions.ts imports from the lusha library", () => {
-  const offenders = sourceFiles
-    .filter((f) => rel(f) !== ACTIONS_FILE)
+test("the allowlist is exactly one file", () => {
+  assert.equal(ALLOWLIST.length, 1);
+  assert.ok(existsSync(join(ROOT, ALLOWLIST[0])));
+  assert.ok(allSrc.length > sourceFiles.length / 2, "the src-wide scan covers more than src/app");
+});
+
+test("no file under src outside the library, other than the allowlisted one, imports from the lusha library", () => {
+  const offenders = allSrc
+    .filter((f) => !ALLOWLIST.includes(rel(f)))
     .filter((f) => LUSHA_LIB_PATH.test(readFileSync(f, "utf8")))
     .map(rel);
   assert.deepEqual(offenders, []);
 });
 
-test("no file under src/app imports lushaActions", () => {
-  const offenders = sourceFiles
+test("no file under src imports lushaActions", () => {
+  const offenders = allSrc
     .filter((f) => /lushaActions/.test(readFileSync(f, "utf8")))
-    .filter((f) => rel(f) !== ACTIONS_FILE)
+    .filter((f) => !ALLOWLIST.includes(rel(f)))
     .map(rel);
   assert.deepEqual(offenders, []);
 });
@@ -56,7 +69,7 @@ test("no route.ts or page.tsx path contains lusha", () => {
 });
 
 test('no "use client" file references lushaActions', () => {
-  const offenders = sourceFiles
+  const offenders = allSrc
     .filter((f) => {
       const text = readFileSync(f, "utf8");
       return /^\s*["']use client["']/m.test(text) && /lushaActions/.test(text);

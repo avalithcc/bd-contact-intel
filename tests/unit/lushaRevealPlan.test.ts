@@ -136,3 +136,13 @@ test("the planner module does not use the manual edit path", () => {
   const imports = src.split("\n").filter((l) => l.startsWith("import")).join("\n");
   assert.doesNotMatch(imports, /updateContactProperty|planPropertyEdit|propertyEdit/);
 });
+
+test("a revealed phone whose digits equal a held phone writes nothing and says it was already held", () => {
+  const pick = phonePick([{ number: "+54 (11) 5555-5555", type: "mobile" }]);
+  for (const held of [{ phone: "541155555555" }, { mobilePhone: "+54 11 5555 5555" }]) {
+    const plan = planRevealedPhoneWrite(person(held), pick, META);
+    assert.deepEqual([plan.personUpdate, plan.historyRows, plan.activity, plan.alreadyHeld], [null, [], null, true], JSON.stringify(held));
+  }
+  // A different number is still placed in the free column.
+  assert.equal(planRevealedPhoneWrite(person({ phone: "+54 11 4444 4444" }), pick, META).personUpdate?.mobilePhone, "+54 (11) 5555-5555");
+});

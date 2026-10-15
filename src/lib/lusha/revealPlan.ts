@@ -25,6 +25,8 @@ export interface RevealWritePlan {
   historyRows: HistoryRow[];
   /** Null when nothing was revealed. A phone that could not be placed is still an activity. */
   activity: RevealActivity | null;
+  /** The revealed phone is a number the Contact already holds: nothing to write, but the credit was spent. */
+  alreadyHeld?: true;
 }
 
 const NOTHING: RevealWritePlan = { personUpdate: null, historyRows: [], activity: null };
@@ -65,6 +67,9 @@ export function planRevealedEmailWrite(person: RevealPerson, pick: Picked, meta:
 /** D11: mobile -> mobilePhone, else phone; the occupied target falls back to the other column; both occupied writes nothing. */
 export function planRevealedPhoneWrite(person: RevealPerson, pick: Picked, meta: RevealMeta): RevealWritePlan {
   if (!pick.ok || person.mergedIntoId || !isValidPhoneFormat(pick.value)) return NOTHING;
+  // Digits only, so formatting differences do not hide a number we already hold.
+  const digits = (v: string | null) => (v ?? "").replace(/\D/g, "");
+  if ([person.phone, person.mobilePhone].some((held) => digits(held) !== "" && digits(held) === digits(pick.value))) return { ...NOTHING, alreadyHeld: true };
   const [first, other] = pick.type === "mobile" ? (["mobilePhone", "phone"] as const) : (["phone", "mobilePhone"] as const);
   const column = !person[first] ? first : !person[other] ? other : null;
   const activity = activityOf(person, "phones", meta);

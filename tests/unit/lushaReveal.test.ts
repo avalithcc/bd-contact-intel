@@ -263,7 +263,8 @@ test("a match that changed between the read and the reservation is never reveale
 const FAILURES: Array<[string, LushaError, string, boolean]> = [
   ["429", new LushaError("rate_limited", "x", 429), "lusha_rate_limited", true],
   ["503", new LushaError("unavailable", "x", 503), "lusha_unavailable", true],
-  ["timeout", new LushaError("unavailable", "Lusha request did not complete"), "lusha_unavailable", true],
+  ["could not connect (nothing sent)", new LushaError("unavailable", "Lusha could not be reached"), "lusha_unavailable", true],
+  ["timeout after the send may have been billed", new LushaError("outcome_unknown", "Lusha request did not complete"), "lusha_outcome_unknown", false],
   ["402", new LushaError("no_credits", "x", 402), "lusha_no_credits", false],
   ["403", new LushaError("plan_denied", "x", 403), "lusha_plan_denied", false],
   ["401", new LushaError("bad_key", "x", 401), "lusha_unconfigured", false],
@@ -366,4 +367,50 @@ test("account usage is free and display-only: a failure is a soft result, a gate
   const off = fake({ config: { ok: false, reason: "not_production" } });
   assert.equal((await getLushaUsage(off.p)).ok, false);
   assert.equal(off.calls.includes("getAccountUsage"), false);
+});
+
+// --- review fixes: replay, held phone, failed settles ------------------------------------
+
+test("a replayed reveal after outcome_unknown is refused server-side with no reservation and no call", async () => {
+  const unknown = row({ id: "r2", field: "emails", state: "failed", errorCode: "outcome_unknown", searchId: "s1" });
+  const f = fake({ rows: { ...WITH_SEARCH, emails: unknown } });
+  const r = await revealLushaField(input(), f.p);
+  assert.deepEqual([r.ok, !r.ok && r.reason, !r.ok && r.retryable], [false, "lusha_outcome_unknown", false]);
+  assert.deepEqual(spends(f.calls), []);
+  // Another failure kind is still a conscious retry.
+  const other = fake({ rows: { ...WITH_SEARCH, emails: { ...unknown, errorCode: "unavailable" } } });
+  assert.equal((await revealLushaField(input(), other.p)).ok, true);
+});
+
+test("a phone Lusha returned that we already held is reported as already_held, not as a successful reveal", async () => {
+  const f = fake({
+    rows: WITH_SEARCH,
+    settleReveal: async () => ({ outcome: "already_held", value: "+54 11 5555 5555", written: null, duplicate: null, writeFailed: false }),
+  });
+  const r = await revealLushaField(input("phones"), f.p);
+  assert.deepEqual([r.ok && r.outcome, r.ok && r.written], ["already_held", null]);
+});
+
+test("a settle that throws after a paid reveal keeps the raw value and the billing on the ledger row, then rethrows", async () => {
+  const saved: unknown[] = [];
+  const f = fake({
+    rows: WITH_SEARCH,
+    settleReveal: async () => { throw new Error("db down"); },
+    failReservation: async (id, code, payload) => { saved.push([id, code, payload]); return true; },
+  });
+  await assert.rejects(() => revealLushaField(input(), f.p), /db down/);
+  const [id, code, payload] = saved[0] as [string, string, { emails: unknown[]; creditsCharged: number }];
+  assert.deepEqual([id, code, payload.creditsCharged, Array.isArray(payload.emails) && payload.emails.length > 0], ["res-1", "settle_failed", 1, true]);
+});
+
+test("a throw while persisting a compliance block still releases the reservation", async () => {
+  const failed: string[][] = [];
+  const f = fake({
+    rows: WITH_SEARCH,
+    enrichContact: async () => { throw new LushaError("compliance_blocked", "x", 451); },
+    settleReveal: async () => { throw new Error("db down"); },
+    failReservation: async (id, code) => { failed.push([id, code]); return true; },
+  });
+  await assert.rejects(() => revealLushaField(input(), f.p), /db down/);
+  assert.deepEqual(failed, [["res-1", "compliance_blocked"]]);
 });

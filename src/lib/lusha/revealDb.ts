@@ -113,10 +113,11 @@ export async function settleSearch(
  * `outcome_unknown`). `credits_charged` stays null, so the RESERVED amount keeps counting (D8).
  * A failed row falls out of the in-flight index, so it never blocks a retry.
  */
-export async function failReservation(reservationId: string, errorCode: string, database: typeof db = db): Promise<boolean> {
+export async function failReservation(reservationId: string, errorCode: string, payload?: unknown, database: typeof db = db): Promise<boolean> {
   const rows = await database
     .update(lushaReveal)
-    .set({ state: "failed", errorCode, settledAt: new Date() })
+    // `payload` keeps a paid-for raw value when the settle itself failed: it is merged in, never replacing what is there.
+    .set({ state: "failed", errorCode, settledAt: new Date(), ...(payload === undefined ? {} : { payload: sql`${lushaReveal.payload} || ${JSON.stringify(payload)}::jsonb` }) })
     .where(inFlight(reservationId))
     .returning({ id: lushaReveal.id });
   return rows.length > 0;
@@ -134,7 +135,8 @@ export async function rejectMatch(personId: string, bdId: string, database: type
 }
 
 export interface RevealSettlement {
-  outcome: "revealed" | "no_value" | "compliance_restricted";
+  /** `already_held`: the paid phone is a number the Contact already had. Recorded honestly, nothing written. */
+  outcome: "revealed" | "no_value" | "compliance_restricted" | "already_held";
   value: string | null;
   /** The person column written, or null when nothing was (ineligible, both phone columns occupied, unparsable). */
   written: "email" | "phone" | "mobilePhone" | null;
@@ -186,6 +188,10 @@ export async function settleReveal(
           lushaId: row.lushaContactId ?? "",
           creditsCharged: input.creditsCharged,
         });
+        if (plan.alreadyHeld) {
+          result.outcome = "already_held";
+          await sp.update(lushaReveal).set({ outcome: "already_held", errorCode: "phone_already_held" }).where(eq(lushaReveal.id, input.reservationId));
+        }
         if (plan.personUpdate) await sp.update(person).set(plan.personUpdate).where(eq(person.id, p.id));
         if (plan.historyRows.length) await sp.insert(personPropertyHistory).values(plan.historyRows);
         // Direct insert, not createActivityInTx: the type is status-neutral by construction (D15).
@@ -228,6 +234,7 @@ export async function getRevealState(personId: string, reader: Pick<typeof db, "
       at: lushaReveal.at,
       field: lushaReveal.field,
       state: lushaReveal.state,
+      errorCode: lushaReveal.errorCode,
       outcome: lushaReveal.outcome,
       value: lushaReveal.value,
       payload: lushaReveal.payload,

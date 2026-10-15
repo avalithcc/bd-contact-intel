@@ -38,7 +38,8 @@ export interface RevealPorts {
   reserve(input: { personId: string; field: "search" | RevealField; actorBdId: string; cap: number }): Promise<ReserveResult>;
   settleSearch(input: { reservationId: string; outcome: "matched" | "no_match" | "compliance_restricted"; creditsCharged: number | null; lushaContactId?: string | null; payload: unknown }): Promise<boolean>;
   settleReveal(input: { reservationId: string; actorBdId: string; field: RevealField; emails?: unknown; phones?: unknown; creditsCharged: number | null; compliance?: boolean }): Promise<RevealSettlement | null>;
-  failReservation(reservationId: string, errorCode: string): Promise<boolean>;
+  /** `payload` is merged into the row: it carries a paid-for raw value when the settle itself failed. */
+  failReservation(reservationId: string, errorCode: string, payload?: unknown): Promise<boolean>;
   rejectMatch(personId: string, bdId: string): Promise<boolean>;
   searchContact(input: SearchInput): Promise<LushaResponse>;
   enrichContact(lushaId: string, field: RevealField): Promise<LushaResponse>;
@@ -62,7 +63,8 @@ export type RevealResult =
   | RevealFailure
   | {
       ok: true;
-      outcome: "revealed" | "no_value";
+      /** `already_held`: Lusha returned a phone the Contact already had (5 credits spent, nothing written). */
+      outcome: "revealed" | "no_value" | "already_held";
       value: string | null;
       /** The person column written; null when nothing was (both phone columns occupied, unreadable, write failed). */
       written: RevealSettlement["written"];
@@ -101,8 +103,15 @@ async function failFrom(err: unknown, reservationId: string, p: RevealPorts, set
     throw err;
   }
   // Compliance is permanent (D6): persist it as an outcome so the control never comes back; every other kind keeps its reservation as `failed`.
-  if (isPermanent(err.kind)) await settleBlocked();
-  else await p.failReservation(reservationId, err.kind); // outcome_unknown included: credits_charged stays null, the reserved amount keeps counting
+  if (isPermanent(err.kind)) {
+    try {
+      await settleBlocked();
+    } catch (e) {
+      // A reservation left `reserved` would answer `busy` for this person and field forever: release it, keep the spend counted.
+      await p.failReservation(reservationId, err.kind).catch(() => undefined);
+      throw e;
+    }
+  } else await p.failReservation(reservationId, err.kind); // outcome_unknown included: credits_charged stays null, the reserved amount keeps counting
   return no(reasonForKind(err.kind), { retryable: isRetryableByBd(err.kind, err.httpStatus), permanent: isPermanent(err.kind) });
 }
 
@@ -201,6 +210,8 @@ export async function revealLushaField(input: { personId: string; field: RevealF
     case "capped":
       return no("lusha_cap_reached", { remaining: state.remaining });
     case "revealable":
+      // outcome_unknown may already have been billed: only an explicit new search (a conscious spend) reopens the field.
+      if (rows[field]?.errorCode === "outcome_unknown") return no("lusha_outcome_unknown");
       break;
     default: // searchable, rejected, unavailable, off, unconfigured: there is no valid stored match to reveal against
       return no("lusha_not_eligible");
@@ -220,12 +231,16 @@ export async function revealLushaField(input: { personId: string; field: RevealF
     const response = await p.enrichContact(lushaId, field);
     const out = parseEnrichResponse(response.body, lushaId);
     const raw = field === "emails" ? out.emails : out.phones;
-    const settlement = await p.settleReveal({ reservationId: id, actorBdId, field, emails: out.emails, phones: out.phones, creditsCharged: out.creditsCharged });
+    const settlement = await p.settleReveal({ reservationId: id, actorBdId, field, emails: out.emails, phones: out.phones, creditsCharged: out.creditsCharged }).catch(async (e) => {
+      // The credit is spent: keep the raw paid value on the ledger row so it can be applied later with no second charge.
+      await p.failReservation(id, "settle_failed", { emails: out.emails, phones: out.phones, creditsCharged: out.creditsCharged }).catch(() => undefined);
+      throw e;
+    });
     if (!settlement) return no("lusha_busy", { retryable: true });
     const pick = field === "emails" ? pickEmail(raw) : pickPhone(raw);
     return {
       ok: true,
-      outcome: settlement.outcome === "revealed" ? "revealed" : "no_value",
+      outcome: settlement.outcome === "revealed" || settlement.outcome === "already_held" ? settlement.outcome : "no_value",
       value: settlement.value,
       written: settlement.written,
       duplicate: settlement.duplicate,

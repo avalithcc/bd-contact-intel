@@ -154,3 +154,8 @@ test("a revealed VALUE is person-level: a paid row on an older search wins over 
   // the other field is untouched by it
   assert.deepEqual(resolveRevealState("phones", { search: current, emails: paid }, open, ok), { kind: "revealable", price: 5 });
 });
+
+test("a phone Lusha returned that we already held is unavailable with no retry (the same number comes back)", () => {
+  const rows = { search: search("matched"), phones: row("phones", "already_held", { value: "+54 11 5555 5555" }) };
+  assert.deepEqual(resolveRevealState("phones", rows, open, ok), { kind: "unavailable", reason: "already_held", retry: false });
+});

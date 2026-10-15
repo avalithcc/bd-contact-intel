@@ -422,3 +422,33 @@ test("the closed gate never reaches the client or the ledger", async () => {
   assert.deepEqual([r.ok, !r.ok && r.reason, spy.requests.length], [false, "lusha_off", 0]);
   assert.equal((await db.select().from(lushaReveal).where(eq(lushaReveal.personId, p.id))).length, 0);
 });
+
+test("a paid phone equal to a held number settles as already_held: charge recorded, nothing written, no activity", async () => {
+  const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
+  const { db } = await import("@/db");
+  const { activity } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const p = await mkPerson("held", { phone: "+54 11 5555 5555" });
+  await matchedSearch(p.id);
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  const out = await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones: [{ number: "541155555555", type: "mobile" }], creditsCharged: 5 });
+  assert.deepEqual([out?.outcome, out?.written, out?.writeFailed], ["already_held", null, false]);
+  const [row] = (await ledger(p.id)).filter((x) => x.field === "phones");
+  assert.deepEqual([row.outcome, row.errorCode, row.creditsCharged, row.state], ["already_held", "phone_already_held", 5, "settled"]);
+  const after = await personRow(p.id);
+  assert.deepEqual([after.phone, after.mobilePhone], ["+54 11 5555 5555", null]);
+  assert.equal((await db.select().from(activity).where(eq(activity.personId, p.id))).length, 0);
+});
+
+test("failReservation can keep a paid raw value on the row, merged into the payload", async () => {
+  const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("keep");
+  await matchedSearch(p.id);
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  assert.equal(await failReservation(r.reservationId, "settle_failed", { emails: [{ email: `k-${run}@x.test` }], creditsCharged: 1 }), true);
+  const [row] = (await ledger(p.id)).filter((x) => x.field === "emails");
+  assert.deepEqual([row.state, row.errorCode, row.creditsCharged], ["failed", "settle_failed", null]);
+  assert.deepEqual((row.payload as { emails: unknown[] }).emails, [{ email: `k-${run}@x.test` }]);
+});

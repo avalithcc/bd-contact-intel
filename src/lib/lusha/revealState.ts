@@ -22,6 +22,8 @@ export interface LedgerRow {
   field: "search" | "emails" | "phones";
   state: "reserved" | "settled" | "failed";
   outcome: string | null;
+  /** The LushaError kind (or settle failure) on a failed row, e.g. outcome_unknown. */
+  errorCode?: string | null;
   value: string | null;
   payload: unknown;
 }
@@ -43,7 +45,7 @@ export type RevealState =
   | { kind: "unconfigured"; missing: string[] }
   | { kind: "searchable"; cost: number }
   | { kind: "revealable"; price: number }
-  | { kind: "unavailable"; reason: "no_match" | "no_value" | "not_revealable"; retry: boolean }
+  | { kind: "unavailable"; reason: "no_match" | "no_value" | "not_revealable" | "already_held"; retry: boolean }
   | { kind: "rejected"; retryCost: number }
   | { kind: "blocked" }
   | { kind: "revealed"; value: string | null }
@@ -92,6 +94,8 @@ export function resolveRevealState(
   }
   if (search.outcome === "match_rejected") return gate(SEARCH_COST, { kind: "rejected", retryCost: SEARCH_COST });
   if (search.outcome === "no_match") return gate(SEARCH_COST, { kind: "unavailable", reason: "no_match", retry: true });
+  // Paid, and Lusha returned a number we already hold: the same number comes back on a re-search, so no retry is offered.
+  if (own?.outcome === "already_held") return { kind: "unavailable", reason: "already_held", retry: false };
   if (own?.outcome === "no_value") return gate(SEARCH_COST, { kind: "unavailable", reason: "no_value", retry: true });
 
   const price = expectedCost(field, canRevealOf(search.payload));

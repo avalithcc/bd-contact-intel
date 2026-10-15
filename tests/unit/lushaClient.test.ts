@@ -87,11 +87,11 @@ test("a status maps to its kind and the real status keeps a 4xx from reading as 
   }
 });
 
-test("a transport error or timeout maps to unavailable, is called once, and never leaks the key", async () => {
+test("a failure to connect is unavailable (nothing was sent), called once, and never leaks the key", async () => {
   let n = 0;
   const fn: FetchFn = async () => {
     n++;
-    throw new Error(`connect failed with api_key=${KEY}`);
+    throw Object.assign(new Error(`connect failed with api_key=${KEY}`), { cause: { code: "ENOTFOUND" } });
   };
   await assert.rejects(searchContact(KEY, fn, person), (e: unknown) => {
     assert.ok(e instanceof LushaError);
@@ -102,6 +102,21 @@ test("a transport error or timeout maps to unavailable, is called once, and neve
     return true;
   });
   assert.equal(n, 1);
+});
+
+test("a timeout, abort or reset after the send is outcome_unknown and not retryable, on both paid calls", async () => {
+  for (const err of [new DOMException("timed out", "TimeoutError"), new Error("socket hang up")]) {
+    for (const run of [(fn: FetchFn) => searchContact(KEY, fn, person), (fn: FetchFn) => enrichContact(KEY, fn, "v1.x", "emails")]) {
+      let n = 0;
+      await assert.rejects(run(async () => { n++; throw err; }), (e: unknown) => {
+        assert.ok(e instanceof LushaError);
+        assert.equal(e.kind, "outcome_unknown");
+        assert.equal(isRetryableByBd(e.kind, e.httpStatus), false);
+        return true;
+      });
+      assert.equal(n, 1);
+    }
+  }
 });
 
 test("a 200 with an unreadable body is outcome_unknown and NOT retryable (the credit may be spent)", async () => {

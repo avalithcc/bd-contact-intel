@@ -34,6 +34,8 @@ export interface SearchInput {
   linkedinUrl?: string;
 }
 
+const NOT_SENT = new Set(["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED"]);
+
 const num = (v: string | null): number | null => (v !== null && /^\d+$/.test(v.trim()) ? Number(v) : null);
 
 function readRateLimit(h: Headers): RateLimit {
@@ -55,9 +57,12 @@ async function call(apiKey: string, fetchFn: FetchFn, method: "GET" | "POST", pa
       redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
-    // Timeout, DNS, reset: the upstream message is dropped on purpose.
-    throw new LushaError("unavailable", "Lusha request did not complete");
+  } catch (e) {
+    // Only a failure to even connect proves nothing was sent or billed. A timeout, abort or reset may have
+    // reached Lusha and been charged, so it must not read as retryable. The upstream message is dropped on purpose.
+    const code = (e as { cause?: { code?: unknown } } | null)?.cause?.code;
+    if (typeof code === "string" && NOT_SENT.has(code)) throw new LushaError("unavailable", "Lusha could not be reached");
+    throw new LushaError("outcome_unknown", "Lusha request did not complete");
   }
   const kind = kindFromHttpStatus(res.status);
   if (kind) throw new LushaError(kind, `Lusha request failed with status ${res.status}`, res.status);
