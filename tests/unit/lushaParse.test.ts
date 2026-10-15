@@ -192,6 +192,60 @@ test("pickEmail prefers work, then highest confidence, never blindly element zer
   assert.equal(first.ok && first.confidence, null, "no confidence reported is null, never -Infinity");
 });
 
+/**
+ * The shape of the FIRST REAL reveal (2026-10-15), with the real values replaced: Lusha returned every
+ * address it holds for the person, both "work" and both graded "A+", and the one on the company's own
+ * domain was NOT first. Order of arrival picked the other company's address and it was written to the
+ * Contact, which is what this ranking exists to prevent.
+ */
+const TWO_A_PLUS = [
+  { type: "work", email: "someone@other-company.invalid", confidence: "A+", dataSource: "Lusha" },
+  { type: "work", email: "someone@example.invalid", confidence: "A+", dataSource: "Lusha" },
+];
+
+const chosen = (raw: unknown, domains?: readonly string[]): string | null => {
+  const out = pickEmail(raw, domains);
+  return out.ok ? out.value : null;
+};
+const graded = (confidence: unknown): number | null => {
+  const out = pickEmail([{ email: "a@x.invalid", confidence }]);
+  return out.ok ? out.confidence : null;
+};
+
+test("pickEmail prefers the company's own domain over Lusha's arrival order", () => {
+  assert.equal(chosen(TWO_A_PLUS, ["example.invalid"]), "someone@example.invalid");
+  // Lusha reports the matched domain with "www.", our own company row without it: one company either way.
+  assert.equal(chosen(TWO_A_PLUS, ["www.Example.invalid"]), "someone@example.invalid");
+  assert.equal(chosen(TWO_A_PLUS, ["https://example.invalid/"]), "someone@example.invalid");
+  // The domain beats the type, because an address at the company we are prospecting is the one to reach.
+  const personalAtCompany = [{ type: "work", email: "a@other.invalid", confidence: "A+" }, { type: "personal", email: "b@example.invalid", confidence: "B" }];
+  assert.equal(chosen(personalAtCompany, ["example.invalid"]), "b@example.invalid");
+});
+
+test("pickEmail knows no company domain and falls back to the previous order", () => {
+  assert.equal(chosen(TWO_A_PLUS), "someone@other-company.invalid");
+  assert.equal(chosen(TWO_A_PLUS, []), "someone@other-company.invalid");
+  assert.equal(chosen(TWO_A_PLUS, [null as unknown as string, "  "]), "someone@other-company.invalid");
+  // A domain we hold that neither address is on must not promote one of them either.
+  assert.equal(chosen(TWO_A_PLUS, ["third.invalid"]), "someone@other-company.invalid");
+});
+
+test("a letter grade is ranked and reported on the 0-100 scale of email_confidence", () => {
+  const raw = [
+    { type: "work", email: "b@x.invalid", confidence: "B" },
+    { type: "work", email: "aplus@x.invalid", confidence: "A+" },
+    { type: "work", email: "a@x.invalid", confidence: "A" },
+  ];
+  assert.deepEqual(pickEmail(raw), { ok: true, value: "aplus@x.invalid", type: "work", confidence: 100, raw });
+  assert.equal(graded("a-"), 89, "lowercase and a modifier are graded too");
+  assert.equal(graded("F-"), 6);
+  assert.equal(graded(80), 80, "a number already on the 0-100 scale is kept as it is");
+  // Unknown stays unknown: an unreadable grade or a scale we cannot place is never reported as a percentage.
+  for (const confidence of ["Z", "A++", "", 0.95, 101, -1, true, null]) {
+    assert.equal(graded(confidence), null, `${String(confidence)} is not a 0-100 confidence`);
+  }
+});
+
 test("pickEmail returns an empty outcome for [] and fails closed on a wrong shape", () => {
   assert.deepEqual(pickEmail([]), { ok: false, reason: "empty", raw: [] });
   const bad = [{ address: "a@x.invalid" }];

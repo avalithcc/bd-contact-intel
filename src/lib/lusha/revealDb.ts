@@ -4,6 +4,7 @@
 // Lusha's eventually consistent /v3/account/usage.
 
 import { and, desc, eq, gte, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, company, duplicateCandidate, lushaReveal, person, personPropertyHistory } from "@/db/schema";
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
@@ -147,6 +148,28 @@ export interface RevealSettlement {
   writeFailed: boolean;
 }
 
+const searchRow = alias(lushaReveal, "search_row");
+
+/**
+ * The company domains a revealed email of this Contact should be on: ours (what the search asked Lusha
+ * about) and the one Lusha matched. Read from the ledger row itself rather than taken from the caller,
+ * so the recovery path (applyStoredReveal, days later) chooses exactly like the live settle. Empty for a
+ * Contact with no company domain, which only restores the previous order-of-arrival behaviour.
+ */
+async function companyDomainsOf(reader: Reader, ledgerId: string): Promise<string[]> {
+  const [row] = await reader
+    .select({ own: company.domain, matched: searchRow.payload })
+    .from(lushaReveal)
+    .innerJoin(person, eq(person.id, lushaReveal.personId))
+    .leftJoin(company, eq(company.companyKey, person.companyKey))
+    // NULL on a search row (it has no search_id), so a search settle simply gets our own domain.
+    .leftJoin(searchRow, eq(searchRow.id, lushaReveal.searchId))
+    .where(eq(lushaReveal.id, ledgerId))
+    .limit(1);
+  const identity = (row?.matched as { identity?: { domain?: unknown } } | null)?.identity;
+  return [row?.own, identity?.domain].filter((d): d is string => typeof d === "string" && d.trim() !== "");
+}
+
 /**
  * Settles a reveal in ONE transaction: ledger, person, history, activity and duplicate candidate. The
  * Contact writes run in a savepoint, so a failure there rolls back only the person side: the paid value
@@ -158,11 +181,13 @@ export async function settleReveal(
   database: typeof db = db,
 ): Promise<RevealSettlement | null> {
   const raw = input.field === "emails" ? input.emails : input.phones;
-  const pick = input.compliance ? null : input.field === "emails" ? pickEmail(raw) : pickPhone(raw);
-  const outcome = input.compliance ? "compliance_restricted" : pick?.ok ? "revealed" : "no_value";
-  const value = pick?.ok ? pick.value : null;
-  const normalized = value === null ? null : input.field === "emails" ? value.trim().toLowerCase() : value.replace(/\D/g, "");
   return database.transaction(async (tx) => {
+    // Choosing among several revealed emails needs the company domains, so the pick happens here, not
+    // before the transaction. A compliance settle short-circuits it: there is no value to choose.
+    const pick = input.compliance ? null : input.field === "emails" ? pickEmail(raw, await companyDomainsOf(tx, input.reservationId)) : pickPhone(raw);
+    const outcome = input.compliance ? "compliance_restricted" : pick?.ok ? "revealed" : "no_value";
+    const value = pick?.ok ? pick.value : null;
+    const normalized = value === null ? null : input.field === "emails" ? value.trim().toLowerCase() : value.replace(/\D/g, "");
     const [row] = await tx
       .update(lushaReveal)
       .set({
@@ -259,9 +284,9 @@ export async function applyStoredReveal(
       .orderBy(desc(lushaReveal.at))
       .limit(1)
       .for("update");
-    const payload = (row?.payload as Record<string, unknown> | null) ?? {};
-    const pick = input.field === "emails" ? pickEmail(payload[input.field]) : pickPhone(payload[input.field]);
     if (!row) return { ok: false, reason: "not_applicable" } as const;
+    const payload = (row.payload as Record<string, unknown> | null) ?? {};
+    const pick = input.field === "emails" ? pickEmail(payload[input.field], await companyDomainsOf(tx, row.id)) : pickPhone(payload[input.field]);
     let value = row.value;
     let normalized = row.valueNormalized;
     let charged = row.creditsCharged;
