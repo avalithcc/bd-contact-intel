@@ -22,3 +22,20 @@ export function assertScratchDatabaseUrl(url: string | undefined): void {
     throw new Error(`Refusing to run: database "${dbName}" does not end in _e2e`);
   }
 }
+
+/**
+ * For seed scripts only (never Playwright, which must keep wiping `_e2e`
+ * alone): also accepts the local development database `bd_contact_intel_dev`,
+ * so the demo seed can fill it. Same loopback requirement.
+ */
+export function assertLocalSeedDatabaseUrl(url: string | undefined): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url ?? "");
+  } catch {
+    return assertScratchDatabaseUrl(url);
+  }
+  const dbName = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  if (LOCAL_HOSTS.has(parsed.hostname) && dbName === "bd_contact_intel_dev") return;
+  assertScratchDatabaseUrl(url);
+}

@@ -1,11 +1,16 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { checkLocalDevTargets } from "../lib/dev/localDevCheck";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set. Copy .env.example to .env.");
 }
+
+// In `next dev`, refuse a non-loopback DATABASE_URL (production values leak in
+// from .env.local). No-op outside NODE_ENV=development.
+checkLocalDevTargets();
 
 // Reuse the client across hot reloads in dev to avoid exhausting connections.
 const globalForDb = globalThis as unknown as {
