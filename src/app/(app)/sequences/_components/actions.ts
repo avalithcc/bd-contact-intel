@@ -28,3 +28,11 @@ export type OnBulkAction = (action: BulkAction) => void;
 /** What the Contact-record block asks for. Same rule as `optOut` above: the container opens `OptOutDialog`, then calls recordOptOutForMember. */
 export type ContactContextAction = { type: "optOut"; memberId: string };
 export type OnContactContextAction = (action: ContactContextAction) => void;
+
+/**
+ * What the create form asks for. The values are the validated ones, in selection order; the container creates the
+ * Sequence (createSequenceRow) and then adds the members (addMembersToSequence), which re-run every rule server-side and
+ * report each refused Contact, so nothing the form shows is trusted.
+ */
+export type CreateSequenceIntent = { name: string; dailySendCap: number; personIds: string[] };
+export type OnCreateSequence = (intent: CreateSequenceIntent) => void;
