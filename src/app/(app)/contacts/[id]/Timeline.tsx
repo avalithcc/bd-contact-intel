@@ -22,6 +22,7 @@ import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
 import {
   groupEmailThreads,
   isInferredThread,
+  isThreadAttributedThread,
   threadContextSummary,
   type EmailThreadGroup,
 } from "@/lib/contacts/emailThreads";
@@ -961,7 +962,11 @@ export function Timeline({
    * clicks to expand it (task brief §1: never a round trip on page load).
    */
   function renderEmailThreadCard(threadId: string, group: EmailThreadGroup<TimelineEntry>, when: Date) {
-    const inferred = isInferredThread(group);
+    // Both cautions can apply to one thread. Only the thread badge renders then:
+    // an unknown sender is the stronger caution, and two badges in the one-line
+    // summary would read as noise.
+    const threadAttributed = isThreadAttributedThread(group);
+    const inferred = isInferredThread(group) && !threadAttributed;
     const { matchedEmail, direction } = threadContextSummary(group);
     const subject = group.messages[0]?.metadata?.subject;
     const subjectText = typeof subject === "string" && subject ? subject : l.timelineThreadNoSubject;
@@ -996,6 +1001,14 @@ export function Timeline({
                 <p>
                   {l.timelineThreadContextPrefix}{" "}
                   {matchedEmail && <span className="mono">{matchedEmail}</span>}
+                  {threadAttributed && (
+                    <>
+                      {" "}
+                      <span className="badge badge-probable" title={l.threadAttributedHint}>
+                        {l.threadAttributedBadge}
+                      </span>
+                    </>
+                  )}
                   {inferred && (
                     <>
                       {" "}

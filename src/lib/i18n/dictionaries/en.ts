@@ -886,6 +886,9 @@ export const en = {
     phoneUnrecognizedTitle: "Unrecognized format: shown as text",
     inferredBadge: "Inferred",
     inferredMatchHint: "The email was matched by a domain pattern (firstname.lastname@company), not verified by hand.",
+    threadAttributedBadge: "Other mailbox",
+    threadAttributedHint:
+      "Replied from an address we do not have on file. It was attributed to this Contact because it arrived in the thread we wrote to — worth confirming it is the same person.",
     linkedInBadge: "LinkedIn",
     timelineThreadWhatPrefix: "Email thread",
     timelineThreadNoSubject: "(no subject)",

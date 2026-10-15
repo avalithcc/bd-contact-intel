@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { groupEmailThreads, isInferredThread, threadContextSummary } from "@/lib/contacts/emailThreads";
+import { groupEmailThreads, isInferredThread, isThreadAttributedThread, threadContextSummary } from "@/lib/contacts/emailThreads";
 
 test("a lone email_sent row with a threadId stays a 'single' (no badge for 1 message)", () => {
   const entry = {
@@ -213,4 +213,50 @@ test("threadContextSummary falls back to null matchedEmail when no message carri
   assert.equal(result[0].kind, "thread");
   if (result[0].kind !== "thread") return;
   assert.deepEqual(threadContextSummary(result[0].group), { matchedEmail: null, direction: "outbound" });
+});
+
+// --- isThreadAttributedThread: thread-level, independent of the latest message.
+
+function mk(id: string, type: string, day: number, matchConfidence?: string) {
+  return {
+    id,
+    type,
+    createdAt: new Date(Date.UTC(2026, 9, day)),
+    metadata: { gmailThreadId: "t1", ...(matchConfidence ? { matchConfidence } : {}) },
+    visible: true,
+  };
+}
+
+function groupOf(entries: ReturnType<typeof mk>[]) {
+  const result = groupEmailThreads(entries);
+  assert.equal(result[0].kind, "thread");
+  if (result[0].kind !== "thread") throw new Error("expected thread");
+  return result[0].group;
+}
+
+test("isThreadAttributedThread is true with one 'thread' message among several, even when it is not the latest", () => {
+  const group = groupOf([
+    mk("a", "email_sent", 10, "exact"),
+    mk("b", "reply_received", 11, "thread"),
+    mk("c", "email_sent", 12, "exact"),
+  ]);
+  assert.equal(isThreadAttributedThread(group), true);
+});
+
+test("isThreadAttributedThread is false when no message matched through the thread", () => {
+  const group = groupOf([mk("a", "email_sent", 10, "exact"), mk("b", "reply_received", 11, "inferred"), mk("c", "email_sent", 12)]);
+  assert.equal(isThreadAttributedThread(group), false);
+});
+
+test("a thread can be both inferred and thread-attributed; both predicates are true", () => {
+  const group = groupOf([mk("a", "email_sent", 10, "inferred"), mk("b", "reply_received", 11, "thread")]);
+  assert.equal(isInferredThread(group), true);
+  assert.equal(isThreadAttributedThread(group), true);
+});
+
+test("isThreadAttributedThread does not depend on message order", () => {
+  const entries = [mk("a", "email_sent", 10, "exact"), mk("b", "reply_received", 11, "thread"), mk("c", "email_sent", 12, "exact")];
+  for (const order of [[0, 1, 2], [2, 1, 0], [1, 2, 0], [2, 0, 1]]) {
+    assert.equal(isThreadAttributedThread(groupOf(order.map((i) => entries[i]))), true);
+  }
 });

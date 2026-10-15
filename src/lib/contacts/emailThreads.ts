@@ -88,6 +88,21 @@ export function isInferredThread<T extends EmailThreadableEntry>(group: EmailThr
   return group.messages.some((m) => m.metadata?.matchConfidence === "inferred");
 }
 
+/**
+ * "Otra casilla" badge. A thread is flagged if ANY of its messages was
+ * attributed to this Contact through the thread (`matchConfidence ===
+ * "thread"`: a reply that came from an address we do NOT hold, assigned
+ * because it arrived in a thread we wrote to). The caution is about the
+ * SENDER's identity, not the address (which is real), so it is deliberately
+ * different from `isInferredThread`. It is thread-level and independent of
+ * which message is latest: once the BD replies, the latest message is an
+ * outbound one with the held address, and a latest-message check would drop
+ * the only hint that the earlier reply came from an unknown mailbox.
+ */
+export function isThreadAttributedThread<T extends EmailThreadableEntry>(group: EmailThreadGroup<T>): boolean {
+  return group.messages.some((m) => m.metadata?.matchConfidence === "thread");
+}
+
 export interface ThreadContextSummary {
   /** The counterpart address this thread matched on, or `null` if no message carries one (should be rare — every synced message has `matchedEmail`). */
   matchedEmail: string | null;

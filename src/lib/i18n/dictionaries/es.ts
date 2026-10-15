@@ -820,6 +820,11 @@ export const es: typeof en = {
     // Tooltip on the "Deducido" badge over a synced thread (email-sync.html:180).
     inferredMatchHint:
       "El correo se emparejó por patrón de dominio (nombre.apellido@empresa), no fue verificado a mano.",
+    // Thread-attributed reply (match_confidence 'thread'): the address is real,
+    // the SENDER's identity is what is uncertain — never reuse "Deducido".
+    threadAttributedBadge: "Otra casilla",
+    threadAttributedHint:
+      "Respondió desde una dirección que no tenemos registrada. Se asignó a este contacto porque llegó en el hilo que le escribimos — conviene confirmar que sea la persona.",
     linkedInBadge: "LinkedIn",
     // --- synced email thread (email-sync.html screen 1) ---
     timelineThreadWhatPrefix: "Hilo de correo",
