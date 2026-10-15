@@ -8,6 +8,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { HistoryIcon, LinkedInIcon } from "@/components/icons";
+import type { LushaView } from "@/lib/lusha/revealView";
 import { PropertyList, type AboutPaneProperty, type JobTitleRoleGroupHint, type OwnerOption } from "./PropertyList";
 import { QuickActions, type TaskAssigneeOption } from "./QuickActions";
 
@@ -54,6 +55,8 @@ export interface AboutPaneProps {
   // "Ubicación" composite row (contact-record.html:86) — see PropertyList.
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   jobTitleRoleGroupHint: JobTitleRoleGroupHint;
+  // Lusha reveal control state (null outside production) — see PropertyList.
+  lusha: LushaView | null;
   messageLabels: GenerateMessageLabels;
   locale: Locale;
   // Board drag/keyboard-menu handoff (task 10.5, 14.1), plus the follow-up
@@ -96,6 +99,7 @@ export function AboutPane({
   properties,
   locationProperties,
   jobTitleRoleGroupHint,
+  lusha,
   messageLabels,
   locale,
   initialAction,
@@ -177,6 +181,7 @@ export function AboutPane({
         properties={properties}
         locationProperties={locationProperties}
         jobTitleRoleGroupHint={jobTitleRoleGroupHint}
+        lusha={lusha}
       />
     </aside>
   );

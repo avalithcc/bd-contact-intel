@@ -16,6 +16,8 @@ import { InfoIcon, EditPencilIcon } from "@/components/icons";
 import { toTelHref, type WhatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
+import type { LushaView } from "@/lib/lusha/revealView";
+import { LushaBadge, LushaRow, lushaBadgeFor } from "./LushaReveal";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
 
 export interface AboutPaneProperty {
@@ -75,6 +77,8 @@ export interface PropertyListProps {
   // its own inline edit form (see LocationPropertyRow below).
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   jobTitleRoleGroupHint: JobTitleRoleGroupHint;
+  /** Resolved on the server (lusha-reveal); null outside production, where nothing Lusha renders. */
+  lusha: LushaView | null;
 }
 
 /**
@@ -105,6 +109,7 @@ export function PropertyList({
   properties,
   locationProperties,
   jobTitleRoleGroupHint,
+  lusha,
 }: PropertyListProps) {
   const router = useRouter();
   const [editingKey, setEditingKey] = useState<EditablePersonProperty | null>(null);
@@ -236,6 +241,8 @@ export function PropertyList({
             labels={l}
             call={{ personId, personName }}
             prop={prop}
+            lusha={lusha}
+            personId={personId}
             emailVerified={prop.key === "email" && emailVerified}
             emailInferred={prop.key === "email" && emailInferred}
             hunterHint={prop.key === "email" ? hunterHint : null}
@@ -292,6 +299,8 @@ function PropertyRow({
   labels: l,
   call,
   prop,
+  lusha,
+  personId,
   emailVerified,
   emailInferred,
   hunterHint,
@@ -306,6 +315,8 @@ function PropertyRow({
   labels: ContactRecordLabels;
   call: { personId: string; personName: string };
   prop: AboutPaneProperty;
+  lusha: LushaView | null;
+  personId: string;
   emailVerified: boolean;
   emailInferred: boolean;
   hunterHint: string | null;
@@ -401,6 +412,7 @@ function PropertyRow({
         )}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
         {emailInferred && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
+        {prop.value && lushaBadgeFor(lusha, prop.key) && <LushaBadge l={l} />}
         {roleGroupHint && (
           <details className="dropdown">
             <summary className="btn btn-ghost btn-sm btn-icon" aria-label={l.jobTitleHintLabel} title={l.jobTitleHintLabel}>
@@ -438,6 +450,9 @@ function PropertyRow({
           <EditPencilIcon className="icon" />
         </button>
       </dd>
+      {lusha && (prop.key === "email" || prop.key === "phone" || prop.key === "mobilePhone") && (
+        <LushaRow personId={personId} field={prop.key === "email" ? "emails" : "phones"} column={prop.key} fieldLabel={prop.label} view={lusha} labels={l} />
+      )}
       {whatsappHint && <dd className="hint">{whatsappHint}</dd>}
       {hunterHint ? (
         <dd className="hint">{hunterHint}</dd>

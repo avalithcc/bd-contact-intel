@@ -3,94 +3,111 @@ import { test } from "node:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-// Mechanical form of the safety rule of the lusha-reveal chain: nothing a user
-// can reach exists until the UI PR (6). Lusha spends real money, so every
-// assertion here is inverted in task 6.9, the PR that deliberately wires it up.
+// lusha-reveal PR 6 inverted this file (task 6.9). PRs 1-5 pinned "nothing a user can reach exists"; now the feature IS
+// reachable, so the same scan pins the opposite, and still mechanical, facts:
+//   1. the control is wired end to end (actions -> dialogs -> property row -> pane -> page);
+//   2. exactly ONE client component can call the paid actions, exactly ONE file can reach the network client, and
+//      nothing else in src reaches into the library at runtime except the page that resolves the control's state;
+//   3. the API key is read in one place and never by client code; nothing registers a route, cron or vercel entry.
+// A new importer of the library, of the actions or of the key fails here and must be added on purpose.
 
 const ROOT = join(__dirname, "..", "..");
-const APP = join(ROOT, "src", "app");
 const SRC = join(ROOT, "src");
-const ACTIONS_FILE = "src/app/(app)/contacts/lushaActions.ts";
-// The ONLY file outside the library allowed to import it. It must not grow quietly.
-const ALLOWLIST = [ACTIONS_FILE];
+const CONTACTS = "src/app/(app)/contacts/";
+const ACTIONS = `${CONTACTS}lushaActions.ts`;
+const REVEAL_UI = `${CONTACTS}[id]/LushaReveal.tsx`;
+const ROW = `${CONTACTS}[id]/PropertyList.tsx`;
+const PANE = `${CONTACTS}[id]/AboutPane.tsx`;
+const PAGE = `${CONTACTS}[id]/page.tsx`;
 const LIBRARY_DIR = "src/lib/lusha/";
+const CONFIG = `${LIBRARY_DIR}config.ts`;
 
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return [];
-  const out: string[] = [];
-  for (const name of readdirSync(dir)) {
+  return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...walk(full));
-    else out.push(full);
-  }
+    return statSync(full).isDirectory() ? walk(full) : [full];
+  });
+}
+const rel = (p: string) => relative(ROOT, p);
+const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
+const allSrc = walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f)).map(rel);
+const outside = allSrc.filter((f) => !f.startsWith(LIBRARY_DIR));
+
+/** Every `from "..."` / import() / require() path in a source text, with whether the import is type-only (erased at build). */
+function imports(text: string): Array<{ path: string; typeOnly: boolean }> {
+  const out = [...text.matchAll(/^import\s+(type\s+)?[^;]*?from\s+["'`]([^"'`]+)["'`]/gm)].map((m) => ({ path: m[2], typeOnly: !!m[1] }));
+  for (const m of text.matchAll(/(?:\bimport|\brequire)\(\s*["'`]([^"'`]+)["'`]\s*\)|^import\s+["'`]([^"'`]+)["'`]/gm)) out.push({ path: m[1] ?? m[2], typeOnly: false });
   return out;
 }
+const importers = (match: RegExp, files = outside, includeTypes = false) =>
+  files.filter((f) => imports(read(f)).some((i) => match.test(i.path) && (includeTypes || !i.typeOnly))).sort();
+const LIB = /(^|\/)lib\/lusha(\/|$)/;
+const isClient = (f: string) => /^\s*["']use client["']/m.test(read(f));
 
-const rel = (p: string) => relative(ROOT, p);
-const EXTRA = ["middleware.ts", "instrumentation.ts"].map((n) => join(ROOT, "src", n)).filter(existsSync);
-const sourceFiles = [...walk(APP), ...EXTRA].filter((f) => /\.(ts|tsx)$/.test(f));
-// Everything under src/ (components, lib, db...) except the library itself: a client component outside src/app
-// importing the actions would make the feature reachable with a src/app-only scan still green.
-const allSrc = walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f) && !rel(f).startsWith(LIBRARY_DIR));
-// Any quoted path into the lusha library: static, dynamic import(), require() or bare import.
-const LUSHA_LIB_PATH = /["'`][^"'`]*\/lib\/lusha(\/[^"'`]*)?["'`]/;
-
-test("the scan covers a non-trivial set of source files", () => {
-  assert.ok(sourceFiles.length > 0);
+test("the scan covers the whole of src, not just src/app", () => {
+  assert.ok(outside.length > 100 && outside.some((f) => f.startsWith("src/components/")));
+  assert.ok(allSrc.some((f) => f === ACTIONS) && allSrc.includes(REVEAL_UI));
 });
 
-test("the allowlist is exactly one file", () => {
-  assert.equal(ALLOWLIST.length, 1);
-  assert.ok(existsSync(join(ROOT, ALLOWLIST[0])));
-  assert.ok(allSrc.length > sourceFiles.length / 2, "the src-wide scan covers more than src/app");
+test("the control is wired end to end: actions, dialogs, property row, pane, page", () => {
+  const exported = [...read(ACTIONS).matchAll(/export async function (\w+)/g)].map((m) => m[1]).sort();
+  assert.deepEqual(exported, ["applyStoredLushaValueAction", "getLushaAccountUsageAction", "rejectLushaMatchAction", "revealLushaFieldAction", "searchLushaContactAction"]);
+  const ui = read(REVEAL_UI);
+  for (const action of exported) assert.match(ui, new RegExp(`\\b${action}\\(`), `${action} is called by the dialogs`);
+  assert.match(read(ROW), /<LushaRow\b/);
+  assert.match(read(PANE), /lusha=\{lusha\}/);
+  assert.match(read(PAGE), /buildLushaView\(/);
+  assert.match(read(PAGE), /lusha=\{lusha\}/);
 });
 
-test("no file under src outside the library, other than the allowlisted one, imports from the lusha library", () => {
-  const offenders = allSrc
-    .filter((f) => !ALLOWLIST.includes(rel(f)))
-    .filter((f) => LUSHA_LIB_PATH.test(readFileSync(f, "utf8")))
-    .map(rel);
-  assert.deepEqual(offenders, []);
+test("only the Lusha dialogs import the server actions, and only the property row renders them", () => {
+  assert.deepEqual(importers(/lushaActions$/, outside, true), [REVEAL_UI]);
+  assert.deepEqual(importers(/LushaReveal$/, outside, true), [ROW]);
+  assert.ok(isClient(REVEAL_UI), "the actions are called from a client component, so the import is a server-action reference");
 });
 
-test("no file under src imports lushaActions", () => {
-  const offenders = allSrc
-    .filter((f) => /lushaActions/.test(readFileSync(f, "utf8")))
-    .filter((f) => !ALLOWLIST.includes(rel(f)))
-    .map(rel);
-  assert.deepEqual(offenders, []);
+test("only the actions file can reach the network client or the real ports", () => {
+  assert.deepEqual(importers(/lib\/lusha\/(client|ports)$/, outside, true), [ACTIONS]);
 });
 
-test("no route.ts or page.tsx path contains lusha", () => {
-  const offenders = walk(APP)
-    .map(rel)
-    .filter((f) => /(^|\/)(page\.tsx|route\.ts)$/.test(f) && /lusha/i.test(f));
-  assert.deepEqual(offenders, []);
+test("outside the library, only the actions and the page resolving the control state import it at runtime", () => {
+  assert.deepEqual(importers(LIB), [ACTIONS, PAGE].sort());
+  // Client code may only use the library's TYPES; a runtime import would ship ledger or client code to the browser.
+  const clientRuntime = importers(LIB, outside.filter(isClient));
+  assert.deepEqual(clientRuntime, []);
+  // Type-only importers: the dialogs and the two components that pass the view down.
+  assert.deepEqual(importers(LIB, outside, true).filter((f) => !importers(LIB).includes(f)), [PANE, ROW, REVEAL_UI].sort());
 });
 
-test('no "use client" file references lushaActions', () => {
-  const offenders = allSrc
-    .filter((f) => {
-      const text = readFileSync(f, "utf8");
-      return /^\s*["']use client["']/m.test(text) && /lushaActions/.test(text);
-    })
-    .map(rel);
-  assert.deepEqual(offenders, []);
+test("the API key is read in one place, by server code, and is never public", () => {
+  const readers = allSrc.filter((f) => /env\.LUSHA_API_KEY|env\[\s*["'`]LUSHA_API_KEY["'`]\s*\]|NEXT_PUBLIC_LUSHA/.test(read(f)));
+  assert.deepEqual(readers, []);
+  assert.match(read(CONFIG), /API_KEY_VAR = "LUSHA_API_KEY"/);
+  assert.deepEqual(allSrc.filter((f) => /API_KEY_VAR/.test(read(f)) && f !== CONFIG), []);
+  assert.deepEqual(importers(/lusha\/config$/, outside.filter(isClient), true), []);
 });
 
-test("vercel.json contains no lusha entry", () => {
-  const raw = readFileSync(join(ROOT, "vercel.json"), "utf8");
-  assert.doesNotMatch(raw, /lusha/i);
+test("nothing registers Lusha as a route, a page or a cron", () => {
+  const appFiles = walk(join(SRC, "app")).map(rel);
+  assert.deepEqual(appFiles.filter((f) => /(^|\/)(page\.tsx|route\.ts)$/.test(f) && /lusha/i.test(f)), []);
+  assert.deepEqual(appFiles.filter((f) => /(^|\/)route\.ts$/.test(f) && /lusha/i.test(read(f))), []);
+  assert.doesNotMatch(readFileSync(join(ROOT, "vercel.json"), "utf8"), /lusha/i);
 });
 
-test("the lusha path matcher catches every import form", () => {
-  const forms = [
-    'import { x } from "@/lib/lusha/cap";',
-    'const m = await import("@/lib/lusha/cap");',
-    'const m = require("../../lib/lusha/cap");',
-    'import "@/lib/lusha/cap";',
-    "import { y } from '@/lib/lusha';",
-  ];
-  for (const f of forms) assert.ok(LUSHA_LIB_PATH.test(f), f);
-  assert.ok(!LUSHA_LIB_PATH.test('import { z } from "@/lib/lushaless/x";'));
+test("the dialogs use only design-system classes, no inline style and no colour literal (spec: no new design tokens)", () => {
+  const css = ["src/app/design-system.css", "src/app/globals.css"].map(read).join("\n");
+  const ui = read(REVEAL_UI);
+  const classAttr = [...ui.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)].map((m) => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, " "));
+  const literals = [...ui.matchAll(/"((?:btn|alert|badge)[\w -]*)"/g)].map((m) => m[1]);
+  const tokens = new Set([...classAttr, ...literals].flatMap((v) => v.split(/\s+/)).filter(Boolean));
+  assert.ok(tokens.size > 15 && tokens.has("locked") && tokens.has("alert-danger") && tokens.has("btn-ghost"));
+  assert.deepEqual([...tokens].filter((t) => !new RegExp(`\\.${t}(?![\\w-])`).test(css)), []);
+  assert.doesNotMatch(ui, /\bstyle=|#[0-9a-fA-F]{3,8}\b/);
+});
+
+test("the import and key scanners recognise every form they claim to", () => {
+  const text = 'import type { A } from "@/lib/lusha/revealView";\nimport { b } from "@/lib/lusha/cap";\nconst m = await import("@/lib/lusha/x");\nimport "@/lib/lusha/side";\nimport {\n  c,\n} from "../lushaActions";';
+  assert.deepEqual(imports(text).map((i) => [i.path, i.typeOnly]), [["@/lib/lusha/revealView", true], ["@/lib/lusha/cap", false], ["../lushaActions", false], ["@/lib/lusha/x", false], ["@/lib/lusha/side", false]]);
+  assert.ok(LIB.test("@/lib/lusha/cap") && LIB.test("@/lib/lusha") && !LIB.test("@/lib/lushaless/x"));
 });

@@ -31,6 +31,10 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { PlusIcon } from "@/components/icons";
 import { whatsappLink } from "@/lib/whatsapp";
+import { getDailyCreditCap } from "@/lib/lusha/cap";
+import { getLushaConfig } from "@/lib/lusha/config";
+import { getDailySpend, getRevealState } from "@/lib/lusha/revealDb";
+import { buildLushaView } from "@/lib/lusha/revealView";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
 import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
@@ -214,7 +218,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // "Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago").
   const emailHistory = record.properties.find((p) => p.key === "email")?.lastEdit ?? null;
   const hunterHint =
-    record.person.emailConfidence != null && emailHistory
+    // A Lusha-revealed email carries its own provenance line (LushaRow): "Hunter · 80 %" would misattribute it.
+    record.person.emailConfidence != null && emailHistory && record.person.emailSource !== "lusha"
       ? dict.contactRecordServer.hunterHint(
           record.person.emailConfidence,
           emailHistory.bdName ?? l.emptyValue,
@@ -266,6 +271,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // Free text wins when present; canonical `company.display_name` only
   // fills in the null case.
   const companyDisplayName = resolveCompanyDisplayName(record.person.company, companyRow?.displayName);
+  // Lusha reveal control (lusha-reveal PR 6): resolved here so no client component decides what a reveal costs.
+  // Outside production the gate is closed and this reads nothing; in production it is two small reads (ledger rows, day's spend).
+  const lushaConfig = getLushaConfig();
+  const lusha = buildLushaView({
+    config: lushaConfig,
+    rows: lushaConfig.ok ? await getRevealState(record.person.id) : {},
+    spentToday: lushaConfig.ok ? await getDailySpend() : 0,
+    cap: getDailyCreditCap(),
+    person: record.person,
+    crm: { name, company: companyDisplayName, domain: companyRow?.domain ?? null, linkedin: linkedinProfileHref(record.person.profileKey) },
+    companyHref: employerHref,
+    formatDay: formatArgentinaDayMonth,
+  });
   const stageLabels: Record<string, string> = {
     prospect: dict.companiesPage.stageProspect,
     qualified: dict.companiesPage.stageQualified,
@@ -425,6 +443,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           properties={properties}
           locationProperties={locationProperties}
           jobTitleRoleGroupHint={jobTitleRoleGroupHint}
+          lusha={lusha}
           messageLabels={messageLabels}
           locale={locale}
           initialAction={openAction}
