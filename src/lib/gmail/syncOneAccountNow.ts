@@ -15,8 +15,11 @@ import { createGmailClient } from "./client";
 import { syncAccountIncremental } from "./syncAccount";
 import { backfillAccountFirstSync } from "./backfillAccount";
 import { BACKFILL_WINDOW_DAYS } from "./backfillWindow";
+import type { ThreadRefQuery } from "./threadAttribution";
 import {
   getKnownPersonsForAddresses,
+  getOutboundThreadRefs,
+  getOwnMailboxAddresses,
   getNeverLogRules,
   getPlatformSentGmailMessageIds,
   updateAccountAfterSync,
@@ -55,6 +58,10 @@ export async function syncOneAccountNow(account: SyncableAccount, now: Date = ne
     getKnownPersons: getKnownPersonsForAddresses,
     getNeverLogRules: () => getNeverLogRules(account.bdId),
     getPlatformSentIds: (ids: string[]) => getPlatformSentGmailMessageIds(account.bdId, ids),
+    threadPorts: {
+      getOutboundThreadRefs: (q: ThreadRefQuery) => getOutboundThreadRefs(account.bdId, q),
+      getOwnMailboxAddresses,
+    },
     writeMessages: (classified: Parameters<typeof writeSyncedMessages>[1]) =>
       writeSyncedMessages(account.bdId, classified),
   };

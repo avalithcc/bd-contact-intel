@@ -106,7 +106,7 @@ export interface EmailMessagePersonRow {
   emailMessageId: string;
   personId: string;
   matchedEmail: string;
-  matchConfidence: string; // 'exact' | 'inferred'
+  matchConfidence: string; // 'exact' | 'inferred' | 'thread'
 }
 
 /** The one key builder for the survivor-rows-by-message lookup below — mergeDb.ts's query and this file's own tests must both build this key through here, never by hand. */
@@ -471,7 +471,7 @@ function connectionValuesEqual(a: MergeConnection, b: MergeConnection): boolean 
   );
 }
 
-const MATCH_CONFIDENCE_RANK: Record<string, number> = { inferred: 0, exact: 1 };
+const MATCH_CONFIDENCE_RANK: Record<string, number> = { thread: 0, inferred: 1, exact: 2 };
 
 /**
  * email_message_person collision rule: the unique (email_message_id,
@@ -480,7 +480,7 @@ const MATCH_CONFIDENCE_RANK: Record<string, number> = { inferred: 0, exact: 1 };
  * Keep the survivor's row id (nothing needs to change which id this
  * message/person pair lives at) and take over merged's matchedEmail +
  * matchConfidence TOGETHER only when merged's confidence outranks
- * survivor's (exact > inferred) — matchConfidence describes matchedEmail,
+ * survivor's (exact > inferred > thread) — matchConfidence describes matchedEmail,
  * so the two must move together or not at all, never a confidence label
  * paired with the other side's address. A tie (both exact or both
  * inferred) keeps survivor's row untouched.

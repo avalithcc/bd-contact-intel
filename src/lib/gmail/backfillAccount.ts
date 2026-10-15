@@ -18,6 +18,7 @@ import {
 } from "./classify";
 import { parseGmailMessage, type ParsedGmailMessage } from "./parseMessage";
 import type { GmailClient } from "./client";
+import { attributeUnmatchedByThread, type ThreadAttributionPorts } from "./threadAttribution";
 
 export interface BackfillAccountDeps {
   client: GmailClient;
@@ -31,6 +32,8 @@ export interface BackfillAccountDeps {
   getKnownPersons(addresses: string[]): Promise<KnownPersonEmail[]>;
   getNeverLogRules(): Promise<NeverLogRule[]>;
   getPlatformSentIds(gmailMessageIds: string[]): Promise<Set<string>>;
+  /** REQUIRED on purpose: an optional port that one caller forgets to wire ships the feature dead with no failing test. */
+  threadPorts: ThreadAttributionPorts;
   writeMessages(classified: ClassifiedMessage[]): Promise<{ inserted: number }>;
 }
 
@@ -85,9 +88,11 @@ export async function backfillAccountFirstSync(deps: BackfillAccountDeps): Promi
   const neverLogRules = await deps.getNeverLogRules();
   const platformSentGmailMessageIds = await deps.getPlatformSentIds(rawMessages.map((m) => m.gmailMessageId));
 
-  const classified = rawMessages.map((message) =>
+  const addressClassified = rawMessages.map((message) =>
     classifyGmailMessage({ message, bdEmail: deps.bdEmail, knownPersons, neverLogRules, platformSentGmailMessageIds }),
   );
+  // A reply from an address we do not hold is attributed through its thread, not dropped.
+  const classified = await attributeUnmatchedByThread(addressClassified, { bdEmail: deps.bdEmail, neverLogRules }, deps.threadPorts);
   const toStore = classified.filter(shouldStoreClassifiedMessage);
   const writeResult = toStore.length > 0 ? await deps.writeMessages(toStore) : { inserted: 0 };
 

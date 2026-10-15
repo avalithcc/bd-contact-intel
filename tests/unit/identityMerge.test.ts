@@ -470,6 +470,22 @@ test("planMerge: email_message_person collision — merged's exact confidence be
   assert.deepEqual(collision.mergedOriginal, mergedRow);
 });
 
+test("planMerge: email_message_person collision — a thread match ranks below inferred and exact", () => {
+  const winner = (mergedConf: string, survivorConf: string) => {
+    const plan = planMerge(
+      baseInput({
+        emailMessagePersonRowsOnMerged: [emailMessagePersonRow({ id: "a", emailMessageId: "msg-1", personId: "merged", matchedEmail: "m@x.com", matchConfidence: mergedConf })],
+        survivorEmailMessagePersonRows: [emailMessagePersonRow({ id: "b", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "s@x.com", matchConfidence: survivorConf })],
+      }),
+    );
+    return plan.emailMessagePersonCollisions[0]!.winner.matchedEmail;
+  };
+  assert.equal(winner("inferred", "thread"), "m@x.com");
+  assert.equal(winner("exact", "thread"), "m@x.com");
+  assert.equal(winner("thread", "inferred"), "s@x.com");
+  assert.equal(winner("thread", "thread"), "s@x.com");
+});
+
 test("planMerge: email_message_person collision — both inferred (tie) keeps survivor's own row untouched", () => {
   const mergedRow = emailMessagePersonRow({ id: "emp-merged", emailMessageId: "msg-1", personId: "merged", matchedEmail: "other@x.com", matchConfidence: "inferred" });
   const survivorRow = emailMessagePersonRow({ id: "emp-survivor", emailMessageId: "msg-1", personId: "survivor", matchedEmail: "guess@x.com", matchConfidence: "inferred" });

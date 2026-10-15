@@ -37,7 +37,10 @@
  */
 import type { ParsedGmailMessage } from "./parseMessage";
 
-export type MatchConfidence = "exact" | "inferred";
+// 'thread' = the sender's address matched nobody; the reply was attributed through the
+// outbound message it answers (threadAttribution.ts). Weaker than 'inferred', never a proof of
+// the address, so nothing that promotes an address may treat it like 'exact'.
+export type MatchConfidence = "exact" | "inferred" | "thread";
 
 /** One CRM person's known address, pre-fetched by the caller for exactly the syncing BD's owned persons. */
 export interface KnownPersonEmail {
@@ -76,6 +79,12 @@ export interface ClassifiedMessage {
   rfcMessageId: string | null;
   /** Raw `References` header; null when absent. */
   references: string | null;
+  /** Raw `In-Reply-To` header; null when absent. */
+  inReplyTo?: string | null;
+  /** True when a never-log rule suppressed this message; thread attribution must not resurrect it. */
+  neverLogged?: boolean;
+  /** Machine-generated (bounce, delivery report, auto-reply); never a human reply. */
+  automated?: boolean;
   /** Every CRM person this message matches, never-log already applied. Empty means "do not store". */
   matches: ClassifiedMatch[];
   /** True when this gmailMessageId already has an `email_sent` activity from src/lib/gmail/send.ts. */
@@ -106,7 +115,7 @@ function extractFirstEmailAddress(headerValue: string | null | undefined): strin
   return extractEmailAddresses(headerValue)[0] ?? "";
 }
 
-function isNeverLogged(address: string, rules: readonly NeverLogRule[]): boolean {
+export function isNeverLogged(address: string, rules: readonly NeverLogRule[]): boolean {
   const domain = address.split("@")[1];
   return rules.some(
     (rule) =>
@@ -171,7 +180,8 @@ export function classifyGmailMessage(input: ClassifyGmailMessageInput): Classifi
   const allParticipantAddresses = [fromAddress, ...toAddresses, ...ccAddresses].filter((address) => address !== "");
 
   const matches: ClassifiedMatch[] = [];
-  if (!isMessageNeverLogged(allParticipantAddresses, neverLogRules)) {
+  const neverLogged = isMessageNeverLogged(allParticipantAddresses, neverLogRules);
+  if (!neverLogged) {
     const seenPersonIds = new Set<string>();
     for (const address of candidateAddresses) {
       const person = personByEmail.get(address);
@@ -194,6 +204,9 @@ export function classifyGmailMessage(input: ClassifyGmailMessageInput): Classifi
     sentAt: message.sentAt,
     rfcMessageId: message.rfcMessageId,
     references: message.references,
+    inReplyTo: message.inReplyTo ?? null,
+    neverLogged,
+    automated: message.automated ?? false,
     matches,
     isPlatformSent: input.platformSentGmailMessageIds?.has(message.gmailMessageId) ?? false,
   };

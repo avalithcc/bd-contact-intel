@@ -16,6 +16,7 @@ import { executeSyncedMessageWrite, type SyncWriteStore } from "./syncWriteCore"
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import { buildAfterSyncSet, type AfterSyncPatch } from "./afterSyncPatch";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "./classify";
+import type { OutboundThreadRef, ThreadRefQuery } from "./threadAttribution";
 
 export { getNeverLogRules };
 
@@ -129,6 +130,44 @@ export async function getPlatformSentGmailMessageIds(bdId: string, gmailMessageI
       AND metadata->>'gmailMessageId' IN (${idList})
   `);
   return new Set(rows.map((r) => r.gmail_message_id));
+}
+
+/** Every connected mailbox address (all BDs), lowercase: any of them writing in a thread is us, not a contact. One row per BD. */
+export async function getOwnMailboxAddresses(): Promise<string[]> {
+  const rows = await db.select({ address: emailAccount.emailAddress }).from(emailAccount).where(eq(emailAccount.status, "connected"));
+  return rows.map((r) => r.address.trim().toLowerCase());
+}
+
+type OutboundRefRow = { thread_id: string; rfc_message_id: string | null; sent_at: Date | string; person_ids: string[]; matched_emails: string[] };
+
+/**
+ * Our outbound mail (with the persons it is attributed to) in the given threads, or carrying the
+ * given Message-IDs. Not limited on purpose: truncating would hide a second contact and turn an
+ * ambiguous thread into a confident wrong one. Bounded by the keys instead, in chunks.
+ * The thread leg uses email_message_bd_thread_idx (bd_id, gmail_thread_id). There is NO index on
+ * rfc_message_id, so the header leg scans this BD's rows; it runs only for replies whose thread
+ * held none of our mail, once per batch (proposed index in the PR notes, not added here).
+ */
+export async function getOutboundThreadRefs(bdId: string, query: ThreadRefQuery): Promise<OutboundThreadRef[]> {
+  const out: OutboundThreadRef[] = [];
+  const legs: [string, string[]][] = [
+    ["em.gmail_thread_id", query.threadIds],
+    ["em.rfc_message_id", query.rfcMessageIds],
+  ];
+  for (const [column, keys] of legs) {
+    for (const part of chunk(keys, WRITE_BATCH_SIZE)) {
+      const list = sql.join(part.map((k) => sql`${k}`), sql`, `);
+      const rows = await db.execute<OutboundRefRow>(sql`
+        select em.gmail_thread_id as thread_id, em.rfc_message_id, em.sent_at, array_agg(distinct emp.person_id::text) as person_ids, array_agg(distinct emp.matched_email) as matched_emails
+        from email_message em
+        join email_message_person emp on emp.email_message_id = em.id
+        where em.bd_id = ${bdId}::uuid and em.direction = 'outbound' and ${sql.raw(column)} in (${list})
+        group by em.id
+      `);
+      out.push(...rows.map((r) => ({ gmailThreadId: r.thread_id, rfcMessageId: r.rfc_message_id, sentAt: new Date(r.sent_at), personIds: r.person_ids, matchedEmails: r.matched_emails })));
+    }
+  }
+  return out;
 }
 
 export async function updateAccountAfterSync(

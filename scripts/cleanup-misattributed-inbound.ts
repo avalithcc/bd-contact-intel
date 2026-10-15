@@ -9,6 +9,12 @@
  * though they never sent anything. Observed in prod on
  * rcrescentini@decreditos.com (person 9d22b1f8-90d9-45eb-bb8c-d254017b75c4).
  *
+ * NEVER touches a row whose `match_confidence = 'thread'` (src/lib/gmail/threadAttribution.ts):
+ * a reply attributed through its thread has a `from_address` that differs from the person's
+ * address BY DEFINITION, so the comparison below would classify every one of them as
+ * misattributed and delete the feature's output. The query and its exclusion live in
+ * src/lib/gmail/misattributedInbound.ts, where tests/db/threadAttribution.test.ts exercises them.
+ *
  * Finds every `email_message_person` row for an INBOUND `email_message`
  * whose matched person's `email_normalized` does not equal that message's
  * `from_address` (both lowercased/trimmed) — i.e. a match that could only
@@ -65,71 +71,9 @@ import { auditLog } from "../src/db/schema";
 import { buildPersonStatusUpdates } from "../src/lib/status/deriveStatus";
 import { mapRawActivityRow, mapRawConnectionRow } from "../src/lib/status/rawStatusRows";
 import { recomputePersonStatuses } from "../src/lib/status/recompute";
+import { readWrongMatches, type WrongMatchRow } from "../src/lib/gmail/misattributedInbound";
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-interface WrongMatchRow {
-  empId: string;
-  emailMessageId: string;
-  personId: string;
-  gmailMessageId: string;
-  bdId: string;
-  activityId: string | null;
-}
-
-/**
- * One query: every wrong `email_message_person` row (inbound message,
- * matched person's email_normalized != the message's from_address) LEFT
- * JOINed to the `reply_received` activity it produced, if any survives
- * (a row can lack a matching activity if it was already cleaned up, or if
- * the platform-sent linking path — irrelevant for inbound — applied).
- */
-async function readWrongMatches(executor: DbOrTx): Promise<WrongMatchRow[]> {
-  const rows = await executor.execute<{
-    emp_id: string;
-    email_message_id: string;
-    person_id: string;
-    gmail_message_id: string;
-    bd_id: string;
-    activity_id: string | null;
-  }>(sql`
-    with wrong_matches as (
-      select
-        emp.id as emp_id,
-        emp.email_message_id as email_message_id,
-        emp.person_id as person_id,
-        em.gmail_message_id as gmail_message_id,
-        em.bd_id as bd_id
-      from email_message_person emp
-      join email_message em on em.id = emp.email_message_id
-      join person p on p.id = emp.person_id
-      where em.direction = 'inbound'
-        and p.email_normalized is distinct from lower(trim(em.from_address))
-    )
-    select
-      wm.emp_id,
-      wm.email_message_id,
-      wm.person_id,
-      wm.gmail_message_id,
-      wm.bd_id,
-      a.id as activity_id
-    from wrong_matches wm
-    left join activity a
-      on a.person_id = wm.person_id
-      and a.type = 'reply_received'
-      and a.actor_bd_id = wm.bd_id
-      and a.metadata->>'gmailMessageId' = wm.gmail_message_id
-  `);
-
-  return rows.map((r) => ({
-    empId: r.emp_id,
-    emailMessageId: r.email_message_id,
-    personId: r.person_id,
-    gmailMessageId: r.gmail_message_id,
-    bdId: r.bd_id,
-    activityId: r.activity_id,
-  }));
-}
 
 interface PersonInfo {
   id: string;
@@ -299,6 +243,8 @@ async function main() {
     }
     await tx.execute(sql`delete from email_message_person where id in (${idList(empIds)})`);
 
+    // Step 3 cannot reach a thread-attributed message: it keeps its thread link row, so the
+    // not-exists guard below holds for it even if it somehow shared an id with a wrong match.
     const deletedMessages = await tx.execute<{ id: string }>(sql`
       delete from email_message
       where id in (${idList(emailMessageIds)})

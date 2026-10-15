@@ -7,6 +7,7 @@
  */
 import { htmlToPlainText } from "./htmlToText";
 import { truncateBodyText } from "./truncateBodyText";
+import { isAutomatedMessage } from "./automatedMessage";
 
 export interface GmailApiHeader {
   name: string;
@@ -46,6 +47,10 @@ export interface ParsedGmailMessage {
   rfcMessageId: string | null;
   // Raw `References` header (space-separated ids, oldest first); null when absent.
   references: string | null;
+  // Raw `In-Reply-To` header. Optional so older fixtures stay valid; the parser always sets it.
+  inReplyTo?: string | null;
+  // Bounce / delivery report / auto-reply by protocol headers (automatedMessage.ts).
+  automated?: boolean;
 }
 
 function decodeBase64Url(data: string): string {
@@ -93,5 +98,7 @@ export function parseGmailMessage(message: GmailApiMessage): ParsedGmailMessage 
     sentAt: new Date(Number(message.internalDate)),
     rfcMessageId: findHeader(headers, "Message-ID").trim() || null,
     references: findHeader(headers, "References").trim() || null,
+    inReplyTo: findHeader(headers, "In-Reply-To").trim() || null,
+    automated: isAutomatedMessage(headers, message.payload?.mimeType),
   };
 }

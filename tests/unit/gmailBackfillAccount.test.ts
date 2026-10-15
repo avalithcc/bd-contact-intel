@@ -73,6 +73,7 @@ function baseDeps(overrides: Partial<BackfillAccountDeps> = {}): BackfillAccount
     getKnownPersons: async () => [],
     getNeverLogRules: async () => [],
     getPlatformSentIds: async () => new Set(),
+    threadPorts: { getOutboundThreadRefs: async () => [], getOwnMailboxAddresses: async () => [] },
     writeMessages: async () => ({ inserted: 0 }),
     ...overrides,
   };

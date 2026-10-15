@@ -78,6 +78,7 @@ function baseDeps(overrides: Partial<SyncAccountDeps> = {}): SyncAccountDeps {
     getKnownPersons: async () => [],
     getNeverLogRules: async () => [],
     getPlatformSentIds: async () => new Set(),
+    threadPorts: { getOutboundThreadRefs: async () => [], getOwnMailboxAddresses: async () => [] },
     writeMessages: async () => ({ inserted: 0 }),
     ...overrides,
   };

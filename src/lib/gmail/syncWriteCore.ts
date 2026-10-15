@@ -107,7 +107,11 @@ export async function executeSyncedMessageWrite(
   // inboundReplyVerification.ts.
   const replied = insertedRows.flatMap((row) => {
     const c = classifiedByGmailId.get(row.gmailMessageId)!;
-    return c.direction === "inbound" ? c.matches.map((m) => ({ personId: m.personId, fromAddress: c.fromAddress })) : [];
+    // A thread attribution is not an address match: the sender's address is not the one we hold,
+    // so it proves nothing about it (the planner would refuse anyway; this keeps the intent explicit).
+    return c.direction === "inbound"
+      ? c.matches.filter((m) => m.matchConfidence !== "thread").map((m) => ({ personId: m.personId, fromAddress: c.fromAddress }))
+      : [];
   });
   if (replied.length > 0) await store.verifyRepliedAddresses(replied);
 
