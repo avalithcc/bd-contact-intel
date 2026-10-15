@@ -53,7 +53,7 @@ Four stat cards MUST be shown, each computed from current member states:
 | "Enviados" | members whose step 1 has been sent, including those who later replied; foot shows how many are awaiting a reminder |
 | "Respondieron" | members in `replied`; foot "pasó a Seguimientos" |
 
-The progress line MUST read "X de N ya salieron" with X = members whose step 1 was sent, and the bar segments MUST be proportional to sent, queued, and to-review counts.
+The progress line MUST read "X de N ya salieron" with X = members whose step 1 was sent, and the bar MUST have three segments proportional to the total: sent, queued, and a neutral remainder "sin salir" (everything neither sent nor queued, so it holds the drafts to review AND the discarded members). The three always add to 100%, matching the approved mockup (40% / 20% / 40% on its dataset); a track that stops short reads as a rendering bug.
 
 #### Scenario: Counters match the cards
 
@@ -61,6 +61,13 @@ The progress line MUST read "X de N ya salieron" with X = members whose step 1 w
 - WHEN the page renders
 - THEN the cards show 3, 2, 4 (3 awaiting reminder), 1
 - AND the progress line says 4 de 10 ya salieron
+
+#### Scenario: The bar always fills
+
+- GIVEN the mockup dataset (3 drafted, 2 approved, 4 sent or replied, 1 discarded)
+- WHEN the progress bar is computed
+- THEN the segments are 40% sent, 20% queued and 40% "sin salir"
+- AND they add to 100%
 
 #### Scenario: Discarded members count in the total
 

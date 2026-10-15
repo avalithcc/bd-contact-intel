@@ -426,3 +426,31 @@ export function AbsorbIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+export function MoreIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </Svg>
+  );
+}
+
+export function FileIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z" />
+      <path d="M14 2v6h6" />
+    </Svg>
+  );
+}
+
+export function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <path d="m22 4-10 10.01-3-3" />
+    </Svg>
+  );
+}

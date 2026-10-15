@@ -21,7 +21,7 @@ const dict = es.auditLog;
 /**
  * Administración → Registro de auditoría (admin-conversation-access mockup,
  * screen 3: admin-conversation.html:310-355). Scoped to `view_conversation`
- * entries only (owner decision, 2026-09-30) — merges/unmerges keep their own
+ * and `view_sequence` entries (owner decision, 2026-09-30, extended for Sequence reads) — merges/unmerges keep their own
  * history table at /admin/duplicates#history. No retention window: shows
  * everything, paginated (owner decision — the mockup's "últimos 90 días" is
  * dropped).
@@ -82,6 +82,7 @@ export default async function AuditLogAdminPage({
                 <tr>
                   <th>{dict.colWhen}</th>
                   <th>{dict.colAdmin}</th>
+                  <th>{dict.colAccess}</th>
                   <th>{dict.colContact}</th>
                   <th>{dict.colConversationOf}</th>
                   <th></th>
@@ -98,7 +99,14 @@ export default async function AuditLogAdminPage({
                       </span>
                     </td>
                     <td>
-                      {row.personId ? (
+                      <span className="badge badge-neutral">
+                        {row.action === "view_sequence" ? dict.accessSequence : dict.accessConversation}
+                      </span>
+                    </td>
+                    <td>
+                      {row.action === "view_sequence" ? (
+                        <span className="strong">{row.sequenceName ?? "—"}</span>
+                      ) : row.personId ? (
                         <Link className="strong" href={`/contacts/${row.personId}`}>
                           {row.personName ?? "—"}
                         </Link>

@@ -1029,6 +1029,10 @@ export const auditLog = pgTable(
     // 'sequence_member_readmit' | 'sequence_member_regenerate' (the approval-side
     // actions on a Sequence member; person_id is the member's Contact, metadata
     // carries memberId, sequenceId and the step)
+    // 'view_sequence' (an admin opened another BD's Sequence and its draft bodies;
+    // target_bd_id is the owner, metadata carries sequenceId; see
+    // src/lib/sequences/readAudit.ts. Listed by /admin/audit-log alongside
+    // view_conversation — both are "an admin read another BD's private content")
     // 'apply_resolved_phones' (scripts/apply-resolved-phones.ts wrote the
     // numbers a human picked for the people whose signatures disagreed and
     // extract-signature-phones.ts therefore left alone; history rows carry

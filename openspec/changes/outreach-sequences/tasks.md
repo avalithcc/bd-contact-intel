@@ -289,11 +289,11 @@ Commits:
 
 Reachable: nothing. Components live under `src/app/(app)/sequences/_components/` (a private folder that is not routed); **no `page.tsx` is added**.
 
-- [ ] 11.1 RED/GREEN: `stats.ts`: the four stat cards, progress segments and finished-state counts. Mockup dataset (3 drafted, 2 approved, 3 sent without reply, 1 replied after being sent, 1 discarded) yields 3, 2, 4 (3 awaiting reminder), 1 and "4 de 10 ya salieron"; discarded members count in the total but not among the unanswered.
-- [ ] 11.2 RED/GREEN: pure card mapper: state + hold reason + reminder-due -> badge, meta line, action set, for all six states in the `sequence-detail-view` table (including "Recordatorio hoy"); held members show their reason; replied cards offer no approve or reminder action.
-- [ ] 11.3 `getSequenceDetail` query, owner-scoped; an admin read of another BD's Sequence writes an `audit_log` row (admin, owner BD, timestamp) before returning draft bodies, following `getConversationForAdmin`.
-- [ ] 11.4 Components: header with "Aprobar los N listos", Cadencia card, stat cards, progress line, member cards, empty state ("N contactos, ningun borrador todavia" + "Generar los N borradores"), finished state ("Secuencia completa"). `sequences` dictionary slice (`es`/`en`) with the `ClientStrings` guard for client components. Existing classes only (`.stat`, `.empty`, `.assoc`, `.chip`, badges); no new CSS.
-- [ ] 11.5 Test: every class used by the components exists in the approved design system `styles.css` (spec "no new design tokens").
+- [x] 11.1 RED/GREEN: `stats.ts`: the four stat cards, progress segments and finished-state counts. Mockup dataset (3 drafted, 2 approved, 3 sent without reply, 1 replied after being sent, 1 discarded) yields 3, 2, 4 (3 awaiting reminder), 1 and "4 de 10 ya salieron"; discarded members count in the total but not among the unanswered.
+- [x] 11.2 RED/GREEN: pure card mapper: state + hold reason + reminder-due -> badge, meta line, action set, for all six states in the `sequence-detail-view` table (including "Recordatorio hoy"); held members show their reason; replied cards offer no approve or reminder action.
+- [x] 11.3 `getSequenceDetail` query, owner-scoped; an admin read of another BD's Sequence writes an `audit_log` row (admin, owner BD, timestamp) before returning draft bodies, following `getConversationForAdmin`.
+- [x] 11.4 Components (progress bar follows the mockup's three segments, spec corrected; `/admin/audit-log` now lists `view_sequence`): header with "Aprobar los N listos", Cadencia card, stat cards, progress line, member cards, empty state ("N contactos, ningun borrador todavia" + "Generar los N borradores"), finished state ("Secuencia completa"). `sequences` dictionary slice (`es`/`en`) with the `ClientStrings` guard for client components. Existing classes only (`.stat`, `.empty`, `.assoc`, `.chip`, badges); no new CSS.
+- [x] 11.5 Test: every class used by the components exists in the approved design system `styles.css` (spec "no new design tokens").
 
 Commits:
 - `feat(sequences): add stat, progress and member-card view models`
