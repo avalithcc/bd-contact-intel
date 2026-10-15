@@ -18,7 +18,8 @@ import type { ContactMembership } from "./contactContext";
 import type { SequenceListRow } from "./listView";
 import { groupListRows, replyPhrases, toMembership, toPickerContact, type ListDbRow, type MembershipDbRow, type PickerDbRow } from "./pageReads";
 import type { PickerContact } from "./pickerView";
-import { clientStatusSql } from "./rosterQuery";
+import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
+import { canonicalCompanyJoinSql, clientStatusSql, companyNameColumnsSql, displayedCompanySql } from "./rosterQuery";
 import { listSuppressionRules } from "./suppressionQueries";
 
 type Row = Record<string, unknown>;
@@ -33,15 +34,16 @@ const date = (v: unknown): Date | null => (v == null ? null : parseDbTimestamp(v
 export async function listSequencesForBd(bdId: string): Promise<SequenceListRow[]> {
   const rows = rowsOf<Row>(
     await db.execute(sql`
-      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, p.company
+      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, ${companyNameColumnsSql}
       from sequence s
       left join sequence_member sm on sm.sequence_id = s.id
       left join sequence_draft d on d.sequence_member_id = sm.id and d.step = 1
       left join person p on p.id = sm.person_id
+      ${canonicalCompanyJoinSql}
       where s.owner_bd_id = ${bdId}::uuid
       order by s.created_at desc, s.id, sm.created_at, sm.id`),
   );
-  return groupListRows(rows.map((r): ListDbRow => ({ ...(r as ListDbRow), created_at: date(r.created_at)!, scheduled_for: date(r.scheduled_for) })));
+  return groupListRows(withResolvedCompanyName(rows.map((r) => ({ ...(r as ListDbRow & { companyCanonicalName: string | null }), created_at: date(r.created_at)!, scheduled_for: date(r.scheduled_for) }))));
 }
 
 /** The BD's connected Gmail account, the one a Sequence sends from. Null when none is connected: nothing can be created. */
@@ -64,12 +66,13 @@ export const PICKER_POOL_LIMIT = 500;
  * construction: the postings join matches on it.
  */
 export async function listPickerContacts(unnamed: string): Promise<PickerContact[]> {
-  const rows = rowsOf<PickerDbRow>(
+  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null }>(
     await db.execute(sql`
       select p.id::text as person_id, p.first_name, p.last_name, p.email, p.email_status, p.email_source, p.job_title, p.status,
-             p.company, p.company_key, p.merged_into_id::text as merged_into_id, ${clientStatusSql} as client_status,
+             ${companyNameColumnsSql}, p.company_key, p.merged_into_id::text as merged_into_id, ${clientStatusSql} as client_status,
              h.open_it::int as open_it, h.is_florida
       from person p
+      ${canonicalCompanyJoinSql}
       join lateral (
         select count(*) as open_it, coalesce(bool_or(jp.is_miami), false) as is_florida
         from job_posting jp
@@ -77,11 +80,11 @@ export async function listPickerContacts(unnamed: string): Promise<PickerContact
           and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
       ) h on h.open_it > 0
       where p.company_key is not null
-      order by (p.merged_into_id is not null), (btrim(coalesce(p.email, '')) = ''), p.company, p.last_name, p.first_name, p.id
+      order by (p.merged_into_id is not null), (btrim(coalesce(p.email, '')) = ''), ${displayedCompanySql}, p.last_name, p.first_name, p.id
       limit ${PICKER_POOL_LIMIT}`),
   );
   const rules = await listSuppressionRules();
-  return rows.map((r) => toPickerContact(r, rules, unnamed));
+  return withResolvedCompanyName(rows).map((r) => toPickerContact(r, rules, unnamed));
 }
 
 /** Newest history first, live and opted-out first, so a bound could only ever cut old discarded history. */

@@ -9,6 +9,7 @@ import { sequenceAuditRow } from "./approvalAudit";
 import { validateDailySendCap, type CapRejection } from "./capValidation";
 import { canTransition, type MemberState } from "./memberState";
 import { DEFAULT_SCHEDULE } from "./schedule";
+import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { clientStatusSql, buildRosterCandidatesQuery } from "./rosterQuery";
 import { evaluateRosterAdds, type RosterCandidate, type RosterDecision, type RosterRejection } from "./rosterGuards";
 import { listSuppressionRules } from "./suppressionQueries";
@@ -30,7 +31,7 @@ export interface PickerRow {
 }
 
 export async function listRosterCandidates(opts: { limit: number; search?: string }): Promise<PickerRow[]> {
-  return rowsOf<PickerRow>(await db.execute(buildRosterCandidatesQuery(opts)));
+  return withResolvedCompanyName(rowsOf<PickerRow & { companyCanonicalName: string | null }>(await db.execute(buildRosterCandidatesQuery(opts))));
 }
 
 async function loadCandidates(tx: Tx, personIds: readonly string[]): Promise<RosterCandidate[]> {

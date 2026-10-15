@@ -35,13 +35,13 @@ async function mkCompany(name: string, over: { clientStatus?: string; postings?:
   return ck;
 }
 
-async function mkPerson(name: string, ck: string | null, over: { email?: string | null; emailStatus?: string; mergedIntoId?: string } = {}) {
+async function mkPerson(name: string, ck: string | null, over: { email?: string | null; emailStatus?: string; mergedIntoId?: string; company?: string | null } = {}) {
   const { db } = await import("@/db");
   const { person } = await import("@/db/schema");
   const email = over.email === undefined ? `${key(name)}@example.test` : over.email;
   const [p] = await db
     .insert(person)
-    .values({ firstName: name, lastName: run, email, emailNormalized: email?.toLowerCase().trim() ?? null, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", company: ck, companyKey: ck, mergedIntoId: over.mergedIntoId })
+    .values({ firstName: name, lastName: run, email, emailNormalized: email?.toLowerCase().trim() ?? null, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", company: over.company === undefined ? ck : over.company, companyKey: ck, mergedIntoId: over.mergedIntoId })
     .returning();
   personIds.push(p.id);
   return p;
@@ -170,6 +170,49 @@ test("the picker KEEPS contacts that cannot be added, each with its reason, and 
   const order = pool.map((c) => c.personId);
   assert.ok(order.indexOf(ok.id) < order.indexOf(merged.id));
   assert.ok(order.indexOf(ok.id) < order.indexOf(noEmail.id));
+});
+
+// --- the company NAME a Contact shows: free text wins, the canonical name fills a null (companyDisplayName.ts) ----------
+
+/** A company with an open US IT posting whose canonical display name differs from its key. */
+async function mkNamedCompany(name: string, displayName: string | null) {
+  const { db } = await import("@/db");
+  const { company, jobPosting, targetCompany } = await import("@/db/schema");
+  const ck = key(`named-${name}`);
+  companyKeys.push(ck);
+  if (displayName !== null) await db.insert(company).values({ companyKey: ck, displayName });
+  await db.insert(targetCompany).values({ companyKey: ck, displayName: displayName ?? ck, ats: "lever", config: {} });
+  await db.insert(jobPosting).values({ companyKey: ck, externalId: "1", title: "Engineer", location: "Miami, FL", url: "https://example.test", isIt: true, market: "us", isMiami: true });
+  return ck;
+}
+
+test("the list shows the canonical company for a null free text, the free text when present, and nothing for a key with no company row", async () => {
+  const { listSequencesForBd } = await import("@/lib/sequences/pageQueries");
+  const { db } = await import("@/db");
+  const { sequence } = await import("@/db/schema");
+  const [seq] = await db.insert(sequence).values({ name: key("names"), ownerBdId: otherId, emailAccountId: otherAccountId, schedule: {} }).returning();
+  sequenceIds.push(seq.id);
+  await mkMember(seq.id, (await mkPerson("nm-free", await mkNamedCompany("l1", `Canon L1 ${run}`), { company: `Free L1 ${run}` })).id, "drafted");
+  await mkMember(seq.id, (await mkPerson("nm-null", await mkNamedCompany("l2", `Canon L2 ${run}`), { company: null })).id, "drafted");
+  await mkMember(seq.id, (await mkPerson("nm-dangling", await mkNamedCompany("l3", null), { company: null })).id, "drafted");
+  const row = (await listSequencesForBd(otherId)).find((r) => r.id === seq.id)!;
+  assert.deepEqual(row.companies, [`Free L1 ${run}`, `Canon L2 ${run}`]);
+});
+
+test("the picker shows the canonical company for a null free text and orders by the name it SHOWS", async () => {
+  const { listPickerContacts } = await import("@/lib/sequences/pageQueries");
+  const mid = await mkPerson("po-mid", await mkNamedCompany("p1", `Zzz canonical ${run}`), { company: `Mmm free ${run}` });
+  const low = await mkPerson("po-low", await mkNamedCompany("p2", `Aaa canonical ${run}`), { company: null });
+  const high = await mkPerson("po-high", await mkNamedCompany("p3", `Ttt canonical ${run}`), { company: null });
+  const dangling = await mkPerson("po-dangling", await mkNamedCompany("p4", null), { company: null });
+  const pool = await listPickerContacts("Sin nombre");
+  const by = new Map(pool.map((c) => [c.personId, c]));
+  assert.equal(by.get(mid.id)?.company, `Mmm free ${run}`);
+  assert.equal(by.get(low.id)?.company, `Aaa canonical ${run}`);
+  assert.equal(by.get(high.id)?.company, `Ttt canonical ${run}`);
+  assert.equal(by.get(dangling.id)?.company, null);
+  const order = pool.map((c) => c.personId);
+  assert.ok(order.indexOf(low.id) < order.indexOf(mid.id) && order.indexOf(mid.id) < order.indexOf(high.id), "ordered Aaa, Mmm, Ttt by displayed name");
 });
 
 test("a Contact's memberships are found by EMAIL ADDRESS: a second Contact row with the same address is included", async () => {

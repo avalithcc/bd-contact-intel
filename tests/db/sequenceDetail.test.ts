@@ -172,3 +172,29 @@ test("the owner reading their own Sequence writes no audit row", async () => {
   await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
   assert.equal((await auditRows(ownerId)).length, 0);
 });
+
+test("a member card shows the canonical company for a null free text, the free text when present, and null for a key with no company row", async () => {
+  const { db } = await import("@/db");
+  const { company, person, sequence, sequenceMember, targetCompany } = await import("@/db/schema");
+  const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
+  const [seq] = await db.insert(sequence).values({ name: key("names"), ownerBdId: ownerId, emailAccountId: accountId, schedule: {} }).returning();
+  const add = async (name: string, displayName: string | null, freeText: string | null) => {
+    const ck = key(`nm-${name}`);
+    companyKeys.push(ck);
+    if (displayName !== null) await db.insert(company).values({ companyKey: ck, displayName });
+    await db.insert(targetCompany).values({ companyKey: ck, displayName: displayName ?? ck, ats: "lever", config: {} });
+    const email = `${key(`nm-${name}`)}@example.test`;
+    const [p] = await db.insert(person).values({ firstName: name, lastName: run, email, emailNormalized: email, company: freeText, companyKey: ck }).returning();
+    personIds.push(p.id);
+    await db.insert(sequenceMember).values({ sequenceId: seq.id, personId: p.id, state: "drafted" });
+    return p.id;
+  };
+  const free = await add("free", `Canon Free ${run}`, `Free Text ${run}`);
+  const nullFree = await add("null", `Canon Null ${run}`, null);
+  const dangling = await add("dangling", null, null);
+  const d = await getSequenceDetail({ id: ownerId, role: "bd" }, seq.id);
+  const by = (id: string) => d!.members.find((m) => m.personId === id)!;
+  assert.equal(by(free).company, `Free Text ${run}`);
+  assert.equal(by(nullFree).company, `Canon Null ${run}`);
+  assert.equal(by(dangling).company, null);
+});

@@ -53,3 +53,20 @@ test("an optional search term filters by name or company with a bound parameter"
   assert.ok(q.params.includes("%twil%"));
   assert.doesNotMatch(q.sql, /twil/);
 });
+
+test("the company NAME is resolved like the Contacts list: canonical name through company_key for a null free text", () => {
+  const sql = text(buildRosterCandidatesQuery({ limit: 10, search: "acme" }));
+  assert.match(sql, /left join company cn on cn\.company_key = p\.company_key/);
+  assert.match(sql, /cn\.display_name as "companyCanonicalName"/);
+});
+
+test("ordering follows the name the user SEES: free text, else the canonical name", () => {
+  assert.match(text(), /order by coalesce\(p\.company, cn\.display_name\), p\.last_name/);
+});
+
+test("search reuses the Contacts list company match (what is displayed), not the raw column", () => {
+  const q = render(buildRosterCandidatesQuery({ limit: 10, search: "acme" }));
+  const sql = q.sql.replace(/\s+/g, " ");
+  assert.doesNotMatch(sql, /concat_ws\(' ', p\.first_name, p\.last_name, p\.company\)/);
+  assert.match(sql, /p\.company ilike \$\d+ or \(\(p\.company is null or p\.company = ''\) and exists \(select 1 from "company" where "company"\."company_key" = p\.company_key and "company"\."display_name" ilike \$\d+\)\)/);
+});
