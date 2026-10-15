@@ -24,11 +24,14 @@ import { assertTransition } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { recipientMarket } from "./recipientMarket";
 import { generateReminderDraft } from "./draftQueries";
-import { parseSchedule, reminderDueAt, reminderReleaseAt, step1DueAt } from "./schedule";
+import { parseSchedule, reminderDueAt } from "./schedule";
+import { pickReleaseKeys, releaseInstant, type SlimRow } from "./releaseSelection";
 import type { HoldChange, ReleaseCandidate, RunnerPorts } from "./runSequenceRelease";
 import { listSuppressionRules } from "./suppressionQueries";
 
 const MAX_CANDIDATES = 500;
+/** Hard bound on the slim scan that precedes the cap. Hitting it is reported as truncation too. */
+const MAX_SCAN = 5000;
 type Row = Record<string, unknown>;
 const rowsOf = <T>(r: unknown) => r as T[];
 const toDate = (v: unknown): Date | null => (v === null || v === undefined ? null : v instanceof Date ? v : new Date(v as string));
@@ -47,11 +50,9 @@ function toCandidate(r: Row): ReleaseCandidate {
   const step = Number(r.step) as 1 | 2;
   const schedule = parseSchedule(r.schedule);
   const approvedAt = toDate(r.approved_at)!;
-  const dueAt =
-    step === 1
-      ? (toDate(r.scheduled_for) ?? step1DueAt(approvedAt, schedule))
-      : // "Adelantar recordatorio" moves only member.reminder_due_at, so a reminder's release instant is derived, not stored.
-        reminderReleaseAt(toDate(r.reminder_due_at)!, approvedAt, schedule)!;
+  // The same helper that ordered the cap (releaseSelection): "Adelantar recordatorio" moves only member.reminder_due_at, so a
+  // reminder's release instant is derived, not stored.
+  const dueAt = releaseInstant({ step, scheduledFor: toDate(r.scheduled_for), reminderDueAt: toDate(r.reminder_due_at), approvedAt, schedule });
   return {
     id: r.member_id as string, sequenceId: r.sequence_id as string, ownerBdId: r.owner_bd_id as string, personId: r.person_id as string,
     accountId: r.account_id as string, dailyCap: Number(r.daily_send_cap), step, dueAt, approvedAt, schedule,
@@ -64,9 +65,37 @@ function toCandidate(r: Row): ReleaseCandidate {
   };
 }
 
-/** Approved, due-or-overdue steps: step 1 for `approved` members, the reminder for `sent` members. Oldest due first. */
-export async function listReleaseCandidates(now: Date): Promise<ReleaseCandidate[]> {
+const dueWhere = (iso: string) => sql`d.approved_at is not null
+        and ((d.step = 1 and sm.state = 'approved' and d.scheduled_for <= ${iso}::timestamptz)
+          or (d.step = 2 and sm.state = 'sent' and sm.reminder_due_at <= ${iso}::timestamptz))`;
+
+/**
+ * Approved, due-or-overdue steps: step 1 for `approved` members, the reminder for `sent` members. Two statements: a slim
+ * scan (no subqueries) picks which `limit` steps to load by RELEASE instant (releaseSelection, the same expression
+ * toCandidate uses), then ONE statement loads the facts for exactly those. `truncated` means more were due than fit:
+ * the oldest are taken first, the rest wait, and the runner reports it (a permanently held member keeps its slot).
+ *
+ * The slim scan orders by the RAW due column, not by `sm.id`: SQL cannot reproduce `releaseInstant` (Miami DST
+ * wall-clock math), so this is only an approximation of the real order — but it is approximately chronological, and
+ * `pickReleaseKeys` then orders the survivors exactly. Cutting the scan by uuid instead, as this first did, means the
+ * oldest due member can sit behind lower-uuid members on every single run, permanently if those are held.
+ */
+export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES): Promise<{ candidates: ReleaseCandidate[]; truncated: boolean }> {
   const iso = now.toISOString();
+  const slim = rowsOf<Row>(
+    await db.execute(sql`
+      select sm.id::text as member_id, d.step, d.scheduled_for, sm.reminder_due_at, d.approved_at, s.schedule
+      from sequence_draft d join sequence_member sm on sm.id = d.sequence_member_id join sequence s on s.id = sm.sequence_id
+      where ${dueWhere(iso)}
+      order by coalesce(sm.reminder_due_at, d.scheduled_for), sm.id limit ${MAX_SCAN + 1}`),
+  );
+  const slimRows: SlimRow[] = slim.slice(0, MAX_SCAN).map((r) => ({
+    id: r.member_id as string, step: Number(r.step) as 1 | 2, scheduledFor: toDate(r.scheduled_for), reminderDueAt: toDate(r.reminder_due_at),
+    approvedAt: toDate(r.approved_at)!, schedule: parseSchedule(r.schedule),
+  }));
+  const picked = pickReleaseKeys(slimRows, now, limit);
+  if (!picked.keys.length) return { candidates: [], truncated: picked.truncated || slim.length > MAX_SCAN };
+  const keys = sql.join(picked.keys.map((k) => sql`(${k.id}::uuid, ${k.step}::int)`), sql`, `);
   const rows = rowsOf<Row>(
     await db.execute(sql`
       select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
@@ -79,7 +108,8 @@ export async function listReleaseCandidates(now: Date): Promise<ReleaseCandidate
              ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
              (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,
              s1.rfc as step1_rfc, s1.thread as step1_thread
-      from sequence_draft d
+      from (values ${keys}) as k(id, step)
+      join sequence_draft d on d.sequence_member_id = k.id and d.step = k.step
       join sequence_member sm on sm.id = d.sequence_member_id
       join sequence s on s.id = sm.sequence_id
       join email_account ea on ea.id = s.email_account_id
@@ -90,13 +120,13 @@ export async function listReleaseCandidates(now: Date): Promise<ReleaseCandidate
         left join email_message em on em.bd_id = ea.bd_id and em.gmail_message_id = cl.gmail_message_id
         where d.step = 2 and cl.sequence_member_id = sm.id and cl.step = 1 and cl.outcome = 'sent' limit 1
       ) s1 on true
-      where d.approved_at is not null
-        and ((d.step = 1 and sm.state = 'approved' and d.scheduled_for <= ${iso}::timestamptz)
-          or (d.step = 2 and sm.state = 'sent' and sm.reminder_due_at <= ${iso}::timestamptz))
-      order by coalesce(sm.reminder_due_at, d.scheduled_for), d.approved_at, sm.id
-      limit ${MAX_CANDIDATES}`),
+      where ${dueWhere(iso)}`),
   );
-  return rows.map(toCandidate);
+  return { candidates: rows.map(toCandidate), truncated: picked.truncated || slim.length > MAX_SCAN };
+}
+
+export async function listReleaseCandidates(now: Date, limit = MAX_CANDIDATES): Promise<ReleaseCandidate[]> {
+  return (await loadReleaseCandidates(now, limit)).candidates;
 }
 
 /**
@@ -135,6 +165,14 @@ export async function setHolds(changes: HoldChange[]): Promise<void> {
 const REQUIRED_STATE = { 1: "approved", 2: "sent" } as const;
 
 /**
+ * The text and approval the candidate was read with, re-checked against the row NOW. The send uses `c.subject`/`c.body`,
+ * so a BD who edited (and re-approved) since the read must not have the old text go out: the claim, not the read, is the
+ * authority. `approved_at` is compared at millisecond precision (the candidate carries a JS Date).
+ */
+const sameDraft = (c: ReleaseCandidate) =>
+  sql`and date_trunc('milliseconds', d.approved_at) = ${c.approvedAt.toISOString()}::timestamptz and d.subject = ${c.subject} and d.body = ${c.body}`;
+
+/**
  * The at-most-once claim. Returns the claim id, or null when another run holds the step or the member is not releasable.
  * The conditions live IN the statement and come from the step, not from the caller, so inertness guarantee 2 (only
  * approved members are ever released) holds here even if preSendChecks never ran or a caller forges `memberState`.
@@ -150,7 +188,7 @@ export async function claimStep(c: ReleaseCandidate): Promise<string | null> {
       insert into sequence_send_claim (sequence_member_id, step, sending_account_id, outcome)
       select sm.id, d.step, ${c.accountId}::uuid, 'pending'
       from sequence_member sm join sequence_draft d on d.sequence_member_id = sm.id and d.step = ${c.step}
-      where sm.id = ${c.id}::uuid and sm.state = ${REQUIRED_STATE[c.step]} and d.approved_at is not null ${reminderOnly}
+      where sm.id = ${c.id}::uuid and sm.state = ${REQUIRED_STATE[c.step]} and d.approved_at is not null ${sameDraft(c)} ${reminderOnly}
       on conflict do nothing returning id::text as id`),
   );
   return row?.id ?? null;
@@ -184,7 +222,7 @@ export async function recordSent(c: ReleaseCandidate, claimId: string, sent: { m
 
 export const liveRunnerPorts: RunnerPorts = {
   now: () => new Date(),
-  load: async (now) => ({ candidates: await listReleaseCandidates(now), sentToday: await countSentToday(now), suppression: await listSuppressionRules() }),
+  load: async (now) => ({ ...(await loadReleaseCandidates(now)), sentToday: await countSentToday(now), suppression: await listSuppressionRules() }),
   setHolds,
   claim: claimStep,
   send: (c, message) => sendGmailMessageFromAccount({ accountId: c.accountId, ...message }),

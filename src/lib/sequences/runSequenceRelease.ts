@@ -45,7 +45,7 @@ export interface HoldChange {
 
 export interface RunnerPorts {
   now(): Date;
-  load(now: Date): Promise<{ candidates: ReleaseCandidate[]; sentToday: Map<string, number>; suppression: SuppressionRule[] }>;
+  load(now: Date): Promise<{ candidates: ReleaseCandidate[]; sentToday: Map<string, number>; suppression: SuppressionRule[]; truncated?: boolean }>;
   setHolds(changes: HoldChange[]): Promise<void>;
   /** INSERT ... ON CONFLICT DO NOTHING: the claim id, or null when the step is already claimed (or no longer approved). */
   claim(c: ReleaseCandidate): Promise<string | null>;
@@ -61,6 +61,15 @@ export interface RunSummary {
   held: number;
   deferred: number;
   failed: number;
+  /** Present (true) only when the candidate cap cut something: more steps were due than this run looked at. */
+  capped?: true;
+  /**
+   * Claims lost between the read and the write, counted apart from `deferred` (which already carries the daily cap
+   * AND a halted account). Benign on its own — another run took it, or the row changed, and both retry next run — but
+   * a count that keeps climbing is the only way to tell contention from a member that cannot get through. Absent when
+   * zero, so it never appears in a quiet run's summary.
+   */
+  lost?: number;
 }
 
 /**
@@ -76,8 +85,9 @@ const HALTS_ACCOUNT: readonly GmailSendErrorKind[] = ["reauth_required", "not_co
 
 export async function runSequenceRelease(ports: RunnerPorts): Promise<RunSummary> {
   const now = ports.now();
-  const { candidates, sentToday, suppression } = await ports.load(now);
+  const { candidates, sentToday, suppression, truncated } = await ports.load(now);
   const summary: RunSummary = { released: 0, held: 0, deferred: 0, failed: 0 };
+  if (truncated) summary.capped = true;
   const eligible: ReleaseCandidate[] = [];
   const holds: HoldChange[] = [];
   const hold = (c: ReleaseCandidate, reason: HoldReason | null) => {
@@ -119,7 +129,13 @@ export async function runSequenceRelease(ports: RunnerPorts): Promise<RunSummary
         continue;
       }
       const claimId = await ports.claim(c);
-      if (!claimId) continue;
+      if (!claimId) {
+        // Lost to another run, or the row changed since the read (state, reply, edited text): nothing was sent. Counted
+        // as `lost`, NOT folded into `deferred`: deferred already means "over the daily cap" and "account halted", and a
+        // third meaning would make a member that never gets through look exactly like an ordinary busy day.
+        summary.lost = (summary.lost ?? 0) + 1;
+        continue;
+      }
 
       let sent: { messageId: string; threadId: string };
       try {

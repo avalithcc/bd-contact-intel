@@ -57,14 +57,37 @@ test("the sidebar nav source has no Secuencias entry", () => {
 // The runner and its real ports. The original `run\b` matched only a module literally named `run`, so the actual
 // runner (`runSequenceRelease`, task 9.5) and its DB ports (`releaseQueries`) slipped past it; the task 1.1 wording is
 // "@/lib/sequences/run*".
-const RUNNER_IMPORT = /@\/lib\/sequences\/(run\w*|releaseQueries)\b/;
+// It matches the module SPECIFIER in either form: the alias, or any relative path ("./runSequenceRelease",
+// "../sequences/releaseQueries", "../../lib/sequences/run"). A relative import is the same module.
+// Two branches, because there are two ways into the runner from src/app:
+//   * a bare `.../sequences` barrel — nothing imports one today, and one re-exporting the runner is exactly the hole
+//     this guard exists to close;
+//   * the runner module itself, by alias or by relative path at any depth, INCLUDING a bare sibling (`./run...`),
+//     which would mean a copy of the runner living under src/app.
+// Backticks count: a template-literal `import()` is still an import. So does an explicit file extension.
+// `run\w*` deliberately over-matches a relative module merely starting with "run" (`./runtime`). Nothing in src trips
+// it, and for a safety rail a false positive costs a conversation while a false negative ships the cron.
+// The leading `@/` or `./` is required: it is what makes this a MODULE specifier and not a route. Without it the
+// barrel branch also matched the href "/sequences" in a Cancel link.
+const RUNNER_IMPORT =
+  /["'`](?:@\/(?:[\w.-]+\/)*|\.{1,2}\/(?:[\w.-]+\/)*)(?:sequences|(?:run\w*|releaseQueries)(?:\.[jt]sx?)?)["'`]/;
 
 test("the runner import guard matches the real runner modules, and not the pure planning ones", () => {
-  for (const hit of ["@/lib/sequences/run", "@/lib/sequences/runSequenceRelease", "@/lib/sequences/releaseQueries"]) {
-    assert.match(hit, RUNNER_IMPORT, hit);
+  const specifiers = (name: string) => [`@/lib/sequences/${name}`, `./${name}`, `../${name}`, `../../lib/sequences/${name}`];
+  for (const name of ["run", "runSequenceRelease", "releaseQueries"]) {
+    for (const spec of specifiers(name)) {
+      for (const quote of ['"', "'", "`"]) assert.match(`import { x } from ${quote}${spec}${quote};`, RUNNER_IMPORT, spec);
+      assert.match(`await import("${spec}")`, RUNNER_IMPORT, spec);
+      assert.match(`await import(\`${spec}\`)`, RUNNER_IMPORT, `template literal: ${spec}`);
+      assert.match(`import { x } from "${spec}.js";`, RUNNER_IMPORT, `with extension: ${spec}`);
+    }
   }
-  for (const miss of ["@/lib/sequences/releasePlan", "@/lib/sequences/preSendChecks", "@/lib/sequences/memberState"]) {
-    assert.doesNotMatch(miss, RUNNER_IMPORT, miss);
+  // A barrel that re-exports the runner is the same reachability, so the barrel itself is refused.
+  for (const spec of ["@/lib/sequences", "../sequences", "../../lib/sequences"]) {
+    assert.match(`import { runSequenceRelease } from "${spec}";`, RUNNER_IMPORT, spec);
+  }
+  for (const name of ["releasePlan", "preSendChecks", "memberState", "releaseSelection"]) {
+    for (const spec of specifiers(name)) assert.doesNotMatch(`import { x } from "${spec}";`, RUNNER_IMPORT, spec);
   }
 });
 

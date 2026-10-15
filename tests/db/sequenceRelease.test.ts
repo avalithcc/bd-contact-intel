@@ -40,7 +40,7 @@ async function footedBody(country: "us" | "latam" = "us") {
   return r.status === "ok" ? r.body : "";
 }
 
-async function mkMember(a: Acct, name: string, over: { state?: string; step?: 1 | 2; country?: string; email?: string } = {}) {
+async function mkMember(a: Acct, name: string, over: { state?: string; step?: 1 | 2; country?: string; email?: string; reminderDueAt?: Date; approvedAt?: Date } = {}) {
   const { db } = await import("@/db");
   const { person, sequenceDraft, sequenceMember } = await import("@/db/schema");
   const email = over.email ?? `zz-rel-${name}-${run}@example.test`;
@@ -49,9 +49,9 @@ async function mkMember(a: Acct, name: string, over: { state?: string; step?: 1 
   const step = over.step ?? 1;
   const [m] = await db
     .insert(sequenceMember)
-    .values({ sequenceId: a.sequenceId, personId: p.id, state: over.state ?? "approved", ...(step === 2 ? { sentAt: new Date("2026-10-08T13:00:00Z"), reminderDueAt: DUE } : {}) })
+    .values({ sequenceId: a.sequenceId, personId: p.id, state: over.state ?? "approved", ...(step === 2 ? { sentAt: new Date("2026-10-08T13:00:00Z"), reminderDueAt: over.reminderDueAt ?? DUE } : {}) })
     .returning();
-  await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step, subject: `Hi ${name}`, body: await footedBody(), approvedAt: new Date("2026-10-14T20:00:00Z"), scheduledFor: DUE });
+  await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step, subject: `Hi ${name}`, body: await footedBody(), approvedAt: over.approvedAt ?? new Date("2026-10-14T20:00:00Z"), scheduledFor: DUE });
   return { memberId: m.id, personId: p.id, email };
 }
 
@@ -373,4 +373,40 @@ test("members of the seeded shape (state drafted, nothing sent) are never touche
   assert.equal(sends.length, 0);
   assert.equal((await memberRow(m.memberId)).state, "drafted");
   assert.deepEqual(await claimsOf(m.memberId), []);
+});
+
+test("the claim re-reads the draft: text edited after the candidate read, or re-approved, is NOT claimed (the old text is never sent)", async () => {
+  const { claimStep, listReleaseCandidates } = await import("@/lib/sequences/releaseQueries");
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const a = await mkAccount("stale");
+  const edited = await mkMember(a, "stale-edited");
+  const reapproved = await mkMember(a, "stale-reapproved");
+  const untouched = await mkMember(a, "stale-untouched");
+  const byId = new Map((await listReleaseCandidates(NOW)).map((c) => [c.id, c]));
+  await db.update(sequenceDraft).set({ subject: "A different subject" }).where(eq(sequenceDraft.sequenceMemberId, edited.memberId));
+  await db.update(sequenceDraft).set({ approvedAt: new Date("2026-10-15T13:30:00Z") }).where(eq(sequenceDraft.sequenceMemberId, reapproved.memberId));
+  assert.equal(await claimStep(byId.get(edited.memberId)!), null, "subject changed since the read");
+  assert.equal(await claimStep(byId.get(reapproved.memberId)!), null, "approved_at changed since the read");
+  assert.ok(await claimStep(byId.get(untouched.memberId)!), "an unchanged draft is still claimable (no ms/us precision mismatch)");
+  await db.update(sequenceDraft).set({ body: "Edited body" }).where(eq(sequenceDraft.sequenceMemberId, untouched.memberId));
+  assert.deepEqual(await claimsOf(edited.memberId), []);
+});
+
+test("the cap cuts by the release instant (reminderReleaseAt), and says so when it cuts", async () => {
+  const { loadReleaseCandidates } = await import("@/lib/sequences/releaseQueries");
+  const a = await mkAccount("order");
+  // Raw reminder_due_at order is A < B; release order is B < A (A was approved late, so it waits for the next 09:00 window).
+  const early = { state: "sent", step: 2 as const, reminderDueAt: new Date("2026-10-10T13:00:00Z"), approvedAt: new Date("2026-10-12T20:00:00Z") };
+  const late = { state: "sent", step: 2 as const, reminderDueAt: new Date("2026-10-11T13:00:00Z"), approvedAt: new Date("2026-10-09T20:00:00Z") };
+  const ma = await mkMember(a, "order-a", early);
+  const mb = await mkMember(a, "order-b", late);
+  const one = await loadReleaseCandidates(NOW, 1);
+  assert.deepEqual(one.candidates.map((c) => c.id), [mb.memberId], "B releases first");
+  assert.equal(one.truncated, true);
+  const many = await loadReleaseCandidates(NOW, 1000);
+  assert.equal(many.truncated, false);
+  const mine = many.candidates.filter((c) => c.id === ma.memberId || c.id === mb.memberId);
+  assert.equal(mine.find((c) => c.id === ma.memberId)!.dueAt.toISOString(), "2026-10-13T13:00:00.000Z", "dueAt comes from the same helper as the ordering");
 });

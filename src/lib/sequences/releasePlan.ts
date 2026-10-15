@@ -35,7 +35,8 @@ export interface ReleasePlanInput<T extends PlanCandidate> {
   sentToday: ReadonlyMap<string, number>;
 }
 
-const byOrder = (a: PlanCandidate, b: PlanCandidate) =>
+type OrderKey = Pick<PlanCandidate, "id" | "dueAt" | "approvedAt">;
+export const byOrder = (a: OrderKey, b: OrderKey) =>
   a.dueAt.getTime() - b.dueAt.getTime() || a.approvedAt.getTime() - b.approvedAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 export function planSequenceRelease<T extends PlanCandidate>(input: ReleasePlanInput<T>): { release: T[]; deferred: T[] } {

@@ -90,11 +90,22 @@ test("happy path: claim BEFORE send, then record, then the reminder draft; count
   assert.equal(f.recorded[0].sentAt.getTime(), NOW.getTime());
 });
 
-test("a lost claim (another run got it) sends nothing and counts nothing", async () => {
+test("a lost claim (another run got it, or the row changed since the read) sends nothing and is counted as `lost`, apart from deferred", async () => {
   const c = candidate();
-  const f = fakes([c], { claimNull: new Set([c.id]) });
-  assert.deepEqual(await runSequenceRelease(f.ports), { released: 0, held: 0, deferred: 0, failed: 0 });
-  assert.deepEqual(f.sent, []);
+  const other = candidate();
+  const f = fakes([c, other], { claimNull: new Set([c.id]) });
+  // NOT folded into `deferred`: that already means "over the daily cap" and "account halted". A third meaning would
+  // make a member that never gets through look exactly like an ordinary busy day.
+  assert.deepEqual(await runSequenceRelease(f.ports), { released: 1, held: 0, deferred: 0, failed: 0, lost: 1 });
+  assert.deepEqual(f.sent, [other.id]);
+});
+
+test("a load that hit the candidate cap says so in the summary; an uncapped load leaves the field absent", async () => {
+  const f = fakes([candidate()]);
+  const load = f.ports.load;
+  assert.equal("capped" in (await runSequenceRelease(f.ports)), false);
+  f.ports.load = async (now) => ({ ...(await load(now)), truncated: true });
+  assert.deepEqual(await runSequenceRelease(f.ports), { released: 1, held: 0, deferred: 0, failed: 0, capped: true });
 });
 
 test("step 2 sends threaded, records the send, and does NOT draft another reminder", async () => {
