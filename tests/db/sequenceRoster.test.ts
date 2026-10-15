@@ -102,7 +102,7 @@ after(async () => {
   await db.delete(bd).where(inArray(bd.id, [bdId, otherBdId]));
 });
 
-test("picker offers a clean Contact and excludes active clients, INACTIVE clients, merged, none, pattern-inferred and no-posting", async () => {
+test("picker offers a clean Contact and excludes active clients, INACTIVE clients, merged, none, an UNCONFIRMED guess and no-posting", async () => {
   const { listRosterCandidates } = await import("@/lib/sequences/rosterQueries");
   const ok = await mkCompany("pk-ok", null, { alias: "pk-ok-alias" });
   const act = await mkCompany("pk-active", "active");
@@ -115,11 +115,16 @@ test("picker offers a clean Contact and excludes active clients, INACTIVE client
   await mkPerson("idle", idle);
   await mkPerson("merged", ok, { mergedIntoId: fl });
   await mkPerson("none", ok, { emailStatus: "none" });
-  await mkPerson("guess", ok, { emailSource: "pattern_inferred" });
+  // An inferred address we never confirmed stays out. One a reply CONFIRMED is reachable: mail from
+  // that exact mailbox outranks any import label, so `verified` beats `pattern_inferred` here
+  // (src/lib/sequences/rosterGuards.ts). Both cases are pinned, because asserting only the exclusion
+  // would keep passing if the rule silently went back to rejecting every guess.
+  await mkPerson("guess", ok, { emailSource: "pattern_inferred", emailStatus: "probable" });
+  const guessConfirmed = await mkPerson("guessok", ok, { emailSource: "pattern_inferred", emailStatus: "verified" });
   await mkPerson("noemail", ok, { email: null, emailNormalized: null });
 
   const rows = await listRosterCandidates({ limit: 200, search: run });
-  assert.deepEqual(rows.map((r) => r.person_id).sort(), [fl, viaAlias].sort());
+  assert.deepEqual(rows.map((r) => r.person_id).sort(), [fl, viaAlias, guessConfirmed].sort());
   assert.ok(rows.every((r) => r.is_florida === true));
 });
 

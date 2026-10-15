@@ -129,7 +129,9 @@ test("apply seeds the survivors as drafted, never approved or sent, with one aud
   assert.equal(r.createdSequence, true);
   assert.equal(r.addedPersonIds.length, 3);
   assert.ok(r.auditLogId);
-  assert.deepEqual(r.drafts, { generated: 3, failed: 0, held: 0 });
+  // `failures` arrived with aa1af7e (report draft failure reasons); this suite could not be run at
+  // the time, so the expectation was never updated. Empty here: nothing failed.
+  assert.deepEqual(r.drafts, { generated: 3, failed: 0, held: 0, failures: [] });
 
   const [s] = await db.select().from(sequence).where(eq(sequence.id, r.sequenceId!));
   assert.equal(s.name, SEQ_NAME);
