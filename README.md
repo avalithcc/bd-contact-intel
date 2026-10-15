@@ -12,9 +12,77 @@ Next.js (App Router) + TypeScript · Postgres (Supabase) · Drizzle ORM.
 ## Setup
 ```bash
 npm install
-cp .env.example .env      # set DATABASE_URL (Supabase → Database → Connection string)
-npm run db:migrate        # replay the migration chain onto an empty database
-npm run dev               # http://localhost:3000
+npm run dev:stack         # starts colima, local Supabase Auth and system Postgres (idempotent)
+npm run dev:setup         # creates bd_contact_intel_dev, migrates, creates the login user, seeds demo data
+npm run dev               # http://localhost:3000, LOCAL stack only
+```
+
+## Local development
+
+Two layers, each with a narrower job than the headline suggests.
+
+**1. The `npm run dev` wrapper (`scripts/dev.ts`, `src/lib/dev/localDevEnv.ts`).**
+It starts `next dev` with the local database
+(`postgres://localhost:5432/bd_contact_intel_dev`) and local Supabase Auth
+(`http://127.0.0.1:54321`, public demo anon key). It blanks every key defined in
+`.env`, `.env.local` and `.env.development*`, plus any shell variable matching
+`DATABASE_URL|SUPABASE_|NEXT_PUBLIC_SUPABASE_|GMAIL_|GOOGLE_|CRON_SECRET|LEADS_|LUSHA_|SMTP_|POSTGRES_|VERCEL_ENV`
+(`shellLeakKeys`). This is the layer that keeps production values out.
+
+**2. The guard (`src/instrumentation.ts`, `src/db/index.ts`).** A safety net for
+a bare `next dev`. It checks only two variables, `DATABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_URL`, and only when `NODE_ENV=development`: either one
+not on loopback stops the server. It does not look at Gmail, Google, cron or any
+other secret. Production builds, Vercel and `vercel env run -e production`
+scripts never reach it. To knowingly use a remote target, type
+`ALLOW_REMOTE_DB_IN_DEV=1 npx next dev` in the shell. It only counts from the
+real process environment: if any of the four dotenv files defines it, the guard
+ignores it and says so. The Playwright-started servers (scratch e2e on :3101,
+launch-readiness on :3100) get it from their own process env, so a hosted
+Supabase project still works there.
+
+**AI drafting bills the real account.** `AI_GATEWAY_API_KEY`,
+`VERCEL_OIDC_TOKEN` and `TZ` pass through on purpose (`DEV_PASSTHROUGH_KEYS`),
+so generating drafts locally spends real AI Gateway credit. This is deliberate.
+Lusha is not reachable locally: `src/lib/lusha/config.ts` returns
+`not_production` whenever `VERCEL_ENV !== "production"`, so the feature is off
+here whatever key is present.
+
+`dev:setup` and `dev:reset` ask the Postgres server, not the URL, whether it is
+local (`inet_server_addr()`) before any `drop database` or `create database`,
+so an SSH tunnel on port 5432 makes them refuse.
+
+| Task | Command |
+| --- | --- |
+| Start services (colima, Supabase, Postgres) | `npm run dev:stack` |
+| Create / migrate / seed (never wipes existing data) | `npm run dev:setup` |
+| Wipe the dev DB and start over | `npm run dev:reset` |
+| Run the app | `npm run dev` |
+| Run the DB tests (`tests/db`) | see "DB tests" below |
+| Stop services | `supabase stop && colima stop` (Postgres: `brew services stop postgresql@16`) |
+
+Login (local demo account, not a secret): `dev@avalith.net` /
+`dev-local-only-password`. Local auth email arrives in Mailpit,
+`http://127.0.0.1:54324`; Studio is `http://127.0.0.1:54323`. Demo data is
+synthetic (`scripts/seed-launch-readiness.ts` plus the fixtures in
+`scripts/fixtures/`). The dev database is separate from `bd_contact_intel_e2e`,
+so e2e runs never touch it.
+
+Warning: `npx tsx scripts/seed-launch-readiness.ts --execute` run by hand against
+`bd_contact_intel_dev` truncates and reseeds it, bypassing the emptiness check
+that `npm run dev:setup` applies. Use `dev:setup` unless you mean to wipe.
+
+### DB tests (`npm run test:db`)
+
+These refuse any database not named `*_e2e` on loopback, so they never use
+`bd_contact_intel_dev` and cannot reach production. They create their own rows;
+no seed is needed, only a migrated database:
+
+```bash
+npm run dev:stack         # Postgres must be running (the DB tests need no Supabase)
+dropdb --if-exists bd_contact_intel_e2e && createdb bd_contact_intel_e2e
+DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npm run db:migrate
+DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e npm run test:db
 ```
 
 ### Standing up a new environment

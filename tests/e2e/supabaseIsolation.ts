@@ -28,11 +28,19 @@ type Env = Record<string, string | undefined>;
 
 export const SHARED_SUPABASE_HATCH = 'E2E_ALLOW_SHARED_SUPABASE';
 
-/** The only variables the e2e app server is given a value for. */
+/**
+ * The only variables the e2e app server is given a value for. The last one is
+ * the local-development guard's opt-out (src/lib/dev/localDevGuard.ts): the
+ * server this config starts is `next dev`, which refuses a non-loopback
+ * Supabase URL, yet a throwaway hosted project or the acknowledged shared one
+ * is a legitimate target here. It is set in the server's real process env, the
+ * only place the guard honours, and DATABASE_URL is always a scratch database.
+ */
 export const SERVER_ENV_ALLOWLIST = [
   'DATABASE_URL',
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'ALLOW_REMOTE_DB_IN_DEV',
 ] as const;
 
 /** dotenv precedence of `next dev`: the first file that defines a key wins. */
@@ -198,6 +206,7 @@ export function buildServerEnv(input: {
   env.DATABASE_URL = input.databaseUrl;
   env.NEXT_PUBLIC_SUPABASE_URL = input.supabase.url;
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY = input.supabase.anonKey;
+  env.ALLOW_REMOTE_DB_IN_DEV = '1';
   return env;
 }
 

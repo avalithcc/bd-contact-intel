@@ -105,7 +105,8 @@ export function devServerRefusal(probeStatus: number | undefined): string | null
     `Read-only e2e mode needs a \`next dev\` server, but ${DEV_SERVER_PROBE_PATH} answered ` +
     `${probeStatus ?? 'nothing'}. A production-mode server (\`next start\`) ignores the x-e2e-read-only ` +
     'marker, so a first visit by an account with no bd row would INSERT one. Stop that server and ' +
-    'run \`npm run dev\` (or point DATABASE_URL at a scratch database, which starts its own server).'
+    'run \`ALLOW_REMOTE_DB_IN_DEV=1 npx next dev -p 3000\` (not \`npm run dev\`, which serves the local development database ' +
+    'and Supabase, not the ones this suite expects), or point DATABASE_URL at a scratch database, which starts its own server.'
   );
 }
 

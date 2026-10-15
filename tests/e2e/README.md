@@ -53,6 +53,27 @@ production too (fail closed). In that mode:
   previews run `next build` and serve the build, so they are `production` and
   ignore the marker.
 
+## Local-development guard (`next dev` refuses remote targets)
+
+`next dev` refuses a non-loopback `DATABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`
+(`src/lib/dev/localDevGuard.ts`). Two paths here are affected:
+
+- **Read-only mode on a hand-started `:3000` server** (the default): that server
+  loads `.env.local` (production). Start it with the opt-out typed in the shell:
+  `ALLOW_REMOTE_DB_IN_DEV=1 npx next dev -p 3000`. A value in a dotenv file is
+  ignored on purpose. `npm run dev` now starts the local stack instead.
+- **Scratch mode with a hosted Supabase project** (a throwaway project, or the
+  `E2E_ALLOW_SHARED_SUPABASE=1` shared one), for `playwright.config.ts` (:3101)
+  and `playwright.launch-readiness.config.ts` (:3100). `buildServerEnv` passes
+  the opt-out in the server's process env, so nothing changes for you. The
+  local Supabase stack never triggered the guard.
+
+  Caveat, kept fail-closed on purpose: if any dev dotenv file sets
+  `ALLOW_REMOTE_DB_IN_DEV=1`, these Playwright-started servers refuse to start
+  too, even though `buildServerEnv` put the value in the child env, because
+  `localDevCheck` re-reads the files and a dotenv value never counts. Remove it
+  from the file.
+
 ## Writing mode (scratch database only)
 
 The guard judges this process's `DATABASE_URL`, but writes land wherever the
@@ -89,8 +110,9 @@ overriding variables already set (the shell wins, then `.env.e2e.local`, then
 `.env.local`). Never put a production credential in it. The filter specs also pass on the tiny seed (the second BD
 has one contact with a phone and one without, which the "responsable + Tiene
 teléfono" spec needs to narrow); read-only mode against a dev server whose
-database is the scratch one runs them too (start `DATABASE_URL=<scratch>
-npx next dev -p 3000`, then run Playwright with a non-scratch `DATABASE_URL`).
+database is the scratch one runs them too (start `ALLOW_REMOTE_DB_IN_DEV=1
+DATABASE_URL=<scratch> npx next dev -p 3000`, then run Playwright with a
+non-scratch `DATABASE_URL`).
 
 Manual proof that the first-visit guard works end to end (2026-10-13, scratch
 database): log in once so the e2e account has a `bd` row, rename that row's
