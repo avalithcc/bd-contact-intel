@@ -828,6 +828,50 @@ Product decisions to settle before implementing (none of these are decided):
 - Does a scheduled email occupy the outbox visibly (so a BD does not write a
   second one), and does it count as a touch before it is actually sent?
 
+### Lusha phone reveal: measured 2026-10-15, three findings from the real shape
+
+Gate 0.7 is CLOSED. The first real phone reveal (Pablo Martín Charchaflie /
+Despegar, by Mariel Meza) billed search 1 + phone 5 = **6 credits**, both
+reserved and charged equal, and the value landed in `person.mobile_phone` —
+correct, because the entry is typed `mobile`. `pickPhone` read it right: the key
+really is `number`, which until now was an assumption.
+
+The shape, which had never been seen:
+
+```json
+{"phones":[{"type":"mobile","number":"+54 9 11 3026-1031","doNotCall":false,
+            "dataSource":"Lusha","updateDate":"2026-10-15","countryIso2":"AR"}]}
+```
+
+1. **`doNotCall` exists and nothing reads it.** A number on a national
+   do-not-call registry; Lusha's docs describe the feature as HIDING such
+   numbers and warn that calling one may bring significant fines. Two limits
+   make `false` much weaker than it looks: the documented registries are **UK
+   (TPS/CTPS) and the US only**, and the hiding feature is **Scale-plan only**
+   while this account is on free (measured 2026-10-14). So on an Argentine
+   number `false` means "not on a list Lusha checks", probably "not checked at
+   all" — NOT "safe to call". Argentina has its own Ley 26.951: whoever offers
+   goods or services by phone may not call anyone registered and **must consult
+   the list every 30 days**, and on a complaint the burden of proof is on the
+   caller. A vendor flag covering UK/US is not evidence of having consulted the
+   Argentine registry. Reading the flag is still worth doing — it is free and
+   real for US/UK numbers, which is where the Sequences motion points — but it
+   must not create false confidence, and storing it unqualified would be worse
+   than not storing it. This belongs with **gate 0.4** (counsel sign-off) in
+   `openspec/changes/outreach-sequences/tasks.md`. Not legal advice; the current
+   fine amounts route through Ley 25.326 and were NOT verified: unverified.
+2. **Phones carry no `confidence` field at all**, so the grade tiebreaker in
+   `choose()` is inert for phones — not because of the letter-grade bug fixed in
+   77e5707, but because the field does not exist in this response.
+3. **Latent defect: our ranking prefers `type: "work"`** (`src/lib/lusha/parse.ts`,
+   `outranks`), and this entry came back `mobile`. With one candidate it did not
+   matter. If Lusha ever returns a `work` switchboard AND a `mobile` cell, we
+   pick the switchboard — backwards for reaching a person, and a 5-credit
+   purchase landing on the wrong number. Decide whether `mobile` should outrank
+   `work` for phones (it does not for emails).
+
+`countryIso2` is also discarded; it would be useful for formatting.
+
 ### Lusha per BD: enable/disable from admin, and a consumption report
 
 Owner decision, 2026-10-15: **a new BD starts DISABLED.** Access to a paid
