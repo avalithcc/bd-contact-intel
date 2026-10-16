@@ -13,16 +13,18 @@ export function FilterCheckbox({
   label,
   checked,
   href,
+  className = "checkbox-label",
 }: {
   id: string;
   label: string;
   checked: boolean;
   href: string;
+  className?: string;
 }) {
   const router = useRouter();
 
   return (
-    <label htmlFor={id} className="checkbox-label">
+    <label htmlFor={id} className={className}>
       <input
         id={id}
         type="checkbox"
