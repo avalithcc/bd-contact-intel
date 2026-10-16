@@ -17,7 +17,9 @@ test("excludes merged, empty email, status none and pattern-inferred emails", ()
 
 test("requires an open US IT posting, matched directly or through a company alias", () => {
   const sql = text();
-  assert.match(sql, /jp\.is_it = true and jp\.closed_at is null and jp\.market = 'us'/);
+  assert.match(sql, /coalesce\(jp\.posted_at, jp\.first_seen\)/);
+  assert.match(sql, /interval '30 days'/);
+  assert.match(sql, /jp\.is_it = true and .*jp\.market = 'us'/);
   assert.match(sql, /company_alias/);
 });
 

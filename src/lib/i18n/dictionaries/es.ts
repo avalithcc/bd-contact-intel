@@ -308,8 +308,8 @@ export const es: typeof en = {
   hiring: {
     eyebrow: "// vacantes_abiertas",
     title: "roles de IT abiertos",
-    subtitle:
-      "Empresas objetivo que actualmente contratan para roles de IT, según sus portales de empleo públicos.",
+    subtitle: (days: number) =>
+      `Empresas con vacantes de IT abiertas en sus portales de empleo, publicadas en los últimos ${days} días. Una búsqueda más vieja que eso casi nunca sigue viva, aunque el portal la muestre.`,
     companiesEyebrow: "// empresas",
     empty:
       "Todavía no hay publicaciones de IT registradas. Carga las empresas objetivo (ver scripts/seed-target-companies.ts) y ejecuta una sincronización.",

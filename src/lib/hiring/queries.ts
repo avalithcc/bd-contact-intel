@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
 import { LEADERSHIP_ROLE_GROUPS } from "@/lib/hiring/leadership";
+import { openFreshPostingCondition, openFreshPostingSql } from "@/lib/hiring/openPosting";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import {
   resolveCanonicalCompanyKey,
@@ -141,7 +142,7 @@ export async function resolveHiringCompanies(
     .where(
       and(
         eq(jobPosting.isIt, true),
-        isNull(jobPosting.closedAt),
+        openFreshPostingCondition(),
         market ? eq(jobPosting.market, market) : undefined,
         miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
         startupsOnly ? eq(targetCompany.isStartup, true) : undefined,
@@ -157,13 +158,13 @@ export async function resolveHiringCompanies(
               from job_posting jp2
               where jp2.company_key = ${jobPosting.companyKey}
                 and jp2.is_it = true
-                and jp2.closed_at is null
+                and ${openFreshPostingSql("jp2")}
             ) <= (
               select count(*) filter (where jp2.market = 'latam')
               from job_posting jp2
               where jp2.company_key = ${jobPosting.companyKey}
                 and jp2.is_it = true
-                and jp2.closed_at is null
+                and ${openFreshPostingSql("jp2")}
             )`
           : undefined,
       ),
@@ -519,11 +520,11 @@ export async function getCompanyPostingsForKey(
       from job_posting jp2
       where jp2.company_key = ${canonicalKey}
         and jp2.is_it = true
-        and jp2.closed_at is null
+        and ${openFreshPostingSql("jp2")}
     ) stats
     where jp.company_key = ${canonicalKey}
       and jp.is_it = true
-      and jp.closed_at is null
+      and ${openFreshPostingSql("jp")}
     order by jp.posted_at desc nulls last, jp.id asc
     limit ${DETAIL_ROW_LIMIT}
   `);
@@ -579,7 +580,7 @@ export async function getHiringCompanyKeys(): Promise<Set<string>> {
     from target_company tc
     where exists (
       select 1 from job_posting jp
-      where jp.company_key = tc.company_key and jp.is_it = true and jp.closed_at is null
+      where jp.company_key = tc.company_key and jp.is_it = true and ${openFreshPostingSql("jp")}
     )
     union
     select ca.alias_key as key
@@ -587,7 +588,7 @@ export async function getHiringCompanyKeys(): Promise<Set<string>> {
     join target_company tc on tc.company_key = ca.company_key
     where exists (
       select 1 from job_posting jp
-      where jp.company_key = tc.company_key and jp.is_it = true and jp.closed_at is null
+      where jp.company_key = tc.company_key and jp.is_it = true and ${openFreshPostingSql("jp")}
     )
   `);
   return new Set(rows.map((r) => r.key));

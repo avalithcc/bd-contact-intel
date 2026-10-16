@@ -321,8 +321,8 @@ export const en = {
   hiring: {
     eyebrow: "// open_roles",
     title: "open IT roles",
-    subtitle:
-      "Target companies currently hiring for IT roles, tracked from their public job boards.",
+    subtitle: (days: number) =>
+      `Companies with open IT roles on their job boards, published in the last ${days} days. A posting older than that is rarely still live, even if the board still lists it.`,
     companiesEyebrow: "// companies",
     empty:
       "No open IT postings tracked yet. Seed target companies (see scripts/seed-target-companies.ts) and run a sync.",

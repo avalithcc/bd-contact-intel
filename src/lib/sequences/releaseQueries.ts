@@ -28,6 +28,7 @@ import { parseSchedule, reminderDueAt } from "./schedule";
 import { pickReleaseKeys, releaseInstant, type SlimRow } from "./releaseSelection";
 import type { HoldChange, ReleaseCandidate, RunnerPorts } from "./runSequenceRelease";
 import { listSuppressionRules } from "./suppressionQueries";
+import { openPostingSql } from "@/lib/hiring/openPosting";
 
 const MAX_CANDIDATES = 500;
 /** Hard bound on the slim scan that precedes the cap. Hitting it is reported as truncation too. */
@@ -102,7 +103,7 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES): 
              s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
              sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country,
              (select c.country from company c where ${sameCompany} limit 1) as company_country,
-             coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and jp.closed_at is null
+             coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
                 and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets,
              exists (select 1 from company c where ${sameCompany} and c.client_status is not null) as has_client_status,
              ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,

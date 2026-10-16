@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FRESH_POSTING_WINDOW_DAYS } from "@/lib/hiring/openPosting";
 import { getCompanyHiringSummaries } from "@/lib/hiring/queries";
 import { MARKETS, isMarketKey } from "@/lib/hiring/markets";
 import { getCurrentBd } from "@/lib/queries";
@@ -46,7 +47,7 @@ export default async function HiringPage({
           <span className="dot">.</span>
         </h1>
         <p className="soft m-0">
-          {dict.hiring.subtitle}
+          {dict.hiring.subtitle(FRESH_POSTING_WINDOW_DAYS)}
         </p>
       </div>
 

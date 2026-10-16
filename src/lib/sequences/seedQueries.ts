@@ -26,6 +26,7 @@ import {
   type SeedRosterEntry,
 } from "./seedRoster";
 import { listSuppressionRules } from "./suppressionQueries";
+import { openFreshPostingSql, openPostingSql } from "@/lib/hiring/openPosting";
 
 export const SEED_AUDIT_ACTION = "seed_outreach_sequence";
 
@@ -93,9 +94,9 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
                p.company_key, p.country as person_country, ${clientStatusSql} as client_status,
                (select c.country from company c where c.company_key = p.company_key
                   or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1) as company_country,
-               exists (select 1 from job_posting jp where jp.is_it = true and jp.closed_at is null and jp.market = 'us'
+               exists (select 1 from job_posting jp where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
                   and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))) as has_open_it_posting,
-               coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and jp.closed_at is null
+               coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
                   and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets
         from person p
         where lower(btrim(concat_ws(' ', p.first_name, p.last_name))) = lower(${entry.name})
