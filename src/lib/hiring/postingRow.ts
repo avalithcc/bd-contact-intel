@@ -55,3 +55,9 @@ export function resolveCanonicalCompanyKey(
 ): string | null {
   return rows[0]?.company_key ?? null;
 }
+
+/** The original ad's URL if (and only if) it is a usable http(s) link; anything else must render as plain text. */
+export function postingAdHref(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  return trimmed && /^https?:\/\/\S+$/i.test(trimmed) ? trimmed : null;
+}

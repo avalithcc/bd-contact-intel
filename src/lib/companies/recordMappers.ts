@@ -27,6 +27,18 @@ export function isCompanyActivityFilter(value: string | undefined): value is Com
   return !!value && (COMPANY_ACTIVITY_FILTERS as readonly string[]).includes(value);
 }
 
+/** Tab ids of the `/companies/[key]` record, in display order; the first is the default. */
+export const COMPANY_TABS = ["activity", "hiring"] as const;
+export type CompanyTabId = (typeof COMPANY_TABS)[number];
+
+/**
+ * Validates an untrusted `?tab=` value against the real tab ids (same contract as `isCompanyActivityFilter`):
+ * unknown, empty or absent values fall back to the default tab, never to a blank page.
+ */
+export function resolveCompanyTab(value: string | undefined): CompanyTabId {
+  return COMPANY_TABS.find((t) => t === value) ?? COMPANY_TABS[0];
+}
+
 export interface FilterableTimelineRow {
   type: string;
   scope: "company" | "contact";

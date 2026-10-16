@@ -4,8 +4,11 @@
  * Fallback chain, first link with data wins:
  *   1. person.country   most specific: where the human is
  *   2. company.country
- *   3. the markets of the company's open IT postings (job_posting.market, already classified). A Contact can only be in
- *      a Sequence because their company has an open IT posting, so this link exists by construction.
+ *   3. the markets of the company's open IT postings (job_posting.market, already classified). Read with
+ *      `openPostingSql` (open, NO freshness window): this is a geography question, not a hiring one, so an aged-out
+ *      posting still locates the recipient. A Contact is seeded because the company had a FRESH posting, but may later
+ *      have no country and no fresh posting; the open one still resolves the market. A company whose postings all
+ *      closed yields no markets and falls to `other` (hold).
  *
  * A link "has data" when its value is non-empty. A country that is present but unmapped (e.g. Spain) DECIDES `other`
  * and does not fall through: the person is known to be somewhere we have no address for, and guessing from a posting

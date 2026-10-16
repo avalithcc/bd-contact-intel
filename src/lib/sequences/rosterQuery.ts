@@ -4,6 +4,7 @@
  * on it cut a real candidate pool from 18 to 2 (measured 2026-10-14).
  */
 import { sql } from "drizzle-orm";
+import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 
 export const ROSTER_PICKER_MAX_LIMIT = 200;
 
@@ -32,7 +33,7 @@ export function buildRosterCandidatesQuery(opts: { limit: number; search?: strin
     join lateral (
       select count(*) as open_it, coalesce(bool_or(jp.is_miami), false) as is_florida
       from job_posting jp
-      where jp.is_it = true and jp.closed_at is null and jp.market = 'us'
+      where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
         and (jp.company_key = p.company_key
           or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
     ) h on h.open_it > 0

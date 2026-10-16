@@ -228,6 +228,9 @@ export async function getWhatsNewFeed(
   hideOffshore?: boolean,
 ): Promise<WhatsNewFeed> {
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  // Deliberately NOT windowed by posting age (src/lib/hiring/openPosting.ts): the closed list is an event feed
+  // already bounded by `closed_at >= cutoff`. A req that closed this week is news whatever its age, and hiding it
+  // would make a posting vanish with no trace. Open postings (resolveHiringCompanies below) do use the window.
 
   const [syncStatus, openCompanies, closedRows] = await Promise.all([
     getSyncStatus(), // query 1

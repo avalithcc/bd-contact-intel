@@ -20,6 +20,7 @@ import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { sequenceReadAuditRow, shouldAuditSequenceRead } from "./readAudit";
 import { parseSchedule, type Schedule } from "./schedule";
+import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 
 /**
  * Hard bound: a hand-picked roster is tens of people. Nothing caps a roster's size, though —
@@ -86,7 +87,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     left join person p on p.id = sm.person_id
     left join lateral (
       select count(*) as open_it, bool_or(jp.is_miami) as is_florida from job_posting jp
-      where jp.is_it = true and jp.closed_at is null and jp.market = 'us'
+      where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
         and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
     ) h on sm.id is not null
     left join sequence_draft d1 on d1.sequence_member_id = sm.id and d1.step = 1

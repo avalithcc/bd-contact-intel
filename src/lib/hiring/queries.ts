@@ -1,9 +1,15 @@
 import { cache } from "react";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { companyAlias, jobPosting, person, targetCompany } from "@/db/schema";
+import { companyAlias, contact, jobPosting, targetCompany } from "@/db/schema";
 import { isOffshoreHeavy, type MarketKey } from "@/lib/hiring/markets";
 import { LEADERSHIP_ROLE_GROUPS } from "@/lib/hiring/leadership";
+import {
+  countedBeforeDeltaWindowSql,
+  openFreshPostingCondition,
+  openFreshPostingSql,
+} from "@/lib/hiring/openPosting";
+import { compareByVacancies, hiringDelta, type HiringDelta } from "@/lib/hiring/delta";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import {
   resolveCanonicalCompanyKey,
@@ -18,29 +24,24 @@ export interface CompanyHiringSummary {
   companyKey: string;
   displayName: string;
   openItCount: number;
-  newLast7Days: number;
-  postings: OpenPosting[];
-  // The signed-in BD's own crossover with this company (see
-  // getCompanyHiringSummaries below).
+  // The signed-in BD's own crossover with this company (see getCompanyHiringSummaries below).
   contactCount: number;
-  leadershipContactCount: number;
-  // Open IT postings in an offshore delivery hub vs. in LATAM (see
-  // src/lib/hiring/markets.ts#isOffshoreHub and the "latam" MarketKey) —
-  // both counted below from the same postings already fetched, no extra
-  // query. Shown on the badge so the offshoreHeavy judgment below is
-  // inspectable, not an unexplained mark.
-  offshoreItCount: number;
-  latamItCount: number;
-  // Whether this company's open IT hiring is offshore-heavy: strictly more
-  // open offshore postings than LATAM ones (see
-  // src/lib/hiring/markets.ts#isOffshoreHeavy). A deprioritizing signal,
-  // not a disqualifying one (see the comment on resolveHiringCompanies
-  // below) — a company with offshore postings but an equal-or-larger LATAM
-  // footprint is a normal prospect, not flagged at all.
+  // Offshore-heavy verdict (strictly more open offshore-hub postings than LATAM ones, see isOffshoreHeavy). A
+  // deprioritizing signal, not a disqualifying one.
   offshoreHeavy: boolean;
+  // Startup classification (null = not classified yet), for the Startup badge.
+  isStartup: boolean | null;
+  // Counted postings per market bucket, for the secondary line under the company ("31 LATAM · 7 US · 2 Miami");
+  // Miami is a subset of US. Derived from the postings already fetched.
+  latamItCount: number;
+  usItCount: number;
+  miamiItCount: number;
+  // Change in the counted total over the last 7 days (see hiringDelta).
+  delta: HiringDelta;
 }
 
-// Role groups considered "leadership" for the hiring crossover — the
+type DetailRow = Omit<Parameters<typeof toOpenPosting>[0], "market">;
+
 interface ResolvedHiringCompany {
   companyKey: string;
   displayName: string;
@@ -57,6 +58,10 @@ interface ResolvedHiringCompany {
   // rather than going stale like a cached column on target_company would.
   offshoreItCount: number;
   latamItCount: number;
+  usItCount: number;
+  miamiItCount: number;
+  // Counted postings. `postings` is only filled when the caller asks for the detail rows (withPostings).
+  openItCount: number;
   offshoreHeavy: boolean;
   // Startup classification carried straight through from `target_company`
   // (see src/lib/hiring/startupClassification.ts) — null means "not
@@ -106,6 +111,10 @@ interface ResolvedHiringCompany {
  * equal-or-larger LATAM footprint is never hidden — it isn't offshore-heavy
  * at all, see isOffshoreHeavy.
  *
+ * `withPostings` (default true) controls whether the per-posting detail rows are selected and returned in
+ * `postings`; the counts (`openItCount`, markets, offshore) are always filled. whats-new and outreach read the
+ * detail, so only the Vacantes table opts out.
+ *
  * `startupsOnly`, when true, further narrows query (1) to
  * `target_company.is_startup = true` (see
  * src/lib/hiring/startupClassification.ts) — same SQL-WHERE approach as the
@@ -120,28 +129,35 @@ export async function resolveHiringCompanies(
   miamiOnly?: boolean,
   hideOffshore?: boolean,
   startupsOnly?: boolean,
+  withPostings = true,
 ): Promise<Map<string, ResolvedHiringCompany>> {
+  // Per-posting detail (title, URL, location, dates) is only fetched when the caller renders it. The Vacantes table
+  // shows counts only, so it passes `withPostings = false` and the row set shrinks to the columns it aggregates.
+  const detailColumns = {
+    id: jobPosting.id,
+    title: jobPosting.title,
+    location: jobPosting.location,
+    url: jobPosting.url,
+    postedAt: jobPosting.postedAt,
+    firstSeen: jobPosting.firstSeen,
+  };
   const openPostings = await db
     .select({
-      id: jobPosting.id,
       companyKey: jobPosting.companyKey,
       displayName: targetCompany.displayName,
-      title: jobPosting.title,
-      location: jobPosting.location,
       market: jobPosting.market,
       isOffshoreHub: jobPosting.isOffshoreHub,
-      url: jobPosting.url,
-      postedAt: jobPosting.postedAt,
-      firstSeen: jobPosting.firstSeen,
       isStartup: targetCompany.isStartup,
       startupReason: targetCompany.startupReason,
+      isMiami: jobPosting.isMiami,
+      ...(withPostings ? detailColumns : ({} as Partial<typeof detailColumns>)),
     })
     .from(jobPosting)
     .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
     .where(
       and(
         eq(jobPosting.isIt, true),
-        isNull(jobPosting.closedAt),
+        openFreshPostingCondition(),
         market ? eq(jobPosting.market, market) : undefined,
         miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
         startupsOnly ? eq(targetCompany.isStartup, true) : undefined,
@@ -157,13 +173,13 @@ export async function resolveHiringCompanies(
               from job_posting jp2
               where jp2.company_key = ${jobPosting.companyKey}
                 and jp2.is_it = true
-                and jp2.closed_at is null
+                and ${openFreshPostingSql("jp2")}
             ) <= (
               select count(*) filter (where jp2.market = 'latam')
               from job_posting jp2
               where jp2.company_key = ${jobPosting.companyKey}
                 and jp2.is_it = true
-                and jp2.closed_at is null
+                and ${openFreshPostingSql("jp2")}
             )`
           : undefined,
       ),
@@ -175,7 +191,7 @@ export async function resolveHiringCompanies(
     // (see the equivalent ordering in getCompanyPostingsForKey below, kept
     // in sync so the whole-map and single-company paths return the exact
     // same order for a given company).
-    .orderBy(desc(jobPosting.postedAt), asc(jobPosting.id));
+    .orderBy(...(withPostings ? [desc(jobPosting.postedAt), asc(jobPosting.id)] : []));
 
   const byCompany = new Map<string, ResolvedHiringCompany>();
   if (!openPostings.length) return byCompany;
@@ -188,14 +204,20 @@ export async function resolveHiringCompanies(
       matchKeys: new Set([p.companyKey]),
       offshoreItCount: 0,
       latamItCount: 0,
+      usItCount: 0,
+      miamiItCount: 0,
+      openItCount: 0,
       offshoreHeavy: false,
       isStartup: p.isStartup,
       startupReason: p.startupReason,
     };
-    const posting = toOpenPosting(p);
-    entry.postings.push(posting);
+    const market = (p.market as MarketKey | null) ?? "other";
+    if (withPostings) entry.postings.push(toOpenPosting({ ...(p as DetailRow), market }));
+    entry.openItCount++;
     if (p.isOffshoreHub) entry.offshoreItCount++;
-    if (posting.market === "latam") entry.latamItCount++;
+    if (market === "latam") entry.latamItCount++;
+    if (market === "us") entry.usItCount++;
+    if (p.isMiami) entry.miamiItCount++;
     byCompany.set(p.companyKey, entry);
   }
 
@@ -218,39 +240,72 @@ export async function resolveHiringCompanies(
   return byCompany;
 }
 
+export interface HiringOverview {
+  summaries: CompanyHiringSummary[];
+  lastSyncAt: Date | null;
+}
+
 /**
- * Target companies that currently have at least one open IT posting, along
- * with those postings for the expandable detail list on /hiring, and how
- * many Contacts (company-wide, not per-BD) work there and how many of those
- * are in a leadership role group (see LEADERSHIP_ROLE_GROUPS).
+ * The counted total of every company as it stood `POSTING_DELTA_WINDOW_DAYS` ago (same freshness rule evaluated at
+ * that instant, see countedBeforeDeltaWindowSql) plus the last successful sync time, in ONE statement/round trip.
+ * It replaces what would otherwise be separate opened/closed reads: the delta is today's total minus this baseline.
+ * A flat cost (one grouped scan of IT postings, never per company). Timestamps and counts are normalized here
+ * (raw SQL returns wire strings), never interpolated as JS Dates.
+ */
+async function getPreviousCountsAndSync(
+  market?: MarketKey,
+  miamiOnly?: boolean,
+): Promise<{ previousByCompany: Map<string, number>; lastSyncAt: Date | null }> {
+  const rows = await db.execute<{ lastSyncAt: Date | string | null; previous: Array<{ k: string; n: number }> }>(sql`
+    select
+      (select max(finished_at) from sync_run where status = 'ok') as "lastSyncAt",
+      coalesce((
+        select json_agg(json_build_object('k', c.company_key, 'n', c.n))
+        from (
+          select jp.company_key, count(*)::int as n
+          from job_posting jp
+          where jp.is_it = true
+            and ${countedBeforeDeltaWindowSql("jp")}
+            ${market ? sql`and jp.market = ${market}` : sql``}
+            ${miamiOnly ? sql`and jp.is_miami = true` : sql``}
+          group by jp.company_key
+        ) c
+      ), '[]'::json) as previous
+  `);
+  const row = rows[0];
+  return {
+    previousByCompany: new Map((row?.previous ?? []).map((r) => [r.k, Number(r.n)])),
+    lastSyncAt: row?.lastSyncAt ? parseDbTimestamp(row.lastSyncAt) : null,
+  };
+}
+
+/**
+ * Target companies that currently have at least one open IT posting, with the counts the Vacantes table renders
+ * (vacancies, per-market, offshore, startup), how many Contacts (company-wide, not per-BD) work there, and the
+ * 7-day delta (today's counted total minus the total counted 7 days ago, see hiringDelta).
  *
- * Re-scoped off `bdId` (task 5.3; proposal success criterion "no `bdId`
- * scoping on Contact queries"; contact-list spec "Central list, no per-BD
- * scoping"): `contactCount`/`leadershipContactCount` now count every unified
- * `person` at the company, not just the calling BD's own address book — a BD
- * now sees the full team's crossover with a hiring company, not only their
- * own. `bdId` is kept as a parameter for call-site stability (see
- * src/app/hiring/page.tsx) even though this query no longer uses it.
+ * `contactCount` is the signed-in BD's own contacts at the company (alias-aware, same `contact` rows and key set as
+ * the `/?companyKey=` list the count links to via listContacts/companyKeyFilter), so the number and the page it
+ * opens always agree.
  *
- * Three fixed queries regardless of how many companies/postings/contacts
- * exist: the two behind resolveHiringCompanies() above, plus one GROUP BY
- * over `person` for every key (canonical + alias) that resolves to any
- * hiring company. No per-company query loop (no N+1).
+ * Four fixed queries regardless of how many companies/postings/contacts exist: the two behind
+ * resolveHiringCompanies() (called without the per-posting detail columns, which this table never renders), the
+ * baseline/sync read (getPreviousCountsAndSync), plus one GROUP BY over the BD's `contact` rows for every key (canonical + alias)
+ * that resolves to any hiring company. No per-company query loop (no N+1). Sorted by vacancies, descending.
  *
- * `market`, `miamiOnly` and `hideOffshore`, when set, flow straight into
- * resolveHiringCompanies' SQL WHERE clause — same query count either way.
+ * `market`, `miamiOnly`, `hideOffshore` and `startupsOnly` flow straight into the SQL WHERE clauses. A market or
+ * Miami filter suppresses the "new on the radar" verdict (see hiringDelta), which is a claim about the company.
  */
 export async function getCompanyHiringSummaries(
   bdId: string,
   market?: MarketKey,
   miamiOnly?: boolean,
   hideOffshore?: boolean,
-): Promise<CompanyHiringSummary[]> {
-  void bdId; // kept for call-site stability — see doc comment above
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore);
-  if (!companies.size) return [];
+  startupsOnly?: boolean,
+): Promise<HiringOverview> {
+  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore, startupsOnly, false);
+  const { previousByCompany, lastSyncAt } = await getPreviousCountsAndSync(market, miamiOnly);
+  if (!companies.size) return { summaries: [], lastSyncAt };
 
   const allMatchKeys = [
     ...new Set([...companies.values()].flatMap((c) => [...c.matchKeys])),
@@ -258,17 +313,10 @@ export async function getCompanyHiringSummaries(
 
   const contactStats = allMatchKeys.length
     ? await db
-        .select({
-          companyKey: person.companyKey,
-          count: sql<number>`count(*)::int`,
-          // `inArray` renders an IN (...) list; interpolating the array
-          // directly would render a record literal, which Postgres cannot
-          // cast to text[].
-          leadershipCount: sql<number>`count(*) filter (where ${inArray(person.roleGroup, LEADERSHIP_ROLE_GROUPS)})::int`,
-        })
-        .from(person)
-        .where(and(isNull(person.mergedIntoId), inArray(person.companyKey, allMatchKeys)))
-        .groupBy(person.companyKey)
+        .select({ companyKey: contact.companyKey, count: sql<number>`count(*)::int` })
+        .from(contact)
+        .where(and(eq(contact.bdId, bdId), inArray(contact.companyKey, allMatchKeys)))
+        .groupBy(contact.companyKey)
     : [];
   const statsByKey = new Map(
     contactStats
@@ -278,41 +326,29 @@ export async function getCompanyHiringSummaries(
 
   const summaries: CompanyHiringSummary[] = [];
   for (const c of companies.values()) {
+    const previousItCount = previousByCompany.get(c.companyKey) ?? 0;
     const summary: CompanyHiringSummary = {
       companyKey: c.companyKey,
       displayName: c.displayName,
-      openItCount: c.postings.length,
-      newLast7Days: c.postings.filter((p) => p.firstSeen >= sevenDaysAgo).length,
-      postings: c.postings,
+      openItCount: c.openItCount,
       contactCount: 0,
-      leadershipContactCount: 0,
-      offshoreItCount: c.offshoreItCount,
-      latamItCount: c.latamItCount,
       offshoreHeavy: c.offshoreHeavy,
+      isStartup: c.isStartup,
+      latamItCount: c.latamItCount,
+      usItCount: c.usItCount,
+      miamiItCount: c.miamiItCount,
+      delta: hiringDelta({
+        total: c.openItCount,
+        previous: previousItCount,
+        filtered: !!market || !!miamiOnly,
+      }),
     };
-    for (const key of c.matchKeys) {
-      const stats = statsByKey.get(key);
-      if (!stats) continue;
-      summary.contactCount += stats.count;
-      summary.leadershipContactCount += stats.leadershipCount;
-    }
+    for (const key of c.matchKeys) summary.contactCount += statsByKey.get(key)?.count ?? 0;
     summaries.push(summary);
   }
 
-  // Companies where the BD already has contacts are the actionable
-  // signal — surface those first, then by open IT posting count. A company
-  // that is offshore-heavy (see isOffshoreHeavy in
-  // src/lib/hiring/markets.ts) is the lowest-priority tiebreak — it only
-  // decides the order between two otherwise-equivalent companies, never
-  // overriding the contact-crossover or posting-count signals above.
-  return summaries.sort((a, b) => {
-    const aHas = a.contactCount > 0 ? 1 : 0;
-    const bHas = b.contactCount > 0 ? 1 : 0;
-    if (aHas !== bHas) return bHas - aHas;
-    if (a.openItCount !== b.openItCount) return b.openItCount - a.openItCount;
-    if (a.offshoreHeavy !== b.offshoreHeavy) return a.offshoreHeavy ? 1 : -1;
-    return 0;
-  });
+  // Biggest hiring first (owner-approved redesign); name breaks ties so the order is stable.
+  return { summaries: summaries.sort(compareByVacancies), lastSyncAt };
 }
 
 export interface HiringMatch {
@@ -473,6 +509,7 @@ type CompanyPostingsRawRow = {
  */
 export async function getCompanyPostingsForKey(
   companyKey: string,
+  filter: { market?: MarketKey; miamiOnly?: boolean } = {},
 ): Promise<CompanyPostingsForMessage | null> {
   const canonicalRows = await db.execute<{ company_key: string }>(sql`
     select company_key from target_company where company_key = ${companyKey}
@@ -482,6 +519,12 @@ export async function getCompanyPostingsForKey(
   `);
   const canonicalKey = resolveCanonicalCompanyKey(canonicalRows);
   if (!canonicalKey) return null;
+
+  // Same predicates as getCompanyHiringSummaries' market/Miami filters, so the list and totalCount describe the
+  // exact set a filtered Vacantes count was computed over.
+  const filterSql = (alias: string) => sql`${
+    filter.market ? sql`and ${sql.raw(alias)}.market = ${filter.market}` : sql``
+  } ${filter.miamiOnly ? sql`and ${sql.raw(alias)}.is_miami = true` : sql``}`;
 
   const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -506,12 +549,9 @@ export async function getCompanyPostingsForKey(
     cross join (
       select
         count(*)::int as total_count,
-        -- new_last_7_days matches the contacts/[id] record's original "new"
-        -- definition (postedAt-based), not getCompanyHiringSummaries'
-        -- firstSeen-based one — same field this replaces
-        -- (companyPostings.postings.filter((p) => p.postedAt && p.postedAt
-        -- > sevenDaysAgo)), unchanged.
-        count(*) filter (where jp2.posted_at > ${sevenDaysAgoIso}::timestamptz)::int as new_last_7_days,
+        -- "New" means new TO US: first_seen, the same basis as the Vacantes 7-day delta. posted_at moves when an ATS
+        -- edit bumps it (Greenhouse updated_at), so counting it made an edited old req read as new this week.
+        count(*) filter (where jp2.first_seen > ${sevenDaysAgoIso}::timestamptz)::int as new_last_7_days,
         count(*) filter (where jp2.market = 'latam')::int as latam_count,
         count(*) filter (where jp2.market = 'us')::int as us_count,
         count(*) filter (where jp2.is_miami = true)::int as miami_count,
@@ -519,11 +559,13 @@ export async function getCompanyPostingsForKey(
       from job_posting jp2
       where jp2.company_key = ${canonicalKey}
         and jp2.is_it = true
-        and jp2.closed_at is null
+        and ${openFreshPostingSql("jp2")}
+        ${filterSql("jp2")}
     ) stats
     where jp.company_key = ${canonicalKey}
       and jp.is_it = true
-      and jp.closed_at is null
+      and ${openFreshPostingSql("jp")}
+      ${filterSql("jp")}
     order by jp.posted_at desc nulls last, jp.id asc
     limit ${DETAIL_ROW_LIMIT}
   `);
@@ -579,7 +621,7 @@ export async function getHiringCompanyKeys(): Promise<Set<string>> {
     from target_company tc
     where exists (
       select 1 from job_posting jp
-      where jp.company_key = tc.company_key and jp.is_it = true and jp.closed_at is null
+      where jp.company_key = tc.company_key and jp.is_it = true and ${openFreshPostingSql("jp")}
     )
     union
     select ca.alias_key as key
@@ -587,7 +629,7 @@ export async function getHiringCompanyKeys(): Promise<Set<string>> {
     join target_company tc on tc.company_key = ca.company_key
     where exists (
       select 1 from job_posting jp
-      where jp.company_key = tc.company_key and jp.is_it = true and jp.closed_at is null
+      where jp.company_key = tc.company_key and jp.is_it = true and ${openFreshPostingSql("jp")}
     )
   `);
   return new Set(rows.map((r) => r.key));

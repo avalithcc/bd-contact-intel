@@ -21,6 +21,7 @@ import { assertTransition, type MemberState } from "./memberState";
 import { recipientMarket } from "./recipientMarket";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
+import { openPostingSql } from "@/lib/hiring/openPosting";
 
 const STEP = 1;
 const REMINDER_STEP = 2;
@@ -50,7 +51,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
              (select c.country from company c where c.company_key = p.company_key
                 or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1) as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp
-                where jp.is_it = true and jp.closed_at is null and ${sameCompany}), '[]'::json) as posting_markets,
+                where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany}), '[]'::json) as posting_markets,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft
       from sequence_member sm
