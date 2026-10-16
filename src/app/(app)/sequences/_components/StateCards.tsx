@@ -16,7 +16,7 @@ export function EmptyState({ total, labels: l }: { total: number; labels: Sequen
 }
 
 /** Discarded members are in the total but never in "sin respuesta": `finished.noReply` counts `no_reply` only. */
-export function FinishedState({ finished, labels: l, onAction }: { finished: SequenceStats["finished"]; labels: SequenceLabels; onAction: OnAction }) {
+export function FinishedState({ finished, labels: l, onAction, readOnly = false }: { finished: SequenceStats["finished"]; labels: SequenceLabels; onAction: OnAction; readOnly?: boolean }) {
   const body = finished.noReply === 0 ? l.finishedBodyAllReplied : l.finishedBody;
   return (
     <div className="card">
@@ -24,7 +24,7 @@ export function FinishedState({ finished, labels: l, onAction }: { finished: Seq
         <div className="empty-icon"><CheckCircleIcon className="icon icon-lg" /></div>
         <h3>{l.finishedTitle}</h3>
         <p>{fill(body, { replied: finished.replied, total: finished.total, noReply: finished.noReply })}</p>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAction({ type: "createNext" })}>{l.finishedCta}</button>
+        {!readOnly && <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAction({ type: "createNext" })}>{l.finishedCta}</button>}
       </div>
     </div>
   );

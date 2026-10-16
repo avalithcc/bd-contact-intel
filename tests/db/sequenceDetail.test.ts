@@ -137,27 +137,28 @@ test("another BD gets null, a missing id gets null, a malformed id gets null; no
   assert.equal((await auditRows(strangerId)).length, 0);
 });
 
-test("an admin reading another BD's Sequence sees the drafts AND leaves an audit row naming admin, owner and Sequence", async () => {
+test("an admin reading another BD's Sequence sees the drafts and leaves NO audit row (admin visibility is never audited)", async () => {
   const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
-  const before = Date.now();
   const d = await getSequenceDetail({ id: adminId, role: "admin" }, sequenceId);
   assert.ok(d);
+  assert.equal(d.ownerBdId, ownerId);
   assert.equal(d.members.find((m) => m.memberId === memberIds.d1)?.draft?.body, "Body d1");
-  const rows = await auditRows(adminId);
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].targetBdId, ownerId);
-  assert.deepEqual(rows[0].metadata, { sequenceId });
-  assert.ok(rows[0].at.getTime() >= before - 2000);
+  assert.equal((await auditRows(adminId)).length, 0);
 });
 
-test("the admin audit-log screen's query lists the view_sequence row with the Sequence name and the owner", async () => {
+test("the admin audit-log screen's query still lists an OLD view_sequence row with the Sequence name and the owner", async () => {
+  const { db } = await import("@/db");
+  const { auditLog } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
   const { listConversationAuditLog } = await import("@/lib/activity/auditLogQueries");
+  await db.insert(auditLog).values({ action: "view_sequence", actorBdId: adminId, targetBdId: ownerId, metadata: { sequenceId } });
   const page = await listConversationAuditLog(1, 200);
   const row = page.rows.find((r) => r.actorBdId === adminId && r.action === "view_sequence");
-  assert.ok(row, "the screen must show what the audit writes");
+  assert.ok(row, "rows written before the audit was dropped stay readable");
   assert.equal(row.sequenceName, key("seq"));
   assert.equal(row.targetBdName, "ZZ owner");
   assert.equal(row.personId, null);
+  await db.delete(auditLog).where(eq(auditLog.actorBdId, adminId));
 });
 
 test("an admin reading a missing Sequence gets null and no audit row", async () => {
@@ -171,6 +172,26 @@ test("the owner reading their own Sequence writes no audit row", async () => {
   const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
   await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
   assert.equal((await auditRows(ownerId)).length, 0);
+});
+
+test("an admin ACTING on another BD's Sequence gets not_found for every write and nothing changes (read-only is enforced by the server)", async () => {
+  const { approveMember, cancelApproval } = await import("@/lib/sequences/approvalQueries");
+  const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+  const { recordOptOutForMember } = await import("@/lib/sequences/optOutQueries");
+  const { removeMembersFromSequence, updateSequenceSettingsRow } = await import("@/lib/sequences/rosterQueries");
+  const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
+  const before = await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
+
+  const approved = await approveMember(adminId, memberIds.d1);
+  assert.deepEqual(approved.ok ? null : approved.rejected.map((r) => r.reason), ["not_found"]);
+  assert.deepEqual(await saveDraftEdit(adminId, memberIds.d1, { subject: "Changed", body: "Changed" }), { ok: false, error: "not_found" });
+  assert.deepEqual(await cancelApproval(adminId, memberIds.appr1), { ok: false, error: "not_found" });
+  assert.deepEqual(await removeMembersFromSequence(adminId, sequenceId, [memberIds.d1], "because"), { ok: false, error: "not_found" });
+  assert.deepEqual(await updateSequenceSettingsRow(adminId, sequenceId, { name: "Renamed", dailySendCap: 7 }), { ok: false, error: "not_found" });
+  assert.deepEqual(await recordOptOutForMember(adminId, memberIds.rep1), { ok: false, error: "not_found" });
+
+  assert.deepEqual(await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId), before, "the owner's Sequence is untouched");
+  assert.equal((await auditRows(adminId)).length, 0);
 });
 
 test("a member card shows the canonical company for a null free text, the free text when present, and null for a key with no company row", async () => {

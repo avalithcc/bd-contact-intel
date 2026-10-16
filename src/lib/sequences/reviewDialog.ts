@@ -39,12 +39,13 @@ function cadenceOf(m: DetailMember, kind: ReviewKind, draft: DetailDraft, step: 
 }
 
 /** Null when the member has no draft for that step: there is nothing to open. */
-export function reviewView(m: DetailMember, step: 1 | 2, schedule: Schedule, now: Date): ReviewView | null {
+export function reviewView(m: DetailMember, step: 1 | 2, schedule: Schedule, now: Date, viewerReadOnly = false): ReviewView | null {
   const draft = step === 2 ? m.reminderDraft : m.draft;
   if (!draft) return null;
   const kind = kindOf(m, step, draft);
-  const readOnly = kind === "sent" || kind === "stopped";
+  // A foreign Sequence (an admin reading) is read-only whatever the state: no footer action, and opening it is not a review.
+  const readOnly = viewerReadOnly || kind === "sent" || kind === "stopped";
   const footer: ReviewFooterId[] = readOnly ? [] : kind === "approved" ? ["regenerate", "save"] : ["regenerate", "save", "approve"];
   const edited = draft.edited;
-  return { kind, readOnly, footer, edited, editedAt: draft.editedAt, marksReviewed: (kind === "draft" || kind === "reminder") && draft.reviewedAt === null, draft, cadence: kind === "stopped" ? null : cadenceOf(m, kind, draft, step, schedule, now) };
+  return { kind, readOnly, footer, edited, editedAt: draft.editedAt, marksReviewed: !viewerReadOnly && (kind === "draft" || kind === "reminder") && draft.reviewedAt === null, draft, cadence: kind === "stopped" ? null : cadenceOf(m, kind, draft, step, schedule, now) };
 }

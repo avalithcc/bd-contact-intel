@@ -20,7 +20,7 @@ export type CardKind = "draft" | "noDraft" | "approved" | "sent" | "reminderToda
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
   | "generate" | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
-  | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
+  | "viewDraft" | "viewReminder" | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
 export type CardFacts = {
@@ -49,7 +49,21 @@ function reminderDue(f: CardFacts, now: Date): boolean {
   return f.state === "sent" && f.reminderDueAt !== null && miamiCalendarDate(f.reminderDueAt) <= miamiCalendarDate(now);
 }
 
-export function mapMemberCard(f: CardFacts, now: Date): CardView {
+/** The same ids, read-only: where a write path says "Revisar" a foreign Sequence says "Ver", and nothing that writes survives. */
+const READ_ONLY_ACTIONS: Partial<Record<CardActionId, CardActionId>> = { reviewDraft: "viewDraft", reviewReminder: "viewReminder", viewEmail: "viewEmail", viewSent: "viewSent", openConversation: "openConversation" };
+
+function readOnlyView(card: CardView): CardView {
+  const actions = card.actions.flatMap((a) => (READ_ONLY_ACTIONS[a.id] ? [{ ...a, id: READ_ONLY_ACTIONS[a.id]! }] : []));
+  return { ...card, actions, menu: card.menu.filter((id) => id === "openContact") };
+}
+
+/** `readOnly`: the viewer is not the owner (an admin); see readOnly.ts. */
+export function mapMemberCard(f: CardFacts, now: Date, readOnly = false): CardView {
+  const card = mapOwnCard(f, now);
+  return readOnly ? readOnlyView(card) : card;
+}
+
+function mapOwnCard(f: CardFacts, now: Date): CardView {
   const base = { florida: false, holdReason: f.holdReason, menu: [] as CardActionId[] };
   switch (f.state) {
     case "drafted":

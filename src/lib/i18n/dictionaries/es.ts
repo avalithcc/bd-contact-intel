@@ -2748,6 +2748,14 @@ export const es: typeof en = {
     reviewSave: "Guardar sin aprobar",
     reviewApprove: "Aprobar y programar",
     reviewClose: "Cerrar",
+    // Read-only view (an admin on another BD's Sequence; mockups/secuencia-detalle-solo-lectura.html).
+    readOnlyTitle: "Secuencia de {owner}. Solo lectura.",
+    readOnlyBody: "Los borradores y el avance se pueden leer; desde aquí no se puede aprobar, editar ni enviar nada.",
+    readOnlyBack: "Volver a Secuencias",
+    readOnlyDialogNotice: "Borrador de {owner}. Solo lectura: no se puede editar, regenerar ni aprobar desde aquí.",
+    readOnlyIntroLead: "{n} contactos elegidos a mano por {owner}, con vacantes IT abiertas y correo verificado. Cada borrador se redacta por separado usando las señales de la empresa;",
+    readOnlyIntroStrong: "nada sale sin la aprobación de {owner}",
+    readOnlyIntroTail: "Se envía desde {from} y queda registrado en la ficha de cada contacto.",
     // Bulk bar. The mockup words the full state "ya revisados" and the partial one "revisados": kept as drawn.
     bulkCount: "{n} seleccionados",
     bulkCountOne: "1 seleccionado",
@@ -3019,6 +3027,8 @@ export const es: typeof en = {
       viewSent: "Ver correo enviado",
       advanceReminder: "Adelantar recordatorio",
       reviewReminder: "Revisar recordatorio",
+      viewDraft: "Ver borrador",
+      viewReminder: "Ver recordatorio",
       openConversation: "Ver conversación",
       readmit: "Reincorporar",
       regenerate: "Regenerar borrador",

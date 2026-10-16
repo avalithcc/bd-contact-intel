@@ -8,12 +8,12 @@ import { SequenceDetailScreen } from "./SequenceDetailScreen";
 export const dynamic = "force-dynamic";
 
 /**
- * A Sequence (mockups/secuencia-detalle.html). The owner reads their own; an admin may read another BD's, and
- * getSequenceDetail writes the audit row BEFORE any draft body is read. Anyone else, and a malformed id, is a 404 that
- * does not reveal whether the Sequence exists.
+ * A Sequence (mockups/secuencia-detalle.html). The owner reads their own; an admin may read another BD's, as a read-only
+ * screen (mockups/secuencia-detalle-solo-lectura.html) and with no audit row. Anyone else, and a malformed id, is a 404
+ * that does not reveal whether the Sequence exists.
  *
  * The advisory opt-out phrases come from the OWNER's own mailbox only: an admin reading someone else's Sequence does not
- * read that BD's mail through this page (the audited conversation access is the path for that).
+ * read that BD's mail through this page.
  */
 export default async function SequencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

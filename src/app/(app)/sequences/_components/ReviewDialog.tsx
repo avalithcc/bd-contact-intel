@@ -2,7 +2,7 @@
 
 import { useEffect, useId, type FormEvent } from "react";
 import { Dialog } from "@/components/Dialog";
-import { GenerateIcon, InfoIcon } from "@/components/icons";
+import { EyeIcon, GenerateIcon, InfoIcon } from "@/components/icons";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { reviewView, type ReviewFooterId } from "@/lib/sequences/reviewDialog";
 import type { Schedule } from "@/lib/sequences/schedule";
@@ -22,14 +22,17 @@ type Props = {
   labels: SequenceLabels;
   /** The viewer owns the Sequence: only then may the notice say the email leaves under THEIR name. */
   ownView: boolean;
+  /** Another BD's Sequence: the neutral read-only notice replaces the editing notice and the only footer action is "Cerrar". */
+  readOnly?: boolean;
+  ownerName?: string;
   onAction: OnReviewAction;
   busy?: boolean;
   error?: string | null;
 };
 
-export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, onAction, busy = false, error = null }: Props) {
+export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, error = null }: Props) {
   const formId = useId();
-  const view = m ? reviewView(m, step, schedule, now) : null;
+  const view = m ? reviewView(m, step, schedule, now, readOnly) : null;
   const memberId = m?.memberId;
   const marks = open && view?.marksReviewed === true;
   // Opening is the review: report it once per open, never from a passive listing.
@@ -67,6 +70,9 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
     <Dialog open={open} onClose={onClose} title={title} wide closeDisabled={busy}
       footer={view.readOnly ? <button type="button" className="btn btn-secondary" onClick={onClose}>{l.reviewClose}</button> : view.footer.map(footerButton)}>
       <form id={formId} className="stack" onSubmit={submit} key={`${m.memberId}-${step}`}>
+        {readOnly ? (
+          <div className="alert alert-neutral"><EyeIcon className="icon" /><div>{fill(l.readOnlyDialogNotice, { owner: ownerName })}</div></div>
+        ) : (
         <div className="alert alert-info">
           <InfoIcon className="icon" />
           <div>
@@ -78,6 +84,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
             {(view.kind === "draft" || view.kind === "reminder") && !view.edited && <> {l.reviewNotice} <strong>{l.reviewNoticeStrong}</strong> {ownView ? l.reviewNoticeTail : l.reviewNoticeTailOther}</>}
           </div>
         </div>
+        )}
         {!view.readOnly && signals && (
           <div className="field"><span className="label">{l.reviewSignals}</span>
             {signals.length > 0 ? <div className="row wrap row-xs">{signals.map((s) => <span key={s} className="chip">{s}</span>)}</div> : <p className="help">{l.reviewSignalsNone}</p>}
@@ -99,7 +106,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
           {!view.readOnly && <p className="help">{l.reviewBodyHelp}</p>}
           {/* Plain `help`: the mockup never drew this warning, so it has no approved emphasis style. Styling it is a
               PR 13 visual-review question; saying it at all is not optional. */}
-          {view.kind === "approved" && <p className="help">{l.reviewApprovedEditWarning}</p>}
+          {view.kind === "approved" && !view.readOnly && <p className="help">{l.reviewApprovedEditWarning}</p>}
         </div>
         {cadence && (
           <div className="field"><span className="label">{l.reviewCadence}</span>

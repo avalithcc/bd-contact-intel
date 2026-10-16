@@ -1,16 +1,13 @@
 /**
  * Read model for the Sequence detail screen. Owner-scoped: a BD reads only their own Sequence (another BD's reads as
- * "not found", indistinguishable from a missing id). An admin may read any, and reading another BD's writes an
- * `audit_log` row BEFORE the draft bodies are read, in the same transaction, so a body is never returned without its
- * audit entry (the policy line is in readAudit.ts).
+ * "not found", indistinguishable from a missing id). An admin reads any Sequence, with no audit row: admin visibility is
+ * follow-up and is never audited (owner decision, 2026-10-16). The screen shows another BD's as read-only.
  *
- * Round trips (PERFORMANCE.md): a BD reading their own Sequence costs ONE statement (sequence, members, drafts, posting
- * counts and last contact in a single left join). Only an admin pays more: one owner lookup, the audit insert if
- * needed, then the same read, all in one transaction.
+ * Round trips (PERFORMANCE.md): ONE statement for everyone (sequence, members, drafts, posting counts and last contact
+ * in a single left join).
  */
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLog, sequence } from "@/db/schema";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
@@ -19,7 +16,6 @@ import { isLeadershipRoleGroup } from "@/lib/outreach/ranking";
 import { isUuid } from "@/lib/uuid";
 import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
-import { sequenceReadAuditRow, shouldAuditSequenceRead } from "./readAudit";
 import { canonicalCompanyJoinSql, companyNameColumnsSql } from "./rosterQuery";
 import { parseSchedule, type Schedule } from "./schedule";
 import { openFreshPostingSql } from "@/lib/hiring/openPosting";
@@ -144,12 +140,6 @@ export async function getSequenceDetail(viewer: { id: string; role: string }, se
   if (!isUuid(sequenceId)) return null;
   // The owner scope is the only thing between a BD and another BD's drafts, and `readDetail` drops that scope
   // for a falsy id. So an unusable viewer id is a handled "not found" here, never an unscoped read.
-  if (!isAdminRole(viewer)) return isUuid(viewer.id) ? readDetail(db, sequenceId, viewer.id) : null;
-  return db.transaction(async (tx) => {
-    const [head] = await tx.select({ ownerBdId: sequence.ownerBdId }).from(sequence).where(eq(sequence.id, sequenceId));
-    if (!head) return null;
-    // The audit row lands BEFORE any draft body is read. This is the one call to remove if the owner drops the audit.
-    if (shouldAuditSequenceRead(viewer.id, head.ownerBdId)) await tx.insert(auditLog).values(sequenceReadAuditRow(viewer.id, head.ownerBdId, sequenceId));
-    return readDetail(tx, sequenceId, null);
-  });
+  if (isAdminRole(viewer)) return readDetail(db, sequenceId, null);
+  return isUuid(viewer.id) ? readDetail(db, sequenceId, viewer.id) : null;
 }
