@@ -18,6 +18,7 @@ import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
 import { isContactType } from "@/lib/contacts/contactType";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
+import { normalizeLinkedinProfileKey, type LinkedinProfileKeyRejection } from "@/lib/contacts/linkedinProfile";
 
 export type InvalidEmailReason = "invalid_format";
 
@@ -51,6 +52,19 @@ export class InvalidPhoneError extends Error {
 }
 
 /**
+ * Thrown by planPropertyEdit when an edited `profileKey` is not a
+ * `linkedin.com` URL (or is not a URL with a path at all). `profile_key`
+ * feeds the identity matcher, so nothing else may reach the column. Clearing
+ * (blank) is always allowed.
+ */
+export class InvalidProfileKeyError extends Error {
+  constructor(public readonly reason: LinkedinProfileKeyRejection) {
+    super(`Invalid LinkedIn profile: ${reason}`);
+    this.name = "InvalidProfileKeyError";
+  }
+}
+
+/**
  * Thrown by planPropertyEdit when `contactType` is set to something outside
  * the closed vocabulary (contactType.ts). Clearing (blank) is always allowed.
  */
@@ -71,6 +85,7 @@ export const EDITABLE_PERSON_PROPERTIES = [
   "email",
   "phone",
   "mobilePhone",
+  "profileKey",
   "jobTitle",
   "roleGroup",
   "contactType",
@@ -137,7 +152,14 @@ export function planPropertyEdit(
   changedByBdId: string,
 ): PropertyEditPlan {
   const trimmed = rawNewValue.trim();
-  const newValue = trimmed === "" ? null : trimmed;
+  let newValue = trimmed === "" ? null : trimmed;
+  if (property === "profileKey" && newValue !== null) {
+    // Normalized BEFORE the no-op check: the same profile pasted in another
+    // shape must not write a history row.
+    const key = normalizeLinkedinProfileKey(newValue);
+    if (!key.ok) throw new InvalidProfileKeyError(key.reason);
+    newValue = key.value;
+  }
   const oldValue = person[property] ?? null;
 
   if (oldValue === newValue) {

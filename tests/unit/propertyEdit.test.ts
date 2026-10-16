@@ -13,6 +13,7 @@ import {
   InvalidContactTypeError,
   InvalidEmailError,
   InvalidPhoneError,
+  InvalidProfileKeyError,
   isEditablePersonProperty,
   planLocationEdit,
   planPropertyEdit,
@@ -36,6 +37,7 @@ const BASE_PERSON = {
   industry: null,
   phone: "+54 11 4000-0000",
   mobilePhone: null,
+  profileKey: null as string | null,
 };
 
 test("isEditablePersonProperty accepts only the allow-listed columns", () => {
@@ -329,4 +331,79 @@ test("re-saving the same contactType is a no-op with no history row", () => {
   const plan = planPropertyEdit({ ...BASE_PERSON, contactType: "INFLUENCER" }, "contactType", "INFLUENCER", "bd-1");
   assert.equal(plan.changed, false);
   assert.deepEqual(plan.historyRows, []);
+});
+
+// ---- profileKey (LinkedIn) -------------------------------------------------
+
+const PERSON_WITH_PROFILE = { ...BASE_PERSON, profileKey: "linkedin.com/in/dana-whitfield" };
+
+test("profileKey is editable and sits right after mobilePhone", () => {
+  assert.ok(isEditablePersonProperty("profileKey"));
+  const i = EDITABLE_PERSON_PROPERTIES.indexOf("mobilePhone");
+  assert.equal(EDITABLE_PERSON_PROPERTIES[i + 1], "profileKey");
+});
+
+for (const raw of [
+  "https://www.linkedin.com/in/Dana-Whitfield/",
+  "linkedin.com/in/dana-whitfield",
+  "  http://LinkedIn.com/in/dana-whitfield?utm_source=share  ",
+]) {
+  test(`profileKey accepts and normalizes ${JSON.stringify(raw)}`, () => {
+    const plan = planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1");
+    assert.equal(plan.changed, true);
+    assert.equal(plan.personUpdate?.profileKey, "linkedin.com/in/dana-whitfield");
+    assert.deepEqual(plan.historyRows, [
+      { personId: BASE_PERSON.id, property: "profileKey", oldValue: null, newValue: "linkedin.com/in/dana-whitfield", changedByBdId: "bd-1", source: "edit" },
+    ]);
+  });
+}
+
+test("profileKey keeps a country subdomain as the importer does, and re-saving it is a no-op", () => {
+  const held = { ...BASE_PERSON, profileKey: "uk.linkedin.com/in/dana-whitfield" };
+  assert.equal(planPropertyEdit(BASE_PERSON, "profileKey", "https://uk.linkedin.com/in/dana-whitfield", "bd-1").personUpdate?.profileKey, "uk.linkedin.com/in/dana-whitfield");
+  assert.equal(planPropertyEdit(held, "profileKey", "https://uk.linkedin.com/in/Dana-Whitfield/", "bd-1").changed, false);
+});
+
+test("profileKey rejects company, school and site pages", () => {
+  for (const raw of ["https://www.linkedin.com/company/acme", "https://www.linkedin.com/school/x", "https://www.linkedin.com/feed"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1"), InvalidProfileKeyError);
+  }
+});
+
+test("profileKey rejects a non-linkedin host", () => {
+  for (const raw of ["https://twitter.com/dwhitfield", "https://linkedin.com.evil.example/in/x", "https://notlinkedin.com/in/x"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1"), InvalidProfileKeyError);
+  }
+});
+
+test("profileKey rejects a value that normalizes to null", () => {
+  for (const raw of ["https://linkedin.com", "https://www.linkedin.com/", "not a url at all"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1"), InvalidProfileKeyError);
+  }
+});
+
+test("profileKey blank clears the profile", () => {
+  const plan = planPropertyEdit(PERSON_WITH_PROFILE, "profileKey", "   ", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.profileKey, null);
+  assert.equal(plan.historyRows[0]?.oldValue, "linkedin.com/in/dana-whitfield");
+  assert.equal(plan.historyRows[0]?.newValue, null);
+});
+
+test("profileKey no-op: the same profile in another shape changes nothing", () => {
+  const plan = planPropertyEdit(PERSON_WITH_PROFILE, "profileKey", "https://www.linkedin.com/in/Dana-Whitfield/", "bd-1");
+  assert.deepEqual(plan, { changed: false, personUpdate: null, historyRows: [] });
+});
+
+test("profileKey no-op: blank on a contact with no profile", () => {
+  assert.equal(planPropertyEdit(BASE_PERSON, "profileKey", "", "bd-1").changed, false);
+});
+
+test("profileKey planner is pure: same input twice, same result, input untouched", () => {
+  const before = structuredClone(BASE_PERSON);
+  const a = planPropertyEdit(BASE_PERSON, "profileKey", "https://www.linkedin.com/in/x", "bd-1");
+  const b = planPropertyEdit(BASE_PERSON, "profileKey", "https://www.linkedin.com/in/x", "bd-1");
+  assert.deepEqual({ ...a.personUpdate, updatedAt: 0 }, { ...b.personUpdate, updatedAt: 0 });
+  assert.deepEqual(a.historyRows, b.historyRows);
+  assert.deepEqual(BASE_PERSON, before);
 });

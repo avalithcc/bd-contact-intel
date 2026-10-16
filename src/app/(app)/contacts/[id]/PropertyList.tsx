@@ -8,11 +8,14 @@ import {
   type ContactRecordLabels,
 } from "@/lib/contacts/labels";
 import type { EditablePersonProperty } from "@/lib/contacts/propertyEdit";
+import type { ProfileKeyOwner } from "@/lib/contacts/errors";
+import { ProfileKeyConflictNotice } from "./ProfileKeyConflictNotice";
+import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { composeLocation } from "@/lib/contacts/locationDisplay";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
-import { InfoIcon, EditPencilIcon } from "@/components/icons";
+import { InfoIcon, EditPencilIcon, WarningIcon } from "@/components/icons";
 import { toTelHref, type WhatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
@@ -120,6 +123,8 @@ export function PropertyList({
   const [locationEditing, setLocationEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set when a LinkedIn save collided with another contact: names and links it.
+  const [conflict, setConflict] = useState<ProfileKeyOwner | null>(null);
   const [ownerError, setOwnerError] = useState<string | null>(null);
   const [ownerDraft, setOwnerDraft] = useState(ownerBdId ?? "");
 
@@ -253,17 +258,22 @@ export function PropertyList({
             editing={editingKey === prop.key}
             busy={busy}
             error={editingKey === prop.key ? error : null}
+            conflict={editingKey === prop.key ? conflict : null}
+            isAdmin={canReassignOwner}
             onStartEdit={() => {
               setError(null);
+              setConflict(null);
               setEditingKey(prop.key);
             }}
             onCancel={() => {
               setError(null);
+              setConflict(null);
               setEditingKey(null);
             }}
             onSave={async (value) => {
               setBusy(true);
               setError(null);
+              setConflict(null);
               try {
                 // Fresh-review WARNING fix: check the typed result and keep
                 // the field in edit mode (with the user's value) on error,
@@ -274,6 +284,7 @@ export function PropertyList({
                   router.refresh();
                 } else {
                   setError(contactActionErrorMessage(l, result.reason));
+                  setConflict(result.conflict ?? null);
                 }
               } finally {
                 setBusy(false);
@@ -311,6 +322,8 @@ function PropertyRow({
   editing,
   busy,
   error,
+  conflict,
+  isAdmin,
   onStartEdit,
   onCancel,
   onSave,
@@ -327,6 +340,9 @@ function PropertyRow({
   editing: boolean;
   busy: boolean;
   error: string | null;
+  conflict: ProfileKeyOwner | null;
+  // Same admin flag as `canReassignOwner`: gates the Duplicados link.
+  isAdmin: boolean;
   onStartEdit: () => void;
   onCancel: () => void;
   onSave: (value: string) => void;
@@ -378,6 +394,7 @@ function PropertyRow({
               id={inputId}
               aria-labelledby={`${inputId}-label`}
               className="input"
+              placeholder={prop.key === "profileKey" ? l.profileKeyPlaceholder : undefined}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               disabled={busy}
@@ -385,10 +402,24 @@ function PropertyRow({
             />
           )}
         </dd>
-        {error && (
-          <dd className="error-text" role="alert">
-            {error}
+        {prop.key === "profileKey" && !error && <dd className="hint">{l.profileKeyHelp}</dd>}
+        {conflict ? (
+          // Nothing is merged here: name the owner and point at Duplicados.
+          <dd className="alert alert-warn mt-md" role="alert">
+            <ProfileKeyConflictNotice labels={l} owner={conflict} isAdmin={isAdmin} />
           </dd>
+        ) : (
+          error &&
+          (prop.key === "profileKey" ? (
+            <dd className="alert alert-warn mt-md" role="alert">
+              <WarningIcon className="icon" />
+              <div>{error}</div>
+            </dd>
+          ) : (
+            <dd className="error-text" role="alert">
+              {error}
+            </dd>
+          ))
         )}
         <dd className="row">
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => onSave(draft)} disabled={busy}>
@@ -414,6 +445,10 @@ function PropertyRow({
             call={call}
             doNotCall={doNotCallFor(lusha, prop.key) ? doNotCallWarning(l, prop.value) : undefined}
           />
+        ) : prop.key === "profileKey" && prop.value ? (
+          <a href={linkedinProfileHref(prop.value) ?? undefined} target="_blank" rel="noopener noreferrer">
+            {prop.value}
+          </a>
         ) : prop.key === "contactType" ? (
           contactTypeLabel(prop.value, l.emptyValue)
         ) : (
