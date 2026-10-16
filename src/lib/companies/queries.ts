@@ -1,4 +1,5 @@
-import { and, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, or, sql, type SQL } from "drizzle-orm";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { bd, company, person, type Company, type NewCompany } from "@/db/schema";
@@ -7,11 +8,6 @@ import { companyContactsCondition } from "@/lib/companies/contactCounts";
 const owner = alias(bd, "owner");
 
 const MAX_SEARCH_TOKENS = 5;
-
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
 
 export interface CompanyFilters {
   search?: string;
@@ -45,7 +41,7 @@ export interface CompaniesPage {
   totalPages: number;
 }
 
-function searchCondition(q: string): SQL | undefined {
+export function searchCondition(q: string): SQL | undefined {
   const tokens = q
     .trim()
     .split(/\s+/)
@@ -53,10 +49,7 @@ function searchCondition(q: string): SQL | undefined {
     .slice(0, MAX_SEARCH_TOKENS);
   if (!tokens.length) return undefined;
 
-  const tokenConditions = tokens.map((token) => {
-    const pattern = `%${escapeLikeWildcards(token)}%`;
-    return ilike(company.displayName, pattern);
-  });
+  const tokenConditions = tokens.map((token) => termContainsSql(company.displayName, token));
 
   return or(...tokenConditions);
 }

@@ -1,4 +1,5 @@
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import { company, contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
 import { isDormant } from "@/lib/queries";
@@ -33,6 +34,11 @@ export {
   relationshipTierOf,
   RELATIONSHIP_TIERS,
 };
+
+/** The Outreach "name" filter: first or last name contains the term, ignoring case and accents. */
+export function outreachNameCondition(name: string) {
+  return or(termContainsSql(person.firstName, name), termContainsSql(person.lastName, name))!;
+}
 export type { HiringMatch, OutreachFilters, OutreachPage, OutreachRow, RelationshipTier };
 
 // Fetched one row over messagePrompt's own MAX_HISTORY_MESSAGES cap, so a
@@ -157,10 +163,7 @@ export async function listOutreachCandidates(
   if (filters.companyCategory) where.push(eq(person.companyCategory, filters.companyCategory));
   const name = filters.name?.trim();
   if (name) {
-    const pattern = `%${name}%`;
-    where.push(
-      or(ilike(person.firstName, pattern), ilike(person.lastName, pattern))!,
-    );
+    where.push(outreachNameCondition(name));
   }
 
   // Aliases are pbc_-prefixed: drizzle references CTE columns unqualified,

@@ -13,6 +13,7 @@
 import { COMPANY_MEMBER_LIMIT } from "./rosterGuards";
 import { resolveSeedRoster, type SeedCandidate, type SeedGuards, type SeedRejection } from "./seedRoster";
 import type { LeadStatusKey } from "@/lib/leads/types";
+import { foldedIncludes } from "@/lib/search/foldAccents";
 
 export type BlockKind = "client" | "clientFormer" | "suppressed" | "member" | "merged" | "noEmail" | "unreachable" | "inferred" | "noPosting" | "companyLimit";
 export type EmailBadge = "verified" | "probable" | "inferred" | "none";
@@ -77,9 +78,9 @@ export function selectionSummary(selection: Selection) {
 }
 
 export function pickerView(contacts: readonly PickerContact[], selection: Selection, filter: PickerFilter) {
-  const term = filter.search.trim().toLowerCase();
+  const term = filter.search.trim();
   const matches = (c: PickerContact) =>
-    (!filter.florida || c.florida) && (!term || [c.name, c.company ?? "", c.email ?? ""].some((s) => s.toLowerCase().includes(term)));
+    (!filter.florida || c.florida) && (!term || [c.name, c.company ?? "", c.email ?? ""].some((s) => foldedIncludes(s, term)));
   const build = (c: PickerContact): PickerRow => {
     const chosen = chosenIn(selection, c);
     const picked = selection.has(c.personId);

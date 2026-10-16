@@ -4,6 +4,7 @@
  * on it cut a real candidate pool from 18 to 2 (measured 2026-10-14).
  */
 import { sql } from "drizzle-orm";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 
 export const ROSTER_PICKER_MAX_LIMIT = 200;
 
@@ -23,7 +24,7 @@ export function buildRosterCandidatesQuery(opts: { limit: number; search?: strin
   const limit = Math.min(Math.max(Math.trunc(opts.limit) || 1, 1), ROSTER_PICKER_MAX_LIMIT);
   const term = opts.search?.trim();
   const search = term
-    ? sql`and (concat_ws(' ', p.first_name, p.last_name, p.company) ilike ${`%${term}%`})`
+    ? sql`and (${termContainsSql(sql`concat_ws(' ', p.first_name, p.last_name, p.company)`, term)})`
     : sql``;
   return sql`
     select p.id as person_id, p.first_name, p.last_name, p.email, p.job_title,

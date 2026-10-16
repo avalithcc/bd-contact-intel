@@ -9,8 +9,9 @@
  * company_key). `count(*)::int` casts the aggregate — Postgres returns
  * bigint aggregates as strings over the wire otherwise.
  */
-import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { activity, bd, company, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
@@ -50,11 +51,6 @@ type Dict = Awaited<ReturnType<typeof getDictionary>>;
 // site reuses (also used by the Contact record timeline,
 // src/lib/activity/queries.ts#getPersonTimeline) — see that module's doc
 // comment for the rule and its guard.
-
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
 
 const MAX_SEARCH_TOKENS = 5;
 
@@ -108,7 +104,7 @@ async function baseContactFilterConditions(
   }
   // "Empresa" ad-hoc filter — matches the name the row actually DISPLAYS,
   // see companyNameMatchCondition.
-  if (filters.company) where.push(companyNameMatchCondition(`%${escapeLikeWildcards(filters.company)}%`));
+  if (filters.company) where.push(companyNameMatchCondition(filters.company));
   // "Grupo de rol" ad-hoc filter.
   if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
   // "Tipo de contacto" ad-hoc filter — equality only, never matches NULL.
@@ -182,33 +178,32 @@ async function baseContactFilterConditions(
  * total count, per-view counts) and none of them can be assumed to join
  * `company`.
  */
-function companyNameMatchCondition(pattern: string): SQL {
+export function companyNameMatchCondition(term: string): SQL {
   return or(
-    ilike(person.company, pattern),
+    termContainsSql(person.company, term),
     and(
       sql`(${person.company} is null or ${person.company} = '')`,
       exists(
         db
           .select({ one: sql`1` })
           .from(company)
-          .where(and(eq(company.companyKey, person.companyKey), ilike(company.displayName, pattern))),
+          .where(and(eq(company.companyKey, person.companyKey), termContainsSql(company.displayName, term))),
       ),
     ),
   )!;
 }
 
-function searchCondition(q: string) {
+export function searchCondition(q: string) {
   const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
   if (!tokens.length) return undefined;
-  const tokenConditions = tokens.map((token) => {
-    const pattern = `%${escapeLikeWildcards(token)}%`;
-    return or(
-      ilike(person.firstName, pattern),
-      ilike(person.lastName, pattern),
-      companyNameMatchCondition(pattern),
-      ilike(person.email, pattern),
-    );
-  });
+  const tokenConditions = tokens.map((token) =>
+    or(
+      termContainsSql(person.firstName, token),
+      termContainsSql(person.lastName, token),
+      companyNameMatchCondition(token),
+      termContainsSql(person.email, token),
+    ),
+  );
   return and(...tokenConditions);
 }
 

@@ -1,6 +1,7 @@
-import { and, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, or, sql, type SQL } from "drizzle-orm";
 import { company, companyAlias } from "@/db/schema";
 import { companyLinkedinSearchTerm } from "@/lib/companies/linkedinUrl";
+import { escapeLikeWildcards, foldedIlike, termContainsSql } from "@/lib/search/accentInsensitive";
 
 /**
  * `/companies` text search ("q") — owner report: "no tengo buscador de
@@ -22,24 +23,22 @@ import { companyLinkedinSearchTerm } from "@/lib/companies/linkedinUrl";
  * / never let a fan-out join multiply rows).
  */
 
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
-
 const MAX_SEARCH_TOKENS = 5;
 
-function aliasMatchCondition(pattern: string): SQL {
+function aliasMatchCondition(term: string): SQL {
   return sql`exists (
     select 1 from ${companyAlias}
     where ${companyAlias.companyKey} = ${company.companyKey}
-      and ${companyAlias.aliasKey} ilike ${pattern}
+      and ${termContainsSql(companyAlias.aliasKey, term)}
   )`;
 }
 
 function textMatchCondition(text: string): SQL {
-  const pattern = `%${escapeLikeWildcards(text)}%`;
-  return or(ilike(company.displayName, pattern), ilike(company.domain, pattern), aliasMatchCondition(pattern))!;
+  return or(
+    termContainsSql(company.displayName, text),
+    termContainsSql(company.domain, text),
+    aliasMatchCondition(text),
+  )!;
 }
 
 function tokenCondition(token: string): SQL {
@@ -55,7 +54,7 @@ function tokenCondition(token: string): SQL {
   const linkedin = companyLinkedinSearchTerm(token);
   if (linkedin?.kind === "exact") return or(eq(company.linkedinUrl, linkedin.value), textMatchCondition(linkedin.slug))!;
   if (linkedin?.kind === "slug") {
-    return or(textMatch, ilike(company.linkedinUrl, `linkedin.com/%/%${escapeLikeWildcards(linkedin.slug)}%`))!;
+    return or(textMatch, foldedIlike(company.linkedinUrl, `linkedin.com/%/%${escapeLikeWildcards(linkedin.slug)}%`))!;
   }
   return textMatch;
 }

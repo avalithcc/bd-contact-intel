@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { and, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import {
   bd,
@@ -258,14 +259,6 @@ export function companyKeyFilter(key: string) {
 // paste-in doesn't blow up the query into dozens of OR'd conditions.
 const MAX_SEARCH_TOKENS = 5;
 
-// Escapes LIKE/ILIKE wildcard characters (and the escape character itself)
-// so literal `%`, `_`, or `\` in a user's search term are matched as-is
-// instead of behaving as wildcards.
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
-
 /**
  * Builds the home page's single-box `q` search filter: every
  * whitespace-separated token in `q` (trimmed, capped at
@@ -275,21 +268,20 @@ function escapeLikeWildcards(value: string): string {
  * last name separately. Returns undefined when `q` has no tokens
  * (e.g. blank/whitespace-only), so callers can skip pushing a filter.
  */
-function searchCondition(q: string) {
+export function searchCondition(q: string) {
   const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
   if (!tokens.length) return undefined;
 
-  const tokenConditions = tokens.map((token) => {
-    const pattern = `%${escapeLikeWildcards(token)}%`;
-    return or(
-      ilike(contact.firstName, pattern),
-      ilike(contact.lastName, pattern),
-      ilike(contact.company, pattern),
-      ilike(contact.position, pattern),
-      ilike(contact.email, pattern),
-      ilike(contact.industry, pattern),
-    );
-  });
+  const tokenConditions = tokens.map((token) =>
+    or(
+      termContainsSql(contact.firstName, token),
+      termContainsSql(contact.lastName, token),
+      termContainsSql(contact.company, token),
+      termContainsSql(contact.position, token),
+      termContainsSql(contact.email, token),
+      termContainsSql(contact.industry, token),
+    ),
+  );
 
   return and(...tokenConditions);
 }

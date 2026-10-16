@@ -6,15 +6,10 @@
  * file's row mapper (`companySubjectSearchResult`) unchanged, since it
  * already does exactly "company row -> { type, id, label }".
  */
-import { ilike } from "drizzle-orm";
 import { db } from "@/db";
 import { company } from "@/db/schema";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { companySubjectSearchResult, type TaskSubjectSearchResult } from "@/lib/tasks/subjectSearch";
-
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
 
 const COMPANY_RESULT_LIMIT = 8;
 
@@ -28,12 +23,10 @@ export async function searchContactCompanies(query: string): Promise<TaskSubject
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
-  const pattern = `%${escapeLikeWildcards(trimmed)}%`;
-
   const rows = await db
     .select({ companyKey: company.companyKey, displayName: company.displayName })
     .from(company)
-    .where(ilike(company.displayName, pattern))
+    .where(termContainsSql(company.displayName, trimmed))
     .limit(COMPANY_RESULT_LIMIT);
 
   return rows.map(companySubjectSearchResult);
