@@ -324,7 +324,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     email: timeline.countsByType.email_sent ?? 0,
     notes: timeline.countsByType.note ?? 0,
   };
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const signal =
     companyKey && companyOpenItCount > 0
       ? {

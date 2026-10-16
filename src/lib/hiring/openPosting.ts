@@ -9,21 +9,24 @@
  * by SmartRecruiters) as a live signal. Owner decision, measured on prod: open postings 11,095 -> 7,478, companies with
  * an open posting 215 -> 168, companies with an open US IT posting (the Sequences pool) 83 -> 59. Quality over volume.
  *
- * Freshness is `coalesce(posted_at, first_seen)`. `posted_at` is nullable (a future ATS may send none); hiding those
- * silently would be worse than showing them, so we fall back to `first_seen`, the moment our sync first saw the row,
- * which is a real lower bound on its age for anything discovered after we started scraping.
+ * Freshness is `least(posted_at, first_seen)`: the EARLIEST evidence we have of the posting's age. Postgres `least`
+ * ignores NULLs, so a missing `posted_at` (a future ATS may send none) falls back to `first_seen`, the moment our
+ * sync first saw the row, exactly what the old `coalesce` did; hiding those silently would be worse than showing them.
  *
- * Caveat, accepted by the owner: `posted_at` does not mean the same thing across providers. Greenhouse sends
- * `updated_at` (best-effort, see greenhouse.ts), Lever `createdAt`, Ashby `publishedAt`, Recruitee `published_at`. So
- * the window measures "last edited" on Greenhouse and "originally published" elsewhere, and bites harder on Lever and
- * Ashby. Measured share of open postings kept within 30 days: Greenhouse 80%, SmartRecruiters 54%, Ashby 37%,
- * Lever 34%. This is not a bug.
+ * Why `least` and not `posted_at` first: `posted_at` is not stable across providers. Greenhouse sends `updated_at`
+ * (best-effort, see greenhouse.ts), Lever `createdAt`, Ashby `publishedAt`, Recruitee `published_at`, and sync.ts
+ * overwrites `posted_at` with `excluded.posted_at` on every conflict. So editing a Greenhouse req pushes its date
+ * forward and an aged-out req (published in 2022, first seen last month) would re-enter the window and show as hot.
+ * The owner decided that must not happen: only genuinely new open jobs count. An edit can only make `posted_at` LATER
+ * than the truth, never earlier, and `first_seen` never mutates, so taking the earlier of the two is immune to it:
+ * published 2022 and edited today stays OUT; published today and first seen today stays IN; published 10 days ago but
+ * first seen 60 days ago (possible only through an edit, we cannot see a posting before it exists) is OUT.
+ * Known limit: the window still measures "originally published" on Lever and Ashby and bites harder there (measured
+ * share of open postings kept within 30 days before this change: Greenhouse 80%, SmartRecruiters 54%, Ashby 37%,
+ * Lever 34%; Greenhouse drops now that its edits no longer count). This is not a bug.
  *
- * Consequence to know before "fixing" it: `posted_at` MOVES. sync.ts overwrites it with `excluded.posted_at` on every
- * conflict, and for Greenhouse it is `updated_at`, so editing a req pushes its date forward and an aged-out Greenhouse
- * posting can re-enter the window and show as hot again. Arguably correct (someone touched the req); it is an owner
- * decision, not a bug. Anything that needs "did we already hold this posting at time T" must therefore NOT trust
- * `posted_at` alone: `first_seen` never mutates (see the delta baseline below).
+ * The 7-day delta baseline below uses the same `least` basis at the earlier instant, so today's total and the
+ * baseline share one definition of age.
  *
  * `is_it` and `market` are deliberately NOT part of this rule; callers add them (draftQueries aggregates markets and
  * does not filter `market = 'us'`, the roster does).
@@ -36,8 +39,8 @@ export const FRESH_POSTING_WINDOW_DAYS = 30;
 export const POSTING_DELTA_WINDOW_DAYS = 7;
 
 const days = (n: number) => sql.raw(`interval '${n} days'`);
-/** The one freshness basis: when the posting was published, else when we first saw it. */
-const basis = (postedAt: SQL, firstSeen: SQL) => sql`coalesce(${postedAt}, ${firstSeen})`;
+/** The one freshness basis: the earliest of when it was published and when we first saw it (NULLs ignored). */
+const basis = (postedAt: SQL, firstSeen: SQL) => sql`least(${postedAt}, ${firstSeen})`;
 const open = (closedAt: SQL) => sql`${closedAt} is null`;
 const fresh = (closedAt: SQL, postedAt: SQL, firstSeen: SQL) =>
   sql`(${open(closedAt)} and ${basis(postedAt, firstSeen)} >= now() - ${days(FRESH_POSTING_WINDOW_DAYS)})`;

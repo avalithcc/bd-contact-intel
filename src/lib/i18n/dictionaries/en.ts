@@ -1714,7 +1714,6 @@ export const en = {
     hiringTablePosition: "Position",
     hiringTableLocation: "Location",
     hiringTableMarket: "Market",
-    hiringTablePosted: "Posted",
     hiringEmpty: "No open IT postings right now.",
     assocContactsTitle: "Contacts",
     assocVacantesTitle: "Openings",

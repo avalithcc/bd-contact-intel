@@ -549,12 +549,9 @@ export async function getCompanyPostingsForKey(
     cross join (
       select
         count(*)::int as total_count,
-        -- new_last_7_days matches the contacts/[id] record's original "new"
-        -- definition (postedAt-based), not getCompanyHiringSummaries'
-        -- firstSeen-based one — same field this replaces
-        -- (companyPostings.postings.filter((p) => p.postedAt && p.postedAt
-        -- > sevenDaysAgo)), unchanged.
-        count(*) filter (where jp2.posted_at > ${sevenDaysAgoIso}::timestamptz)::int as new_last_7_days,
+        -- "New" means new TO US: first_seen, the same basis as the Vacantes 7-day delta. posted_at moves when an ATS
+        -- edit bumps it (Greenhouse updated_at), so counting it made an edited old req read as new this week.
+        count(*) filter (where jp2.first_seen > ${sevenDaysAgoIso}::timestamptz)::int as new_last_7_days,
         count(*) filter (where jp2.market = 'latam')::int as latam_count,
         count(*) filter (where jp2.market = 'us')::int as us_count,
         count(*) filter (where jp2.is_miami = true)::int as miami_count,

@@ -17,19 +17,19 @@ test("the window is 30 days and the SQL states it", () => {
   assert.equal(FRESH_POSTING_WINDOW_DAYS, 30);
   assert.equal(
     render(openFreshPostingSql("jp")),
-    "(jp.closed_at is null and coalesce(jp.posted_at, jp.first_seen) >= now() - interval '30 days')",
+    "(jp.closed_at is null and least(jp.posted_at, jp.first_seen) >= now() - interval '30 days')",
   );
 });
 
 test("the alias is honoured and an unsafe alias is rejected", () => {
-  assert.match(render(openFreshPostingSql("jp2")), /^\(jp2\.closed_at is null and coalesce\(jp2\.posted_at, jp2\.first_seen\)/);
+  assert.match(render(openFreshPostingSql("jp2")), /^\(jp2\.closed_at is null and least\(jp2\.posted_at, jp2\.first_seen\)/);
   assert.throws(() => openFreshPostingSql("jp; drop table x"));
 });
 
 test("the drizzle twin states the same rule over the typed columns", () => {
   const twin = render(openFreshPostingCondition());
   assert.match(twin, /"job_posting"\."closed_at" is null/);
-  assert.match(twin, /coalesce\("job_posting"\."posted_at", "job_posting"\."first_seen"\) >= now\(\) - interval '30 days'/);
+  assert.match(twin, /least\("job_posting"\."posted_at", "job_posting"\."first_seen"\) >= now\(\) - interval '30 days'/);
 });
 
 test("composing the fragment twice yields the same SQL (no shared mutable state)", () => {

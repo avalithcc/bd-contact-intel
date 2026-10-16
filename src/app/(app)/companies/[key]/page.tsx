@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
-import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { getCompanyByKey } from "@/lib/companies/queries";
 import {
   getCompanyOpenTasks,
@@ -31,6 +30,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { getDictionary } from "@/lib/i18n/server";
 import { companyPostingsHref, resolvePostingFilter } from "@/lib/hiring/delta";
+import { HiringPostingsTable } from "./HiringPostingsTable";
 import { RecordTabs } from "@/app/(app)/contacts/[id]/RecordTabs";
 import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import { CompanyAboutPane } from "./CompanyAboutPane";
@@ -264,30 +264,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                   {postings.postings.length < postings.totalCount && (
                     <p className="meta mt-xl">{dict.hiring.showingLatest(postings.postings.length, postings.totalCount)}</p>
                   )}
-                  <div className="table-wrap mt-xl">
-                    <table className="data compact">
-                      <thead>
-                        <tr>
-                          <th>{l.hiringTablePosition}</th>
-                          <th>{l.hiringTableLocation}</th>
-                          <th>{l.hiringTableMarket}</th>
-                          <th>{l.hiringTablePosted}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {postings.postings.map((p) => (
-                          <tr key={p.id}>
-                            <td>{p.title}</td>
-                            <td>{p.location}</td>
-                            <td>
-                              <span className="badge badge-neutral no-dot">{dict.markets[p.market]}</span>
-                            </td>
-                            <td className="meta">{formatArgentinaDayMonth(p.firstSeen)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <HiringPostingsTable postings={postings.postings} labels={l} markets={dict.markets} />
                   </>
                 ) : (
                   <>

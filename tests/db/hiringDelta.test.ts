@@ -125,9 +125,9 @@ test("what we had not scraped a week ago was not in our total, whatever its publ
     lateSeen: await mk("lateseen", [{ posted: daysAgo(20) }, { posted: daysAgo(15), seen: daysAgo(1) }]),
     // A company we just met whose postings are all older than a week: new on the radar, not "no change".
     lateCompany: await mk("latecompany", [{ posted: daysAgo(15), seen: daysAgo(1) }, { posted: daysAgo(12), seen: daysAgo(1) }]),
-    // Opposite direction, the Greenhouse case: held for 30 days, then edited 3 days ago so posted_at (updated_at)
+    // Opposite direction, the Greenhouse case: held for 20 days, then edited 3 days ago so posted_at (updated_at)
     // jumped forward. It did not open and did not close: no badge.
-    editedOld: await mk("editedold", [{ posted: daysAgo(20) }, { posted: daysAgo(3), seen: daysAgo(30) }]),
+    editedOld: await mk("editedold", [{ posted: daysAgo(20) }, { posted: daysAgo(3), seen: daysAgo(20) }]),
   };
   const { summaries } = await getCompanyHiringSummaries(anyBd);
   const delta = (k: keyof typeof keys) => summaries.find((s) => s.companyKey === keys[k])!.delta;
@@ -217,4 +217,44 @@ test("under a market or Miami filter the table number equals the filtered total 
     assert.equal(tab.totalCount, row.openItCount, `tab agrees with the table under ${JSON.stringify(filter)}`);
     assert.equal(tab.postings.length, want);
   }
+});
+
+test("a Greenhouse edit cannot resurrect an aged-out posting, and a null posted_at falls back to first_seen", async () => {
+  const { getCompanyHiringSummaries, getCompanyPostingsForKey } = await import("@/lib/hiring/queries");
+  const { db } = await import("@/db");
+  const { jobPosting } = await import("@/db/schema");
+  const anchor = { posted: daysAgo(20) };
+  // First seen 40 days ago, posted_at pushed to 3 days ago by an edit: never opened this week, aged out long ago.
+  const edited = await mk("gh-edited", [anchor, { posted: daysAgo(3), seen: daysAgo(40) }]);
+  // Same row shape but only 33 days old by first_seen: it WAS counted a week ago and has since aged out: a real drop.
+  const agedAfterEdit = await mk("gh-aged", [anchor, { posted: daysAgo(3), seen: daysAgo(33) }]);
+  const nullFresh = await mk("null-fresh", [anchor]);
+  const nullStale = await mk("null-stale", [anchor]);
+  await db.insert(jobPosting).values([
+    { companyKey: nullFresh, externalId: "n", title: "E", location: "x", url: "https://example.test", isIt: true, market: "us", postedAt: null, firstSeen: daysAgo(5) },
+    { companyKey: nullStale, externalId: "n", title: "E", location: "x", url: "https://example.test", isIt: true, market: "us", postedAt: null, firstSeen: daysAgo(40) },
+  ]);
+  const by = new Map((await getCompanyHiringSummaries(anyBd)).summaries.map((s) => [s.companyKey, s]));
+  assert.equal(by.get(edited)!.openItCount, 1, "only the anchor counts");
+  assert.deepEqual(by.get(edited)!.delta, { kind: "none" }, "no badge for an edited old posting");
+  assert.equal((await getCompanyPostingsForKey(edited))!.totalCount, 1);
+  assert.equal(by.get(agedAfterEdit)!.openItCount, 1);
+  assert.deepEqual(by.get(agedAfterEdit)!.delta, { kind: "down", amount: 1 }, "it did age out this week");
+  assert.equal(by.get(nullFresh)!.openItCount, 2, "null posted_at, first seen 5 days ago: counted");
+  assert.equal(by.get(nullStale)!.openItCount, 1, "null posted_at, first seen 40 days ago: not counted");
+});
+
+test("\"new this week\" on the contact record is new to us (first_seen), so an edit does not make an old req new", async () => {
+  const { getCompanyPostingsForKey } = await import("@/lib/hiring/queries");
+  const anchor = { posted: daysAgo(20) };
+  // Greenhouse shape: first seen 20 days ago, posted_at (updated_at) bumped to 2 days ago by an edit.
+  const edited = await mk("new-edited", [anchor, { posted: daysAgo(2), seen: daysAgo(20) }]);
+  // Genuinely new: published and first seen 2 days ago.
+  const fresh = await mk("new-fresh", [anchor, { posted: daysAgo(2) }]);
+  // Published 15 days ago but we only found it yesterday: new to us, matching the Vacantes delta.
+  const lateSeen = await mk("new-late", [anchor, { posted: daysAgo(15), seen: daysAgo(1) }]);
+  assert.equal((await getCompanyPostingsForKey(edited))!.newLast7DaysCount, 0);
+  assert.equal((await getCompanyPostingsForKey(edited))!.totalCount, 2, "still counted as open and fresh");
+  assert.equal((await getCompanyPostingsForKey(fresh))!.newLast7DaysCount, 1);
+  assert.equal((await getCompanyPostingsForKey(lateSeen))!.newLast7DaysCount, 1);
 });

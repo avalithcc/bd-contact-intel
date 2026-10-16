@@ -1678,7 +1678,6 @@ export const es: typeof en = {
     hiringTablePosition: "Cargo",
     hiringTableLocation: "Ubicación",
     hiringTableMarket: "Mercado",
-    hiringTablePosted: "Publicado",
     hiringEmpty: "No hay vacantes de IT abiertas por ahora.",
     assocContactsTitle: "Contactos",
     assocVacantesTitle: "Vacantes",

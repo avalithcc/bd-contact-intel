@@ -68,12 +68,14 @@ test("every surface agrees: 29 days counts, 31 days does not, closed never count
     closedFresh: await mkCase("closed", { posted: daysAgo(2), first: daysAgo(2), closed: daysAgo(1) }),
     nullFresh: await mkCase("nullfresh", { posted: null, first: daysAgo(5) }),
     nullStale: await mkCase("nullstale", { posted: null, first: daysAgo(40) }),
-    // posted_at wins over first_seen: a re-discovered old posting is judged by its own date, and a
-    // freshly published one is not hidden because our sync saw it late.
+    // The Greenhouse edit case: first seen 90 days ago, posted_at (updated_at) moved to 3 days ago by an edit.
+    // The earliest evidence wins, so it stays out; we cannot see a posting before it exists.
     postedFreshSeenOld: await mkCase("postedfresh", { posted: daysAgo(3), first: daysAgo(90) }),
+    // A genuinely new posting: published and first seen today.
+    brandNew: await mkCase("brandnew", { posted: daysAgo(0), first: daysAgo(0) }),
     postedStaleSeenNew: await mkCase("postedstale", { posted: daysAgo(90), first: daysAgo(1) }),
   };
-  const expectedIn = new Set(["fresh29", "nullFresh", "postedFreshSeenOld"]);
+  const expectedIn = new Set(["fresh29", "nullFresh", "brandNew"]);
 
   const hiring = await resolveHiringCompanies("us");
   const badge = await getHiringCompanyKeys();
