@@ -55,9 +55,9 @@ test("search: a pasted URL matches the column OR the slug by name/domain/alias",
 
 test("search: a pasted URL finds a company by name while linkedin_url is null (name branch survives)", () => {
   const { sql: text, params } = render("https://www.linkedin.com/company/globant/about");
-  assert.match(text, /"linkedin_url" = \$1 or \(unaccent\("company"\."display_name"\) ilike unaccent\(\$2\)/i);
-  assert.match(text, /unaccent\("company"\."domain"\) ilike unaccent\(\$3\)/i);
-  assert.match(text, /unaccent\("company_alias"\."alias_key"\) ilike unaccent\(\$4\)/i);
+  assert.match(text, /"linkedin_url" = \$1 or \(unaccent\("company"\."display_name"\) ilike \(select unaccent\(\$2\)\)/i);
+  assert.match(text, /unaccent\("company"\."domain"\) ilike \(select unaccent\(\$3\)\)/i);
+  assert.match(text, /unaccent\("company_alias"\."alias_key"\) ilike \(select unaccent\(\$4\)\)/i);
   assert.deepEqual(params, ["linkedin.com/company/globant", "%globant%", "%globant%", "%globant%"]);
 });
 
@@ -73,8 +73,8 @@ test("search: a school URL and a regional subdomain collapse to the stored form"
 
 test("search: a bare word still searches name/domain/alias AND the LinkedIn slug", () => {
   const { sql: text, params } = render("acme");
-  assert.match(text, /unaccent\("company"\."display_name"\) ilike unaccent\(\$1\)/i);
-  assert.match(text, /unaccent\("company"\."linkedin_url"\) ilike unaccent\(\$4\)/i);
+  assert.match(text, /unaccent\("company"\."display_name"\) ilike \(select unaccent\(\$1\)\)/i);
+  assert.match(text, /unaccent\("company"\."linkedin_url"\) ilike \(select unaccent\(\$4\)\)/i);
   assert.deepEqual(params, ["%acme%", "%acme%", "%acme%", "linkedin.com/%/%acme%"]);
 });
 

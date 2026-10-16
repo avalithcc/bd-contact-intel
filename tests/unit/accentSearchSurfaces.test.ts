@@ -24,7 +24,7 @@ test("/companies search folds accents on display_name, domain, alias_key and the
 
 test("Sequences roster picker folds accents on the name and escapes the user's wildcards", () => {
   const q = flat(buildRosterCandidatesQuery({ limit: 10, search: "50%_José" }));
-  assert.match(q.sql, /unaccent\(concat_ws\(' ', p\.first_name, p\.last_name, p\.company\)\) ilike unaccent\(\$1\)/);
+  assert.match(q.sql, /unaccent\(concat_ws\(' ', p\.first_name, p\.last_name, p\.company\)\) ilike \(select unaccent\(\$1\)\)/);
   assert.equal(q.params[0], "%50\\%\\_José%");
 });
 

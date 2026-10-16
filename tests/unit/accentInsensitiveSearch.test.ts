@@ -11,7 +11,7 @@ import {
   containsPattern,
   escapeLikeWildcards,
   foldAccents,
-  foldedIlike,
+  foldedIlikeRawPattern,
   foldedIncludes,
   termContainsSql,
 } from "@/lib/search/accentInsensitive";
@@ -49,15 +49,15 @@ test("escapeLikeWildcards escapes %, _ and the escape character", () => {
   assert.equal(containsPattern("a%b"), "%a\\%b%");
 });
 
-test("foldedIlike folds the column and the pattern", () => {
-  const q = dialect.sqlToQuery(sql`select 1 where ${foldedIlike(sql`name`, "%José%")}`);
-  assert.equal(q.sql, "select 1 where unaccent(name) ilike unaccent($1)");
+test("foldedIlikeRawPattern folds the column and the pattern", () => {
+  const q = dialect.sqlToQuery(sql`select 1 where ${foldedIlikeRawPattern(sql`name`, "%José%")}`);
+  assert.equal(q.sql, "select 1 where unaccent(name) ilike (select unaccent($1))");
   assert.deepEqual(q.params, ["%José%"]);
 });
 
 test("termContainsSql builds the escaped contains pattern, so a typed % is not a wildcard", () => {
   const q = dialect.sqlToQuery(sql`select 1 where ${termContainsSql(sql`name`, "50%")}`);
-  assert.equal(q.sql, "select 1 where unaccent(name) ilike unaccent($1)");
+  assert.equal(q.sql, "select 1 where unaccent(name) ilike (select unaccent($1))");
   assert.deepEqual(q.params, ["%50\\%%"]);
 });
 

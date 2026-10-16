@@ -1,7 +1,7 @@
 import { and, eq, or, sql, type SQL } from "drizzle-orm";
 import { company, companyAlias } from "@/db/schema";
 import { companyLinkedinSearchTerm } from "@/lib/companies/linkedinUrl";
-import { escapeLikeWildcards, foldedIlike, termContainsSql } from "@/lib/search/accentInsensitive";
+import { escapeLikeWildcards, foldedIlikeRawPattern, termContainsSql } from "@/lib/search/accentInsensitive";
 
 /**
  * `/companies` text search ("q") — owner report: "no tengo buscador de
@@ -54,7 +54,7 @@ function tokenCondition(token: string): SQL {
   const linkedin = companyLinkedinSearchTerm(token);
   if (linkedin?.kind === "exact") return or(eq(company.linkedinUrl, linkedin.value), textMatchCondition(linkedin.slug))!;
   if (linkedin?.kind === "slug") {
-    return or(textMatch, foldedIlike(company.linkedinUrl, `linkedin.com/%/%${escapeLikeWildcards(linkedin.slug)}%`))!;
+    return or(textMatch, foldedIlikeRawPattern(company.linkedinUrl, `linkedin.com/%/%${escapeLikeWildcards(linkedin.slug)}%`))!;
   }
   return textMatch;
 }
