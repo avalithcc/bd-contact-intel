@@ -37,6 +37,7 @@ import * as schema from "@/db/schema";
  */
 const CONVERTED_TABLES: readonly string[] = [
   "bd",
+  "gmail_reminder_send",
   "company_category",
   "target_company",
   "company_alias",

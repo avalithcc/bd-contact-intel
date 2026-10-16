@@ -35,6 +35,13 @@ export const bd = pgTable("bd", {
   // BD that existed to true. Only an admin changes it (/admin/lusha), and every change writes an audit_log row. Admins are
   // not exempt. Disabling stops NEW reveals only: past reveals and consumption stay.
   lushaEnabled: boolean("lusha_enabled").notNull().default(false),
+  // When this BD was last seen using the CRM (drizzle/0048). Written by getCurrentBd, throttled (src/lib/auth/lastSeenPolicy.ts, written by lastSeenDb.ts).
+  // The migration backfilled every BD that existed to now(); a BD created later stays NULL until the first visit, and the
+  // reminder planner reads coalesce(last_seen_at, created_at).
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  // Whether the Gmail reminder cron may email this BD (drizzle/0048). Data only, no UI yet. The migration switched it off
+  // for the two e2e test accounts by email; the launch-readiness seed does the same on a fresh scratch database.
+  emailRemindersEnabled: boolean("email_reminders_enabled").notNull().default(true),
 });
 
 // A contact, private to exactly one BD.
@@ -1579,6 +1586,34 @@ export const taskDigestSend = pgTable(
   (t) => ({
     bdDateUnique: unique("task_digest_send_bd_date_unique").on(t.bdId, t.sendDate),
     byBd: index("task_digest_send_bd_idx").on(t.bdId),
+  }),
+);
+
+// One row per "connect your Gmail" reminder email (gmail-reminder-email). Same claim-before-send idempotency as
+// task_digest_send: the cron inserts a 'pending' row with `on conflict (bd_id, sent_on) do nothing` BEFORE sending and sends
+// only when its own insert returned a row, so a duplicated run on the same Argentina day never mails a BD twice. A series is
+// counted from the 'sent' rows whose sent_at is after bd.last_seen_at (src/lib/gmail/reminderPlan.ts). A 'failed' row is
+// left for a human, like the digest.
+export const gmailReminderSend = pgTable(
+  "gmail_reminder_send",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    sentOn: date("sent_on").notNull(),
+    // 1, 2 or 3: the position in the series this email was planned as.
+    reminderNumber: smallint("reminder_number").notNull(),
+    // 'pending' (claimed, send in progress) | 'sent' | 'failed'
+    status: text("status").notNull().default("pending"),
+    // Sanitized send-failure text, never the raw SMTP error (src/lib/tasks/sendErrorSanitizer.ts).
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    bdDayUnique: unique("gmail_reminder_send_bd_day_unique").on(t.bdId, t.sentOn),
+    byBd: index("gmail_reminder_send_bd_idx").on(t.bdId),
   }),
 );
 

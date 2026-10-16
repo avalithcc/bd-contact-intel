@@ -26,6 +26,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/gmail/reminders",
+      "schedule": "0 12 * * 1-5"
+    },
+    {
       "path": "/api/owners/recompute",
       "schedule": "0 6 * * *"
     },

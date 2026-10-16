@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { SESSION_EXEMPT_ROUTES, isSessionExemptPath } from "@/lib/auth/sessionExemptRoutes";
 
 test("the two sequence routes are session-exempt, alongside every route that was already", () => {
-  for (const route of ["/api/unsubscribe", "/api/sequences/run", "/api/hiring/sync", "/api/hiring/discover", "/api/leads/ingest", "/api/tasks/digest", "/api/gmail/sync", "/api/owners/recompute"]) {
+  for (const route of ["/api/unsubscribe", "/api/sequences/run", "/api/hiring/sync", "/api/hiring/discover", "/api/leads/ingest", "/api/tasks/digest", "/api/gmail/sync", "/api/gmail/reminders", "/api/owners/recompute"]) {
     assert.ok(SESSION_EXEMPT_ROUTES.includes(route), route);
     assert.ok(isSessionExemptPath(route), route);
   }
