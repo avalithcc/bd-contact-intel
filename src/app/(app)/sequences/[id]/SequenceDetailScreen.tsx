@@ -176,6 +176,7 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   }
 
   async function onBulk(a: BulkAction) {
+    if (readOnly) return;
     if (a.type === "remove") return setRemoveIds(a.memberIds);
     const r = await guarded(() => approveBulk(a.memberIds, 1));
     if (!r) return;
