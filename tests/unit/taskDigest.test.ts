@@ -288,7 +288,7 @@ test("the preheader is the summary sentence and the footer states why, who sends
   assert.ok(email);
   assert.match(email!.html, /display:none;[^>]*>Tenés 1 tarea para hoy, 1 pendiente de ayer y 1 tarea atrasada\./);
   assert.match(email!.html, /Recibís este resumen cada mañana/);
-  assert.match(email!.html, /notificaciones@avalith\.net/);
+  assert.match(email!.html, /notificaciones@crm\.avalith\.net/);
   assert.match(email!.html, /no recibe respuestas/);
 });
 

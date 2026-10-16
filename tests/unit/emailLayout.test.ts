@@ -37,7 +37,7 @@ test("subject, eyebrow, title, preheader and reason are escaped", () => {
 test("footer: replies flag switches between the no-reply and the admin-reply sentence", () => {
   assert.match(renderEmail(base), /no recibe respuestas/);
   assert.match(renderEmail({ ...base, replies: true }), /tu respuesta llega a la administración/);
-  assert.match(renderEmail(base), /notificaciones@avalith\.net/);
+  assert.match(renderEmail(base), /notificaciones@crm\.avalith\.net/);
 });
 
 test("button: comment-free padded cell; href and label are escaped", () => {
@@ -58,6 +58,6 @@ test("fallback link, callout, steps, facts and pill escape their text arguments"
 
 test("the text twin appends the same reason and footer as the HTML", () => {
   const text = renderEmailText({ body: "Hola\nhttps://x.test/go", reason: "Motivo", replies: true });
-  assert.equal(text, "Hola\nhttps://x.test/go\n\nMotivo\nMensaje automático de Avalith CRM, enviado desde notificaciones@avalith.net. Podés responder este correo: tu respuesta llega a la administración del CRM.\n");
+  assert.equal(text, "Hola\nhttps://x.test/go\n\nMotivo\nMensaje automático de Avalith CRM, enviado desde notificaciones@crm.avalith.net. Podés responder este correo: tu respuesta llega a la administración del CRM.\n");
   assert.equal(escapeHtml(`'`), "&#39;");
 });

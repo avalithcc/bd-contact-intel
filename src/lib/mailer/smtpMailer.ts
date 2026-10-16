@@ -1,8 +1,10 @@
 /**
- * SMTP transport for the task-reminders digest (HostGator mailbox
- * `notificaciones@avalith.net`, same account already verified for
- * Supabase's password-reset email — see src/lib/auth/passwordReset.ts's
- * doc comment). Port 465 is implicit TLS (`secure: true`) — do NOT set
+ * SMTP transport for every notification email (Resend, `smtp.resend.com`,
+ * sending as `notificaciones@crm.avalith.net`; the same provider sends
+ * Supabase's auth emails — see src/lib/auth/passwordReset.ts's doc comment).
+ * Moved off HostGator on 2026-10-16: its outbound filter silently dropped the
+ * password-reset template and then blocked the account for every message
+ * after it. Port 465 is implicit TLS (`secure: true`) — do NOT set
  * `secure: false` with port 465, that pattern is for STARTTLS on 587.
  *
  * This module is intentionally the ONLY place `nodemailer.createTransport`
@@ -15,7 +17,7 @@
 import nodemailer from "nodemailer";
 
 /** The digest's sending mailbox — also shown in the footer (src/lib/tasks/digest.ts) so the two never drift apart. */
-export const DIGEST_FROM_ADDRESS = "notificaciones@avalith.net";
+export const DIGEST_FROM_ADDRESS = "notificaciones@crm.avalith.net";
 
 export interface DigestSendInput {
   to: string;
