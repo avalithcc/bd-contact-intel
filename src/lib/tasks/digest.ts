@@ -308,7 +308,7 @@ ${sections.map((s) => s.html).join("")}
 </td></tr>
 
 <tr><td class="digest-pad" style="padding:20px 32px 28px;">
-<p style="margin:0;font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:${COLOR_INK_MUTED};">Resumen diario de tus tareas en Avalith BD, enviado desde ${escapeHtml(
+<p style="margin:0;font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:${COLOR_INK_MUTED};">Resumen diario de tus tareas en Avalith CRM, enviado desde ${escapeHtml(
     DIGEST_FROM_ADDRESS,
   )}.</p>
 </td></tr>

@@ -48,7 +48,7 @@ function buildTransport() {
 export async function sendDigestEmail(input: DigestSendInput): Promise<void> {
   const transport = buildTransport();
   await transport.sendMail({
-    from: `"Avalith BD" <${DIGEST_FROM_ADDRESS}>`,
+    from: `"Avalith CRM" <${DIGEST_FROM_ADDRESS}>`,
     to: input.to,
     subject: input.subject,
     html: input.html,

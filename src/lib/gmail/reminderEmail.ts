@@ -57,7 +57,7 @@ export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: str
   const url = `${siteBaseUrl}/account/email`;
   const first = greetingName(recipient.name);
   const hello = first ? `Hola ${first},` : "Hola,";
-  const footer = `Recibís este aviso porque tu Gmail está sin conectar. Dejamos de mandarlo apenas lo conectes. Es un mensaje automático de Avalith BD, enviado desde ${escapeHtml(DIGEST_FROM_ADDRESS)}.`;
+  const footer = `Recibís este aviso porque tu Gmail está sin conectar. Dejamos de mandarlo apenas lo conectes. Es un mensaje automático de Avalith CRM, enviado desde ${escapeHtml(DIGEST_FROM_ADDRESS)}.`;
 
   const body = `<p>${escapeHtml(hello)}</p>
 <p>Hace unos días que no entrás al CRM y tu Gmail todavía <strong>no está conectado</strong>. <strong>Es clave que lo conectes:</strong> es lo que hace que el CRM funcione para vos.</p>
@@ -86,7 +86,7 @@ export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: str
     "",
     "Cualquier problema, escribile a Cristian.",
     "",
-    `Recibís este aviso porque tu Gmail está sin conectar. Dejamos de mandarlo apenas lo conectes. Es un mensaje automático de Avalith BD, enviado desde ${DIGEST_FROM_ADDRESS}.`,
+    `Recibís este aviso porque tu Gmail está sin conectar. Dejamos de mandarlo apenas lo conectes. Es un mensaje automático de Avalith CRM, enviado desde ${DIGEST_FROM_ADDRESS}.`,
     "",
   ].join("\n");
 
@@ -98,6 +98,6 @@ export function buildOwnerNoticeEmail(bd: { name: string; email: string }): Remi
   const subject = `${bd.name} sigue sin conectar Gmail`;
   const line = `Le mandamos 3 recordatorios por email a ${bd.name} (${bd.email}) y todavía no conectó su Gmail. No le mandamos más: conviene hablarle directamente.`;
   const body = `<p>${escapeHtml(line)}</p>`;
-  const footer = `Aviso automático de Avalith BD, enviado desde ${escapeHtml(DIGEST_FROM_ADDRESS)}.`;
+  const footer = `Aviso automático de Avalith CRM, enviado desde ${escapeHtml(DIGEST_FROM_ADDRESS)}.`;
   return { subject, html: layout(subject, body, footer), text: `${line}\n` };
 }
