@@ -8,8 +8,8 @@
  * Privacy, enforced in the WHERE clause itself, not just in the caller:
  * `email_message.bd_id = bdId` scopes every row to the REQUESTING BD's own
  * mailbox (never another BD's, and never bypassed for an admin here — an
- * admin reads another BD's conversation only through the existing audited
- * `getConversationForAdmin` path). The `EXISTS` against
+ * admin reads another BD's conversation through
+ * `getAdminInlineConversations`, which ships the bodies with the page). The `EXISTS` against
  * `email_message_person` additionally requires the thread to actually
  * belong to `personId` — without it, a BD who can see two different
  * contacts' threads could pass one contact's `gmailThreadId` while viewing

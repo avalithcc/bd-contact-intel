@@ -2,7 +2,7 @@
  * Read model for the Sequence detail screen. Owner-scoped: a BD reads only their own Sequence (another BD's reads as
  * "not found", indistinguishable from a missing id). An admin may read any, and reading another BD's writes an
  * `audit_log` row BEFORE the draft bodies are read, in the same transaction, so a body is never returned without its
- * audit entry (the getConversationForAdmin pattern; the policy line is in readAudit.ts).
+ * audit entry (the policy line is in readAudit.ts).
  *
  * Round trips (PERFORMANCE.md): a BD reading their own Sequence costs ONE statement (sequence, members, drafts, posting
  * counts and last contact in a single left join). Only an admin pays more: one owner lookup, the audit insert if

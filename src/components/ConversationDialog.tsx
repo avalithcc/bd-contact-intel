@@ -5,10 +5,10 @@ import { Dialog } from "@/components/Dialog";
 
 /**
  * Shared conversation viewer modal (owner decision 2026-09-30) — the ONE
- * dialog both the viewing BD's own LinkedIn history
- * (OwnConversationHistory.tsx) and the admin bypass (AdminConversationFlow.tsx)
- * render into, replacing the old inline sidebar expansion and the standalone
- * `/contacts/[id]/conversation/[bdId]` page respectively.
+ * dialog the viewing BD's own LinkedIn history (OwnConversationHistory.tsx)
+ * renders into, replacing the old inline sidebar expansion. (The admin's
+ * view of other BDs' conversations is inline in the timeline since
+ * 2026-10-15 and no longer uses a dialog.)
  *
  * The base `.dialog` caps its own height to the viewport and scrolls
  * `.dialog-body` (globals.css). `.dialog-body-scroll` makes THIS wrapper the
@@ -26,7 +26,6 @@ export function ConversationDialog({
   loading,
   error,
   errorLabel,
-  banner,
   children,
 }: {
   open: boolean;
@@ -35,7 +34,6 @@ export function ConversationDialog({
   loading: boolean;
   error: boolean;
   errorLabel: string;
-  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -69,10 +67,7 @@ export function ConversationDialog({
             {errorLabel}
           </span>
         ) : (
-          <>
-            {banner}
-            {children}
-          </>
+          children
         )}
       </div>
     </Dialog>

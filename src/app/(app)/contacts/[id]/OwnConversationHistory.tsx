@@ -16,8 +16,7 @@ import type { OwnConversationMessage } from "@/lib/activity/getOwnConversationMe
  * conversaciones" card (owner decision 2026-09-30; contact-record.html:
  * 172-178) — count + last message date are already on screen (page.tsx,
  * from `record.connections`, no extra query). "Ver mensajes" opens the
- * shared `ConversationDialog` (same modal the admin bypass uses,
- * AdminConversationFlow.tsx) instead of expanding inline in the narrow
+ * shared `ConversationDialog` instead of expanding inline in the narrow
  * sidebar column (owner complaint 2026-09-30: an inline expansion here was
  * an endless vertical scroll in a narrow column). Content is fetched on
  * demand (getOwnConversationMessagesAction) the first time the dialog opens

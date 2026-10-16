@@ -5,8 +5,8 @@
  *
  * Two static checks over `src/`:
  *  1. Only one file ever SELECTs from the `audit_log` table:
- *     src/lib/activity/auditLogQueries.ts (getConversationForAdmin.ts only
- *     INSERTs into it, writing the audit trail — never reads it back).
+ *     src/lib/activity/auditLogQueries.ts (no conversation read writes
+ *     view_conversation rows any more; past rows stay readable there).
  *  2. Every importer of `listConversationAuditLog` (that file's own read)
  *     lives under `src/app/(app)/admin/` — the same 404-for-non-admins
  *     route family every other admin-only screen uses (requireAdmin()).
@@ -44,7 +44,7 @@ test("only auditLogQueries.ts ever SELECTs view_conversation rows from audit_log
     // src/lib/identity/) — this scan only cares about reads scoped to
     // `view_conversation`, the conversation-view trail, not every read of
     // the shared table. A raw `.select(...)...from(auditLog)` read —
-    // INSERTs (getConversationForAdmin.ts's audit write) don't match this
+    // INSERTs don't match this
     // shape at all.
     if (/\.from\(\s*auditLog\s*\)/.test(src) && /view_conversation/.test(src)) offenders.push(file);
   }

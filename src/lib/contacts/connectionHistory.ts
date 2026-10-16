@@ -6,8 +6,8 @@
  * the non-admin-safe summary admin-access-audit requires ("Non-admins ... MAY
  * see which BDs have history with a Contact, never the content", task 11.2).
  * Every viewer, admin or not, gets this same summary on the associations
- * pane; only the audited admin bypass (getConversationForAdmin, task 11.3)
- * reveals actual message content.
+ * pane; only an admin reads actual message content, inline in the timeline
+ * (adminInlineConversations.ts).
  */
 
 export interface ConnectionHistoryInput {

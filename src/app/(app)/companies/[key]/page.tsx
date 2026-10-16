@@ -23,6 +23,7 @@ import {
 import { buildCompanyTimelineViewRows } from "@/lib/companies/timelineView";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getCurrentBd } from "@/lib/queries";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import { pickCompanyRecordLabels } from "@/lib/companies/labels";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
@@ -161,6 +162,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     l,
     (stage) => stageLabelOf(stage, lc),
     me.id,
+    isAdminRole(me),
   );
 
   const newContactLabels: NewContactDialogLabels = {

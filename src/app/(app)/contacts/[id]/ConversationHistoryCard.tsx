@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { EyeIcon, LockIcon } from "@/components/icons";
+import { LockIcon } from "@/components/icons";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
-import { AdminConversationFlow, type AdminConversationTrigger } from "./AdminConversationFlow";
 import { OwnConversationHistory } from "./OwnConversationHistory";
 
 export interface LockedConversationSummaryView {
@@ -26,10 +24,10 @@ export interface OwnConversationRow {
  *  - `ownRow` — the viewing BD's own connection with this Contact, for
  *    EVERY viewer (admin or not): count + last message date, opening the
  *    shared `ConversationDialog` on demand (`OwnConversationHistory`).
- *  - `summaries` — every OTHER BD with locked content (email thread(s),
- *    LinkedIn message history, or both), ADMIN-ONLY, with the "Ver" action
- *    that opens the SAME shared modal via `AdminConversationFlow` (confirm
- *    -> audited fetch -> content — no more navigating to a separate page).
+ *  - `summaries` — every OTHER BD with conversation content (email thread(s),
+ *    LinkedIn message history, or both), ADMIN-ONLY, as a plain summary: the
+ *    content itself is already inline in the timeline (owner decision
+ *    2026-10-15), so there is no action here.
  *  - `lockedRows` — every OTHER BD with real LinkedIn message history, for a
  *    NON-admin viewer: name + count/date, no content, no action (bugfix
  *    2026-09-30 — this card used to render nothing at all here, while the
@@ -52,8 +50,6 @@ export function ConversationHistoryCard({
   lockedRows: LockedConversationSummaryView[];
   labels: ContactRecordLabels;
 }) {
-  const [pending, setPending] = useState<AdminConversationTrigger | null>(null);
-
   if (!ownRow && summaries.length === 0 && lockedRows.length === 0) return null;
 
   const mentionedNames = [
@@ -93,14 +89,6 @@ export function ConversationHistoryCard({
               <div className="n">{s.bdName}</div>
               <div className="s">{s.summaryText}</div>
             </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setPending({ bdId: s.bdId, bdName: s.bdName })}
-            >
-              <EyeIcon className="icon" />
-              {l.conversationHistoryViewAction}
-            </button>
           </div>
         ))}
 
@@ -120,17 +108,6 @@ export function ConversationHistoryCard({
           {summaries.length > 0 ? l.conversationHistoryAdminFooter : l.conversationHistoryPrivateFooter}
         </p>
       </div>
-
-      {pending && (
-        <AdminConversationFlow
-          key={pending.bdId}
-          trigger={pending}
-          personId={personId}
-          personName={personName}
-          labels={l}
-          onClose={() => setPending(null)}
-        />
-      )}
     </div>
   );
 }

@@ -161,6 +161,9 @@ export function buildCompanyTimelineViewRows(
   labels: CompanyTimelineViewLabels,
   stageLabelOf: (stage: string) => string,
   viewerBdId: string,
+  // Owner decision 2026-10-15: an admin reads other BDs' conversation rows, same as on
+  // the contact timeline. Closed by default; callers derive it from the session's bd row.
+  viewerIsAdmin = false,
 ): CompanyTimelineViewRow[] {
   return rows.map((row) => {
     // Same rule the contact timeline runs (src/lib/activity/timelineEntry.ts)
@@ -168,7 +171,7 @@ export function buildCompanyTimelineViewRows(
     // (email_sent/reply_received) whose actorBdId isn't this viewer's own.
     // Every other type is always `true`, so this never affects note/call/
     // status_change/etc regardless of who logged them.
-    const visible = isTimelineEntryVisible({ type: row.type, actorBdId: row.actorBdId }, viewerBdId);
+    const visible = isTimelineEntryVisible({ type: row.type, actorBdId: row.actorBdId }, viewerBdId, viewerIsAdmin);
     // Metadata is computed from the RAW row only for building `what`/`body`
     // below — an empty object when locked, so no branch here can
     // accidentally read a real subject/address into either. The row

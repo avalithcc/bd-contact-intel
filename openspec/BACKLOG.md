@@ -937,6 +937,27 @@ Open before implementing:
   header over the now-visible content so it is still obvious whose thread it
   is.
 
+**Shipped 2026-10-16 (branch `admin-inline-conversation`).** Both open
+questions above are settled:
+- Cost: the inline bodies are ONE statement
+  (`getAdminInlineConversations`, a UNION ALL of synced mail and LinkedIn
+  messages), admin-only, capped at 100 rows and 4,000 characters per body
+  (`left(...)` in SQL, so a 256 KB body never leaves Postgres): worst case
+  about 400 KB. Past the row cap the newest rows win and the timeline says so.
+- The locked card disappears for an admin; another BD's synced thread renders
+  open under a "conversation of {BD}" line, and the single-entry cards already
+  name their BD in the header.
+No audit row is written; `getConversationForAdmin`, the confirm dialog and the
+`?conversation=` auto-open were deleted. Past `view_conversation` rows and
+`/admin/audit-log` stay; its "Abrir" link now lands on the record's timeline.
+Spec: `openspec/changes/crm-hubspot-ux/specs/admin-access-audit/spec.md`.
+The aggregated middle path (one row per admin/contact/day) was not taken.
+Follow-ups closed the same day: synced mail with no `activity` row (the send path
+stores one `email_message` for every matched person but writes its activity for
+one) is flagged `orphan` in the same statement and listed with the mail entries;
+the company timeline applies the same admin rule (it never shows bodies, only
+what the owner would see).
+
 ## Known defects
 
 ### contact-names

@@ -25,8 +25,7 @@ import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
 import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { AdminRequiredError } from "@/lib/auth/adminRole";
-import { getConversationForAdmin, type AdminConversationData } from "@/lib/activity/getConversationForAdmin";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
 import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
@@ -346,40 +345,6 @@ export async function addContactSignalAction(personId: string, text: string): Pr
   }
 }
 
-export type RevealAdminConversationResult =
-  | { ok: true; data: AdminConversationData }
-  | { ok: false; reason: "not_admin" | "invalid" | "not_found" };
-
-/**
- * Powers the shared admin conversation modal (owner decision 2026-09-30;
- * `AdminConversationFlow.tsx`, used by ConversationHistoryCard.tsx,
- * Timeline.tsx and AdminConversationAutoOpen.tsx) — the standalone
- * `/contacts/[id]/conversation/[bdId]` page this action originally backed
- * (mockup-port r04) is deleted; every "Ver conversación" entry point now
- * opens the same modal instead. Goes through the SAME audited path that
- * page always used (`getConversationForAdmin` — writes
- * `audit_log(view_conversation)` before returning content, and skips the
- * audit write only when the viewer is looking at their own conversation,
- * `shouldAuditConversationView`).
- */
-export async function revealAdminConversationAction(
-  personId: string,
-  targetBdId: string,
-): Promise<RevealAdminConversationResult> {
-  if (!isUuid(personId) || !isUuid(targetBdId)) return { ok: false, reason: "invalid" };
-  let me;
-  try {
-    me = await requireAdmin();
-  } catch (err) {
-    if (err instanceof AdminRequiredError) return { ok: false, reason: "not_admin" };
-    throw err;
-  }
-  const result = await getConversationForAdmin(personId, targetBdId, me.id);
-  if (result.kind === "not_found") return { ok: false, reason: "not_found" };
-  const { kind: _kind, ...data } = result;
-  return { ok: true, data };
-}
-
 export type SendContactEmailResult = ContactActionResult;
 
 /** "Correo" quick action (task 9.2) — same Gmail send path as leads; no AI draft here. */
@@ -464,7 +429,7 @@ export type TimelinePillFetchResult = { ok: true; entries: TimelineEntry[] } | {
  * `personId`/`pillKey` arrive from the client as plain strings (a Server
  * Action is a public endpoint, not a type-checked function call) —
  * `personId` is re-validated via `isUuid` (same convention as
- * `getConversationForAdminAction` above) and `pillKey` via
+ * the other record actions) and `pillKey` via
  * `isTimelinePillKey`, rather than either being trusted.
  */
 export async function getTimelinePillEntriesAction(
@@ -475,7 +440,11 @@ export async function getTimelinePillEntriesAction(
     if (!isUuid(personId)) return { ok: false };
     const me = await getCurrentBd();
     const pill = pillKey && isTimelinePillKey(pillKey) ? pillKey : undefined;
-    const { entries } = await getPersonTimeline(personId, me.id, { pill });
+    const { entries } = await getPersonTimeline(personId, me.id, {
+      pill,
+      // Derived from the session's own bd row, never from anything the client sent.
+      viewerIsAdmin: isAdminRole(me),
+    });
     return { ok: true, entries };
   } catch (err) {
     unstable_rethrow(err);

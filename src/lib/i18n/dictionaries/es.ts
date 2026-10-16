@@ -791,8 +791,6 @@ export const es: typeof en = {
     connectedOnPrefix: "Conectado el",
     connectionHistoryNone: "Sin historial de conversaciones",
     connectionHistorySomePrefix: "mensajes · último",
-    viewConversationLink: "Ver conversación",
-    viewConversationAuditHint: "Queda registrada en el registro de auditoría",
     timelineFilterGroupLabel: "Filtrar por tipo de actividad",
     timelineFilterAll: "Todo",
     timelineFilterNote: "Nota",
@@ -955,43 +953,18 @@ export const es: typeof en = {
     linkedinSentPrefix: "Mensaje de LinkedIn enviado",
     linkedinConversationOfPrefix: "conversación de",
     adminNoConversationContent: "Sin contenido de conversación registrado.",
+    adminInlineCappedNote: "Se muestran los mensajes más recientes de otros BDs; los más antiguos no se cargaron.",
     // Título del ConversationDialog compartido (decisión del owner
-    // 2026-09-30) — tanto el historial propio como el bypass de admin
-    // componen `${conversationDialogTitlePrefix} ${nombreDeLaContraparte}`.
+    // 2026-09-30) — el historial propio compone
+    // `${conversationDialogTitlePrefix} ${nombreDeLaContraparte}`.
     conversationDialogTitlePrefix: "Conversación con",
-    // Banner de auditoría del modal de admin (decisión del owner
-    // 2026-09-30) — se compone como `${adminAuditBannerPrefix} ${bdName}
-    // ${adminAuditBannerSuffix}`, del lado del cliente (ConversationDialog/
-    // AdminConversationFlow son client components, ver ClientStrings), mismo
-    // patrón "prefijo + nombre interpolado" que ya usa el diálogo de
-    // confirmación de abajo.
-    adminAuditBannerPrefix: "Estás viendo la conversación de",
-    adminAuditBannerSuffix: "como administrador — este acceso quedó registrado",
-    // Tres secciones del modal de admin (portadas desde la página standalone
-    // eliminada `/contacts/[id]/conversation/[bdId]` — mismo texto).
-    adminSyncedEmailSectionTitle: "Correos sincronizados",
-    adminNoSyncedEmailContent: "No hay correo sincronizado con este BD.",
-    adminLegacyEmailSectionTitle: "Correos (registro manual)",
-    adminLegacyEmailNoSubject: "(sin asunto)",
-    adminLinkedinSectionTitle: "Conversación de LinkedIn",
     adminNoLinkedinContent: "No hay conversación de LinkedIn con este BD.",
-    adminViewDialogTitlePrefix: "¿Ver la conversación de",
-    adminViewDialogBodyPrefix: "Vas a ver la conversación de",
-    adminViewDialogBodyWith: "con",
-    adminAuditConfirmTitle: "Esta visualización queda registrada",
-    adminAuditConfirmBody:
-      "Se guarda en el registro de auditoría con tu nombre, la fecha y a quién pertenece la conversación. El registro es visible únicamente para administradores; no se notifica a nadie ni puede verse que la visualizaste.",
     stageBadgePrefix: "Etapa:",
     conversationHistoryTitle: "Historial de conversaciones",
     conversationHistoryIntroPrefix: "Existe historial de conversaciones con:",
     conversationHistoryPrivateFooter: "El contenido es privado para cada BD.",
     conversationHistoryAdminFooter:
-      "Los administradores pueden abrir cualquier conversación; cada visualización queda registrada en el registro de auditoría.",
-    // Right-rail card's own "Ver" link (admin-conversation.html:141-142) —
-    // shorter than the per-row `viewConversationLink` ("Ver conversación")
-    // since this button already sits under a card titled "Historial de
-    // conversaciones", naming the BD right next to it.
-    conversationHistoryViewAction: "Ver",
+      "Los administradores ven estas conversaciones directamente en la actividad del contacto.",
     tasksCardTitle: "Tareas",
     addTaskAction: "Agregar tarea",
     changeCompanyAria: "Cambiar empresa",
@@ -1387,7 +1360,7 @@ export const es: typeof en = {
     subtitle: "Importá el archivo messages.csv de tu export de LinkedIn.",
     cardTitle: "Mensajes de LinkedIn",
     privacy:
-      "Estos mensajes son tuyos: solo vos y un administrador pueden verlos, y cada acceso de un administrador queda registrado.",
+      "Estos mensajes son tuyos: solo vos y un administrador pueden verlos.",
     statsLabel: "Importado hasta ahora",
     statsMeta: (messages: string, conversations: string, lastImport: string) =>
       `${messages} mensajes · ${conversations} conversaciones · última importación: ${lastImport}`,
@@ -2198,7 +2171,7 @@ export const es: typeof en = {
     eyebrow: "Administración",
     title: "registro de auditoría",
     subtitle: "Quién vio la conversación o la secuencia de otro BD, de qué y cuándo.",
-    noteBodyPrefix: "Solo visualizaciones de conversaciones y secuencias.",
+    noteBodyPrefix: "Desde el 16/10/2026 las lecturas de conversaciones ya no se registran; las de secuencias sí. Aquí se conservan las anteriores.",
     noteBodyBeforeLink: "Otras acciones auditadas (fusiones, deshacer fusión) ya tienen su propia vista en",
     noteLinkText: "Duplicados → historial de fusiones",
     cardTitle: "Visualizaciones de contenido de otro BD",
@@ -2210,7 +2183,7 @@ export const es: typeof en = {
     accessSequence: "Secuencia",
     colConversationOf: "Propietario",
     openAction: "Abrir",
-    emptyState: "Todavía no hay visualizaciones registradas.",
+    emptyState: "No hay visualizaciones registradas.",
     prevPage: "Anterior",
     nextPage: "Siguiente",
     pageOf: (page: number, pageCount: number) => `Página ${page} de ${pageCount}`,

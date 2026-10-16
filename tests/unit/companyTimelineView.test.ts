@@ -358,3 +358,31 @@ test("buildCompanyTimelineViewRows: a call attempt reads as 'Intento de llamada 
   );
   assert.equal(row!.what, "Intento de llamada · Lucila Delgado");
 });
+
+// --- owner decision 2026-10-15: an admin reads other BDs' conversation ------
+// content everywhere the contact timeline shows it. The flag defaults closed.
+const otherBdReply = {
+  ...baseRow,
+  type: "reply_received",
+  actorBdId: "other-bd",
+  metadata: { subject: "Re: intro", from: "jane@prospect.com" },
+  scope: "contact" as const,
+  personId: "p1",
+  personName: "Bruno Diaz",
+};
+
+test("an admin sees another BD's reply on the company timeline: subject, sender and metadata", () => {
+  const [view] = buildCompanyTimelineViewRows([otherBdReply], serverStrings, labels, stageLabelOf, "admin-bd", true);
+  assert.equal(view.visible, true);
+  assert.match(view.body ?? "", /Re: intro · jane@prospect\.com/);
+  assert.ok(view.metadata);
+});
+
+test("a non-admin still gets the locked row, with or without the explicit false flag", () => {
+  for (const flag of [undefined, false]) {
+    const [view] = buildCompanyTimelineViewRows([otherBdReply], serverStrings, labels, stageLabelOf, VIEWER_BD_ID, flag);
+    assert.equal(view.visible, false);
+    assert.equal(view.metadata, null);
+    assert.ok(!JSON.stringify(view).includes("jane@prospect.com"));
+  }
+});

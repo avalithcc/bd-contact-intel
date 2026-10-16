@@ -4,8 +4,8 @@
  * with an expandable full message history for the viewer's own connection,
  * loaded on demand — never during the record page's own render, same
  * "never a round trip on page load" rule as `getThreadMessageBodies`,
- * src/lib/gmail/threadMessages.ts). Unlike `getConversationForAdmin.ts`,
- * this is NOT an admin bypass and writes no audit row: a BD reading their
+ * src/lib/gmail/threadMessages.ts). Unlike the admin's inline read
+ * (adminInlineConversations.ts), this is for the owner only; it writes no audit row: a BD reading their
  * own conversation isn't reading anyone else's private data. Privacy is
  * enforced in the WHERE clause itself — `message.bd_id = bdId` scopes every
  * row to the REQUESTING BD's own imported messages, exactly the caller's

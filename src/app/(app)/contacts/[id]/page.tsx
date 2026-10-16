@@ -9,7 +9,8 @@ import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
 import { getLockedConversationSummaries } from "@/lib/activity/lockedConversationSummaries";
 import { resolveLockedConnectionCardRows } from "@/lib/contacts/conversationHistoryAccess";
-import { resolveConversationDialogParam } from "@/lib/contacts/conversationDialogParam";
+import { getAdminInlineConversations } from "@/lib/activity/adminInlineConversations";
+import { EMPTY_INLINE_CONVERSATIONS } from "@/lib/activity/inlineConversationGroups";
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
@@ -44,7 +45,6 @@ import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
 import { ConversationHistoryCard } from "./ConversationHistoryCard";
-import { AdminConversationAutoOpen } from "./AdminConversationAutoOpen";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
 import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
@@ -84,12 +84,7 @@ export const maxDuration = 60;
 
 interface ContactRecordPageProps {
   params: Promise<{ id: string }>;
-  // `conversation` — Administración → Registro de auditoría's "Abrir" link
-  // (owner decision 2026-09-30: the standalone `/contacts/[id]/conversation/
-  // [bdId]` page is deleted; this param + AdminConversationAutoOpen replace
-  // it). Validated below (resolveConversationDialogParam) and admin-gated
-  // server-side before it ever reaches a client component.
-  searchParams: Promise<{ activityType?: string; openAction?: string; conversation?: string }>;
+  searchParams: Promise<{ activityType?: string; openAction?: string }>;
 }
 
 // Board drag/keyboard-menu targets (task 10.5, 14.1) plus the follow-up
@@ -113,7 +108,7 @@ function isOpenActionParam(value: string | undefined): value is OpenActionParam 
  */
 export default async function ContactRecordPage({ params, searchParams }: ContactRecordPageProps) {
   const { id } = await params;
-  const { activityType: rawActivityType, openAction: rawOpenAction, conversation: rawConversation } = await searchParams;
+  const { activityType: rawActivityType, openAction: rawOpenAction } = await searchParams;
   const openAction = isOpenActionParam(rawOpenAction) ? rawOpenAction : null;
   const result = await getContactRecord(id);
 
@@ -136,7 +131,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
   const [timeline, ownerOptions, tasksForPerson, sequenceMemberships] = await Promise.all([
-    getPersonTimeline(record.person.id, me.id, { pill: activePill }),
+    getPersonTimeline(record.person.id, me.id, { pill: activePill, viewerIsAdmin: isAdmin }),
     listOwnerOptions(),
     getTasksForPerson(record.person.id),
     // Right-rail "Secuencias" block: every membership of this Contact's EMAIL ADDRESS (the key the opt-out write uses).
@@ -153,14 +148,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // mockup) — admin-only, so a non-admin's render pays zero extra round
   // trips for this (the ternary skips the query entirely rather than
   // fetching and discarding).
-  const lockedConversationSummaries = isAdmin
-    ? await getLockedConversationSummaries(record.person.id, me.id)
-    : [];
-  // Audit log's "Abrir" link (?conversation=<bdId>) — admin-gated here,
-  // server-side, BEFORE the param ever reaches a client component: a
-  // non-admin never gets AdminConversationAutoOpen rendered at all, so no
-  // modal and no data, no matter what the query string says.
-  const autoOpenAdminBdId = isAdmin ? resolveConversationDialogParam(rawConversation) : null;
+  // The admin's inline conversation content rides on the same branch (owner
+  // decision 2026-10-15: visible from the start, no click, no audit row). One
+  // statement, and a non-admin never reaches it: the role is re-checked inside.
+  const [lockedConversationSummaries, inlineConversations] = isAdmin
+    ? await Promise.all([
+        getLockedConversationSummaries(record.person.id, me.id),
+        getAdminInlineConversations(
+          me,
+          record.person.id,
+          resolveLockedConnectionCardRows(record.connections, me.id).map((r) => r.bdId),
+        ),
+      ])
+    : [[], EMPTY_INLINE_CONVERSATIONS];
 
   const name = [record.person.firstName, record.person.lastName].filter(Boolean).join(" ") || dict.contact.unnamed;
   const statusLabel = dict.leadStatuses[record.person.status as keyof typeof dict.leadStatuses] ?? record.person.status;
@@ -508,6 +508,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                     isAdmin={isAdmin}
                     connections={record.connections}
                     linkedinSummaryByBdId={linkedinSummaryByBdId}
+                    inlineConversations={inlineConversations}
                     mergeInfo={
                       record.merge.unifiedFromCount > 1
                         ? {
@@ -723,15 +724,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           </div>
         </aside>
       </div>
-
-      {autoOpenAdminBdId && (
-        <AdminConversationAutoOpen
-          bdId={autoOpenAdminBdId}
-          personId={record.person.id}
-          personName={name}
-          labels={l}
-        />
-      )}
     </main>
   );
 }

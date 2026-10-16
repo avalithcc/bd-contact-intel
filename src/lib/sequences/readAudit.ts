@@ -1,6 +1,6 @@
 /**
  * Audit decision for an admin reading another BD's Sequence (sequence-roster "Admin read of another BD's drafts is
- * audited"). Kept as its own pure module, mirroring conversationAudit.ts, so the policy is ONE line.
+ * audited"). Kept as its own pure module so the policy is ONE line.
  *
  * OWNER NOTE: the owner has a pending preference in the other direction for a different surface (admins read a
  * Contact's conversations inline, no audit row; see openspec/BACKLOG.md). If he extends it to Sequences, change the

@@ -119,3 +119,26 @@ test("status_backfill is always visible (never a conversation-content type), so 
   assert.notEqual(entry.metadata, null);
   assert.equal(entry.at.getTime(), originalAt.getTime());
 });
+
+const SECRET_BODY = "SECRET-BODY-never-for-other-bds";
+const otherBdEmail = {
+  id: "e1",
+  type: "email_sent",
+  createdAt: new Date("2026-10-01T10:00:00.000Z"),
+  actorBdId: "bd-a",
+  actorName: "Ana",
+  metadata: { subject: "Hola", body: SECRET_BODY },
+};
+
+test("a non-admin viewer's entry for another BD's email carries no body anywhere in the serialized payload", () => {
+  const entry = buildTimelineEntry(otherBdEmail, "bd-b");
+  assert.equal(entry.visible, false);
+  assert.equal(entry.metadata, null);
+  assert.ok(!JSON.stringify(entry).includes(SECRET_BODY));
+});
+
+test("an admin viewer's entry for another BD's email carries the body", () => {
+  const entry = buildTimelineEntry(otherBdEmail, "admin-bd", true);
+  assert.equal(entry.visible, true);
+  assert.equal((entry.metadata as { body: string }).body, SECRET_BODY);
+});

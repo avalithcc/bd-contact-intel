@@ -10,12 +10,13 @@
  * the email-sync brief (2026-09-30) — its metadata carries `matchedEmail`,
  * the counterpart address one specific BD's mailbox exchanged mail with, so
  * it gets the same per-BD scoping as `email_sent` rather than being treated
- * as a team-shared fact. An admin bypass with audited access
- * (`getConversationForAdmin`) is Phase 11 scope (task 11.3) — until that
- * ships, every viewer (including an admin) sees the same locked marker for
- * another BD's entry, never its metadata. This is the conservative default:
- * it can only under-reveal, never leak content ahead of the audited access
- * path.
+ * as a team-shared fact.
+ *
+ * Owner decision 2026-10-15: an admin reads every BD's conversation content
+ * in the timeline directly, with no click and no audit row (the audited
+ * `getConversationForAdmin` path is gone). `viewerIsAdmin` is the only way
+ * past the per-BD scoping and defaults to closed, so a caller that forgets
+ * it can only under-reveal.
  */
 
 /** Activity types this pane can carry per-BD conversation content for. */
@@ -26,7 +27,12 @@ export interface TimelineVisibilityInput {
   actorBdId: string | null;
 }
 
-export function isTimelineEntryVisible(entry: TimelineVisibilityInput, viewerBdId: string): boolean {
+export function isTimelineEntryVisible(
+  entry: TimelineVisibilityInput,
+  viewerBdId: string,
+  viewerIsAdmin = false,
+): boolean {
   if (!CONVERSATION_CONTENT_TYPES.has(entry.type)) return true;
+  if (viewerIsAdmin) return true;
   return entry.actorBdId === null || entry.actorBdId === viewerBdId;
 }

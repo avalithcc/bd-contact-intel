@@ -186,7 +186,8 @@ export async function createActivityInTx(tx: DbTransaction, input: NewActivity):
  * spec "Filtered activity timeline"). Not `bdId`-scoped at the row level —
  * same as getContactRecord (queries.ts) — but redacts `metadata` per entry
  * via `buildTimelineEntry` (design R6) before returning, so the caller never
- * has to remember to redact.
+ * has to remember to redact. `opts.viewerIsAdmin` (default closed) is the one
+ * way another BD's conversation content stays unredacted.
  *
  * Bug fix (prod smoke test): ordered by `effectiveActivityAtSql()` (the ONE
  * shared SQL helper listQueries.ts also uses), not raw `activity.createdAt`
@@ -207,7 +208,7 @@ export async function createActivityInTx(tx: DbTransaction, input: NewActivity):
 export async function getPersonTimeline(
   personId: string,
   viewerBdId: string,
-  opts: { pill?: TimelinePillKey; limit?: number } = {},
+  opts: { pill?: TimelinePillKey; limit?: number; viewerIsAdmin?: boolean } = {},
 ): Promise<PersonTimelinePage> {
   const types = opts.pill ? TIMELINE_PILL_GROUPS[opts.pill] : TIMELINE_ACTIVITY_TYPES;
   const notFolded = notFoldedAttemptSql();
@@ -237,7 +238,7 @@ export async function getPersonTimeline(
       .groupBy(activity.type),
   ]);
 
-  const entries: TimelineEntry[] = rows.map((row) => buildTimelineEntry(row, viewerBdId));
+  const entries: TimelineEntry[] = rows.map((row) => buildTimelineEntry(row, viewerBdId, opts.viewerIsAdmin ?? false));
 
   const countsByType: Record<string, number> = {};
   for (const r of countRows) countsByType[r.type] = Number(r.count);
