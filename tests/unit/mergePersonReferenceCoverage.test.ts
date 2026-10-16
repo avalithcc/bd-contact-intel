@@ -62,6 +62,10 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
     excluded:
       "handled by its own policy in mergeContacts (src/lib/sequences/mergePlan.ts, owner decision 2026-10-14), not by the generic repoint: the merge stops and names each affected membership; an approved member (scheduled send) blocks until cancelled; a sent/replied/no_reply member is repointed or the merge is refused and is NEVER deleted (sequence_send_claim cascades from it and is the only guard against a second send); a same-sequence collision keeps one membership and discards the other",
   },
+  scheduled_email: {
+    excluded:
+      "a pending row still points at the merged-away person; the sender resolves the survivor at send time (src/lib/scheduledEmail/send.ts) so the touch lands on the live Contact, and nothing is lost or sent twice",
+  },
   email_suppression: {
     excluded:
       "person_id is provenance only (nullable, ON DELETE SET NULL). A suppression is keyed by the normalized address or domain, never by person, so a merge neither strands nor needs to repoint it: the opt-out keeps applying to the address wherever the Contact ends up",

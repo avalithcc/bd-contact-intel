@@ -1617,6 +1617,48 @@ export const gmailReminderSend = pgTable(
   }),
 );
 
+// A 1:1 email composed now and sent later (scheduled-send). Gmail cannot schedule through its API, so the delay is ours:
+// a pg_cron job calls /api/email/scheduled/run every minute and the dispatcher claims due rows. NOTHING here is a touch:
+// the email_sent activity (and with it last contact / status / ownership effects) is written by the normal send path only
+// when the message actually goes out. `status`: scheduled | sending | sent | on_hold | failed | cancelled (free text
+// validated by src/lib/scheduledEmail/plan.ts, the repo convention). `error` is a fixed code, never a raw Gmail message.
+export const scheduledEmail = pgTable(
+  "scheduled_email",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    toAddress: text("to_address").notNull(),
+    subject: text("subject").notNull(),
+    // The text as typed; the signature is composed at send time, exactly like a normal send.
+    body: text("body").notNull(),
+    // Set only for a reply on an existing thread; headers are re-derived from stored messages at send time.
+    replyThreadId: text("reply_thread_id"),
+    sendAt: timestamp("send_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("scheduled"),
+    error: text("error"),
+    gmailMessageId: text("gmail_message_id"),
+    // A contact reply after this instant puts the row on hold. Reset only when the BD edits a held row.
+    replyBaselineAt: timestamp("reply_baseline_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Moves on every status change; a 'sending' row whose updated_at is old belongs to a dead run.
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // The dispatcher's due scan only ever looks at 'scheduled' rows.
+    due: index("scheduled_email_due_idx").on(t.sendAt).where(sql`${t.status} = 'scheduled'`),
+    byBdStatus: index("scheduled_email_bd_status_idx").on(t.bdId, t.status),
+    byPerson: index("scheduled_email_person_idx").on(t.personId),
+  }),
+);
+
+export type ScheduledEmail = typeof scheduledEmail.$inferSelect;
+
 export type TaskDigestSend = typeof taskDigestSend.$inferSelect;
 export type NewTaskDigestSend = typeof taskDigestSend.$inferInsert;
 
