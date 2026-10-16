@@ -16,6 +16,7 @@ import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/quer
 import { accountTypeLabel, industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/lib/companies/listMappers";
 import {
   isCompanyActivityFilter,
+  resolveCompanyTab,
   latestEditByProperty,
   startupLabel,
   type CompanyActivityFilter,
@@ -29,6 +30,7 @@ import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { getDictionary } from "@/lib/i18n/server";
+import { companyPostingsHref, resolvePostingFilter } from "@/lib/hiring/delta";
 import { RecordTabs } from "@/app/(app)/contacts/[id]/RecordTabs";
 import type { NewContactDialogLabels } from "@/app/(app)/contacts/NewContactDialog";
 import { CompanyAboutPane } from "./CompanyAboutPane";
@@ -73,7 +75,7 @@ type Stage = (typeof STAGES)[number];
 
 interface CompanyDetailPageProps {
   params: Promise<{ key: string }>;
-  searchParams: Promise<{ activityFilter?: string }>;
+  searchParams: Promise<{ activityFilter?: string; tab?: string; market?: string; miamiOnly?: string }>;
 }
 
 /**
@@ -86,9 +88,14 @@ interface CompanyDetailPageProps {
  */
 export default async function CompanyDetailPage({ params, searchParams }: CompanyDetailPageProps) {
   const { key: rawKey } = await params;
-  const { activityFilter: rawActivityFilter } = await searchParams;
+  const { activityFilter: rawActivityFilter, tab: rawTab, market: rawMarket, miamiOnly: rawMiami } = await searchParams;
   const key = decodeURIComponent(rawKey);
   const activityFilter = isCompanyActivityFilter(rawActivityFilter) ? rawActivityFilter : "all";
+  // `?tab=` only picks the STARTING tab: later clicks are client state and do not rewrite the URL (intentional, not a bug).
+  const initialTab = resolveCompanyTab(rawTab);
+  // Carried from the Vacantes screen so the hiring tab lists the same subset its number counted.
+  const postingFilter = resolvePostingFilter({ market: rawMarket, miamiOnly: rawMiami });
+  const filterActive = !!postingFilter.market;
 
   const dict = await getDictionary();
   const l = dict.companyRecord;
@@ -112,7 +119,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     );
   }
 
-  const [hiringIndex, people, timelineRows, timelineCounts, openTasks, postings, propertyHistoryRows, ownerOptions, absorption] =
+  const [hiringIndex, people, timelineRows, timelineCounts, openTasks, allPostings, propertyHistoryRows, ownerOptions, absorption, filteredPostings] =
     await Promise.all([
       getHiringMatchIndex(),
       getCompanyPeople(key),
@@ -132,11 +139,14 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
       listOwnerOptions(),
       // The open absorption proposal, if any (one indexed query on the partial unique index).
       getOpenAbsorptionNotice(key),
+      // Only when a filter is carried: the record's own breakdown card keeps describing the whole company.
+      filterActive ? getCompanyPostingsForKey(key, postingFilter) : Promise.resolve(null),
     ]);
+  const postings = filterActive ? filteredPostings : allPostings;
 
   const hiring = hiringIndex.get(key) ?? null;
-  const breakdown = postings
-    ? { latam: postings.latamCount, us: postings.usCount, other: postings.otherCount, total: postings.totalCount }
+  const breakdown = allPostings
+    ? { latam: allPostings.latamCount, us: allPostings.usCount, other: allPostings.otherCount, total: allPostings.totalCount }
     : { latam: 0, us: 0, other: 0, total: 0 };
   // Plain object (not the Map recordMappers.ts returns) — see
   // CompanyAboutPane.tsx's `lastEditByProperty` prop doc comment on why.
@@ -173,6 +183,13 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     blockedOwnCompany: dict.contactList.newContactBlockedOwnCompany,
     invalidRequiresName: dict.contactList.newContactInvalidRequiresName,
   };
+
+  const filterLabel = postingFilter.miamiOnly ? dict.hiring.marketMiami : postingFilter.market === "us" ? dict.hiring.marketUs : postingFilter.market ? dict.markets[postingFilter.market] : "";
+  const filterNote = filterActive ? (
+    <p className="meta mt-xl">
+      {dict.hiring.filteredBy(filterLabel)} <Link href={companyPostingsHref(key)}>{dict.hiring.showAllPostings}</Link>
+    </p>
+  ) : null;
 
   return (
     <main>
@@ -223,6 +240,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             />
           )}
           <RecordTabs
+            initialTabId={initialTab}
             tabs={[
               {
                 id: "activity",
@@ -241,6 +259,11 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                 id: "hiring",
                 label: l.tabHiring,
                 content: postings && postings.postings.length > 0 ? (
+                  <>
+                  {filterNote}
+                  {postings.postings.length < postings.totalCount && (
+                    <p className="meta mt-xl">{dict.hiring.showingLatest(postings.postings.length, postings.totalCount)}</p>
+                  )}
                   <div className="table-wrap mt-xl">
                     <table className="data compact">
                       <thead>
@@ -265,8 +288,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                       </tbody>
                     </table>
                   </div>
+                  </>
                 ) : (
-                  <p className="muted">{l.hiringEmpty}</p>
+                  <>
+                    {filterNote}
+                    <p className="muted">{l.hiringEmpty}</p>
+                  </>
                 ),
               },
             ]}

@@ -60,38 +60,38 @@
 </div>
 </header>
 <main class="page">
-<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota de mockup.</strong> Vacantes abiertas mantiene su tabla centrada en la empresa. Los filtros usan la barra de chips compartida. <strong>Rediseño aprobado hoy:</strong> de siete columnas a tres. El desglose por mercado baja a una línea secundaria bajo la empresa (los filtros de arriba ya permiten cortar por mercado), la columna "Señal" —vacía en casi todas las filas— se convierte en badge sobre la empresa, y entra el <strong>delta de 7 días</strong> al lado del número: el total de vacantes vigentes hoy menos el total que estaba vigente hace 7 días, con la misma regla de 30 días aplicada a esa fecha (así cuentan las que se abrieron, las que se cerraron y las que dejaron de contar por antigüedad); una vacante que nosotros todavía no habíamos registrado hace 7 días no estaba en ese total, aunque la fecha de publicación sea vieja. La columna de contactos muestra los contactos propios del BD en esa empresa, los mismos que abre el enlace. Ese dato es calculable hoy con <span class="mono">first_seen</span>, <span class="mono">posted_at</span> y <span class="mono">closed_at</span>; no hace falta guardar nada nuevo. Una empresa sin cambios no muestra badge, para que el color signifique algo. Orden: por vacantes, de mayor a menor. El lado de contactos de esta sección ahora es la vista <a href='contacts.html'>Empresas con vacantes</a>. <a href="index.html">Todas las pantallas</a></div><span class="tag tag-restyle">Solo rediseño (cambio posterior)</span></div>
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota de mockup.</strong> Vacantes abiertas mantiene su tabla centrada en la empresa. Los filtros usan la barra de chips compartida. <strong>Rediseño aprobado hoy:</strong> de siete columnas a tres. El desglose por mercado baja a una línea secundaria bajo la empresa (los filtros de arriba ya permiten cortar por mercado), la columna "Señal" —vacía en casi todas las filas— se convierte en badge sobre la empresa, y entra el <strong>delta de 7 días</strong> al lado del número: el total de vacantes vigentes hoy menos el total que estaba vigente hace 7 días, con la misma regla de 30 días aplicada a esa fecha (así cuentan las que se abrieron, las que se cerraron y las que dejaron de contar por antigüedad); una vacante que nosotros todavía no habíamos registrado hace 7 días no estaba en ese total, aunque la fecha de publicación sea vieja. La columna de contactos muestra los contactos propios del BD en esa empresa, los mismos que abre el enlace. Ese dato es calculable hoy con <span class="mono">first_seen</span>, <span class="mono">posted_at</span> y <span class="mono">closed_at</span>; no hace falta guardar nada nuevo. Una empresa sin cambios no muestra badge, para que el color signifique algo. Orden: por vacantes, de mayor a menor. <strong>El número es un enlace</strong>: lleva a la pestaña Vacantes de la ficha de esa empresa, donde está el listado con cargo, ubicación y mercado. <strong>Ojo, tres límites de esa pestaña, verificados:</strong> el listado está topeado en 100 filas (<span class="mono">DETAIL_ROW_LIMIT</span>), así que una empresa con 526 muestra 100 y lo avisa; <strong>no hay enlace al aviso original</strong> aunque la consulta sí trae la URL y no la dibuja; y la columna "Publicado" muestra <span class="mono">first_seen</span> —cuándo la vimos nosotros— no la fecha de publicación. Las tres son decisiones del dueño, no se tocaron acá. Hoy esas pestañas no son enlazables por URL —sólo se lee <span class="mono">activityFilter</span>—, así que hace falta que acepten la pestaña como parámetro. Sin eso, el número cuenta algo que no se puede abrir. El lado de contactos de esta sección ahora es la vista <a href='contacts.html'>Empresas con vacantes</a>. <a href="index.html">Todas las pantallas</a></div><span class="tag tag-restyle">Solo rediseño (cambio posterior)</span></div>
 <div class="page-header"><div class="titles"><div class="eyebrow">Señales</div><h1>vacantes abiertas<span class="dot">.</span></h1><p class="meta">Empresas con vacantes de IT abiertas en sus portales de empleo, <strong>publicadas en los últimos 30 días</strong>. Una búsqueda más vieja que eso casi nunca sigue viva, aunque el portal la muestre.</p></div></div>
 <div class="toolbar"><div class="segmented"><a class="on" href="#">Todos los mercados</a><a href="#">LATAM</a><a href="#">US</a><a href="#">Miami</a></div><label class="check"><input type="checkbox" checked> Ocultar predominio offshore</label><label class="check"><input type="checkbox"> Solo startups</label><span class="spacer"></span><span class="meta">Sincronizado hace 2 h</span></div>
 <div class="table-wrap"><table class="data"><thead><tr><th>Empresa</th><th>Vacantes de IT</th><th>Mis contactos</th></tr></thead><tbody>
 <tr><td><a class="row" href="company-record.html"><span class="company-logo" aria-hidden="true">ML</span><span class="strong">Mercado Libre</span></a>
 <div class="meta">31 LATAM · 7 US · 2 Miami</div></td>
-<td class="num"><span class="strong">38</span> <span class="badge badge-success no-dot">+12</span></td>
+<td class="num"><a class="strong" href="company-record.html#vacantes">38</a> <span class="badge badge-success no-dot">+12</span></td>
 <td><a href="contacts.html">42 contactos</a></td></tr>
 
 <tr><td><a class="row" href="company-record.html"><span class="company-logo" aria-hidden="true">N</span><span class="strong">Nubank</span></a> <span class="badge badge-brand no-dot">Startup</span>
 <div class="meta">18 LATAM · 3 US</div></td>
-<td class="num"><span class="strong">21</span> <span class="badge badge-success no-dot">+3</span></td>
+<td class="num"><a class="strong" href="company-record.html#vacantes">21</a> <span class="badge badge-success no-dot">+3</span></td>
 <td><a href="contacts.html">27 contactos</a></td></tr>
 
 <tr><td><a class="row" href="company-record.html"><span class="company-logo" aria-hidden="true">T</span><span class="strong">TOTVS</span></a>
 <div class="meta">15 LATAM</div></td>
-<td class="num"><span class="strong">15</span> <span class="badge badge-danger no-dot">−2</span></td>
+<td class="num"><a class="strong" href="company-record.html#vacantes">15</a> <span class="badge badge-danger no-dot">−2</span></td>
 <td><a href="contacts.html">11 contactos</a></td></tr>
 
 <tr><td><a class="row" href="company-record.html"><span class="company-logo" aria-hidden="true">R</span><span class="strong">Rappi</span></a> <span class="badge badge-brand no-dot">Startup</span> <span class="badge badge-offshore no-dot">Predominio offshore</span>
 <div class="meta">9 LATAM · 1 US</div></td>
-<td class="num"><span class="strong">12</span> <span class="badge badge-danger no-dot">−4</span></td>
+<td class="num"><a class="strong" href="company-record.html#vacantes">12</a> <span class="badge badge-danger no-dot">−4</span></td>
 <td><a href="contacts.html">18 contactos</a></td></tr>
 
 <tr><td><a class="row" href="company-record.html"><span class="company-logo" aria-hidden="true">D</span><span class="strong">dLocal</span></a> <span class="badge badge-brand no-dot">Startup</span>
 <div class="meta">6 LATAM · 2 US · 1 Miami</div></td>
-<td class="num"><span class="strong">9</span> <span class="badge badge-info no-dot">nueva en el radar</span></td>
+<td class="num"><a class="strong" href="company-record.html#vacantes">9</a> <span class="badge badge-info no-dot">nueva en el radar</span></td>
 <td><a href="contacts.html">14 contactos</a></td></tr>
 
 <tr><td><a class="row" href="company-record.html"><span class="company-logo" aria-hidden="true">K</span><span class="strong">Kavak</span></a> <span class="badge badge-brand no-dot">Startup</span>
 <div class="meta">7 LATAM</div></td>
-<td class="num"><span class="strong">7</span></td>
+<td class="num"><a class="strong" href="company-record.html#vacantes">7</a></td>
 <td><a href="contacts.html">9 contactos</a></td></tr>
 </tbody></table></div>
 </div>

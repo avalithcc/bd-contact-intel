@@ -7,11 +7,14 @@ import {
 import { PgDialect } from "drizzle-orm/pg-core";
 import {
   companyContactsHref,
+  companyPostingsHref,
+  resolvePostingFilter,
   compareByVacancies,
   formatDeltaAmount,
   hiringDelta,
   marketLine,
 } from "@/lib/hiring/delta";
+import { resolveCompanyTab } from "@/lib/companies/recordMappers";
 
 const render = (q: Parameters<PgDialect["sqlToQuery"]>[0]) => new PgDialect().sqlToQuery(q).sql.replace(/\s+/g, " ");
 
@@ -38,6 +41,29 @@ test("under a market filter new-on-radar is suppressed: the view cannot speak fo
 test("the contacts link carries the company key, never the display name", () => {
   assert.equal(companyContactsHref("meta"), "/?companyKey=meta");
   assert.equal(companyContactsHref("a&b c"), "/?companyKey=a%26b%20c");
+});
+
+test("the vacancy number links to the company's hiring tab by key, URL-encoded, and the tab resolves back", () => {
+  assert.equal(companyPostingsHref("databricks"), "/companies/databricks?tab=hiring");
+  assert.equal(companyPostingsHref("a&b c/d"), "/companies/a%26b%20c%2Fd?tab=hiring");
+  const tab = new URL(companyPostingsHref("a&b"), "http://x").searchParams.get("tab") ?? undefined;
+  assert.equal(resolveCompanyTab(tab), "hiring");
+});
+
+test("the link carries only the filters that subset a company's postings: market and Miami", () => {
+  assert.equal(companyPostingsHref("meta", { market: "latam" }), "/companies/meta?tab=hiring&market=latam");
+  assert.equal(companyPostingsHref("meta", { market: "us", miamiOnly: true }), "/companies/meta?tab=hiring&market=us&miamiOnly=on");
+  // Miami is a sub-filter of US: never emitted on its own.
+  assert.equal(companyPostingsHref("meta", { miamiOnly: true }), "/companies/meta?tab=hiring");
+  assert.equal(companyPostingsHref("meta", {}), "/companies/meta?tab=hiring");
+});
+
+test("resolvePostingFilter validates market and ignores Miami outside US", () => {
+  assert.deepEqual(resolvePostingFilter({ market: "us", miamiOnly: "on" }), { market: "us", miamiOnly: true });
+  assert.deepEqual(resolvePostingFilter({ market: "latam", miamiOnly: "on" }), { market: "latam", miamiOnly: false });
+  assert.deepEqual(resolvePostingFilter({ market: "mars" }), { market: undefined, miamiOnly: false });
+  assert.deepEqual(resolvePostingFilter({ miamiOnly: "on" }), { market: undefined, miamiOnly: false });
+  assert.deepEqual(resolvePostingFilter({}), { market: undefined, miamiOnly: false });
 });
 
 test("the amount is signed with the real minus sign", () => {

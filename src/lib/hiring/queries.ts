@@ -509,6 +509,7 @@ type CompanyPostingsRawRow = {
  */
 export async function getCompanyPostingsForKey(
   companyKey: string,
+  filter: { market?: MarketKey; miamiOnly?: boolean } = {},
 ): Promise<CompanyPostingsForMessage | null> {
   const canonicalRows = await db.execute<{ company_key: string }>(sql`
     select company_key from target_company where company_key = ${companyKey}
@@ -518,6 +519,12 @@ export async function getCompanyPostingsForKey(
   `);
   const canonicalKey = resolveCanonicalCompanyKey(canonicalRows);
   if (!canonicalKey) return null;
+
+  // Same predicates as getCompanyHiringSummaries' market/Miami filters, so the list and totalCount describe the
+  // exact set a filtered Vacantes count was computed over.
+  const filterSql = (alias: string) => sql`${
+    filter.market ? sql`and ${sql.raw(alias)}.market = ${filter.market}` : sql``
+  } ${filter.miamiOnly ? sql`and ${sql.raw(alias)}.is_miami = true` : sql``}`;
 
   const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -556,10 +563,12 @@ export async function getCompanyPostingsForKey(
       where jp2.company_key = ${canonicalKey}
         and jp2.is_it = true
         and ${openFreshPostingSql("jp2")}
+        ${filterSql("jp2")}
     ) stats
     where jp.company_key = ${canonicalKey}
       and jp.is_it = true
       and ${openFreshPostingSql("jp")}
+      ${filterSql("jp")}
     order by jp.posted_at desc nulls last, jp.id asc
     limit ${DETAIL_ROW_LIMIT}
   `);

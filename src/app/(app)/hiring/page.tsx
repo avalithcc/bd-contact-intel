@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FRESH_POSTING_WINDOW_DAYS } from "@/lib/hiring/openPosting";
 import { getCompanyHiringSummaries } from "@/lib/hiring/queries";
-import { companyContactsHref, formatDeltaAmount, marketLine } from "@/lib/hiring/delta";
+import { companyContactsHref, companyPostingsHref, formatDeltaAmount, marketLine } from "@/lib/hiring/delta";
 import { isMarketKey } from "@/lib/hiring/markets";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { getCurrentBd } from "@/lib/queries";
@@ -143,7 +143,9 @@ export default async function HiringPage({
                       {line && <div className="meta">{line}</div>}
                     </td>
                     <td className="num">
-                      <span className="strong">{s.openItCount}</span>
+                      <Link className="strong" href={companyPostingsHref(s.companyKey, { market, miamiOnly })} aria-label={l.vacanciesLinkLabel(s.openItCount, s.displayName)}>
+                        {s.openItCount}
+                      </Link>
                       {s.delta.kind === "up" && <> <span className="badge badge-success no-dot">{formatDeltaAmount(s.delta)}</span></>}
                       {s.delta.kind === "down" && <> <span className="badge badge-danger no-dot">{formatDeltaAmount(s.delta)}</span></>}
                       {s.delta.kind === "new" && <> <span className="badge badge-info no-dot">{l.newOnRadar}</span></>}

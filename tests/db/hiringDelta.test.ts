@@ -168,3 +168,53 @@ test("the contact count is the signed-in BD's own, the same rows /?companyKey= l
     assert.equal((await listContacts(who.id, { companyKey: ck })).total, want, "the link opens as many rows as the count says");
   }
 });
+
+// The owner clicks the number and lands on that company's hiring tab: both must be the same set, not merely close.
+test("the number on the Vacantes table equals the total behind the company's hiring tab", async () => {
+  const { getCompanyHiringSummaries, getCompanyPostingsForKey } = await import("@/lib/hiring/queries");
+  const fresh = Array.from({ length: 105 }, (_, i) => ({ posted: daysAgo(1 + (i % 25)) }));
+  const ck = await mk("clicked", [
+    ...fresh,
+    { posted: daysAgo(40) }, // aged out of the window
+    { posted: daysAgo(5), closed: daysAgo(1) }, // closed
+  ]);
+  const row = (await getCompanyHiringSummaries(anyBd)).summaries.find((s) => s.companyKey === ck)!;
+  const tab = (await getCompanyPostingsForKey(ck))!;
+  assert.equal(row.openItCount, 105);
+  assert.equal(tab.totalCount, row.openItCount, "same window, same total");
+  // The tab lists a bounded page, so it must be able to say it is showing fewer than the total it opens onto.
+  assert.ok(tab.postings.length < tab.totalCount);
+});
+
+test("under a market or Miami filter the table number equals the filtered total behind the tab", async () => {
+  const { db } = await import("@/db");
+  const { jobPosting, targetCompany, company } = await import("@/db/schema");
+  const { getCompanyHiringSummaries, getCompanyPostingsForKey } = await import("@/lib/hiring/queries");
+  const ck = `zz-${run}-filtered`;
+  companyKeys.push(ck);
+  await db.insert(company).values({ companyKey: ck, displayName: ck });
+  await db.insert(targetCompany).values({ companyKey: ck, displayName: ck, ats: "lever", config: {} });
+  const mkp = (i: number, market: string, isMiami = false, closedAt: Date | null = null) => ({
+    companyKey: ck, externalId: `f${i}`, title: "Engineer", location: "x", url: "https://example.test",
+    isIt: true, market, isMiami, postedAt: daysAgo(2), firstSeen: daysAgo(2), closedAt,
+  });
+  await db.insert(jobPosting).values([
+    ...[0, 1, 2].map((i) => mkp(i, "us", true)),
+    ...[3, 4].map((i) => mkp(i, "us")),
+    ...[5, 6, 7, 8].map((i) => mkp(i, "latam")),
+    mkp(9, "us", true, daysAgo(1)), // closed: counted by neither side
+  ]);
+  const cases = [
+    { filter: {}, want: 9 },
+    { filter: { market: "us" as const }, want: 5 },
+    { filter: { market: "us" as const, miamiOnly: true }, want: 3 },
+    { filter: { market: "latam" as const }, want: 4 },
+  ];
+  for (const { filter, want } of cases) {
+    const row = (await getCompanyHiringSummaries(anyBd, filter.market, filter.miamiOnly)).summaries.find((s) => s.companyKey === ck)!;
+    const tab = (await getCompanyPostingsForKey(ck, filter))!;
+    assert.equal(row.openItCount, want, JSON.stringify(filter));
+    assert.equal(tab.totalCount, row.openItCount, `tab agrees with the table under ${JSON.stringify(filter)}`);
+    assert.equal(tab.postings.length, want);
+  }
+});

@@ -1,4 +1,20 @@
 // Pure view-model helpers for the Vacantes screen. No "@/db" import so they unit-test without a DATABASE_URL.
+import { isMarketKey, type MarketKey } from "./markets";
+
+/**
+ * The Vacantes filters that change WHICH postings a company has. Offshore-heavy and startups-only select whole
+ * companies and leave a surviving company's postings untouched, so they are deliberately not part of this.
+ */
+export interface PostingFilter {
+  market?: MarketKey;
+  miamiOnly?: boolean;
+}
+
+/** Validates untrusted `?market=&miamiOnly=` values; Miami is a sub-filter of US, so it is dropped otherwise. */
+export function resolvePostingFilter(raw: { market?: string; miamiOnly?: string }): Required<Pick<PostingFilter, "miamiOnly">> & PostingFilter {
+  const market = isMarketKey(raw.market) ? raw.market : undefined;
+  return { market, miamiOnly: market === "us" && raw.miamiOnly === "on" };
+}
 
 export type HiringDelta =
   | { kind: "new" }
@@ -25,6 +41,14 @@ export function hiringDelta(i: { total: number; previous: number; filtered?: boo
 /** Contacts of a company, by key (a name match would mix "Meta" with "Metalab"). */
 export function companyContactsHref(companyKey: string): string {
   return `/?companyKey=${encodeURIComponent(companyKey)}`;
+}
+
+/** The company record opened on its hiring tab (the list behind the vacancy number), by key, under the same filter. */
+export function companyPostingsHref(companyKey: string, filter: PostingFilter = {}): string {
+  const params = new URLSearchParams({ tab: "hiring" });
+  if (filter.market) params.set("market", filter.market);
+  if (filter.market === "us" && filter.miamiOnly) params.set("miamiOnly", "on");
+  return `/companies/${encodeURIComponent(companyKey)}?${params.toString()}`;
 }
 
 /** "+12" / "−2" (real minus sign, as in the mockup). Empty for kinds that show text instead of a number. */

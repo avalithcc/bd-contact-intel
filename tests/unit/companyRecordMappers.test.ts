@@ -12,6 +12,7 @@ import {
   isCompanyActivityFilter,
   isCompanyFilterSelectionComplete,
   latestEditByProperty,
+  resolveCompanyTab,
   resolveCompanyScopeRows,
   startupLabel,
   startupListBadge,
@@ -145,4 +146,15 @@ test("startupListBadge: three-valued, so 'not a startup' and 'never classified' 
   assert.equal(startupListBadge(true), "startup");
   assert.equal(startupListBadge(false), null);
   assert.equal(startupListBadge(null), "unclassified");
+});
+
+test("resolveCompanyTab: a real tab id opens that tab, anything else falls back to the default", () => {
+  assert.equal(resolveCompanyTab("hiring"), "hiring");
+  assert.equal(resolveCompanyTab("activity"), "activity");
+  assert.equal(resolveCompanyTab(undefined), "activity");
+  assert.equal(resolveCompanyTab(""), "activity");
+  assert.equal(resolveCompanyTab("nope"), "activity");
+  assert.equal(resolveCompanyTab("HIRING"), "activity");
+  assert.equal(resolveCompanyTab("__proto__"), "activity");
+  assert.equal(resolveCompanyTab("toString"), "activity");
 });
