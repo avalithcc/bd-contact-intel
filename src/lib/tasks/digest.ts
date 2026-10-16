@@ -85,19 +85,19 @@ export interface DigestEmail {
 // HTML `style="..."` attribute — a literal `"Segoe UI"` would terminate that
 // attribute early and silently drop every style after it (verified with a
 // Playwright render; this bit real, not just cosmetic).
-const FONT_STACK = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+export const FONT_STACK = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const FONT_MONO_STACK = "'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace";
 
-const COLOR_CANVAS = "#f5f4f7"; // --color-canvas
-const COLOR_SURFACE_2 = "#ffffff"; // --color-surface-2
-const COLOR_BORDER = "rgba(0,0,0,0.08)"; // --color-border
-const COLOR_INK = "#17151c"; // --color-ink
-const COLOR_INK_SOFT = "#5b5865"; // --color-ink-soft
+export const COLOR_CANVAS = "#f5f4f7"; // --color-canvas
+export const COLOR_SURFACE_2 = "#ffffff"; // --color-surface-2
+export const COLOR_BORDER = "rgba(0,0,0,0.08)"; // --color-border
+export const COLOR_INK = "#17151c"; // --color-ink
+export const COLOR_INK_SOFT = "#5b5865"; // --color-ink-soft
 const COLOR_INK_SUBTLE = "#6e6b78"; // --color-ink-subtle (mockups/styles.css .nav-title)
-const COLOR_INK_MUTED = "#8b8894"; // --color-ink-muted
-const COLOR_ACCENT = "#d5252f"; // --color-accent
+export const COLOR_INK_MUTED = "#8b8894"; // --color-ink-muted
+export const COLOR_ACCENT = "#d5252f"; // --color-accent
 const COLOR_ACCENT_STRONG = "#b81f27"; // --color-accent-hover / -focus / -strong
-const COLOR_ACCENT_FG = "#ffffff"; // --color-accent-fg
+export const COLOR_ACCENT_FG = "#ffffff"; // --color-accent-fg
 const COLOR_WARN_BG = "#f6eae1"; // --color-warn-bg
 const COLOR_WARN_TEXT = "#92400e"; // --color-warn-text
 const COLOR_DANGER_BG = "#fbe5e5"; // --color-danger-bg
@@ -112,7 +112,7 @@ function formatDueDate(dueAt: Date): string {
   return `${day}/${month}`;
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

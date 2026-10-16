@@ -22,6 +22,8 @@ export interface DigestSendInput {
   subject: string;
   html: string;
   text: string;
+  /** The sending mailbox cannot receive mail, so a message that expects an answer sets where replies go. */
+  replyTo?: string[];
 }
 
 function requiredEnv(name: string): string {
@@ -51,5 +53,6 @@ export async function sendDigestEmail(input: DigestSendInput): Promise<void> {
     subject: input.subject,
     html: input.html,
     text: input.text,
+    ...(input.replyTo?.length ? { replyTo: input.replyTo } : {}),
   });
 }

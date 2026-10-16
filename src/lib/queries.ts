@@ -34,6 +34,8 @@ import { applyIdentityWrites, prefetchIdentityIndex, withIdentityLock } from "@/
 import { recomputePersonStatuses } from "@/lib/status/recompute";
 import { isAllowedWorkEmail } from "@/lib/auth/allowedEmail";
 import { mayProvisionBd } from "@/lib/auth/bdProvisioning";
+import { recordBdSeen } from "@/lib/auth/lastSeenPolicy";
+import { touchLastSeen } from "@/lib/auth/lastSeenDb";
 import {
   buildMessageImportStatsQuery,
   toMessageImportStats,
@@ -80,7 +82,11 @@ export const getCurrentBd = cache(async function getCurrentBd() {
   const existing = await db.query.bd.findFirst({
     where: eq(bd.email, user.email),
   });
-  if (existing) return existing;
+  if (existing) {
+    // Throttled, best-effort "seen" stamp for the Gmail reminder series; see lastSeenPolicy.ts.
+    await recordBdSeen(existing, new Date(), async (id, at) => void (await touchLastSeen(id, at)));
+    return existing;
+  }
   // A read-only e2e request (marked by tests/e2e/fixtures.ts) must not insert:
   // the request-level guard cannot see this write. Ignored in production, so
   // a real BD's first visit always provisions their row. See bdProvisioning.ts.
