@@ -26,6 +26,11 @@ export interface DigestSendInput {
   replyTo?: string[];
 }
 
+/** Header values must be one line: CR/LF in a subject (e.g. a BD name) would let data inject headers. */
+export function singleLine(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is not set`);
@@ -50,7 +55,7 @@ export async function sendDigestEmail(input: DigestSendInput): Promise<void> {
   await transport.sendMail({
     from: `"Avalith CRM" <${DIGEST_FROM_ADDRESS}>`,
     to: input.to,
-    subject: input.subject,
+    subject: singleLine(input.subject),
     html: input.html,
     text: input.text,
     ...(input.replyTo?.length ? { replyTo: input.replyTo } : {}),

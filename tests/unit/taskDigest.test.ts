@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDigestEmail, groupDigestTasks, type DigestTask } from "@/lib/tasks/digest";
+import { DIGEST_MAX_ROWS_PER_GROUP, buildDigestEmail, groupDigestTasks, type DigestTask } from "@/lib/tasks/digest";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
 
 const BOUNDARIES = { today: "2026-09-29", yesterday: "2026-09-28" };
@@ -210,11 +210,11 @@ test("buildDigestEmail orders sections 'Para hoy', 'Pendientes de ayer', 'Atrasa
   };
   const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, tasks, "https://bd-contact-intel.vercel.app");
   assert.ok(email);
-  const todayIdx = email!.html.lastIndexOf("Para hoy");
-  const yesterdayIdx = email!.html.lastIndexOf("Pendientes de ayer");
-  const overdueIdx = email!.html.lastIndexOf("Atrasadas");
-  assert.ok(todayIdx < yesterdayIdx, "Para hoy must render before Pendientes de ayer");
-  assert.ok(yesterdayIdx < overdueIdx, "Pendientes de ayer must render before Atrasadas");
+  const heading = (label: string) => email!.html.indexOf(`font-weight:800;color:#17151c;">${label} <span`);
+  const [today, yesterday, overdue] = [heading("Para hoy"), heading("Pendientes de ayer"), heading("Atrasadas")];
+  assert.ok(today > -1 && yesterday > -1 && overdue > -1, "all three section headings render");
+  assert.ok(today < yesterday, "Para hoy must render before Pendientes de ayer");
+  assert.ok(yesterday < overdue, "Pendientes de ayer must render before Atrasadas");
 });
 
 test("buildDigestEmail renders a task with no resolvable subject as title + due pill only, no dangling link", () => {
@@ -353,4 +353,23 @@ test("the due-date pill has a narrow-screen fallback row below the related link,
   assert.match(email!.html, /<tr class="due-mobile-row" style="display:none;">/);
   assert.match(email!.html, /\.due-desktop-cell \{ display: none !important; \}/);
   assert.match(email!.html, /\.due-mobile-row \{ display: table-row !important; \}/);
+});
+
+test("a group renders at most DIGEST_MAX_ROWS_PER_GROUP rows, keeps the true count and links 'y N más en el CRM'", () => {
+  const many = Array.from({ length: DIGEST_MAX_ROWS_PER_GROUP + 5 }, (_, i) => task(`m${i}`, "2026-09-29T00:00:00Z", { title: `TASK_${i}_END` }));
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, { today: many, overdue: [], yesterday: [] }, SITE);
+  assert.ok(email);
+  assert.equal((email!.html.match(/TASK_\d+_END/g) ?? []).length, DIGEST_MAX_ROWS_PER_GROUP);
+  assert.equal((email!.text.match(/TASK_\d+_END/g) ?? []).length, DIGEST_MAX_ROWS_PER_GROUP);
+  assert.match(email!.html, new RegExp(`>${DIGEST_MAX_ROWS_PER_GROUP + 5}</span>`), "pill shows the real total");
+  assert.match(email!.html, /href="https:\/\/bd-contact-intel\.vercel\.app\/tasks"[^>]*>y 5 más en el CRM</);
+  assert.ok(email!.text.includes(`y 5 más en el CRM: ${SITE}/tasks`));
+  assert.ok(email!.html.length < 100_000, "stays under Gmail's clip");
+});
+
+test("the CTA button also sits above the first section", () => {
+  const email = buildDigestEmail({ name: "Ana", email: "ana@avalith.net" }, ONE_EACH, SITE);
+  assert.ok(email);
+  assert.equal((email!.html.match(/>Ver mis tareas<\/a>/g) ?? []).length, 2);
+  assert.ok(email!.html.indexOf(">Ver mis tareas</a>") < email!.html.indexOf("Pendientes de ayer"));
 });

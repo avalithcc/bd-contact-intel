@@ -7,7 +7,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildOwnerNoticeEmail, buildReminderEmail } from "../src/lib/gmail/reminderEmail";
-import { buildInviteTemplate, buildRecoveryTemplate } from "../src/lib/mailer/supabaseTemplates";
+import { buildInviteTemplate, buildRecoveryTemplate, stripHtmlComments } from "../src/lib/mailer/supabaseTemplates";
 import { buildDigestEmail } from "../src/lib/tasks/digest";
 
 const out = process.argv[2];
@@ -27,9 +27,9 @@ const digest = buildDigestEmail(
   },
   SITE,
 )!;
-// Supabase substitutes its Go-template actions at send time; do the same with sample values here.
+// Supabase strips HTML comments and substitutes its Go-template actions at send time; do the same with sample values here.
 const fill = (html: string) =>
-  html.replaceAll("{{ .SiteURL }}", SITE).replaceAll("{{ .TokenHash }}", "7c1f9e0a").replaceAll("{{ .Email }}", "valentina.rojas@avalith.example");
+  stripHtmlComments(html).replaceAll("{{ .SiteURL }}", SITE).replaceAll("{{ .TokenHash }}", "7c1f9e0a").replaceAll("{{ .Email }}", "valentina.rojas@avalith.example");
 const files: Record<string, string> = {
   "resumen-diario.html": digest.html,
   "recordatorio-gmail.html": buildReminderEmail({ name: "Joaquín Reyes" }, SITE).html,

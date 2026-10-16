@@ -5,7 +5,7 @@ import { buildOwnerNoticeEmail, buildReminderEmail, greetingName } from "@/lib/g
 const SITE = "https://bd-contact-intel.vercel.app";
 
 test("the reminder matches the approved mockup: subject, headline, copy, steps and one link target", () => {
-  const e = buildReminderEmail({ name: "Joaquín Rivas" }, SITE);
+  const e = buildReminderEmail({ name: "Joaquín Rivas" }, SITE, true);
   assert.equal(e.subject, "Es clave que conectes tu Gmail al CRM");
   for (const part of [
     "Hola Joaquín,",
@@ -59,4 +59,14 @@ test("the owner notice names the BD and says three reminders went unanswered", (
   assert.ok(e.text.includes("Estado de Gmail: sin conectar"));
   const hostile = buildOwnerNoticeEmail({ name: "<script>", email: "a@b.c" });
   assert.ok(!hostile.html.includes("<script>"));
+});
+
+test("the reply invitation and footer promise appear only when a Reply-To exists", () => {
+  const yes = buildReminderEmail({ name: "Ana" }, SITE, true);
+  const no = buildReminderEmail({ name: "Ana" }, SITE, false);
+  for (const part of ["Respondé a este correo", "tu respuesta llega a la administración"]) {
+    assert.ok(yes.html.includes(part) && yes.text.includes(part), part);
+    assert.ok(!no.html.includes(part) && !no.text.includes(part), `absent: ${part}`);
+  }
+  assert.ok(no.html.includes("no recibe respuestas") && no.text.includes("no recibe respuestas"));
 });

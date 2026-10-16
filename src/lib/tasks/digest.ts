@@ -153,14 +153,23 @@ function taskRow(task: DigestTask, siteBaseUrl: string, tone: DueTone, isLast: b
   return { text, html };
 }
 
-function renderSection(heading: string, tasks: DigestTask[], siteBaseUrl: string, tone: DueTone): { text: string; html: string } {
-  if (tasks.length === 0) return { text: "", html: "" };
-  const rows = tasks.map((t, i) => taskRow(t, siteBaseUrl, tone, i === tasks.length - 1));
-  const text = `${heading} (${tasks.length})\n${rows.map((r) => r.text).join("\n")}\n`;
+/** Rows rendered per group; Gmail clips a message at ~102KB, so a long backlog links to the board instead. */
+export const DIGEST_MAX_ROWS_PER_GROUP = 20;
+
+function renderSection(heading: string, all: DigestTask[], siteBaseUrl: string, tone: DueTone): { text: string; html: string } {
+  if (all.length === 0) return { text: "", html: "" };
+  const tasks = all.slice(0, DIGEST_MAX_ROWS_PER_GROUP);
+  const hidden = all.length - tasks.length;
+  const moreText = `y ${hidden} más en el CRM`;
+  const rows = tasks.map((t, i) => taskRow(t, siteBaseUrl, tone, i === tasks.length - 1 && hidden === 0));
+  const moreRow = hidden
+    ? `<tr><td style="padding:12px 16px;font-family:${FONT_STACK};font-size:13px;"><a href="${escapeHtml(`${siteBaseUrl}/tasks`)}" style="color:${C.accentStrong};text-decoration:none;font-weight:700;">${moreText}</a></td></tr>`
+    : "";
+  const text = `${heading} (${all.length})\n${rows.map((r) => r.text).join("\n")}\n${hidden ? `${moreText}: ${siteBaseUrl}/tasks\n` : ""}`;
   const html =
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">` +
-    `<tr><td style="padding:0 0 10px;font-family:${FONT_STACK};font-size:15px;font-weight:800;color:${C.ink};">${escapeHtml(heading)} ${emailPill(String(tasks.length), tone, "margin-left:4px;padding:2px 8px;")}</td></tr>` +
-    `<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${C.line};border-radius:8px;border-collapse:separate;">${rows.map((r) => r.html).join("")}</table></td></tr></table>`;
+    `<tr><td style="padding:0 0 10px;font-family:${FONT_STACK};font-size:15px;font-weight:800;color:${C.ink};">${escapeHtml(heading)} ${emailPill(String(all.length), tone, "margin-left:4px;padding:2px 8px;")}</td></tr>` +
+    `<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${C.line};border-radius:8px;border-collapse:separate;">${rows.map((r) => r.html).join("")}${moreRow}</table></td></tr></table>`;
   return { text, html };
 }
 
@@ -211,6 +220,7 @@ export function buildDigestEmail(
   const bodyHtml =
     `<p style="margin:0 0 16px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${C.ink};">${escapeHtml(greeting)} ${escapeHtml(summary)}</p>` +
     countsStrip(groups) +
+    emailButton("Ver mis tareas", ctaUrl) +
     sections.map((s) => s.html).join("") +
     emailButton("Ver mis tareas", ctaUrl);
 

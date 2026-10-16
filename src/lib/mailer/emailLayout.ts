@@ -50,15 +50,14 @@ export function emailParagraph(html: string, extra = ""): string {
   return `<p style="margin:0 0 16px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${C.ink};${extra}">${html}</p>`;
 }
 
-/** Primary button: padded link in a colored cell, plus a VML rounded rectangle for desktop Outlook. */
+/**
+ * Primary button: a padded link inside a colored cell. No conditional comments (Supabase's Go html/template strips
+ * every HTML comment), so it must work in every client as-is; `mso-padding-alt` keeps the padding in desktop Outlook.
+ */
 export function emailButton(label: string, href: string): string {
-  const l = escapeHtml(label);
-  const h = escapeHtml(href);
-  const width = Math.round(48 + label.length * 8.4);
   return `<table ${TABLE} style="margin:8px 0 20px;"><tr>
-<td align="center" bgcolor="${C.accent}" style="border-radius:6px;background-color:${C.accent};">
-<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h}" style="height:46px;v-text-anchor:middle;width:${width}px;" arcsize="13%" stroke="f" fillcolor="${C.accent}"><w:anchorlock/><center style="color:${C.accentFg};font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">${l}</center></v:roundrect><![endif]-->
-<!--[if !mso]><!-- --><a href="${h}" style="display:inline-block;padding:13px 28px;font-family:${FONT_STACK};font-size:15px;font-weight:700;line-height:20px;color:${C.accentFg};text-decoration:none;border-radius:6px;background-color:${C.accent};">${l}</a><!--<![endif]-->
+<td align="center" bgcolor="${C.accent}" style="border-radius:6px;background-color:${C.accent};mso-padding-alt:13px 28px;">
+<a href="${escapeHtml(href)}" style="display:inline-block;padding:13px 28px;font-family:${FONT_STACK};font-size:15px;font-weight:700;line-height:20px;color:${C.accentFg};text-decoration:none;border-radius:6px;background-color:${C.accent};">${escapeHtml(label)}</a>
 </td></tr></table>`;
 }
 

@@ -34,6 +34,7 @@ export function greetingName(name: string): string | null {
 const REMINDER_REASON = "Recibís este aviso porque tu Gmail está sin conectar. Dejamos de enviarlo apenas lo conectes.";
 const OWNER_REASON =
   "Recibís este aviso porque sos administrador de Avalith CRM. Se envía una sola vez por persona, junto con el tercer recordatorio.";
+const HELP = "¿Algún problema para conectarlo? Respondé a este correo y te ayudamos.";
 const LOST = "Tus correos y las respuestas de tus contactos no entran al CRM, así que no queda registro de lo que conversás.";
 const PAUSED = "Tus Secuencias están pausadas: no sale ningún envío.";
 const STEPS: Array<[string, string]> = [
@@ -42,8 +43,11 @@ const STEPS: Array<[string, string]> = [
   ["Listo", "Tus correos empiezan a registrarse solos."],
 ];
 
-/** `siteBaseUrl` has no trailing slash (getSiteUrl). The one link goes to the Gmail connect page. Replies reach the admins (Reply-To). */
-export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: string): ReminderEmail {
+/**
+ * `siteBaseUrl` has no trailing slash (getSiteUrl). The one link goes to the Gmail connect page. `canReply` is true
+ * only when the send sets a Reply-To (admins exist); the reply invitation is shown only then.
+ */
+export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: string, canReply = false): ReminderEmail {
   const subject = "Es clave que conectes tu Gmail al CRM";
   const url = `${siteBaseUrl}/account/email`;
   const first = greetingName(recipient.name);
@@ -61,7 +65,7 @@ export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: str
     emailSteps(STEPS) +
     emailButton("Conectar mi Gmail", url) +
     emailFallbackLink(url) +
-    emailParagraph("¿Algún problema para conectarlo? Respondé a este correo y te ayudamos.", `font-size:14px;color:${COLORS.soft};margin-bottom:12px;`);
+    (canReply ? emailParagraph(HELP, `font-size:14px;color:${COLORS.soft};margin-bottom:12px;`) : "");
 
   const html = renderEmail({
     subject,
@@ -70,7 +74,7 @@ export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: str
     title: "Conectá tu Gmail al CRM",
     bodyHtml,
     reason: REMINDER_REASON,
-    replies: true,
+    replies: canReply,
   });
   const text = renderEmailText({
     body: [
@@ -86,11 +90,10 @@ export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: str
       ...STEPS.map(([t], i) => `${i + 1}. ${t}.`),
       "",
       `Conectar mi Gmail: ${url}`,
-      "",
-      "¿Algún problema para conectarlo? Respondé a este correo y te ayudamos.",
+      ...(canReply ? ["", HELP] : []),
     ].join("\n"),
     reason: REMINDER_REASON,
-    replies: true,
+    replies: canReply,
   });
   return { subject, html, text };
 }

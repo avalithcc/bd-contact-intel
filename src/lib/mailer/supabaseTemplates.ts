@@ -15,6 +15,11 @@ import {
   renderEmail,
 } from "@/lib/mailer/emailLayout";
 
+/** Supabase renders with Go html/template, which drops every HTML comment; this mirrors that for previews and tests. */
+export function stripHtmlComments(html: string): string {
+  return html.replace(/<!--[\s\S]*?-->/g, "");
+}
+
 export interface SupabaseTemplate {
   subject: string;
   html: string;

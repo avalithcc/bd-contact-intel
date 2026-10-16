@@ -40,10 +40,11 @@ test("footer: replies flag switches between the no-reply and the admin-reply sen
   assert.match(renderEmail(base), /notificaciones@avalith\.net/);
 });
 
-test("button: href and label land in both the VML and the link, escaped", () => {
+test("button: comment-free padded cell; href and label are escaped", () => {
   const html = emailButton(`Ir <ya>`, `https://x.test/a?b=1&c="2"`);
-  assert.equal(html.split(`href="https://x.test/a?b=1&amp;c=&quot;2&quot;"`).length - 1, 2);
-  assert.match(html, /v:roundrect/);
+  assert.equal(html.split(`href="https://x.test/a?b=1&amp;c=&quot;2&quot;"`).length - 1, 1);
+  assert.match(html, /<td align="center" bgcolor="#d5252f"[^>]*mso-padding-alt/);
+  assert.doesNotMatch(html, /<!--/);
   assert.doesNotMatch(html, /<ya>/);
 });
 
