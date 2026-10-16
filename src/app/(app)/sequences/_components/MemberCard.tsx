@@ -87,8 +87,8 @@ function Actions({ card, m, l, onAction, generating }: { card: CardView; m: Deta
 /** `selection` makes a draft card selectable for the bulk bar (the spec's "selecting rows"); a card in any other state has nothing to select. */
 export type CardSelection = { selected: boolean; onToggle: () => void };
 
-export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOutPhrase = null, selection, generating = false }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; optOutPhrase?: string | null; selection?: CardSelection; generating?: boolean }) {
-  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now);
+export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generating = false }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generating?: boolean }) {
+  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now, readOnly);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;
   const parts = metaParts(m, card.kind, now, l, ownView);
@@ -116,7 +116,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOu
         </div>
         <Actions card={card} m={m} l={l} onAction={onAction} generating={generating} />
       </div>
-      {showOptOutPrompt(card.kind, optOutPhrase) && (
+      {!readOnly && showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">
           <div className="alert alert-warn" role="note">
             <div className="grow"><span className="title">{l.optOutPromptTitle}</span> {fill(l.optOutPromptBody, { phrase: optOutPhrase ?? "" })}</div>

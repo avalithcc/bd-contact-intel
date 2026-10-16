@@ -8,6 +8,7 @@ import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent } from
 import type { SkippedEdit } from "@/lib/sequences/draftCompose";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
+import { isReadOnlyAction, isReadOnlyView } from "@/lib/sequences/readOnly";
 import { agoText, fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import {
   addMembers as _unused,
@@ -57,7 +58,8 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   // A "Regenerar" the server refused because the draft is hand-edited waits here for confirmation.
   const [regen, setRegen] = useState<{ skipped: SkippedEdit; step: 1 | 2; review: boolean } | null>(null);
-  const ownView = viewerBdId === detail.ownerBdId;
+  const readOnly = isReadOnlyView(viewerBdId, detail.ownerBdId);
+  const ownView = !readOnly;
   const member = (id: string) => detail.members.find((m) => m.memberId === id) ?? null;
   const reviewed = review ? member(review.memberId) : null;
 
@@ -114,13 +116,15 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   }
 
   function onAction(a: DetailAction) {
+    // The server refuses every write on a foreign Sequence; the screen does not even try.
+    if (readOnly && !isReadOnlyAction(a.type)) return;
     switch (a.type) {
       case "editSequence": return setEditing(true);
       case "changeCadence": return showToast(fill(l.toastCadenceFixed, { n: detail.schedule.step2.afterDays }), "success");
       case "createNext": return router.push("/sequences/new");
       case "approveReady": return setSelected(readyMemberIds(detail.members));
       case "generate": return void generateOne(a.memberId);
-      case "reviewDraft": case "viewEmail": case "viewSent": case "reviewReminder": return void openReview(a.memberId, cardStep(a.type));
+      case "reviewDraft": case "viewDraft": case "viewEmail": case "viewSent": case "reviewReminder": case "viewReminder": return void openReview(a.memberId, cardStep(a.type));
       case "remove": return setRemoveIds([a.memberId]);
       case "optOut": return setOptOutId(a.memberId);
       case "regenerate": return void regenerateOne(a.memberId);
@@ -142,6 +146,7 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   }
 
   async function onReview(a: ReviewAction) {
+    if (readOnly) return;
     const m = member(a.memberId);
     if (!m) return;
     if (a.type === "markReviewed") {
@@ -171,6 +176,7 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   }
 
   async function onBulk(a: BulkAction) {
+    if (readOnly) return;
     if (a.type === "remove") return setRemoveIds(a.memberIds);
     const r = await guarded(() => approveBulk(a.memberIds, 1));
     if (!r) return;
@@ -219,9 +225,9 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       <SequenceDetailView
         detail={detail} labels={l} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
         generatingId={generatingId} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
-        bulk={<BulkBar selection={rows} labels={l} onAction={onBulk} />}
+        bulk={readOnly ? null : <BulkBar selection={rows} labels={l} onAction={onBulk} />}
       />
-      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} error={error} />
+      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} error={error} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
       {regen && (

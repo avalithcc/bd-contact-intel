@@ -24,6 +24,9 @@ export type ListDbRow = {
   has_draft: boolean | null;
   scheduled_for: Date | null;
   company: string | null;
+  /** Only the all-owners read selects these. */
+  owner_id?: string | null;
+  owner_name?: string | null;
 };
 
 /**
@@ -36,7 +39,7 @@ export function groupListRows(rows: readonly ListDbRow[]): SequenceListRow[] {
   for (const r of rows) {
     let seq = bySequence.get(r.id);
     if (!seq) {
-      seq = { id: r.id, name: r.name, createdAt: r.created_at, dailySendCap: Number(r.daily_send_cap), schedule: parseSchedule(r.schedule), companies: [], members: [] };
+      seq = { id: r.id, name: r.name, createdAt: r.created_at, dailySendCap: Number(r.daily_send_cap), schedule: parseSchedule(r.schedule), companies: [], members: [], ...(r.owner_id ? { owner: { id: r.owner_id, name: String(r.owner_name) } } : {}) };
       bySequence.set(r.id, seq);
     }
     if (r.state === null) continue;

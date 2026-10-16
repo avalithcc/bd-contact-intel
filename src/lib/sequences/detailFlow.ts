@@ -62,7 +62,7 @@ export function gateRows(members: readonly DetailMember[], selected: readonly st
 }
 
 /** Which draft a card action refers to: only the reminder action means step 2. */
-export const cardStep = (action: CardActionId): 1 | 2 => (action === "reviewReminder" ? 2 : 1);
+export const cardStep = (action: CardActionId): 1 | 2 => (action === "reviewReminder" || action === "viewReminder" ? 2 : 1);
 
 /** "Aprobar" on a card: the reminder when the card is the reminder-due-today card, step 1 otherwise. */
 export function approveStep(m: DetailMember, now: Date): 1 | 2 {

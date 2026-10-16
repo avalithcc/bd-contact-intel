@@ -18,6 +18,8 @@ export type SequenceListRow = {
   /** Every distinct company on the roster, in roster order. */
   companies: readonly string[];
   members: readonly StatMember[];
+  /** Set only by the all-owners read (admin); a BD's own list carries none. */
+  owner?: { id: string; name: string };
 };
 
 export function listView(rows: readonly SequenceListRow[]) {
@@ -28,7 +30,7 @@ export function listView(rows: readonly SequenceListRow[]) {
       review: stats.toReview, noDraft: n((s) => s.state === "drafted" && !s.hasDraft), queued: stats.queued,
       sent: n((s) => s.state === "sent" || s.state === "no_reply"), replied: stats.replied, removed: n((s) => s.state === "discarded"),
     };
-    return { id: r.id, name: r.name, createdAt: r.createdAt, total: stats.total, counts, segments: stats.segments, companies: r.companies, cap: r.dailySendCap, capHigh: r.dailySendCap > DAILY_SEND_CAP_WARN_ABOVE, afterDays: r.schedule.step2.afterDays, nextReleaseAt: stats.nextReleaseAt };
+    return { id: r.id, name: r.name, createdAt: r.createdAt, total: stats.total, counts, segments: stats.segments, companies: r.companies, cap: r.dailySendCap, capHigh: r.dailySendCap > DAILY_SEND_CAP_WARN_ABOVE, afterDays: r.schedule.step2.afterDays, nextReleaseAt: stats.nextReleaseAt, owner: r.owner };
   });
   const releases = views.flatMap((v) => (v.nextReleaseAt ? [v.nextReleaseAt.getTime()] : []));
   const sum = (pick: (v: (typeof views)[number]) => number) => views.reduce((acc, v) => acc + pick(v), 0);
