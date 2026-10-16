@@ -64,7 +64,7 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
   },
   scheduled_email: {
     excluded:
-      "a pending row still points at the merged-away person; the sender resolves the survivor at send time (src/lib/scheduledEmail/send.ts) so the touch lands on the live Contact, and nothing is lost or sent twice",
+      "a pending row keeps pointing at the merged-away person (soft merge). Its reply check follows the merged_into_id chain (repliedSinceBaseline in src/lib/scheduledEmail/queries.ts, since email_message_person is repointed to the survivor) and the sender resolves the survivor at send time (send.ts), so the touch lands on the live Contact",
   },
   email_suppression: {
     excluded:

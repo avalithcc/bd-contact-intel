@@ -60,3 +60,16 @@ test("the dispatcher route is session-exempt and an unset secret never authorize
   assert.equal(isValidBearer("Bearer x", undefined), false);
   assert.equal(isValidBearer(null, "x"), false);
 });
+
+test("a sent mail whose bookkeeping throws is never marked failed: it is counted and left as is", async () => {
+  const { deps, calls } = fakeDeps({
+    markSent: async (id) => {
+      calls.push(`sent-attempt:${id}`);
+      if (id === "a") throw new Error("db down");
+    },
+  });
+  const summary = await dispatchScheduledEmails(deps, { dryRun: false });
+  assert.ok(!calls.some((c) => c.startsWith("failed:")), "no markFailed after a successful send");
+  assert.ok(calls.includes("sent-attempt:b"), "the batch carries on");
+  assert.deepEqual([summary.sent, summary.failed, summary.unrecorded], [1, 0, 1]);
+});

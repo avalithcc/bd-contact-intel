@@ -21,7 +21,12 @@ const lockSeconds = LOCK_MS / 1000;
 // A 'scheduled' row is changeable only while it is still more than the lock window away; held/failed rows always are.
 const changeable = sql`(${scheduledEmail.status} <> 'scheduled' or ${scheduledEmail.sendAt} > now() + make_interval(secs => ${lockSeconds}))`;
 
-async function countPending(bdId: string, run: Pick<typeof db, "select"> = db): Promise<number> {
+type Runner = Pick<typeof db, "select" | "execute">;
+
+/** Serialises one BD's scheduling so a count and the write that depends on it cannot interleave with another request. */
+const lockBd = (tx: Runner, bdId: string) => tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`scheduled_email:${bdId}`}))`);
+
+async function countPending(bdId: string, run: Runner = db): Promise<number> {
   const [row] = await run
     .select({ n: count() })
     .from(scheduledEmail)
@@ -39,8 +44,7 @@ export async function scheduleEmail(input: {
   replyThreadId?: string;
 }): Promise<ScheduleResult> {
   return db.transaction(async (tx) => {
-    // Serialises this BD's scheduling so the count below and the insert cannot interleave with another request.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`scheduled_email:${input.bdId}`}))`);
+    await lockBd(tx, input.bdId);
     const plan = planSchedule({ sendAt: input.sendAt, now: new Date(), pendingCount: await countPending(input.bdId, tx) });
     if (!plan.ok) return plan;
     const [row] = await tx.insert(scheduledEmail).values({ ...input, sendAt: plan.sendAt }).returning({ id: scheduledEmail.id });
@@ -58,17 +62,28 @@ export async function editScheduled(input: { id: string; bdId: string; subject: 
   if (!row) return { ok: false, reason: "not_found" };
   // Only an untouched time on a still-scheduled row skips the 5-minute rule (so text can be fixed up to the lock).
   const sameTime = row.status === "scheduled" && input.sendAt.getTime() === row.sendAt.getTime();
-  if (!sameTime) {
-    const plan = planSchedule({ sendAt: input.sendAt, now: new Date(), pendingCount: row.status === "failed" ? await countPending(input.bdId) : 0 });
-    if (!plan.ok) return plan;
-  }
   const rebaseline = row.status === "scheduled" ? {} : { replyBaselineAt: sql`now()` };
-  const updated = await db
-    .update(scheduledEmail)
-    .set({ subject: input.subject, body: input.body, sendAt: input.sendAt, status: "scheduled", error: null, updatedAt: sql`now()`, ...rebaseline })
-    .where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId), inArray(scheduledEmail.status, [...OPEN_STATUSES]), changeable))
-    .returning({ id: scheduledEmail.id });
-  return updated.length ? { ok: true } : refusalFor(input.id, input.bdId);
+  const outcome = await db.transaction(async (tx) => {
+    // A failed row returning to 'scheduled' adds to the pending count, so it takes the same lock as scheduleEmail.
+    if (row.status === "failed") await lockBd(tx, input.bdId);
+    if (!sameTime) {
+      const plan = planSchedule({ sendAt: input.sendAt, now: new Date(), pendingCount: row.status === "failed" ? await countPending(input.bdId, tx) : 0 });
+      if (!plan.ok) return plan;
+    }
+    const updated = await tx
+      .update(scheduledEmail)
+      .set({ subject: input.subject, body: input.body, sendAt: input.sendAt, status: "scheduled", error: null, updatedAt: sql`now()`, ...rebaseline })
+      .where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId), inArray(scheduledEmail.status, [...OPEN_STATUSES]), changeable))
+      .returning({ id: scheduledEmail.id });
+    return updated.length ? { ok: true as const } : null;
+  });
+  return outcome ?? refusalFor(input.id, input.bdId);
+}
+
+/** The caller's own row (person and stored recipient), for re-validating the recipient on edit. */
+export async function getOwnScheduled(id: string, bdId: string) {
+  const [row] = await db.select({ personId: scheduledEmail.personId, toAddress: scheduledEmail.toAddress }).from(scheduledEmail).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.bdId, bdId)));
+  return row ?? null;
 }
 
 export async function cancelScheduled(input: { id: string; bdId: string }): Promise<EditResult> {
@@ -81,10 +96,16 @@ export async function cancelScheduled(input: { id: string; bdId: string }): Prom
 }
 
 const dueNow = sql`${scheduledEmail.status} = 'scheduled' and ${scheduledEmail.sendAt} <= now()`;
-// An inbound, non-automatic message from this person to this BD, newer than the row's baseline.
+// An inbound, non-automatic message from this person to this BD, newer than the row's baseline. A merge repoints
+// email_message_person to the survivor, so "this person" is the row's person plus every survivor up its merged_into_id chain.
 const repliedSinceBaseline = sql`exists (
   select 1 from email_message em join email_message_person emp on emp.email_message_id = em.id
-  where em.bd_id = ${scheduledEmail.bdId} and emp.person_id = ${scheduledEmail.personId}
+  where em.bd_id = ${scheduledEmail.bdId}
+    and emp.person_id in (
+      with recursive pbc_chain(pbc_id) as (
+        select ${scheduledEmail.personId}::uuid
+        union select p.merged_into_id from person p join pbc_chain c on p.id = c.pbc_id where p.merged_into_id is not null)
+      select pbc_id from pbc_chain)
     and em.direction = 'inbound' and em.is_automatic = false and em.sent_at > ${scheduledEmail.replyBaselineAt})`;
 
 export async function countDue(): Promise<number> {
@@ -119,8 +140,12 @@ export async function claimDue(limit: number): Promise<ClaimedEmail[]> {
   return claimed.map((c) => ({ ...c, signatureHtml: byBd.get(c.bdId) ?? null }));
 }
 
+/** Also accepts a row the sweep already declared 'outcome_unknown': the mail did go out, so it must not look unsent. */
 export async function markSent(id: string, gmailMessageId: string): Promise<void> {
-  await db.update(scheduledEmail).set({ status: "sent", gmailMessageId, sentAt: sql`now()`, updatedAt: sql`now()` }).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "sending")));
+  await db
+    .update(scheduledEmail)
+    .set({ status: "sent", error: null, gmailMessageId, sentAt: sql`now()`, updatedAt: sql`now()` })
+    .where(and(eq(scheduledEmail.id, id), sql`(${scheduledEmail.status} = 'sending' or (${scheduledEmail.status} = 'failed' and ${scheduledEmail.error} = 'outcome_unknown'))`));
 }
 
 export async function markFailed(id: string, code: string): Promise<void> {

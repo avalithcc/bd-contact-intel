@@ -6,9 +6,8 @@
 -- Vercel Hobby crons are daily-only, so the every-minute cadence lives here. The route is GET-only (like /api/gmail/sync),
 -- hence net.http_get.
 --
--- Secret: reuses the app's CRON_SECRET, already in Vault under `gmail_sync_cron_secret` (see scripts/gmail-sync-cron.sql).
--- If you prefer a separate Vault entry, create it and replace the name below; never paste the value into this file.
--- Placeholder to review before running:  <SECRET_NAME_IN_VAULT>  -> gmail_sync_cron_secret
+-- Secret: the Vault entry NAMED `gmail_sync_cron_secret` (name only; the value, the app's CRON_SECRET, is never in this
+-- file). It already exists in production (see scripts/gmail-sync-cron.sql), so nothing needs to be created first.
 --
 -- Overlap: the route's maxDuration is 60 s and pg_net's timeout below is 60 s, so a run cannot outlive the 1-minute
 -- interval by much; if one does, the claim (`for update skip locked`) keeps the two runs from taking the same row.
@@ -29,7 +28,7 @@ select cron.schedule(
       'Bearer ' || (
         select decrypted_secret
         from vault.decrypted_secrets
-        where name = '<SECRET_NAME_IN_VAULT>'
+        where name = 'gmail_sync_cron_secret'
       )
     ),
     timeout_milliseconds := 60000

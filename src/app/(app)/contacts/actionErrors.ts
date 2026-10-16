@@ -68,6 +68,7 @@ export type ContactActionErrorReason =
   | "schedule_too_far"
   | "schedule_cap_reached"
   | "schedule_locked"
+  | "schedule_recipient_invalid"
   | "owner_invalid"
   | "admin_required"
   // Deleting a note that is not yours (and you are not an admin): see lib/activity/noteDelete.ts.

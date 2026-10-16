@@ -28,6 +28,8 @@ export interface RunSummary {
   held: number;
   sent: number;
   failed: number;
+  /** Sent, but recording it failed: the row is left as is (markSent also heals a swept row). */
+  unrecorded: number;
   swept: number;
 }
 
@@ -41,21 +43,30 @@ export function failureCode(err: unknown): string {
 }
 
 export async function dispatchScheduledEmails(deps: RunDeps, opts: { dryRun: boolean }): Promise<RunSummary> {
-  if (opts.dryRun) return { dryRun: true, due: await deps.countDue(), held: 0, sent: 0, failed: 0, swept: 0 };
+  if (opts.dryRun) return { dryRun: true, due: await deps.countDue(), held: 0, sent: 0, failed: 0, unrecorded: 0, swept: 0 };
   const swept = await deps.sweepStale();
   const held = await deps.holdReplied();
   const rows = await deps.claimDue(BATCH_SIZE);
   let sent = 0;
   let failed = 0;
+  let unrecorded = 0;
   for (const row of rows) {
+    let messageId: string;
     try {
-      const { messageId } = await deps.send(row);
-      await deps.markSent(row.id, messageId);
-      sent++;
+      ({ messageId } = await deps.send(row));
     } catch (err) {
       await deps.markFailed(row.id, failureCode(err));
       failed++;
+      continue;
+    }
+    // The mail is out. A bookkeeping error must never turn into markFailed: that would show a sent mail as unsent.
+    try {
+      await deps.markSent(row.id, messageId);
+      sent++;
+    } catch (err) {
+      unrecorded++;
+      console.error("[scheduled-email] sent but not recorded", row.id, messageId, err);
     }
   }
-  return { dryRun: false, due: rows.length, held, sent, failed, swept };
+  return { dryRun: false, due: rows.length, held, sent, failed, unrecorded, swept };
 }

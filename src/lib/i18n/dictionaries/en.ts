@@ -839,6 +839,7 @@ export const en = {
     errorScheduleTooSoon: "Pick a time at least 5 minutes ahead.",
     errorScheduleTooFar: "You can only schedule up to 30 days ahead.",
     errorScheduleCapReached: "You already have 50 pending emails. Cancel one or wait for one to go out.",
+    errorScheduleRecipientInvalid: "An email can only be scheduled to one of this contact's own addresses.",
     errorScheduleLocked: "It can no longer be changed: it is about to go out or already did.",
     meetingDateLabel: "Date",
     meetingTimeLabel: "Time",

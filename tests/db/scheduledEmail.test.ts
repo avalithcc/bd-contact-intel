@@ -232,3 +232,124 @@ test("an edited held or failed row goes back to scheduled with a fresh reply bas
   assert.equal(row.error, null);
   assert.ok(Date.now() - row.replyBaselineAt.getTime() < 60_000);
 });
+
+async function inboundTo(bdId: string, personId: string) {
+  const { db } = await import("@/db");
+  const { emailMessage, emailMessagePerson } = await import("@/db/schema");
+  const [m] = await db.insert(emailMessage).values({
+    bdId, gmailMessageId: `g-${randomUUID()}`, gmailThreadId: "t", direction: "inbound", personId, fromAddress: "x@prospect.test",
+    sentAt: new Date(Date.now() + MIN), matchedEmail: "x@prospect.test", matchConfidence: "exact",
+  }).returning();
+  await db.insert(emailMessagePerson).values({ emailMessageId: m!.id, personId, matchedEmail: "x@prospect.test", matchConfidence: "exact" });
+}
+
+test("a merge does not blind the reply check: scheduled to A, A merged into B, B replies -> on hold", async () => {
+  const { db } = await import("@/db");
+  const { person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { holdReplied } = await import("@/lib/scheduledEmail/queries");
+  const b = await mkBd("Merge");
+  const a = await mkPerson("mergea");
+  const survivor = await mkPerson("mergeb");
+  const grand = await mkPerson("mergec");
+  const id = await schedule(b.id, a.id);
+  await setRow(id, `send_at = now() - interval '1 minute'`);
+  await db.update(person).set({ mergedIntoId: survivor.id }).where(eq(person.id, a.id)); // soft merge A -> B
+  await db.update(person).set({ mergedIntoId: grand.id }).where(eq(person.id, survivor.id)); // and B -> C (two hops)
+  await inboundTo(b.id, grand.id); // the repointed link lives on the final survivor
+  assert.ok((await holdReplied()) >= 1);
+  assert.equal((await getRow(id)).status, "on_hold");
+});
+
+test("the recipient must be header-safe and one of the Contact's own addresses (the survivor's after a merge)", async () => {
+  const { db } = await import("@/db");
+  const { person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { checkRecipient } = await import("@/lib/scheduledEmail/recipient");
+  const a = await mkPerson("rcpta");
+  const s = await mkPerson("rcptb");
+  assert.equal(await checkRecipient(a.id, a.email!), "ok");
+  assert.equal(await checkRecipient(a.id, ` ${a.email!.toUpperCase()} `), "ok");
+  assert.equal(await checkRecipient(a.id, "someone.else@prospect.test"), "schedule_recipient_invalid");
+  assert.equal(await checkRecipient(a.id, `${a.email}\r\nBcc: evil@x.test`), "invalid_email");
+  await db.update(person).set({ mergedIntoId: s.id }).where(eq(person.id, a.id));
+  assert.equal(await checkRecipient(a.id, s.email!), "ok");
+  assert.equal(await checkRecipient(a.id, a.email!), "schedule_recipient_invalid");
+});
+
+test("markSent heals a row the sweep already called outcome_unknown, but never a plain failed or cancelled one", async () => {
+  const { markSent } = await import("@/lib/scheduledEmail/queries");
+  const b = await mkBd("Heal");
+  const p = await mkPerson("heal");
+  const swept = await schedule(b.id, p.id);
+  const failed = await schedule(b.id, p.id);
+  await setRow(swept, `status = 'failed', error = 'outcome_unknown'`);
+  await setRow(failed, `status = 'failed', error = 'gmail_not_connected'`);
+  await markSent(swept, "gm-late");
+  await markSent(failed, "gm-nope");
+  const row = await getRow(swept);
+  assert.deepEqual([row.status, row.error, row.gmailMessageId], ["sent", null, "gm-late"]);
+  assert.equal((await getRow(failed)).status, "failed");
+});
+
+test("the 50 cap also holds when failed rows are rescheduled, even concurrently", async () => {
+  const { editScheduled } = await import("@/lib/scheduledEmail/queries");
+  const b = await mkBd("Recap");
+  const p = await mkPerson("recap");
+  for (let i = 0; i < 49; i++) await schedule(b.id, p.id, (10 + i) * MIN);
+  const f1 = await schedule(b.id, p.id, 200 * MIN); // 50 pending
+  await setRow(f1, `status = 'failed', error = 'x'`); // 49 pending
+  const f2 = await schedule(b.id, p.id, 201 * MIN); // 50 pending
+  await setRow(f2, `status = 'failed', error = 'x'`); // 49 pending, two failed rows, one free slot
+  const edit = (id: string) => editScheduled({ id, bdId: b.id, subject: "s", body: "b", sendAt: new Date(Date.now() + 30 * MIN) });
+  const results = await Promise.all([edit(f1), edit(f2)]);
+  assert.equal(results.filter((r) => r.ok).length, 1, "one free slot: exactly one failed row may return to scheduled");
+  assert.ok(results.some((r) => !r.ok && r.reason === "schedule_cap_reached"));
+});
+
+test("the REAL sender: exactly one email_sent activity when it goes out, none when held or failed", async () => {
+  const { dispatchScheduledEmails } = await import("@/lib/scheduledEmail/dispatch");
+  const { sendScheduledEmail } = await import("@/lib/scheduledEmail/send");
+  const { encryptToken } = await import("@/lib/gmail/crypto");
+  const { db } = await import("@/db");
+  const { emailAccount, activity } = await import("@/db/schema");
+  const { eq, and } = await import("drizzle-orm");
+  Object.assign(process.env, { GOOGLE_OAUTH_CLIENT_ID: "cid", GOOGLE_OAUTH_CLIENT_SECRET: "sec", GOOGLE_OAUTH_REDIRECT_URI: "http://localhost/cb", GMAIL_TOKEN_ENCRYPTION_KEY: "test-key" });
+  const good = await mkBd("RealOk");
+  const noAccount = await mkBd("RealFail");
+  await db.insert(emailAccount).values({ bdId: good.id, emailAddress: good.email, refreshTokenEncrypted: encryptToken("rt"), status: "connected" });
+  const sentP = await mkPerson("realsent");
+  const heldP = await mkPerson("realheld");
+  const failP = await mkPerson("realfail");
+  const sentId = await schedule(good.id, sentP.id);
+  const heldId = await schedule(good.id, heldP.id);
+  const failId = await schedule(noAccount.id, failP.id);
+  for (const id of [sentId, heldId, failId]) await setRow(id, `send_at = now() - interval '1 minute'`);
+  await inboundTo(good.id, heldP.id);
+
+  const cache = require("next/cache") as { revalidatePath: (p: string) => void };
+  const realRevalidate = cache.revalidatePath;
+  cache.revalidatePath = () => {}; // outside a request there is no Next store to revalidate
+  const realFetch = globalThis.fetch;
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: unknown) => {
+    const url = String(input);
+    urls.push(url);
+    if (url.includes("oauth2.googleapis.com/token")) return Response.json({ access_token: "at" });
+    if (url.endsWith("/messages/send")) return Response.json({ id: "gm-real", threadId: "th-real" });
+    return new Response("{}", { status: 404 });
+  }) as typeof fetch;
+  try {
+    const q = await import("@/lib/scheduledEmail/queries");
+    await dispatchScheduledEmails({ ...q, send: sendScheduledEmail }, { dryRun: false });
+  } finally {
+    globalThis.fetch = realFetch;
+    cache.revalidatePath = realRevalidate;
+  }
+  assert.equal(urls.filter((u) => u.endsWith("/messages/send")).length, 1, "Gmail was called once, for the one row that could go");
+  const emailSent = (personId: string) => db.select({ id: activity.id }).from(activity).where(and(eq(activity.personId, personId), eq(activity.type, "email_sent")));
+  assert.equal((await emailSent(sentP.id)).length, 1);
+  assert.equal((await emailSent(heldP.id)).length, 0);
+  assert.equal((await emailSent(failP.id)).length, 0);
+  assert.deepEqual([(await getRow(sentId)).status, (await getRow(heldId)).status, (await getRow(failId)).status], ["sent", "on_hold", "failed"]);
+});

@@ -764,6 +764,7 @@ export const es: typeof en = {
     errorScheduleTooSoon: "Elegí una hora al menos 5 minutos adelante.",
     errorScheduleTooFar: "Sólo se puede programar hasta 30 días adelante.",
     errorScheduleCapReached: "Ya tenés 50 correos pendientes. Cancelá o esperá a que salga alguno.",
+    errorScheduleRecipientInvalid: "Sólo se puede programar un correo a una dirección de este contacto.",
     errorScheduleLocked: "Ya no se puede cambiar: el envío está por salir o ya salió.",
     meetingDateLabel: "Fecha",
     meetingTimeLabel: "Hora",

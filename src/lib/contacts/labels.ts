@@ -132,6 +132,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorScheduleCapReached;
     case "schedule_locked":
       return l.errorScheduleLocked;
+    case "schedule_recipient_invalid":
+      return l.errorScheduleRecipientInvalid;
     case "owner_invalid":
       return l.errorOwnerInvalid;
     case "admin_required":
