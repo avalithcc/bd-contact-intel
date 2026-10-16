@@ -16,6 +16,8 @@ import {
   logContactMeetingAction,
   sendContactEmailAction,
 } from "../actions";
+import { scheduleContactEmailAction } from "../scheduleActions";
+import { ScheduleEmailDialog } from "./ScheduleEmailDialog";
 import { CALL_OUTCOME_CODES, MANUAL_CALL_DIRECTION, type CallOutcomeCode } from "@/lib/contacts/call";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
@@ -29,6 +31,7 @@ import {
   CallIcon,
   ClipboardIcon,
   DiscardIcon,
+  FollowUpIcon,
   GenerateIcon,
   MailIcon,
   MeetingIcon,
@@ -66,7 +69,7 @@ export interface QuickActionsProps {
   ownerBdId: string | null;
 }
 
-type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
+type QuickAction = "call" | "email" | "schedule" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
 
 const CALL_OUTCOME_LABEL_KEY: Record<CallOutcomeCode, keyof ContactRecordLabels> = {
   connected: "callOutcomeConnected",
@@ -325,6 +328,7 @@ export function QuickActions({
             setOpenAction("generate");
           }}
           onCancel={closeQuickAction}
+          onOpenSchedule={() => setOpenAction("schedule")}
           onSubmit={async (subject, body) => {
             if (!email) return;
             setBusy(true);
@@ -337,6 +341,37 @@ export function QuickActions({
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastEmailSent);
+              router.refresh();
+            } else {
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message, href: contactActionErrorHref(result.reason) });
+              showToast(message, "error");
+            }
+          }}
+        />
+      )}
+
+      {openAction === "schedule" && email && (
+        <ScheduleEmailDialog
+          labels={l}
+          name={name}
+          subject={emailSubject}
+          body={emailBody}
+          busy={busy}
+          error={error?.message ?? null}
+          onSubjectChange={setEmailSubject}
+          onBodyChange={setEmailBody}
+          onBack={() => setOpenAction("email")}
+          onCancel={closeQuickAction}
+          onSubmit={async (sendAt) => {
+            setBusy(true);
+            setError(null);
+            const result = await settleAction(() => scheduleContactEmailAction(personId, email, emailSubject, emailBody, sendAt.toISOString()));
+            setBusy(false);
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
+            if (result.ok) {
+              closeQuickAction();
+              showToast(l.toastEmailScheduled);
               router.refresh();
             } else {
               const message = contactActionErrorMessage(l, result.reason);
@@ -558,6 +593,7 @@ function EmailForm({
   onSubjectChange,
   onBodyChange,
   onOpenGenerate,
+  onOpenSchedule,
   onCancel,
   onSubmit,
 }: ComposerProps & {
@@ -579,6 +615,8 @@ function EmailForm({
   // this composer reusable for a context with no AI draft (none today, but
   // no reason to hard-couple the two).
   onOpenGenerate?: () => void;
+  // "Programar…" (approved mockup envio-programado.html): hands the same draft to the schedule dialog.
+  onOpenSchedule: () => void;
   onSubmit: (subject: string, body: string) => void;
 }) {
   const ids = useId();
@@ -614,6 +652,10 @@ function EmailForm({
           )}
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={onOpenSchedule} disabled={busy}>
+            <FollowUpIcon className="icon" />
+            {l.scheduleAction}
           </button>
           <button
             type="button"

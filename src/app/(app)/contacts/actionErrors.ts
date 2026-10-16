@@ -63,6 +63,12 @@ export type ContactActionErrorReason =
   // subject comes from the thread). See contacts/newEmailInput.ts.
   | "email_subject_required"
   | "email_body_required"
+  // scheduled-send limits and lock (src/lib/scheduledEmail/plan.ts).
+  | "schedule_too_soon"
+  | "schedule_too_far"
+  | "schedule_cap_reached"
+  | "schedule_locked"
+  | "schedule_recipient_invalid"
   | "owner_invalid"
   | "admin_required"
   // Deleting a note that is not yours (and you are not an admin): see lib/activity/noteDelete.ts.
