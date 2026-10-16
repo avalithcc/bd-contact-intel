@@ -45,6 +45,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const when = (d: Date) => { const w = miamiWhen(d, now); return `${w.ddmm} ${w.hhmm}`; };
   // Null for a member stopped before anything was sent: there is no cadence to show (reviewDialog.ts kindOf).
   const { cadence } = view;
+  const editedAgo = view.editedAt ? agoText(view.editedAt, now, l) : "";
   const step1Lead = !cadence ? null : cadence.step1.kind === "sent" ? fill(l.emailSent, { ago: agoText(cadence.step1.at, now, l) }) : cadence.step1.kind === "scheduled" ? l.reviewReleases : l.reviewReleasesIfApproved;
 
   function submit(e: FormEvent<HTMLFormElement>) {
@@ -54,6 +55,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
     const data = new FormData(e.currentTarget);
     if (intent === "save" || intent === "approve") onAction({ type: intent, memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? "") });
   }
+  // Always asks the server without a confirmation: it refuses to overwrite an edit and the container then confirms with the BD.
   const footerButton = (id: ReviewFooterId) =>
     id === "regenerate" ? (
       <button key={id} type="button" className="btn btn-ghost left" disabled={busy} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}><GenerateIcon className="icon" />{l.reviewRegenerate}</button>
@@ -72,13 +74,14 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
             {view.kind === "stopped" && l.reviewStoppedNotice}
             {view.kind === "reminder" && fill(l.reviewReminderNotice, { date: miamiWhen(m.sentAt ?? now, now).ddmm })}
             {view.kind === "approved" && fill(l.reviewApprovedNotice, { ago: view.draft.approvedAt ? agoText(view.draft.approvedAt, now, l) : "" })}
-            {(view.kind === "draft" || view.kind === "reminder") && <> {l.reviewNotice} <strong>{l.reviewNoticeStrong}</strong> {ownView ? l.reviewNoticeTail : l.reviewNoticeTailOther}</>}
+            {(view.kind === "draft" || view.kind === "reminder") && view.edited && <> {l.reviewEditedLead} <strong>{ownView ? l.reviewEditedStrong : l.reviewEditedStrongOther}</strong>{fill(ownView ? l.reviewEditedRest : l.reviewEditedRestOther, { ago: editedAgo })} {ownView ? l.reviewEditedTail : l.reviewEditedTailOther}</>}
+            {(view.kind === "draft" || view.kind === "reminder") && !view.edited && <> {l.reviewNotice} <strong>{l.reviewNoticeStrong}</strong> {ownView ? l.reviewNoticeTail : l.reviewNoticeTailOther}</>}
           </div>
         </div>
         {!view.readOnly && signals && (
           <div className="field"><span className="label">{l.reviewSignals}</span>
             {signals.length > 0 ? <div className="row wrap row-xs">{signals.map((s) => <span key={s} className="chip">{s}</span>)}</div> : <p className="help">{l.reviewSignalsNone}</p>}
-            <p className="help">{l.reviewSignalsHelp}</p>
+            <p className="help">{view.edited ? <>{l.reviewSignalsEditedLead} <strong>{l.reviewSignalsEditedStrong}</strong> {ownView ? l.reviewSignalsEditedTail : l.reviewSignalsEditedTailOther}</> : l.reviewSignalsHelp}</p>
           </div>
         )}
         <div className="field"><label className="label" htmlFor={`${formId}-to`}>{l.reviewTo}</label>

@@ -15,33 +15,28 @@ import { StatCards } from "./StatCards";
  * `optOutPhrases` maps memberId to the advisory phrase the container found in that member's reply (detectOptOutPhrase); a replied card with an entry shows the "No contactar" prompt.
  * Presentational (mounted by SequenceDetailScreen): it reports intent through `onAction` and holds no state, so the container that mounts it
  * owns dialogs and server actions. Which blocks show follows `sequenceStats(...).view`:
- *  - empty: header, cadence and the empty state; no member cards (sequence-detail-view "Freshly created").
+ *  - empty: header, cadence, the empty state and the member cards: with no batch generation, each card's own "Generar borrador" is the only way to create a draft.
  *  - finished: header, the final progress line and "Secuencia completa", then the cards (so a replied contact stays one
  *    click away). Showing the cards here is NOT in the mockup; flagged in the checklist as an owner decision.
  *  - live: header, stat cards, progress, cadence, cards.
  */
-export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, optOutPhrases = {}, selected, onToggle, bulk }: { detail: SequenceDetail; labels: SequenceLabels; now: Date; onAction: OnAction; viewerBdId: string; optOutPhrases?: Readonly<Record<string, string>>; selected?: ReadonlySet<string>; onToggle?: (memberId: string) => void; bulk?: ReactNode }) {
+export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, optOutPhrases = {}, selected, onToggle, bulk, generatingId = null }: { detail: SequenceDetail; labels: SequenceLabels; now: Date; onAction: OnAction; viewerBdId: string; optOutPhrases?: Readonly<Record<string, string>>; selected?: ReadonlySet<string>; onToggle?: (memberId: string) => void; bulk?: ReactNode; generatingId?: string | null }) {
   // An admin reads another BD's Sequence (audited): the cards must not word its approvals as the reader's own.
   const ownView = viewerBdId === detail.ownerBdId;
   const stats = sequenceStats(detail.members.map((m) => ({ state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null })));
-  const missing = detail.members.filter((m) => m.state === "drafted" && m.draft === null).length;
   return (
     <>
-      <SequenceHeader name={detail.name} memberCount={stats.total} readyCount={stats.toReview} missingCount={missing} labels={labels} onAction={onAction} />
+      <SequenceHeader name={detail.name} memberCount={stats.total} readyCount={stats.toReview} labels={labels} onAction={onAction} />
       {stats.view === "live" && <StatCards stats={stats} now={now} labels={labels} />}
       {stats.view !== "empty" && <ProgressLine stats={stats} finished={stats.view === "finished"} labels={labels} />}
       {stats.view !== "finished" && <CadenceCard schedule={detail.schedule} labels={labels} onAction={onAction} />}
-      {stats.view === "empty" && <EmptyState total={stats.total} labels={labels} onAction={onAction} />}
+      {stats.view === "empty" && <EmptyState total={stats.total} labels={labels} />}
       {stats.view === "finished" && <FinishedState finished={stats.finished} labels={labels} onAction={onAction} />}
-      {stats.view !== "empty" && (
-        <>
-          <h2 className={stats.view === "finished" ? "mt-2xl mb-lg" : "mb-lg"}>{labels.membersTitle}</h2>
-          {bulk}
-          <div className="stack">
-            {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} optOutPhrase={optOutPhrases[m.memberId] ?? null} selection={selected && onToggle ? { selected: selected.has(m.memberId), onToggle: () => onToggle(m.memberId) } : undefined} />)}
-          </div>
-        </>
-      )}
+      <h2 className={stats.view !== "live" ? "mt-2xl mb-lg" : "mb-lg"}>{labels.membersTitle}</h2>
+      {bulk}
+      <div className="stack">
+        {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} optOutPhrase={optOutPhrases[m.memberId] ?? null} generating={generatingId === m.memberId} selection={selected && onToggle ? { selected: selected.has(m.memberId), onToggle: () => onToggle(m.memberId) } : undefined} />)}
+      </div>
     </>
   );
 }

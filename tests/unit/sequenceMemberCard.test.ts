@@ -107,11 +107,21 @@ test("a held approved member can still be cancelled", () => {
   assert.deepEqual(ids(mapMemberCard(facts({ state: "approved", holdReason: "sync_stale" }), NOW)), ["viewEmail", "cancel"]);
 });
 
-test("a drafted member with no draft offers neither review nor approve", () => {
+test("a drafted member with no draft offers neither review nor approve, only its own Generar borrador", () => {
   const c = mapMemberCard(facts({ state: "drafted", hasDraft: false }), NOW);
   assert.equal(c.kind, "noDraft");
-  assert.deepEqual(c.actions, []);
+  assert.deepEqual(c.actions, [{ id: "generate", style: "primary" }]);
   assert.deepEqual(c.menu, ["openContact", "remove"]);
+});
+
+test("no other card kind offers generate, in its actions or its menu", () => {
+  for (const state of MEMBER_STATES) {
+    for (const hasDraft of [true, false]) {
+      const c = mapMemberCard(facts({ state, hasDraft, reminderDueAt: new Date("2099-01-01T00:00:00Z") }), NOW);
+      if (c.kind === "noDraft") continue;
+      assert.ok(![...ids(c), ...c.menu].includes("generate" as never), `${state}/${hasDraft}`);
+    }
+  }
 });
 
 test("no_reply: the sent email can be read; nothing can be approved", () => {

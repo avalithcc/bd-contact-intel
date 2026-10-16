@@ -69,3 +69,6 @@ export function approveStep(m: DetailMember, now: Date): 1 | 2 {
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now);
   return card.kind === "reminderToday" ? 2 : 1;
 }
+
+/** The member states whose draft Regenerar may replace, per step. The server uses the same lists, so client and server agree on who is touched. */
+export const REGENERABLE_STATES: Record<1 | 2, readonly string[]> = { 1: ["drafted", "approved"], 2: ["sent"] };

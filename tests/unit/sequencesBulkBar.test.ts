@@ -30,7 +30,7 @@ test("view model: no selection hides the bar, and a duplicated row counts once",
 test("the bar renders the partial state as the mockup draws it, with the approve button disabled", () => {
   const html = render(rows(true, false, false));
   assert.ok(html.includes("3 seleccionados") && html.includes("1 de 3 borradores revisados"));
-  assert.ok(html.includes("Regenerar los 3") && html.includes("Quitar de la secuencia"));
+  assert.ok(html.includes("Quitar de la secuencia") && !html.includes("Regenerar"));
   assert.match(html, /<button[^>]*class="btn btn-primary btn-sm"[^>]*disabled=""[^>]*>Aprobar y programar los 3</);
   assert.ok(html.includes("Acciones masivas, revisión incompleta") && html.includes("hasta que los 3 hayan sido abiertos"));
 });

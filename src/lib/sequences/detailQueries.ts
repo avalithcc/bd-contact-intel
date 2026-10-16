@@ -32,7 +32,7 @@ import { parseSchedule, type Schedule } from "./schedule";
  */
 export const SEQUENCE_DETAIL_MEMBER_LIMIT = 200;
 
-export type DetailDraft = { subject: string; body: string; edited: boolean; reviewedAt: Date | null; approvedAt: Date | null; scheduledFor: Date | null };
+export type DetailDraft = { subject: string; body: string; edited: boolean; editedAt: Date | null; reviewedAt: Date | null; approvedAt: Date | null; scheduledFor: Date | null };
 
 export type DetailMember = {
   memberId: string;
@@ -67,7 +67,7 @@ const ts = (v: unknown) => (v == null ? null : parseDbTimestamp(v as string | Da
 
 function draftOf(r: Row, p: "d1" | "d2"): DetailDraft | null {
   if (r[`${p}_id`] == null) return null;
-  return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
+  return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), editedAt: ts(r[`${p}_edited_at`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
 }
 
 async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string | null): Promise<SequenceDetail | null> {

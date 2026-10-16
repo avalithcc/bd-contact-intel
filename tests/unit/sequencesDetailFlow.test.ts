@@ -4,7 +4,7 @@ import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent, sameC
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
 
 const NOW = new Date("2026-10-15T15:00:00Z");
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject", body: "Body", edited: false, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject", body: "Body", edited: false, editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 const member = (id: string, over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: id, personId: `p-${id}`, state: "drafted", holdReason: null, firstName: "A", lastName: "B", jobTitle: null, company: "Acme", companyKey: "acme",
   email: "a@acme.test", emailVerified: true, openIt: 1, florida: false, leadership: false, lastContactAt: null, repliedAt: null, sentAt: null,

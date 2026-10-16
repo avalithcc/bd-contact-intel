@@ -5,16 +5,17 @@ import { useState } from "react";
 import { useToast } from "@/components/ToastProvider";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
 import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent } from "@/lib/sequences/detailFlow";
+import type { SkippedEdit } from "@/lib/sequences/draftCompose";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
-import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
+import { agoText, fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import {
   addMembers as _unused,
   advanceReminder,
   approveBulk,
   approveMember,
   cancelApproval,
-  generateMissingSequenceDrafts,
+  generateMemberDraft,
   loadReviewSignals,
   markDraftReviewed,
   recordOptOut,
@@ -28,6 +29,7 @@ import {
 import { BulkBar, RemoveReasonDialog } from "../_components/BulkBar";
 import { EditSequenceDialog } from "../_components/EditSequenceDialog";
 import { OptOutDialog } from "../_components/OptOutDialog";
+import { RegenerateConfirmDialog } from "../_components/RegenerateConfirmDialog";
 import { ReviewDialog } from "../_components/ReviewDialog";
 import { SequenceDetailView } from "../_components/SequenceDetailView";
 import type { BulkAction, DetailAction, ReviewAction } from "../_components/actions";
@@ -52,6 +54,9 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   const [removeIds, setRemoveIds] = useState<string[] | null>(null);
   const [optOutId, setOptOutId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  // A "Regenerar" the server refused because the draft is hand-edited waits here for confirmation.
+  const [regen, setRegen] = useState<{ skipped: SkippedEdit; step: 1 | 2; review: boolean } | null>(null);
   const ownView = viewerBdId === detail.ownerBdId;
   const member = (id: string) => detail.members.find((m) => m.memberId === id) ?? null;
   const reviewed = review ? member(review.memberId) : null;
@@ -69,7 +74,7 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       setBusy(false);
     }
   }
-  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setError(null); };
+  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setError(null); };
   const reasonText = (reason: string) => (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
 
   async function reportBatch(result: Batch | undefined, one: string, many: string) {
@@ -79,10 +84,25 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
     router.refresh();
   }
 
-  async function generateMissing() {
-    const r = await guarded(() => generateMissingSequenceDrafts(detail.id));
+  /**
+   * Regenerating is one-to-one (card menu and review dialog). It always starts with NO confirmation: the server is the
+   * boundary, it leaves a hand-edited draft alone and reports it in `skippedEdited`, and only THAT report (never this
+   * page's possibly stale copy) feeds the confirmation. Confirming re-calls for that member with the instant of the text
+   * shown; if the server reports an edit again, the dialog opens again instead of looping silently.
+   */
+  async function regenerateOne(memberId: string, confirmed: Record<string, number> = {}) {
+    const r = await guarded(() => regenerateSequenceDrafts(detail.id, [memberId], confirmed));
+    if (r?.ok && r.skippedEdited[0]) setRegen({ skipped: r.skippedEdited[0], step: 1, review: false });
+    return reportBatch(r, l.toastRegenerated, l.toastRegeneratedMany);
+  }
+
+  /** One card, one draft: the button is disabled and reads "Generando…" until this member's own call returns. */
+  async function generateOne(memberId: string) {
+    setGeneratingId(memberId);
+    const r = await guarded(() => generateMemberDraft(detail.id, memberId));
+    setGeneratingId(null);
     if (r?.ok && r.generated.length === 0 && r.failed.length === 0) showToast(l.toastGeneratedNone, "success");
-    await reportBatch(r, l.toastGeneratedOne, l.toastGenerated);
+    await reportBatch(r, l.toastGeneratedOne, l.toastGeneratedOne);
   }
 
   async function openReview(memberId: string, step: 1 | 2) {
@@ -99,11 +119,11 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       case "changeCadence": return showToast(fill(l.toastCadenceFixed, { n: detail.schedule.step2.afterDays }), "success");
       case "createNext": return router.push("/sequences/new");
       case "approveReady": return setSelected(readyMemberIds(detail.members));
-      case "generateMissing": return void generateMissing();
+      case "generate": return void generateOne(a.memberId);
       case "reviewDraft": case "viewEmail": case "viewSent": case "reviewReminder": return void openReview(a.memberId, cardStep(a.type));
       case "remove": return setRemoveIds([a.memberId]);
       case "optOut": return setOptOutId(a.memberId);
-      case "regenerate": return void guarded(() => regenerateSequenceDrafts(detail.id, [a.memberId])).then((r) => reportBatch(r, l.toastRegenerated, l.toastRegeneratedMany));
+      case "regenerate": return void regenerateOne(a.memberId);
       case "approve": {
         const m = member(a.memberId);
         if (!m) return;
@@ -131,8 +151,10 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       return;
     }
     if (a.type === "regenerate") {
-      const r = await guarded(() => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId) : regenerateSequenceDrafts(detail.id, [a.memberId])), setError);
+      const confirmed = a.confirmedEdits ?? {};
+      const r = await guarded(() => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed)), setError);
       if (!r) return;
+      if (r.ok && r.skippedEdited[0]) return setRegen({ skipped: r.skippedEdited[0], step: a.step, review: true });
       if (r.ok && r.generated.length > 0) { showToast(l.toastRegenerated, "success"); closeDialogs(); } else setError(l.actionFailed);
       return router.refresh();
     }
@@ -150,11 +172,6 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
 
   async function onBulk(a: BulkAction) {
     if (a.type === "remove") return setRemoveIds(a.memberIds);
-    if (a.type === "regenerate") {
-      const r = await guarded(() => regenerateSequenceDrafts(detail.id, a.memberIds));
-      setSelected([]);
-      return reportBatch(r, l.toastRegenerated, l.toastRegeneratedMany);
-    }
     const r = await guarded(() => approveBulk(a.memberIds, 1));
     if (!r) return;
     if (r.ok) { showToast(fill(l.toastApprovedMany, { n: r.approved.length }), "success"); setSelected([]); } else fail(reasonText(r.rejected[0]?.reason ?? "failed"));
@@ -201,12 +218,23 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
     <>
       <SequenceDetailView
         detail={detail} labels={l} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
-        selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
+        generatingId={generatingId} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
         bulk={<BulkBar selection={rows} labels={l} onAction={onBulk} />}
       />
       <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} error={error} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
+      {regen && (
+        <RegenerateConfirmDialog open labels={l} ownView={ownView} ago={agoText(new Date(regen.skipped.editedAt), now, l)}
+          onCancel={() => setRegen(null)}
+          onConfirm={() => {
+            const r = regen;
+            const confirmed = { [r.skipped.memberId]: r.skipped.editedAt };
+            setRegen(null);
+            if (r.review) void onReview({ type: "regenerate", memberId: r.skipped.memberId, step: r.step, confirmedEdits: confirmed });
+            else void regenerateOne(r.skipped.memberId, confirmed);
+          }} />
+      )}
       {editing && <EditSequenceDialog open name={detail.name} cap={detail.dailySendCap} labels={l} onClose={closeDialogs} onSave={onEdit} busy={busy} error={error} />}
     </>
   );

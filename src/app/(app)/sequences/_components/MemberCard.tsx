@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { Avatar } from "@/components/Avatar";
 import { DropdownMenu } from "@/components/DropdownMenu";
-import { MoreIcon } from "@/components/icons";
+import { GenerateIcon, MoreIcon } from "@/components/icons";
 import { initialsFromName } from "@/components/initials";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
@@ -47,10 +47,12 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
       parts.push(kind === "reminderToday" ? fill(l.reminderToday, { time: w.hhmm }) : <strong>{fill(l.reminderOn, { date: w.ddmm })}</strong>);
     }
   }
+  // A hand-edited draft says so on the card: the state badge cannot, and the two cards are otherwise identical.
+  if (m.draft?.edited && m.draft.editedAt && (kind === "draft" || kind === "approved")) parts.push(<strong>{fill(ownView ? l.editedBy : l.editedByOther, { ago: ago(m.draft.editedAt) })}</strong>);
   return parts;
 }
 
-function Actions({ card, m, l, onAction }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction }) {
+function Actions({ card, m, l, onAction, generating }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generating: boolean }) {
   const contactHref = `/contacts/${m.personId}`;
   const run = (type: CardActionId) => () => onAction({ type, memberId: m.memberId });
   return (
@@ -58,6 +60,8 @@ function Actions({ card, m, l, onAction }: { card: CardView; m: DetailMember; l:
       {card.actions.map((a) =>
         a.id === "openConversation" ? (
           <Link key={a.id} className={`btn btn-${a.style} btn-sm`} href={contactHref}>{l.actions[a.id]}</Link>
+        ) : a.id === "generate" ? (
+          <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={generating} onClick={run(a.id)}><GenerateIcon className="icon" />{generating ? l.generating : l.actions[a.id]}</button>
         ) : (
           <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} onClick={run(a.id)}>{l.actions[a.id]}</button>
         ),
@@ -83,7 +87,7 @@ function Actions({ card, m, l, onAction }: { card: CardView; m: DetailMember; l:
 /** `selection` makes a draft card selectable for the bulk bar (the spec's "selecting rows"); a card in any other state has nothing to select. */
 export type CardSelection = { selected: boolean; onToggle: () => void };
 
-export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOutPhrase = null, selection }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; optOutPhrase?: string | null; selection?: CardSelection }) {
+export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOutPhrase = null, selection, generating = false }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; optOutPhrase?: string | null; selection?: CardSelection; generating?: boolean }) {
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason }, now);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;
@@ -110,7 +114,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, optOu
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
-        <Actions card={card} m={m} l={l} onAction={onAction} />
+        <Actions card={card} m={m} l={l} onAction={onAction} generating={generating} />
       </div>
       {showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">

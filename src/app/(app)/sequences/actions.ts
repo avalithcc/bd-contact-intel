@@ -8,7 +8,7 @@ import { formatOutreachSignalLabel } from "@/lib/outreach/messageSignalLabels";
 import { pickGenerateMessageLabels, signalLabelsFromDict } from "@/lib/outreach/messageLabels";
 import { getDictionary } from "@/lib/i18n/server";
 import {
-  generateMissingDrafts,
+  generateMemberDraft as generateMemberDraftRow,
   memberDraftSignals,
   regenerateReminderDraft,
   regenerateDrafts,
@@ -16,6 +16,7 @@ import {
   type DraftBatchResult,
   type SaveEditResult,
 } from "@/lib/sequences/draftQueries";
+import { validConfirmations } from "@/lib/sequences/draftCompose";
 import { recordOptOutForMember, type OptOutResult } from "@/lib/sequences/optOutQueries";
 import {
   addMembersToSequence,
@@ -64,22 +65,22 @@ export async function updateSequenceSettings(sequenceId: string, patch: { name?:
   return updateSequenceSettingsRow(me.id, sequenceId, patch);
 }
 
-/** "Generar borradores faltantes": members with no draft only; an existing draft is never touched. */
-export async function generateMissingSequenceDrafts(sequenceId: string): Promise<ClientDraftBatchResult> {
+/** "Generar borrador" on one card: creates that member's missing draft only; an existing draft is never touched. */
+export async function generateMemberDraft(sequenceId: string, memberId: string): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return withoutReasons(await generateMissingDrafts(me.id, sequenceId));
+  return withoutReasons(await generateMemberDraftRow(me.id, sequenceId, memberId));
 }
 
 /** "Regenerar" (single or bulk): explicit replacement, clears review and approval. */
-export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[]): Promise<ClientDraftBatchResult> {
+export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[], confirmedEdits: Record<string, number> = {}): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return withoutReasons(await regenerateDrafts(me.id, sequenceId, memberIds));
+  return withoutReasons(await regenerateDrafts(me.id, sequenceId, memberIds, {}, validConfirmations(confirmedEdits)));
 }
 
 /** "Regenerar" in the reminder dialog (step 2 only): replaces that one draft, clears its review and approval. */
-export async function regenerateSequenceReminder(sequenceId: string, memberId: string): Promise<ClientDraftBatchResult> {
+export async function regenerateSequenceReminder(sequenceId: string, memberId: string, confirmedEdits: Record<string, number> = {}): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return withoutReasons(await regenerateReminderDraft(me.id, sequenceId, memberId));
+  return withoutReasons(await regenerateReminderDraft(me.id, sequenceId, memberId, {}, validConfirmations(confirmedEdits)));
 }
 
 /** "Guardar sin aprobar". `step` 2 saves the reminder. */
