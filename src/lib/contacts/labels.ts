@@ -124,6 +124,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorOwnerInvalid;
     case "admin_required":
       return l.errorAdminRequired;
+    case "note_delete_forbidden":
+      return l.errorNoteDeleteForbidden;
     case "company_not_found":
       return l.errorCompanyNotFound;
     case "lusha_off":

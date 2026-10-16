@@ -794,6 +794,21 @@ export const es: typeof en = {
     timelineEmpty: "Todavía no hay actividad registrada para este contacto.",
     timelineLockedContent: "Contenido privado para el BD que lo registró (y los administradores).",
     timelineSystemActor: "Sistema",
+    // Borrar una nota (contact-note-delete): lápida en la línea de tiempo, menú de la tarjeta y confirmación.
+    noteDeletedTitle: "Nota eliminada",
+    noteDeletedWrittenBy: "Escrita por",
+    noteDeletedDeletedBy: "eliminada por",
+    noteDeletedAdminSuffix: "(administrador)",
+    noteMenuLabel: "Más acciones",
+    noteDeleteAction: "Eliminar nota",
+    noteDeleteDialogTitle: "¿Eliminar esta nota?",
+    noteDeleteWarningLead: "El texto deja de verse, pero",
+    noteDeleteWarningEmphasis: "la línea de tiempo va a decir que vos la borraste",
+    noteDeleteWarningTail: ", con la fecha. No se puede borrar sin dejar rastro.",
+    noteDeleteHint: "Si la nota está mal pero el hecho sirve, conviene escribir otra en vez de borrar esta.",
+    noteDeleteCancel: "Cancelar",
+    toastNoteDeleted: "Nota eliminada.",
+    errorNoteDeleteForbidden: "Solo el autor de la nota o un administrador pueden eliminarla.",
     timelineEmailSentPrefix: "Correo enviado a",
     // Fallback body when a synced reply has neither subject nor sender
     // address available (should be rare — every synced message carries at

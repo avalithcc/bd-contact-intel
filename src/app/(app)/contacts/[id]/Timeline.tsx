@@ -58,6 +58,9 @@ import { CompleteTaskButton } from "./CompleteTaskButton";
 import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
 import { AdminConversationFlow } from "./AdminConversationFlow";
+import { NoteTombstone } from "./NoteTombstone";
+import { NoteDeleteMenu } from "./NoteDeleteMenu";
+import { canDeleteNote } from "@/lib/activity/noteDelete";
 import { canShowAdminConversationAction } from "@/lib/activity/adminConversationAccess";
 import { getTimelinePillEntriesAction, sendThreadReplyAction } from "../actions";
 import { contactActionErrorHref } from "../actionErrors";
@@ -1304,6 +1307,20 @@ export function Timeline({
                     </div>
                   );
                 }
+                // A deleted note is a tombstone (who wrote it, who deleted it, when), never a gap and never its text.
+                if (timelineEntry.deleted) {
+                  return (
+                    <NoteTombstone
+                      key={timelineEntry.id}
+                      labels={l}
+                      authorName={timelineEntry.actorName}
+                      deleterName={timelineEntry.deleted.byName}
+                      deletedByAdmin={timelineEntry.deleted.byIsAdmin}
+                      writtenAtText={formatWhen(at)}
+                      deletedAtText={formatWhen(timelineEntry.deleted.at)}
+                    />
+                  );
+                }
                 const Icon = TYPE_ICON[timelineEntry.type as TimelineActivityType] ?? NoteIcon;
                 const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
                 return (
@@ -1324,6 +1341,9 @@ export function Timeline({
                           )}
                         </span>
                         <span className="when">{formatWhen(at)}</span>
+                        {canDeleteNote({ type: timelineEntry.type, actorBdId: timelineEntry.actorBdId, deletedAt: null }, { id: meId, role: isAdmin ? "admin" : "bd" }) && (
+                          <NoteDeleteMenu noteId={timelineEntry.id} labels={l} />
+                        )}
                       </div>
                       <div className={timelineEntry.visible ? "tl-body" : "locked"}>
                         {timelineEntry.visible ? (

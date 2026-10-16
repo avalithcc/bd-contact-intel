@@ -1271,6 +1271,10 @@ export const activity = pgTable(
     metadata: jsonb("metadata").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Soft-delete marker (contact-note-delete). Only a Contact `note` is ever deleted. The row and its `metadata` (the text)
+    // stay, so a deletion is recoverable and the who/when survive; every reader decides what a marked row does.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedByBdId: uuid("deleted_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
   },
   (t) => ({
     // Exactly one subject FK is set — checked at application level, not DB constraint,

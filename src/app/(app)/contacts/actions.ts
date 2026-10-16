@@ -27,6 +27,7 @@ import { normalizeOwnerSelectValue } from "@/lib/contacts/bulkOwner";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { getConversationForAdmin, type AdminConversationData } from "@/lib/activity/getConversationForAdmin";
+import { softDeleteContactNote } from "@/lib/activity/noteDeleteDb";
 import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
 import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
@@ -165,6 +166,23 @@ export async function addContactNoteAction(personId: string, note: string): Prom
   try {
     await assertContactEditableById(personId);
     await createActivityAction({ type: "note", personId, metadata: { note } });
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/**
+ * "Eliminar nota" on a timeline note card (contact-note-delete). Soft delete only. The author-or-admin rule is enforced inside
+ * softDeleteContactNote against the row as stored and the BD resolved here, never against anything the client sends, so a
+ * forged call for someone else's note fails the same way whether or not the menu item was shown.
+ */
+export async function deleteContactNoteAction(noteId: string): Promise<ContactActionResult> {
+  try {
+    if (!isUuid(noteId)) return { ok: false, reason: "not_found" };
+    const me = await getCurrentBd();
+    const { personId } = await softDeleteContactNote(me, noteId);
+    revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

@@ -40,7 +40,7 @@
  */
 import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
-import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { effectiveActivityAtSql, workDoneAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
 import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
 
@@ -196,8 +196,12 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       where activity.actor_bd_id is not null
         and activity.type in (${activityTypes})
         and (${bdId}::uuid is null or activity.actor_bd_id = ${bdId}::uuid)
-        and ${effectiveActivityAtSql()} >= ${fromIso}::timestamptz
-        and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
+        -- workDoneAtSql, NOT effectiveActivityAtSql, on purpose: this asks "how much did this BD do?", so a note the BD wrote
+        -- and later deleted still counts (as queue_worked below already does). The follow-up queue asks a different question,
+        -- "is this contact stale?", and deliberately keeps the display rule (a deleted note is often one filed on the WRONG
+        -- contact, which is no evidence the contact is warm). Do not "fix" either back into agreement with the other.
+        and ${workDoneAtSql()} >= ${fromIso}::timestamptz
+        and ${workDoneAtSql()} < ${toIso}::timestamptz
       group by activity.actor_bd_id
     ),
     rpt_task_completions as (

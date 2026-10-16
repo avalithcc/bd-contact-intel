@@ -19,6 +19,7 @@
  * nulled.
  */
 import { resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
+import { withholdDeletedMetadata } from "@/lib/activity/noteDelete";
 import { isTimelineEntryVisible } from "@/lib/activity/timelineVisibility";
 
 export interface TimelineEntry {
@@ -33,6 +34,8 @@ export interface TimelineEntry {
   // see this entry's content (design R6 / admin-access-audit).
   metadata: Record<string, unknown> | null;
   visible: boolean;
+  /** Set for a soft-deleted note (contact-note-delete): the timeline renders a tombstone from this, never the text. */
+  deleted: { at: Date; byBdId: string | null; byName: string | null; byIsAdmin: boolean } | null;
 }
 
 export interface TimelineRowInput {
@@ -42,6 +45,10 @@ export interface TimelineRowInput {
   actorBdId: string | null;
   actorName: string | null;
   metadata: unknown;
+  deletedAt?: Date | null;
+  deletedByBdId?: string | null;
+  deletedByName?: string | null;
+  deletedByRole?: string | null;
 }
 
 export function buildTimelineEntry(row: TimelineRowInput, viewerBdId: string): TimelineEntry {
@@ -57,6 +64,7 @@ export function buildTimelineEntry(row: TimelineRowInput, viewerBdId: string): T
       type: row.type,
       createdAt: row.createdAt,
       metadata: row.metadata,
+      deletedAt: row.deletedAt,
     }) ?? row.createdAt;
   return {
     id: row.id,
@@ -65,7 +73,11 @@ export function buildTimelineEntry(row: TimelineRowInput, viewerBdId: string): T
     at,
     actorBdId: row.actorBdId,
     actorName: row.actorName,
-    metadata: visible ? (row.metadata as Record<string, unknown>) : null,
+    // A deleted note's text is dropped HERE, so it never reaches the client at all.
+    metadata: visible ? withholdDeletedMetadata(row.metadata as Record<string, unknown>, row.deletedAt) : null,
     visible,
+    deleted: row.deletedAt
+      ? { at: row.deletedAt, byBdId: row.deletedByBdId ?? null, byName: row.deletedByName ?? null, byIsAdmin: row.deletedByRole === "admin" }
+      : null,
   };
 }

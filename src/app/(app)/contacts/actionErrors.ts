@@ -28,6 +28,7 @@ import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
+import { NoteDeleteForbiddenError, NoteNotFoundError } from "@/lib/activity/noteDelete";
 
 export type ContactActionErrorReason =
   | "not_found"
@@ -59,6 +60,8 @@ export type ContactActionErrorReason =
   | "email_body_required"
   | "owner_invalid"
   | "admin_required"
+  // Deleting a note that is not yours (and you are not an admin): see lib/activity/noteDelete.ts.
+  | "note_delete_forbidden"
   | "company_not_found"
   // Lusha reveal outcomes. Mirrors LUSHA_REASONS (reasons.ts in the Lusha library), which this file cannot import
   // while the inert guard holds; tests/unit/lushaReasons.test.ts pins that the two lists agree.
@@ -123,6 +126,8 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   // to the same "not_found" reason as a missing Contact itself (never leak
   // which case it was — see TaskNotFoundError's doc comment).
   if (err instanceof TaskNotFoundError) return "not_found";
+  if (err instanceof NoteNotFoundError) return "not_found";
+  if (err instanceof NoteDeleteForbiddenError) return "note_delete_forbidden";
   if (err instanceof InvalidEmailError) return "invalid_email";
   if (err instanceof InvalidPhoneError) return "invalid_phone";
   if (err instanceof InvalidContactTypeError) return "invalid_contact_type";

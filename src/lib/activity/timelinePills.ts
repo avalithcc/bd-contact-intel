@@ -133,15 +133,18 @@ export function filterEntriesForPill<T extends { type: string }>(
  * fetch that pill's own page instead of trusting the local filter.
  */
 export function isPillSelectionComplete(
-  loadedEntries: readonly { type: string }[],
+  loadedEntries: readonly { type: string; deleted?: unknown }[],
   countsByType: Record<string, number>,
   pill: TimelinePillKey | undefined,
 ): boolean {
+  // One rule: only LIVE rows are compared with the counts. A tombstone is shown but never counted (contact-note-delete),
+  // so letting it into this comparison could make a capped pool look complete while real rows are still missing.
+  const live = loadedEntries.filter((e) => !e.deleted);
   if (!pill) {
     const total = Object.values(countsByType).reduce((sum, n) => sum + n, 0);
-    return loadedEntries.length >= total;
+    return live.length >= total;
   }
-  return filterEntriesForPill(loadedEntries, pill).length >= sumPillCount(countsByType, pill);
+  return filterEntriesForPill(live, pill).length >= sumPillCount(countsByType, pill);
 }
 
 export type ScopeResolution<T> = { kind: "ready"; entries: T[] } | { kind: "fetch" };
@@ -157,7 +160,7 @@ export type ScopeResolution<T> = { kind: "ready"; entries: T[] } | { kind: "fetc
  * re-deriving the CLIENT's own still-active pill from the new data) so both
  * call sites can never answer this question differently.
  */
-export function resolveScopeEntries<T extends { type: string }>(
+export function resolveScopeEntries<T extends { type: string; deleted?: unknown }>(
   pool: readonly T[],
   countsByType: Record<string, number>,
   pill: TimelinePillKey | undefined,

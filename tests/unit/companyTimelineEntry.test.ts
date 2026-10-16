@@ -29,12 +29,14 @@ function rawRow(overrides: Partial<CompanyTimelineRawRow> = {}): CompanyTimeline
 }
 
 const noNames = new Map<string, string | null>();
+const noAdmins = new Set<string>();
 
 test("buildCompanyTimelineEntry: a real touch uses its own effective time (`at`), not rawCreatedAt", () => {
   const entry = buildCompanyTimelineEntry(
     rawRow({ at: "2026-06-01T00:00:00+00:00", rawCreatedAt: "2026-09-26T00:00:00+00:00" }),
     noNames,
     noNames,
+    noAdmins,
   );
   assert.equal(entry.createdAt.toISOString(), new Date("2026-06-01T00:00:00Z").toISOString());
 });
@@ -44,6 +46,7 @@ test("buildCompanyTimelineEntry: a non-touch row (at: null) falls back to rawCre
     rawRow({ type: "task_updated", at: null, rawCreatedAt: "2026-09-29T12:00:00+00:00" }),
     noNames,
     noNames,
+    noAdmins,
   );
   assert.equal(entry.createdAt.toISOString(), new Date("2026-09-29T12:00:00Z").toISOString());
   assert.notEqual(entry.createdAt.getTime(), 0, "must never be epoch 1970 (new Date(null))");
@@ -54,6 +57,7 @@ test("buildCompanyTimelineEntry: an offset-less rawCreatedAt fallback is still p
     rawRow({ type: "task_completed", at: null, rawCreatedAt: "2026-09-29T00:00:00" }),
     noNames,
     noNames,
+    noAdmins,
   );
   assert.equal(
     entry.createdAt.getTime(),
@@ -69,6 +73,7 @@ test("buildCompanyTimelineEntry: resolves actorName/personName from the given ma
     rawRow({ actorBdId: "bd1", personId: "p1" }),
     personNames,
     actorNames,
+    noAdmins,
   );
   assert.equal(entry.actorName, "Ana Pereyra");
   assert.equal(entry.personName, "Juan Martínez");
@@ -79,12 +84,12 @@ test("buildCompanyTimelineEntry: resolves actorName/personName from the given ma
 // the raw actorBdId (not just the resolved actorName) to run
 // isTimelineEntryVisible, the same privacy check the contact timeline uses.
 test("buildCompanyTimelineEntry: exposes the raw actorBdId (needed for the privacy check downstream), not just the resolved actorName", () => {
-  const entry = buildCompanyTimelineEntry(rawRow({ actorBdId: "bd1" }), noNames, noNames);
+  const entry = buildCompanyTimelineEntry(rawRow({ actorBdId: "bd1" }), noNames, noNames, noAdmins);
   assert.equal(entry.actorBdId, "bd1");
 });
 
 test("buildCompanyTimelineEntry: no personId -> scope 'company', no actor/person lookups attempted", () => {
-  const entry = buildCompanyTimelineEntry(rawRow({ actorBdId: null, personId: null }), noNames, noNames);
+  const entry = buildCompanyTimelineEntry(rawRow({ actorBdId: null, personId: null }), noNames, noNames, noAdmins);
   assert.equal(entry.scope, "company");
   assert.equal(entry.actorName, null);
   assert.equal(entry.personName, null);

@@ -23,7 +23,7 @@ import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { companyHref } from "@/lib/contacts/companyHref";
 import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
-import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
+import { mostRecentActivity, timelineEntryCandidates, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { classifyPosition } from "@/lib/roleGroups";
 import { ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
@@ -308,12 +308,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // Resumen tab (contact-record.html:151-157; mockup-port r06) — every stat
   // reuses data already fetched above for the Actividad tab/right panel.
   const lastActivityCandidates: RecentActivityCandidate[] = [
-    ...timeline.entries.map((e) => ({
-      at: e.at,
-      channelLabel:
-        e.type === "email_sent" ? l.channelEmail : e.type === "note" ? l.channelNote : l.timelineSystemActor,
-      actorName: e.actorName,
-    })),
+    ...timelineEntryCandidates(timeline.entries, l),
     ...record.connections
       .filter((c) => c.lastMessageAt !== null)
       .map((c) => ({ at: c.lastMessageAt!, channelLabel: l.channelLinkedIn, actorName: c.bdName })),

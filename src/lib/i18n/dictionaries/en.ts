@@ -863,6 +863,21 @@ export const en = {
     timelineEmpty: "No activity recorded for this contact yet.",
     timelineLockedContent: "Private to the BD who logged it (and admins).",
     timelineSystemActor: "System",
+    // Deleting a note (contact-note-delete): timeline tombstone, card menu and confirmation.
+    noteDeletedTitle: "Note deleted",
+    noteDeletedWrittenBy: "Written by",
+    noteDeletedDeletedBy: "deleted by",
+    noteDeletedAdminSuffix: "(admin)",
+    noteMenuLabel: "More actions",
+    noteDeleteAction: "Delete note",
+    noteDeleteDialogTitle: "Delete this note?",
+    noteDeleteWarningLead: "The text stops being shown, but",
+    noteDeleteWarningEmphasis: "the timeline will say you deleted it",
+    noteDeleteWarningTail: ", with the date. A note cannot be deleted without leaving a trace.",
+    noteDeleteHint: "If the note is wrong but the fact still matters, write another one instead of deleting this one.",
+    noteDeleteCancel: "Cancel",
+    toastNoteDeleted: "Note deleted.",
+    errorNoteDeleteForbidden: "Only the note's author or an admin can delete it.",
     timelineEmailSentPrefix: "Email sent to",
     // Fallback body when a synced reply has neither subject nor sender
     // address available (should be rare — every synced message carries at

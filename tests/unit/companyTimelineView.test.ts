@@ -57,6 +57,7 @@ const baseRow = {
   actorName: null,
   personId: null,
   personName: null,
+  deleted: null,
 };
 
 const VIEWER_BD_ID = "viewer-bd";

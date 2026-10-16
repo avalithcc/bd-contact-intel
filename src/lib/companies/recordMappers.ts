@@ -30,6 +30,8 @@ export function isCompanyActivityFilter(value: string | undefined): value is Com
 export interface FilterableTimelineRow {
   type: string;
   scope: "company" | "contact";
+  /** A tombstone (soft-deleted note): shown, never counted. */
+  deleted?: unknown;
 }
 
 /**
@@ -80,7 +82,8 @@ export function isCompanyFilterSelectionComplete<T extends FilterableTimelineRow
   counts: CompanyTimelineFilterCounts,
   filter: CompanyActivityFilter,
 ): boolean {
-  return filterTimelineRows(loadedRows, filter).length >= counts[filter];
+  // Live rows only, the same rule as the Contact side (isPillSelectionComplete): counts never include tombstones.
+  return filterTimelineRows(loadedRows, filter).filter((r) => !r.deleted).length >= counts[filter];
 }
 
 export type CompanyScopeResolution<T> = { kind: "ready"; rows: T[] } | { kind: "fetch" };
