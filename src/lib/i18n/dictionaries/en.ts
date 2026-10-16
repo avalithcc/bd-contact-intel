@@ -719,6 +719,7 @@ export const en = {
     jobTitlePainPrefix: "Pain Avalith solves:",
     jobTitleGuideLinkText: "See the full guide for this group →",
     propRoleGroup: "Role group",
+    roleGroupDerivedHint: "Deduced from the title; it updates when you change the title.",
     propContactType: "Contact type",
     propSeniority: "Seniority",
     propCity: "City",
@@ -1168,6 +1169,10 @@ export const en = {
 
   // Server-only formatter templates — see the matching comment in es.ts.
   contactRecordServer: {
+    roleGroupDriftHint: (storedLabel: string | null, derivedLabel: string) =>
+      storedLabel
+        ? `The current title points to "${derivedLabel}", not "${storedLabel}"; save the title to update it.`
+        : `The current title points to "${derivedLabel}"; save the title to update it.`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence}% confidence · updated by ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "an email was sent",

@@ -64,11 +64,19 @@ test("changed value produces a person update and a history row", () => {
       changedByBdId: "bd-1",
       source: "edit",
     },
+    {
+      personId: BASE_PERSON.id,
+      property: "roleGroup",
+      oldValue: null,
+      newValue: "eng_leadership",
+      changedByBdId: "bd-1",
+      source: "edit",
+    },
   ]);
 });
 
 test("null -> null (both empty) reports changed: false", () => {
-  const plan = planPropertyEdit(BASE_PERSON, "roleGroup", "   ", "bd-1");
+  const plan = planPropertyEdit(BASE_PERSON, "city", "   ", "bd-1");
   assert.deepEqual(plan, { changed: false, personUpdate: null, historyRows: [] });
 });
 
@@ -194,16 +202,16 @@ test("batch: only entries whose value actually changed are written", () => {
     BASE_PERSON,
     [
       { property: "jobTitle", rawNewValue: "VP of Engineering" },
-      { property: "roleGroup", rawNewValue: "   " }, // null -> null, a no-op
+      { property: "city", rawNewValue: "   " }, // null -> null, a no-op
     ],
     "bd-1",
   );
   assert.equal(plan.changed, true);
   assert.equal(plan.personUpdate?.jobTitle, "VP of Engineering");
-  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.equal("city" in (plan.personUpdate ?? {}), false);
   assert.deepEqual(
     plan.historyRows.map((r) => r.property),
-    ["jobTitle"],
+    ["jobTitle", "roleGroup"],
   );
 });
 
@@ -219,7 +227,7 @@ test("batch: one history row per changed field (plus email's derived columns), m
   assert.equal(plan.changed, true);
   assert.deepEqual(
     plan.historyRows.map((r) => r.property).sort(),
-    ["email", "emailNormalized", "emailSource", "emailStatus", "jobTitle"],
+    ["email", "emailNormalized", "emailSource", "emailStatus", "jobTitle", "roleGroup"],
   );
 });
 
@@ -286,10 +294,10 @@ test("planLocationEdit: all three changed fields each get their own history row"
 
 // --- contactType (contact-type-ui): editable closed-set property -----------
 
-test("contactType is editable and sits right after roleGroup", () => {
+test("contactType is editable and sits right after jobTitle", () => {
   assert.equal(isEditablePersonProperty("contactType"), true);
   assert.equal(
-    EDITABLE_PERSON_PROPERTIES[EDITABLE_PERSON_PROPERTIES.indexOf("roleGroup") + 1],
+    EDITABLE_PERSON_PROPERTIES[EDITABLE_PERSON_PROPERTIES.indexOf("jobTitle") + 1],
     "contactType",
   );
 });
@@ -406,4 +414,86 @@ test("profileKey planner is pure: same input twice, same result, input untouched
   assert.deepEqual({ ...a.personUpdate, updatedAt: 0 }, { ...b.personUpdate, updatedAt: 0 });
   assert.deepEqual(a.historyRows, b.historyRows);
   assert.deepEqual(BASE_PERSON, before);
+});
+
+// --- roleGroup is derived from jobTitle, never edited directly -------------
+
+test("roleGroup is no longer an editable property", () => {
+  assert.equal(isEditablePersonProperty("roleGroup"), false);
+  assert.equal((EDITABLE_PERSON_PROPERTIES as readonly string[]).includes("roleGroup"), false);
+});
+
+test("a jobTitle edit re-derives roleGroup and writes both history rows", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.jobTitle, "Head of Engineering");
+  assert.equal(plan.personUpdate?.roleGroup, "eng_leadership");
+  assert.deepEqual(
+    plan.historyRows.map((r) => [r.property, r.oldValue, r.newValue, r.changedByBdId, r.source]),
+    [
+      ["jobTitle", "Engineer", "Head of Engineering", "bd-1", "edit"],
+      ["roleGroup", "developers", "eng_leadership", "bd-1", "edit"],
+    ],
+  );
+});
+
+test("a jobTitle edit that keeps the derived group writes only the jobTitle row", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Software Engineer", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle"]);
+});
+
+test("clearing the jobTitle derives no_position", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "   ", "bd-1");
+  assert.equal(plan.personUpdate?.jobTitle, null);
+  assert.equal(plan.personUpdate?.roleGroup, "no_position");
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle", "roleGroup"]);
+});
+
+test("a stale roleGroup is repaired on the next jobTitle edit; a null one is filled", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "jobTitle", "Head of Engineering", "bd-1");
+  assert.equal(plan.personUpdate?.roleGroup, "eng_leadership");
+  assert.deepEqual(plan.historyRows.map((r) => [r.property, r.oldValue]), [
+    ["jobTitle", "Engineer"],
+    ["roleGroup", null],
+  ]);
+});
+
+test("editing other properties never touches roleGroup", () => {
+  const plan = planPropertyEdit({ ...BASE_PERSON, roleGroup: "developers" }, "city", "Rosario", "bd-1");
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["city"]);
+});
+
+test("planPropertyEdit is pure: the same input twice gives the same plan and the input is untouched", () => {
+  const person = Object.freeze({ ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" });
+  const a = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  const b = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  assert.deepEqual(a.historyRows, b.historyRows);
+  assert.equal(a.personUpdate?.roleGroup, b.personUpdate?.roleGroup);
+  assert.equal(person.roleGroup, "developers");
+});
+
+test("saving an unchanged jobTitle still repairs a stale roleGroup (only the roleGroup row)", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Head of Engineering", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.roleGroup, "eng_leadership");
+  assert.equal("jobTitle" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => [r.property, r.oldValue, r.newValue]), [
+    ["roleGroup", "developers", "eng_leadership"],
+  ]);
+});
+
+test("saving an unchanged jobTitle with an in-sync roleGroup is a no-op", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  assert.deepEqual(planPropertyEdit(person, "jobTitle", "Engineer", "bd-1"), {
+    changed: false,
+    personUpdate: null,
+    historyRows: [],
+  });
 });

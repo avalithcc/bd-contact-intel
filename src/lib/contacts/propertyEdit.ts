@@ -15,6 +15,7 @@
  * is left as a documented gap for a later phase.
  */
 import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
+import { classifyPosition } from "@/lib/roleGroups";
 import { isContactType } from "@/lib/contacts/contactType";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
@@ -87,7 +88,6 @@ export const EDITABLE_PERSON_PROPERTIES = [
   "mobilePhone",
   "profileKey",
   "jobTitle",
-  "roleGroup",
   "contactType",
   "seniority",
   "city",
@@ -114,7 +114,7 @@ export interface PropertyEditPlan {
 
 export type EditablePersonForPlan = Pick<
   Person,
-  "id" | EditablePersonProperty | "emailNormalized" | "emailStatus" | "emailSource"
+  "id" | EditablePersonProperty | "roleGroup" | "emailNormalized" | "emailStatus" | "emailSource"
 >;
 
 function historyRow(
@@ -163,7 +163,25 @@ export function planPropertyEdit(
   const oldValue = person[property] ?? null;
 
   if (oldValue === newValue) {
-    return { changed: false, personUpdate: null, historyRows: [] };
+    // Saving an unchanged Cargo still repairs a stale roleGroup (the record's
+    // drift hint promises exactly that); in sync, it stays a no-op.
+    //
+    // This is the ONE path that writes a `roleGroup` history row with no
+    // `jobTitle` row beside it. That shape is deliberate, not a bug: the title
+    // did not change, only the group derived from it did. It is attributed to
+    // whoever clicked Guardar, exactly as the re-derivation on a real Cargo
+    // edit already is.
+    const group = property === "jobTitle" ? classifyPosition(newValue) : null;
+    if (group === null || group === (person.roleGroup ?? null)) {
+      return { changed: false, personUpdate: null, historyRows: [] };
+    }
+    return {
+      changed: true,
+      personUpdate: { roleGroup: group, updatedAt: new Date(), updatedByBdId: changedByBdId },
+      historyRows: [
+        { personId: person.id, property: "roleGroup", oldValue: person.roleGroup ?? null, newValue: group, changedByBdId, source: "edit" },
+      ],
+    };
   }
 
   if (property === "email" && newValue !== null && !isValidEmailFormat(newValue)) {
@@ -197,6 +215,17 @@ export function planPropertyEdit(
       historyRow(person.id, "emailStatus", person.emailStatus ?? null, newStatus, changedByBdId),
       historyRow(person.id, "emailSource", person.emailSource ?? null, newSource, changedByBdId),
     );
+  }
+
+  if (property === "jobTitle") {
+    // roleGroup is derived from the Cargo (the identity engine re-derives it
+    // on every import, resolve.ts), so a Cargo edit must keep it in step. Its
+    // own history row is skipped when the derived group does not change.
+    const newGroup = classifyPosition(newValue);
+    if (newGroup !== (person.roleGroup ?? null)) {
+      personUpdate.roleGroup = newGroup;
+      rows.push(historyRow(person.id, "roleGroup", person.roleGroup ?? null, newGroup, changedByBdId));
+    }
   }
 
   return {

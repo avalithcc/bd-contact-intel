@@ -644,6 +644,7 @@ export const es: typeof en = {
     jobTitlePainPrefix: "Dolor que resuelve Avalith:",
     jobTitleGuideLinkText: "Ver guía completa de este grupo →",
     propRoleGroup: "Grupo de rol",
+    roleGroupDerivedHint: "Se deduce del cargo y se actualiza solo cuando cambiás el cargo.",
     propContactType: "Tipo de contacto",
     propSeniority: "Nivel",
     propCity: "Ciudad",
@@ -1118,6 +1119,10 @@ export const es: typeof en = {
   // final plain strings from these templates via describeStatusReason()/
   // inline formatting, and only ever passes the RESULT down as a prop.
   contactRecordServer: {
+    roleGroupDriftHint: (storedLabel: string | null, derivedLabel: string) =>
+      storedLabel
+        ? `El cargo actual apunta a «${derivedLabel}», no a «${storedLabel}»; guardá el cargo para actualizarlo.`
+        : `El cargo actual apunta a «${derivedLabel}»; guardá el cargo para actualizarlo.`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "se envió un correo",
