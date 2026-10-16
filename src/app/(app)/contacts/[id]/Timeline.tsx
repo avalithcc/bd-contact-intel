@@ -44,7 +44,6 @@ import {
   CloseIcon,
   DiscardIcon,
   ExternalLinkIcon,
-  EyeIcon,
   HistoryIcon,
   LinkedInIcon,
   LockIcon,
@@ -57,8 +56,7 @@ import {
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { ReopenTaskButton } from "./ReopenTaskButton";
 import { NoteComposer } from "./NoteComposer";
-import { AdminConversationFlow } from "./AdminConversationFlow";
-import { canShowAdminConversationAction } from "@/lib/activity/adminConversationAccess";
+import { inlineEmailBody, isTimelineEmpty, unlistedMailToEntry, type AdminInlineConversations } from "@/lib/activity/inlineConversationGroups";
 import { getTimelinePillEntriesAction, sendThreadReplyAction } from "../actions";
 import { contactActionErrorHref } from "../actionErrors";
 import { ReplyDialog, type ReplyDialogError } from "./ReplyDialog";
@@ -90,8 +88,8 @@ export interface TimelineTask {
 // (src/lib/contacts/connectionTimelineEntries.ts) to synthesize the
 // "Mensaje de LinkedIn enviado"/"Respuesta de LinkedIn recibida" cards
 // (contact-record.html:124-131) and gate the old inline
-// `AdminConversationReveal` (deleted 2026-09-30, superseded by
-// AdminConversationFlow.tsx's shared modal). All of that is untouched in
+// `AdminConversationReveal` (deleted 2026-09-30; an admin now reads other
+// BDs' conversations inline, see `inlineConversations`). All of that is untouched in
 // the DB and in connectionTimelineEntries.ts; to restore, re-add both props here and
 // in page.tsx's <Timeline connections={record.connections}
 // viewerBdId={me.id} />, then bring back the imports/const/render branch
@@ -159,6 +157,10 @@ export interface TimelineProps {
   // Feeds the "own" branch of a synthesized LinkedIn entry (real content
   // summary instead of the bare `connectionHistorySomePrefix` fragment).
   linkedinSummaryByBdId: Record<string, string>;
+  // What an admin reads inline from other BDs (owner decision 2026-10-15: no
+  // click, no audit row). Empty for every non-admin — the server never sends
+  // a body to someone who may not read it (adminInlineConversations.ts).
+  inlineConversations: AdminInlineConversations;
   // "Unificado a partir de N registros" system card (mockup-port r08;
   // contact-record.html:135-138). `null`/`unifiedFromCount <= 1` when this
   // person was never the survivor of a migration/merge. `bodyText` is
@@ -351,6 +353,7 @@ export function Timeline({
   isAdmin,
   connections,
   linkedinSummaryByBdId,
+  inlineConversations,
   mergeInfo,
   statusMovedByActivityId,
 }: TimelineProps) {
@@ -371,15 +374,6 @@ export function Timeline({
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyError, setReplyError] = useState<ReplyDialogError | null>(null);
   const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
-  // Admin's "Ver conversación (queda registrado)" action (admin-conversation-
-  // access mockup, screen 1) — one AdminConversationFlow instance shared by
-  // every locked row, rather than one per BD like the mockup's own
-  // `#confirm-view-juan`/`-ana` anchors, since the set of BDs a contact has
-  // locked content from isn't known ahead of render time here the way the
-  // mockup's fixed sample is. Confirming opens the SAME shared
-  // ConversationDialog ConversationHistoryCard's own "Ver" action uses
-  // (owner decision 2026-09-30) — no more navigating to a separate page.
-  const [pendingAdminView, setPendingAdminView] = useState<{ bdId: string; bdName: string } | null>(null);
 
   function toggleQuoted(messageId: string) {
     setExpandedQuotedIds((prev) => {
@@ -720,7 +714,13 @@ export function Timeline({
   // `displayedEntries` BEFORE merging in the merge synthetic entry, so
   // `groupEmailThreads` only ever sees real `TimelineEntry` rows (it needs
   // `.visible`, which the synthetic doesn't carry).
-  const threaded = groupEmailThreads(displayedEntries);
+  // Synced mail of other BDs that no activity row covers: an admin still reads it
+  // (adminInlineConversations.ts), listed with the mail entries, never under another pill.
+  const unlistedEntries =
+    isAdmin && !isTasksActive && (!activePillNow || activePillNow === "email_sent")
+      ? inlineConversations.unlistedMail.map(unlistedMailToEntry)
+      : [];
+  const threaded = groupEmailThreads([...displayedEntries, ...unlistedEntries]);
   const threadGroupsById = new Map(
     threaded.filter((t) => t.kind === "thread").map((t) => [`thread-${t.group.threadId}`, t.group]),
   );
@@ -814,25 +814,56 @@ export function Timeline({
   }
 
   /**
-   * The admin-only action row under a locked card (admin-conversation-access
-   * mockup, `.locked-actions`). `canShowAdminConversationAction` (pure;
-   * src/lib/activity/adminConversationAccess.ts) is the single source of
-   * truth for "does this admin get the button" — `isAdmin` is server-computed
-   * (page.tsx, from `me.role`), never a client-side guess.
+   * An admin's inline view of one other BD's LinkedIn messages with this
+   * contact (owner decision 2026-10-15: visible from the start, no audit row).
    */
-  function renderAdminViewAction(bdId: string | null, bdName: string | null) {
-    if (!canShowAdminConversationAction({ isAdmin, locked: true, targetBdId: bdId })) return null;
+  function renderInlineLinkedin(bdId: string, bdName: string) {
+    const messages = inlineConversations.linkedin[bdId] ?? [];
+    if (messages.length === 0) return <p className="meta">{l.adminNoLinkedinContent}</p>;
     return (
-      <div className="locked-actions row">
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={() => setPendingAdminView({ bdId: bdId!, bdName: bdName ?? l.timelineSystemActor })}
-        >
-          <EyeIcon className="icon" />
-          {l.viewConversationLink} ({l.viewConversationAuditHint})
-        </button>
+      <div className="thread">
+        {messages.map((m) => {
+          const fromBd = m.senderName === bdName;
+          return (
+            <div key={m.id} className="thread-msg">
+              <Avatar
+                id={fromBd ? bdId : personId}
+                initials={initialsFromName(m.senderName ?? l.emptyValue)}
+                variant={fromBd ? "bd" : "circle"}
+                size="sm"
+              />
+              <div>
+                <div className="thread-msg-head">
+                  <span className="from">{m.senderName ?? l.timelineSystemActor}</span>
+                  <span className="when">{formatWhen(m.sentAt)}</span>
+                </div>
+                <div className="snippet" style={{ whiteSpace: "pre-wrap" }}>
+                  {m.content}
+                </div>
+                {m.truncated && <p className="meta mt-2xs">{l.timelineBodyTruncatedNote}</p>}
+              </div>
+            </div>
+          );
+        })}
       </div>
+    );
+  }
+
+  /** The body of a lone synced message from another BD, for an admin (a thread card renders its own). */
+  function renderForeignMailBody(entry: TimelineEntry) {
+    const threadId = entry.metadata?.gmailThreadId;
+    const messageId = entry.metadata?.gmailMessageId;
+    if (!isAdmin || !entry.actorBdId || entry.actorBdId === meId) return null;
+    if (typeof threadId !== "string" || typeof messageId !== "string") return null;
+    const body = inlineEmailBody(inlineConversations.emailBodies, threadId, messageId);
+    if (!body?.bodyText) return null;
+    return (
+      <>
+        <div className="snippet" style={{ whiteSpace: "pre-wrap" }}>
+          {body.bodyText}
+        </div>
+        {body.bodyTruncated && <p className="meta mt-2xs">{l.timelineBodyTruncatedNote}</p>}
+      </>
     );
   }
 
@@ -973,8 +1004,13 @@ export function Timeline({
     const { matchedEmail, direction } = threadContextSummary(group);
     const subject = group.messages[0]?.metadata?.subject;
     const subjectText = typeof subject === "string" && subject ? subject : l.timelineThreadNoSubject;
-    const isExpanded = expandedThreadId === threadId;
-    const isLoadingThread = loadingThreadId === threadId;
+    // Another BD's thread, visible because the viewer is an admin: its bodies
+    // arrive with the page (inlineConversations), so it renders open, with no
+    // toggle, no Gmail link (their mailbox) and no reply (not the admin's mail).
+    const threadOwner = group.messages.find((m) => m.actorBdId);
+    const foreign = isAdmin && !!threadOwner?.actorBdId && threadOwner.actorBdId !== meId;
+    const isExpanded = foreign || expandedThreadId === threadId;
+    const isLoadingThread = !foreign && loadingThreadId === threadId;
     const bodiesForThread = threadBodies[threadId];
 
     return (
@@ -1022,34 +1058,46 @@ export function Timeline({
                   )}{" "}
                   · {personName} · {direction === "inbound" ? l.timelineThreadInbound : l.timelineThreadOutbound}
                 </p>
-                <a
-                  className="btn btn-ghost btn-sm mt-md"
-                  href={`https://mail.google.com/mail/u/0/#all/${threadId}`}
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <ExternalLinkIcon className="icon" />
-                  {l.timelineViewInGmail}
-                </a>
+                {foreign ? (
+                  <p className="meta mt-md">
+                    {l.linkedinConversationOfPrefix} {threadOwner?.actorName ?? l.timelineSystemActor}
+                  </p>
+                ) : (
+                  <a
+                    className="btn btn-ghost btn-sm mt-md"
+                    href={`https://mail.google.com/mail/u/0/#all/${threadId}`}
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <ExternalLinkIcon className="icon" />
+                    {l.timelineViewInGmail}
+                  </a>
+                )}
               </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm mt-md"
-                aria-expanded={isExpanded}
-                onClick={() => toggleThread(threadId)}
-              >
-                <ChevronDownIcon className="icon" />
-                {isExpanded ? l.timelineHideMessages : l.timelineShowMessages}
-                {isLoadingThread && <span className="spinner" aria-hidden="true" />}
-              </button>
+              {!foreign && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm mt-md"
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleThread(threadId)}
+                >
+                  <ChevronDownIcon className="icon" />
+                  {isExpanded ? l.timelineHideMessages : l.timelineShowMessages}
+                  {isLoadingThread && <span className="spinner" aria-hidden="true" />}
+                </button>
+              )}
               {isExpanded && (
                 <div className="thread">
                   {group.messages.map((m) => {
                     const gmailMessageId = typeof m.metadata?.gmailMessageId === "string" ? m.metadata.gmailMessageId : null;
-                    const body = gmailMessageId ? bodiesForThread?.[gmailMessageId] : undefined;
+                    const body = !gmailMessageId
+                      ? undefined
+                      : foreign
+                        ? inlineEmailBody(inlineConversations.emailBodies, threadId, gmailMessageId)
+                        : bodiesForThread?.[gmailMessageId];
                     return renderThreadMessage(m, body, isLoadingThread);
                   })}
-                  {!isLoadingThread && renderReplyAction(threadId)}
+                  {!foreign && !isLoadingThread && renderReplyAction(threadId)}
                 </div>
               )}
             </>
@@ -1072,11 +1120,6 @@ export function Timeline({
               </span>
             </div>
           )}
-          {!group.visible &&
-            renderAdminViewAction(
-              group.messages.find((m) => m.actorBdId)?.actorBdId ?? null,
-              group.messages.find((m) => m.actorName)?.actorName ?? null,
-            )}
         </div>
       </div>
     );
@@ -1198,7 +1241,7 @@ export function Timeline({
             </>
           )}
 
-          {displayedEntries.length === 0 && upcoming.length === 0 ? (
+          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length, unlisted: unlistedEntries.length }) ? (
             <div className={styles.placeholder}>{l.timelineEmpty}</div>
           ) : (
             groups.map((group, i) => (
@@ -1264,9 +1307,9 @@ export function Timeline({
                         ) : (
                           <div className="tl-body">
                             {linkedinSummaryByBdId[linkedinMeta.bdId] ?? l.connectionHistorySomePrefix}
+                            {access === "admin-bypass" && renderInlineLinkedin(linkedinMeta.bdId, bdName)}
                           </div>
                         )}
-                        {isLinkedinEntryLocked(access) && renderAdminViewAction(linkedinMeta.bdId, bdName)}
                       </div>
                     </div>
                   );
@@ -1330,7 +1373,10 @@ export function Timeline({
                           timelineEntry.type === "note" ? (
                             <blockquote>{entryBody(timelineEntry, l)}</blockquote>
                           ) : (
-                            entryBody(timelineEntry, l)
+                            <>
+                              {entryBody(timelineEntry, l)}
+                              {renderForeignMailBody(timelineEntry)}
+                            </>
                           )
                         ) : (
                           // Same rich "belongs to X" copy the locked-THREAD
@@ -1351,8 +1397,6 @@ export function Timeline({
                           </>
                         )}
                       </div>
-                      {!timelineEntry.visible &&
-                        renderAdminViewAction(timelineEntry.actorBdId, timelineEntry.actorName)}
                     </div>
                   </div>
                 );
@@ -1364,6 +1408,8 @@ export function Timeline({
         </>
       )}
 
+      {isAdmin && inlineConversations.capped && <p className="meta">{l.adminInlineCappedNote}</p>}
+
       {replyingThreadId && threadReplies[replyingThreadId]?.ok === true && (
         <ReplyDialog
           labels={l}
@@ -1373,16 +1419,6 @@ export function Timeline({
           error={replyError}
           onCancel={closeReply}
           onSubmit={(body) => submitReply(replyingThreadId, body)}
-        />
-      )}
-      {pendingAdminView && (
-        <AdminConversationFlow
-          key={pendingAdminView.bdId}
-          trigger={pendingAdminView}
-          personId={personId}
-          personName={personName}
-          labels={l}
-          onClose={() => setPendingAdminView(null)}
         />
       )}
 

@@ -128,7 +128,7 @@ export default async function AuditLogAdminPage({
                       {row.personId && row.targetBdId && (
                         <Link
                           className="btn btn-secondary btn-sm"
-                          href={`/contacts/${row.personId}?conversation=${row.targetBdId}`}
+                          href={`/contacts/${row.personId}#activity`}
                           prefetch={false}
                         >
                           {dict.openAction}

@@ -20,18 +20,13 @@ import {
  * recibida" cards) must render the generic locked marker instead of its
  * own content.
  *
- * Deliberate collapse of `admin-bypass` into "locked" here: the old inline
- * `AdminConversationReveal` (removed 2026-09-28, file deleted 2026-09-30) is
- * NOT being restored in the timeline. An admin still gets an entry point —
- * the SAME locked-row "Ver conversación (queda registrado)" action
- * email_sent/reply_received rows use (admin-conversation-access,
- * `renderAdminViewAction` in Timeline.tsx) — but it now opens the shared
- * `ConversationDialog` (via `AdminConversationFlow`) instead of navigating to
- * a separate page. Only the connection's OWNING BD ever sees an unlocked
- * entry inline.
+ * Owner decision 2026-10-15: an admin reads another BD's conversation inline,
+ * with no click and no audit row, so only a non-admin viewing someone else's
+ * connection sees the locked marker. (`admin-bypass` used to be collapsed into
+ * "locked" behind a confirm dialog that wrote an audit row.)
  */
 export function isLinkedinEntryLocked(access: LinkedinEntryAccess): boolean {
-  return access !== "own";
+  return access === "locked";
 }
 
 /**

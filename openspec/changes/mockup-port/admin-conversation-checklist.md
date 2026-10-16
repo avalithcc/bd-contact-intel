@@ -1,5 +1,7 @@
 # admin-conversation-access mockup parity checklist
 
+> Superseded 2026-10-16: admins now read other BDs' conversations inline in the contact timeline with no confirm step and no audit row; getConversationForAdmin and the components below were deleted. See the 'Admins read another BD's conversation inline' entry in openspec/BACKLOG.md.
+
 Source mockup: `openspec/changes/admin-conversation-access/mockups/admin-conversation.html`
 + `README.md` (cherry-picked from `docs/admin-conversation-mockup` @ dccf81e onto
 `feat/admin-conversation-access`). Backend already existed

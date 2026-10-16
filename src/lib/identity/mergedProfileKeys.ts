@@ -2,7 +2,7 @@
  * Bugfix (PR #235 review, pre-existing gap also present on #232): a
  * person's LinkedIn conversation content was being resolved by joining
  * `conversation.peer_profile_key` directly to `person.profile_key`
- * (getOwnConversationMessages.ts, getConversationForAdmin.ts). That column
+ * (getOwnConversationMessages.ts, adminInlineConversations.ts). That column
  * is single-valued (`person_profile_key_unique`) and is deliberately NOT
  * migrated by a merge (`MergePersonFields` in src/lib/identity/merge.ts has
  * no `profileKey` field) — the merged-away person keeps its own
@@ -29,7 +29,7 @@
  *
  * `mergedProfileKeysAnyCondition` is the ONE production entry point — both
  * read paths (getOwnConversationMessages.ts's own-history query,
- * getConversationForAdmin.ts's admin-bypass query) and this module's own pure
+ * adminInlineConversations.ts's admin query) and this module's own pure
  * twin (`resolveMergedProfileKeys`, used only by this file's unit tests to
  * pin the exact closure semantics before the SQL was written) must stay in
  * sync; change one, change the other's test fixture.

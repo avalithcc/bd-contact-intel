@@ -7,8 +7,7 @@ skipWithoutCredentials();
  * Phase 14 task 14.3: full flow — import a CSV, see the dedup outcome, then
  * find the resulting Contact both on the table view and on the board view.
  *
- * NOT EXECUTED by this batch — same reasons as tests/e2e/phase7.spec.ts and
- * phase11.spec.ts: no DATABASE_URL/live server in this environment, and a
+ * NOT EXECUTED by this batch — same reasons as tests/e2e/phase7.spec.ts: no DATABASE_URL/live server in this environment, and a
  * real run needs a throwaway CSV fixture plus a seeded BD session
  * (tests/e2e/auth.setup.ts). Written to the repo's existing e2e
  * conventions (gotoAuthed, test.skip with a stated reason) for a maintainer

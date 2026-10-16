@@ -1,5 +1,7 @@
 # /contacts/[id] mockup parity checklist
 
+> Superseded 2026-10-16: admins now read other BDs' conversations inline in the contact timeline with no confirm step and no audit row; getConversationForAdmin and the components below were deleted. See the 'Admins read another BD's conversation inline' entry in openspec/BACKLOG.md.
+
 Source mockups: `openspec/changes/crm-hubspot-ux/mockups/contact-record.html`
 (BD view) and `contact-record-admin.html` (admin view — audited-conversation
 expansion + admin sidenav section). Audited against worktree tip

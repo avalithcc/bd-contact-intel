@@ -36,3 +36,17 @@ test("a reply_received by the syncing BD is visible to that BD (email-sync brief
 test("a reply_received synced into another BD's mailbox is hidden from a different viewer", () => {
   assert.equal(isTimelineEntryVisible({ type: "reply_received", actorBdId: "bd-a" }, "bd-b"), false);
 });
+
+// Owner decision 2026-10-15: an admin reads every BD's conversation content in
+// the timeline directly. The flag must default to closed, so a caller that
+// forgets it can only under-reveal.
+test("an admin sees every conversation-content type from another BD", () => {
+  for (const type of ["email_sent", "reply_received", "auto_reply_received"]) {
+    assert.equal(isTimelineEntryVisible({ type, actorBdId: "bd-a" }, "admin-bd", true), true, type);
+  }
+});
+
+test("the admin flag defaults to closed: omitting it keeps another BD's entry locked", () => {
+  assert.equal(isTimelineEntryVisible({ type: "email_sent", actorBdId: "bd-a" }, "bd-b"), false);
+  assert.equal(isTimelineEntryVisible({ type: "email_sent", actorBdId: "bd-a" }, "bd-b", false), false);
+});

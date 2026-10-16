@@ -14,9 +14,9 @@ export const dynamic = "force-dynamic";
  * BD's only (`getMessageImportStats` scopes every count by `bd_id`).
  *
  * Privacy line: only the owner reads these messages in the app
- * (`getConversationThreads` filters by `bdId`); the sole bypass is
- * `getConversationForAdmin`, which writes an `audit_log` row whenever the
- * admin is not the owner (`shouldAuditConversationView`).
+ * (`getConversationThreads` filters by `bdId`); the sole exception is
+ * an admin, who reads other BDs' conversations inline in the contact timeline
+ * (`getAdminInlineConversations`; no audit row, owner decision 2026-10-15).
  */
 export default async function LinkedinMessagesPage() {
   const [me, dict, locale] = await Promise.all([getCurrentBd(), getDictionary(), getLocale()]);

@@ -22,13 +22,10 @@ production too (fail closed). In that mode:
 - **A test that writes must call `skipUnlessWritesAllowed()`** (`helpers.ts`).
   It skips outside a scratch database.
 - Today those are: the duplicate-merge test (`phase7.spec.ts`, additionally
-  gated by `E2E_ALLOW_DESTRUCTIVE=1`), the CSV import (`phase14.spec.ts`) and
-  the admin conversation tests (`phase11.spec.ts`, whose audit row is written
-  by the `revealAdminConversationAction` server action; they flip the e2e
-  account's role to admin and restore it to the hard-coded `bd` baseline, and
-  the seed resets it on conflict, so a hard kill is repaired by a rebuild; they also read
-  `audit_log` directly, which is safe because they only run on a scratch
-  database). All skip on production.
+  gated by `E2E_ALLOW_DESTRUCTIVE=1`) and the CSV import (`phase14.spec.ts`).
+  Both skip on production. (The admin conversation spec, `phase11.spec.ts`, was
+  deleted with the confirm flow it tested; the inline read and its "no audit
+  row" rule are covered by `tests/db/adminInlineConversation.test.ts`.)
 - The setup project logs in through Supabase Auth (a session in Supabase's own
   `auth` schema, outside the app guard). It does not write app tables.
 - **Server-side writes during a plain GET render** are invisible to a request

@@ -94,7 +94,7 @@ export interface MergeDuplicateCandidateRow {
  * fix): `email_message_person` is the ONLY authoritative "which persons does
  * this synced Gmail message belong to" source (see its doc comment in
  * schema.ts) and both read paths
- * (getConversationForAdmin.ts/threadMessages.ts) filter `person_id = :personId`
+ * (adminInlineConversations.ts/threadMessages.ts) filter `person_id = :personId`
  * directly — no chain-resolve, unlike `conversation`. A merge that doesn't
  * repoint these rows silently hides the merged-away person's synced emails
  * forever. Fixed by repointing at merge time (not a read-time chain walk,

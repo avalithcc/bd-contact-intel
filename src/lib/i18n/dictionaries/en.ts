@@ -829,8 +829,6 @@ export const en = {
     connectedOnPrefix: "Connected on",
     connectionHistoryNone: "No conversation history",
     connectionHistorySomePrefix: "messages · last",
-    viewConversationLink: "View conversation",
-    viewConversationAuditHint: "This view is recorded in the audit log",
     timelineFilterGroupLabel: "Filter by activity type",
     timelineFilterAll: "All",
     timelineFilterNote: "Note",
@@ -974,48 +972,17 @@ export const en = {
     linkedinSentPrefix: "LinkedIn message sent",
     linkedinConversationOfPrefix: "conversation with",
     adminNoConversationContent: "No conversation content on file.",
-    // Shared ConversationDialog title (owner decision 2026-09-30) — both the
-    // viewing BD's own history and the admin bypass compose
-    // `${conversationDialogTitlePrefix} ${counterpartName}`.
+    adminInlineCappedNote: "Showing the most recent messages from other BDs; older ones were not loaded.",
+    // Shared ConversationDialog title (owner decision 2026-09-30) — the viewing
+    // BD's own history composes `${conversationDialogTitlePrefix} ${counterpartName}`.
     conversationDialogTitlePrefix: "Conversation with",
-    // Admin modal's audit banner (owner decision 2026-09-30) — composed as
-    // `${adminAuditBannerPrefix} ${bdName} ${adminAuditBannerSuffix}`,
-    // client-side (ConversationDialog/AdminConversationFlow are client
-    // components, see ClientStrings), same "prefix + interpolated name"
-    // pattern the confirmation dialog below already uses.
-    adminAuditBannerPrefix: "You're viewing",
-    adminAuditBannerSuffix: "'s conversation as an administrator — this access was recorded",
-    // Admin modal's three sections (ported from the deleted standalone
-    // `/contacts/[id]/conversation/[bdId]` page — same copy).
-    adminSyncedEmailSectionTitle: "Synced email",
-    adminNoSyncedEmailContent: "No synced email with this BD.",
-    adminLegacyEmailSectionTitle: "Email (manual record)",
-    adminLegacyEmailNoSubject: "(no subject)",
-    adminLinkedinSectionTitle: "LinkedIn conversation",
     adminNoLinkedinContent: "No LinkedIn conversation with this BD.",
-    // --- admin "Ver conversación" confirmation dialog (admin-conversation-
-    // access mockup, screen 1) — plain strings only (Timeline.tsx is a client
-    // component, see ClientStrings): the dialog composes
-    // `${adminViewDialogTitlePrefix} ${bdName}?` / `${adminViewDialogBodyPrefix}
-    // ${bdName} ${adminViewDialogBodyWith} ${personName}.` in code, the same
-    // "prefix + interpolated name" pattern timelineLockedThreadBelongsTo above
-    // already uses.
-    adminViewDialogTitlePrefix: "View the conversation of",
-    adminViewDialogBodyPrefix: "You're about to view the conversation of",
-    adminViewDialogBodyWith: "with",
-    // Owner decision (2026-09-30): the conversation's owner is never notified
-    // and has no way to see this view — this copy states that plainly instead
-    // of the earlier "they'll be able to see you viewed it" wording.
-    adminAuditConfirmTitle: "This view is recorded",
-    adminAuditConfirmBody:
-      "It's saved to the audit log with your name, the date, and whose conversation it is. The log is visible to admins only; they are never notified and cannot see that you viewed it.",
     stageBadgePrefix: "Stage:",
     conversationHistoryTitle: "Conversation history",
     conversationHistoryIntroPrefix: "Conversation history exists with:",
     conversationHistoryPrivateFooter: "Content is private to each BD.",
     conversationHistoryAdminFooter:
-      "Admins can open any conversation; every view is recorded in the audit log.",
-    conversationHistoryViewAction: "View",
+      "Admins read these conversations directly in the contact's activity.",
     tasksCardTitle: "Tasks",
     addTaskAction: "Add task",
     changeCompanyAria: "Change company",
@@ -1388,7 +1355,7 @@ export const en = {
     subtitle: "Import the messages.csv file from your LinkedIn data export.",
     cardTitle: "LinkedIn messages",
     privacy:
-      "These messages are yours: only you and an administrator can read them, and every administrator access is logged.",
+      "These messages are yours: only you and an administrator can read them.",
     statsLabel: "Imported so far",
     statsMeta: (messages: string, conversations: string, lastImport: string) =>
       `${messages} messages · ${conversations} conversations · last import: ${lastImport}`,
@@ -2180,7 +2147,7 @@ export const en = {
     eyebrow: "Admin",
     title: "audit log",
     subtitle: "Who viewed another BD's conversation or sequence, of what, and when.",
-    noteBodyPrefix: "Conversation and sequence views only.",
+    noteBodyPrefix: "Conversation reads are no longer recorded from 2026-10-16 on; Sequence reads still are. Earlier entries are kept here.",
     noteBodyBeforeLink: "Other audited actions (merges, undo merge) already have their own view in",
     noteLinkText: "Duplicates → merge history",
     cardTitle: "Views of another BD's content",
@@ -2192,7 +2159,7 @@ export const en = {
     accessSequence: "Sequence",
     colConversationOf: "Owner",
     openAction: "Open",
-    emptyState: "No views recorded yet.",
+    emptyState: "No views recorded.",
     prevPage: "Previous",
     nextPage: "Next",
     pageOf: (page: number, pageCount: number) => `Page ${page} of ${pageCount}`,

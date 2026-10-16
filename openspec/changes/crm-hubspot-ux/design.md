@@ -104,7 +104,7 @@ Deferred pages keep their current bodies inside the new shell. Because they cons
 
 **Outreach → saved views**: the `roleGroup`, `companyCategory`, `market`, `miamiOnly`, `hideOffshore` and `startupsOnly` filters become Contact filters. `excludeNever` becomes `status = new`. The system views are *All*, *My contacts* (owner = me), *Not contacted* (status new), *New with verified email*, *Hiring companies* (company_key in active target companies) and *Outreach-ready* (hiring + new + verified email).
 
-**Conversation privacy (R6)**: message reads keep `bd_id = me`. `getConversationForAdmin(personId, bdId)` is the only path around that rule, and it writes `audit_log(view_conversation)` before it returns content.
+**Conversation privacy (R6)**: message reads keep `bd_id = me`. Amended 2026-10-15 (owner): an admin reads other BDs' conversations inline in the contact timeline, with no click and NO audit row. The only path around the rule is now `getAdminInlineConversations` (src/lib/activity/adminInlineConversations.ts), which re-checks the admin role itself and is bounded to one statement; `getConversationForAdmin` and its `audit_log(view_conversation)` write are gone, and past `view_conversation` rows stay readable.
 
 ## Testing strategy
 

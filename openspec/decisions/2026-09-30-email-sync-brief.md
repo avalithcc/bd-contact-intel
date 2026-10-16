@@ -31,7 +31,7 @@ A daily Vercel cron can stay as a safety net behind `pg_cron`.
 - **Tokens:** one AES-256-GCM encrypted refresh token per BD in `email_account`. A revoked token flips `status` to `error` (`src/lib/gmail/errors.ts:18-41`).
 - **Status contract:** a `reply_received` activity is all that `deriveStatus` needs. `src/lib/contacts/board.ts:9-15` documents it as reserved for email sync.
 - **Storage precedent:** the LinkedIn `conversation`/`message` tables with `unique(bd_id, content_hash)` for idempotent re-import (`src/db/schema.ts:335-413`).
-- **Privacy:** `src/lib/activity/timelineVisibility.ts:18-27` hides conversation content from other BDs, but only for the types listed in `CONVERSATION_CONTENT_TYPES`. Any new inbound-mail type must be added there in the same change, or it leaks. Admins read other BDs' mail through `getConversationForAdmin`, which writes an audit row.
+- **Privacy:** `src/lib/activity/timelineVisibility.ts:18-27` hides conversation content from other BDs, but only for the types listed in `CONVERSATION_CONTENT_TYPES`. Any new inbound-mail type must be added there in the same change, or it leaks. Admins read other BDs' mail through `getConversationForAdmin`, which writes an audit row. (Superseded 2026-10-16: admins now read it inline, with no audit row; see the 'Admins read another BD's conversation inline' entry in openspec/BACKLOG.md.)
 - **Matching:** `person.email_normalized` is indexed and includes the 480 emails deduced by pattern (`email_source = 'pattern_inferred'`). A match against a deduced address should be flagged as such.
 - **Pool:** production pool `max: 3`, session mode. The sync must process BDs sequentially, never `Promise.all` across mailboxes (`PERFORMANCE.md`).
 

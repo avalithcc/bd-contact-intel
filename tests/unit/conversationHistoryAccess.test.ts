@@ -11,8 +11,8 @@ test("isLinkedinEntryLocked: the connection's own BD is never locked", () => {
   assert.equal(isLinkedinEntryLocked("own"), false);
 });
 
-test("isLinkedinEntryLocked: admin-bypass is locked in the interleaved 'Todo' timeline (no inline reveal restored)", () => {
-  assert.equal(isLinkedinEntryLocked("admin-bypass"), true);
+test("isLinkedinEntryLocked: admin-bypass is NOT locked, the admin reads the content inline", () => {
+  assert.equal(isLinkedinEntryLocked("admin-bypass"), false);
 });
 
 test("isLinkedinEntryLocked: a non-admin viewing someone else's connection is locked", () => {

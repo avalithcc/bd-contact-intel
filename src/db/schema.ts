@@ -1428,9 +1428,9 @@ export type NewEmailAccount = typeof emailAccount.$inferInsert;
 // handlers, `javascript:` URIs, or `<svg onload>`; an HTML-only message is
 // converted to text instead, src/lib/gmail/htmlToText.ts). Visible only to
 // the owning BD (src/lib/activity/timelineVisibility.ts's
-// CONVERSATION_CONTENT_TYPES) or an admin through the audited
-// getConversationForAdmin path — no timeline UI reads this table yet (that
-// ships after the mockup, slice 5).
+// CONVERSATION_CONTENT_TYPES) or an admin, who reads it inline in the contact
+// timeline (src/lib/activity/adminInlineConversations.ts; no audit row, owner
+// decision 2026-10-15).
 export const emailMessage = pgTable(
   "email_message",
   {

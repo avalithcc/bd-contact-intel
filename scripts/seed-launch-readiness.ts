@@ -79,7 +79,7 @@ async function main() {
   try {
     await sql.begin(async (tx) => {
       await tx.unsafe(truncateStatement());
-      // `role = 'bd'` on conflict: phase11.spec.ts flips the e2e account to admin
+      // `role = 'bd'` on conflict: a spec that flips the e2e account to admin
       // and a hard kill can leave it there; a rebuild must repair that.
       const [me] = await tx`
         insert into bd (name, email) values ('ZZ E2E (no asignar)', ${email!})

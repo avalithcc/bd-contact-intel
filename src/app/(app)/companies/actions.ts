@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { createCompany, getCompanyByKey, updateCompany } from "@/lib/companies/queries";
 import { getCurrentBd } from "@/lib/queries";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import {
   proposeAbsorption,
   searchAbsorptionCandidates,
@@ -278,6 +279,8 @@ export async function getCompanyTimelineFilterEntriesAction(
       l,
       (stage) => stageLabelOf(stage, lc),
       me.id,
+      // From the session's own bd row, never from the client.
+      isAdminRole(me),
     );
     return { ok: true, rows: viewRows };
   } catch (err) {
