@@ -83,7 +83,6 @@ export interface PropertyListProps {
   // its own inline edit form (see LocationPropertyRow below).
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   jobTitleRoleGroupHint: JobTitleRoleGroupHint;
-  /** Derived "Grupo de rol" row: stored label plus a hint that flags drift from the Cargo. */
   /** Resolved on the server (lusha-reveal); null outside production, where nothing Lusha renders. */
   lusha: LushaView | null;
 }
