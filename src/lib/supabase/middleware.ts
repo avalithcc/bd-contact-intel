@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isPublicAuthRoute } from "@/lib/auth/publicAuthRoutes";
 import { isAllowedWorkEmail } from "@/lib/auth/allowedEmail";
+import { isSessionExemptPath } from "@/lib/auth/sessionExemptRoutes";
 
 /**
  * Refreshes the auth session on every request and gates access:
@@ -45,27 +46,12 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAuthRoute = isPublicAuthRoute(path);
-  // Authenticated via a bearer token instead of a Supabase session — see
-  // src/app/api/hiring/sync/route.ts, src/app/api/hiring/discover/route.ts
-  // (CRON_SECRET), src/app/api/leads/ingest/route.ts (LEADS_INGEST_TOKEN),
-  // and src/app/api/tasks/digest/route.ts (CRON_SECRET). Exact allowlist
-  // (not a bare prefix) so future routes like /api/hiring-admin don't
-  // silently bypass the session gate. Each route still verifies its own
-  // token — this only stops the session redirect from swallowing the
-  // request before it gets there.
-  const CRON_ROUTES = [
-    "/api/hiring/sync",
-    "/api/hiring/discover",
-    "/api/leads/ingest",
-    "/api/tasks/digest",
-    "/api/gmail/sync",
-    "/api/owners/recompute",
-  ];
-  const isCronRoute = CRON_ROUTES.some(
-    (route) => path === route || path.startsWith(`${route}/`),
-  );
+  // No Supabase session by design: a bearer-token cron or webhook, or the public unsubscribe link. The exact-match
+  // allowlist (SESSION_EXEMPT_ROUTES) lives in src/lib/auth/sessionExemptRoutes.ts. Each route still verifies its own
+  // caller, this only stops the session redirect from swallowing the request before it gets there.
+  const isExempt = isSessionExemptPath(path);
 
-  if (!user && !isAuthRoute && !isCronRoute) {
+  if (!user && !isAuthRoute && !isExempt) {
     const requestedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -83,7 +69,7 @@ export async function updateSession(request: NextRequest) {
   // session that exists but is for a disallowed domain or an unconfirmed
   // email is treated the same as no session at all: signed out and bounced
   // to /login, never allowed to reach an app route.
-  if (user && !isAuthRoute && !isCronRoute) {
+  if (user && !isAuthRoute && !isExempt) {
     if (!isAllowedWorkEmail(user.email) || !user.email_confirmed_at) {
       // Clears the session cookies via the `cookies.setAll` adapter above,
       // which mutates the `response` closure variable — NOT the redirect

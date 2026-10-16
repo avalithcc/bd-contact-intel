@@ -128,6 +128,32 @@ test("picker offers a clean Contact and excludes active clients, INACTIVE client
   assert.ok(rows.every((r) => r.is_florida === true));
 });
 
+test("candidates show the canonical company for a null free text, search and order by the name they SHOW", async () => {
+  const { db } = await import("@/db");
+  const { company } = await import("@/db/schema");
+  const { listRosterCandidates } = await import("@/lib/sequences/rosterQueries");
+  const named = async (name: string, displayName: string | null) => {
+    const ck = await mkCompany(name, null);
+    if (displayName !== null) await db.update(company).set({ displayName }).where((await import("drizzle-orm")).eq(company.companyKey, ck));
+    else await db.delete(company).where((await import("drizzle-orm")).eq(company.companyKey, ck));
+    return ck;
+  };
+  const mid = await mkPerson("rn-mid", await named("rn1", `Zzz canon ${run}`), { company: `Mmm free ${run}` });
+  const low = await mkPerson("rn-low", await named("rn2", `Aaa canon ${run}`), { company: null });
+  const dangling = await mkPerson("rn-dangling", await named("rn3", null), { company: null });
+  const rows = await listRosterCandidates({ limit: 200, search: run });
+  const by = new Map(rows.map((r) => [r.person_id, r]));
+  assert.equal(by.get(mid)?.company, `Mmm free ${run}`);
+  assert.equal(by.get(low)?.company, `Aaa canon ${run}`);
+  assert.equal(by.get(dangling)?.company, null);
+  const order = rows.map((r) => r.person_id);
+  assert.ok(order.indexOf(low) < order.indexOf(mid), "ordered by the shown name: Aaa before Mmm");
+  // Search follows the shown name: the canonical name finds the null-free-text contact, but NOT the one whose free text hides it.
+  const byCanon = (await listRosterCandidates({ limit: 200, search: `canon ${run}` })).map((r) => r.person_id);
+  assert.deepEqual(byCanon, [low]);
+  assert.deepEqual((await listRosterCandidates({ limit: 200, search: `free ${run}` })).map((r) => r.person_id), [mid]);
+});
+
 test("Florida label comes from is_miami and a NULL is_startup does not exclude", async () => {
   const { listRosterCandidates } = await import("@/lib/sequences/rosterQueries");
   const tx = await mkCompany("tx", null, { posting: "texas" });

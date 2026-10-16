@@ -11,7 +11,7 @@ const NewButton = ({ label }: { label: string }) => (
 );
 
 /**
- * The Sequences list (mockups/secuencias-lista.html). Presentational and unrouted: the rows are the signed-in BD's own
+ * The Sequences list (mockups/secuencias-lista.html). Presentational (mounted by /sequences): the rows are the signed-in BD's own
  * Sequences (the read scopes them), with EVERY member so the counts are true. It only links; creating is /sequences/new.
  */
 export function SequenceListView({ rows, labels: l, now }: { rows: readonly SequenceListRow[]; labels: SequenceLabels; now: Date }) {

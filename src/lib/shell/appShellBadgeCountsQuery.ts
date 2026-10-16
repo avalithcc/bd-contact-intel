@@ -43,8 +43,9 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, task } from "@/db/schema";
+import { activity, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
+import { CLOSED_STATES } from "@/lib/sequences/memberState";
 
 /** Raw-SQL-text twin of queueSelection.ts#workedTodayAtSql() — see this file's doc comment for why it can't reuse that helper via interpolation here. */
 const WORKED_TODAY_AT_SQL_TEXT = `(case
@@ -92,6 +93,10 @@ export function buildAppShellBadgeCountsQuery({
 }: AppShellBadgeCountsQueryParams) {
   const workedTypes = sql.join(
     [...WORKED_ACTIVITY_TYPES].map((t) => sql`${t}`),
+    sql`, `,
+  );
+  const closedStates = sql.join(
+    CLOSED_STATES.map((s) => sql`${s}`),
     sql`, `,
   );
   return sql`
@@ -177,6 +182,19 @@ export function buildAppShellBadgeCountsQuery({
         )
         from ${emailAccount}
         where email_account.bd_id = ${bdId}::uuid
-      ) as email_account_banner_state
+      ) as email_account_banner_state,
+      (
+        -- Sidebar "Secuencias" pill (outreach-sequences 13.6): THIS BD's Sequences that still have at least one member
+        -- with something left to do (anything outside replied / no_reply / discarded). Per-BD, like task_count.
+        -- Backed by sequence_member_sequence_state_idx; the owner scan is over a handful of rows.
+        select count(*)::int
+        from ${sequence}
+        where sequence.owner_bd_id = ${bdId}::uuid
+          and exists (
+            select 1 from ${sequenceMember}
+            where sequence_member.sequence_id = sequence.id
+              and sequence_member.state not in (${closedStates})
+          )
+      ) as sequence_count
   `;
 }

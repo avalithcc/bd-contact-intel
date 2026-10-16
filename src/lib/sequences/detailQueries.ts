@@ -11,6 +11,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence } from "@/db/schema";
+import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { isAdminRole } from "@/lib/auth/adminRole";
@@ -19,6 +20,7 @@ import { isUuid } from "@/lib/uuid";
 import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { sequenceReadAuditRow, shouldAuditSequenceRead } from "./readAudit";
+import { canonicalCompanyJoinSql, companyNameColumnsSql } from "./rosterQuery";
 import { parseSchedule, type Schedule } from "./schedule";
 import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 
@@ -31,7 +33,7 @@ import { openFreshPostingSql } from "@/lib/hiring/openPosting";
  */
 export const SEQUENCE_DETAIL_MEMBER_LIMIT = 200;
 
-export type DetailDraft = { subject: string; body: string; edited: boolean; reviewedAt: Date | null; approvedAt: Date | null; scheduledFor: Date | null };
+export type DetailDraft = { subject: string; body: string; edited: boolean; editedAt: Date | null; reviewedAt: Date | null; approvedAt: Date | null; scheduledFor: Date | null };
 
 export type DetailMember = {
   memberId: string;
@@ -66,7 +68,7 @@ const ts = (v: unknown) => (v == null ? null : parseDbTimestamp(v as string | Da
 
 function draftOf(r: Row, p: "d1" | "d2"): DetailDraft | null {
   if (r[`${p}_id`] == null) return null;
-  return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
+  return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), editedAt: ts(r[`${p}_edited_at`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
 }
 
 async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string | null): Promise<SequenceDetail | null> {
@@ -75,7 +77,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     select s.id::text as sid, s.name, s.owner_bd_id::text as owner_id, ob.name as owner_name, s.schedule, s.daily_send_cap, ea.email_address,
            sm.id::text as member_id, sm.person_id::text as person_id, sm.state, sm.hold_reason, sm.sent_at, sm.replied_at, sm.reminder_due_at,
            sm.discarded_at, sm.discard_reason,
-           p.first_name, p.last_name, p.job_title, p.company, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group,
+           p.first_name, p.last_name, p.job_title, ${companyNameColumnsSql}, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group,
            coalesce(h.open_it, 0)::int as open_it, coalesce(h.is_florida, false) as is_florida,
            (select max(${effectiveActivityAtSql()}) from activity where activity.person_id = sm.person_id) as last_contact_at,
            d1.id as d1_id, d1.subject as d1_subject, d1.body as d1_body, d1.edited_at as d1_edited_at, d1.reviewed_at as d1_reviewed_at, d1.approved_at as d1_approved_at, d1.scheduled_for as d1_scheduled_for,
@@ -85,6 +87,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     join email_account ea on ea.id = s.email_account_id
     left join sequence_member sm on sm.sequence_id = s.id
     left join person p on p.id = sm.person_id
+    ${canonicalCompanyJoinSql}
     left join lateral (
       select count(*) as open_it, bool_or(jp.is_miami) as is_florida from job_posting jp
       where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
@@ -117,7 +120,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       firstName: (r.first_name ?? null) as string | null,
       lastName: (r.last_name ?? null) as string | null,
       jobTitle: (r.job_title ?? null) as string | null,
-      company: (r.company ?? null) as string | null,
+      company: resolveCompanyDisplayName((r.company ?? null) as string | null, (r.companyCanonicalName ?? null) as string | null),
       companyKey: (r.company_key ?? null) as string | null,
       email: (r.email ?? null) as string | null,
       emailVerified: r.verified === true,

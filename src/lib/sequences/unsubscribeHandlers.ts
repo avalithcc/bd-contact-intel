@@ -1,5 +1,5 @@
 /**
- * Unsubscribe request handlers as plain functions over injected ports. No route serves them until PR 13.
+ * Unsubscribe request handlers as plain functions over injected ports. Served by /api/unsubscribe (unsubscribeRequest.ts).
  *
  * GET renders, POST suppresses, never the other way round. Corporate mail scanners and inbox prefetchers open every
  * URL in an inbound message; a GET that acted would unsubscribe people who never touched the link. The GET handler is

@@ -111,3 +111,23 @@ test("buildAppShellBadgeCountsQuery: non-admins get a literal 0 and never touch 
   assert.match(sql, /0\s+as duplicate_count/i);
   assert.doesNotMatch(sql, /duplicate_candidate/i);
 });
+
+// Task 13.6: the sidebar's Secuencias pill rides the same single statement as the other badges.
+test("buildAppShellBadgeCountsQuery: sequence_count counts THIS bd's sequences that still have a live member", () => {
+  const { sql, params } = render();
+  const match = sql.match(/select count\(\*\)::int\s+from "sequence"[\s\S]*?\)\s+as sequence_count/i);
+  assert.ok(match, "expected a sequence_count scalar subquery over sequence");
+  assert.match(match[0], /sequence\.owner_bd_id = \$\d+::uuid/i);
+  assert.match(match[0], /exists\s*\(\s*select 1 from "sequence_member"/i);
+  assert.match(match[0], /sequence_member\.sequence_id = sequence\.id/i);
+  assert.match(match[0], /sequence_member\.state not in \(\$\d+, \$\d+, \$\d+\)/i);
+  for (const state of ["replied", "no_reply", "discarded"]) assert.ok(params.includes(state), state);
+  for (const live of ["drafted", "approved", "sent"]) assert.ok(!params.includes(live), `${live} must count as live`);
+});
+
+test("buildAppShellBadgeCountsQuery: the sequence badge adds a column, not a round trip", () => {
+  const { sql } = render();
+  assert.ok(sql.trim().toLowerCase().startsWith("select"), "one statement");
+  assert.doesNotMatch(sql.replace(/--.*$/gm, ""), /;/, "no second statement");
+  assert.match(sql, /as sequence_count/i);
+});

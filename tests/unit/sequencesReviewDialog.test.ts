@@ -14,7 +14,7 @@ const { ReviewDialog } = require("@/app/(app)/sequences/_components/ReviewDialog
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const hours = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject 1", body: "Body 1\n\n--\nSynthetic footer", edited: false, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject 1", body: "Body 1\n\n--\nSynthetic footer", edited: false, editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 // Synthetic person only: the approved mockup holds real prospects and none of them may enter the repo.
 const member = (over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "drafted", holdReason: null, firstName: "Test1", lastName: "Person",
@@ -105,4 +105,37 @@ test("every new review and bulk key exists in both languages", () => {
   const keys = (o: Record<string, unknown>) => Object.keys(o).filter((k) => /^(review|bulk)/.test(k)).sort();
   assert.deepEqual(keys(en.sequences), keys(es.sequences));
   assert.ok(keys(es.sequences).length > 40);
+});
+
+test("a hand-edited draft reports that it is edited and when; a never-edited one does not", () => {
+  const editedAt = hours(2);
+  const mine = view(member({ draft: draft({ edited: true, editedAt }) }))!;
+  assert.deepEqual([mine.edited, mine.editedAt], [true, editedAt]);
+  const auto = view(member())!;
+  assert.deepEqual([auto.edited, auto.editedAt], [false, null]);
+  assert.deepEqual(Object.keys(mine).includes("confirmRegenerate"), false, "whether Regenerar needs a confirmation is the server's call, not the view model's");
+});
+
+function banner(m: DetailMember, ownView: boolean, lang = es) {
+  return renderToStaticMarkup(createElement(ReviewDialog, { open: true, onClose: () => {}, member: m, step: 1, fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, signals: ["s1"], now: NOW, labels: lang.sequences, ownView, onAction: () => {} }));
+}
+
+const strongMine = `<strong>${es.sequences.reviewEditedStrong}</strong>`; // the body help also says "tu versión", so match the notice markup
+const strongOther = `<strong>${es.sequences.reviewEditedStrongOther}</strong>`;
+test("the notice says whose text it is only when the draft was edited, and the irreversibility clause survives in both variants", () => {
+  const auto = banner(member(), true);
+  assert.ok(auto.includes(es.sequences.reviewNotice) && !auto.includes(strongMine));
+  const mine = banner(member({ draft: draft({ edited: true, editedAt: hours(2) }) }), true);
+  assert.ok(mine.includes(strongMine) && mine.includes("hace 2 h") && !mine.includes(es.sequences.reviewNotice));
+  assert.ok(mine.includes(es.sequences.reviewEditedTail) && auto.includes(es.sequences.reviewNoticeTail));
+  assert.ok(mine.includes(`<strong>${es.sequences.reviewSignalsEditedStrong}</strong>`) && mine.includes(es.sequences.reviewSignalsEditedTail) && !mine.includes(es.sequences.reviewSignalsHelp));
+  const other = banner(member({ draft: draft({ edited: true, editedAt: hours(2) }) }), false);
+  assert.ok(other.includes(strongOther) && !other.includes(strongMine) && other.includes(es.sequences.reviewEditedTailOther));
+  assert.ok(!other.includes("tocás Regenerar") && mine.includes("tocás Regenerar"), "an admin cannot regenerate, so the admin notice does not offer it");
+});
+
+test("every new review label exists in both dictionaries", () => {
+  for (const k of ["reviewEditedLead", "reviewEditedStrong", "reviewEditedStrongOther", "reviewEditedRest", "reviewEditedTail", "reviewEditedTailOther", "reviewEditedRestOther", "reviewSignalsEditedLead", "reviewSignalsEditedStrong", "reviewSignalsEditedTail", "reviewSignalsEditedTailOther", "regenConfirmTailOther", "regenConfirmTitle", "regenConfirmTitleOther", "regenConfirmLead", "regenConfirmLeadOther", "regenConfirmStrong", "regenConfirmTail", "regenConfirmHelp", "regenConfirmCancel", "regenConfirmAction", "editedBy", "editedByOther"] as const) {
+    assert.ok(es.sequences[k] && en.sequences[k], k);
+  }
 });

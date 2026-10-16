@@ -19,7 +19,7 @@ import type { HoldReason } from "./preSendChecks";
 export type CardKind = "draft" | "noDraft" | "approved" | "sent" | "reminderToday" | "noReply" | "replied" | "discarded";
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
-  | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
+  | "generate" | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
   | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
@@ -53,7 +53,7 @@ export function mapMemberCard(f: CardFacts, now: Date): CardView {
   const base = { florida: false, holdReason: f.holdReason, menu: [] as CardActionId[] };
   switch (f.state) {
     case "drafted":
-      if (!f.hasDraft) return { ...base, kind: "noDraft", tone: "neutral", actions: [], menu: ["openContact", "remove"] };
+      if (!f.hasDraft) return { ...base, kind: "noDraft", tone: "neutral", actions: [act("generate", "primary")], menu: ["openContact", "remove"] };
       return { ...base, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
     case "approved":
       return { ...base, kind: "approved", tone: "brand", actions: [act("viewEmail", "ghost"), act("cancel", "secondary")] };

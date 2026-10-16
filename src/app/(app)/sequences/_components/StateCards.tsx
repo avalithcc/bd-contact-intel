@@ -3,14 +3,13 @@ import type { SequenceStats } from "@/lib/sequences/stats";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnAction } from "./actions";
 
-export function EmptyState({ total, labels: l, onAction }: { total: number; labels: SequenceLabels; onAction: OnAction }) {
+export function EmptyState({ total, labels: l }: { total: number; labels: SequenceLabels }) {
   return (
     <div className="card">
       <div className="empty">
         <div className="empty-icon"><FileIcon className="icon icon-lg" /></div>
         <h3>{total === 1 ? l.emptyTitleOne : fill(l.emptyTitle, { n: total })}</h3>
         <p>{l.emptyBody}</p>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => onAction({ type: "generateMissing" })}>{total === 1 ? l.emptyCtaOne : fill(l.emptyCta, { n: total })}</button>
       </div>
     </div>
   );

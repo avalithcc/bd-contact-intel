@@ -36,7 +36,9 @@ import { getDailyCreditCap } from "@/lib/lusha/cap";
 import { getLushaConfig } from "@/lib/lusha/config";
 import { getDailySpend, getRevealState } from "@/lib/lusha/revealDb";
 import { buildLushaView, type LushaView } from "@/lib/lusha/revealView";
+import { listContactMemberships } from "@/lib/sequences/pageQueries";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
+import { ContactSequenceBlock } from "./ContactSequenceBlock";
 import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
 import { Timeline } from "./Timeline";
@@ -133,10 +135,12 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const timelineTab = rawActivityType === "task" ? ("task" as const) : activePill;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const [timeline, ownerOptions, tasksForPerson] = await Promise.all([
+  const [timeline, ownerOptions, tasksForPerson, sequenceMemberships] = await Promise.all([
     getPersonTimeline(record.person.id, me.id, { pill: activePill }),
     listOwnerOptions(),
     getTasksForPerson(record.person.id),
+    // Right-rail "Secuencias" block: every membership of this Contact's EMAIL ADDRESS (the key the opt-out write uses).
+    listContactMemberships(me.id, record.person.email),
   ]);
   const personTasks = tasksForPerson.rows;
   // "Próximas" bucket + right-panel "Tareas" card (contact-record.html's
@@ -661,6 +665,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
             lockedRows={nonAdminLockedConversationRows}
             labels={l}
           />
+
+          <ContactSequenceBlock memberships={sequenceMemberships} email={record.person.email} now={new Date()} labels={dict.sequences} />
 
           <div className="card assoc">
             <div className="card-header">

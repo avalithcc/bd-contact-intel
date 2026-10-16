@@ -4,6 +4,7 @@
  * on it cut a real candidate pool from 18 to 2 (measured 2026-10-14).
  */
 import { sql } from "drizzle-orm";
+import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
 import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 
 export const ROSTER_PICKER_MAX_LIMIT = 200;
@@ -20,16 +21,33 @@ export const clientStatusSql = sql`(
   limit 1
 )`;
 
+/**
+ * The company NAME a Sequence read shows, same rule and same join as the Contacts list (companyDisplayName.ts): free
+ * text wins, `company.display_name` fills a null. Joins `company` on `person.company_key` DIRECTLY and not through
+ * `company_alias`, deliberately: /contacts shows the same name for the same person, and the search below
+ * (companyNameMatchCondition) matches exactly what is displayed. `company_key` is the primary key, so the join cannot
+ * fan out; a key with no `company` row yields NULL. Alias resolution stays where it is logic (postings, client status,
+ * country), never display.
+ */
+export const canonicalCompanyJoinSql = sql`left join company cn on cn.company_key = p.company_key`;
+/** The select-list pair `withResolvedCompanyName` resolves. */
+export const companyNameColumnsSql = sql`p.company, cn.display_name as "companyCanonicalName"`;
+/** The name the user SEES as a sort key (`resolveCompanyDisplayName` in SQL). */
+export const displayedCompanySql = sql`coalesce(p.company, cn.display_name)`;
+/** The Contacts list's company match, spelled for a `from person p` read. */
+export const companyMatchSql = (pattern: string) => companyNameMatchCondition(pattern, { company: sql`p.company`, companyKey: sql`p.company_key` });
+
 export function buildRosterCandidatesQuery(opts: { limit: number; search?: string }) {
   const limit = Math.min(Math.max(Math.trunc(opts.limit) || 1, 1), ROSTER_PICKER_MAX_LIMIT);
   const term = opts.search?.trim();
   const search = term
-    ? sql`and (concat_ws(' ', p.first_name, p.last_name, p.company) ilike ${`%${term}%`})`
+    ? sql`and (concat_ws(' ', p.first_name, p.last_name) ilike ${`%${term}%`} or ${companyMatchSql(`%${term}%`)})`
     : sql``;
   return sql`
     select p.id as person_id, p.first_name, p.last_name, p.email, p.job_title,
-           p.company, p.company_key, h.is_florida
+           ${companyNameColumnsSql}, p.company_key, h.is_florida
     from person p
+    ${canonicalCompanyJoinSql}
     join lateral (
       select count(*) as open_it, coalesce(bool_or(jp.is_miami), false) as is_florida
       from job_posting jp
@@ -48,6 +66,6 @@ export function buildRosterCandidatesQuery(opts: { limit: number; search?: strin
            or (s.kind = 'domain' and s.value = split_part(p.email_normalized, '@', 2))
       )
       ${search}
-    order by p.company, p.last_name, p.first_name, p.id
+    order by ${displayedCompanySql}, p.last_name, p.first_name, p.id
     limit ${limit}`;
 }

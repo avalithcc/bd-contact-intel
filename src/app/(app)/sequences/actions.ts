@@ -1,16 +1,22 @@
 "use server";
 
-// Roster, drafting and approval actions. Imported by no page or component until the go-live PR, so none is exposed yet. Every
+// Roster, drafting and approval actions, mounted by the Sequence pages (go-live, PR 13). Every
 // guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
 import { getCurrentBd } from "@/lib/queries";
 import { advanceReminder as advanceReminderRow, approveBulk as approveBulkRows, approveMember as approveMemberRow, cancelApproval as cancelApprovalRow, markDraftReviewed as markDraftReviewedRow } from "@/lib/sequences/approvalQueries";
+import { formatOutreachSignalLabel } from "@/lib/outreach/messageSignalLabels";
+import { pickGenerateMessageLabels, signalLabelsFromDict } from "@/lib/outreach/messageLabels";
+import { getDictionary } from "@/lib/i18n/server";
 import {
-  generateMissingDrafts,
+  generateMemberDraft as generateMemberDraftRow,
+  memberDraftSignals,
+  regenerateReminderDraft,
   regenerateDrafts,
   saveDraftEdit,
   type DraftBatchResult,
   type SaveEditResult,
 } from "@/lib/sequences/draftQueries";
+import { validConfirmations } from "@/lib/sequences/draftCompose";
 import { recordOptOutForMember, type OptOutResult } from "@/lib/sequences/optOutQueries";
 import {
   addMembersToSequence,
@@ -59,22 +65,28 @@ export async function updateSequenceSettings(sequenceId: string, patch: { name?:
   return updateSequenceSettingsRow(me.id, sequenceId, patch);
 }
 
-/** "Generar borradores faltantes": members with no draft only; an existing draft is never touched. */
-export async function generateMissingSequenceDrafts(sequenceId: string): Promise<ClientDraftBatchResult> {
+/** "Generar borrador" on one card: creates that member's missing draft only; an existing draft is never touched. */
+export async function generateMemberDraft(sequenceId: string, memberId: string): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return withoutReasons(await generateMissingDrafts(me.id, sequenceId));
+  return withoutReasons(await generateMemberDraftRow(me.id, sequenceId, memberId));
 }
 
 /** "Regenerar" (single or bulk): explicit replacement, clears review and approval. */
-export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[]): Promise<ClientDraftBatchResult> {
+export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[], confirmedEdits: Record<string, number> = {}): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return withoutReasons(await regenerateDrafts(me.id, sequenceId, memberIds));
+  return withoutReasons(await regenerateDrafts(me.id, sequenceId, memberIds, {}, validConfirmations(confirmedEdits)));
 }
 
-/** "Guardar sin aprobar". */
-export async function saveSequenceDraft(memberId: string, input: { subject: string; body: string }): Promise<SaveEditResult> {
+/** "Regenerar" in the reminder dialog (step 2 only): replaces that one draft, clears its review and approval. */
+export async function regenerateSequenceReminder(sequenceId: string, memberId: string, confirmedEdits: Record<string, number> = {}): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
-  return saveDraftEdit(me.id, memberId, input);
+  return withoutReasons(await regenerateReminderDraft(me.id, sequenceId, memberId, {}, validConfirmations(confirmedEdits)));
+}
+
+/** "Guardar sin aprobar". `step` 2 saves the reminder. */
+export async function saveSequenceDraft(memberId: string, input: { subject: string; body: string }, step: 1 | 2 = 1): Promise<SaveEditResult> {
+  const me = await getCurrentBd();
+  return saveDraftEdit(me.id, memberId, input, step);
 }
 
 /** Called when the review dialog opens ("revisado"). Never from passive listing. */
@@ -111,4 +123,16 @@ export async function advanceReminder(memberId: string) {
 export async function recordOptOut(memberId: string): Promise<OptOutResult> {
   const me = await getCurrentBd();
   return recordOptOutForMember(me.id, memberId);
+}
+
+/**
+ * The "Señales usadas" chips for the review dialog, already worded. Null when the member is not the signed-in BD's own
+ * (an admin reading another BD's Sequence gets none: the generator input includes that BD's private connection data).
+ */
+export async function loadReviewSignals(memberId: string, step: 1 | 2 = 1): Promise<string[] | null> {
+  const me = await getCurrentBd();
+  const signals = await memberDraftSignals(me.id, memberId, step);
+  if (!signals) return null;
+  const labels = signalLabelsFromDict(pickGenerateMessageLabels(await getDictionary()));
+  return signals.map((s) => formatOutreachSignalLabel(s, labels));
 }

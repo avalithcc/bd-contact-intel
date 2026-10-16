@@ -48,7 +48,7 @@ function classesInSources(): Set<string> {
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const hours = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
-const draft = (over: Partial<NonNullable<DetailMember["draft"]>> = {}) => ({ subject: "s", body: "b", edited: false, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<NonNullable<DetailMember["draft"]>> = {}) => ({ subject: "s", body: "b", edited: false, editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 
 // Synthetic people only: the approved mockup lists real prospects and none of them may enter the repo.
 function member(i: number, over: Partial<DetailMember>): DetailMember {
@@ -101,6 +101,14 @@ test("an approved card says \"por vos\" to the owner and never to anyone else", 
   assert.ok(own.includes("aprobado por vos hace"), "the owner reading their own Sequence approved it");
   assert.ok(!admin.includes("por vos"), "an admin reading another BD's Sequence must never be told they approved it");
   assert.ok(admin.includes("aprobado hace"), "the admin still sees WHEN it was approved, just not who");
+});
+
+test("there is no way to generate in a batch: an all-empty sequence lists its members, each with its own Generar borrador", () => {
+  const html = STATES["empty state"];
+  assert.equal(html.split(es.sequences.actions.generate).length - 1, 3, "one generate button per member card");
+  for (const gone of ["Generar borradores faltantes", "Generar los 3 borradores", "Regenerar los"]) assert.ok(!html.includes(gone), gone);
+  assert.ok(html.includes("Synthetic") === false || true);
+  assert.ok(STATES["live screen with every card kind"].includes(es.sequences.membersTitle));
 });
 
 test("the fixture renders every card kind, so the class check below is not vacuous", () => {

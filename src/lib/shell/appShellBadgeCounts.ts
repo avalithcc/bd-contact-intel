@@ -21,6 +21,8 @@ export interface AppShellBadgeCounts {
   absorptionCount: number;
   /** Open duplicate candidates, team-wide; always 0 for non-admins (query skipped). */
   duplicateCount: number;
+  /** This BD's Sequences with at least one member still in progress (13.6). */
+  sequenceCount: number;
   /** email-sync.html screen 4 — see reconnectBannerState.ts. */
   needsReconnectBanner: boolean;
   /** Connected and readonly-scoped, but not syncing (syncHealth.ts); null when healthy or not applicable. */
@@ -75,12 +77,13 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
       follow_up_count: number;
       absorption_count: number;
       duplicate_count: number;
+      sequence_count: number;
       queue_built: boolean;
       email_account_banner_state: EmailAccountBannerState | null;
     }[];
     // An empty result cannot happen (scalar subqueries), but keep the old
     // `row?.` tolerance rather than throwing in the shell.
-    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, queue_built: true, email_account_banner_state: null };
+    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, queue_built: true, email_account_banner_state: null };
   };
   // F5: build today's queue on the first page of the day — see
   // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
@@ -109,6 +112,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
     followUpCount: Number(row?.follow_up_count ?? 0),
     absorptionCount: Number(row?.absorption_count ?? 0),
     duplicateCount: Number(row?.duplicate_count ?? 0),
+    sequenceCount: Number(row?.sequence_count ?? 0),
     needsReconnectBanner: shouldShowReconnectBanner({
       accountStatus: bannerState?.status ?? null,
       grantedScopes: bannerState?.grantedScopes ?? null,

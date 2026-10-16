@@ -33,6 +33,29 @@ export function batchReason(error: unknown): string {
   return raw.replace(/\b(Basic|Bearer)\s+[A-Za-z0-9+/=._-]+/gi, "[redacted]").slice(0, MAX_REASON_CHARS);
 }
 
+/** A hand-edited draft the server left alone: `editedAt` (epoch ms) is the instant of the text it found, which is what the BD is shown. */
+export type SkippedEdit = { memberId: string; editedAt: number };
+/** member id -> the `editedAt` (epoch ms) of the text the BD saw and accepted losing. Anything not listed stays protected. */
+export type EditConfirmations = Readonly<Record<string, number>>;
+
+/**
+ * Regenerating replaces the row in place and nothing keeps the old text, so a hand-edited draft is overwritten only for
+ * the exact text the BD confirmed: no confirmation, or an edit newer than the confirmed instant, refuses. Pure so the rule
+ * is tested; draftQueries applies it inside the member-row lock, where "newer" cannot race with a save.
+ */
+export function blocksEditedOverwrite(mode: "missing" | "regenerate", confirmedAt: number | null | undefined, editedAt: Date | null): boolean {
+  if (mode !== "regenerate" || editedAt === null) return false;
+  // Fails CLOSED: only a finite number that covers the stored edit lets the overwrite through. NaN, a string, undefined,
+  // Infinity and a negative all fall through to "block", because what this protects cannot be recovered.
+  return !(typeof confirmedAt === "number" && Number.isFinite(confirmedAt) && editedAt.getTime() <= confirmedAt);
+}
+
+/** The trust boundary for a client-sent confirmation: keeps only entries whose value is a finite number. */
+export function validConfirmations(input: unknown): EditConfirmations {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return {};
+  return Object.fromEntries(Object.entries(input).filter(([, v]) => typeof v === "number" && Number.isFinite(v)));
+}
+
 export interface BatchResult {
   generated: string[];
   skipped: string[];

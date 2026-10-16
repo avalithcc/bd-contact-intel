@@ -75,7 +75,7 @@ A generator failure for one member MUST NOT block, roll back, or alter drafts fo
 
 ### Requirement: Edited drafts are never auto-regenerated
 
-Once a BD has changed a draft's subject or body, the stored version MUST be treated as BD-owned. No batch action ("Generar borradores faltantes"), scheduled job, signal change, or reminder step MUST overwrite it. Only an explicit "Regenerar" action by the BD MAY replace it.
+Once a BD has changed a draft's subject or body, the stored version MUST be treated as BD-owned. No batch action ("Generar borradores faltantes"), scheduled job, signal change, or reminder step MUST overwrite it. Only an explicit, one-to-one "Regenerar" action by the BD MAY replace it, and only after the server refused a first attempt and the BD confirmed losing that exact text: the server leaves an edited draft untouched unless the request carries the `editedAt` the BD was shown, and refuses again if the draft was edited after that instant.
 
 #### Scenario: Missing-drafts batch skips edited drafts
 

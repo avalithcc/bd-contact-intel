@@ -3,10 +3,10 @@
  * an injected port (the `runCatchUpExecute` pattern: src/lib/migration/catchUpRun.ts), so the ordering guarantees below
  * are tested with fakes and the real ports live in releaseQueries.ts.
  *
- * LIBRARY CODE ONLY. Nothing under src/app imports this file or releaseQueries.ts until PR 13 adds the route and the
- * cron (tests/unit/sequencesInert.test.ts enforces it). Two independent guarantees keep the feature inert before then,
- * and NEITHER alone is enough: (1) nothing invokes the runner; (2) it only ever releases members in `approved` (step 1)
- * or `sent` with an approved reminder (step 2), which the candidate read and preSendChecks both require.
+ * Invoked from exactly one place: the cron route (src/app/api/sequences/run/route.ts, through runHandler.ts), which
+ * tests/unit/sequencesInert.test.ts pins as the only importer under src/app. Its `capped` and `lost` signals are read
+ * by that route's log, not here. Independent of who calls it, the runner only ever releases members in `approved`
+ * (step 1) or `sent` with an approved reminder (step 2), which the candidate read and preSendChecks both require.
  *
  * Order of work, and why:
  *  - Checks run BEFORE the plan, so a held member never takes a slot of the cap (it would otherwise displace a sendable

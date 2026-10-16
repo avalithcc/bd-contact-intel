@@ -27,6 +27,7 @@ import {
   PersonIcon,
   ReportsIcon,
   AbsorbIcon,
+  SendIcon,
 } from "@/components/icons";
 
 /** Longest a clicked item stays highlighted without the route committing. */
@@ -72,6 +73,7 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "companies", href: "/companies", icon: CompaniesIcon },
       { labelKey: "tasks", href: "/tasks", icon: TasksIcon },
       { labelKey: "followUps", href: "/follow-ups", icon: FollowUpIcon },
+      { labelKey: "sequences", href: "/sequences", icon: SendIcon },
       { labelKey: "outreach", href: "/contacts?view=outreach", icon: OutreachIcon },
     ],
   },
@@ -124,6 +126,7 @@ export function Sidebar({
   labels,
   taskCount,
   followUpCount,
+  sequenceCount,
   absorptionCount,
   duplicateCount,
   isAdmin,
@@ -131,6 +134,7 @@ export function Sidebar({
   labels: NavLabels;
   taskCount?: number;
   followUpCount?: number;
+  sequenceCount?: number;
   absorptionCount?: number;
   duplicateCount?: number;
   // Admin-only "Administración" section (admin-conversation-access mockup,
@@ -181,6 +185,7 @@ export function Sidebar({
   const pillCountByLabelKey: Partial<Record<SidebarItem["labelKey"], number | undefined>> = {
     tasks: taskCount,
     followUps: followUpCount,
+    sequences: sequenceCount,
   };
 
   return (

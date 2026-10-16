@@ -160,6 +160,23 @@ test("edit protection: an edited draft is byte-identical after a missing-drafts 
   assert.deepEqual(await draftOf(edited), before);
 });
 
+test("per-card generate creates that member's draft only: a sibling with no draft still has none, and an existing draft is untouched", async () => {
+  const { generateMemberDraft } = await import("@/lib/sequences/draftQueries");
+  const target = await mkMember("solotarget");
+  const sibling = await mkMember("solosibling");
+  const edited = await mkMember("soloedited");
+  await setDraft(edited, { subject: "Mine", body: "My own words", editedAt: new Date(), editedByBdId: bdId });
+  const before = await draftOf(edited);
+  const result = await generateMemberDraft(bdId, sequenceId, target, deps());
+  assert.ok(result.ok && result.generated.length === 1 && result.generated[0] === target);
+  assert.match((await draftOf(target)).body, /^Hi solotarget,/);
+  assert.equal(await draftOf(sibling), undefined, "no other member is generated");
+  const again = await generateMemberDraft(bdId, sequenceId, edited, deps());
+  assert.ok(again.ok && again.generated.length === 0 && again.skipped.includes(edited));
+  assert.deepEqual(await draftOf(edited), before, "missing mode never overwrites");
+  assert.deepEqual(await generateMemberDraft(otherBdId, sequenceId, sibling, deps()), { ok: false, error: "not_found" });
+});
+
 test("one generator failure leaves the rest drafted and the failed member retryable", async () => {
   const { generateMissingDrafts } = await import("@/lib/sequences/draftQueries");
   const ids = [];
@@ -174,17 +191,77 @@ test("one generator failure leaves the rest drafted and the failed member retrya
   assert.ok(await draftOf(ids[2]));
 });
 
-test("regenerate replaces an edited draft, clears review and approval, and returns an approved member to drafted", async () => {
+test("regenerate replaces an edited draft (for the exact text the BD confirmed), clears review and approval, and returns an approved member to drafted", async () => {
   const { regenerateDrafts } = await import("@/lib/sequences/draftQueries");
   const m = await mkMember("regen", { state: "approved" });
   const stamp = new Date();
   await setDraft(m, { editedAt: stamp, editedByBdId: bdId, reviewedAt: stamp, reviewedByBdId: bdId, approvedAt: stamp, approvedByBdId: bdId, scheduledFor: stamp });
-  const result = await regenerateDrafts(bdId, sequenceId, [m], deps());
+  const result = await regenerateDrafts(bdId, sequenceId, [m], deps(), { [m]: stamp.getTime() });
   assert.ok(result.ok && result.generated.includes(m));
   const d = await draftOf(m);
   assert.match(d.body, /^Hi regen,/);
   assert.deepEqual([d.editedAt, d.editedByBdId, d.reviewedAt, d.approvedAt, d.approvedByBdId, d.scheduledFor], [null, null, null, null, null, null]);
   assert.equal((await memberOf(m)).state, "drafted");
+});
+
+test("regenerate without a confirmation skips an edited draft and reports it with the instant found; an unedited one is regenerated", async () => {
+  const { regenerateDrafts } = await import("@/lib/sequences/draftQueries");
+  const mine = await mkMember("keepmine");
+  const auto = await mkMember("autoone");
+  await setDraft(mine, { subject: "Mine", body: "My own words", editedAt: new Date(), editedByBdId: bdId });
+  await setDraft(auto, { body: "auto text" });
+  const before = await draftOf(mine);
+  const result = await regenerateDrafts(bdId, sequenceId, [mine, auto], deps());
+  assert.ok(result.ok);
+  assert.deepEqual(result.skippedEdited, [{ memberId: mine, editedAt: before.editedAt!.getTime() }], "the report carries the instant of the text found");
+  assert.ok(result.generated.includes(auto) && !result.generated.includes(mine));
+  assert.deepEqual(await draftOf(mine), before);
+  assert.match((await draftOf(auto)).body, /^Hi autoone,/);
+});
+
+test("a confirmation covers only the listed member and only the text it was shown", async () => {
+  const { regenerateDrafts } = await import("@/lib/sequences/draftQueries");
+  const shown = await mkMember("shownone");
+  const unseen = await mkMember("unseenone");
+  const t0 = new Date(Date.now() - 60_000);
+  await setDraft(shown, { subject: "Mine", body: "shown text", editedAt: t0, editedByBdId: bdId });
+  await setDraft(unseen, { subject: "Mine", body: "edited elsewhere", editedAt: t0, editedByBdId: bdId });
+  // Only `shown` is confirmed: `unseen` is in the same call but was never shown to the BD, so it stays protected.
+  const result = await regenerateDrafts(bdId, sequenceId, [shown, unseen], deps(), { [shown]: t0.getTime() });
+  assert.ok(result.ok && result.generated.includes(shown));
+  assert.deepEqual(result.skippedEdited.map((s) => s.memberId), [unseen]);
+  assert.equal((await draftOf(unseen)).body, "edited elsewhere");
+});
+
+test("a confirmation older than the stored edit is refused: confirm means THAT text, not whatever is there when it lands", async () => {
+  const { regenerateDrafts } = await import("@/lib/sequences/draftQueries");
+  const m = await mkMember("staleconf");
+  const seen = new Date(Date.now() - 120_000);
+  const later = new Date(Date.now() - 30_000);
+  await setDraft(m, { subject: "Mine", body: "edited again after the dialog", editedAt: later, editedByBdId: bdId });
+  const result = await regenerateDrafts(bdId, sequenceId, [m], deps(), { [m]: seen.getTime() });
+  assert.ok(result.ok && !result.generated.includes(m));
+  assert.deepEqual(result.skippedEdited, [{ memberId: m, editedAt: later.getTime() }], "reported again with the newer instant so the dialog can show it");
+  assert.equal((await draftOf(m)).body, "edited again after the dialog");
+});
+
+test("an edit committed after the early check but before the write is refused by the transaction", async () => {
+  const { regenerateDrafts } = await import("@/lib/sequences/draftQueries");
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const m = await mkMember("racing");
+  await setDraft(m, { body: "auto text" });
+  const inner = generator([]);
+  // The generator runs between the early check (draft still unedited) and the transaction: the BD saves an edit right there.
+  const racing = async (...args: unknown[]) => {
+    await db.update(sequenceDraft).set({ body: "saved in the meantime", editedAt: new Date(), editedByBdId: bdId }).where(eq(sequenceDraft.sequenceMemberId, m));
+    return (inner as (...a: unknown[]) => unknown)(...args);
+  };
+  const result = await regenerateDrafts(bdId, sequenceId, [m], { generate: racing as never, siteUrl: "https://example.test" });
+  assert.ok(result.ok && !result.generated.includes(m));
+  assert.deepEqual(result.skippedEdited.map((s) => s.memberId), [m]);
+  assert.equal((await draftOf(m)).body, "saved in the meantime");
 });
 
 test("regenerate never touches a sent or discarded member", async () => {
@@ -311,7 +388,10 @@ test("an edited reminder survives a missing run; regenerate replaces it and clea
   const before = await stepDraft(m, 2);
   assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps()), "skipped");
   assert.deepEqual(await stepDraft(m, 2), before);
-  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps(), "regenerate"), "generated");
+  // The destructive capability needs the explicit argument at this level too: a mode string alone never destroys an edit.
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps(), "regenerate"), "skipped");
+  assert.deepEqual(await stepDraft(m, 2), before);
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps(), "regenerate", { [m]: stamp.getTime() }), "generated");
   const d = await stepDraft(m, 2);
   assert.match(d.body, /^Hi remedit,/);
   assert.deepEqual([d.editedAt, d.editedByBdId, d.reviewedAt, d.approvedAt, d.approvedByBdId], [null, null, null, null, null]);

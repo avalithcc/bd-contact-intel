@@ -13,14 +13,13 @@ export function BulkBar({ selection, labels: l, onAction }: { selection: readonl
   if (!v.visible) return null;
   const one = v.selected === 1;
   const n = { n: v.selected };
-  const run = (type: "regenerate" | "approve" | "remove") => () => onAction({ type, memberIds: v.ids });
+  const run = (type: "approve" | "remove") => () => onAction({ type, memberIds: v.ids });
   return (
     <>
       <div className="bulk-bar" role="region" aria-label={v.allReviewed ? l.bulkAriaAll : l.bulkAriaPartial}>
         <span className="count">{fill(one ? l.bulkCountOne : l.bulkCount, n)}</span><span className="sep"></span>
         <span>{fill(v.allReviewed ? l.bulkReviewedAll : l.bulkReviewed, { reviewed: v.reviewed, total: v.selected })}</span>
         <span className="grow"></span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={run("regenerate")}>{fill(one ? l.bulkRegenerateOne : l.bulkRegenerate, n)}</button>
         <button type="button" className="btn btn-secondary btn-sm" onClick={run("remove")}>{l.bulkRemove}</button>
         <button type="button" className="btn btn-primary btn-sm" disabled={!v.approveEnabled} onClick={run("approve")}>{fill(one ? l.bulkApproveOne : l.bulkApprove, n)}</button>
       </div>

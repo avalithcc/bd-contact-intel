@@ -32,7 +32,7 @@ function metaParts(r: MembershipRow, now: Date, l: SequenceLabels): ReactNode[] 
 
 /**
  * Contact-record right-rail block (the `.card.assoc` pattern of contact-record.html): the Contact's Sequence membership
- * and state, and the "No contactar" control. Presentational and unmounted: it reports `optOut` intent and the container
+ * and state, and the "No contactar" control. Presentational (mounted by ContactSequenceBlock on the Contact record): it reports `optOut` intent and the container
  * opens `OptOutDialog` (task 13.6 mounts both). Renders nothing for a Contact in no Sequence.
  */
 export function SequenceContext({ memberships, now, labels: l, onAction }: { memberships: readonly ContactMembership[]; now: Date; labels: SequenceLabels; onAction: OnContactContextAction }) {

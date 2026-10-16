@@ -1,10 +1,13 @@
 /**
- * DB layer for the unsubscribe flow. Nothing under src/app imports it until PR 13 mounts the route.
+ * DB layer for the unsubscribe flow. Used by src/app/api/unsubscribe/route.ts.
  * Uses the app's Drizzle/postgres client (never supabase-js: RLS is on with no policies and would block it).
  */
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { emailSuppression, person, sequenceMember, sequenceUnsubscribeToken } from "@/db/schema";
+import { openPostingSql } from "@/lib/hiring/openPosting";
+import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
+import { recipientMarket } from "@/lib/sequences/recipientMarket";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
 import type { UnsubscribePort } from "@/lib/sequences/unsubscribeHandlers";
@@ -101,5 +104,28 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
   });
 }
 
-/** The port the route handlers (PR 13) will be given. */
+/**
+ * The postal address the recipient's own email carried: the compliance entry of their market (config.ts), found from the
+ * token the same way the draft found it (recipientMarket: person country, company country, then posting markets).
+ * One read, no writes. Undefined for an unknown token or a market with no address: the page then shows none rather than
+ * another country's.
+ */
+export async function postalAddressForToken(tokenHash: string): Promise<string | undefined> {
+  const sameCompany = (alias: string) => sql.raw(`(${alias}.company_key = p.company_key or ${alias}.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`);
+  const rows = (await db.execute(sql`
+    select p.country as person_country,
+           (select c.country from company c where ${sameCompany("c")} limit 1) as company_country,
+           coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany("jp")}), '[]'::json) as posting_markets
+    from sequence_unsubscribe_token t
+    join sequence_member sm on sm.id = t.sequence_member_id
+    join person p on p.id = sm.person_id
+    where t.token_hash = ${tokenHash}
+    limit 1`)) as unknown as { person_country: string | null; company_country: string | null; posting_markets: string[] }[];
+  const row = rows[0];
+  if (!row) return undefined;
+  const market = recipientMarket({ personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets });
+  return COMPLIANCE_CONFIG[market]?.postalAddress;
+}
+
+/** The port the unsubscribe route (PR 13) is given. */
 export const unsubscribePort: UnsubscribePort = { findToken: findTokenByHash, suppressByToken };
