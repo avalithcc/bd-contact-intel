@@ -134,7 +134,9 @@ test('a 1.1 MB note (server answers 500) fails visibly, not silently', async ({ 
   await dlg.getByRole('button', { name: 'Registrar llamada' }).click();
   await page.waitForTimeout(4000);
   const saved = (await activitiesFor(p.id)).length;
-  const shown = (await page.getByRole('alert').allInnerTexts()).join(' ');
+  // Scoped to the dialog: the app shell can show its own role="alert" Gmail banner on every page
+  // (the e2e account has no email_account row), which would satisfy a page-wide query on its own.
+  const shown = (await dlg.getByRole('alert').allInnerTexts()).join(' ');
   // Either it saved, or the BD was told. Never "nothing saved and nothing said".
   expect(saved > 0 || shown.length > 0, 'neither saved nor reported').toBe(true);
   // And the dialog must not be left frozen.

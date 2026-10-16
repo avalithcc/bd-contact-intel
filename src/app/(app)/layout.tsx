@@ -6,9 +6,9 @@ import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { CallAttemptProvider } from "@/components/CallAttemptProvider";
-import { ReconnectBanner } from "@/components/ReconnectBanner";
-import { SyncHealthBanner } from "@/components/SyncHealthBanner";
-import { getGmailOAuthConfig } from "@/lib/gmail/config";
+import { ConnectionBanner } from "@/components/ConnectionBanner";
+import { formatSince } from "@/lib/gmail/connectionBanner";
+import { gmailConfigOkOrWarnOnce } from "@/lib/gmail/config";
 import { Sidebar } from "../contacts/Sidebar";
 import { TopBar } from "../contacts/TopBar";
 
@@ -48,7 +48,7 @@ export default async function AppLayout({
   const searchLabels = pickTopBarSearchLabels(dict);
   const me = await getCurrentBd();
   const now = new Date();
-  const { taskCount, followUpCount, absorptionCount, duplicateCount, needsReconnectBanner, syncBanner } = await getAppShellBadgeCounts(me.id, now, me.role === "admin");
+  const { taskCount, followUpCount, absorptionCount, duplicateCount, connectionBanner } = await getAppShellBadgeCounts(me.id, now, me.role === "admin");
 
   return (
     <ToastProvider>
@@ -69,9 +69,14 @@ export default async function AppLayout({
               locale={locale}
               me={{ id: me.id, name: me.name, role: me.role === "admin" ? "admin" : "bd" }}
             />
-            {needsReconnectBanner && <ReconnectBanner labels={dict.reconnectBanner} />}
             {/* Without server OAuth config /account/email renders no card, so the link would land on nothing. */}
-            {syncBanner && getGmailOAuthConfig().ok && <SyncHealthBanner kind={syncBanner} labels={dict.syncHealthBanner} />}
+            {connectionBanner && gmailConfigOkOrWarnOnce() && (
+              <ConnectionBanner
+                decision={connectionBanner}
+                labels={dict.connectionBanner}
+                sinceText={connectionBanner.reason === "expired" && connectionBanner.sinceMs !== null ? formatSince(connectionBanner.sinceMs, locale) : null}
+              />
+            )}
             {children}
           </div>
         </div>

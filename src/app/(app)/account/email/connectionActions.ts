@@ -2,9 +2,8 @@
 
 /**
  * Server actions behind /account/email's connected-state footer
- * (email-sync.html:244,249,256,371-372): "Desconectar", "Sincronizar ahora",
- * and the one-time reconnect banner's close button. Each is scoped to the
- * signed-in BD's own `email_account` row — never another BD's.
+ * (email-sync.html:244,249,256): "Desconectar" and "Sincronizar ahora". Each is
+ * scoped to the signed-in BD's own `email_account` row — never another BD's.
  */
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
@@ -68,25 +67,6 @@ export async function syncEmailAccountNowAction(): Promise<ConnectionActionResul
     if (!cooldown.ok) return { ok: false, reason: cooldown.reason };
     await syncOneAccountNow(account);
     revalidatePath("/account/email");
-    return { ok: true };
-  } catch (err) {
-    return actionFailure(err);
-  }
-}
-
-/**
- * Reconnect banner's close button (email-sync.html:372; README decision 5).
- * Persisted on `email_account` (not `localStorage`) so it stays dismissed
- * across devices — see the column's doc comment in src/db/schema.ts.
- */
-export async function dismissReconnectBannerAction(): Promise<ConnectionActionResult> {
-  try {
-    const me = await getCurrentBd();
-    await db
-      .update(emailAccount)
-      .set({ reconnectBannerDismissedAt: new Date() })
-      .where(eq(emailAccount.bdId, me.id));
-    revalidatePath("/", "layout");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

@@ -1328,19 +1328,24 @@ export const es: typeof en = {
     saveError: "No se pudo guardar el resultado. Inténtalo de nuevo.",
   },
 
-  reconnectBanner: {
-    message:
-      "Reconectá Gmail para activar la sincronización automática de correos: vamos a registrar las respuestas de tus contactos sin que tengas que hacer nada.",
+  // Shell banner for the three cases where the BD's Gmail stops feeding the
+  // CRM and only reconnecting fixes it (red), plus the amber ones
+  // (connectionBanner.ts). Never dismissible. Each red case is
+  // lead + strong + tail; `expiredTailSince` takes {since} ("hace 3 horas").
+  connectionBanner: {
     cta: "Reconectar Gmail",
-    closeAria: "Cerrar aviso",
-  },
-
-  // Shell banner while Gmail is connected but not syncing (syncHealth.ts).
-  // Not dismissible on purpose: hiding an outage is how it went unnoticed.
-  syncHealthBanner: {
+    strong: "Es clave que lo reconectes ahora:",
+    disconnectedLead: "Tu Gmail está desconectado.",
+    disconnectedTail: "mientras tanto tus correos no entran al CRM y tus secuencias quedan frenadas.",
+    expiredLead: "Se venció el permiso de tu Gmail.",
+    expiredTailSince: "desde {since} tus correos no entran al CRM.",
+    expiredTail: "tus correos no entran al CRM.",
+    missingScopeLead: "A tu Gmail le falta el permiso de lectura.",
+    missingScopeTail: "sin él, las respuestas de tus contactos no entran al CRM.",
+    stale: "Tus correos se están sincronizando con demora. Si sigue así en una hora, reconectá tu Gmail.",
+    staleCta: "Ver estado",
     failing: "Gmail no se está sincronizando: los correos nuevos no llegan al CRM.",
-    stale: "Hace más de una hora que Gmail no se sincroniza.",
-    cta: "Ver detalle",
+    failingCta: "Ver detalle",
   },
 
   // `/account/linkedin-messages` (linkedin-import-visible mockup, screen 2).
