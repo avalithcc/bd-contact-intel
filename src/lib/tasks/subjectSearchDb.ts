@@ -3,15 +3,11 @@
  * Split from subjectSearch.ts's pure row mappers so those stay unit-testable
  * without a live DATABASE_URL (same convention as bulkOwner.ts/bulkOwnerDb.ts).
  */
-import { and, ilike, or, sql } from "drizzle-orm";
+import { and, or, sql } from "drizzle-orm";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import { company, person } from "@/db/schema";
 import { companySubjectSearchResult, personSubjectSearchResult, type TaskSubjectSearchResult } from "./subjectSearch";
-
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
 
 const PERSON_RESULT_LIMIT = 8;
 const COMPANY_RESULT_LIMIT = 5;
@@ -27,8 +23,6 @@ export async function searchTaskSubjects(query: string): Promise<TaskSubjectSear
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
-  const pattern = `%${escapeLikeWildcards(trimmed)}%`;
-
   const [personRows, companyRows] = await Promise.all([
     db
       .select({ id: person.id, firstName: person.firstName, lastName: person.lastName, company: person.company })
@@ -37,9 +31,9 @@ export async function searchTaskSubjects(query: string): Promise<TaskSubjectSear
         and(
           sql`${person.mergedIntoId} is null`,
           or(
-            ilike(person.firstName, pattern),
-            ilike(person.lastName, pattern),
-            ilike(sql`${person.firstName} || ' ' || ${person.lastName}`, pattern),
+            termContainsSql(person.firstName, trimmed),
+            termContainsSql(person.lastName, trimmed),
+            termContainsSql(sql`${person.firstName} || ' ' || ${person.lastName}`, trimmed),
           ),
         ),
       )
@@ -47,7 +41,7 @@ export async function searchTaskSubjects(query: string): Promise<TaskSubjectSear
     db
       .select({ companyKey: company.companyKey, displayName: company.displayName })
       .from(company)
-      .where(ilike(company.displayName, pattern))
+      .where(termContainsSql(company.displayName, trimmed))
       .limit(COMPANY_RESULT_LIMIT),
   ]);
 

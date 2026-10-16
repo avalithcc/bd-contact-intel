@@ -7,7 +7,7 @@
 import { and, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { activity, personPropertyHistory } from "@/db/schema";
-import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { workDoneAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTIES } from "@/lib/identity/ownerRule";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 
@@ -39,7 +39,7 @@ export function readImportOwnerPersonIds(executor: Executor, personIds?: readonl
 }
 
 /**
- * Latest effective activity time per (person, BD): `person_id` + `actor_bd_id`
+ * Latest time of WORK per (person, BD) (workDoneAtSql: a soft-deleted note still counts, deleting its text never reassigns a contact): `person_id` + `actor_bd_id`
  * + the shared effective-time rule (status_backfill uses metadata.originalAt;
  * task edits are not touches), never the denormalized contact_owner_bd_id.
  * Types in NO_PROGRESS_ACTIVITY_TYPES (call attempts) are not touches either:
@@ -54,7 +54,7 @@ export async function readOwnerTouches(
     .select({
       personId: activity.personId,
       bdId: activity.actorBdId,
-      lastAt: sql<Date | string | null>`max(${effectiveActivityAtSql()})`,
+      lastAt: sql<Date | string | null>`max(${workDoneAtSql()})`,
     })
     .from(activity)
     .where(

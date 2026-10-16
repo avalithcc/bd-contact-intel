@@ -60,7 +60,7 @@ test("companyListConditions: composes with stage + account type + client status"
 test("companyListConditions: composes with the text search (name search narrowed to missing LinkedIn)", () => {
   const q = render(companyListConditions({ ...NO_FILTERS, linkedin: "without", q: "acme" }));
   assert.match(q.sql, /"linkedin_url" is null/i);
-  assert.match(q.sql, /"display_name" ilike/i);
+  assert.match(q.sql, /unaccent\("company"\."display_name"\) ilike/i);
 });
 
 test("companyListConditions: unknown linkedin value in the type's absence changes nothing", () => {

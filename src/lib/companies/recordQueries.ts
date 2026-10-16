@@ -69,6 +69,15 @@ async function getCompanyPersonIds(companyKey: string): Promise<string[]> {
 export type { CompanyTimelineEntry as CompanyTimelineRow } from "@/lib/companies/companyTimelineEntry";
 
 /**
+ * The Activity tab's base WHERE, shared by the rows and the counts. A soft-deleted Contact note STAYS in the rows (the tab
+ * renders a tombstone, never a gap) with its text withheld by buildCompanyTimelineEntry; the counts exclude it.
+ */
+function companyTimelineBaseWhere(companyKey: string, personIds: string[]) {
+  const subject = personIds.length ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds)) : eq(activity.companyKey, companyKey);
+  return and(subject, notFoldedAttemptSql());
+}
+
+/**
  * Narrows the Activity tab's base WHERE (company row OR a row from any
  * person at this company) down to one filter's own rows, entirely in SQL —
  * the scoped-fetch counterpart of `filterTimelineRows` (recordMappers.ts).
@@ -107,9 +116,7 @@ export async function getCompanyTimeline(
 ): Promise<CompanyTimelineEntry[]> {
   const personIds = await getCompanyPersonIds(companyKey);
 
-  const baseWhere = personIds.length
-    ? and(or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds)), notFoldedAttemptSql())
-    : and(eq(activity.companyKey, companyKey), notFoldedAttemptSql());
+  const baseWhere = companyTimelineBaseWhere(companyKey, personIds);
   const filterCondition = companyFilterCondition(opts.filter);
 
   const rows = await db
@@ -134,6 +141,8 @@ export async function getCompanyTimeline(
       metadata: activity.metadata,
       actorBdId: activity.actorBdId,
       personId: activity.personId,
+      deletedAt: activity.deletedAt,
+      deletedByBdId: activity.deletedByBdId,
     })
     .from(activity)
     .where(filterCondition ? and(baseWhere, filterCondition) : baseWhere)
@@ -145,17 +154,19 @@ export async function getCompanyTimeline(
   // Batched name lookups for whichever person/actor ids actually showed up
   // among the (already bounded) rows above — never a per-row query.
   const rowPersonIds = [...new Set(rows.map((r) => r.personId).filter((id): id is string => !!id))];
-  const rowActorIds = [...new Set(rows.map((r) => r.actorBdId).filter((id): id is string => !!id))];
+  const rowActorIds = [...new Set(rows.flatMap((r) => [r.actorBdId, r.deletedByBdId]).filter((id): id is string => !!id))];
   const [people, actors] = await Promise.all([
     rowPersonIds.length
       ? db.select({ id: person.id, firstName: person.firstName, lastName: person.lastName }).from(person).where(inArray(person.id, rowPersonIds))
       : Promise.resolve([]),
-    rowActorIds.length ? db.select({ id: bd.id, name: bd.name }).from(bd).where(inArray(bd.id, rowActorIds)) : Promise.resolve([]),
+    rowActorIds.length ? db.select({ id: bd.id, name: bd.name, role: bd.role }).from(bd).where(inArray(bd.id, rowActorIds)) : Promise.resolve([]),
   ]);
   const personNameById = new Map(people.map((p) => [p.id, [p.firstName, p.lastName].filter(Boolean).join(" ") || null]));
   const actorNameById = new Map(actors.map((a) => [a.id, a.name]));
 
-  return rows.map((r) => buildCompanyTimelineEntry(r, personNameById, actorNameById));
+  const adminIds = new Set(actors.filter((a) => a.role === "admin").map((a) => a.id));
+
+  return rows.map((r) => buildCompanyTimelineEntry(r, personNameById, actorNameById, adminIds));
 }
 
 /**
@@ -174,16 +185,15 @@ export async function getCompanyTimeline(
  */
 export async function getCompanyTimelineFilterCounts(companyKey: string): Promise<CompanyTimelineFilterCounts> {
   const personIds = await getCompanyPersonIds(companyKey);
-  const baseWhere = personIds.length
-    ? and(or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds)), notFoldedAttemptSql())
-    : and(eq(activity.companyKey, companyKey), notFoldedAttemptSql());
+  const baseWhere = companyTimelineBaseWhere(companyKey, personIds);
 
   const [row] = await db
     .select({
-      all: sql<number>`count(*)`,
-      note: sql<number>`count(*) filter (where ${activity.type} = 'note' and ${activity.personId} is null)`,
-      stageChange: sql<number>`count(*) filter (where ${activity.type} = 'status_change' and ${activity.personId} is null)`,
-      contactActivity: sql<number>`count(*) filter (where ${activity.personId} is not null)`,
+      // A tombstone is shown but not counted: it is no longer a note or an activity anyone can read.
+      all: sql<number>`count(*) filter (where ${activity.deletedAt} is null)`,
+      note: sql<number>`count(*) filter (where ${activity.type} = 'note' and ${activity.personId} is null and ${activity.deletedAt} is null)`,
+      stageChange: sql<number>`count(*) filter (where ${activity.type} = 'status_change' and ${activity.personId} is null and ${activity.deletedAt} is null)`,
+      contactActivity: sql<number>`count(*) filter (where ${activity.personId} is not null and ${activity.deletedAt} is null)`,
     })
     .from(activity)
     .where(baseWhere);

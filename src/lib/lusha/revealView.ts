@@ -12,7 +12,7 @@ import { isOutcomeUnknown, resolveRevealState, type LatestRows, type RevealState
 /** Shown before any search exists, labelled "~"; the real price comes from the search's own canReveal list afterwards. */
 const ESTIMATED_FIELD_PRICE = { emails: 1, phones: 5 } as const;
 
-export type LushaNote = "no_value" | "no_match" | "rejected" | "blocked" | "already_held" | "outcome_unknown" | "not_revealable" | "write_failed" | "capped" | "unconfigured";
+export type LushaNote = "no_value" | "no_match" | "rejected" | "blocked" | "already_held" | "outcome_unknown" | "not_revealable" | "write_failed" | "capped" | "unconfigured" | "not_enabled";
 export type LushaField = "emails" | "phones";
 
 export interface LushaFieldView {
@@ -54,6 +54,8 @@ const identityOf = (row: { payload: unknown } | null | undefined): IdentityField
 
 export function buildLushaView(i: {
   config: LushaConfigResult;
+  /** The viewing BD's Lusha switch (lusha-per-bd). Off: no purchase is offered, only already-revealed values show. */
+  enabled: boolean;
   rows: LatestRows;
   spentToday: number;
   cap: number;
@@ -89,6 +91,8 @@ export function buildLushaView(i: {
     }
     // Never offered: a Contact that can already be sequenced, or one with no phone column left to place a number in.
     if (field === "emails" ? reachable : !!(person.phone && person.mobilePhone)) return out;
+    // Switched off for this BD: no button (a grey one invites "why?"), just the reason. The server refuses it too.
+    if (!i.enabled) return { ...out, twin: null, note: "not_enabled" };
 
     // A capped action keeps its priced control, disabled: describe what is open without the cap, then close it.
     const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, cap: Number.MAX_SAFE_INTEGER }, i.config) : live;

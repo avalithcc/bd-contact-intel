@@ -1,4 +1,5 @@
-import { and, asc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import { activity, bd, lead, leadSource, type NewLead } from "@/db/schema";
 import type { LeadDraft } from "./csv";
@@ -27,11 +28,6 @@ import { requireAdmin } from "@/lib/auth/requireAdmin";
 // a pathological paste-in doesn't blow up the query into dozens of OR'd
 // conditions — same convention as src/lib/queries.ts#searchCondition.
 const MAX_SEARCH_TOKENS = 5;
-
-const LIKE_WILDCARD_RE = /[%_\\]/g;
-function escapeLikeWildcards(value: string): string {
-  return value.replace(LIKE_WILDCARD_RE, (ch) => `\\${ch}`);
-}
 
 /**
  * Resolves each distinct raw `owner` value from the source CSVs (e.g.
@@ -256,13 +252,10 @@ export interface LeadsPage {
   totalPages: number;
 }
 
-function nameSearchCondition(q: string) {
+export function nameSearchCondition(q: string) {
   const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
   if (!tokens.length) return undefined;
-  const tokenConditions = tokens.map((token) => {
-    const pattern = `%${escapeLikeWildcards(token)}%`;
-    return or(ilike(lead.firstName, pattern), ilike(lead.lastName, pattern));
-  });
+  const tokenConditions = tokens.map((token) => or(termContainsSql(lead.firstName, token), termContainsSql(lead.lastName, token)));
   return and(...tokenConditions);
 }
 
@@ -270,6 +263,11 @@ function ownerFilterCondition(owner: OwnerFilterValue, myBdId: string) {
   if (owner === "mine") return eq(lead.ownerBdId, myBdId);
   if (owner === "unassigned") return isNull(lead.ownerBdId);
   return eq(lead.ownerBdId, owner);
+}
+
+export function leadCompanyCondition(companyTerm: string): SQL {
+  const term = companyTerm.trim();
+  return or(termContainsSql(lead.companyDisplay, term), termContainsSql(lead.companyRaw, term))!;
 }
 
 export async function listLeads(
@@ -284,10 +282,7 @@ export async function listLeads(
     if (cond) where.push(cond);
   }
   if (filters.company) {
-    const pattern = `%${escapeLikeWildcards(filters.company.trim())}%`;
-    where.push(
-      or(ilike(lead.companyDisplay, pattern), ilike(lead.companyRaw, pattern))!,
-    );
+    where.push(leadCompanyCondition(filters.company));
   }
   if (filters.industryGroup) where.push(eq(lead.industryGroup, filters.industryGroup));
   if (filters.seniority) where.push(eq(lead.seniority, filters.seniority));

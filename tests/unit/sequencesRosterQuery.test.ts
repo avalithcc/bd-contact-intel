@@ -70,5 +70,5 @@ test("search reuses the Contacts list company match (what is displayed), not the
   const q = render(buildRosterCandidatesQuery({ limit: 10, search: "acme" }));
   const sql = q.sql.replace(/\s+/g, " ");
   assert.doesNotMatch(sql, /concat_ws\(' ', p\.first_name, p\.last_name, p\.company\)/);
-  assert.match(sql, /p\.company ilike \$\d+ or \(\(p\.company is null or p\.company = ''\) and exists \(select 1 from "company" where "company"\."company_key" = p\.company_key and "company"\."display_name" ilike \$\d+\)\)/);
+  assert.match(sql, /unaccent\(p\.company\) ilike \(select unaccent\(\$\d+\)\) or \(\(p\.company is null or p\.company = ''\) and exists \(select 1 from "company" where "company"\."company_key" = p\.company_key and unaccent\("company"\."display_name"\) ilike \(select unaccent\(\$\d+\)\)\)\)/);
 });

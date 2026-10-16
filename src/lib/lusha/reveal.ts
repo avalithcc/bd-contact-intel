@@ -30,6 +30,8 @@ export interface Subject {
 export interface RevealPorts {
   config: LushaConfigResult;
   cap: number;
+  /** The acting BD's Lusha switch (lusha-per-bd), read fresh from the DB on every call. */
+  isLushaEnabled(bdId: string): Promise<boolean>;
   /** Throws ContactNotFoundError / ContactMergedError (assertContactEditableById). */
   assertEditable(personId: string): Promise<void>;
   loadSubject(personId: string): Promise<Subject | null>;
@@ -87,8 +89,10 @@ function eligible(s: Subject, field: RevealField): boolean {
 
 type Prepared = { subject: Subject; rows: LatestRows; state: ReturnType<typeof resolveRevealState> };
 
-async function prepare(personId: string, field: RevealField, p: RevealPorts): Promise<RevealFailure | Prepared> {
+async function prepare(personId: string, field: RevealField, actorBdId: string, p: RevealPorts): Promise<RevealFailure | Prepared> {
   if (!p.config.ok) return no(p.config.reason === "not_production" ? "lusha_off" : "lusha_unconfigured");
+  // The per-BD switch, ahead of every read, reservation and Lusha call. reserve() checks it again inside the cap's lock.
+  if (!(await p.isLushaEnabled(actorBdId))) return no("lusha_not_enabled");
   await p.assertEditable(personId); // a merged or missing Contact is refused here, before anything is read or reserved
   const subject = await p.loadSubject(personId);
   if (!subject || !eligible(subject, field)) return no("lusha_not_eligible");
@@ -119,7 +123,7 @@ const payloadOf = (row: { payload: unknown } | null | undefined): Record<string,
   typeof row?.payload === "object" && row.payload !== null ? (row.payload as Record<string, unknown>) : {};
 
 export async function searchLushaContact(input: { personId: string; field: RevealField; actorBdId: string }, p: RevealPorts): Promise<SearchResult> {
-  const prep = await prepare(input.personId, input.field, p);
+  const prep = await prepare(input.personId, input.field, input.actorBdId, p);
   if ("ok" in prep) return prep;
   const { subject, rows, state } = prep;
   switch (state.kind) {
@@ -194,6 +198,8 @@ function reserveFailure(r: Extract<ReserveResult, { ok: false }>): RevealFailure
     case "merged":
     case "not_found":
       return no(r.reason);
+    case "not_enabled":
+      return no("lusha_not_enabled");
     default: // no_search, no_price_list, not_revealable, already_revealed
       return no("lusha_not_eligible");
   }
@@ -202,7 +208,7 @@ function reserveFailure(r: Extract<ReserveResult, { ok: false }>): RevealFailure
 /** `expect` is what the BD confirmed on screen: the search the match belongs to and the price shown. Anything else is refused. */
 export async function revealLushaField(input: { personId: string; field: RevealField; actorBdId: string; expect: { searchId: string; price: number } }, p: RevealPorts): Promise<RevealResult> {
   const { personId, field, actorBdId } = input;
-  const prep = await prepare(personId, field, p);
+  const prep = await prepare(personId, field, actorBdId, p);
   if ("ok" in prep) return prep;
   const { rows, state } = prep;
   switch (state.kind) {

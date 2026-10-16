@@ -21,6 +21,9 @@ const PANE = `${CONTACTS}[id]/AboutPane.tsx`;
 const PAGE = `${CONTACTS}[id]/page.tsx`;
 // The contacts LIST reads the ledger once per page to warn before dialling a number Lusha flagged: a read only, no spend, no client.
 const LIST = `${CONTACTS}page.tsx`;
+const ADMIN = "src/app/(app)/admin/lusha/";
+const ADMIN_PAGE = `${ADMIN}page.tsx`;
+const ADMIN_ACTIONS = `${ADMIN}actions.ts`;
 const LIBRARY_DIR = "src/lib/lusha/";
 const CONFIG = `${LIBRARY_DIR}config.ts`;
 
@@ -73,8 +76,10 @@ test("only the actions file can reach the network client or the real ports", () 
   assert.deepEqual(importers(/lib\/lusha\/(client|ports)$/, outside, true), [ACTIONS]);
 });
 
-test("outside the library, only the actions, the record page and the list (a read-only flag lookup) import it at runtime", () => {
-  assert.deepEqual(importers(LIB), [ACTIONS, PAGE, LIST].sort());
+test("outside the library, only the actions, the record page, the list (a read-only flag lookup) and the admin switch import it at runtime", () => {
+  // lusha-per-bd: the admin page reads the report and the day's spend; its action flips the switch. Neither can spend a credit
+  // (no client, no ports, no reserve): the "network client or real ports" test above still pins that.
+  assert.deepEqual(importers(LIB), [ACTIONS, PAGE, LIST, ADMIN_PAGE, ADMIN_ACTIONS].sort());
   // Client code may only use the library's TYPES; a runtime import would ship ledger or client code to the browser.
   const clientRuntime = importers(LIB, outside.filter(isClient));
   assert.deepEqual(clientRuntime, []);
@@ -98,7 +103,8 @@ test("the Lusha fetch always times out before the function that hosts the action
 
 test("nothing registers Lusha as a route, a page or a cron", () => {
   const appFiles = walk(join(SRC, "app")).map(rel);
-  assert.deepEqual(appFiles.filter((f) => /(^|\/)(page\.tsx|route\.ts)$/.test(f) && /lusha/i.test(f)), []);
+  // The one deliberate exception: the admin switch/report page (lusha-per-bd), which can spend nothing.
+  assert.deepEqual(appFiles.filter((f) => /(^|\/)(page\.tsx|route\.ts)$/.test(f) && /lusha/i.test(f)), [ADMIN_PAGE]);
   assert.deepEqual(appFiles.filter((f) => /(^|\/)route\.ts$/.test(f) && /lusha/i.test(read(f))), []);
   assert.doesNotMatch(readFileSync(join(ROOT, "vercel.json"), "utf8"), /lusha/i);
 });

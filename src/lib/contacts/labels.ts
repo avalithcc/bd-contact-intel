@@ -128,6 +128,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorOwnerInvalid;
     case "admin_required":
       return l.errorAdminRequired;
+    case "note_delete_forbidden":
+      return l.errorNoteDeleteForbidden;
     case "company_not_found":
       return l.errorCompanyNotFound;
     case "lusha_off":
@@ -164,6 +166,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorLushaInsufficientData;
     case "lusha_stale":
       return l.errorLushaStale;
+    case "lusha_not_enabled":
+      return l.errorLushaNotEnabled;
     case "unexpected":
       return l.genericError;
     case "unconfirmed":

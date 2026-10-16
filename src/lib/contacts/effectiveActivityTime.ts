@@ -74,23 +74,34 @@ function isNonTouchActivityType(type: string): boolean {
  * date to render) falls back to `row.createdAt` itself at the call site,
  * same as the SQL twin's callers fall back via `coalesce`.
  */
-export function resolveEffectiveActivityAt(row: ActivityRowForStatus): Date | null {
-  if (isNonTouchActivityType(row.type)) return null;
+export function resolveEffectiveActivityAt(row: ActivityRowForStatus & { deletedAt?: Date | null }): Date | null {
+  // A soft-deleted note (contact-note-delete) is no longer an activity anyone can see, so it is not a "touch" either.
+  if (row.deletedAt || isNonTouchActivityType(row.type)) return null;
   return activityRowToStatusEvent(row).at;
 }
 
 /**
- * SQL-side twin of `resolveEffectiveActivityAt` — same rule, same guard
- * (only casts when `metadata->>'originalAt'` already looks like an ISO
- * datetime), so a query can `ORDER BY`/aggregate on a row's effective time
- * without pulling every row into JS first. `@/db/schema`-only import (no
- * `@/db` client), so this stays importable — and this file's tests stay
- * runnable — without a live DATABASE_URL, same as every other pure helper
- * here.
+ * The ONE time rule, in SQL. Two named entry points below ask two DIFFERENT questions of the same rows, and they differ in
+ * exactly one branch (a soft-deleted note). Do not merge them back into one function: that is the mistake this split prevents.
+ *
+ *  - `effectiveActivityAtSql()`  "what should the BD SEE as activity?"  A soft-deleted note is NULL here: it is no longer
+ *    shown, so it is not "Última actividad", not a day-filter match, not a count in a display. Use it for anything rendered.
+ *  - `workDoneAtSql()`  "what WORK actually happened?"  A deleted note still has its time, because the touch happened and
+ *    deleting its text does not un-happen it (owner decision: deleting a note is text cleanup, never a reassignment or an
+ *    un-counting). Use it where the answer has a CONSEQUENCE beyond display: today the owner rule's evidence
+ *    (identity/ownerRuleDb.ts#readOwnerTouches). The "worked today" reads (queueSelection.ts#workedTodayAtSql and its two
+ *    raw-text twins) are the same second question and likewise ignore `deleted_at`.
+ *
+ * Both share `activityTimeCase`, so the status_backfill / occurredAt / non-touch rules cannot drift between them.
+ *
+ * SQL-side twin of `resolveEffectiveActivityAt` — same rule, same guard (only casts when `metadata->>'originalAt'` already
+ * looks like an ISO datetime), so a query can `ORDER BY`/aggregate on a row's effective time without pulling every row into
+ * JS first. `@/db/schema`-only import (no `@/db` client), so this stays importable without a live DATABASE_URL.
  */
-export function effectiveActivityAtSql() {
+function activityTimeCase(hideDeleted: boolean) {
+  const deletedBranch = hideDeleted ? sql`when ${activity.deletedAt} is not null then null ` : sql``;
   return sql`(case
-    when ${activity.type} in (${sql.join(
+    ${deletedBranch}when ${activity.type} in (${sql.join(
       NON_TOUCH_ACTIVITY_TYPES.map((t) => sql`${t}`),
       sql`, `,
     )}) then null
@@ -100,6 +111,16 @@ export function effectiveActivityAtSql() {
       sql`, `,
     )}) and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
     else ${activity.createdAt} end)`;
+}
+
+/** What the BD SEES as activity: a soft-deleted note is NULL. See `activityTimeCase`'s doc for the two-question split. */
+export function effectiveActivityAtSql() {
+  return activityTimeCase(true);
+}
+
+/** What WORK happened: identical to `effectiveActivityAtSql()` except a soft-deleted note keeps its time. See above. */
+export function workDoneAtSql() {
+  return activityTimeCase(false);
 }
 
 /** Same semantics as the SQL EXISTS filter's `effectiveAt >= since` check —

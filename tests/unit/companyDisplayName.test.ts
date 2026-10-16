@@ -110,11 +110,11 @@ test("companyNameMatchCondition renders the same rule for the person table and f
   const { companyNameMatchCondition } = await import("@/lib/contacts/companyNameCondition");
   const render = (q: ReturnType<typeof companyNameMatchCondition>) => new PgDialect().sqlToQuery(q).sql;
   assert.equal(
-    render(companyNameMatchCondition("%a%")),
-    `("person"."company" ilike $1 or (("person"."company" is null or "person"."company" = '') and exists (select 1 from "company" where "company"."company_key" = "person"."company_key" and "company"."display_name" ilike $2)))`,
+    render(companyNameMatchCondition("a")),
+    `(unaccent("person"."company") ilike (select unaccent($1)) or (("person"."company" is null or "person"."company" = '') and exists (select 1 from "company" where "company"."company_key" = "person"."company_key" and unaccent("company"."display_name") ilike (select unaccent($2)))))`,
   );
   assert.equal(
-    render(companyNameMatchCondition("%a%", { company: sql`p.company`, companyKey: sql`p.company_key` })),
-    render(companyNameMatchCondition("%a%")).replaceAll('"person"."company_key"', "p.company_key").replaceAll('"person"."company"', "p.company"),
+    render(companyNameMatchCondition("a", { company: sql`p.company`, companyKey: sql`p.company_key` })),
+    render(companyNameMatchCondition("a")).replaceAll('"person"."company_key"', "p.company_key").replaceAll('"person"."company"', "p.company"),
   );
 });

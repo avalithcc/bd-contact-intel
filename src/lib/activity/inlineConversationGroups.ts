@@ -108,6 +108,7 @@ export function unlistedMailToEntry(m: InlineMail): TimelineEntry {
     actorBdId: m.bdId,
     actorName: m.bdName,
     visible: true,
+    deleted: null,
     metadata: {
       gmailMessageId: m.gmailMessageId,
       gmailThreadId: m.gmailThreadId,

@@ -3,6 +3,7 @@
 // fetch and never reach the network. With the gate closed the key is empty and nothing here can be called.
 
 import { assertContactEditableById } from "@/lib/contacts/queries";
+import { isLushaEnabled } from "./adminDb";
 import { getAccountUsage, enrichContact, searchContact, type FetchFn } from "./client";
 import { getDailyCreditCap } from "./cap";
 import { getLushaConfig } from "./config";
@@ -15,6 +16,7 @@ export function livePorts(env: Record<string, string | undefined> = process.env,
   return {
     config,
     cap: getDailyCreditCap(env),
+    isLushaEnabled: (bdId) => isLushaEnabled(bdId),
     assertEditable: assertContactEditableById,
     loadSubject: (id) => loadRevealSubject(id),
     getRevealState: (id) => getRevealState(id),

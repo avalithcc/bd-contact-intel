@@ -11,6 +11,7 @@ import { groupTimelineEntries } from "@/lib/contacts/timelineGrouping";
 import { MailIcon, HistoryIcon, NoteIcon, MeetingIcon, TasksIcon } from "@/components/icons";
 import { useToast } from "@/components/ToastProvider";
 import { getCompanyTimelineFilterEntriesAction } from "../actions";
+import { NoteTombstone, type NoteTombstoneLabels } from "@/app/(app)/contacts/[id]/NoteTombstone";
 
 export interface CompanyTimelineLabels {
   timelineFilterAll: string;
@@ -101,12 +102,14 @@ export function CompanyTimeline({
   counts,
   activeFilter,
   labels: l,
+  tombstoneLabels,
 }: {
   companyKey: string;
   rows: CompanyTimelineViewRow[];
   counts: CompanyTimelineFilterCounts;
   activeFilter: CompanyActivityFilter;
   labels: CompanyTimelineLabels;
+  tombstoneLabels: NoteTombstoneLabels;
 }) {
   const { showToast } = useToast();
   const [cache, setCache] = useState<Partial<Record<CompanyActivityFilter, CompanyTimelineViewRow[]>>>(() => ({
@@ -257,6 +260,20 @@ export function CompanyTimeline({
             <div className="tl">
               {group.items.map(({ entry, at }) => {
                 const row = displayedRows.find((r) => r.id === entry.id)!;
+                if (row.deleted) {
+                  // Same tombstone as the Contact timeline: a note existed, who wrote it, who deleted it. Never a gap.
+                  return (
+                    <NoteTombstone
+                      key={entry.id}
+                      labels={tombstoneLabels}
+                      authorName={row.actorName}
+                      deleterName={row.deleted.byName}
+                      deletedByAdmin={row.deleted.byIsAdmin}
+                      writtenAtText={formatWhen(at)}
+                      deletedAtText={formatWhen(row.deleted.at)}
+                    />
+                  );
+                }
                 const Icon = TYPE_ICON[entry.type] ?? NoteIcon;
                 return (
                   <div key={entry.id} className="tl-item">

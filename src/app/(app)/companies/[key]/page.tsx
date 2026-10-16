@@ -254,6 +254,13 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                     counts={timelineCounts}
                     activeFilter={activityFilter}
                     labels={l}
+                    tombstoneLabels={{
+                      noteDeletedTitle: dict.contactRecord.noteDeletedTitle,
+                      noteDeletedWrittenBy: dict.contactRecord.noteDeletedWrittenBy,
+                      noteDeletedDeletedBy: dict.contactRecord.noteDeletedDeletedBy,
+                      noteDeletedAdminSuffix: dict.contactRecord.noteDeletedAdminSuffix,
+                      timelineSystemActor: dict.contactRecord.timelineSystemActor,
+                    }}
                   />
                 ),
               },

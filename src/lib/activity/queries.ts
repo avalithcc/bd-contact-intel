@@ -1,4 +1,5 @@
-import { and, desc, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, bd, type Activity, type NewActivity } from "@/db/schema";
 import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
@@ -92,7 +93,8 @@ export async function getActivities(
     conditions.push(or(...typeConditions)!);
   }
 
-  const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+  conditions.push(isNull(activity.deletedAt));
+  const whereCondition = and(...conditions);
 
   const [total] = await db
     .select({ count: sql<number>`count(*)` })
@@ -120,7 +122,7 @@ export async function getActivitiesByLead(
   return db
     .select()
     .from(activity)
-    .where(eq(activity.leadId, leadId))
+    .where(and(eq(activity.leadId, leadId), isNull(activity.deletedAt)))
     .orderBy(desc(activity.createdAt))
     .limit(limit);
 }
@@ -132,7 +134,7 @@ export async function getActivitiesByCompany(
   return db
     .select()
     .from(activity)
-    .where(eq(activity.companyKey, companyKey))
+    .where(and(eq(activity.companyKey, companyKey), isNull(activity.deletedAt)))
     .orderBy(desc(activity.createdAt))
     .limit(limit);
 }
@@ -144,7 +146,7 @@ export async function getActivitiesByContact(
   return db
     .select()
     .from(activity)
-    .where(eq(activity.contactId, contactId))
+    .where(and(eq(activity.contactId, contactId), isNull(activity.deletedAt)))
     .orderBy(desc(activity.createdAt))
     .limit(limit);
 }
@@ -212,6 +214,7 @@ export async function getPersonTimeline(
 ): Promise<PersonTimelinePage> {
   const types = opts.pill ? TIMELINE_PILL_GROUPS[opts.pill] : TIMELINE_ACTIVITY_TYPES;
   const notFolded = notFoldedAttemptSql();
+  const deleter = alias(bd, "note_deleter");
   const typeCondition = and(eq(activity.personId, personId), or(...types.map((t) => eq(activity.type, t))), notFolded);
 
   const [rows, countRows] = await Promise.all([
@@ -223,9 +226,14 @@ export async function getPersonTimeline(
         actorBdId: activity.actorBdId,
         actorName: bd.name,
         metadata: activity.metadata,
+        deletedAt: activity.deletedAt,
+        deletedByBdId: activity.deletedByBdId,
+        deletedByName: deleter.name,
+        deletedByRole: deleter.role,
       })
       .from(activity)
       .leftJoin(bd, eq(bd.id, activity.actorBdId))
+      .leftJoin(deleter, eq(deleter.id, activity.deletedByBdId))
       .where(typeCondition)
       // DISPLAY time, not "last touch" time — see timelineOrder.ts's doc
       // comment for why this timeline must NOT use `NULLS LAST` here.
@@ -234,7 +242,8 @@ export async function getPersonTimeline(
     db
       .select({ type: activity.type, count: sql<number>`count(*)` })
       .from(activity)
-      .where(and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t))), notFolded))
+      // A deleted note still renders (as a tombstone) but is not a note any more: it does not count in any pill.
+      .where(and(eq(activity.personId, personId), or(...TIMELINE_ACTIVITY_TYPES.map((t) => eq(activity.type, t))), notFolded, isNull(activity.deletedAt)))
       .groupBy(activity.type),
   ]);
 

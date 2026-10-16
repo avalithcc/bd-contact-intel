@@ -6,6 +6,7 @@
 import { sql } from "drizzle-orm";
 import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
 import { openFreshPostingSql } from "@/lib/hiring/openPosting";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 
 export const ROSTER_PICKER_MAX_LIMIT = 200;
 
@@ -35,13 +36,13 @@ export const companyNameColumnsSql = sql`p.company, cn.display_name as "companyC
 /** The name the user SEES as a sort key (`resolveCompanyDisplayName` in SQL). */
 export const displayedCompanySql = sql`coalesce(p.company, cn.display_name)`;
 /** The Contacts list's company match, spelled for a `from person p` read. */
-export const companyMatchSql = (pattern: string) => companyNameMatchCondition(pattern, { company: sql`p.company`, companyKey: sql`p.company_key` });
+export const companyMatchSql = (term: string) => companyNameMatchCondition(term, { company: sql`p.company`, companyKey: sql`p.company_key` });
 
 export function buildRosterCandidatesQuery(opts: { limit: number; search?: string }) {
   const limit = Math.min(Math.max(Math.trunc(opts.limit) || 1, 1), ROSTER_PICKER_MAX_LIMIT);
   const term = opts.search?.trim();
   const search = term
-    ? sql`and (concat_ws(' ', p.first_name, p.last_name) ilike ${`%${term}%`} or ${companyMatchSql(`%${term}%`)})`
+    ? sql`and (${termContainsSql(sql`concat_ws(' ', p.first_name, p.last_name)`, term)} or ${companyMatchSql(term)})`
     : sql``;
   return sql`
     select p.id as person_id, p.first_name, p.last_name, p.email, p.job_title,

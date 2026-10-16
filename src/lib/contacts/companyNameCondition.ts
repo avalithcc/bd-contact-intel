@@ -23,6 +23,7 @@
  */
 import { sql, type SQL } from "drizzle-orm";
 import { company, person } from "@/db/schema";
+import { termContainsSql } from "@/lib/search/accentInsensitive";
 
 export interface PersonCompanyColumns {
   company: SQL;
@@ -31,6 +32,10 @@ export interface PersonCompanyColumns {
 
 const PERSON_COLUMNS: PersonCompanyColumns = { company: sql`${person.company}`, companyKey: sql`${person.companyKey}` };
 
-export function companyNameMatchCondition(pattern: string, cols: PersonCompanyColumns = PERSON_COLUMNS): SQL {
-  return sql`(${cols.company} ilike ${pattern} or ((${cols.company} is null or ${cols.company} = '') and exists (select 1 from ${company} where ${company.companyKey} = ${cols.companyKey} and ${company.displayName} ilike ${pattern})))`;
+/**
+ * `term` is the user-typed text, NOT a LIKE pattern: it goes through `termContainsSql`, so the match ignores case AND
+ * accents and a typed `%` or `_` is a literal character (the app-wide search rule, src/lib/search/accentInsensitive.ts).
+ */
+export function companyNameMatchCondition(term: string, cols: PersonCompanyColumns = PERSON_COLUMNS): SQL {
+  return sql`(${termContainsSql(cols.company, term)} or ((${cols.company} is null or ${cols.company} = '') and exists (select 1 from ${company} where ${company.companyKey} = ${cols.companyKey} and ${termContainsSql(company.displayName, term)})))`;
 }

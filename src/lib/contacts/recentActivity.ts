@@ -12,6 +12,23 @@ export interface RecentActivityCandidate {
   actorName: string | null;
 }
 
+/**
+ * Candidates from the Contact timeline's entries. A tombstone (soft-deleted note) is skipped: it is shown on the timeline but
+ * it is not an activity any more, so it must not be the "Última actividad" here while the list column reads "—" for the same contact.
+ */
+export function timelineEntryCandidates(
+  entries: readonly { type: string; at: Date; actorName: string | null; deleted?: unknown }[],
+  l: { channelEmail: string; channelNote: string; timelineSystemActor: string },
+): RecentActivityCandidate[] {
+  return entries
+    .filter((e) => !e.deleted)
+    .map((e) => ({
+      at: e.at,
+      channelLabel: e.type === "email_sent" ? l.channelEmail : e.type === "note" ? l.channelNote : l.timelineSystemActor,
+      actorName: e.actorName,
+    }));
+}
+
 export function mostRecentActivity(
   candidates: readonly RecentActivityCandidate[],
 ): RecentActivityCandidate | null {

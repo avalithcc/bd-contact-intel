@@ -24,11 +24,11 @@ test("companySearchCondition: undefined/empty q adds no condition", () => {
 test("companySearchCondition: a single token matches display_name, domain or a company_alias row, via EXISTS (never a JOIN)", () => {
   const condition = companySearchCondition("nubiral");
   const { sql: text, params } = dialect.sqlToQuery(sql`select 1 from ${company} where ${condition}`);
-  assert.match(text, /"display_name" ilike \$1/i);
-  assert.match(text, /"domain" ilike \$2/i);
+  assert.match(text, /unaccent\("company"\."display_name"\) ilike \(select unaccent\(\$1\)\)/i);
+  assert.match(text, /unaccent\("company"\."domain"\) ilike \(select unaccent\(\$2\)\)/i);
   assert.match(text, /exists \(/i);
   assert.match(text, /"company_alias"/i);
-  assert.match(text, /"alias_key" ilike \$3/i);
+  assert.match(text, /unaccent\("company_alias"\."alias_key"\) ilike \(select unaccent\(\$3\)\)/i);
   // EXISTS, never a JOIN against company_alias — a company with several
   // matching aliases must still produce exactly one row.
   assert.doesNotMatch(text, /join "company_alias"/i);

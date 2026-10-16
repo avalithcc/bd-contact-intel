@@ -66,7 +66,7 @@ export async function rejectLushaMatchAction(personId: string) {
   }
 }
 
-/** Free and display-only: a failure here must never block a reveal. */
+/** Free and display-only: a failure here must never block a reveal. Deliberately NOT gated by the per-BD Lusha switch (lusha-per-bd): it spends no credits and shows only the account balance any BD can already see. */
 export async function getLushaAccountUsageAction() {
   try {
     await getCurrentBd();

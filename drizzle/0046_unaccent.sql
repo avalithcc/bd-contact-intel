@@ -1,0 +1,15 @@
+-- accent-insensitive search: installs the `unaccent` extension so every search site can fold accents on both the
+-- column and the typed term (src/lib/search/accentInsensitive.ts). 'José' ilike '%jose%' is false without it.
+-- ADDITIVE ONLY, one statement. No table, column, index or row changes. IF NOT EXISTS makes a second run a no-op.
+--   * Deploy order: apply this BEFORE the code that calls unaccent(); the reverse order makes every search error with
+--     "function unaccent(text) does not exist".
+--   * unaccent() is STABLE, not IMMUTABLE: fine in a WHERE clause, but it cannot back an expression index. No index is
+--     added here (the current search is already a Seq Scan; a leading-wildcard ilike cannot use a btree), and no
+--     IMMUTABLE wrapper either: add one together with the first index that needs it, not before.
+--   * NO schema is pinned, on purpose. Production keeps its other extensions in `extensions`, and pinning there was
+--     tried and reverted: a local or freshly bootstrapped database has no `extensions` schema (search_path is just
+--     "$user", public), so `WITH SCHEMA extensions` fails there. Unpinned, the extension lands in `public`, which is on
+--     the search_path everywhere — verified 2026-10-16 on production (the app connects as `postgres`, search_path
+--     "$user", public, extensions) and on the local scratch database — so the unqualified unaccent() resolves in both.
+-- Rollback: 0046_unaccent_rollback.sql (deploy the code that no longer calls unaccent() first).
+CREATE EXTENSION IF NOT EXISTS unaccent;

@@ -15,12 +15,12 @@ const CRM = { name: "Julián Marchetti", company: "Aument", domain: "aument.io",
 const LUSHA = { name: "Julian Marchetti", company: "Aumenta GT", domain: "www.aumenta.do", linkedin: null };
 const row = (over: Partial<LedgerRow>): LedgerRow => ({ id: "r", searchId: "s1", at: new Date("2026-10-14T15:00:00Z"), field: "search", state: "settled", outcome: null, value: null, payload: {}, ...over });
 const SEARCH = row({ id: "s1", outcome: "matched", payload: { identity: LUSHA, canReveal: [{ field: "emails", credits: 1 }, { field: "phones", credits: 5 }] } });
-const build = (rows: LatestRows, over: { person?: Partial<ViewPerson>; spent?: number; config?: LushaConfigResult } = {}) =>
-  buildLushaView({ config: over.config ?? ON, rows, spentToday: over.spent ?? 0, cap: 12, person: { ...EMPTY, ...over.person }, crm: CRM, companyHref: "/companies/aument", formatDay: () => "14 oct" })!;
+const build = (rows: LatestRows, over: { person?: Partial<ViewPerson>; spent?: number; config?: LushaConfigResult; enabled?: boolean } = {}) =>
+  buildLushaView({ config: over.config ?? ON, enabled: over.enabled ?? true, rows, spentToday: over.spent ?? 0, cap: 12, person: { ...EMPTY, ...over.person }, crm: CRM, companyHref: "/companies/aument", formatDay: () => "14 oct" })!;
 const ctl = (v: ReturnType<typeof build>, f: "emails" | "phones") => v[f].control && [v[f].control!.kind, v[f].control!.price, v[f].control!.disabled];
 
 test("outside production nothing is built at all", () => {
-  assert.equal(buildLushaView({ config: { ok: false, reason: "not_production" }, rows: {}, spentToday: 0, cap: 12, person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "" }), null);
+  assert.equal(buildLushaView({ config: { ok: false, reason: "not_production" }, enabled: true, rows: {}, spentToday: 0, cap: 12, person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "" }), null);
 });
 
 test("state 10: without the key both controls are disabled, unpriced, and only the email row names the variable", () => {
@@ -100,6 +100,21 @@ test("state 4: a revealed email carries who and when; a revealed phone is locate
   assert.deepEqual(v.emails.revealed, { by: "Cristian Civita", at: "14 oct", column: "email" });
   assert.deepEqual(v.phones.revealed, { by: "Cristian Civita", at: "14 oct", column: "mobilePhone" });
   assert.deepEqual([v.emails.control, v.phones.control, v.emails.twin], [null, null, { id: "t1", name: "Vale Rojas" }]);
+});
+
+test("lusha-per-bd: a BD with Lusha off gets no button, only the reason, and nothing to confirm", () => {
+  const v = build({ search: SEARCH }, { enabled: false });
+  assert.deepEqual([v.emails.control, v.phones.control, v.emails.note, v.phones.note, v.match, v.matchSearchId], [null, null, "not_enabled", "not_enabled", null, null]);
+  const empty = build({}, { enabled: false });
+  assert.deepEqual([empty.emails.control, empty.emails.hint, empty.emails.note], [null, null, "not_enabled"]);
+});
+
+test("lusha-per-bd: what was already revealed stays visible, and the free apply stays available, with Lusha off", () => {
+  const email = row({ id: "e1", field: "emails", outcome: "revealed", value: "v@x.co", actorName: "Lucia", settledAt: new Date("2026-10-14T15:00:00Z") });
+  const v = build({ search: SEARCH, emails: email }, { enabled: false, person: { email: "v@x.co", emailStatus: "probable", emailSource: "lusha" } });
+  assert.deepEqual([v.emails.revealed, v.emails.note, v.phones.note], [{ by: "Lucia", at: "14 oct", column: "email" }, null, "not_enabled"]);
+  const stuck = row({ id: "e2", field: "emails", outcome: "revealed", value: "v@x.co", errorCode: "write_failed" });
+  assert.deepEqual(ctl(build({ search: SEARCH, emails: stuck }, { enabled: false }), "emails"), ["apply", null, false]);
 });
 
 test("task 6.11: a paid value the Contact never received offers the free apply, never a second purchase", () => {

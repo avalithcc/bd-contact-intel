@@ -14,6 +14,7 @@
  * the 5,790 blanks that were actually asked for. The canonical name is
  * fallback-only, for the null case.
  */
+import { foldedIncludes } from "@/lib/search/foldAccents";
 
 /** One person's company display value: free text first, canonical name
  * second, `null` when neither is on file (no `company_key`, or a
@@ -58,7 +59,8 @@ export function withResolvedCompanyName<T extends RowWithCompanyCanonicalName>(
  * agree with it case by case: a row matches a company term if and only if
  * the name a BD can actually see on that row matches it.
  * `listQueries.ts#companyNameMatchCondition` is the SQL translation of this
- * function — change one and the other is wrong.
+ * function — change one and the other is wrong. Case AND accents are ignored on both
+ * sides (src/lib/search/accentInsensitive.ts), so "jose" matches "José SA".
  *
  * Why not simply OR both columns: free text wins the display, so a contact
  * whose free text says "Acme" while its `company_key` resolves to "Nubiral"
@@ -81,5 +83,5 @@ export function companyNameMatchesTerm(
   // if that changes, BOTH sides move together or neither does.
   const displayed = resolveCompanyDisplayName(freeText || null, canonicalDisplayName);
   if (displayed === null) return false;
-  return displayed.toLowerCase().includes(term.toLowerCase());
+  return foldedIncludes(displayed, term);
 }

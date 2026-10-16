@@ -13,6 +13,7 @@
  * Date(null)`, the bug this guards against).
  */
 import { parseDbTimestamp } from "@/lib/db/timestamp";
+import { withholdDeletedMetadata } from "@/lib/activity/noteDelete";
 
 export interface CompanyTimelineRawRow {
   id: string;
@@ -22,6 +23,8 @@ export interface CompanyTimelineRawRow {
   metadata: unknown;
   actorBdId: string | null;
   personId: string | null;
+  deletedAt?: Date | string | null;
+  deletedByBdId?: string | null;
 }
 
 export interface CompanyTimelineEntry {
@@ -39,22 +42,34 @@ export interface CompanyTimelineEntry {
   personId: string | null;
   personName: string | null;
   scope: "company" | "contact";
+  /** Set for a soft-deleted Contact note: the tab renders a tombstone from this (NoteTombstone), never the text. */
+  deleted: { at: Date; byBdId: string | null; byName: string | null; byIsAdmin: boolean } | null;
 }
 
 export function buildCompanyTimelineEntry(
   row: CompanyTimelineRawRow,
   personNameById: ReadonlyMap<string, string | null>,
   actorNameById: ReadonlyMap<string, string | null>,
+  adminIds: ReadonlySet<string>,
 ): CompanyTimelineEntry {
+  const deletedAt = row.deletedAt ? parseDbTimestamp(row.deletedAt) : null;
   return {
     id: row.id,
     type: row.type,
     createdAt: row.at !== null ? parseDbTimestamp(row.at) : parseDbTimestamp(row.rawCreatedAt),
-    metadata: row.metadata as Record<string, unknown> | null,
+    metadata: withholdDeletedMetadata(row.metadata as Record<string, unknown> | null, deletedAt),
     actorBdId: row.actorBdId,
     actorName: row.actorBdId ? (actorNameById.get(row.actorBdId) ?? null) : null,
     personId: row.personId,
     personName: row.personId ? (personNameById.get(row.personId) ?? null) : null,
     scope: row.personId ? "contact" : "company",
+    deleted: deletedAt
+      ? {
+          at: deletedAt,
+          byBdId: row.deletedByBdId ?? null,
+          byName: row.deletedByBdId ? (actorNameById.get(row.deletedByBdId) ?? null) : null,
+          byIsAdmin: row.deletedByBdId ? adminIds.has(row.deletedByBdId) : false,
+        }
+      : null,
   };
 }

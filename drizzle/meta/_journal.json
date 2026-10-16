@@ -316,6 +316,27 @@
       "when": 1793305471556,
       "tag": "0044_email_message_is_automatic",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1793391871556,
+      "tag": "0045_activity_soft_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793478271556,
+      "tag": "0046_unaccent",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793564671556,
+      "tag": "0047_bd_lusha_enabled",
+      "breakpoints": true
     }
   ]
 }

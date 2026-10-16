@@ -68,6 +68,8 @@ const WORKED_TODAY_OCCURRED_AT_TYPES = ["email_sent", "reply_received"] as const
 
 /** SQL-side twin of `resolveWorkedTodayAt` — same `call` carve-out, same ISO-datetime guard before casting. */
 export function workedTodayAtSql() {
+  // Deliberately ignores `deleted_at`: this asks "what work happened", not "what is shown" (see workDoneAtSql). Deleting
+  // today's note must not put the contact back in the queue or lower the badge and report.
   return sql`(case
     when ${activity.type} = 'call' then ${activity.createdAt}
     when ${activity.type} in (${sql.join(

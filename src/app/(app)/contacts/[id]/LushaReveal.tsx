@@ -74,6 +74,8 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
       write_failed: l.lushaNoteWriteFailed,
       capped: fill(l.lushaNoteCapped, { spent: view.spent, cap: view.cap }),
       unconfigured: l.lushaNoteUnconfigured,
+      // As drawn: the email row says who to ask, the phone row repeats it shorter.
+      not_enabled: field === "emails" ? l.lushaNoteNotEnabled : l.lushaNoteNotEnabledShort,
     };
     return t[n];
   };
