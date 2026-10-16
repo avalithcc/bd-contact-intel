@@ -63,7 +63,7 @@ function Actions({ card, m, l, onAction }: { card: CardView; m: DetailMember; l:
         ),
       )}
       {card.menu.length > 0 && (
-        <DropdownMenu trigger={<MoreIcon className="icon" />} triggerClassName="btn btn-ghost btn-sm btn-icon" ariaLabel={l.moreActions} align="left">
+        <DropdownMenu trigger={<MoreIcon className="icon" />} triggerClassName="btn btn-ghost btn-sm btn-icon" ariaLabel={l.moreActions}>
           {card.menu.map((id) => (
             <Fragment key={id}>
               {id === "remove" && <div className="menu-sep" />}
