@@ -124,6 +124,14 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorEmailSubjectRequired;
     case "email_body_required":
       return l.errorEmailBodyRequired;
+    case "schedule_too_soon":
+      return l.errorScheduleTooSoon;
+    case "schedule_too_far":
+      return l.errorScheduleTooFar;
+    case "schedule_cap_reached":
+      return l.errorScheduleCapReached;
+    case "schedule_locked":
+      return l.errorScheduleLocked;
     case "owner_invalid":
       return l.errorOwnerInvalid;
     case "admin_required":
