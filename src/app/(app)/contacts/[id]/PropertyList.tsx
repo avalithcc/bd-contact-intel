@@ -84,7 +84,6 @@ export interface PropertyListProps {
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   jobTitleRoleGroupHint: JobTitleRoleGroupHint;
   /** Derived "Grupo de rol" row: stored label plus a hint that flags drift from the Cargo. */
-  roleGroupRow: { text: string; hint: string };
   /** Resolved on the server (lusha-reveal); null outside production, where nothing Lusha renders. */
   lusha: LushaView | null;
 }
@@ -117,7 +116,6 @@ export function PropertyList({
   properties,
   locationProperties,
   jobTitleRoleGroupHint,
-  roleGroupRow,
   lusha,
 }: PropertyListProps) {
   const router = useRouter();
@@ -294,16 +292,6 @@ export function PropertyList({
               }
             }}
           />
-          {prop.key === "jobTitle" && (
-            // Derived from the Cargo (classifyPosition): read-only, no pencil.
-            <div className="prop derived">
-              <dt>{l.propRoleGroup}</dt>
-              <dd>{roleGroupRow.text}</dd>
-              <dd className="why">
-                <InfoIcon className="icon" /> {roleGroupRow.hint}
-              </dd>
-            </div>
-          )}
         </Fragment>
       ))}
 

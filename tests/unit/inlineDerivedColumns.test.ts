@@ -42,7 +42,6 @@ function baseRow(overrides: Partial<BaseRow> & { id: string }): BaseRow {
     status: "contacted",
     email: "ana@acme.com",
     emailStatus: "verified",
-    roleGroup: null,
     contactType: null,
     industry: null,
     country: null,

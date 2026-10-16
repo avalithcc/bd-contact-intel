@@ -50,7 +50,6 @@ export async function GET(request: Request): Promise<Response> {
     phone: l.colPhone,
     bdConnections: l.colBdConnections,
     lastActivity: l.colLastActivity,
-    roleGroup: l.colRoleGroup,
     contactType: l.colContactType,
     industry: l.colIndustry,
     country: l.colCountry,

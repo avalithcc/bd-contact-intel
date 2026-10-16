@@ -49,7 +49,6 @@ export interface ContactExportRow {
   // "Teléfono" column export value — display prefers `phone`, falls back
   // to `mobilePhone` (mapContactRowToExportRow below).
   phone: string | null;
-  roleGroup: string | null;
   // Stored value; cellValue exports its Spanish label.
   contactType: string | null;
   industry: string | null;
@@ -90,8 +89,6 @@ function cellValue(key: ContactColumnKey, row: ContactExportRow): string {
       return row.email ?? "";
     case "phone":
       return phoneCell(row.phone);
-    case "roleGroup":
-      return row.roleGroup ?? "";
     case "contactType":
       return contactTypeLabel(row.contactType, "");
     case "industry":
@@ -134,7 +131,6 @@ export function mapContactRowToExportRow(row: ContactListRow, statusLabel: strin
     lastActivityText: row.lastActivity
       ? `${row.lastActivity.label} (${row.lastActivity.createdAt.toISOString().slice(0, 10)})`
       : "",
-    roleGroup: row.roleGroup,
     contactType: row.contactType,
     industry: row.industry,
     country: row.country,

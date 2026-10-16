@@ -169,8 +169,6 @@ function columnLabel(
       return l.colBdConnections;
     case "lastActivity":
       return l.colLastActivity;
-    case "roleGroup":
-      return l.colRoleGroup;
     case "industry":
       return l.colIndustry;
     case "country":
@@ -273,10 +271,8 @@ function columnCell(
       );
     case "lastActivity":
       return row.lastActivity ? `${row.lastActivity.label} · ${relTime(row.lastActivity.createdAt)}` : "—";
-    case "roleGroup":
-      return row.roleGroup ?? l.ownerNone;
     case "contactType":
-      // Plain text, em dash when empty — a classification like roleGroup, not
+      // Plain text, em dash when empty — a classification, not
       // a workflow state, so no badge and no "sin dato" pill.
       return contactTypeLabel(row.contactType, l.ownerNone);
     case "industry":

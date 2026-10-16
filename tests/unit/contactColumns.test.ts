@@ -79,3 +79,11 @@ test("contactType is a selectable column, OFF by default, right after status", (
 test("DEFAULT_CONTACT_COLUMNS is Empresa, Responsable, Estado, Correo, Teléfono in that order", () => {
   assert.deepEqual([...DEFAULT_CONTACT_COLUMNS], ["company", "owner", "status", "email", "phone"]);
 });
+
+test("roleGroup is no longer a column: a saved view that still lists it silently drops the key", () => {
+  assert.ok(!(ALL_CONTACT_COLUMNS as readonly string[]).includes("roleGroup"));
+  assert.deepEqual(sanitizeColumnKeys(["company", "roleGroup", "status"]), ["company", "status"]);
+  assert.deepEqual(resolveVisibleColumns(["roleGroup", "industry"]), ["industry"]);
+  // A view that stored ONLY the removed column falls back to the defaults.
+  assert.deepEqual(resolveVisibleColumns(["roleGroup"]), DEFAULT_CONTACT_COLUMNS);
+});

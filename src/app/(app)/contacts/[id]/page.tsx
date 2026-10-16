@@ -26,7 +26,6 @@ import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { mostRecentActivity, timelineEntryCandidates, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { classifyPosition } from "@/lib/roleGroups";
-import { roleGroupRowView } from "@/lib/contacts/roleGroupDisplay";
 import { ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { Avatar } from "@/components/Avatar";
@@ -205,18 +204,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     note: jobTitleRoleGroupEntry.note ?? null,
     guideHref: `/playbook#${jobTitleRoleGroupKey}`,
   };
-
-  // "Grupo de rol" is a derived, read-only row: the stored key goes through
-  // the dictionary here. It shows the STORED group (what filters and reports
-  // use); if the current Cargo classifies elsewhere, the hint says so.
-  const roleGroupRow = roleGroupRowView(
-    record.person.roleGroup,
-    record.person.jobTitle?.trim() ? jobTitleRoleGroupKey : null,
-    dict.roleGroups,
-    l.emptyValue,
-    l.roleGroupDerivedHint,
-    dict.contactRecordServer.roleGroupDriftHint,
-  );
 
   // "Estado" derivation "why" hint (contact-record.html:77) — composed
   // server-side from `record.statusReason` via `dict.contactRecordServer`'s
@@ -464,7 +451,6 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           properties={properties}
           locationProperties={locationProperties}
           jobTitleRoleGroupHint={jobTitleRoleGroupHint}
-          roleGroupRow={roleGroupRow}
           lusha={lusha}
           messageLabels={messageLabels}
           locale={locale}
