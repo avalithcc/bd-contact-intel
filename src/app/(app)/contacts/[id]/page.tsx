@@ -207,7 +207,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // use); if the current Cargo classifies elsewhere, the hint says so.
   const roleGroupRow = roleGroupRowView(
     record.person.roleGroup,
-    jobTitleRoleGroupKey,
+    record.person.jobTitle?.trim() ? jobTitleRoleGroupKey : null,
     dict.roleGroups,
     l.emptyValue,
     l.roleGroupDerivedHint,

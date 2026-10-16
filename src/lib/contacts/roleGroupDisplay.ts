@@ -27,7 +27,8 @@ export function roleGroupDisplay(
 
 export function roleGroupRowView(
   stored: string | null,
-  derived: RoleGroupKey,
+  /** The group the current Cargo classifies to; null when there is no Cargo (nothing to compare). */
+  derived: RoleGroupKey | null,
   labels: Readonly<Record<RoleGroupKey, string>>,
   emptyValue: string,
   plainHint: string,
@@ -36,6 +37,6 @@ export function roleGroupRowView(
   const key = knownKey(stored);
   return {
     text: roleGroupDisplay(stored, labels, emptyValue),
-    hint: key === derived ? plainHint : driftHint(key ? labels[key] : null, labels[derived]),
+    hint: derived === null || key === derived ? plainHint : driftHint(key ? labels[key] : null, labels[derived]),
   };
 }

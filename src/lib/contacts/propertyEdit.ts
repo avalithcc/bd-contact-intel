@@ -15,7 +15,7 @@
  * is left as a documented gap for a later phase.
  */
 import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
-import { classifyPosition } from "@/lib/roleGroups";
+import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import { isContactType } from "@/lib/contacts/contactType";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
@@ -80,6 +80,11 @@ export class InvalidContactTypeError extends Error {
 function isValidEmailFormat(value: string): boolean {
   const split = splitEmail(value);
   return split !== null && split.domain.includes(".");
+}
+
+/** The group a Cargo points to, or null when there is no Cargo to classify. */
+function derivedRoleGroup(jobTitle: string | null): RoleGroupKey | null {
+  return jobTitle === null ? null : classifyPosition(jobTitle);
 }
 
 export const EDITABLE_PERSON_PROPERTIES = [
@@ -164,14 +169,9 @@ export function planPropertyEdit(
 
   if (oldValue === newValue) {
     // Saving an unchanged Cargo still repairs a stale roleGroup (the record's
-    // drift hint promises exactly that); in sync, it stays a no-op.
-    //
-    // This is the ONE path that writes a `roleGroup` history row with no
-    // `jobTitle` row beside it. That shape is deliberate, not a bug: the title
-    // did not change, only the group derived from it did. It is attributed to
-    // whoever clicked Guardar, exactly as the re-derivation on a real Cargo
-    // edit already is.
-    const group = property === "jobTitle" ? classifyPosition(newValue) : null;
+    // drift hint promises exactly that); in sync, it stays a no-op. A blank
+    // Cargo has nothing to classify, so it never reaches this repair.
+    const group = property === "jobTitle" ? derivedRoleGroup(newValue) : null;
     if (group === null || group === (person.roleGroup ?? null)) {
       return { changed: false, personUpdate: null, historyRows: [] };
     }
@@ -221,8 +221,10 @@ export function planPropertyEdit(
     // roleGroup is derived from the Cargo (the identity engine re-derives it
     // on every import, resolve.ts), so a Cargo edit must keep it in step. Its
     // own history row is skipped when the derived group does not change.
-    const newGroup = classifyPosition(newValue);
-    if (newGroup !== (person.roleGroup ?? null)) {
+    // A blank Cargo is absence of information, not evidence of "no role":
+    // clearing it keeps the last known group.
+    const newGroup = derivedRoleGroup(newValue);
+    if (newGroup !== null && newGroup !== (person.roleGroup ?? null)) {
       personUpdate.roleGroup = newGroup;
       rows.push(historyRow(person.id, "roleGroup", person.roleGroup ?? null, newGroup, changedByBdId));
     }

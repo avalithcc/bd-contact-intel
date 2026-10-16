@@ -62,3 +62,17 @@ test("both dictionaries carry the hints", () => {
     assert.ok(d.contactRecordServer.roleGroupDriftHint(null, "B").includes("B"));
   }
 });
+
+test("no Cargo (derived null) never produces the drift hint, whatever the stored group", () => {
+  for (const stored of ["developers", null, "legacy_group", "no_position"]) {
+    const row = rowFor(stored, null);
+    assert.equal(row.hint, es.contactRecord.roleGroupDerivedHint);
+    assert.equal(row.text, roleGroupDisplay(stored, es.roleGroups, EMPTY));
+  }
+});
+
+test("a Cargo that classifies to other, against a different stored group, still drifts", () => {
+  const row = rowFor("developers", "other");
+  assert.ok(row.hint.includes(es.roleGroups.other));
+  assert.notEqual(row.hint, es.contactRecord.roleGroupDerivedHint);
+});

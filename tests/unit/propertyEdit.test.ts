@@ -446,11 +446,30 @@ test("a jobTitle edit that keeps the derived group writes only the jobTitle row"
   assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle"]);
 });
 
-test("clearing the jobTitle derives no_position", () => {
+test("clearing a real jobTitle keeps the stored roleGroup and writes only the jobTitle row", () => {
   const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
   const plan = planPropertyEdit(person, "jobTitle", "   ", "bd-1");
+  assert.equal(plan.changed, true);
   assert.equal(plan.personUpdate?.jobTitle, null);
-  assert.equal(plan.personUpdate?.roleGroup, "no_position");
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle"]);
+});
+
+test("saving a blank jobTitle that is already blank writes nothing, whatever the stored group", () => {
+  for (const group of ["developers", null, "no_position"]) {
+    const person = { ...BASE_PERSON, jobTitle: null as string | null, roleGroup: group };
+    assert.deepEqual(planPropertyEdit(person, "jobTitle", "  ", "bd-1"), {
+      changed: false,
+      personUpdate: null,
+      historyRows: [],
+    });
+  }
+});
+
+test("a title matching no rule classifies to other (no_position is only the blank fallback) and is written like any group", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Zzyzx Wrangler", "bd-1");
+  assert.equal(plan.personUpdate?.roleGroup, "other");
   assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle", "roleGroup"]);
 });
 
