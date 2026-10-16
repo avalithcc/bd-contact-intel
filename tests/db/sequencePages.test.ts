@@ -106,6 +106,18 @@ test("the list reads only the signed-in BD's Sequences, newest first, with membe
   assert.equal((await listSequencesForBd(otherId)).map((r) => r.id)[0], otherSequenceId);
 });
 
+test("the admin list reads EVERY BD's Sequences with the owner; a BD's own list carries no owner", async () => {
+  const { listAllSequences, listSequencesForBd } = await import("@/lib/sequences/pageQueries");
+  const everyone = await listAllSequences();
+  const mine = everyone.find((r) => r.id === sequenceId)!;
+  const theirs = everyone.find((r) => r.id === otherSequenceId)!;
+  assert.deepEqual(mine.owner, { id: ownerId, name: "ZZ owner" });
+  assert.deepEqual(theirs.owner, { id: otherId, name: "ZZ other" });
+  assert.equal(mine.members.length, (await listSequencesForBd(ownerId)).find((r) => r.id === sequenceId)!.members.length, "same members as the BD's own read");
+  assert.ok(mine.createdAt instanceof Date);
+  assert.equal((await listSequencesForBd(ownerId)).every((r) => r.owner === undefined), true);
+});
+
 test("the list does not truncate: 250 members are all there", async () => {
   const { db } = await import("@/db");
   const { person, sequence, sequenceMember } = await import("@/db/schema");

@@ -27,3 +27,20 @@ Owner decisions 2026-10-16: admin reads all, read-only on others, no audit.
 | Admin read costs one statement, no audit row | owner decision | done | src/lib/sequences/detailQueries.ts (getSequenceDetail) | tests/db/sequenceDetail.test.ts |
 | Old `view_sequence` rows still listed in the audit log | owner decision | done | src/lib/sequences/readAudit.ts, tests/db/sequenceDetail.test.ts | |
 | Server refuses writes on a foreign Sequence | owner decision | done | tests/db/sequenceDetail.test.ts "ACTING on another BD's Sequence" | approve, save, cancel, remove, settings, opt-out |
+
+## List (slice 2)
+
+| element | mockup ref | status | evidence | notes |
+|---|---|---|---|---|
+| Admin intro ("Las de otros BD se abren en solo lectura") | lista:60 | done | src/app/(app)/sequences/_components/SequenceListView.tsx:63 | admin only; BD intro unchanged |
+| Tabs Mías / Todas with counts, default Mías | lista:62 | done | SequenceListView.tsx:19, src/lib/sequences/listScope.ts:14 | `/sequences`, `/sequences?scope=all` |
+| BD never sees others' rows by URL | owner decision | done | src/app/(app)/sequences/page.tsx:18-24, tests/unit/sequencesListScope.test.ts | non-admin takes the unchanged own-only read |
+| Responsable filter chip (menu with avatar, name, (yo), count) | lista:101 | done | SequenceListView.tsx:27 | Todas only |
+| Applied chip "Responsable: X" removable, "Borrar todo", note | lista:181 | done | SequenceListView.tsx:27 | remove is a GET form + button (only mockup classes) |
+| Responsable column (owner-chip, "(yo)" on own rows) | lista:70,74 | done | SequenceListView.tsx:105,112 | shown to the admin on BOTH tabs, as the mockup draws it |
+| Foreign row menu: only "Abrir secuencia"; own row keeps "Editar secuencia" | lista:130 | done | SequenceListView.tsx:138 | static markup cannot see the menu; logic is `own` |
+| Stat cards computed on visible rows; "Borradores por revisar" and "Aprobados, en cola" hidden on Todas | lista:103-108 + owner decision | deviation | SequenceListView.tsx:89 | mockup draws all four on Todas; owner decided to hide two |
+| Footers: Mías / Todas ("N secuencias de M BD") / one BD | lista:93,173,212 | done | SequenceListView.tsx:91 | |
+| Mías empty state with "Ver todas" + "Nueva secuencia" | lista:220 | done | SequenceListView.tsx:77 | |
+| Sidebar pill keeps counting own Sequences | lista:55 (7) | done | unchanged | not touched |
+| One round trip, no limit | lista:56 | done | src/lib/sequences/pageQueries.ts:45 | revisit past ~50 rows (mockup note) |

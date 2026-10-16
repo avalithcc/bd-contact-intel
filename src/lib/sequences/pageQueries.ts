@@ -4,12 +4,13 @@
  *
  * Round trips (PERFORMANCE.md), each ONE statement unless noted:
  *   listSequencesForBd      1   (sequences + members + step 1 drafts + companies, one flat join)
+ *   listAllSequences        1   (the same join, every owner, plus the owner name: admin only)
  *   getSendingAccount       1
  *   listPickerContacts      2   (the pool, then the company-wide suppression list that staticBlock needs)
  *   listContactMemberships  1
  *   listReplyPhrases        1   (skipped when no member has replied)
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 import { emailAccount } from "@/db/schema";
@@ -33,15 +34,29 @@ const date = (v: unknown): Date | null => (v == null ? null : parseDbTimestamp(v
  * truncate). A BD's own Sequences are hand-picked rosters of tens of people.
  */
 export async function listSequencesForBd(bdId: string): Promise<SequenceListRow[]> {
+  return readListRows(sql``, sql``, sql`where s.owner_bd_id = ${bdId}::uuid`);
+}
+
+/**
+ * Every BD's Sequences with their owner, for the admin list. The caller (the page) calls it for an admin only. Unbounded
+ * for the same reason as above, and the tab counts and the owner menu need every row: about ten members per Sequence,
+ * a few Sequences per BD. Revisit if the list passes ~50 rows (mockup note).
+ */
+export async function listAllSequences(): Promise<SequenceListRow[]> {
+  return readListRows(sql`, s.owner_bd_id::text as owner_id, ob.name as owner_name`, sql`join bd ob on ob.id = s.owner_bd_id`, sql``);
+}
+
+async function readListRows(ownerCols: SQL, ownerJoin: SQL, where: SQL): Promise<SequenceListRow[]> {
   const rows = rowsOf<Row>(
     await db.execute(sql`
-      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, ${companyNameColumnsSql}
+      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, ${companyNameColumnsSql}${ownerCols}
       from sequence s
+      ${ownerJoin}
       left join sequence_member sm on sm.sequence_id = s.id
       left join sequence_draft d on d.sequence_member_id = sm.id and d.step = 1
       left join person p on p.id = sm.person_id
       ${canonicalCompanyJoinSql}
-      where s.owner_bd_id = ${bdId}::uuid
+      ${where}
       order by s.created_at desc, s.id, sm.created_at, sm.id`),
   );
   return groupListRows(withResolvedCompanyName(rows.map((r) => ({ ...(r as ListDbRow & { companyCanonicalName: string | null }), created_at: date(r.created_at)!, scheduled_for: date(r.scheduled_for) }))));
