@@ -35,7 +35,7 @@ export const bd = pgTable("bd", {
   // BD that existed to true. Only an admin changes it (/admin/lusha), and every change writes an audit_log row. Admins are
   // not exempt. Disabling stops NEW reveals only: past reveals and consumption stay.
   lushaEnabled: boolean("lusha_enabled").notNull().default(false),
-  // When this BD was last seen using the CRM (drizzle/0048). Written by getCurrentBd, throttled (src/lib/auth/lastSeen.ts).
+  // When this BD was last seen using the CRM (drizzle/0048). Written by getCurrentBd, throttled (src/lib/auth/lastSeenPolicy.ts, written by lastSeenDb.ts).
   // The migration backfilled every BD that existed to now(); a BD created later stays NULL until the first visit, and the
   // reminder planner reads coalesce(last_seen_at, created_at).
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),

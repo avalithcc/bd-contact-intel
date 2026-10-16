@@ -124,3 +124,25 @@ test("with no admin in the table there is no Reply-To and no owner notice", asyn
   assert.equal(f.sent.length, 1);
   assert.equal(f.sent[0]!.replyTo, undefined);
 });
+
+test("when markSent throws after the mail went out the row is never marked failed; it is logged and counted as a failure", async () => {
+  const f = fakes({
+    markSent: async () => {
+      throw new Error("db down");
+    },
+  });
+  const original = console.error;
+  const logged: unknown[][] = [];
+  console.error = (...args: unknown[]) => void logged.push(args);
+  let out;
+  try {
+    out = await runGmailReminders({ rows: [admin, row("a")], now: NOW, siteUrl: SITE, dryRun: false }, f.deps);
+  } finally {
+    console.error = original;
+  }
+  assert.equal(f.sent.length, 1, "the mail did go out");
+  assert.deepEqual(f.marks, [], "the claim row is left as is, never marked failed");
+  assert.deepEqual(out.summary, { sent: 0, skipped: 1, failed: 1 });
+  assert.equal(out.results.find((r) => r.bdId === "a")?.skippedReason, "mark_sent_failed");
+  assert.equal(logged.length, 1);
+});

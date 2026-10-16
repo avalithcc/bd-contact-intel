@@ -82,15 +82,17 @@ export const getCurrentBd = cache(async function getCurrentBd() {
   const existing = await db.query.bd.findFirst({
     where: eq(bd.email, user.email),
   });
+  // A read-only e2e request (marked by tests/e2e/fixtures.ts) must not write:
+  // the request-level guard cannot see a write made during a GET render, neither
+  // the first-visit insert nor the "seen" stamp. Ignored in production, so a real
+  // BD's first visit always provisions their row. See bdProvisioning.ts.
+  const mayWrite = mayProvisionBd(await headers(), process.env.NODE_ENV);
   if (existing) {
     // Throttled, best-effort "seen" stamp for the Gmail reminder series; see lastSeenPolicy.ts.
-    await recordBdSeen(existing, new Date(), async (id, at) => void (await touchLastSeen(id, at)));
+    if (mayWrite) await recordBdSeen(existing, new Date(), async (id, at) => void (await touchLastSeen(id, at)));
     return existing;
   }
-  // A read-only e2e request (marked by tests/e2e/fixtures.ts) must not insert:
-  // the request-level guard cannot see this write. Ignored in production, so
-  // a real BD's first visit always provisions their row. See bdProvisioning.ts.
-  if (!mayProvisionBd(await headers(), process.env.NODE_ENV)) {
+  if (!mayWrite) {
     throw new Error(
       "No bd row for this session, and first-visit provisioning is disabled for a read-only e2e request",
     );

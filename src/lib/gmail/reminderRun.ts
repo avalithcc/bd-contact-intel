@@ -66,17 +66,26 @@ export async function runGmailReminders(
     }
 
     const email = buildReminderEmail({ name: r.rm_name }, siteUrl);
+    // Once the mail is out the row must never be marked failed (tomorrow would send it again). A crash between the claim
+    // and the send leaves a `pending` row that does not count in the series: one possible repeat, accepted.
+    let mailSent = false;
     try {
       await deps.send({ to: r.rm_email, ...email, ...(admins.length ? { replyTo: admins } : {}) });
+      mailSent = true;
       await deps.markSent(claimId);
       summary.sent++;
       results.push({ bdId: d.bdId, bdEmail: r.rm_email, sent: true, number: d.number });
     } catch (error) {
       const sanitized = sanitizeSendError(error);
-      await deps.markFailed(claimId, sanitized);
       summary.failed++;
-      results.push({ bdId: d.bdId, bdEmail: r.rm_email, sent: false, number: d.number, skippedReason: "send_failed", error: sanitized });
-      continue;
+      if (mailSent) {
+        console.error("[gmail-reminders] mail sent but the row could not be marked sent", sanitized);
+        results.push({ bdId: d.bdId, bdEmail: r.rm_email, sent: true, number: d.number, skippedReason: "mark_sent_failed", error: sanitized });
+      } else {
+        await deps.markFailed(claimId, sanitized);
+        results.push({ bdId: d.bdId, bdEmail: r.rm_email, sent: false, number: d.number, skippedReason: "send_failed", error: sanitized });
+        continue;
+      }
     }
 
     if (d.notifyOwner && admins.length) {
