@@ -18,6 +18,7 @@ export async function getReminderRows(limit = 500): Promise<ReminderRow[]> {
       b.name as rm_name,
       b.email as rm_email,
       b.role as rm_role,
+      b.email_reminders_enabled as rm_reminders_enabled,
       b.created_at as rm_created_at,
       b.last_seen_at as rm_last_seen_at,
       (ea.bd_id is not null) as rm_has_account,

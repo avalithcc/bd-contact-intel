@@ -11,6 +11,7 @@ function row(over: Partial<ReminderRow> = {}): ReminderRow {
     rm_name: "Joaquín Rivas",
     rm_email: "joaquin@avalith.net",
     rm_role: "bd",
+    rm_reminders_enabled: true,
     rm_created_at: "2026-08-01T10:00:00.000Z",
     rm_last_seen_at: "2026-10-14T10:00:00.000Z",
     rm_has_account: false,
@@ -48,6 +49,13 @@ test("a connected account with the read scope and a fresh sync is healthy", () =
     NOW,
   );
   assert.equal(c.gmailUnhealthy, false);
+});
+
+test("email_reminders_enabled = false makes the BD excluded; true does not", () => {
+  assert.equal(rowToCandidate(row({ rm_reminders_enabled: false }), NOW).excluded, true);
+  assert.equal(rowToCandidate(row({ rm_reminders_enabled: true }), NOW).excluded, false);
+  const [d] = planGmailReminders([rowToCandidate(row({ rm_reminders_enabled: false, rm_last_seen_at: "2026-10-01T10:00:00.000Z" }), NOW)], NOW);
+  assert.deepEqual(d, { bdId: "bd-1", action: "skip", reason: "excluded" });
 });
 
 test("a mapped row feeds the planner end to end", () => {

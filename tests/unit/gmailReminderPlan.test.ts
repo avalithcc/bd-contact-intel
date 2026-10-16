@@ -142,3 +142,49 @@ test("isGmailUnhealthy is exactly the red banner: disconnected, expired/revoked 
   assert.equal(isGmailUnhealthy({ ...ok, grantedScopes: "https://www.googleapis.com/auth/gmail.send" }, NOW), true);
   assert.equal(isGmailUnhealthy(ok, NOW), false);
 });
+
+// Business days: Mon-Fri on the Argentina calendar, no holiday calendar. 2026-10-16 is a Friday.
+const at = (iso: string) => new Date(iso);
+const FRI_AFTERNOON = at("2026-10-16T19:00:00Z"); // 16:00 ART
+const MON_RUN = at("2026-10-19T12:00:00Z");
+const TUE_RUN = at("2026-10-20T12:00:00Z");
+
+function planAt(now: Date, over: Partial<ReminderCandidate> = {}): ReminderDecision {
+  return planGmailReminders([candidate(over)], now)[0]!;
+}
+
+test("last seen Friday afternoon: no reminder Monday morning, reminder #1 on Tuesday", () => {
+  assert.deepEqual(planAt(MON_RUN, { lastSeenAt: FRI_AFTERNOON }), { bdId: "bd-1", action: "skip", reason: "not_due" });
+  assert.deepEqual(planAt(TUE_RUN, { lastSeenAt: FRI_AFTERNOON }), { bdId: "bd-1", action: "send", number: 1, notifyOwner: false });
+});
+
+test("last seen on a weekend counts from the next business day", () => {
+  const sat = at("2026-10-17T15:00:00Z");
+  assert.equal(planAt(MON_RUN, { lastSeenAt: sat }).action, "skip");
+  assert.equal(planAt(TUE_RUN, { lastSeenAt: sat }).action, "send");
+});
+
+test("last seen Wednesday is due on Friday: two business days, no weekend involved", () => {
+  assert.equal(planAt(NOW, { lastSeenAt: daysAgo(2) }).action, "send");
+});
+
+test("spacing is 3 business days: #1 Tuesday is followed by #2 on Friday, not Thursday", () => {
+  const seen = at("2026-10-12T15:00:00Z"); // Monday
+  const sent = [at("2026-10-14T12:00:00Z")]; // Wednesday
+  assert.equal(planAt(at("2026-10-16T12:00:00Z"), { lastSeenAt: seen, sentReminders: sent }).action, "skip"); // 2 business days
+  assert.equal(planAt(at("2026-10-19T12:00:00Z"), { lastSeenAt: seen, sentReminders: sent }).action, "send"); // Mon = 3rd
+});
+
+test("spacing across a weekend: #1 on Thursday is due again on Tuesday, not Monday", () => {
+  const seen = at("2026-10-08T15:00:00Z");
+  const sent = [at("2026-10-15T12:00:00Z")]; // Thursday
+  assert.equal(planAt(MON_RUN, { lastSeenAt: seen, sentReminders: sent }).action, "skip"); // Fri, Mon = 2
+  assert.deepEqual(planAt(TUE_RUN, { lastSeenAt: seen, sentReminders: sent }), { bdId: "bd-1", action: "send", number: 2, notifyOwner: false });
+});
+
+test("#3 across a weekend also waits 3 business days and notifies the owner", () => {
+  const seen = at("2026-10-01T15:00:00Z");
+  const sent = [at("2026-10-05T12:00:00Z"), at("2026-10-15T12:00:00Z")];
+  assert.equal(planAt(MON_RUN, { lastSeenAt: seen, sentReminders: sent }).action, "skip");
+  assert.deepEqual(planAt(TUE_RUN, { lastSeenAt: seen, sentReminders: sent }), { bdId: "bd-1", action: "send", number: 3, notifyOwner: true });
+});

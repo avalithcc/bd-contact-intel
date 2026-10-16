@@ -9,6 +9,7 @@ export interface ReminderRow {
   rm_name: string;
   rm_email: string;
   rm_role: string;
+  rm_reminders_enabled: boolean;
   rm_created_at: Date | string;
   rm_last_seen_at: Date | string | null;
   rm_has_account: boolean;
@@ -37,8 +38,8 @@ export function rowToCandidate(r: ReminderRow, now: Date): ReminderCandidate {
   return {
     bdId: r.rm_bd_id,
     role: r.rm_role,
-    // No shared test-account marker exists in the codebase yet (owner decision pending): nobody is excluded here.
-    excluded: false,
+    // bd.email_reminders_enabled: switched off by the migration for the e2e test accounts (and any BD who left).
+    excluded: !r.rm_reminders_enabled,
     createdAt: toDate(r.rm_created_at),
     lastSeenAt: toDateOrNull(r.rm_last_seen_at),
     gmailUnhealthy: isGmailUnhealthy(account, now),

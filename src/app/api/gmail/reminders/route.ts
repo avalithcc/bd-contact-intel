@@ -11,8 +11,8 @@ import {
 import { sendDigestEmail } from "@/lib/mailer/smtpMailer";
 
 /**
- * Daily "connect your Gmail" reminder (gmail-reminder-email). Vercel Cron `30 12 * * *` UTC (09:30 Argentina, after the
- * 11:30 digest; see vercel.json), or manually with the same bearer token as the other cron routes. Exempt from the Supabase
+ * Weekday "connect your Gmail" reminder (gmail-reminder-email). Vercel Cron `0 12 * * 1-5` UTC (09:00 Argentina, Mon-Fri;
+ * see vercel.json), or manually with the same bearer token as the other cron routes. Exempt from the Supabase
  * session gate via src/lib/auth/sessionExemptRoutes.ts. An unset CRON_SECRET never means "allow" (isValidBearer).
  *
  * Who gets what, and when, is decided by the pure planner (src/lib/gmail/reminderPlan.ts); the send runs through the same

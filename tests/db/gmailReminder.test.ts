@@ -30,9 +30,10 @@ after(async () => {
   if (bdIds.length) await db.delete(bd).where(inArray(bd.id, bdIds)); // cascades gmail_reminder_send
 });
 
-test("a BD created after the migration has last_seen_at NULL", async () => {
+test("a BD created after the migration has last_seen_at NULL and reminders enabled", async () => {
   const b = await mkBd("Fresh");
   assert.equal(b.lastSeenAt, null);
+  assert.equal(b.emailRemindersEnabled, true);
 });
 
 test("migration 0048 backfills existing BDs to now() once; a rerun leaves a NULL and real values alone", async () => {
@@ -44,15 +45,20 @@ test("migration 0048 backfills existing BDs to now() once; a rerun leaves a NULL
   await db
     .transaction(async (tx) => {
       await tx.execute(sql.raw(`DROP TABLE "gmail_reminder_send"`));
-      await tx.execute(sql.raw(`ALTER TABLE "bd" DROP COLUMN "last_seen_at"`)); // the world before 0048
+      await tx.execute(sql.raw(`ALTER TABLE "bd" DROP COLUMN "last_seen_at", DROP COLUMN "email_reminders_enabled"`)); // the world before 0048
       await tx.execute(sql`insert into bd (name, email) values ('old', ${`zz-old-${run}@example.test`})`);
+      await tx.execute(sql`insert into bd (name, email) values ('ZZ E2E', 'e2e-bot@avalith.net') on conflict (email) do nothing`);
+      await tx.execute(sql`insert into bd (name, email) values ('ZZ Otro', 'otro-bd-e2e@avalith.net') on conflict (email) do nothing`);
       for (const s of statements) await tx.execute(sql.raw(s));
       const first = (await tx.execute(sql`select last_seen_at is not null as pb_set, now() - last_seen_at < interval '1 minute' as pb_recent from bd where email = ${`zz-old-${run}@example.test`}`)) as unknown as { pb_set: boolean; pb_recent: boolean }[];
       seen.backfilled = first[0];
+      await tx.execute(sql`update bd set email_reminders_enabled = true where email = 'otro-bd-e2e@avalith.net'`); // an operator re-enables one
       await tx.execute(sql`insert into bd (name, email) values ('new', ${`zz-new-${run}@example.test`})`);
       for (const s of statements) await tx.execute(sql.raw(s)); // the migration runs a second time
       const after = (await tx.execute(sql`select email as pb_email, last_seen_at is null as pb_null from bd where email like ${`zz-%-${run}@example.test`}`)) as unknown as { pb_email: string; pb_null: boolean }[];
       for (const r of after) seen[r.pb_email] = r.pb_null;
+      const flags = (await tx.execute(sql`select email as pb_email, email_reminders_enabled as pb_on from bd where email in ('e2e-bot@avalith.net', 'otro-bd-e2e@avalith.net', ${`zz-old-${run}@example.test`})`)) as unknown as { pb_email: string; pb_on: boolean }[];
+      for (const r of flags) seen[`flag:${r.pb_email}`] = r.pb_on;
       throw ROLLBACK;
     })
     .catch((e) => {
@@ -61,6 +67,9 @@ test("migration 0048 backfills existing BDs to now() once; a rerun leaves a NULL
   assert.deepEqual(seen.backfilled, { pb_set: true, pb_recent: true });
   assert.equal(seen[`zz-old-${run}@example.test`], false, "a rerun keeps the backfilled value");
   assert.equal(seen[`zz-new-${run}@example.test`], true, "a rerun must not stamp a BD created after the first run");
+  assert.equal(seen["flag:e2e-bot@avalith.net"], false, "the e2e test account is switched off by email");
+  assert.equal(seen["flag:otro-bd-e2e@avalith.net"], true, "a rerun must not undo a later change to the flag");
+  assert.equal(seen[`flag:zz-old-${run}@example.test`], true, "any other existing BD stays enabled");
 });
 
 test("claimGmailReminder: the same BD on the same day twice yields one claim; another day or BD claims again", async () => {
@@ -121,6 +130,7 @@ test("getReminderRows: one read returns each BD with its account state and only 
   const rows = await getReminderRows();
   const mine = rows.find((r) => r.rm_bd_id === d.id)!;
   assert.equal(mine.rm_has_account, false);
+  assert.equal(mine.rm_reminders_enabled, true);
   assert.equal(mine.rm_sent.length, 1, "failed and pending rows are not reminders that went out");
 
   const now = new Date("2026-10-16T12:00:00Z");

@@ -82,11 +82,11 @@ async function main() {
       // `role = 'bd'` on conflict: a spec that flips the e2e account to admin
       // and a hard kill can leave it there; a rebuild must repair that.
       const [me] = await tx`
-        insert into bd (name, email) values ('ZZ E2E (no asignar)', ${email!})
-        on conflict (email) do update set name = excluded.name, role = 'bd' returning id`;
+        insert into bd (name, email, email_reminders_enabled) values ('ZZ E2E (no asignar)', ${email!}, false)
+        on conflict (email) do update set name = excluded.name, role = 'bd', email_reminders_enabled = false returning id`;
       const [other] = await tx`
-        insert into bd (name, email) values ('ZZ Otro BD', 'otro-bd-e2e@avalith.net')
-        on conflict (email) do update set name = excluded.name, role = 'bd' returning id`;
+        insert into bd (name, email, email_reminders_enabled) values ('ZZ Otro BD', 'otro-bd-e2e@avalith.net', false)
+        on conflict (email) do update set name = excluded.name, role = 'bd', email_reminders_enabled = false returning id`;
       for (const c of COMPANIES) {
         await tx`insert into company (company_key, display_name, created_by_bd_id) values (${c.key}, ${c.name}, ${me!.id})`;
       }

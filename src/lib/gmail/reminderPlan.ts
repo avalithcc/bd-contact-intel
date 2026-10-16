@@ -6,11 +6,13 @@
  * decideConnectionBanner so the two can never drift) and it is not an admin or an excluded account. A "series" is the
  * reminders sent AFTER the BD was last seen: coming back ends it, and a later absence starts a fresh one.
  *   #1: last seen 2+ days ago, none yet in the series.   #2 and #3: 3+ days after the previous one.   Max 3 per series.
- * Day counts are Argentina calendar days (the run is a daily cron whose send time drifts by seconds, so comparing raw
- * milliseconds would push a due reminder back a whole day). #3 also asks the route to tell the owner.
+ * Thresholds count BUSINESS days: Mon-Fri on the Argentina calendar, no holiday calendar. The cron runs weekdays only, and
+ * with calendar days a BD last seen Friday afternoon would be reminded Monday 09:00, before opening the CRM. Comparing whole
+ * days (not raw milliseconds) also keeps a send time that drifts by seconds from pushing a due reminder back a day.
+ * #3 also asks the route to tell the owner.
  */
 import { decideConnectionBanner, type ConnectionBannerAccount } from "./connectionBanner";
-import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
+import { addDaysToDateString, argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 
 export const FIRST_REMINDER_AFTER_DAYS = 2;
 export const REMINDER_SPACING_DAYS = 3;
@@ -40,11 +42,17 @@ export function isGmailUnhealthy(account: ConnectionBannerAccount | null, now: D
   return decideConnectionBanner({ account, now })?.tone === "danger";
 }
 
-/** Whole Argentina calendar days from `from` to `to`. */
-function calendarDaysBetween(from: Date, to: Date): number {
-  const a = Date.parse(argentinaCalendarDate(from));
-  const b = Date.parse(argentinaCalendarDate(to));
-  return Math.round((b - a) / 86_400_000);
+/** True when at least `n` business days (Mon-Fri, Argentina calendar) lie in the interval (from, to]. */
+function businessDaysElapsed(from: Date, to: Date, n: number): boolean {
+  const end = argentinaCalendarDate(to);
+  let day = argentinaCalendarDate(from);
+  let count = 0;
+  while (day < end && count < n) {
+    day = addDaysToDateString(day, 1);
+    const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) count++;
+  }
+  return count >= n;
 }
 
 function planOne(c: ReminderCandidate, now: Date): ReminderDecision {
@@ -60,8 +68,8 @@ function planOne(c: ReminderCandidate, now: Date): ReminderDecision {
   const last = series.reduce<Date | null>((acc, d) => (acc === null || d.getTime() > acc.getTime() ? d : acc), null);
   const due =
     last === null
-      ? calendarDaysBetween(seenAt, now) >= FIRST_REMINDER_AFTER_DAYS
-      : calendarDaysBetween(last, now) >= REMINDER_SPACING_DAYS;
+      ? businessDaysElapsed(seenAt, now, FIRST_REMINDER_AFTER_DAYS)
+      : businessDaysElapsed(last, now, REMINDER_SPACING_DAYS);
   if (!due) return skip("not_due");
 
   const number = (series.length + 1) as 1 | 2 | 3;

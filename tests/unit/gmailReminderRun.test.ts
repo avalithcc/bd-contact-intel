@@ -14,6 +14,7 @@ function row(id: string, over: Partial<ReminderRow> = {}): ReminderRow {
     rm_name: `Name ${id}`,
     rm_email: `${id}@avalith.net`,
     rm_role: "bd",
+    rm_reminders_enabled: true,
     rm_created_at: daysAgo(60),
     rm_last_seen_at: daysAgo(2),
     rm_has_account: false,

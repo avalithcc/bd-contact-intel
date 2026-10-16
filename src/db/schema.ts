@@ -39,6 +39,9 @@ export const bd = pgTable("bd", {
   // The migration backfilled every BD that existed to now(); a BD created later stays NULL until the first visit, and the
   // reminder planner reads coalesce(last_seen_at, created_at).
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  // Whether the Gmail reminder cron may email this BD (drizzle/0048). Data only, no UI yet. The migration switched it off
+  // for the two e2e test accounts by email; the launch-readiness seed does the same on a fresh scratch database.
+  emailRemindersEnabled: boolean("email_reminders_enabled").notNull().default(true),
 });
 
 // A contact, private to exactly one BD.

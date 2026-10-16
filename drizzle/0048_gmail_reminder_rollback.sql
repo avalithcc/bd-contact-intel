@@ -7,3 +7,4 @@
 -- drizzle.__drizzle_migrations row for it.
 DROP TABLE IF EXISTS "gmail_reminder_send";
 ALTER TABLE "bd" DROP COLUMN IF EXISTS "last_seen_at";
+ALTER TABLE "bd" DROP COLUMN IF EXISTS "email_reminders_enabled";
