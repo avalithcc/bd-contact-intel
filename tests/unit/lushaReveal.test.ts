@@ -56,6 +56,7 @@ function fake(over: Partial<RevealPorts> & { rows?: LatestRows; subject?: Subjec
   const p: RevealPorts = {
     config: { ok: true, config: { apiKey: KEY } },
     cap: 12,
+    isLushaEnabled: async () => true,
     assertEditable: rec("assertEditable", undefined),
     loadSubject: rec("loadSubject", over.subject === undefined ? SUBJECT : over.subject),
     getRevealState: rec("getRevealState", over.rows ?? {}),

@@ -82,6 +82,7 @@ export type ContactActionErrorReason =
   | "lusha_not_eligible"
   | "lusha_insufficient_data"
   | "lusha_stale"
+  | "lusha_not_enabled"
   | "unexpected"
   // Client-side only: the request threw (dropped connection, HTTP 500), so
   // whether the write landed is unknown. See contacts/actionOutcome.ts.

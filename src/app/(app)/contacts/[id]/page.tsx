@@ -283,6 +283,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     const [rows, spentToday] = lushaConfig.ok ? await Promise.all([getRevealState(record.person.id), getDailySpend()]) : [{}, 0];
     lusha = buildLushaView({
       config: lushaConfig,
+      enabled: me.lushaEnabled, // the viewing BD's switch, already on the row getCurrentBd loaded: no extra read
       rows,
       spentToday,
       cap: getDailyCreditCap(),

@@ -52,7 +52,7 @@ async function matchedSearch(personId: string, canReveal = [{ field: "emails", c
 before(async () => {
   const { db } = await import("@/db");
   const { bd } = await import("@/db/schema");
-  const [b] = await db.insert(bd).values({ name: "ZZ Lusha", email: `zz-lusha-${run}@example.test` }).returning();
+  const [b] = await db.insert(bd).values({ name: "ZZ Lusha", email: `zz-lusha-${run}@example.test`, lushaEnabled: true }).returning();
   bdId = b.id;
 });
 

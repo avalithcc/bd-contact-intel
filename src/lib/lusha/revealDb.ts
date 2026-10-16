@@ -8,6 +8,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, company, duplicateCandidate, lushaReveal, person, personPropertyHistory } from "@/db/schema";
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
+import { isLushaEnabled } from "./adminDb";
 import { artDayWindow, planReservation } from "./cap";
 import { pickEmail, pickPhone } from "./parse";
 import type { CanRevealEntry, LushaField } from "./pricing";
@@ -35,7 +36,7 @@ export async function getDailySpend(now: Date = new Date(), reader: Reader = db)
 export type ReserveResult =
   | { ok: true; reservationId: string; credits: number; searchId: string | null }
   | { ok: false; reason: "cap_exceeded"; remaining: number }
-  | { ok: false; reason: "busy" | "outcome_unknown" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
+  | { ok: false; reason: "busy" | "outcome_unknown" | "not_enabled" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
 
 /**
  * ONE short transaction: advisory lock, the day's spend, a fresh read of the latest search row (price and
@@ -48,6 +49,9 @@ export async function reserve(
   const now = input.now ?? new Date();
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${LUSHA_CAP_LOCK})`);
+    // lusha-per-bd: the switch is checked where the cap is, so no caller can reserve a credit without passing it. A BD switched off
+    // after prepare() ran (an open dialog) is stopped here, before the row exists and so before any Lusha call.
+    if (!(await isLushaEnabled(input.actorBdId, tx))) return { ok: false, reason: "not_enabled" };
     // Reap before anything is read: a killed function leaves its row `reserved`, which used to answer "busy" forever. Under the
     // lock, so two reserves cannot both release the same row. The row is FAILED with its credits_reserved untouched: the cap
     // keeps counting what may have been billed (in its own Argentina day), and the field takes the outcome_unknown guard.

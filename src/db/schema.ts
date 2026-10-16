@@ -31,6 +31,10 @@ export const bd = pgTable("bd", {
   // (src/lib/signature/sanitize.ts) and re-sanitized when appended at send.
   // NULL = no signature: the BD keeps sending plain text.
   signatureHtml: text("signature_html"),
+  // Whether this BD may spend Lusha credits (drizzle/0047). NEW BDs start disabled (the default); the migration set every
+  // BD that existed to true. Only an admin changes it (/admin/lusha), and every change writes an audit_log row. Admins are
+  // not exempt. Disabling stops NEW reveals only: past reveals and consumption stay.
+  lushaEnabled: boolean("lusha_enabled").notNull().default(false),
 });
 
 // A contact, private to exactly one BD.
@@ -1037,6 +1041,8 @@ export const auditLog = pgTable(
     // numbers a human picked for the people whose signatures disagreed and
     // extract-signature-phones.ts therefore left alone; history rows carry
     // source 'signature_extract', the same provenance as the extractor)
+    // 'bd_lusha_enable' | 'bd_lusha_disable' (an admin flipped a BD's Lusha switch on
+    // /admin/lusha; target_bd_id is the BD, actor_bd_id the admin, metadata { enabled })
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",

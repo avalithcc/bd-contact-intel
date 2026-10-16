@@ -27,6 +27,7 @@ import {
   PersonIcon,
   ReportsIcon,
   AbsorbIcon,
+  BoltIcon,
 } from "@/components/icons";
 
 /** Longest a clicked item stays highlighted without the route committing. */
@@ -282,6 +283,15 @@ export function Sidebar({
           >
             <EyeIcon className="icon" />
             {labels.auditLog}
+          </Link>
+          <Link
+            href="/admin/lusha"
+            className={`nav-item${isActive("/admin/lusha") ? " active" : ""}`}
+            aria-current={isActive("/admin/lusha") ? "page" : undefined}
+            onClick={markPending("/admin/lusha")}
+          >
+            <BoltIcon className="icon" />
+            {labels.lushaByBd}
           </Link>
         </div>
       )}
