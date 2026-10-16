@@ -4,18 +4,7 @@
  * reminder #3. Pure: no I/O, no SMTP. Styling reuses the digest's inlined tokens (src/lib/tasks/digest.ts).
  */
 import { DIGEST_FROM_ADDRESS } from "@/lib/mailer/smtpMailer";
-import {
-  COLOR_ACCENT,
-  COLOR_ACCENT_FG,
-  COLOR_BORDER,
-  COLOR_CANVAS,
-  COLOR_INK,
-  COLOR_INK_MUTED,
-  COLOR_INK_SOFT,
-  COLOR_SURFACE_2,
-  FONT_STACK,
-  escapeHtml,
-} from "@/lib/tasks/digest";
+import { COLORS, FONT_STACK, escapeHtml } from "@/lib/mailer/emailLayout";
 
 export interface ReminderEmail {
   subject: string;
@@ -30,7 +19,7 @@ export function greetingName(name: string): string | null {
 }
 
 function layout(subject: string, bodyHtml: string, footer: string): string {
-  const p = `margin:0 0 14px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${COLOR_INK};`;
+  const p = `margin:0 0 14px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${COLORS.ink};`;
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -39,12 +28,12 @@ function layout(subject: string, bodyHtml: string, footer: string): string {
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background-color:${COLOR_CANVAS};">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${COLOR_CANVAS};">
+<body style="margin:0;padding:0;background-color:${COLORS.canvas};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${COLORS.canvas};">
 <tr><td align="center" style="padding:32px 16px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:${COLOR_SURFACE_2};border:1px solid ${COLOR_BORDER};border-radius:12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:${COLORS.surface};border:1px solid ${COLORS.line};border-radius:12px;">
 <tr><td style="padding:28px 32px 8px;">${bodyHtml.replaceAll("<p>", `<p style="${p}">`)}</td></tr>
-<tr><td style="padding:8px 32px 24px;border-top:1px solid ${COLOR_BORDER};"><p style="margin:16px 0 0;font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:${COLOR_INK_MUTED};">${footer}</p></td></tr>
+<tr><td style="padding:8px 32px 24px;border-top:1px solid ${COLORS.line};"><p style="margin:16px 0 0;font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:${COLORS.muted};">${footer}</p></td></tr>
 </table>
 </td></tr></table>
 </body>
@@ -62,13 +51,13 @@ export function buildReminderEmail(recipient: { name: string }, siteBaseUrl: str
   const body = `<p>${escapeHtml(hello)}</p>
 <p>Hace unos días que no entrás al CRM y tu Gmail todavía <strong>no está conectado</strong>. <strong>Es clave que lo conectes:</strong> es lo que hace que el CRM funcione para vos.</p>
 <p>Mientras siga desconectado:</p>
-<ul style="margin:0 0 14px;padding-left:22px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${COLOR_INK};">
+<ul style="margin:0 0 14px;padding-left:22px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${COLORS.ink};">
 <li>Tus correos y las respuestas de tus contactos <strong>no entran al CRM</strong>, así que no queda registro de lo que hablás.</li>
 <li>Tus <strong>Secuencias están pausadas</strong>: no sale ningún envío.</li>
 </ul>
 <p>Son dos minutos: entrás, elegís tu cuenta de Google y listo.</p>
-<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 28px;font-family:${FONT_STACK};font-size:14px;font-weight:700;color:${COLOR_ACCENT_FG};background-color:${COLOR_ACCENT};text-decoration:none;border-radius:6px;">Conectar mi Gmail</a></p>
-<p style="color:${COLOR_INK_SOFT};">Si el botón no anda, copiá este link: ${escapeHtml(url)}</p>
+<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 28px;font-family:${FONT_STACK};font-size:14px;font-weight:700;color:${COLORS.accentFg};background-color:${COLORS.accent};text-decoration:none;border-radius:6px;">Conectar mi Gmail</a></p>
+<p style="color:${COLORS.soft};">Si el botón no anda, copiá este link: ${escapeHtml(url)}</p>
 <p>Cualquier problema, escribile a Cristian.</p>`;
 
   const text = [
