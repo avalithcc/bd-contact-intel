@@ -18,7 +18,6 @@ export type ContactColumnKey =
   | "phone"
   | "bdConnections"
   | "lastActivity"
-  | "roleGroup"
   | "industry"
   | "country"
   | "source"
@@ -39,7 +38,6 @@ export const ALL_CONTACT_COLUMNS: readonly ContactColumnKey[] = [
   "phone",
   "bdConnections",
   "lastActivity",
-  "roleGroup",
   "industry",
   "country",
   "source",

@@ -183,7 +183,6 @@ export interface ContactListRow {
   emailStatus: string;
   // Column-picker (task 13.1) additions — projected always, rendered only
   // when the resolved column set includes them (src/lib/contacts/columns.ts).
-  roleGroup: string | null;
   // "Tipo de contacto" column (contact-type-ui) — stored value, label via
   // contactTypeLabel.
   contactType: string | null;

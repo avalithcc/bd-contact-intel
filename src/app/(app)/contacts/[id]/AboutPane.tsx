@@ -55,8 +55,6 @@ export interface AboutPaneProps {
   // "Ubicación" composite row (contact-record.html:86) — see PropertyList.
   locationProperties: { city: AboutPaneProperty; region: AboutPaneProperty; country: AboutPaneProperty };
   jobTitleRoleGroupHint: JobTitleRoleGroupHint;
-  /** Derived "Grupo de rol" row: stored label plus a hint that flags drift from the Cargo. */
-  roleGroupRow: { text: string; hint: string };
   // Lusha reveal control state (null outside production) — see PropertyList.
   lusha: LushaView | null;
   messageLabels: GenerateMessageLabels;
@@ -101,7 +99,6 @@ export function AboutPane({
   properties,
   locationProperties,
   jobTitleRoleGroupHint,
-  roleGroupRow,
   lusha,
   messageLabels,
   locale,
@@ -184,7 +181,6 @@ export function AboutPane({
         properties={properties}
         locationProperties={locationProperties}
         jobTitleRoleGroupHint={jobTitleRoleGroupHint}
-        roleGroupRow={roleGroupRow}
         lusha={lusha}
       />
     </aside>
