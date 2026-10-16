@@ -25,6 +25,7 @@ import { resolveCompanyDomain } from "@/lib/contacts/companyDomain";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { mostRecentActivity, touchpointTotal, type RecentActivityCandidate } from "@/lib/contacts/recentActivity";
 import { classifyPosition } from "@/lib/roleGroups";
+import { roleGroupRowView } from "@/lib/contacts/roleGroupDisplay";
 import { ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { describeConnectionHistory } from "@/lib/contacts/connectionHistory";
 import { Avatar } from "@/components/Avatar";
@@ -189,9 +190,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   // "Por qué este rol" hint on the Cargo row (openspec/changes/bd-playbook,
   // surface 1) — classifyPosition is a pure function over the jobTitle
   // already fetched above for the Cargo row itself, so this adds no query.
-  // Deliberately reclassifies from the raw jobTitle text rather than trusting
-  // the separately editable `roleGroup` property (a BD can override that one
-  // by hand), so the hint always explains the CURRENT Cargo value.
+  // Reclassifies from the raw jobTitle text, so the hint always explains the
+  // CURRENT Cargo value (the stored `roleGroup` is derived from it too).
   const jobTitleRoleGroupKey = classifyPosition(record.person.jobTitle);
   const jobTitleRoleGroupEntry = ROLE_GROUP_PLAYBOOK[jobTitleRoleGroupKey];
   const jobTitleRoleGroupHint = {
@@ -201,6 +201,18 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     note: jobTitleRoleGroupEntry.note ?? null,
     guideHref: `/playbook#${jobTitleRoleGroupKey}`,
   };
+
+  // "Grupo de rol" is a derived, read-only row: the stored key goes through
+  // the dictionary here. It shows the STORED group (what filters and reports
+  // use); if the current Cargo classifies elsewhere, the hint says so.
+  const roleGroupRow = roleGroupRowView(
+    record.person.roleGroup,
+    record.person.jobTitle?.trim() ? jobTitleRoleGroupKey : null,
+    dict.roleGroups,
+    l.emptyValue,
+    l.roleGroupDerivedHint,
+    dict.contactRecordServer.roleGroupDriftHint,
+  );
 
   // "Estado" derivation "why" hint (contact-record.html:77) — composed
   // server-side from `record.statusReason` via `dict.contactRecordServer`'s
@@ -453,6 +465,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           properties={properties}
           locationProperties={locationProperties}
           jobTitleRoleGroupHint={jobTitleRoleGroupHint}
+          roleGroupRow={roleGroupRow}
           lusha={lusha}
           messageLabels={messageLabels}
           locale={locale}

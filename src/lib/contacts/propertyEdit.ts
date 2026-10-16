@@ -15,9 +15,11 @@
  * is left as a documented gap for a later phase.
  */
 import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
+import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import { isContactType } from "@/lib/contacts/contactType";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
+import { normalizeLinkedinProfileKey, type LinkedinProfileKeyRejection } from "@/lib/contacts/linkedinProfile";
 
 export type InvalidEmailReason = "invalid_format";
 
@@ -51,6 +53,19 @@ export class InvalidPhoneError extends Error {
 }
 
 /**
+ * Thrown by planPropertyEdit when an edited `profileKey` is not a
+ * `linkedin.com` URL (or is not a URL with a path at all). `profile_key`
+ * feeds the identity matcher, so nothing else may reach the column. Clearing
+ * (blank) is always allowed.
+ */
+export class InvalidProfileKeyError extends Error {
+  constructor(public readonly reason: LinkedinProfileKeyRejection) {
+    super(`Invalid LinkedIn profile: ${reason}`);
+    this.name = "InvalidProfileKeyError";
+  }
+}
+
+/**
  * Thrown by planPropertyEdit when `contactType` is set to something outside
  * the closed vocabulary (contactType.ts). Clearing (blank) is always allowed.
  */
@@ -67,12 +82,17 @@ function isValidEmailFormat(value: string): boolean {
   return split !== null && split.domain.includes(".");
 }
 
+/** The group a Cargo points to, or null when there is no Cargo to classify. */
+function derivedRoleGroup(jobTitle: string | null): RoleGroupKey | null {
+  return jobTitle === null ? null : classifyPosition(jobTitle);
+}
+
 export const EDITABLE_PERSON_PROPERTIES = [
   "email",
   "phone",
   "mobilePhone",
+  "profileKey",
   "jobTitle",
-  "roleGroup",
   "contactType",
   "seniority",
   "city",
@@ -99,7 +119,7 @@ export interface PropertyEditPlan {
 
 export type EditablePersonForPlan = Pick<
   Person,
-  "id" | EditablePersonProperty | "emailNormalized" | "emailStatus" | "emailSource"
+  "id" | EditablePersonProperty | "roleGroup" | "emailNormalized" | "emailStatus" | "emailSource"
 >;
 
 function historyRow(
@@ -137,11 +157,31 @@ export function planPropertyEdit(
   changedByBdId: string,
 ): PropertyEditPlan {
   const trimmed = rawNewValue.trim();
-  const newValue = trimmed === "" ? null : trimmed;
+  let newValue = trimmed === "" ? null : trimmed;
+  if (property === "profileKey" && newValue !== null) {
+    // Normalized BEFORE the no-op check: the same profile pasted in another
+    // shape must not write a history row.
+    const key = normalizeLinkedinProfileKey(newValue);
+    if (!key.ok) throw new InvalidProfileKeyError(key.reason);
+    newValue = key.value;
+  }
   const oldValue = person[property] ?? null;
 
   if (oldValue === newValue) {
-    return { changed: false, personUpdate: null, historyRows: [] };
+    // Saving an unchanged Cargo still repairs a stale roleGroup (the record's
+    // drift hint promises exactly that); in sync, it stays a no-op. A blank
+    // Cargo has nothing to classify, so it never reaches this repair.
+    const group = property === "jobTitle" ? derivedRoleGroup(newValue) : null;
+    if (group === null || group === (person.roleGroup ?? null)) {
+      return { changed: false, personUpdate: null, historyRows: [] };
+    }
+    return {
+      changed: true,
+      personUpdate: { roleGroup: group, updatedAt: new Date(), updatedByBdId: changedByBdId },
+      historyRows: [
+        { personId: person.id, property: "roleGroup", oldValue: person.roleGroup ?? null, newValue: group, changedByBdId, source: "edit" },
+      ],
+    };
   }
 
   if (property === "email" && newValue !== null && !isValidEmailFormat(newValue)) {
@@ -175,6 +215,19 @@ export function planPropertyEdit(
       historyRow(person.id, "emailStatus", person.emailStatus ?? null, newStatus, changedByBdId),
       historyRow(person.id, "emailSource", person.emailSource ?? null, newSource, changedByBdId),
     );
+  }
+
+  if (property === "jobTitle") {
+    // roleGroup is derived from the Cargo (the identity engine re-derives it
+    // on every import, resolve.ts), so a Cargo edit must keep it in step. Its
+    // own history row is skipped when the derived group does not change.
+    // A blank Cargo is absence of information, not evidence of "no role":
+    // clearing it keeps the last known group.
+    const newGroup = derivedRoleGroup(newValue);
+    if (newGroup !== null && newGroup !== (person.roleGroup ?? null)) {
+      personUpdate.roleGroup = newGroup;
+      rows.push(historyRow(person.id, "roleGroup", person.roleGroup ?? null, newGroup, changedByBdId));
+    }
   }
 
   return {

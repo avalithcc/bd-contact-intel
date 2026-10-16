@@ -11,12 +11,13 @@
  */
 import { unstable_rethrow } from "next/navigation";
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
-import { ContactNotFoundError } from "@/lib/contacts/errors";
+import { ContactNotFoundError, ProfileKeyTakenError, type ProfileKeyOwner } from "@/lib/contacts/errors";
 import { CompanyNotFoundError } from "@/lib/companies/errors";
 import {
   InvalidContactTypeError,
   InvalidEmailError,
   InvalidPhoneError,
+  InvalidProfileKeyError,
   PropertyBatchEditError,
   type LocationProperty,
 } from "@/lib/contacts/propertyEdit";
@@ -34,6 +35,10 @@ export type ContactActionErrorReason =
   | "merged"
   | "invalid_email"
   | "invalid_phone"
+  | "invalid_profile_key"
+  // The LinkedIn profile already belongs to another contact; the failure also
+  // carries that contact (see ContactActionResult.conflict).
+  | "profile_key_taken"
   | "invalid_contact_type"
   | "not_editable"
   | "gmail_not_connected"
@@ -93,7 +98,9 @@ export class OwnerValueInvalidError extends Error {
   }
 }
 
-export type ContactActionResult = { ok: true } | { ok: false; reason: ContactActionErrorReason };
+export type ContactActionResult =
+  | { ok: true }
+  | { ok: false; reason: ContactActionErrorReason; conflict?: ProfileKeyOwner };
 
 /**
  * Result of the atomic "Ubicación" save (fresh-review CRITICAL fix). Same
@@ -125,6 +132,8 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof TaskNotFoundError) return "not_found";
   if (err instanceof InvalidEmailError) return "invalid_email";
   if (err instanceof InvalidPhoneError) return "invalid_phone";
+  if (err instanceof InvalidProfileKeyError) return "invalid_profile_key";
+  if (err instanceof ProfileKeyTakenError) return "profile_key_taken";
   if (err instanceof InvalidContactTypeError) return "invalid_contact_type";
   if (err instanceof PropertyNotEditableError) return "not_editable";
   if (err instanceof GmailSendError) {
@@ -189,7 +198,7 @@ export function contactActionErrorHref(reason: ContactActionErrorReason): string
 
 // Unclassified errors reach the client only as "unexpected"; log them here so
 // a real failure (DB, schema drift) still leaves a server-side trace.
-export function actionFailure(err: unknown): { ok: false; reason: ContactActionErrorReason } {
+export function actionFailure(err: unknown): Extract<ContactActionResult, { ok: false }> {
   // A redirect()/notFound() thrown inside the try (e.g. getCurrentBd()'s
   // defense-in-depth auth redirect) must reach Next's router, not be
   // swallowed into a generic `{ ok: false }` result — see
@@ -197,5 +206,5 @@ export function actionFailure(err: unknown): { ok: false; reason: ContactActionE
   unstable_rethrow(err);
   const reason = contactActionErrorReason(err);
   if (reason === "unexpected") console.error("[contacts] unexpected action error", err);
-  return { ok: false, reason };
+  return err instanceof ProfileKeyTakenError ? { ok: false, reason, conflict: err.owner } : { ok: false, reason };
 }

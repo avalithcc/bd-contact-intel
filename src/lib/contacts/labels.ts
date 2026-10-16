@@ -88,6 +88,10 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorInvalidEmail;
     case "invalid_phone":
       return l.errorInvalidPhone;
+    case "invalid_profile_key":
+      return l.errorInvalidProfileKey;
+    case "profile_key_taken":
+      return l.errorProfileKeyTaken;
     case "invalid_contact_type":
       return l.errorInvalidContactType;
     case "not_editable":

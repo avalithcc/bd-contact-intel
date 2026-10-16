@@ -13,6 +13,7 @@ import {
   InvalidContactTypeError,
   InvalidEmailError,
   InvalidPhoneError,
+  InvalidProfileKeyError,
   isEditablePersonProperty,
   planLocationEdit,
   planPropertyEdit,
@@ -36,6 +37,7 @@ const BASE_PERSON = {
   industry: null,
   phone: "+54 11 4000-0000",
   mobilePhone: null,
+  profileKey: null as string | null,
 };
 
 test("isEditablePersonProperty accepts only the allow-listed columns", () => {
@@ -62,11 +64,19 @@ test("changed value produces a person update and a history row", () => {
       changedByBdId: "bd-1",
       source: "edit",
     },
+    {
+      personId: BASE_PERSON.id,
+      property: "roleGroup",
+      oldValue: null,
+      newValue: "eng_leadership",
+      changedByBdId: "bd-1",
+      source: "edit",
+    },
   ]);
 });
 
 test("null -> null (both empty) reports changed: false", () => {
-  const plan = planPropertyEdit(BASE_PERSON, "roleGroup", "   ", "bd-1");
+  const plan = planPropertyEdit(BASE_PERSON, "city", "   ", "bd-1");
   assert.deepEqual(plan, { changed: false, personUpdate: null, historyRows: [] });
 });
 
@@ -192,16 +202,16 @@ test("batch: only entries whose value actually changed are written", () => {
     BASE_PERSON,
     [
       { property: "jobTitle", rawNewValue: "VP of Engineering" },
-      { property: "roleGroup", rawNewValue: "   " }, // null -> null, a no-op
+      { property: "city", rawNewValue: "   " }, // null -> null, a no-op
     ],
     "bd-1",
   );
   assert.equal(plan.changed, true);
   assert.equal(plan.personUpdate?.jobTitle, "VP of Engineering");
-  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.equal("city" in (plan.personUpdate ?? {}), false);
   assert.deepEqual(
     plan.historyRows.map((r) => r.property),
-    ["jobTitle"],
+    ["jobTitle", "roleGroup"],
   );
 });
 
@@ -217,7 +227,7 @@ test("batch: one history row per changed field (plus email's derived columns), m
   assert.equal(plan.changed, true);
   assert.deepEqual(
     plan.historyRows.map((r) => r.property).sort(),
-    ["email", "emailNormalized", "emailSource", "emailStatus", "jobTitle"],
+    ["email", "emailNormalized", "emailSource", "emailStatus", "jobTitle", "roleGroup"],
   );
 });
 
@@ -284,10 +294,10 @@ test("planLocationEdit: all three changed fields each get their own history row"
 
 // --- contactType (contact-type-ui): editable closed-set property -----------
 
-test("contactType is editable and sits right after roleGroup", () => {
+test("contactType is editable and sits right after jobTitle", () => {
   assert.equal(isEditablePersonProperty("contactType"), true);
   assert.equal(
-    EDITABLE_PERSON_PROPERTIES[EDITABLE_PERSON_PROPERTIES.indexOf("roleGroup") + 1],
+    EDITABLE_PERSON_PROPERTIES[EDITABLE_PERSON_PROPERTIES.indexOf("jobTitle") + 1],
     "contactType",
   );
 });
@@ -329,4 +339,180 @@ test("re-saving the same contactType is a no-op with no history row", () => {
   const plan = planPropertyEdit({ ...BASE_PERSON, contactType: "INFLUENCER" }, "contactType", "INFLUENCER", "bd-1");
   assert.equal(plan.changed, false);
   assert.deepEqual(plan.historyRows, []);
+});
+
+// ---- profileKey (LinkedIn) -------------------------------------------------
+
+const PERSON_WITH_PROFILE = { ...BASE_PERSON, profileKey: "linkedin.com/in/dana-whitfield" };
+
+test("profileKey is editable and sits right after mobilePhone", () => {
+  assert.ok(isEditablePersonProperty("profileKey"));
+  const i = EDITABLE_PERSON_PROPERTIES.indexOf("mobilePhone");
+  assert.equal(EDITABLE_PERSON_PROPERTIES[i + 1], "profileKey");
+});
+
+for (const raw of [
+  "https://www.linkedin.com/in/Dana-Whitfield/",
+  "linkedin.com/in/dana-whitfield",
+  "  http://LinkedIn.com/in/dana-whitfield?utm_source=share  ",
+]) {
+  test(`profileKey accepts and normalizes ${JSON.stringify(raw)}`, () => {
+    const plan = planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1");
+    assert.equal(plan.changed, true);
+    assert.equal(plan.personUpdate?.profileKey, "linkedin.com/in/dana-whitfield");
+    assert.deepEqual(plan.historyRows, [
+      { personId: BASE_PERSON.id, property: "profileKey", oldValue: null, newValue: "linkedin.com/in/dana-whitfield", changedByBdId: "bd-1", source: "edit" },
+    ]);
+  });
+}
+
+test("profileKey keeps a country subdomain as the importer does, and re-saving it is a no-op", () => {
+  const held = { ...BASE_PERSON, profileKey: "uk.linkedin.com/in/dana-whitfield" };
+  assert.equal(planPropertyEdit(BASE_PERSON, "profileKey", "https://uk.linkedin.com/in/dana-whitfield", "bd-1").personUpdate?.profileKey, "uk.linkedin.com/in/dana-whitfield");
+  assert.equal(planPropertyEdit(held, "profileKey", "https://uk.linkedin.com/in/Dana-Whitfield/", "bd-1").changed, false);
+});
+
+test("profileKey rejects company, school and site pages", () => {
+  for (const raw of ["https://www.linkedin.com/company/acme", "https://www.linkedin.com/school/x", "https://www.linkedin.com/feed"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1"), InvalidProfileKeyError);
+  }
+});
+
+test("profileKey rejects a non-linkedin host", () => {
+  for (const raw of ["https://twitter.com/dwhitfield", "https://linkedin.com.evil.example/in/x", "https://notlinkedin.com/in/x"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1"), InvalidProfileKeyError);
+  }
+});
+
+test("profileKey rejects a value that normalizes to null", () => {
+  for (const raw of ["https://linkedin.com", "https://www.linkedin.com/", "not a url at all"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "profileKey", raw, "bd-1"), InvalidProfileKeyError);
+  }
+});
+
+test("profileKey blank clears the profile", () => {
+  const plan = planPropertyEdit(PERSON_WITH_PROFILE, "profileKey", "   ", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.profileKey, null);
+  assert.equal(plan.historyRows[0]?.oldValue, "linkedin.com/in/dana-whitfield");
+  assert.equal(plan.historyRows[0]?.newValue, null);
+});
+
+test("profileKey no-op: the same profile in another shape changes nothing", () => {
+  const plan = planPropertyEdit(PERSON_WITH_PROFILE, "profileKey", "https://www.linkedin.com/in/Dana-Whitfield/", "bd-1");
+  assert.deepEqual(plan, { changed: false, personUpdate: null, historyRows: [] });
+});
+
+test("profileKey no-op: blank on a contact with no profile", () => {
+  assert.equal(planPropertyEdit(BASE_PERSON, "profileKey", "", "bd-1").changed, false);
+});
+
+test("profileKey planner is pure: same input twice, same result, input untouched", () => {
+  const before = structuredClone(BASE_PERSON);
+  const a = planPropertyEdit(BASE_PERSON, "profileKey", "https://www.linkedin.com/in/x", "bd-1");
+  const b = planPropertyEdit(BASE_PERSON, "profileKey", "https://www.linkedin.com/in/x", "bd-1");
+  assert.deepEqual({ ...a.personUpdate, updatedAt: 0 }, { ...b.personUpdate, updatedAt: 0 });
+  assert.deepEqual(a.historyRows, b.historyRows);
+  assert.deepEqual(BASE_PERSON, before);
+});
+
+// --- roleGroup is derived from jobTitle, never edited directly -------------
+
+test("roleGroup is no longer an editable property", () => {
+  assert.equal(isEditablePersonProperty("roleGroup"), false);
+  assert.equal((EDITABLE_PERSON_PROPERTIES as readonly string[]).includes("roleGroup"), false);
+});
+
+test("a jobTitle edit re-derives roleGroup and writes both history rows", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.jobTitle, "Head of Engineering");
+  assert.equal(plan.personUpdate?.roleGroup, "eng_leadership");
+  assert.deepEqual(
+    plan.historyRows.map((r) => [r.property, r.oldValue, r.newValue, r.changedByBdId, r.source]),
+    [
+      ["jobTitle", "Engineer", "Head of Engineering", "bd-1", "edit"],
+      ["roleGroup", "developers", "eng_leadership", "bd-1", "edit"],
+    ],
+  );
+});
+
+test("a jobTitle edit that keeps the derived group writes only the jobTitle row", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Software Engineer", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle"]);
+});
+
+test("clearing a real jobTitle keeps the stored roleGroup and writes only the jobTitle row", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "   ", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.jobTitle, null);
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle"]);
+});
+
+test("saving a blank jobTitle that is already blank writes nothing, whatever the stored group", () => {
+  for (const group of ["developers", null, "no_position"]) {
+    const person = { ...BASE_PERSON, jobTitle: null as string | null, roleGroup: group };
+    assert.deepEqual(planPropertyEdit(person, "jobTitle", "  ", "bd-1"), {
+      changed: false,
+      personUpdate: null,
+      historyRows: [],
+    });
+  }
+});
+
+test("a title matching no rule classifies to other (no_position is only the blank fallback) and is written like any group", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Zzyzx Wrangler", "bd-1");
+  assert.equal(plan.personUpdate?.roleGroup, "other");
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["jobTitle", "roleGroup"]);
+});
+
+test("a stale roleGroup is repaired on the next jobTitle edit; a null one is filled", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "jobTitle", "Head of Engineering", "bd-1");
+  assert.equal(plan.personUpdate?.roleGroup, "eng_leadership");
+  assert.deepEqual(plan.historyRows.map((r) => [r.property, r.oldValue]), [
+    ["jobTitle", "Engineer"],
+    ["roleGroup", null],
+  ]);
+});
+
+test("editing other properties never touches roleGroup", () => {
+  const plan = planPropertyEdit({ ...BASE_PERSON, roleGroup: "developers" }, "city", "Rosario", "bd-1");
+  assert.equal("roleGroup" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["city"]);
+});
+
+test("planPropertyEdit is pure: the same input twice gives the same plan and the input is untouched", () => {
+  const person = Object.freeze({ ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" });
+  const a = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  const b = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  assert.deepEqual(a.historyRows, b.historyRows);
+  assert.equal(a.personUpdate?.roleGroup, b.personUpdate?.roleGroup);
+  assert.equal(person.roleGroup, "developers");
+});
+
+test("saving an unchanged jobTitle still repairs a stale roleGroup (only the roleGroup row)", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Head of Engineering", roleGroup: "developers" };
+  const plan = planPropertyEdit(person, "jobTitle", "Head of Engineering", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.roleGroup, "eng_leadership");
+  assert.equal("jobTitle" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => [r.property, r.oldValue, r.newValue]), [
+    ["roleGroup", "developers", "eng_leadership"],
+  ]);
+});
+
+test("saving an unchanged jobTitle with an in-sync roleGroup is a no-op", () => {
+  const person = { ...BASE_PERSON, jobTitle: "Engineer", roleGroup: "developers" };
+  assert.deepEqual(planPropertyEdit(person, "jobTitle", "Engineer", "bd-1"), {
+    changed: false,
+    personUpdate: null,
+    historyRows: [],
+  });
 });

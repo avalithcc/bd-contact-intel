@@ -710,12 +710,16 @@ export const en = {
     propEmail: "Email",
     propPhone: "Phone",
     propMobilePhone: "Mobile",
+    propProfileKey: "LinkedIn",
+    profileKeyPlaceholder: "https://www.linkedin.com/in/…",
+    profileKeyHelp: "Paste the profile link. It is saved normalized.",
     propJobTitle: "Title",
     jobTitleHintLabel: "Why this role",
     jobTitleHintMenuLabel: "Why contact this role",
     jobTitlePainPrefix: "Pain Avalith solves:",
     jobTitleGuideLinkText: "See the full guide for this group →",
     propRoleGroup: "Role group",
+    roleGroupDerivedHint: "Deduced from the title; it updates when you change the title.",
     propContactType: "Contact type",
     propSeniority: "Seniority",
     propCity: "City",
@@ -769,6 +773,15 @@ export const en = {
     errorMerged: "This contact was merged into another one. Open the current contact.",
     errorInvalidEmail: "That doesn't look like a valid email address.",
     errorInvalidPhone: "That doesn't look like a valid phone number.",
+    errorInvalidProfileKey: "It has to be the link of a personal linkedin.com profile (linkedin.com/in/…).",
+    errorProfileKeyTaken: "That profile already belongs to another contact. It can't be on two contacts.",
+    errorProfileKeyTakenPrefix: "That profile already belongs to",
+    errorProfileKeyTakenNoRepeat: "It can't be on two contacts.",
+    errorProfileKeyMergedPrefix: "That profile stayed on a contact that was already merged into",
+    errorProfileKeyTakenRest: "If they are the same person, merge them from",
+    errorProfileKeyTakenAskAdmin: "If they are the same person, ask an admin to merge them.",
+    errorProfileKeyTakenDuplicates: "Duplicates",
+    errorProfileKeyTakenNoAuto: "Nothing is merged automatically.",
     contactTypeNoneOption: "No type",
     errorInvalidContactType: "Pick a contact type from the list.",
     errorNotEditable: "This field can't be edited from this page.",
@@ -1156,6 +1169,10 @@ export const en = {
 
   // Server-only formatter templates — see the matching comment in es.ts.
   contactRecordServer: {
+    roleGroupDriftHint: (storedLabel: string | null, derivedLabel: string) =>
+      storedLabel
+        ? `The current title points to "${derivedLabel}", not "${storedLabel}"; save the title to update it.`
+        : `The current title points to "${derivedLabel}"; save the title to update it.`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence}% confidence · updated by ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "an email was sent",

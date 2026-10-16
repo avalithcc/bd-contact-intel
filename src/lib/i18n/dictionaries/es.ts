@@ -633,6 +633,9 @@ export const es: typeof en = {
     propEmail: "Correo electrónico",
     propPhone: "Teléfono",
     propMobilePhone: "Móvil",
+    propProfileKey: "LinkedIn",
+    profileKeyPlaceholder: "https://www.linkedin.com/in/…",
+    profileKeyHelp: "Pegá el enlace del perfil. Se guarda normalizado.",
     propJobTitle: "Cargo",
     // "Por qué este rol" disclosure on the Cargo row (openspec/changes/
     // bd-playbook, surface 1) — reuses classifyPosition, no new query.
@@ -641,6 +644,7 @@ export const es: typeof en = {
     jobTitlePainPrefix: "Dolor que resuelve Avalith:",
     jobTitleGuideLinkText: "Ver guía completa de este grupo →",
     propRoleGroup: "Grupo de rol",
+    roleGroupDerivedHint: "Se deduce del cargo y se actualiza solo cuando cambiás el cargo.",
     propContactType: "Tipo de contacto",
     propSeniority: "Nivel",
     propCity: "Ciudad",
@@ -694,6 +698,15 @@ export const es: typeof en = {
     errorMerged: "Este contacto fue fusionado con otro. Abrir el contacto vigente.",
     errorInvalidEmail: "Ese valor no parece un correo electrónico válido.",
     errorInvalidPhone: "Ese valor no parece un número de teléfono válido.",
+    errorInvalidProfileKey: "Tiene que ser el enlace de un perfil personal de linkedin.com (linkedin.com/in/…).",
+    errorProfileKeyTaken: "Ese perfil ya pertenece a otro contacto. No se puede repetir en dos contactos.",
+    errorProfileKeyTakenPrefix: "Ese perfil ya es de",
+    errorProfileKeyTakenNoRepeat: "No se puede repetir en dos contactos.",
+    errorProfileKeyMergedPrefix: "Ese perfil quedó en un contacto que ya se fusionó con",
+    errorProfileKeyTakenRest: "Si son la misma persona, fusionalos desde",
+    errorProfileKeyTakenAskAdmin: "Si son la misma persona, pedile a un admin que los fusione.",
+    errorProfileKeyTakenDuplicates: "Duplicados",
+    errorProfileKeyTakenNoAuto: "No se fusiona nada solo.",
     contactTypeNoneOption: "Sin tipo",
     errorInvalidContactType: "Seleccionar un tipo de contacto de la lista.",
     errorNotEditable: "Este campo no se puede editar desde esta página.",
@@ -1106,6 +1119,10 @@ export const es: typeof en = {
   // final plain strings from these templates via describeStatusReason()/
   // inline formatting, and only ever passes the RESULT down as a prop.
   contactRecordServer: {
+    roleGroupDriftHint: (storedLabel: string | null, derivedLabel: string) =>
+      storedLabel
+        ? `El cargo actual apunta a «${derivedLabel}», no a «${storedLabel}»; guardá el cargo para actualizarlo.`
+        : `El cargo actual apunta a «${derivedLabel}»; guardá el cargo para actualizarlo.`,
     hunterHint: (confidence: number, updatedByName: string, date: string) =>
       `Hunter · ${confidence} % de confianza · actualizado por ${updatedByName}, ${date}`,
     statusReasonSourceEmail: "se envió un correo",
