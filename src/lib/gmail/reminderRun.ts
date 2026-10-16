@@ -65,7 +65,7 @@ export async function runGmailReminders(
       continue;
     }
 
-    const email = buildReminderEmail({ name: r.rm_name }, siteUrl);
+    const email = buildReminderEmail({ name: r.rm_name }, siteUrl, admins.length > 0);
     // Once the mail is out the row must never be marked failed (tomorrow would send it again). A crash between the claim
     // and the send leaves a `pending` row that does not count in the series: one possible repeat, accepted.
     let mailSent = false;

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Correos de notificaciones · avalith. CRM (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+</head>
+<body>
+<main class="page" style="max-width:1100px;margin:0 auto">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Una sola plantilla visual para <strong>todo lo que sale de <span class="mono">notificaciones@avalith.net</span></strong>: los tres correos que envía la app y los dos de Supabase Auth que pueden dispararse. Todos los nombres y direcciones son inventados (dominio <span class="mono">.example</span>). <strong>Decisiones a aprobar:</strong>
+(1) <strong>Voseo profesional</strong> ("tenés", "conectá", "respondé"), igual que el resto del CRM y los correos actuales, sin jerga.
+(2) <strong>Mismo marco para los cinco</strong>: cabecera con el nombre, tarjeta con franja roja, botón principal, pie con el motivo, el remitente y la indicación sobre respuestas.
+(3) <strong>Los dos correos de Supabase</strong> se pegan a mano en el panel (no se versionan allí); propongo guardar su HTML en el repo y generarlo con el mismo módulo que usa la app.
+(4) En el aviso a administración no hay botón porque no existe hoy una pantalla a la que enlazar.</div><span class="tag tag-scope">En alcance: email-templates</span></div>
+
+<div class="page-header"><div class="titles"><div class="eyebrow">Notificaciones</div><h1>Correos de Avalith CRM<span class="dot">.</span></h1>
+<p class="meta">Remitente "Avalith CRM" &lt;notificaciones@avalith.net&gt;. Cinco correos, un solo diseño.</p></div></div>
+
+<h2 class="mb-lg">1 · Inventario</h2>
+<div class="table-wrap"><table class="data"><thead><tr><th>#</th><th>Correo</th><th>Destinatario</th><th>Asunto actual</th><th>Dónde vive hoy</th><th>Cómo se aplica</th></tr></thead><tbody>
+<tr><td class="mono">1</td>
+<td><a href="resumen-diario.html"><strong>Resumen diario de tareas</strong></a><br><span class="meta">Hoy a las 08:30 (hora de Argentina), todos los días, solo si hay tareas</span></td>
+<td>Cada BD con tareas pendientes</td>
+<td>Tus tareas de hoy — N para hoy, N atrasada(s), N de ayer</td>
+<td>Plantilla en código: <span class="mono">src/lib/tasks/digest.ts</span> (buildDigestEmail)</td>
+<td><span class="tag tag-scope">Cambio en el repo</span></td></tr>
+<tr><td class="mono">2</td>
+<td><a href="recordatorio-gmail.html"><strong>Recordatorio: conectar Gmail</strong></a><br><span class="meta">Días hábiles a las 09:00 (Argentina); a los 2 días sin actividad, luego cada 3 días, máximo 3</span></td>
+<td>El BD con Gmail sin conectar</td>
+<td>Es clave que conectes tu Gmail al CRM</td>
+<td>Código: <span class="mono">src/lib/gmail/reminderEmail.ts</span> (layout + buildReminderEmail)</td>
+<td><span class="tag tag-scope">Cambio en el repo</span></td></tr>
+<tr><td class="mono">3</td>
+<td><a href="aviso-administracion.html"><strong>Aviso a administración (tercer recordatorio)</strong></a><br><span class="meta">Una vez, cuando sale el tercer recordatorio a un BD</span></td>
+<td>Administradores (un solo correo)</td>
+<td>{Nombre} sigue sin conectar Gmail</td>
+<td>Código: <span class="mono">src/lib/gmail/reminderEmail.ts</span> (buildOwnerNoticeEmail)</td>
+<td><span class="tag tag-scope">Cambio en el repo</span></td></tr>
+<tr><td class="mono">4</td>
+<td><a href="restablecer-contrasena.html"><strong>Supabase Auth: Reset Password</strong></a><br><span class="meta">Al enviar el formulario de «¿Olvidaste tu contraseña?»</span></td>
+<td>Quien lo solicita</td>
+<td>Predeterminado de Supabase ("Reset Your Password") salvo que se haya editado en el panel</td>
+<td>Panel de Supabase: Authentication > Email Templates > Reset Password</td>
+<td><span class="tag tag-restyle">Pegar en Supabase</span></td></tr>
+<tr><td class="mono">5</td>
+<td><a href="invitacion.html"><strong>Supabase Auth: Invite user</strong></a><br><span class="meta">Cuando un administrador invita a un BD desde el panel de Supabase (Authentication &gt; Invite user)</span></td>
+<td>La persona invitada</td>
+<td>Predeterminado de Supabase ("You have been invited") salvo que se haya editado en el panel</td>
+<td>Panel de Supabase: Authentication > Email Templates > Invite user</td>
+<td><span class="tag tag-restyle">Pegar en Supabase</span></td></tr>
+</tbody></table>
+<div class="table-footer"><span>5 correos · 3 desde la app por SMTP · 2 desde Supabase Auth</span></div></div>
+
+<div class="grid-2 mt-xl">
+<div class="card"><div class="card-header"><h3>Excluidos a propósito</h3></div><div class="card-body stack-sm">
+<p><strong>Correos que los BDs envían a prospectos por Gmail</strong> (Secuencias, envíos 1:1, envíos programados): son correo personal de cada BD, salen desde su propia cuenta y no son notificaciones. No usan <span class="mono">notificaciones@avalith.net</span> ni esta plantilla.</p>
+<p><strong>Flujos de Supabase Auth que no se pueden disparar hoy:</strong> confirmar registro (no hay pantalla de alta; las cuentas se crean por invitación), enlace mágico (el acceso es con contraseña), cambio de correo (no hay interfaz para cambiarlo) y reautenticación (el cambio de contraseña pide la contraseña actual, no un código). Si alguno se activa en el futuro, se agrega con el mismo marco.</p>
+<p class="meta">Opcional a futuro: la notificación de seguridad "tu contraseña cambió" de Supabase está desactivada por defecto; no se incluye acá.</p>
+</div></div>
+<div class="card"><div class="card-header"><h3>Qué requiere el repo y qué el panel de Supabase</h3></div><div class="card-body stack-sm">
+<p><strong>Repo (3 correos):</strong> un módulo de layout compartido y la migración de <span class="mono">digest.ts</span> y <span class="mono">reminderEmail.ts</span> a ese módulo. Hoy cada uno tiene su propia copia del marco.</p>
+<p><strong>Panel de Supabase (2 correos):</strong> pegar el HTML en Reset Password e Invite user, y editar el asunto en el mismo lugar. El HTML se mantiene en el repo para poder pegarlo y revisarlo, pero Supabase solo lee lo que está en el panel.</p>
+<p><strong>Nombre del remitente:</strong> "Avalith CRM" ya está en el código de la app; en Supabase se cambia en Project Settings &gt; Auth &gt; SMTP (en curso).</p>
+</div></div>
+</div>
+
+<h2 class="mt-2xl mb-lg">2 · Restricciones de un correo (por qué no usa <span class="mono">styles.css</span>)</h2>
+<div class="card"><div class="card-body stack-sm">
+<p>Los clientes de correo (Gmail, Outlook, Apple Mail) <strong>ignoran hojas de estilo externas y la mayoría de las clases</strong>. Por eso el correo es la <strong>única excepción</strong> a "solo clases de <span class="mono">styles.css</span>": se arma con tablas y estilos en línea, copiando los valores de los tokens del CRM. El marco de bandeja que lo rodea en estos mockups sí usa las clases del sistema.</p>
+<ul style="padding-left:var(--space-2xl);list-style:disc" class="stack-sm">
+<li><strong>Tablas + estilos en línea</strong>, ancho máximo 600 px, fluido por debajo (sin horizontal scroll); un único ajuste de márgenes con <span class="mono">@media</span> como mejora opcional.</li>
+<li><strong>Botón a prueba de clientes</strong>: celda con color de fondo + enlace con relleno, y un rectángulo VML para Outlook de escritorio.</li>
+<li><strong>Funciona con imágenes desactivadas</strong>: no hay ninguna imagen; el logotipo es texto ("avalith." con el punto rojo).</li>
+<li><strong>Tipografía</strong>: pila de Inter y tipografías del sistema; las fuentes web casi no se cargan en correo, así que el diseño no depende de ellas.</li>
+<li><strong>Modo oscuro</strong>: la plantilla declara <span class="mono">color-scheme: light</span> y define fondo y color de texto explícitos en cada celda, de modo que si el cliente invierte colores a la fuerza el texto sigue siendo legible; los bordes usan hex sólidos (equivalentes al <span class="mono">rgba</span> del token) porque varios clientes descartan <span class="mono">rgba</span>.</li>
+<li><strong>Gemelo en texto plano</strong>: todos los correos se envían como <span class="mono">multipart/alternative</span> con versión de texto (ya existe en los tres de la app; se redacta para los dos de Supabase). Cada mockup lo muestra al final.</li>
+<li><strong>Preheader</strong> oculto con relleno, para que la bandeja no muestre texto del cuerpo ni del pie.</li>
+</ul></div></div>
+
+<h2 class="mt-2xl mb-lg">3 · Anatomía y tokens</h2>
+<div class="grid-2">
+<div class="card"><div class="card-header"><h3>Anatomía del marco</h3></div><div class="card-body"><ol style="padding-left:var(--space-2xl)" class="stack-sm">
+<li><strong>Cabecera</strong>: "avalith." (texto, 800, punto en rojo) y a la derecha la etiqueta mono <span class="mono">CRM</span>.</li>
+<li><strong>Tarjeta</strong>: fondo blanco, radio 12, borde fino y <strong>franja roja de 4 px arriba</strong>.</li>
+<li><strong>Cabecera de la tarjeta</strong>: etiqueta mono "// categoría" (como los <span class="mono">eyebrow</span> del CRM) y título de 24 px.</li>
+<li><strong>Cuerpo</strong>: párrafos de 15 px, recuadros (<span class="mono">warn</span> / <span class="mono">info</span>), pasos numerados, fichas de datos, píldoras de estado.</li>
+<li><strong>Botón principal</strong>: rojo de acento, texto blanco, radio 6, 46 px de alto, más enlace de respaldo en mono.</li>
+<li><strong>Pie</strong> (sobre el fondo, fuera de la tarjeta): motivo por el que lo recibís, remitente <span class="mono">notificaciones@avalith.net</span> e indicación de respuestas ("no recibe respuestas" o "tu respuesta llega a la administración" cuando hay Reply-To).</li>
+</ol></div></div>
+<div class="card"><div class="card-header"><h3>Tokens usados</h3></div><div class="table-wrap" style="border:0"><table class="data compact"><tbody>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#f5f4f7;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">canvas</td><td class="mono">#f5f4f7</td><td>Fondo del correo</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#ffffff;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">surface-2</td><td class="mono">#ffffff</td><td>Tarjeta</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#fbfafc;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">surface-1</td><td class="mono">#fbfafc</td><td>Fichas y franjas</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#17151c;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">ink</td><td class="mono">#17151c</td><td>Texto principal</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#5b5865 / #6e6b78;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">ink-soft / subtle</td><td class="mono">#5b5865 / #6e6b78</td><td>Texto secundario y pie</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#d5252f;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">accent</td><td class="mono">#d5252f</td><td>Botón, franja, punto</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#b81f27;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">accent-strong</td><td class="mono">#b81f27</td><td>Enlaces</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#fae5e6;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">accent-soft</td><td class="mono">#fae5e6</td><td>Círculos de pasos</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#f6eae1 / #92400e;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">warn bg / text</td><td class="mono">#f6eae1 / #92400e</td><td>Hoy, avisos</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#fbe5e5 / #b91c1c;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">danger bg / text</td><td class="mono">#fbe5e5 / #b91c1c</td><td>Atrasadas</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#e4eafa / #1e40af;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">info bg / text</td><td class="mono">#e4eafa / #1e40af</td><td>Notas de seguridad</td></tr>
+<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#ebebeb;border:1px solid var(--color-border-strong);vertical-align:middle"></span></td><td class="mono">border (sólido)</td><td class="mono">#ebebeb</td><td>Equivale a rgba(0,0,0,.08) sobre blanco</td></tr>
+</tbody></table></div></div>
+</div>
+
+<h2 class="mt-2xl mb-lg">4 · Estimación de implementación</h2>
+<div class="card"><div class="table-wrap" style="border:0"><table class="data compact"><thead><tr><th>Pieza</th><th>Código de producción (aprox.)</th></tr></thead><tbody>
+<tr><td>Módulo de layout compartido (marco, botón, recuadro, pasos, ficha, píldora, pie, tokens movidos desde <span class="mono">digest.ts</span>)</td><td class="mono">~170 líneas</td></tr>
+<tr><td>Migrar el digest (<span class="mono">digest.ts</span>: usar el layout, franja de conteos, titular)</td><td class="mono">~90 líneas cambiadas</td></tr>
+<tr><td>Migrar recordatorio y aviso (<span class="mono">reminderEmail.ts</span>: copy en voseo, recuadro, pasos, ficha)</td><td class="mono">~80 líneas cambiadas</td></tr>
+<tr><td>Script que genera el HTML de Supabase desde el layout (Reset Password, Invite) a <span class="mono">supabase/email-templates/*.html</span></td><td class="mono">~70 líneas</td></tr>
+<tr><th>Total código</th><th class="mono">~410 líneas (2 ramas: layout + app; Supabase)</th></tr>
+</tbody></table></div>
+<div class="card-body meta">Aparte: pruebas (~150 líneas, no cuentan para el presupuesto) y 2 archivos HTML generados para pegar en Supabase (~120 líneas cada uno, son artefactos, no lógica).</div></div>
+
+</main>
+</body>
+</html>
