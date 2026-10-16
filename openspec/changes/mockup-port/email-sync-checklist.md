@@ -62,6 +62,8 @@ Columns: element | mockup ref | status | evidence | notes
 
 ## Screen 4 — one-time reconnect banner
 
+> Superseded 2026-10-16: the dismissible banner, `ReconnectBanner.tsx`, `dismissReconnectBannerAction` and `reconnectBannerState.ts` below were replaced by a red, non-dismissible `ConnectionBanner` — see `openspec/changes/gmail-reconnect-banner/`. The rows below are kept as history.
+
 | element | mockup ref | status | evidence | notes |
 |---|---|---|---|---|
 | Full-width dismissible banner | email-sync.html:369-373 | done | src/components/ReconnectBanner.tsx, src/app/design-system.css (`.reconnect-banner`) | New global component, approved (README decision 6). |

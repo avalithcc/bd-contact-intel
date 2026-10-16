@@ -10,9 +10,7 @@ import { argentinaCalendarDate, argentinaDayBoundaries, argentinaInstantDayWindo
 import { ensureTodayFollowUpQueue } from "@/lib/followUp/queueQueries";
 import { readBadgeRowEnsuringQueue } from "@/lib/shell/readBadgeRowEnsuringQueue";
 import { buildAppShellBadgeCountsQuery } from "@/lib/shell/appShellBadgeCountsQuery";
-import { shouldShowReconnectBanner } from "@/lib/gmail/reconnectBannerState";
-import { needsReconnectForSync } from "@/lib/gmail/needsReconnectForSync";
-import { deriveSyncHealth } from "@/lib/gmail/syncHealth";
+import { decideConnectionBanner, type ConnectionBannerDecision } from "@/lib/gmail/connectionBanner";
 
 export interface AppShellBadgeCounts {
   taskCount: number;
@@ -23,16 +21,13 @@ export interface AppShellBadgeCounts {
   duplicateCount: number;
   /** This BD's Sequences with at least one member still in progress (13.6). */
   sequenceCount: number;
-  /** email-sync.html screen 4 — see reconnectBannerState.ts. */
-  needsReconnectBanner: boolean;
-  /** Connected and readonly-scoped, but not syncing (syncHealth.ts); null when healthy or not applicable. */
-  syncBanner: "failing" | "stale" | null;
+  /** Which Gmail banner the shell shows, if any — see connectionBanner.ts. */
+  connectionBanner: ConnectionBannerDecision | null;
 }
 
 interface EmailAccountBannerState {
   status: string | null;
   grantedScopes: string | null;
-  dismissedAt: string | null;
   syncError: string | null;
   // json_build_object serializes timestamptz as ISO text, never a Date.
   lastSyncedAt: string | null;
@@ -95,29 +90,22 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
     attempted: queueBuildAttempted,
   });
   const bannerState = row?.email_account_banner_state ?? null;
-  // A pre-readonly connection is skipped by the cron entirely, so its
-  // timestamp is old by design: the reconnect banner covers it, not this.
-  const syncable = bannerState !== null && !needsReconnectForSync(bannerState.grantedScopes);
-  const health = syncable
-    ? deriveSyncHealth({
-        status: bannerState.status,
-        syncError: bannerState.syncError,
-        lastSyncedAt: toDate(bannerState.lastSyncedAt),
-        connectedAt: toDate(bannerState.connectedAt),
-        now,
-      })
-    : null;
+  const connectionBanner = decideConnectionBanner({
+    account: bannerState && {
+      status: bannerState.status,
+      grantedScopes: bannerState.grantedScopes,
+      syncError: bannerState.syncError,
+      lastSyncedAt: toDate(bannerState.lastSyncedAt),
+      connectedAt: toDate(bannerState.connectedAt),
+    },
+    now,
+  });
   return {
     taskCount: Number(row?.task_count ?? 0),
     followUpCount: Number(row?.follow_up_count ?? 0),
     absorptionCount: Number(row?.absorption_count ?? 0),
     duplicateCount: Number(row?.duplicate_count ?? 0),
     sequenceCount: Number(row?.sequence_count ?? 0),
-    needsReconnectBanner: shouldShowReconnectBanner({
-      accountStatus: bannerState?.status ?? null,
-      grantedScopes: bannerState?.grantedScopes ?? null,
-      reconnectBannerDismissedAt: bannerState?.dismissedAt ?? null,
-    }),
-    syncBanner: health?.state === "failing" || health?.state === "stale" ? health.state : null,
+    connectionBanner,
   };
 }

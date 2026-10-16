@@ -39,3 +39,29 @@ export function getGmailOAuthConfig(): GmailOAuthConfigResult {
     },
   };
 }
+
+/**
+ * Shell guard: is the Gmail OAuth config usable so the banner link can land on
+ * a real card? When it is not, every Gmail banner is hidden, so say so in the
+ * server log, once per server instance (the layout runs on every page view).
+ * Names only, never values.
+ */
+let warnedMissingConfig = false;
+
+export function gmailConfigOkOrWarnOnce(
+  read: () => GmailOAuthConfigResult = getGmailOAuthConfig,
+  warn: (message: string) => void = (m) => console.error(m),
+): boolean {
+  const result = read();
+  if (result.ok) return true;
+  if (!warnedMissingConfig) {
+    warnedMissingConfig = true;
+    warn(`[gmail] OAuth config missing (${result.missing.join(", ")}): Gmail reconnect/sync banners are hidden for every BD`);
+  }
+  return false;
+}
+
+/** Test hook: forget that the warning was already emitted. */
+export function resetGmailConfigWarning(): void {
+  warnedMissingConfig = false;
+}

@@ -168,14 +168,12 @@ export function buildAppShellBadgeCountsQuery({
         -- Reconnect banner (email-sync.html screen 4) — piggybacked onto
         -- this SAME single round trip (PERFORMANCE.md) rather than a
         -- second query in AppLayout. Returns the raw columns
-        -- shouldShowReconnectBanner() needs, not a precomputed boolean, so
-        -- that pure function (already unit-tested) stays the one place the
-        -- actual rule lives.
+        -- decideConnectionBanner() needs, not a precomputed verdict, so that
+        -- pure function (unit-tested) stays the one place the rule lives.
         select json_build_object(
           'status', email_account.status,
           'grantedScopes', email_account.granted_scopes,
-          'dismissedAt', email_account.reconnect_banner_dismissed_at,
-          -- Sync-health banner (syncHealth.ts): same row, same round trip.
+          -- Sync health inputs (syncHealth.ts): same row, same round trip.
           'syncError', email_account.sync_error,
           'lastSyncedAt', email_account.last_synced_at,
           'connectedAt', email_account.connected_at

@@ -1392,17 +1392,20 @@ export const en = {
     saveError: "The outcome could not be saved. Try again.",
   },
 
-  reconnectBanner: {
-    message:
-      "Reconnect Gmail to turn on automatic email sync: we'll log your contacts' replies without you having to do anything.",
+  connectionBanner: {
     cta: "Reconnect Gmail",
-    closeAria: "Close notice",
-  },
-
-  syncHealthBanner: {
+    strong: "It is key that you reconnect it now:",
+    disconnectedLead: "Your Gmail is disconnected.",
+    disconnectedTail: "until then your emails do not reach the CRM and your sequences are paused.",
+    expiredLead: "Your Gmail permission has expired.",
+    expiredTailSince: "since {since} your emails have not reached the CRM.",
+    expiredTail: "your emails are not reaching the CRM.",
+    missingScopeLead: "Your Gmail is missing the read permission.",
+    missingScopeTail: "without it, your contacts' replies do not reach the CRM.",
+    stale: "Your emails are syncing with a delay. If it keeps up for another hour, reconnect your Gmail.",
+    staleCta: "View status",
     failing: "Gmail is not syncing: new emails are not reaching the CRM.",
-    stale: "Gmail has not synced for over an hour.",
-    cta: "View details",
+    failingCta: "View details",
   },
 
   accountLinkedinMessages: {
