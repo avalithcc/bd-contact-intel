@@ -1846,6 +1846,7 @@ export const en = {
     atReplyReceived: "Reply received",
     atReplyReceivedDefault: "Reply received.",
     atAutoReply: "Automatic reply",
+    atBounced: "Email bounced",
     atAutoReplyDefault: "Automatic reply.",
     atStatusChange: "Stage changed",
     atMeetingLogged: "Meeting logged",

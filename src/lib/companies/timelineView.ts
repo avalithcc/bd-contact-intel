@@ -20,6 +20,8 @@ export interface CompanyTimelineViewLabels {
   // Out-of-office / machine-generated inbound mail (auto_reply_received).
   atAutoReply: string;
   atAutoReplyDefault: string;
+  // A delivery failure on the address (email_bounced).
+  atBounced: string;
   atStatusChange: string;
   atMeetingLogged: string;
   atCall: string;
@@ -74,6 +76,8 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atReplyReceived;
     case "auto_reply_received":
       return l.atAutoReply;
+    case "email_bounced":
+      return l.atBounced;
     case "status_change":
       return l.atStatusChange;
     case "status_backfill":

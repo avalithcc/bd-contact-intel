@@ -86,7 +86,7 @@ test("a hard bounce marks the person, suppresses the address, stops the sequence
   const { recordBounces } = await import("@/lib/gmail/bounceQueries");
   const s = await seed();
   const result = await recordBounces(s.bdId, [await hard(s)]);
-  assert.deepEqual(result, { hard: 1, soft: 0, unlinked: 0, duplicates: 0, failed: 0, scheduledCancelled: 1, membersDiscarded: 1 });
+  assert.deepEqual(result, { hard: 1, soft: 0, unlinked: 0, duplicates: 0, noHolder: 0, failed: 0, scheduledCancelled: 1, membersDiscarded: 1 });
   const after = await state(s);
   assert.equal(after.status, "bounced");
   assert.equal(after.suppressions.length, 1);
@@ -115,7 +115,7 @@ test("re-syncing the same notification changes nothing", async () => {
   const s = await seed();
   await recordBounces(s.bdId, [await hard(s)]);
   const again = await recordBounces(s.bdId, [await hard(s)]);
-  assert.deepEqual(again, { hard: 0, soft: 0, unlinked: 0, duplicates: 1, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 });
+  assert.deepEqual(again, { hard: 0, soft: 0, unlinked: 0, duplicates: 1, noHolder: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 });
   const after = await state(s);
   assert.equal(after.activities.length, 1);
   assert.equal(after.suppressions.length, 1);
@@ -182,6 +182,48 @@ test("every notification in a tick is processed, in chunks, none dropped", async
   const result = await recordBounces(s.bdId, batch);
   assert.equal(result.soft, total);
   assert.equal((await state(s)).activities.length, total);
+});
+
+test("a hard bounce for an address no live Contact holds suppresses it but is counted as skipped, not as a bounce", async () => {
+  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
+  const { db } = await import("@/db");
+  const { emailMessage } = await import("@/db/schema");
+  const s = await seed();
+  const ghost = `zz-bn-ghost-${run}-${s.i}@example.test`;
+  addresses.push(ghost);
+  await db.insert(emailMessage).values({
+    bdId: s.bdId, gmailMessageId: `gm-ghost-${run}-${s.i}`, gmailThreadId: `th-ghost-${run}-${s.i}`, direction: "outbound", fromAddress: "x@example.test",
+    toAddresses: [ghost], subject: "Hola", sentAt: new Date("2026-10-08T13:00:00Z"), rfcMessageId: `<ghost-${run}-${s.i}@mail.gmail.com>`, matchedEmail: ghost, matchConfidence: "exact",
+  });
+  const { parseBounce } = await import("@/lib/gmail/parseBounce");
+  const { gmailHard511 } = await import("../unit/bounceFixtures");
+  const parsed = parseBounce(gmailHard511({ id: `dsn-ghost-${run}-${s.i}`, address: ghost, originalId: `<ghost-${run}-${s.i}@mail.gmail.com>` }));
+  assert.ok(parsed);
+  const result = await recordBounces(s.bdId, [parsed]);
+  assert.equal(result.hard, 0);
+  assert.equal(result.noHolder, 1);
+  const { emailSuppression } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  assert.equal((await db.select().from(emailSuppression).where(eq(emailSuppression.value, ghost))).length, 1);
+});
+
+test("a transient database error inside one notification aborts the run (so the sync holds its cursor) and rolls everything back", async () => {
+  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
+  const { isTransientDbError } = await import("@/lib/gmail/bounceErrors");
+  const { db } = await import("@/db");
+  const { sql } = await import("drizzle-orm");
+  const s = await seed();
+  // A deadlock (SQLSTATE 40P01) raised by the suppression insert, on this scratch database only.
+  await db.execute(sql.raw(`create or replace function zz_bounce_deadlock() returns trigger language plpgsql as $$ begin if new.value = '${s.address}' then raise exception 'simulated deadlock' using errcode = '40P01'; end if; return new; end $$`));
+  await db.execute(sql.raw(`create trigger zz_bounce_deadlock_${run}_${s.i} before insert on email_suppression for each row execute function zz_bounce_deadlock()`));
+  try {
+    await assert.rejects(recordBounces(s.bdId, [await hard(s)]), (error) => isTransientDbError(error));
+    const after = await state(s);
+    assert.equal(after.status, "verified");
+    assert.equal(after.activities.length, 0);
+  } finally {
+    await db.execute(sql.raw(`drop trigger zz_bounce_deadlock_${run}_${s.i} on email_suppression`));
+  }
 });
 
 test("one bad notification among several costs only itself: its writes roll back, the others are recorded", async () => {

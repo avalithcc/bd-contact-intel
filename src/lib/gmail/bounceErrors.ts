@@ -4,10 +4,12 @@
  * a stuck cursor is worse than a lost bounce.
  */
 const TRANSIENT_NODE_CODES = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EPIPE", "CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "EMAXCONNSESSION"]);
+// Deadlock, lock timeout and statement timeout are contention, not bad data: the same write succeeds on a retry.
+const TRANSIENT_SQLSTATES = new Set(["40P01", "55P03", "57014"]);
 
 export function isTransientDbError(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code !== "string") return false;
   // SQLSTATE class 08 (connection exception), 53 (insufficient resources), 57P (operator intervention / shutdown).
-  return TRANSIENT_NODE_CODES.has(code) || /^(08|53|57P)/.test(code);
+  return TRANSIENT_NODE_CODES.has(code) || TRANSIENT_SQLSTATES.has(code) || /^(08|53|57P)/.test(code);
 }
