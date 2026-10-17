@@ -43,11 +43,15 @@ const SYSTEM_SENDERS = new Set(["mailer-daemon", "postmaster"]);
 
 /**
  * A genuine notification has the null envelope sender `<>`; some MTAs write `<MAILER-DAEMON>` or `<mailer-daemon@host>`
- * instead. Absent or empty is fine too. A path naming any other address means a person's mail wrote it.
+ * instead (a host must match the From host). Absent or empty is fine too. A path naming any other address means a person's mail wrote it.
  */
-function returnPathAllowed(returnPath: string | null): boolean {
+function returnPathAllowed(returnPath: string | null, fromAddress: string): boolean {
   const path = (returnPath ?? "").replace(/[\s<>]/g, "").toLowerCase();
-  return path === "" || SYSTEM_SENDERS.has(path.split("@")[0] ?? "");
+  if (path === "") return true;
+  const [local, host] = path.split("@");
+  if (!SYSTEM_SENDERS.has(local ?? "")) return false;
+  // No host (`<MAILER-DAEMON>`) is fine; with one, it must be the host the notification itself came from.
+  return host === undefined || host === fromAddress.split("@")[1]?.toLowerCase();
 }
 
 export function planBounces(bounces: readonly ParsedBounce[], outbound: readonly OutboundCandidate[], recorded: ReadonlySet<string>): BouncePlan {
@@ -58,7 +62,7 @@ export function planBounces(bounces: readonly ParsedBounce[], outbound: readonly
     // thread proves nothing: anyone can reply into a thread.
     const systemSender = SYSTEM_SENDERS.has(bounce.fromAddress.split("@")[0] ?? "");
     // Counted on its own: a burst of these is someone forging notifications, not mail that simply links to nothing.
-    if (systemSender && !returnPathAllowed(bounce.returnPath)) {
+    if (systemSender && !returnPathAllowed(bounce.returnPath, bounce.fromAddress)) {
       plan.returnPathRejected += bounce.recipients.length;
       continue;
     }

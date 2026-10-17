@@ -84,9 +84,17 @@ test("a Return-Path with a real address means a person wrote it: only an absent 
   const withPath = (value: string) => parseBounce(failedWith("5.1.1", "no such user", { extraHeaders: { "Return-Path": value } }))!;
   assert.equal(planBounces([withPath("<attacker@evil.test>")], [sent()], new Set()).events.length, 0);
   assert.equal(planBounces([withPath("<>")], [sent()], new Set()).events.length, 1);
-  for (const path of ["<MAILER-DAEMON>", "<mailer-daemon@mx.example.test>", "<postmaster@contoso-ejemplo.test>", " < > "]) {
+  for (const path of ["<MAILER-DAEMON>", "<mailer-daemon@googlemail.com>", "<postmaster@googlemail.com>", " < > "]) {
     assert.equal(planBounces([withPath(path)], [sent()], new Set()).events.length, 1, path);
   }
+  // An address in the path must be on the same host as the From address (googlemail.com in the default fixture).
+  const hostPath = (path: string, from = "Mail Delivery Subsystem <mailer-daemon@googlemail.com>") => parseBounce(failedWith("5.1.1", "no such user", { from, extraHeaders: { "Return-Path": path } }))!;
+  assert.equal(planBounces([hostPath("<mailer-daemon@GoogleMail.com>")], [sent()], new Set()).events.length, 1);
+  const otherHost = planBounces([hostPath("<mailer-daemon@evil.test>")], [sent()], new Set());
+  assert.equal(otherHost.events.length, 0);
+  assert.equal(otherHost.returnPathRejected, 1);
+  assert.equal(planBounces([hostPath("<postmaster@evil.test>")], [sent()], new Set()).returnPathRejected, 1);
+  assert.equal(planBounces([hostPath("<MAILER-DAEMON>")], [sent()], new Set()).events.length, 1);
   // Counted on its own, not as an unlinked notification.
   const rejected = planBounces([withPath("<attacker@evil.test>")], [sent()], new Set());
   assert.equal(rejected.returnPathRejected, 1);

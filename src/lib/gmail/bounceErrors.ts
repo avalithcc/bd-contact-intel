@@ -7,6 +7,8 @@
  *  - anything else: a data error. Skip the notification.
  * Conservative on purpose: anything not clearly recognised is "data", because a stuck cursor is worse than a lost bounce.
  */
+// Exact SQLSTATEs only: 08P01 (protocol violation) and 53400 (configuration limit) are not outages and must not hold the cursor.
+const TRANSIENT_SQLSTATES = new Set(["08000", "08001", "08003", "08004", "08006", "53100", "53200", "53300", "57P01", "57P02", "57P03"]);
 const TRANSIENT_NODE_CODES = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EPIPE", "CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "EMAXCONNSESSION"]);
 const CONTENTION_SQLSTATES = new Set(["40P01", "55P03", "57014"]);
 
@@ -17,8 +19,8 @@ const codeOf = (error: unknown): string | null => {
 
 export function isTransientDbError(error: unknown): boolean {
   const code = codeOf(error);
-  // SQLSTATE class 08 (connection exception), 53 (insufficient resources), 57P (operator intervention / shutdown).
-  return code !== null && (TRANSIENT_NODE_CODES.has(code) || /^(08|53|57P)/.test(code));
+  // Connection failures (08), resource exhaustion (53) and server shutdown (57P), by exact code.
+  return code !== null && (TRANSIENT_NODE_CODES.has(code) || TRANSIENT_SQLSTATES.has(code));
 }
 
 export function isContentionDbError(error: unknown): boolean {
