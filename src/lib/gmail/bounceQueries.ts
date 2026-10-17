@@ -21,7 +21,7 @@ import { db } from "@/db";
 import { activity, emailMessage, emailSuppression, person, personPropertyHistory, sequence, sequenceMember } from "@/db/schema";
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { canTransition, MEMBER_STATES, type MemberState } from "@/lib/sequences/memberState";
-import { bounceKey, buildBounceMetadata, planBounces, type BounceEffects, type OutboundCandidate } from "./bouncePlan";
+import { bounceKey, buildBounceMetadata, planBounces, type BounceEffects, type BounceEvent, type OutboundCandidate } from "./bouncePlan";
 import type { ParsedBounce } from "./parseBounce";
 
 export const MAX_BOUNCES_PER_RUN = 50;
@@ -34,6 +34,8 @@ export interface RecordBouncesResult {
   soft: number;
   unlinked: number;
   duplicates: number;
+  /** Notifications whose own writes failed and were rolled back (the rest of the tick is unaffected). */
+  failed: number;
   scheduledCancelled: number;
   membersDiscarded: number;
 }
@@ -64,40 +66,66 @@ async function readRecorded(tx: Tx, batch: readonly ParsedBounce[]): Promise<Set
 }
 
 export async function recordBounces(bdId: string, bounces: readonly ParsedBounce[]): Promise<RecordBouncesResult> {
-  const result: RecordBouncesResult = { hard: 0, soft: 0, unlinked: 0, duplicates: 0, scheduledCancelled: 0, membersDiscarded: 0 };
-  const batch = bounces.slice(0, MAX_BOUNCES_PER_RUN);
-  if (batch.length === 0) return result;
-  const outbound = await readOutbound(bdId, batch);
+  const result: RecordBouncesResult = { hard: 0, soft: 0, unlinked: 0, duplicates: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 };
+  if (bounces.length === 0) return result;
+  const outbound = await readOutbound(bdId, bounces);
+  // Every notification of the tick is handled, MAX_BOUNCES_PER_RUN per transaction (never dropped).
+  for (let at = 0; at < bounces.length; at += MAX_BOUNCES_PER_RUN) {
+    await recordChunk(bdId, bounces.slice(at, at + MAX_BOUNCES_PER_RUN), outbound, result);
+  }
+  // Counts only: no address, subject or id ever reaches the log.
+  console.info(`bounces: recorded=${result.hard + result.soft} skipped=${result.unlinked + result.duplicates} failed=${result.failed}`);
+  return result;
+}
 
-  return db.transaction(async (tx) => {
+async function recordChunk(bdId: string, batch: readonly ParsedBounce[], outbound: OutboundCandidate[], result: RecordBouncesResult): Promise<void> {
+  await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`bounce:${bdId}`}, 0))`);
     const plan = planBounces(batch, outbound, await readRecorded(tx, batch));
-    result.unlinked = plan.unlinked;
-    result.duplicates = plan.duplicates;
-    if (plan.events.length === 0) return result;
+    result.unlinked += plan.unlinked;
+    result.duplicates += plan.duplicates;
 
-    const addresses = [...new Set(plan.events.map((e) => e.address))];
-    const holders = await tx
-      .select({ id: person.id, address: person.emailNormalized, status: person.emailStatus })
-      .from(person)
-      .where(and(inArray(person.emailNormalized, addresses), isNull(person.mergedIntoId)));
-    const hardAddresses = [...new Set(plan.events.filter((e) => e.severity === "hard").map((e) => e.address))];
-    const effects = await applyHard(tx, bdId, hardAddresses, holders);
-    result.scheduledCancelled = [...effects.values()].reduce((sum, e) => sum + e.scheduledCancelled, 0);
-    result.membersDiscarded = [...effects.values()].reduce((sum, e) => sum + e.discarded, 0);
-
-    // The entry names what THIS run did: the first notification for an address carries the effects, a later one none.
-    const reported = new Set<string>();
-    const entries = plan.events.flatMap((event) =>
-      holders
-        .filter((h) => h.address === event.address)
-        .map((h) => ({ personId: h.id, type: BOUNCE_ACTIVITY_TYPE, actorBdId: bdId, metadata: buildBounceMetadata(event, event.severity === "hard" && !reported.has(event.address) ? effects.get(event.address) : undefined) })),
-    );
-    for (const event of plan.events) if (event.severity === "hard") reported.add(event.address);
-    if (entries.length > 0) await tx.insert(activity).values(entries);
-    for (const event of plan.events) result[event.severity] += 1;
-    return result;
+    const byNotification = new Map<string, BounceEvent[]>();
+    for (const event of plan.events) byNotification.set(event.dsnGmailMessageId, [...(byNotification.get(event.dsnGmailMessageId) ?? []), event]);
+    for (const events of byNotification.values()) {
+      // One savepoint per notification: a failure rolls back only that notification's writes, and the rest go on.
+      try {
+        const done = await tx.transaction((sp) => recordNotification(sp, bdId, events));
+        result.hard += done.hard;
+        result.soft += done.soft;
+        result.scheduledCancelled += done.scheduledCancelled;
+        result.membersDiscarded += done.membersDiscarded;
+      } catch {
+        result.failed += 1;
+      }
+    }
   });
+}
+
+async function recordNotification(tx: Tx, bdId: string, events: BounceEvent[]) {
+  const addresses = [...new Set(events.map((e) => e.address))];
+  const holders = await tx
+    .select({ id: person.id, address: person.emailNormalized, status: person.emailStatus })
+    .from(person)
+    .where(and(inArray(person.emailNormalized, addresses), isNull(person.mergedIntoId)));
+  const hardAddresses = [...new Set(events.filter((e) => e.severity === "hard").map((e) => e.address))];
+  const effects = await applyHard(tx, bdId, hardAddresses, holders);
+
+  // The entry names what THIS run did: the first notification for an address carries the effects, a later one none.
+  const reported = new Set<string>();
+  const entries = events.flatMap((event) => {
+    const carried = event.severity === "hard" && !reported.has(event.address) ? effects.get(event.address) : undefined;
+    if (event.severity === "hard") reported.add(event.address);
+    return holders.filter((h) => h.address === event.address).map((h) => ({ personId: h.id, type: BOUNCE_ACTIVITY_TYPE, actorBdId: bdId, metadata: buildBounceMetadata(event, carried) }));
+  });
+  if (entries.length > 0) await tx.insert(activity).values(entries);
+  const sum = (pick: (e: BounceEffects) => number) => [...effects.values()].reduce((total, e) => total + pick(e), 0);
+  return {
+    hard: events.filter((e) => e.severity === "hard").length,
+    soft: events.filter((e) => e.severity === "soft").length,
+    scheduledCancelled: sum((e) => e.scheduledCancelled),
+    membersDiscarded: sum((e) => e.discarded),
+  };
 }
 
 async function applyHard(tx: Tx, bdId: string, addresses: string[], holders: { id: string; address: string | null; status: string }[]): Promise<Map<string, BounceEffects>> {

@@ -91,6 +91,21 @@ export const gmailDelay422 = (v: DsnVariant = {}) => {
   });
 };
 
+/** A Gmail-style failure notification with a chosen status, action and diagnostic (severity and sanitising cases). */
+export const failedWith = (status: string, diagnostic: string, o: { action?: string; subject?: string; internalDate?: string; from?: string } = {}): GmailApiMessage => {
+  const m = dsn({
+    from: o.from,
+    extraHeaders: { "In-Reply-To": ORIGINAL_ID },
+    parts: [
+      text("Delivery failed."),
+      statusAsHeaders([{ "Final-Recipient": "rfc822; lucia@acme-ejemplo.test", Action: o.action ?? "failed", Status: status, "Diagnostic-Code": `smtp; ${diagnostic}` }]),
+      original(ORIGINAL_ID, o.subject ?? ORIGINAL_SUBJECT),
+    ],
+  });
+  if (o.internalDate !== undefined) m.internalDate = o.internalDate;
+  return m;
+};
+
 export const exchangeNdr = () =>
   dsn({
     id: "dsn-3",
