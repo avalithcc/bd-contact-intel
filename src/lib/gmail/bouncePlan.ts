@@ -37,10 +37,18 @@ export interface BouncePlan {
 /** THE key of one recorded notification for one address: the writer stores it, the planner reads it. */
 export const bounceKey = (dsnGmailMessageId: string, address: string): string => `${dsnGmailMessageId}|${address}`;
 
+const SYSTEM_SENDERS = new Set(["mailer-daemon", "postmaster"]);
+
 export function planBounces(bounces: readonly ParsedBounce[], outbound: readonly OutboundCandidate[], recorded: ReadonlySet<string>): BouncePlan {
   const plan: BouncePlan = { events: [], unlinked: 0, duplicates: 0 };
   for (const bounce of bounces) {
-    const linked = outbound.filter((o) => o.gmailThreadId === bounce.gmailThreadId || (o.rfcMessageId !== null && bounce.linkRfcIds.includes(o.rfcMessageId)));
+    // Two independent checks must both hold: a system sender, and a reference back to our own mail. A message with no
+    // In-Reply-To, References or embedded original links to nothing, even if it sits in the right thread.
+    const systemSender = SYSTEM_SENDERS.has(bounce.fromAddress.split("@")[0] ?? "");
+    const linked =
+      systemSender && bounce.linkRfcIds.length > 0
+        ? outbound.filter((o) => o.gmailThreadId === bounce.gmailThreadId || (o.rfcMessageId !== null && bounce.linkRfcIds.includes(o.rfcMessageId)))
+        : [];
     for (const r of bounce.recipients) {
       const named = [r.address, r.originalAddress].filter((a): a is string => a !== null);
       const message = linked.find((o) => named.some((a) => o.recipients.includes(a)));
