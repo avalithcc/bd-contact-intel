@@ -90,6 +90,10 @@ started.
 
 ## Shipped
 
+- Shipped 2026-10-17: scheduled send (the Programados screen and the contact
+  timeline cards), scheduled sends auto-cancelled on opt-out with a failure
+  task, Lusha reveal storing both the work and the mobile phone, and new e2e
+  specs (contact record, hiring three columns, Lusha per BD).
 - Launch-readiness pass and every defect it found (#307–#312, 2026-10-02/03).
   The deliberate end-to-end pass Layer 1 asked for, run against a disposable
   local Postgres rather than production (see **Layer 1 → launch-readiness** for
@@ -553,14 +557,10 @@ that replaced the standalone page (#237); see **Shipped** above. It serves
 synced Gmail threads as well as LinkedIn history, and every view is logged to
 `audit_log` before the read.
 
-### auth-security — remaining
-**Both bullets below are unverified as of 2026-10-01** — they are Supabase
-project settings, and the Management API read returned 401 (expired or wrong
-`SUPABASE_ACCESS_TOKEN`). They were last checked 2026-09-30.
-- The invite email template still uses the default `{{ .ConfirmationURL }}`.
-  Invites are not used today (the owner creates users with a password and Auto
-  Confirm); if they ever are, switch it to the token_hash shape first.
-- `mailer_autoconfirm` is still on; harmless while sign-ups are disabled.
+### auth-security — verified
+Checked on the Supabase project 2026-10-16/17: `disable_signup = true`, minimum
+password length 12, and the invite template uses `token_hash`. Still not
+checked: `mailer_autoconfirm` (harmless while sign-ups are disabled).
 
 ### timestamptz migration — complete
 (Corrected 2026-10-01: this entry said "All timestamp columns are `timestamp
@@ -788,45 +788,12 @@ decision on the brief (unverified).
   recommendation for both is to keep them; the free-tier terms it cites were
   not re-verified: unverified.
 
-### Scheduled send: let a BD write an email now and have it leave later
-
-Owner ask, 2026-10-15: "cuando se mande un correo, me de la posibilidad a cada
-BD que pueda programarse cuando salga el mismo. Por ahi lo redacta y hace en ese
-momento, pero quiere que salga mas tarde por algun motivo." Every BD, on a
-single manual email — not a Sequence step.
-
-**The blocker is infrastructure, not UI.** All five crons in `vercel.json:11-31`
-fire ONCE A DAY at a fixed hour (`/api/hiring/sync` 09:00, `/api/hiring/discover`
-Mondays 07:00, `/api/tasks/digest` 11:30, `/api/gmail/sync` 12:00,
-`/api/owners/recompute` 06:00, all UTC — read 2026-10-15). There is no
-sub-daily job, so a "send at 15:00" cannot be honoured by the machinery that
-exists: the finest grain available today is one fixed sweep per day. Before any
-of this is designed, decide how the due time is reached. Whether the Vercel plan
-allows a more frequent cron was NOT checked: unverified. Whether the Gmail API
-can accept a send-at time at all (as opposed to Gmail's UI "Schedule send") was
-NOT checked: unverified — if it cannot, the delay has to be ours.
-
-What exists to build on:
-- The send itself is `sendGmailMessageFromAccount` in `src/lib/gmail/send.ts`,
-  which sends through the BD's own connected Gmail account. A deferred send
-  therefore depends on that BD's OAuth token still working at due time, and on
-  the account still being connected — a failure mode that does not exist for a
-  send the BD watches happen.
-- Sequences already schedule, but on a different clock and a different shape:
-  `src/lib/sequences/schedule.ts:3` says "Only America/New_York is supported"
-  and it is built on `./miamiTime`, while the rest of the CRM reasons in
-  Argentina time. A single scheduled send needs an explicit answer on whose
-  clock the BD is picking a time in.
-
-Product decisions to settle before implementing (none of these are decided):
-- Can the BD edit or cancel a scheduled email before it leaves, and from where?
-- If the contact replies before the due time, does the queued email still go
-  out? HubSpot's behaviour here is the reference (repo convention).
-- What happens when the due time passes while the Gmail account is
-  disconnected, the token is dead, or the address has since been suppressed —
-  silent drop, retry, or a task for the BD?
-- Does a scheduled email occupy the outbox visibly (so a BD does not write a
-  second one), and does it count as a touch before it is actually sent?
+### Bounce detection — built, awaiting owner OK
+Built on branch `bounce-detection-preview`, not merged: about 735 code lines,
+over the 400-line budget, so it needs the owner's OK. Known trade-offs: an
+Exchange/M365 `550 5.4.1` stays a soft bounce; NDRs from
+`MicrosoftExchange…@tenant` senders are ignored; there is no backfill of
+historical bounces.
 
 ### Lusha phone reveal: measured 2026-10-15, three findings from the real shape
 
@@ -863,12 +830,10 @@ The shape, which had never been seen:
 2. **Phones carry no `confidence` field at all**, so the grade tiebreaker in
    `choose()` is inert for phones — not because of the letter-grade bug fixed in
    77e5707, but because the field does not exist in this response.
-3. **Latent defect: our ranking prefers `type: "work"`** (`src/lib/lusha/parse.ts`,
-   `outranks`), and this entry came back `mobile`. With one candidate it did not
-   matter. If Lusha ever returns a `work` switchboard AND a `mobile` cell, we
-   pick the switchboard — backwards for reaching a person, and a 5-credit
-   purchase landing on the wrong number. Decide whether `mobile` should outrank
-   `work` for phones (it does not for emails).
+3. ~~Latent defect: the ranking preferred `type: "work"` over `mobile`.~~
+   Resolved 2026-10-17: one phones reveal now stores both the work and the
+   mobile number, and the type is compared case-insensitively (`da42b3a8`,
+   `b9d4b84d`).
 
 `countryIso2` is also discarded; it would be useful for formatting.
 
@@ -1761,6 +1726,14 @@ was identified when it did occur. Not independently reproduced or
 investigated further in this pass — **unverified**; for what it is worth,
 `npm run test:unit` passed 2317 of 2317 in each of 4 runs on 2026-10-01 (default
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
+
+### Open, noted 2026-10-17
+- The e2e login setup times out on a cold dev server (flaky).
+- `email_account.reconnect_banner_dismissed_at` is unused.
+- `listAllSequences` has no limit.
+- The role-group backfill has not been run.
+- Split contact groups do not appear in the Duplicados queue.
+- There is no lint script, and unused imports are not caught.
 
 ## Deferred from crm-hubspot-ux
 
