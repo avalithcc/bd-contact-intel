@@ -43,7 +43,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
+import { activity, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { CLOSED_STATES } from "@/lib/sequences/memberState";
 
@@ -193,6 +193,14 @@ export function buildAppShellBadgeCountsQuery({
             where sequence_member.sequence_id = sequence.id
               and sequence_member.state not in (${closedStates})
           )
-      ) as sequence_count
+      ) as sequence_count,
+      (
+        -- Sidebar "Programados" pill (scheduled-send): THIS BD's emails still waiting on them or on the clock -- scheduled,
+        -- on hold (the contact replied) or failed. Backed by scheduled_email_bd_status_idx.
+        select count(*)::int
+        from ${scheduledEmail}
+        where scheduled_email.bd_id = ${bdId}::uuid
+          and scheduled_email.status in ('scheduled', 'on_hold', 'failed')
+      ) as scheduled_count
   `;
 }

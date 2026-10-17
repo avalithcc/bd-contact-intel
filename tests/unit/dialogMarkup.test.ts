@@ -203,7 +203,8 @@ function buttonViolations(blocks: DialogBlock[]): { violations: string[]; checke
       const openTag = text.slice(m.index!, tagEnd + 1);
       checked++;
       const cls = classNameValue(openTag) ?? "";
-      if (/\bbtn\b/.test(cls)) continue;
+      // A `.chip` preset toggle (it carries aria-pressed) is a design-system skin that globals.css promises to outrank the legacy `:where(button)`.
+      if (/\bbtn\b/.test(cls) || (/\bchip\b/.test(cls) && /aria-pressed/.test(openTag))) continue;
       const exception = BUTTON_EXCEPTIONS.find((e) => openTag.includes(e.match));
       if (exception) continue;
       const line = text.slice(0, m.index).split("\n").length;

@@ -131,3 +131,11 @@ test("buildAppShellBadgeCountsQuery: the sequence badge adds a column, not a rou
   assert.doesNotMatch(sql.replace(/--.*$/gm, ""), /;/, "no second statement");
   assert.match(sql, /as sequence_count/i);
 });
+
+test("buildAppShellBadgeCountsQuery: scheduled_count is this BD's scheduled, on_hold and failed emails (scheduled-send)", () => {
+  const { sql } = render();
+  assert.match(
+    sql,
+    /select count\(\*\)::int\s+from "scheduled_email"\s+where scheduled_email\.bd_id = \$\d+::uuid\s+and scheduled_email\.status in \('scheduled', 'on_hold', 'failed'\)\s*\) as scheduled_count/i,
+  );
+});

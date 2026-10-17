@@ -21,6 +21,8 @@ export interface AppShellBadgeCounts {
   duplicateCount: number;
   /** This BD's Sequences with at least one member still in progress (13.6). */
   sequenceCount: number;
+  /** This BD's scheduled emails that are scheduled, on hold or failed. */
+  scheduledCount: number;
   /** Which Gmail banner the shell shows, if any — see connectionBanner.ts. */
   connectionBanner: ConnectionBannerDecision | null;
 }
@@ -73,12 +75,13 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
       absorption_count: number;
       duplicate_count: number;
       sequence_count: number;
+      scheduled_count: number;
       queue_built: boolean;
       email_account_banner_state: EmailAccountBannerState | null;
     }[];
     // An empty result cannot happen (scalar subqueries), but keep the old
     // `row?.` tolerance rather than throwing in the shell.
-    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, queue_built: true, email_account_banner_state: null };
+    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, scheduled_count: 0, queue_built: true, email_account_banner_state: null };
   };
   // F5: build today's queue on the first page of the day — see
   // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
@@ -106,6 +109,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
     absorptionCount: Number(row?.absorption_count ?? 0),
     duplicateCount: Number(row?.duplicate_count ?? 0),
     sequenceCount: Number(row?.sequence_count ?? 0),
+    scheduledCount: Number(row?.scheduled_count ?? 0),
     connectionBanner,
   };
 }

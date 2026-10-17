@@ -42,6 +42,7 @@ const ROUTE_LABELS: ReadonlyArray<readonly [string, BreadcrumbKey]> = [
   ["/playbook", "playbook"],
   ["/follow-ups", "followUps"],
   ["/sequences", "sequences"],
+  ["/scheduled", "scheduled"],
   ["/companies", "companies"],
   ["/contacts", "leads"],
   ["/discovery", "discovery"],

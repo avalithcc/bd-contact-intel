@@ -29,6 +29,7 @@ import {
   AbsorbIcon,
   SendIcon,
   BoltIcon,
+  ClockIcon,
 } from "@/components/icons";
 
 /** Longest a clicked item stays highlighted without the route committing. */
@@ -75,6 +76,7 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "tasks", href: "/tasks", icon: TasksIcon },
       { labelKey: "followUps", href: "/follow-ups", icon: FollowUpIcon },
       { labelKey: "sequences", href: "/sequences", icon: SendIcon },
+      { labelKey: "scheduled", href: "/scheduled", icon: ClockIcon },
       { labelKey: "outreach", href: "/contacts?view=outreach", icon: OutreachIcon },
     ],
   },
@@ -128,6 +130,7 @@ export function Sidebar({
   taskCount,
   followUpCount,
   sequenceCount,
+  scheduledCount,
   absorptionCount,
   duplicateCount,
   isAdmin,
@@ -136,6 +139,7 @@ export function Sidebar({
   taskCount?: number;
   followUpCount?: number;
   sequenceCount?: number;
+  scheduledCount?: number;
   absorptionCount?: number;
   duplicateCount?: number;
   // Admin-only "Administración" section (admin-conversation-access mockup,
@@ -187,6 +191,7 @@ export function Sidebar({
     tasks: taskCount,
     followUps: followUpCount,
     sequences: sequenceCount,
+    scheduled: scheduledCount,
   };
 
   return (

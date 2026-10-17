@@ -169,6 +169,8 @@ kbd, .kbd {
 .btn-danger { background: var(--color-surface-2); color: var(--color-danger-text); border-color: var(--color-danger); }
 .btn-danger:hover, .btn-danger.is-hover { background: var(--color-danger-bg); }
 .btn-danger-solid { background: var(--color-danger-text); color: var(--color-accent-fg); }
+/* Ghost button for a destructive choice among several (envio-programado.html "Cancelar envío"): danger ink, no border. */
+.btn-ghost-danger { color: var(--color-danger-text); }
 .btn-danger-solid:hover { background: var(--color-danger-press); }
 .btn.is-focus { box-shadow: var(--focus-ring); }
 /* Disabled: ONE recipe for every button variant, never opacity. Fading the whole button also
@@ -297,6 +299,8 @@ kbd, .kbd {
    whole chip already reads as one control. Reset to plain inline text
    (button chrome removed) so it renders exactly like the mockup's chip
    text, just with a bigger hit target than the mockup's label-only `.k`. */
+/* A preset toggle (envio-programado.html "Lunes 9:00 en Miami") shows its pressed state with the accent border. */
+.chip[aria-pressed="true"] { border-color: var(--color-accent); }
 .chip-target { display: inline-flex; align-items: center; gap: 0.2rem; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 /* `.k` is the label span inside `.chip-target` — kept as its own class so
    it still gets the mockup's subtler label color while the value text

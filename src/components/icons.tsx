@@ -85,6 +85,16 @@ export function FollowUpIcon({ className }: { className?: string }) {
   );
 }
 
+// "Programados" sidebar entry and the schedule buttons (envio-programado mockup): a plain clock.
+export function ClockIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </Svg>
+  );
+}
+
 // No standalone "Outreach" row exists in the approved mockup anymore — it
 // redirects into Contactos (see outreach.html's "Trasladado" note). This
 // icon (arrow, reused from that same page's before/after table) is a
