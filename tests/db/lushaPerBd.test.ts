@@ -156,8 +156,9 @@ test("the report matches the seeded ledger for the period, keeps a disabled BD's
   assert.ok(rows.every((r) => r.chargedCredits >= 0 && Number.isInteger(r.chargedCredits)), "aggregates arrive as numbers");
   const mine = rows.filter((r) => [ana.id, lucia.id, admin.id].includes(r.bdId));
   assert.deepEqual([summarizeUsage(mine).chargedCredits, summarizeUsage(mine).reveals], [9, 2]);
-  const { count } = await import("drizzle-orm");
-  const { bd } = await import("@/db/schema");
-  assert.equal(rows.length, (await db.select({ n: count() }).from(bd))[0].n, "every BD is in the report, so none loses its switch");
+  // Scoped to this run's BDs: other test files create and delete BDs in parallel, so the table-wide row count is not stable.
+  const seeded = rows.filter((r) => bdIds.includes(r.bdId));
+  assert.deepEqual([...seeded.map((r) => r.bdId)].sort(), [...bdIds].sort(), "every seeded BD is in the report exactly once, so none loses its switch");
+  assert.equal(new Set(rows.map((r) => r.bdId)).size, rows.length, "the report never repeats a BD");
   await setLushaEnabled({ actor: admin, bdId: ana.id, enabled: true });
 });
