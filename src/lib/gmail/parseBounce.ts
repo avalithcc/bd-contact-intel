@@ -40,7 +40,8 @@ export interface ParsedBounce {
   recipients: BounceRecipient[];
 }
 
-const STATUS_CODE = /\b([2-5]\.\d{1,3}\.\d{1,3})\b/;
+// An enhanced status code, never a slice of an IP address or of a longer dotted number ("[10.2.45.7]" holds a 2.45.7).
+const STATUS_CODE = /(?<![\d.])([2-5]\.\d{1,3}\.\d{1,3})(?![\d.]*\d)/;
 const MAX_DIAGNOSTIC = 240;
 
 type Fields = Map<string, string>;
@@ -90,7 +91,10 @@ export function bounceReasonKey(statusCode: string | null, diagnostic: string | 
 
 // "does not exist" counts only when the sentence is about the user, mailbox, recipient, address or account: relays, hosts
 // and policies use the same words. "mailbox unavailable" is deliberately absent (greylisting, quota and policy use it).
-const UNKNOWN_USER = /user unknown|unknown user|no such user|mailbox not found|address not found|invalid recipient|recipient not found|\b(user|mailbox|recipient|address|account)\b[^.;\n]{0,60}\bdoes not exist/i;
+const UNKNOWN_USER =
+  /user unknown|unknown user|no such user|mailbox not found|address not found|invalid recipient|recipient not found|usuario no existe|el buz[oó]n no existe|usu[aá]rio n[aã]o existe|caixa postal n[aã]o existe|\b(user|mailbox|recipient|address|account)\b[^.;\n]{0,60}\bdoes not exist/i;
+// "domain does not exist" says nothing about the mailbox (and is a different failure), so it is cut out before matching.
+const DOMAIN_MISSING = /\b(domain|host|server)\b[^.;\n]{0,40}\bdoes not exist/gi;
 // The bad-address codes: 5.1.3 (bad syntax), 5.1.7/5.1.8 (sender address problems) and 5.1.9 are not about the recipient.
 const BAD_ADDRESS_STATUS = /^5\.1\.(0|1|2|4|5|6|10)$/;
 
@@ -105,7 +109,10 @@ function severityOf(action: string | undefined, statusCode: string | null, diagn
   if (action === "delayed") return "soft";
   if (statusCode && BAD_ADDRESS_STATUS.test(statusCode)) return "hard";
   const bareReject = statusCode === "5.0.0" || (statusCode === null && /\b550\b/.test(diagnostic ?? ""));
-  return bareReject && UNKNOWN_USER.test(diagnostic ?? "") ? "hard" : "soft";
+  // Trade-off, on purpose: Microsoft 365 rejects with `550 5.4.1 Recipient address rejected: Access denied` for BOTH a missing
+  // mailbox and a tenant policy, so it stays soft here. A false hard bounce suppresses a live contact; a missed one only
+  // delays the suppression until a clearer notification arrives.
+  return bareReject && UNKNOWN_USER.test((diagnostic ?? "").replace(DOMAIN_MISSING, "")) ? "hard" : "soft";
 }
 
 /** Control characters (a NUL breaks jsonb) and lone surrogates never reach storage. */
