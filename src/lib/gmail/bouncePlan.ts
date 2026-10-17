@@ -42,13 +42,12 @@ const SYSTEM_SENDERS = new Set(["mailer-daemon", "postmaster"]);
 export function planBounces(bounces: readonly ParsedBounce[], outbound: readonly OutboundCandidate[], recorded: ReadonlySet<string>): BouncePlan {
   const plan: BouncePlan = { events: [], unlinked: 0, duplicates: 0 };
   for (const bounce of bounces) {
-    // Two independent checks must both hold: a system sender, and a reference back to our own mail. A message with no
-    // In-Reply-To, References or embedded original links to nothing, even if it sits in the right thread.
+    // Three independent checks must all hold: a system sender, a genuine null envelope sender (a real DSN has Return-Path
+    // `<>`; a person's mail has their address), and OUR OWN Message-ID named in the notification. Sitting in the same
+    // thread proves nothing: anyone can reply into a thread.
     const systemSender = SYSTEM_SENDERS.has(bounce.fromAddress.split("@")[0] ?? "");
-    const linked =
-      systemSender && bounce.linkRfcIds.length > 0
-        ? outbound.filter((o) => o.gmailThreadId === bounce.gmailThreadId || (o.rfcMessageId !== null && bounce.linkRfcIds.includes(o.rfcMessageId)))
-        : [];
+    const nullPath = bounce.returnPath === null || bounce.returnPath.replace(/\s/g, "") === "" || bounce.returnPath.replace(/\s/g, "") === "<>";
+    const linked = systemSender && nullPath ? outbound.filter((o) => o.rfcMessageId !== null && bounce.linkRfcIds.includes(o.rfcMessageId)) : [];
     for (const r of bounce.recipients) {
       const named = [r.address, r.originalAddress].filter((a): a is string => a !== null);
       const message = linked.find((o) => named.some((a) => o.recipients.includes(a)));
