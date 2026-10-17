@@ -76,6 +76,31 @@ test("only a bad address (5.1.x) or an explicit unknown-user 5.0.0/550 is hard; 
   assert.equal(severityOf("4.2.2", "mailbox full", "delayed"), "soft");
 });
 
+test("'does not exist' and 'mailbox unavailable' alone do not make a bounce hard", () => {
+  assert.equal(severityOf("5.7.1", "550 5.7.1 relay access denied, host does not exist"), "soft");
+  assert.equal(severityOf("5.0.0", "550 5.0.0 relay host does not exist"), "soft");
+  assert.equal(severityOf("5.0.0", "550 mailbox unavailable"), "soft");
+  assert.equal(severityOf("5.0.0", "550 The email account does not exist"), "hard");
+  assert.equal(severityOf("5.0.0", "550 No such user here"), "hard");
+});
+
+test("without a Status field the enhanced code is read from the diagnostic, and a 5.7.x there makes it soft", () => {
+  assert.equal(severityOf("", "550 5.7.1 blocked by policy; the user does not exist"), "soft");
+  assert.equal(parseBounce(failedWith("", "550 5.7.1 blocked by policy"))?.recipients[0]?.statusCode, "5.7.1");
+  assert.equal(severityOf("", "550 5.1.1 no such user"), "hard");
+});
+
+test("only the bad-address 5.1.x codes are hard", () => {
+  for (const code of ["5.1.0", "5.1.1", "5.1.2", "5.1.4", "5.1.5", "5.1.6", "5.1.10"]) assert.equal(severityOf(code, "rejected"), "hard", code);
+  for (const code of ["5.1.3", "5.1.7", "5.1.8", "5.1.9"]) assert.equal(severityOf(code, "rejected"), "soft", code);
+});
+
+test("the Return-Path header is kept so the plan can refuse a notification that has a real envelope sender", () => {
+  assert.equal(parseBounce(failedWith("5.1.1", "x", { extraHeaders: { "Return-Path": "<>" } }))?.returnPath, "<>");
+  assert.equal(parseBounce(failedWith("5.1.1", "x", { extraHeaders: { "Return-Path": "<evil@x.test>" } }))?.returnPath, "<evil@x.test>");
+  assert.equal(parseBounce(failedWith("5.1.1", "x"))?.returnPath, null);
+});
+
 test("control characters never reach a stored string, whatever the notification carries", () => {
   const b = parseBounce(failedWith("5.1.1", "550 5.1.1 gone\u0000\u0007 now", { subject: "Hola\u0000 mundo\u001f" }));
   assert.equal(b?.recipients[0]?.diagnostic, "550 5.1.1 gone now");

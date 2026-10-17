@@ -32,6 +32,8 @@ export interface ParsedBounce {
   occurredAt: Date;
   /** The notification's own sender (From), lower-cased: bouncePlan accepts only mailer-daemon / postmaster. */
   fromAddress: string;
+  /** The Return-Path header as sent, or null when absent. A genuine DSN has the null path `<>`. */
+  returnPath: string | null;
   /** Message-IDs the notification points at: In-Reply-To, References and the embedded original's own Message-ID. */
   linkRfcIds: string[];
   originalSubject: string | null;
@@ -86,7 +88,11 @@ export function bounceReasonKey(statusCode: string | null, diagnostic: string | 
   return "other";
 }
 
-const UNKNOWN_USER = /user unknown|unknown user|no such user|does not exist|mailbox (not found|unavailable)|address not found|invalid recipient|recipient not found/i;
+// "does not exist" counts only when the sentence is about the user, mailbox, recipient, address or account: relays, hosts
+// and policies use the same words. "mailbox unavailable" is deliberately absent (greylisting, quota and policy use it).
+const UNKNOWN_USER = /user unknown|unknown user|no such user|mailbox not found|address not found|invalid recipient|recipient not found|\b(user|mailbox|recipient|address|account)\b[^.;\n]{0,60}\bdoes not exist/i;
+// The bad-address codes: 5.1.3 (bad syntax), 5.1.7/5.1.8 (sender address problems) and 5.1.9 are not about the recipient.
+const BAD_ADDRESS_STATUS = /^5\.1\.(0|1|2|4|5|6|10)$/;
 
 /**
  * Hard means "this address is dead": a bad-address status (5.1.x), or a bare 5.0.0 / 550 whose text says the user or
@@ -97,7 +103,7 @@ const UNKNOWN_USER = /user unknown|unknown user|no such user|does not exist|mail
 function severityOf(action: string | undefined, statusCode: string | null, diagnostic: string | null): BounceSeverity | null {
   if (statusCode?.[0] === "2" || (action !== undefined && action !== "failed" && action !== "delayed")) return null;
   if (action === "delayed") return "soft";
-  if (statusCode && /^5\.1\./.test(statusCode)) return "hard";
+  if (statusCode && BAD_ADDRESS_STATUS.test(statusCode)) return "hard";
   const bareReject = statusCode === "5.0.0" || (statusCode === null && /\b550\b/.test(diagnostic ?? ""));
   return bareReject && UNKNOWN_USER.test(diagnostic ?? "") ? "hard" : "soft";
 }
@@ -140,8 +146,9 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
   for (const block of statusBlocks) {
     const address = cleanAddress(block.get("final-recipient")) ?? cleanAddress(block.get("original-recipient"));
     if (!address) continue;
-    const statusCode = STATUS_CODE.exec(block.get("status") ?? "")?.[1] ?? null;
     const diagnostic = cleanDiagnostic(block.get("diagnostic-code"));
+    // No Status field: the enhanced code usually still sits in the diagnostic ("550 5.7.1 ...").
+    const statusCode = STATUS_CODE.exec(block.get("status") ?? "")?.[1] ?? STATUS_CODE.exec(diagnostic ?? "")?.[1] ?? null;
     const severity = severityOf(block.get("action")?.toLowerCase(), statusCode, diagnostic);
     if (!severity) continue;
     const originalAddress = cleanAddress(block.get("original-recipient"));
@@ -174,6 +181,7 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
     // A missing internalDate must not throw later at toISOString(): fall back to "now" (the sync time).
     occurredAt: Number.isFinite(Number(message.internalDate)) && message.internalDate !== "" ? new Date(Number(message.internalDate)) : new Date(),
     fromAddress: extractEmailAddresses(top.get("from"))[0] ?? "",
+    returnPath: top.get("return-path") ?? null,
     linkRfcIds,
     originalSubject: clean(originals.map((o) => o.get("subject")).find((s) => !!s) ?? "") || null,
     recipients,
