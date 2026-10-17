@@ -24,7 +24,7 @@ export interface LockedConversationSummary {
   threadCount: number;
 }
 
-const CONVERSATION_TYPES: string[] = ["email_sent", "reply_received", "auto_reply_received"];
+const CONVERSATION_TYPES: string[] = ["email_sent", "reply_received", "auto_reply_received", "email_bounced"];
 
 export async function getLockedConversationSummaries(
   personId: string,

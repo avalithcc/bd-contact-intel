@@ -1795,6 +1795,7 @@ export const es: typeof en = {
     atReplyReceived: "Respuesta recibida",
     atReplyReceivedDefault: "Respuesta recibida.",
     atAutoReply: "Respuesta automática",
+    atBounced: "Correo rebotado",
     atAutoReplyDefault: "Respuesta automática.",
     atStatusChange: "Cambio de etapa",
     atMeetingLogged: "Reunión registrada",

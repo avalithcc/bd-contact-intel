@@ -49,6 +49,7 @@ const TYPE_ICON: Record<string, (props: { className?: string }) => React.ReactEl
   // visual design for this entry type yet.
   reply_received: MailIcon,
   auto_reply_received: MailIcon,
+  email_bounced: MailIcon,
   status_change: HistoryIcon,
   status_backfill: HistoryIcon,
   meeting_logged: MeetingIcon,

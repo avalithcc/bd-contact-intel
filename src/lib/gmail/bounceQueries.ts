@@ -19,6 +19,7 @@
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, emailMessage, emailSuppression, person, personPropertyHistory, sequence, sequenceMember } from "@/db/schema";
+import { isTransientDbError } from "./bounceErrors";
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { canTransition, MEMBER_STATES, type MemberState } from "@/lib/sequences/memberState";
 import { bounceKey, buildBounceMetadata, planBounces, type BounceEffects, type BounceEvent, type OutboundCandidate } from "./bouncePlan";
@@ -34,6 +35,8 @@ export interface RecordBouncesResult {
   soft: number;
   unlinked: number;
   duplicates: number;
+  /** Events for an address no live Contact holds: the address is still suppressed, but nothing was marked or logged. */
+  noHolder: number;
   /** Notifications whose own writes failed and were rolled back (the rest of the tick is unaffected). */
   failed: number;
   scheduledCancelled: number;
@@ -66,7 +69,7 @@ async function readRecorded(tx: Tx, batch: readonly ParsedBounce[]): Promise<Set
 }
 
 export async function recordBounces(bdId: string, bounces: readonly ParsedBounce[]): Promise<RecordBouncesResult> {
-  const result: RecordBouncesResult = { hard: 0, soft: 0, unlinked: 0, duplicates: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 };
+  const result: RecordBouncesResult = { hard: 0, soft: 0, unlinked: 0, duplicates: 0, noHolder: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 };
   if (bounces.length === 0) return result;
   const outbound = await readOutbound(bdId, bounces);
   // Every notification of the tick is handled, MAX_BOUNCES_PER_RUN per transaction (never dropped).
@@ -74,7 +77,9 @@ export async function recordBounces(bdId: string, bounces: readonly ParsedBounce
     await recordChunk(bdId, bounces.slice(at, at + MAX_BOUNCES_PER_RUN), outbound, result);
   }
   // Counts only: no address, subject or id ever reaches the log.
-  console.info(`bounces: recorded=${result.hard + result.soft} skipped=${result.unlinked + result.duplicates} failed=${result.failed}`);
+  const summary = `bounces: recorded=${result.hard + result.soft} skipped=${result.unlinked + result.duplicates + result.noHolder} failed=${result.failed}`;
+  if (result.failed > 0) console.warn(summary);
+  else console.info(summary);
   return result;
 }
 
@@ -95,7 +100,11 @@ async function recordChunk(bdId: string, batch: readonly ParsedBounce[], outboun
         result.soft += done.soft;
         result.scheduledCancelled += done.scheduledCancelled;
         result.membersDiscarded += done.membersDiscarded;
-      } catch {
+        result.noHolder += done.noHolder;
+      } catch (error) {
+        // Contention or an outage is not this notification's fault: abort the chunk so the sync holds its cursor and the
+        // whole tick is retried (recording is idempotent). Only a data error is skipped.
+        if (isTransientDbError(error)) throw error;
         result.failed += 1;
       }
     }
@@ -120,9 +129,11 @@ async function recordNotification(tx: Tx, bdId: string, events: BounceEvent[]) {
   });
   if (entries.length > 0) await tx.insert(activity).values(entries);
   const sum = (pick: (e: BounceEffects) => number) => [...effects.values()].reduce((total, e) => total + pick(e), 0);
+  const held = events.filter((e) => holders.some((h) => h.address === e.address));
   return {
-    hard: events.filter((e) => e.severity === "hard").length,
-    soft: events.filter((e) => e.severity === "soft").length,
+    hard: held.filter((e) => e.severity === "hard").length,
+    soft: held.filter((e) => e.severity === "soft").length,
+    noHolder: events.length - held.length,
     scheduledCancelled: sum((e) => e.scheduledCancelled),
     membersDiscarded: sum((e) => e.discarded),
   };
