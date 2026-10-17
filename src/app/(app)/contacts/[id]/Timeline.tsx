@@ -30,6 +30,8 @@ import {
   type EmailThreadGroup,
 } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, emailRecipientText, entryBody } from "@/lib/contacts/timelineEntryBody";
+import { readBounceMetadata } from "@/lib/gmail/bouncePlan";
+import { BounceTimelineCard } from "./BounceTimelineCard";
 import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
 import {
   buildConnectionTimelineEntries,
@@ -1397,6 +1399,9 @@ export function Timeline({
                     />
                   );
                 }
+                // A visible bounce has its own layout (hard: danger card with effect chips; soft: neutral dotted card).
+                const bounceMeta = timelineEntry.type === "email_bounced" && timelineEntry.visible ? readBounceMetadata(timelineEntry.metadata) : null;
+                if (bounceMeta) return <BounceTimelineCard key={timelineEntry.id} meta={bounceMeta} when={formatWhen(at)} labels={l} />;
                 const Icon = TYPE_ICON[timelineEntry.type as TimelineActivityType] ?? NoteIcon;
                 const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
                 return (

@@ -33,6 +33,9 @@ export interface AboutPaneProps {
   // passed through to PropertyList (see its own doc comment); not used in
   // this component's own identity-header badge row.
   emailInferred: boolean;
+  /** email_status is bounced: the email row shows the danger badge, the hint and the suppression alert. */
+  emailBounced: boolean;
+  emailBounceHint: string | null;
   linkedinHref: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
@@ -86,6 +89,8 @@ export function AboutPane({
   statusReasonText,
   emailVerified,
   emailInferred,
+  emailBounced,
+  emailBounceHint,
   linkedinHref,
   ownerLabel,
   ownerBdId,
@@ -178,6 +183,8 @@ export function AboutPane({
         canReassignOwner={canReassignOwner}
         emailVerified={emailVerified}
         emailInferred={emailInferred}
+        emailBounced={emailBounced}
+        emailBounceHint={emailBounceHint}
         hunterHint={hunterHint}
         sourceText={sourceText}
         createdText={createdText}

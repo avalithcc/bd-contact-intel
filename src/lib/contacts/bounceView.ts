@@ -2,7 +2,7 @@
  * Pure text for a bounce, shared by the timeline body (timelineEntryBody.ts), the dedicated timeline card and the email
  * property row. The stored address is complete; the UI shows it masked ("l***@acme.com") like the mockup.
  */
-import type { BounceEntryMetadata } from "@/lib/gmail/bouncePlan";
+import { readBounceMetadata, type BounceEntryMetadata } from "@/lib/gmail/bouncePlan";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { fill } from "@/lib/sequences/viewText";
 
@@ -25,9 +25,37 @@ export function bounceReasonText(reasonKey: string, l: ContactRecordLabels): str
 }
 
 /** "casilla inexistente (5.1.1)", or the reason alone when the notification carried no code. */
-export function reasonWithCode(meta: Pick<BounceEntryMetadata, "reasonKey" | "statusCode">, l: ContactRecordLabels): string {
+export function reasonWithCode(meta: { reasonKey: string; statusCode: string | null }, l: ContactRecordLabels): string {
   const reason = bounceReasonText(meta.reasonKey, l);
   return meta.statusCode ? `${reason} (${meta.statusCode})` : reason;
+}
+
+export interface HardBounceFact {
+  occurredAt: Date;
+  reasonKey: string;
+  statusCode: string | null;
+}
+
+/**
+ * The newest HARD bounce among a person's activity rows, for the email row's hint. The record page already reads every
+ * activity row of the person, so this adds no query. It reads all viewers' rows (not the redacted timeline): the fact that
+ * the address bounced is team-wide, the original subject is not exposed here.
+ */
+export function latestHardBounce(rows: readonly { type: string; metadata: unknown }[]): HardBounceFact | null {
+  let best: HardBounceFact | null = null;
+  for (const row of rows) {
+    if (row.type !== "email_bounced") continue;
+    const meta = readBounceMetadata(row.metadata as Record<string, unknown> | null);
+    if (!meta || meta.severity !== "hard") continue;
+    const at = new Date(meta.occurredAt);
+    if (Number.isNaN(at.getTime()) || (best && at <= best.occurredAt)) continue;
+    best = { occurredAt: at, reasonKey: meta.reasonKey, statusCode: meta.statusCode };
+  }
+  return best;
+}
+
+export function emailBounceHint(fact: HardBounceFact, l: ContactRecordLabels, formatDate: (d: Date) => string): string {
+  return fill(l.emailBouncedHint, { date: formatDate(fact.occurredAt), reason: reasonWithCode(fact, l) });
 }
 
 export function bounceEntryText(meta: BounceEntryMetadata, l: ContactRecordLabels): { headline: string; body: string } {

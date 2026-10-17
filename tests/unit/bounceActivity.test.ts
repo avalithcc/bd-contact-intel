@@ -9,7 +9,8 @@ import { test } from "node:test";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { isTimelineEntryVisible } from "@/lib/activity/timelineVisibility";
 import { TIMELINE_PILL_GROUPS } from "@/lib/activity/timelinePills";
-import { bounceEntryText, maskAddress } from "@/lib/contacts/bounceView";
+import { bounceEntryText, emailBounceHint, latestHardBounce, maskAddress } from "@/lib/contacts/bounceView";
+import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
 import { formatLastActivityLabel } from "@/lib/contacts/lastActivity";
 import { entryBody } from "@/lib/contacts/timelineEntryBody";
@@ -77,4 +78,27 @@ test("bounceEntryText gives the headline of each severity", () => {
 
 test("the contact list names the last activity", () => {
   assert.equal(formatLastActivityLabel({ type: "email_bounced", metadata: hardMeta() }, dict), "Correo rebotado");
+});
+
+test("the record's hint comes from the latest HARD entry, ignoring soft ones and other types", () => {
+  const older = { ...hardMeta(), occurredAt: "2026-10-01T10:00:00.000Z", statusCode: "5.1.2", reasonKey: "domain_not_found" };
+  const newer = { ...hardMeta(), occurredAt: "2026-10-14T12:41:00.000Z" };
+  const laterSoft = { ...softMeta(), occurredAt: "2026-10-16T12:00:00.000Z" };
+  const rows = [
+    { type: "email_bounced", metadata: older },
+    { type: "email_bounced", metadata: laterSoft },
+    { type: "note", metadata: { note: "x" } },
+    { type: "email_bounced", metadata: newer },
+  ];
+  const found = latestHardBounce(rows);
+  assert.equal(found?.occurredAt.toISOString(), "2026-10-14T12:41:00.000Z");
+  assert.equal(found?.statusCode, "5.1.1");
+  assert.equal(latestHardBounce([{ type: "email_bounced", metadata: laterSoft }]), null);
+  assert.equal(latestHardBounce([]), null);
+});
+
+test("the hint reads 'Rebotó el {fecha} · {motivo} ({código})'", () => {
+  const found = latestHardBounce([{ type: "email_bounced", metadata: hardMeta() }])!;
+  const hint = emailBounceHint(found, labels, (d) => formatArgentinaDayMonth(d));
+  assert.match(hint, /^Rebotó el \d{1,2} \S+ · casilla inexistente \(5\.1\.1\)$/);
 });

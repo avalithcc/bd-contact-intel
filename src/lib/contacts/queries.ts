@@ -6,6 +6,7 @@
  */
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { latestHardBounce, type HardBounceFact } from "@/lib/contacts/bounceView";
 import {
   activity,
   bd,
@@ -90,6 +91,8 @@ export interface ContactRecord {
   source: ContactSourceEvidence;
   merge: ContactMergeEvidence;
   statusReason: StatusReasonEvidence | null;
+  /** The newest hard bounce, only while the email is bounced (feeds the email row hint). */
+  emailBounce: HardBounceFact | null;
 }
 
 export type ContactRecordResult =
@@ -235,6 +238,7 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       properties,
       connections: connectionRows,
       statusReason,
+      emailBounce: row.emailStatus === "bounced" ? latestHardBounce(statusEventActivityRows) : null,
       source: {
         linkedinConnectionCount: connectionRows.length,
         leadSourceKey: leadSourceRows[0]?.sourceKey ?? null,
