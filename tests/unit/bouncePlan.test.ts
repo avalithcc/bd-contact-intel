@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bounceKey, planBounces, type OutboundCandidate } from "@/lib/gmail/bouncePlan";
 import { parseBounce } from "@/lib/gmail/parseBounce";
-import { ORIGINAL_ID, ORIGINAL_SUBJECT, dsn, exchangeNdr, gmailDelay422, gmailHard511 } from "./bounceFixtures";
+import { ORIGINAL_ID, ORIGINAL_SUBJECT, dsn, exchangeNdr, failedWith, gmailDelay422, gmailHard511 } from "./bounceFixtures";
 
 const sent = (over: Partial<OutboundCandidate> = {}): OutboundCandidate => ({
   gmailThreadId: "thread-out-1",
@@ -67,4 +67,21 @@ test("the planner mutates nothing and gives the same answer twice", () => {
 test("two notifications for the same address in one run produce one event per notification", () => {
   const second = parseBounce(dsn({ id: "dsn-9", extraHeaders: { "In-Reply-To": ORIGINAL_ID }, parts: gmailHard511().payload!.parts! }))!;
   assert.equal(planBounces([parsed(gmailHard511()), second], [sent()], new Set()).events.length, 2);
+});
+
+test("a notification not sent by mailer-daemon or postmaster is ignored, even when it links to our mail", () => {
+  const human = parseBounce(failedWith("5.1.1", "no such user", { from: "Lucia <lucia@acme-ejemplo.test>" }))!;
+  const plan = planBounces([human], [sent()], new Set());
+  assert.equal(plan.events.length, 0);
+  assert.equal(plan.unlinked, 1);
+  const postmaster = parseBounce(failedWith("5.1.1", "no such user", { from: "Postmaster <PostMaster@otro-dominio.test>" }))!;
+  assert.equal(planBounces([postmaster], [sent()], new Set()).events.length, 1);
+});
+
+test("a thread match alone is not enough: the notification must also carry a Message-ID reference", () => {
+  const noRefs = parseBounce(dsn({ parts: gmailHard511().payload!.parts!.filter((p) => p.mimeType !== "message/rfc822") }))!;
+  assert.deepEqual(noRefs.linkRfcIds, []);
+  const plan = planBounces([noRefs], [sent()], new Set());
+  assert.equal(plan.events.length, 0);
+  assert.equal(plan.unlinked, 1);
 });
