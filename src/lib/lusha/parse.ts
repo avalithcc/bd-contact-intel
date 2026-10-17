@@ -178,7 +178,7 @@ const hostOf = (email: string): string => email.slice(email.lastIndexOf("@") + 1
 
 /** Lexicographic over the criteria below; a tie keeps the candidate already held, i.e. the earlier one. */
 const outranks = (c: Candidate, best: Candidate): boolean => {
-  const score = (x: Candidate): readonly number[] => [x.companyDomain, x.type === "work" ? 1 : 0, x.confidence];
+  const score = (x: Candidate): readonly number[] => [x.companyDomain, x.type?.toLowerCase() === "work" ? 1 : 0, x.confidence];
   const [a, b] = [score(c), score(best)];
   const i = a.findIndex((v, n) => v !== b[n]);
   return i >= 0 && a[i] > b[i];
@@ -227,13 +227,16 @@ export const pickEmail = (raw: unknown, companyDomains: readonly string[] = []):
 const validPhone = (v: string) => /^\+?[\d\s().-]+$/.test(v) && v.replace(/\D/g, "").length >= 7;
 export const pickPhone = (raw: unknown): Pick => choose(raw, "number", validPhone);
 
+/** Lusha does not fix the casing of `type`: every check of it goes through here. */
+export const isMobileType = (type: string | null | undefined): boolean => type?.toLowerCase() === "mobile";
+
 /**
  * One reveal can hold a work and a mobile number: the best valid one per bucket ("mobile" vs everything else, work
  * preferred inside the second), non-mobile first. The same digits are never returned twice (the non-mobile entry wins,
  * as in pickPhone). Empty when nothing valid came back; the single pick above stays the ledger value.
  */
 export function pickPhones(raw: unknown): Extract<Pick, { ok: true }>[] {
-  const typed = (mobile: boolean) => (Array.isArray(raw) ? raw.filter((e) => isRecord(e) && (str(e.type)?.toLowerCase() === "mobile") === mobile) : raw);
+  const typed = (mobile: boolean) => (Array.isArray(raw) ? raw.filter((e) => isRecord(e) && isMobileType(str(e.type)) === mobile) : raw);
   const picks = [choose(typed(false), "number", validPhone), choose(typed(true), "number", validPhone)].filter((p): p is Extract<Pick, { ok: true }> => p.ok);
   return picks.filter((p, i) => picks.findIndex((q) => q.value.replace(/\D/g, "") === p.value.replace(/\D/g, "")) === i);
 }

@@ -6,7 +6,7 @@
 import type { NewActivity, NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
 import { isValidPhoneFormat } from "@/lib/phone";
 import { isReachable } from "@/lib/sequences/rosterGuards";
-import type { Pick as Picked } from "./parse";
+import { isMobileType, type Pick as Picked } from "./parse";
 
 export type RevealPerson = Pick<Person, "id" | "email" | "emailNormalized" | "emailStatus" | "emailSource" | "emailConfidence" | "mergedIntoId" | "phone" | "mobilePhone">;
 
@@ -70,7 +70,7 @@ export function planRevealedPhoneWrite(person: RevealPerson, pick: Picked, meta:
   // Digits only, so formatting differences do not hide a number we already hold.
   const digits = (v: string | null) => (v ?? "").replace(/\D/g, "");
   if ([person.phone, person.mobilePhone].some((held) => digits(held) !== "" && digits(held) === digits(pick.value))) return { ...NOTHING, alreadyHeld: true };
-  const [first, other] = pick.type === "mobile" ? (["mobilePhone", "phone"] as const) : (["phone", "mobilePhone"] as const);
+  const [first, other] = isMobileType(pick.type) ? (["mobilePhone", "phone"] as const) : (["phone", "mobilePhone"] as const);
   const column = !person[first] ? first : !person[other] ? other : null;
   const activity = activityOf(person, "phones", meta);
   if (!column) return { personUpdate: null, historyRows: [], activity };
@@ -96,7 +96,7 @@ export function planRevealedPhonesWrite(person: RevealPerson, picks: readonly Pi
   if (fresh.length === 1) return planRevealedPhoneWrite(person, fresh[0], meta);
   const next: Record<string, string> = {};
   for (const p of fresh) {
-    const column = p.type === "mobile" ? "mobilePhone" : "phone";
+    const column = isMobileType(p.type) ? "mobilePhone" : "phone";
     if (!person[column] && !(column in next)) next[column] = p.value;
   }
   const activity = activityOf(person, "phones", meta);

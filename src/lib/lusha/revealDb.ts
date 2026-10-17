@@ -264,6 +264,7 @@ async function writeToContact(
   if (plan.historyRows.length) await sp.insert(personPropertyHistory).values(plan.historyRows);
   // Direct insert, not createActivityInTx: the type is status-neutral by construction (D15).
   if (plan.activity) await sp.insert(activity).values(plan.activity);
+  // Reports a single column even when two were written (mobilePhone wins); callers only use its truthiness.
   const written: RevealSettlement["written"] = !plan.personUpdate ? null : i.field === "emails" ? "email" : "mobilePhone" in plan.personUpdate ? "mobilePhone" : "phone";
   const out = { alreadyHeld: plan.alreadyHeld === true, written, duplicate: null as RevealSettlement["duplicate"] };
   if (written !== "email" || !i.normalized) return out;

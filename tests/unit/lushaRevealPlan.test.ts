@@ -204,3 +204,21 @@ test("phones: the planner is repeatable and mutates nothing", () => {
   assert.deepEqual(a.historyRows, b.historyRows);
   assert.deepEqual(a.personUpdate && { ...a.personUpdate, updatedAt: 0 }, b.personUpdate && { ...b.personUpdate, updatedAt: 0 });
 });
+
+test("phones: the type is compared case-insensitively end to end (Mobile / MOBILE are mobile)", () => {
+  for (const type of ["Mobile", "MOBILE"]) {
+    const plan = both(person(), [{ ...M, type }, { ...W, type: "Work" }]);
+    assert.deepEqual(plan.personUpdate && [plan.personUpdate.phone, plan.personUpdate.mobilePhone], [W.number, M.number], type);
+    assert.deepEqual(cols(plan).map((c) => c[0]).sort(), ["mobilePhone", "phone"]);
+    // The single-number planner agrees.
+    assert.equal(planRevealedPhoneWrite(person(), phonePick([{ ...M, type }]), META).personUpdate?.mobilePhone, M.number);
+  }
+});
+
+test("phones: two fresh numbers with one target column already full from another source (mixed-case types)", () => {
+  const mobile = { ...M, type: "Mobile" };
+  const phoneFull = both(person({ phone: "111 1111111" }), [mobile, W]);
+  assert.deepEqual(cols(phoneFull), [["mobilePhone", M.number, "lusha_reveal"]]);
+  const mobileFull = both(person({ mobilePhone: "222 2222222" }), [mobile, W]);
+  assert.deepEqual(cols(mobileFull), [["phone", W.number, "lusha_reveal"]]);
+});
