@@ -86,7 +86,7 @@ test("a hard bounce marks the person, suppresses the address, stops the sequence
   const { recordBounces } = await import("@/lib/gmail/bounceQueries");
   const s = await seed();
   const result = await recordBounces(s.bdId, [await hard(s)]);
-  assert.deepEqual(result, { hard: 1, soft: 0, unlinked: 0, duplicates: 0, noHolder: 0, failed: 0, scheduledCancelled: 1, membersDiscarded: 1 });
+  assert.deepEqual(result, { hard: 1, soft: 0, unlinked: 0, returnPathRejected: 0, duplicates: 0, noHolder: 0, failed: 0, scheduledCancelled: 1, membersDiscarded: 1 });
   const after = await state(s);
   assert.equal(after.status, "bounced");
   assert.equal(after.suppressions.length, 1);
@@ -115,7 +115,7 @@ test("re-syncing the same notification changes nothing", async () => {
   const s = await seed();
   await recordBounces(s.bdId, [await hard(s)]);
   const again = await recordBounces(s.bdId, [await hard(s)]);
-  assert.deepEqual(again, { hard: 0, soft: 0, unlinked: 0, duplicates: 1, noHolder: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 });
+  assert.deepEqual(again, { hard: 0, soft: 0, unlinked: 0, returnPathRejected: 0, duplicates: 1, noHolder: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 });
   const after = await state(s);
   assert.equal(after.activities.length, 1);
   assert.equal(after.suppressions.length, 1);

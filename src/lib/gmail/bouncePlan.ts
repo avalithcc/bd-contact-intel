@@ -31,6 +31,8 @@ export interface BounceEvent {
 export interface BouncePlan {
   events: BounceEvent[];
   unlinked: number;
+  /** Notifications from a system-looking sender whose Return-Path names a real address. */
+  returnPathRejected: number;
   duplicates: number;
 }
 
@@ -39,15 +41,28 @@ export const bounceKey = (dsnGmailMessageId: string, address: string): string =>
 
 const SYSTEM_SENDERS = new Set(["mailer-daemon", "postmaster"]);
 
+/**
+ * A genuine notification has the null envelope sender `<>`; some MTAs write `<MAILER-DAEMON>` or `<mailer-daemon@host>`
+ * instead. Absent or empty is fine too. A path naming any other address means a person's mail wrote it.
+ */
+function returnPathAllowed(returnPath: string | null): boolean {
+  const path = (returnPath ?? "").replace(/[\s<>]/g, "").toLowerCase();
+  return path === "" || SYSTEM_SENDERS.has(path.split("@")[0] ?? "");
+}
+
 export function planBounces(bounces: readonly ParsedBounce[], outbound: readonly OutboundCandidate[], recorded: ReadonlySet<string>): BouncePlan {
-  const plan: BouncePlan = { events: [], unlinked: 0, duplicates: 0 };
+  const plan: BouncePlan = { events: [], unlinked: 0, returnPathRejected: 0, duplicates: 0 };
   for (const bounce of bounces) {
     // Three independent checks must all hold: a system sender, a genuine null envelope sender (a real DSN has Return-Path
     // `<>`; a person's mail has their address), and OUR OWN Message-ID named in the notification. Sitting in the same
     // thread proves nothing: anyone can reply into a thread.
     const systemSender = SYSTEM_SENDERS.has(bounce.fromAddress.split("@")[0] ?? "");
-    const nullPath = bounce.returnPath === null || bounce.returnPath.replace(/\s/g, "") === "" || bounce.returnPath.replace(/\s/g, "") === "<>";
-    const linked = systemSender && nullPath ? outbound.filter((o) => o.rfcMessageId !== null && bounce.linkRfcIds.includes(o.rfcMessageId)) : [];
+    // Counted on its own: a burst of these is someone forging notifications, not mail that simply links to nothing.
+    if (systemSender && !returnPathAllowed(bounce.returnPath)) {
+      plan.returnPathRejected += bounce.recipients.length;
+      continue;
+    }
+    const linked = systemSender ? outbound.filter((o) => o.rfcMessageId !== null && bounce.linkRfcIds.includes(o.rfcMessageId)) : [];
     for (const r of bounce.recipients) {
       const named = [r.address, r.originalAddress].filter((a): a is string => a !== null);
       const message = linked.find((o) => named.some((a) => o.recipients.includes(a)));
