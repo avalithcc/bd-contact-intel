@@ -84,7 +84,7 @@ test("resolveSupabase does not mutate its input and is repeatable", () => {
   assert.deepEqual(input, copy);
 });
 
-test("the server env allowlists four variables and blanks every other dotenv key", () => {
+test("the server env allowlists five variables and blanks every other dotenv key", () => {
   const env = buildServerEnv({
     databaseUrl: "postgres://localhost/x_e2e",
     supabase: { url: E2E, anonKey: E2E_KEY },
@@ -95,6 +95,8 @@ test("the server env allowlists four variables and blanks every other dotenv key
   assert.equal(env.NEXT_PUBLIC_SUPABASE_ANON_KEY, E2E_KEY);
   assert.equal(env.GMAIL_TOKEN_ENCRYPTION_KEY, "");
   assert.equal(env.SMTP_PASSWORD, "");
+  assert.equal(env.VERCEL_ENV, "production");
+  assert.equal(env.LUSHA_API_KEY, "");
   assert.deepEqual(
     Object.keys(env).filter((k) => env[k] !== "").sort(),
     [...SERVER_ENV_ALLOWLIST].sort(),

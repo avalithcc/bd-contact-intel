@@ -145,6 +145,12 @@ does not change it.
   to `.env.local` tomorrow (Gmail key, OAuth secret, SMTP) cannot reach the test
   server and nothing here needs editing. If a spec ever needs another variable,
   add it to `buildServerEnv` on purpose.
+- Two deliberate additions for Lusha (`lusha-per-bd.spec.ts`): the server gets
+  `VERCEL_ENV=production` and `LUSHA_API_KEY=''`. Lusha is hidden entirely
+  outside Vercel production (`src/lib/lusha/config.ts`), so without the first
+  the per-BD gate would never render; with the key forced empty the config
+  resolves to `missing_env`, the gate and its reasons render, and no request
+  can reach Lusha. Specs never click a priced Lusha control.
 - Not covered: a secret exported in your shell (not in a dotenv file) is still
   inherited by the server. Do not export production secrets before a run.
 - Read-only mode reuses a server the suite did not start, so none of this can

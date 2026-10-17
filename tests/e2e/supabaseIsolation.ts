@@ -41,6 +41,7 @@ export const SERVER_ENV_ALLOWLIST = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'ALLOW_REMOTE_DB_IN_DEV',
+  'VERCEL_ENV',
 ] as const;
 
 /** dotenv precedence of `next dev`: the first file that defines a key wins. */
@@ -207,6 +208,11 @@ export function buildServerEnv(input: {
   env.NEXT_PUBLIC_SUPABASE_URL = input.supabase.url;
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY = input.supabase.anonKey;
   env.ALLOW_REMOTE_DB_IN_DEV = '1';
+  // Lusha is offline outside Vercel production (src/lib/lusha/config.ts), which hides its whole UI on the record. Claiming
+  // production while the key is forced empty makes the config resolve to "missing_env": the per-BD gate and its reasons
+  // render, and no request can reach Lusha because there is no key (a key exported in the shell is blanked too).
+  env.VERCEL_ENV = 'production';
+  env.LUSHA_API_KEY = '';
   return env;
 }
 
