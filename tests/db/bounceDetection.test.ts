@@ -207,23 +207,57 @@ test("a hard bounce for an address no live Contact holds suppresses it but is co
   assert.equal((await db.select().from(emailSuppression).where(eq(emailSuppression.value, ghost))).length, 1);
 });
 
-test("a transient database error inside one notification aborts the run (so the sync holds its cursor) and rolls everything back", async () => {
-  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
-  const { isTransientDbError } = await import("@/lib/gmail/bounceErrors");
+// Raises `errcode` from the suppression insert for this seed's address, on this scratch database only. `firstOnly` raises on
+// the first attempt and lets the retry through (a sequence survives the savepoint rollback, a table row would not).
+async function failSuppressionInsert<T>(s: Awaited<ReturnType<typeof seed>>, errcode: string, firstOnly: boolean, body: () => Promise<T>): Promise<T> {
   const { db } = await import("@/db");
   const { sql } = await import("drizzle-orm");
-  const s = await seed();
-  // A deadlock (SQLSTATE 40P01) raised by the suppression insert, on this scratch database only.
-  await db.execute(sql.raw(`create or replace function zz_bounce_deadlock() returns trigger language plpgsql as $$ begin if new.value = '${s.address}' then raise exception 'simulated deadlock' using errcode = '40P01'; end if; return new; end $$`));
-  await db.execute(sql.raw(`create trigger zz_bounce_deadlock_${run}_${s.i} before insert on email_suppression for each row execute function zz_bounce_deadlock()`));
+  const name = `zz_bounce_${run}_${s.i}`;
+  await db.execute(sql.raw(`create sequence ${name}_seq`));
+  await db.execute(sql.raw(`create or replace function ${name}() returns trigger language plpgsql as $$ begin if new.value = '${s.address}' and (${firstOnly ? `nextval('${name}_seq') = 1` : "true"}) then raise exception 'simulated' using errcode = '${errcode}'; end if; return new; end $$`));
+  await db.execute(sql.raw(`create trigger ${name} before insert on email_suppression for each row execute function ${name}()`));
   try {
-    await assert.rejects(recordBounces(s.bdId, [await hard(s)]), (error) => isTransientDbError(error));
-    const after = await state(s);
-    assert.equal(after.status, "verified");
-    assert.equal(after.activities.length, 0);
+    return await body();
   } finally {
-    await db.execute(sql.raw(`drop trigger zz_bounce_deadlock_${run}_${s.i} on email_suppression`));
+    await db.execute(sql.raw(`drop trigger ${name} on email_suppression`));
+    await db.execute(sql.raw(`drop function ${name}()`));
+    await db.execute(sql.raw(`drop sequence ${name}_seq`));
   }
+}
+
+test("a connection-class error aborts the run (so the sync holds its cursor) and rolls everything back", async () => {
+  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
+  const { isTransientDbError } = await import("@/lib/gmail/bounceErrors");
+  const s = await seed();
+  await failSuppressionInsert(s, "08006", false, async () => {
+    await assert.rejects(recordBounces(s.bdId, [await hard(s)]), (error) => isTransientDbError(error));
+  });
+  const after = await state(s);
+  assert.equal(after.status, "verified");
+  assert.equal(after.activities.length, 0);
+});
+
+test("a deadlock that clears on the retry is recorded", async () => {
+  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
+  const s = await seed();
+  const result = await failSuppressionInsert(s, "40P01", true, async () => recordBounces(s.bdId, [await hard(s)]));
+  assert.equal(result.failed, 0);
+  assert.equal(result.hard, 1);
+  const after = await state(s);
+  assert.equal(after.status, "bounced");
+  assert.equal(after.activities.length, 1);
+});
+
+test("a statement timeout that persists is skipped after one retry: counted as failed, rolled back, no throw", async () => {
+  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
+  const s = await seed();
+  const good = await soft(s, `dsn-after-${run}-${s.i}`);
+  const result = await failSuppressionInsert(s, "57014", false, async () => recordBounces(s.bdId, [await hard(s), good]));
+  assert.equal(result.failed, 1);
+  assert.equal(result.soft, 1, "the rest of the tick is still recorded");
+  const after = await state(s);
+  assert.equal(after.status, "verified");
+  assert.equal(after.suppressions.length, 0);
 });
 
 test("one bad notification among several costs only itself: its writes roll back, the others are recorded", async () => {
