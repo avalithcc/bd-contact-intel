@@ -246,6 +246,16 @@ is not loopback. Re-run it after every `supabase stop --no-backup`. The `bd`
 row for the same email comes from `scripts/seed-launch-readiness.ts`
 (`role = 'bd'`); the two must use the same `E2E_EMAIL`.
 
+The same script also creates a second login, `admin-e2e@avalith.net` (override with `E2E_ADMIN_EMAIL`), with the
+same password. It is only ever used by specs that need an admin next to the BD (`sequences-admin.spec.ts`): the spec
+upserts that account's `bd` row as `role = 'admin'`, signs in through the real login form and saves its session to
+`tests/.auth/admin-state.json` (gitignored). The shared session stays the BD (`role = 'bd'`).
+
+Specs that must seed rows (a second BD's Sequences, scheduled emails, accented names) or read back what the app wrote
+use `tests/e2e/scratchDb.ts`. It refuses anything but a local `*_e2e` database, the specs call
+`skipUnlessWritesAllowed()` first (so read-only runs skip them with a reason), and each tags its rows with a random
+per-run suffix and removes them in `afterAll`.
+
 Prove a run used the local stack: `psql
 postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "select
 payload->>'action', payload->>'actor_username', created_at from
