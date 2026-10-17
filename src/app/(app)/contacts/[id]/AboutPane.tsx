@@ -10,7 +10,7 @@ import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { HistoryIcon, LinkedInIcon } from "@/components/icons";
 import type { LushaView } from "@/lib/lusha/revealView";
 import { PropertyList, type AboutPaneProperty, type JobTitleRoleGroupHint, type OwnerOption } from "./PropertyList";
-import { QuickActions, type TaskAssigneeOption } from "./QuickActions";
+import { QuickActions, type QuickActionsProps, type TaskAssigneeOption } from "./QuickActions";
 
 export type { AboutPaneProperty, JobTitleRoleGroupHint, OwnerOption };
 
@@ -36,6 +36,7 @@ export interface AboutPaneProps {
   linkedinHref: string | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
+  pendingScheduled: QuickActionsProps["pendingScheduled"];
   ownerOptions: OwnerOption[];
   // Manual owner reassignment is admin-only; false hides the edit control.
   canReassignOwner: boolean;
@@ -88,6 +89,7 @@ export function AboutPane({
   linkedinHref,
   ownerLabel,
   ownerBdId,
+  pendingScheduled,
   ownerOptions,
   canReassignOwner,
   assigneeOptions,
@@ -146,6 +148,7 @@ export function AboutPane({
         assigneeOptions={assigneeOptions}
         meId={meId}
         ownerBdId={ownerBdId}
+        pendingScheduled={pendingScheduled}
       />
 
       <div className="section-title">

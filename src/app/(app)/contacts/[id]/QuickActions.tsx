@@ -30,8 +30,8 @@ import { useToast } from "@/components/ToastProvider";
 import {
   CallIcon,
   ClipboardIcon,
+  ClockIcon,
   DiscardIcon,
-  FollowUpIcon,
   GenerateIcon,
   MailIcon,
   MeetingIcon,
@@ -67,6 +67,8 @@ export interface QuickActionsProps {
   // loaded on the record page as `ownerBdId`, never fetched here).
   meId: string;
   ownerBdId: string | null;
+  // This BD's next pending scheduled email to this Contact (envio-programado.html view 1a's "ya tenés uno" alert).
+  pendingScheduled: { subject: string; sendsLabel: string } | null;
 }
 
 type QuickAction = "call" | "email" | "schedule" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
@@ -132,6 +134,7 @@ export function QuickActions({
   assigneeOptions,
   meId,
   ownerBdId,
+  pendingScheduled,
 }: QuickActionsProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -167,6 +170,25 @@ export function QuickActions({
       setOpenAction("email");
     } else {
       closeQuickAction();
+    }
+  }
+
+  async function sendEmail(subject: string, body: string) {
+    if (!email) return;
+    setBusy(true);
+    setError(null);
+    const result = await settleAction(() => sendContactEmailAction(personId, email, subject, body));
+    setBusy(false);
+    // The write may have landed: show the timeline as it is now, so "revisar" points at the truth and not at a stale screen.
+    if (!result.ok && result.reason === "unconfirmed") router.refresh();
+    if (result.ok) {
+      closeQuickAction();
+      showToast(l.toastEmailSent);
+      router.refresh();
+    } else {
+      const message = contactActionErrorMessage(l, result.reason);
+      setError({ message, href: contactActionErrorHref(result.reason) });
+      showToast(message, "error");
     }
   }
 
@@ -317,6 +339,7 @@ export function QuickActions({
         <EmailForm
           labels={l}
           to={email}
+          name={name}
           busy={busy}
           error={error}
           subject={emailSubject}
@@ -329,25 +352,8 @@ export function QuickActions({
           }}
           onCancel={closeQuickAction}
           onOpenSchedule={() => setOpenAction("schedule")}
-          onSubmit={async (subject, body) => {
-            if (!email) return;
-            setBusy(true);
-            setError(null);
-            const result = await settleAction(() => sendContactEmailAction(personId, email, subject, body));
-            setBusy(false);
-            // The write may have landed: show the timeline as it is now, so
-            // "revisar" points at the truth and not at a stale screen.
-            if (!result.ok && result.reason === "unconfirmed") router.refresh();
-            if (result.ok) {
-              closeQuickAction();
-              showToast(l.toastEmailSent);
-              router.refresh();
-            } else {
-              const message = contactActionErrorMessage(l, result.reason);
-              setError({ message, href: contactActionErrorHref(result.reason) });
-              showToast(message, "error");
-            }
-          }}
+          pendingScheduled={pendingScheduled}
+          onSubmit={sendEmail}
         />
       )}
 
@@ -362,6 +368,7 @@ export function QuickActions({
           onSubjectChange={setEmailSubject}
           onBodyChange={setEmailBody}
           onBack={() => setOpenAction("email")}
+          onSendNow={() => void sendEmail(emailSubject.trim(), emailBody.trim())}
           onCancel={closeQuickAction}
           onSubmit={async (sendAt) => {
             setBusy(true);
@@ -586,6 +593,7 @@ function TaskForm({
 function EmailForm({
   labels: l,
   to,
+  name,
   busy,
   error,
   subject,
@@ -594,10 +602,12 @@ function EmailForm({
   onBodyChange,
   onOpenGenerate,
   onOpenSchedule,
+  pendingScheduled,
   onCancel,
   onSubmit,
 }: ComposerProps & {
   to: string | null;
+  name: string;
   // Controlled by the caller (QuickActions), not local state (fresh-review
   // fix): "Redactar con IA" below unmounts this form while the "Generar
   // mensaje" dialog is open, which would silently drop a locally-held draft.
@@ -617,6 +627,7 @@ function EmailForm({
   onOpenGenerate?: () => void;
   // "Programar…" (approved mockup envio-programado.html): hands the same draft to the schedule dialog.
   onOpenSchedule: () => void;
+  pendingScheduled: QuickActionsProps["pendingScheduled"];
   onSubmit: (subject: string, body: string) => void;
 }) {
   const ids = useId();
@@ -654,7 +665,7 @@ function EmailForm({
             {l.cancel}
           </button>
           <button type="button" className="btn btn-secondary" onClick={onOpenSchedule} disabled={busy}>
-            <FollowUpIcon className="icon" />
+            <ClockIcon className="icon" />
             {l.scheduleAction}
           </button>
           <button
@@ -669,6 +680,15 @@ function EmailForm({
       }
     >
       {error && <ErrorNotice labels={l} error={error} />}
+      {pendingScheduled && (
+        <div className="alert alert-info">
+          <ClockIcon className="icon" />
+          <div>
+            <span className="title">{l.scheduledAlreadyTitle} {name}.</span> {l.scheduledAlreadySends} {pendingScheduled.sendsLabel} · “{pendingScheduled.subject}”.{" "}
+            <a href="#scheduled-emails" onClick={onCancel}>{l.scheduledAlreadyView}</a> {l.scheduledAlreadyAfter}
+          </div>
+        </div>
+      )}
       <div className="field">
         <label className="label" htmlFor={`${ids}-to`}>
           {l.emailToLabel}

@@ -18,6 +18,9 @@ import {
 import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
+import type { ScheduledItem } from "@/lib/scheduledEmail/view";
+import { CancelledLine, ScheduledCard } from "../../scheduled/ScheduledCard";
+import { useNow, useScheduledActions } from "../../scheduled/useScheduledActions";
 import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
 import {
   groupEmailThreads,
@@ -126,6 +129,11 @@ export interface TimelineProps {
   // `status === "open"` itself (unchanged behavior); the "Tareas" pill uses
   // the full array via sortTasksForTimelinePill.
   tasks: TimelineTask[];
+  // This BD's scheduled emails for the Contact (open ones plus recent cancellations), see listScheduledForPerson.
+  scheduled: ScheduledItem[];
+  gmailConnected: boolean;
+  // The server's clock, so the scheduled cards render the same on both sides; it ticks from there (useNow).
+  now: Date;
   // TRUE count of open+done tasks (cancelled excluded), never capped by
   // `tasks`' own bounded reads — same "never capped" contract as
   // `countsByType` above. Drives the Tareas pill's own badge AND the part of
@@ -349,6 +357,9 @@ export function Timeline({
   countsByType,
   activePill,
   tasks,
+  scheduled,
+  gmailConnected,
+  now: serverNow,
   taskTotalCount,
   assigneeOptions,
   meId,
@@ -363,6 +374,8 @@ export function Timeline({
   const router = useRouter();
   const { showToast } = useToast();
   const [editingTask, setEditingTask] = useState<TimelineTask | null>(null);
+  const sched = useScheduledActions(l);
+  const now = useNow(serverNow);
   // On-demand thread bodies (task brief §1 — never fetched during the
   // page's own render). Keyed by `gmailThreadId`, only ever populated the
   // first time that thread is expanded; re-collapsing/re-expanding reuses
@@ -750,6 +763,11 @@ export function Timeline({
   ]);
   const openTasksForUpcoming = tasks.filter((t) => t.status === "open");
   const upcoming = upcomingTasks(openTasksForUpcoming);
+  const openScheduled = scheduled.filter((s) => s.status !== "cancelled");
+  const cancelledScheduled = scheduled
+    .filter((s) => s.status === "cancelled")
+    .sort((a, b) => (b.cancelledAt?.getTime() ?? 0) - (a.cancelledAt?.getTime() ?? 0))
+    .slice(0, 3);
   const sortedTasksForPill = sortTasksForTimelinePill(tasks);
   const openTasksForPill = sortedTasksForPill.filter((t) => t.status === "open");
   const doneTasksForPill = sortedTasksForPill.filter((t) => t.status === "done");
@@ -1179,6 +1197,7 @@ export function Timeline({
 
       <NoteComposer personId={personId} labels={l} />
 
+      <div id="scheduled-emails">
       {isTasksActive ? (
         <>
           {openTasksForPill.length === 0 && doneTasksForPill.length === 0 && taskActivityEntries.length === 0 ? (
@@ -1237,14 +1256,26 @@ export function Timeline({
         </>
       ) : (
         <>
-          {upcoming.length > 0 && (
+          {(upcoming.length > 0 || openScheduled.length > 0) && (
             <>
               <div className="tl-group">{l.timelineGroupUpcoming}</div>
-              <div className="tl">{upcoming.map(renderOpenTaskCard)}</div>
+              <div className="tl">
+                {openScheduled.map((s) => (
+                  <ScheduledCard key={s.id} item={s} l={l} run={sched.run} gmailConnected={gmailConnected} now={now} busy={sched.busy} />
+                ))}
+                {upcoming.map(renderOpenTaskCard)}
+              </div>
             </>
           )}
+          {cancelledScheduled.length > 0 && (
+            <>
+              <div className="tl-group">{l.schedCancelledGroup}</div>
+              <div className="tl">{cancelledScheduled.map((s) => <CancelledLine key={s.id} item={s} l={l} />)}</div>
+            </>
+          )}
+          {sched.dialogs}
 
-          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length, unlisted: unlistedEntries.length }) ? (
+          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length + openScheduled.length + cancelledScheduled.length, unlisted: unlistedEntries.length }) ? (
             <div className={styles.placeholder}>{l.timelineEmpty}</div>
           ) : (
             groups.map((group, i) => (
@@ -1427,6 +1458,7 @@ export function Timeline({
           )}
         </>
       )}
+      </div>
 
       {isAdmin && inlineConversations.capped && <p className="meta">{l.adminInlineCappedNote}</p>}
 

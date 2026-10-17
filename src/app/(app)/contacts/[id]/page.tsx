@@ -14,6 +14,8 @@ import { EMPTY_INLINE_CONVERSATIONS } from "@/lib/activity/inlineConversationGro
 import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
+import { isGmailConnected, listScheduledForPerson } from "@/lib/scheduledEmail/queries";
+import { stateOf, whenLabel } from "@/lib/scheduledEmail/view";
 import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { describeStatusReason, pickContactRecordLabels } from "@/lib/contacts/labels";
@@ -129,13 +131,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const timelineTab = rawActivityType === "task" ? ("task" as const) : activePill;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const [timeline, ownerOptions, tasksForPerson, sequenceMemberships] = await Promise.all([
+  const [timeline, ownerOptions, tasksForPerson, sequenceMemberships, scheduled] = await Promise.all([
     getPersonTimeline(record.person.id, me.id, { pill: activePill, viewerIsAdmin: isAdmin }),
     listOwnerOptions(),
     getTasksForPerson(record.person.id),
     // Right-rail "Secuencias" block: every membership of this Contact's EMAIL ADDRESS (the key the opt-out write uses).
     listContactMemberships(me.id, record.person.email),
+    // This BD's own scheduled emails for the Contact: the "Próximas" cards, the cancellation lines and the composer's notice.
+    listScheduledForPerson(record.person.id, me.id),
   ]);
+  const nowForScheduled = new Date();
+  const needsGmail = scheduled.some((s) => stateOf(s, nowForScheduled) === "failed_gmail");
+  const gmailConnected = needsGmail ? await isGmailConnected(me.id) : true;
+  const nextScheduled = scheduled.find((s) => s.status === "scheduled" || s.status === "on_hold");
   const personTasks = tasksForPerson.rows;
   // "Próximas" bucket + right-panel "Tareas" card (contact-record.html's
   // r03/r05 cards) only ever show OPEN tasks — unchanged by this pill; the
@@ -440,6 +448,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           linkedinHref={linkedinProfileHref(record.person.profileKey)}
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}
+          pendingScheduled={nextScheduled ? { subject: nextScheduled.subject, sendsLabel: whenLabel(nextScheduled.sendAt, "argentina") } : null}
           ownerOptions={ownerOptions}
           canReassignOwner={isAdminRole(me)}
           assigneeOptions={ownerOptions}
@@ -483,6 +492,9 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       assignedToName: t.assignedToName ?? null,
                       associationLabel: companyDisplayName ? `${name} · ${companyDisplayName}` : name,
                     }))}
+                    scheduled={scheduled}
+                    gmailConnected={gmailConnected}
+                    now={nowForScheduled}
                     taskTotalCount={tasksForPerson.openCount + tasksForPerson.doneCount}
                     assigneeOptions={ownerOptions}
                     meId={me.id}
