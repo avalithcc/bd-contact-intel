@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { formatArgentinaDayMonth, formatArgentinaDayMonthYear } from "@/lib/i18n/format";
+import { emailBounceHint } from "@/lib/contacts/bounceView";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
@@ -445,6 +446,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           statusReasonText={statusReasonText}
           emailVerified={record.person.emailStatus === "verified"}
           emailInferred={record.person.emailSource === "pattern_inferred"}
+          emailBounced={record.person.emailStatus === "bounced"}
+          emailBounceHint={record.emailBounce ? emailBounceHint(record.emailBounce, l, formatArgentinaDayMonth) : null}
           linkedinHref={linkedinProfileHref(record.person.profileKey)}
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}

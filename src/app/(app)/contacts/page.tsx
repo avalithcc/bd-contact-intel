@@ -145,6 +145,7 @@ function bulkResultMessage(
 function emailBadge(row: ContactListRow, dict: Awaited<ReturnType<typeof getDictionary>>) {
   if (row.emailStatus === "verified") return dict.contactList.emailVerified;
   if (row.emailStatus === "probable") return dict.contactList.emailProbable;
+  if (row.emailStatus === "bounced") return dict.contactList.emailBounced;
   return null;
 }
 
@@ -230,6 +231,14 @@ function columnCell(
         return (
           <>
             <span className="badge badge-verified">{l.emailVerified}</span> <span className="meta">{row.email}</span>
+          </>
+        );
+      }
+      // Badge only: the address stays plain, no strikethrough (owner decision).
+      if (row.emailStatus === "bounced") {
+        return (
+          <>
+            <span className="badge badge-danger">{l.emailBounced}</span> <span className="meta">{row.email}</span>
           </>
         );
       }

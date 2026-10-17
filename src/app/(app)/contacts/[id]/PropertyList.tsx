@@ -73,6 +73,8 @@ export interface PropertyListProps {
   // 'verified', after an inbound reply from that exact address), so verified
   // wins in the UI: a confirmed reply must not be shown as a guess.
   emailInferred: boolean;
+  emailBounced: boolean;
+  emailBounceHint: string | null;
   hunterHint: string | null;
   sourceText: string | null;
   createdText: string;
@@ -109,6 +111,8 @@ export function PropertyList({
   canReassignOwner,
   emailVerified,
   emailInferred,
+  emailBounced,
+  emailBounceHint,
   hunterHint,
   sourceText,
   createdText,
@@ -129,6 +133,7 @@ export function PropertyList({
   const [ownerDraft, setOwnerDraft] = useState(ownerBdId ?? "");
 
   return (
+    <>
     <dl className="props">
       <div className="prop derived">
         <dt>{l.propStatus}</dt>
@@ -253,6 +258,8 @@ export function PropertyList({
             personId={personId}
             emailVerified={prop.key === "email" && emailVerified}
             emailInferred={prop.key === "email" && emailInferred}
+            emailBounced={prop.key === "email" && emailBounced}
+            emailBounceHint={prop.key === "email" ? emailBounceHint : null}
             hunterHint={prop.key === "email" ? hunterHint : null}
             roleGroupHint={prop.key === "jobTitle" ? jobTitleRoleGroupHint : null}
             editing={editingKey === prop.key}
@@ -306,6 +313,16 @@ export function PropertyList({
         <dd className="soft">{createdText}</dd>
       </div>
     </dl>
+    {emailBounced && (
+      <div className="alert alert-danger mt-lg" role="status">
+        <WarningIcon className="icon" />
+        <div>
+          <div className="title">{l.emailBouncedAlertTitle}</div>
+          {l.emailBouncedAlertBody}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -317,6 +334,8 @@ function PropertyRow({
   personId,
   emailVerified,
   emailInferred,
+  emailBounced,
+  emailBounceHint,
   hunterHint,
   roleGroupHint,
   editing,
@@ -335,6 +354,8 @@ function PropertyRow({
   personId: string;
   emailVerified: boolean;
   emailInferred: boolean;
+  emailBounced: boolean;
+  emailBounceHint: string | null;
   hunterHint: string | null;
   roleGroupHint?: JobTitleRoleGroupHint | null;
   editing: boolean;
@@ -455,7 +476,12 @@ function PropertyRow({
           (prop.value ?? l.emptyValue)
         )}
         {emailVerified && prop.value && <span className="badge badge-verified">{l.verifiedBadge}</span>}
-        {emailInferred && !emailVerified && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
+        {emailBounced && prop.value && (
+          <span className="badge badge-danger" title={emailBounceHint ?? undefined}>
+            {l.emailBouncedBadge}
+          </span>
+        )}
+        {emailInferred && !emailVerified && !emailBounced && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
         {prop.value && lushaBadgeFor(lusha, prop.key) && <LushaBadge l={l} />}
         {prop.value && doNotCallFor(lusha, prop.key) && <DoNotCallBadge l={l} />}
         {roleGroupHint && (
@@ -499,7 +525,9 @@ function PropertyRow({
         <LushaRow personId={personId} field={prop.key === "email" ? "emails" : "phones"} column={prop.key} fieldLabel={prop.label} view={lusha} labels={l} />
       )}
       {whatsappHint && <dd className="hint">{whatsappHint}</dd>}
-      {hunterHint ? (
+      {emailBounced && emailBounceHint ? (
+        <dd className="hint">{emailBounceHint}</dd>
+      ) : hunterHint ? (
         <dd className="hint">{hunterHint}</dd>
       ) : (
         prop.lastUpdatedLabel && <dd className="hint">{prop.lastUpdatedLabel}</dd>
