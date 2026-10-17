@@ -64,7 +64,8 @@ import {
   type OutreachViewSearchParams,
 } from "@/lib/contacts/outreachViewParams";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
-import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
+import { CONTACT_TYPES, contactTypeLabel } from "@/lib/contacts/contactType";
+import { seniorityLabel } from "@/lib/contacts/seniority";
 import { COMPANY_CATEGORIES } from "@/lib/companyCategories";
 import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
@@ -274,7 +275,7 @@ function columnCell(
     case "contactType":
       // Plain text, em dash when empty — a classification, not
       // a workflow state, so no badge and no "sin dato" pill.
-      return contactTypeLabel(row.contactType, l.ownerNone);
+      return contactTypeLabel(row.contactType, l.ownerNone, dict.contactTypes);
     case "industry":
       return row.industry ?? l.ownerNone;
     case "country":
@@ -284,7 +285,7 @@ function columnCell(
     case "created":
       return row.createdAt.toLocaleDateString();
     case "seniority":
-      return row.seniority ?? l.ownerNone;
+      return seniorityLabel(row.seniority, dict.seniorities, l.ownerNone);
   }
 }
 
@@ -515,6 +516,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           status === "verified" ? l.emailVerified : status === "probable" ? l.emailProbable : l.emailNone,
         marketLabel: (market) => dict.markets[market],
         roleGroupLabel: (key) => dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key,
+        contactTypeLabel: (value) => contactTypeLabel(value, "—", dict.contactTypes),
+        seniorityLabel: (value) => seniorityLabel(value, dict.seniorities),
         bdName: (bdId) => bdNameById.get(bdId) ?? bdId,
       });
 
@@ -786,14 +789,14 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             ]}
             marketOptions={MARKETS.map((m) => ({ value: m, label: dict.markets[m] }))}
             roleGroupOptions={ROLE_GROUPS.map((g) => ({ value: g.key, label: dict.roleGroups[g.key] }))}
-            contactTypeOptions={CONTACT_TYPES.map((t) => ({ value: t, label: CONTACT_TYPE_LABELS[t] }))}
+            contactTypeOptions={CONTACT_TYPES.map((t) => ({ value: t, label: dict.contactTypes[t] }))}
             lastActivityOptions={[
               { value: "7", label: l.filterLastActivity7d },
               { value: "30", label: l.filterLastActivity30d },
               { value: "90", label: l.filterLastActivity90d },
             ]}
             industryGroupOptions={filterOptions.industryGroups.map((v) => ({ value: v, label: v }))}
-            seniorityOptions={filterOptions.seniorities.map((v) => ({ value: v, label: v }))}
+            seniorityOptions={filterOptions.seniorities.map((v) => ({ value: v, label: seniorityLabel(v, dict.seniorities) }))}
             labels={{
               addFilterLabel: l.filtersPanelLabel,
               removeFilterLabel: l.filterRemoveLabel,

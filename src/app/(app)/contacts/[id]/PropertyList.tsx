@@ -18,7 +18,7 @@ import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon, WarningIcon } from "@/components/icons";
 import { toTelHref, type WhatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
-import { CONTACT_TYPES, CONTACT_TYPE_LABELS, contactTypeLabel } from "@/lib/contacts/contactType";
+import { CONTACT_TYPES, CONTACT_TYPE_LABELS } from "@/lib/contacts/contactType";
 import type { LushaView } from "@/lib/lusha/revealView";
 import { doNotCallWarning } from "@/lib/contacts/doNotCallWarning";
 import { DoNotCallBadge, LushaBadge, LushaRow, doNotCallFor, lushaBadgeFor } from "./LushaReveal";
@@ -28,6 +28,8 @@ export interface AboutPaneProperty {
   key: EditablePersonProperty;
   label: string;
   value: string | null;
+  /** Human label for a stored enum-ish value (contact type, seniority); the edit input still holds `value`. */
+  displayValue?: string;
   lastUpdatedLabel: string | null;
   // Phone rows only: the WhatsApp link, built on the server because the
   // parsing library (src/lib/whatsapp.ts) must not ship to the browser.
@@ -449,8 +451,8 @@ function PropertyRow({
           <a href={linkedinProfileHref(prop.value) ?? undefined} target="_blank" rel="noopener noreferrer">
             {prop.value}
           </a>
-        ) : prop.key === "contactType" ? (
-          contactTypeLabel(prop.value, l.emptyValue)
+        ) : prop.displayValue !== undefined ? (
+          prop.displayValue
         ) : (
           (prop.value ?? l.emptyValue)
         )}

@@ -135,6 +135,28 @@ export const en = {
     brandEyebrow: "// bd_contact_intelligence",
   },
 
+  // Display labels for person.contact_type / person.seniority (stored values
+  // stay raw; see src/lib/contacts/contactType.ts and seniority.ts).
+  contactTypes: {
+    "BUYER-CHAMPION": "Buyer / champion",
+    INFLUENCER: "Influencer",
+  },
+  seniorities: {
+    owner: "Owner",
+    founder: "Founder",
+    partner: "Partner",
+    c_level: "C-Level",
+    vp: "VP",
+    head: "Head",
+    director: "Director",
+    manager: "Manager",
+    senior: "Senior",
+    mid: "Mid-level",
+    junior: "Junior",
+    entry: "Entry",
+    intern: "Intern",
+  },
+
   roleGroups,
 
   // "Role guide" page chrome (openspec/changes/bd-playbook). Per-role-group

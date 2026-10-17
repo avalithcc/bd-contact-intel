@@ -47,6 +47,28 @@ export const es: typeof en = {
     brandEyebrow: "// inteligencia_de_contactos_bd",
   },
 
+  // Display labels for person.contact_type / person.seniority (stored values
+  // stay raw; see src/lib/contacts/contactType.ts and seniority.ts).
+  contactTypes: {
+    "BUYER-CHAMPION": "Comprador / promotor",
+    INFLUENCER: "Influenciador",
+  },
+  seniorities: {
+    owner: "Propietario",
+    founder: "Fundador",
+    partner: "Socio",
+    c_level: "C-Level",
+    vp: "VP",
+    head: "Head",
+    director: "Director",
+    manager: "Gerente",
+    senior: "Senior",
+    mid: "Semi senior",
+    junior: "Junior",
+    entry: "Inicial",
+    intern: "Pasante",
+  },
+
   roleGroups: {
     c_level_tech: "C-Level Tech",
     c_level_business: "C-Level / Fundadores",

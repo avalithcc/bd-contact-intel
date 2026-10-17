@@ -24,6 +24,9 @@ export interface FilterChipContext {
   emailStatusLabel(status: NonNullable<ContactFilters["emailStatus"]>): string;
   marketLabel(market: NonNullable<ContactFilters["market"]>): string;
   roleGroupLabel(key: string): string;
+  /** Optional: callers that omit them get the Spanish/stored default. */
+  contactTypeLabel?(value: string): string;
+  seniorityLabel?(value: string): string;
   bdName(bdId: string): string;
 }
 
@@ -69,7 +72,7 @@ export function buildActiveFilterChips(filters: ContactFilters, ctx: FilterChipC
   if (filters.market) chips.push({ field: "market", label: L.market, valueText: ctx.marketLabel(filters.market) });
   if (filters.roleGroup) chips.push({ field: "roleGroup", label: L.roleGroup, valueText: ctx.roleGroupLabel(filters.roleGroup) });
   if (filters.contactType) {
-    chips.push({ field: "contactType", label: L.contactType, valueText: contactTypeLabel(filters.contactType) });
+    chips.push({ field: "contactType", label: L.contactType, valueText: ctx.contactTypeLabel?.(filters.contactType) ?? contactTypeLabel(filters.contactType) });
   }
   if (filters.startupsOnly) chips.push({ field: "startupsOnly", label: L.startupsOnly, valueText: null });
   if (filters.bdConnected) chips.push({ field: "bdConnected", label: L.bdConnected, valueText: ctx.bdName(filters.bdConnected) });
@@ -80,7 +83,7 @@ export function buildActiveFilterChips(filters: ContactFilters, ctx: FilterChipC
   // ad-hoc-overridable from before this batch) — kept last so the "official
   // 10" always come first, still removable via the same chip mechanism.
   if (filters.industryGroup) chips.push({ field: "industryGroup", label: L.industryGroup, valueText: filters.industryGroup });
-  if (filters.seniority) chips.push({ field: "seniority", label: L.seniority, valueText: filters.seniority });
+  if (filters.seniority) chips.push({ field: "seniority", label: L.seniority, valueText: ctx.seniorityLabel?.(filters.seniority) ?? filters.seniority });
   if (filters.emailVerified) chips.push({ field: "emailVerified", label: L.emailVerified, valueText: null });
   if (filters.hasPhone) chips.push({ field: "hasPhone", label: L.hasPhone, valueText: null });
 

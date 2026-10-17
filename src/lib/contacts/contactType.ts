@@ -33,9 +33,13 @@ export function isContactType(value: unknown): value is ContactType {
  * almost every row and not a gap a BD can act on. A stored value outside the
  * vocabulary is shown verbatim rather than hidden.
  */
-export function contactTypeLabel(value: string | null | undefined, empty = "—"): string {
+export function contactTypeLabel(
+  value: string | null | undefined,
+  empty = "—",
+  labels: Record<ContactType, string> = CONTACT_TYPE_LABELS,
+): string {
   if (!value) return empty;
-  return isContactType(value) ? CONTACT_TYPE_LABELS[value] : value;
+  return isContactType(value) ? labels[value] : value;
 }
 
 /** Case/whitespace-insensitive; anything outside the vocabulary (including

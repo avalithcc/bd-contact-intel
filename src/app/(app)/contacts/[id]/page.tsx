@@ -40,6 +40,8 @@ import { getDailySpend, getRevealState } from "@/lib/lusha/revealDb";
 import { buildLushaView, type LushaView } from "@/lib/lusha/revealView";
 import { listContactMemberships } from "@/lib/sequences/pageQueries";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
+import { contactTypeLabel } from "@/lib/contacts/contactType";
+import { seniorityLabel } from "@/lib/contacts/seniority";
 import { ContactSequenceBlock } from "./ContactSequenceBlock";
 import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
@@ -176,6 +178,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     key: p.key,
     label: l[`prop${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}` as keyof typeof l] as string,
     value: p.value,
+    ...(p.key === "contactType" ? { displayValue: contactTypeLabel(p.value, l.emptyValue, dict.contactTypes) } : {}),
+    ...(p.key === "seniority" ? { displayValue: seniorityLabel(p.value, dict.seniorities, l.emptyValue) } : {}),
     lastUpdatedLabel: p.lastEdit
       ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${formatArgentinaDayMonth(p.lastEdit.at)}`
       : null,
