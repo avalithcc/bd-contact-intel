@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { activity, bd, emailAccount, person, scheduledEmail, task, type ScheduledEmail } from "@/db/schema";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
-import { buildFailureTask } from "./failureTask";
+import { buildFailureTask, failureTaskRef } from "./failureTask";
 import {
   LOCK_MS,
   MAX_PENDING,
@@ -149,12 +149,22 @@ export async function claimDue(limit: number): Promise<ClaimedEmail[]> {
   return claimed.map((c) => ({ ...c, signatureHtml: byBd.get(c.bdId) ?? null }));
 }
 
-/** Also accepts a row the sweep already declared 'outcome_unknown': the mail did go out, so it must not look unsent. */
+/**
+ * Also accepts a row the sweep already declared 'outcome_unknown': the mail did go out, so it must not look unsent, and
+ * the follow-up task that sweep opened is closed (best-effort, with its activity). The common path stays ONE statement.
+ */
 export async function markSent(id: string, gmailMessageId: string): Promise<void> {
-  await db
-    .update(scheduledEmail)
-    .set({ status: "sent", error: null, gmailMessageId, sentAt: sql`now()`, updatedAt: sql`now()` })
-    .where(and(eq(scheduledEmail.id, id), sql`(${scheduledEmail.status} = 'sending' or (${scheduledEmail.status} = 'failed' and ${scheduledEmail.error} = 'outcome_unknown'))`));
+  const done = { status: "sent", error: null, gmailMessageId, sentAt: sql`now()`, updatedAt: sql`now()` } as const;
+  const sent = await db.update(scheduledEmail).set(done).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "sending"))).returning({ id: scheduledEmail.id });
+  if (sent.length) return;
+  await db.transaction(async (tx) => {
+    const healed = await tx
+      .update(scheduledEmail)
+      .set(done)
+      .where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "failed"), eq(scheduledEmail.error, "outcome_unknown")))
+      .returning({ id: scheduledEmail.id });
+    if (healed.length) await bestEffort(tx, "close failure task", (sp) => closeFailureTask(sp, id));
+  });
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -165,8 +175,36 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  * returns nothing from the UPDATE and gets no task. Set-based (2 inserts for any number of rows). A merged contact's
  * task lands on the live survivor. No audit_log: a failed send is not a consequential admin action.
  */
+/**
+ * The task step must never undo or block a status change: it runs in a SAVEPOINT, and a failure there (bad FK, odd
+ * merge chain, ...) is logged and swallowed while the surrounding transition still commits.
+ */
+async function bestEffort(tx: Tx, what: string, step: (sp: Tx) => Promise<void>): Promise<void> {
+  try {
+    await tx.transaction(async (sp) => step(sp as unknown as Tx));
+  } catch (err) {
+    console.error(`[scheduled-email] ${what} failed`, err);
+  }
+}
+
+/** Marks the open failure task of this scheduled row done (the mail did go out), with its task_completed activity. */
+async function closeFailureTask(tx: Tx, scheduledId: string): Promise<void> {
+  const closed = await tx
+    .update(task)
+    .set({ status: "done", updatedAt: new Date() })
+    .where(and(eq(task.status, "open"), sql`${task.description} like ${"%" + failureTaskRef(scheduledId)}`))
+    .returning();
+  if (!closed.length) return;
+  await tx.insert(activity).values(closed.map((t) => buildTaskActivityRow("task_completed", t, t.actorBdId!, { taskId: t.id, taskTitle: t.title })));
+  for (const personId of new Set(closed.map((t) => t.personId!))) await recomputePersonStatus(tx, personId);
+}
+
 async function openFailureTasks(tx: Tx, ids: string[]): Promise<void> {
   if (!ids.length) return;
+  await bestEffort(tx, "open failure task", (sp) => insertFailureTasks(sp, ids));
+}
+
+async function insertFailureTasks(tx: Tx, ids: string[]): Promise<void> {
   const rows = await tx
     .select({
       id: scheduledEmail.id, bdId: scheduledEmail.bdId, subject: scheduledEmail.subject, error: scheduledEmail.error,
@@ -197,6 +235,15 @@ export async function markFailed(id: string, code: string): Promise<void> {
 /** Last-moment cancel of a claimed row (suppressed recipient). Guarded on 'sending': nothing was sent. */
 export async function markCancelled(id: string, code: string): Promise<void> {
   await db.update(scheduledEmail).set({ status: "cancelled", error: code, updatedAt: sql`now()` }).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "sending")));
+}
+
+/**
+ * Puts claimed rows back to 'scheduled' (guarded on 'sending'). ONLY valid strictly before Gmail is called for them:
+ * nothing was sent, so the next run simply retries. Never use after a send attempt (that would allow a double send).
+ */
+export async function releaseClaimed(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  await db.update(scheduledEmail).set({ status: "scheduled", updatedAt: sql`now()` }).where(and(inArray(scheduledEmail.id, ids), eq(scheduledEmail.status, "sending")));
 }
 
 /**

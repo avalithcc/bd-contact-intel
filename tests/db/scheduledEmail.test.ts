@@ -56,7 +56,7 @@ async function activityCount(personId: string) {
 async function realDeps(send: (row: { id: string }) => Promise<{ messageId: string }>) {
   const q = await import("@/lib/scheduledEmail/queries");
   const { listSuppressionRules } = await import("@/lib/sequences/suppressionQueries");
-  return { holdReplied: q.holdReplied, claimDue: q.claimDue, countDue: q.countDue, sweepStale: q.sweepStale, markSent: q.markSent, markFailed: q.markFailed, markCancelled: q.markCancelled, loadSuppression: listSuppressionRules, send };
+  return { holdReplied: q.holdReplied, claimDue: q.claimDue, countDue: q.countDue, sweepStale: q.sweepStale, markSent: q.markSent, markFailed: q.markFailed, markCancelled: q.markCancelled, releaseClaimed: q.releaseClaimed, loadSuppression: listSuppressionRules, send };
 }
 async function tasksFor(personId: string) {
   const { db } = await import("@/db");
@@ -580,4 +580,97 @@ test("send now re-validates like an edit: a changed contact address, someone els
   assert.deepEqual(await sendScheduledNowChecked({ id, bdId: b.id }), { ok: false, reason: "gmail_not_connected" });
   await db.update(emailAccount).set({ status: "connected" }).where(eq(emailAccount.bdId, b.id));
   assert.deepEqual(await sendScheduledNowChecked({ id, bdId: b.id }), { ok: true });
+});
+
+test("a task insert that fails still leaves the row failed, and the dispatcher stays healthy (savepoint)", async () => {
+  const { dispatchScheduledEmails } = await import("@/lib/scheduledEmail/dispatch");
+  const { GmailSendError } = await import("@/lib/gmail/errors");
+  const { db } = await import("@/db");
+  const { sql } = await import("drizzle-orm");
+  const b = await mkBd("Poison");
+  const p = await mkPerson("poison");
+  const swept = await schedule(b.id, p.id, 10 * MIN);
+  const dead = await schedule(b.id, p.id, 11 * MIN);
+  const ok = await schedule(b.id, p.id, 12 * MIN);
+  await setRow(swept, `status = 'sending', send_at = now() - interval '30 minutes', updated_at = now() - interval '20 minutes'`);
+  await setRow(dead, `send_at = now() - interval '1 minute'`);
+  await setRow(ok, `send_at = now() - interval '1 minute'`);
+  await db.execute(sql.raw(`create or replace function pg_temp_poison_${run}() returns trigger language plpgsql as $$ begin raise exception 'poisoned'; end $$`));
+  await db.execute(sql.raw(`create trigger poison_${run} before insert on task for each row execute function pg_temp_poison_${run}()`));
+  try {
+    const summary = await dispatchScheduledEmails(await realDeps(async (r) => { if (r.id === dead) throw new GmailSendError("reauth_required", "x"); return { messageId: "m" }; }), { dryRun: false });
+    assert.equal(summary.swept, 1);
+    assert.equal((await getRow(swept)).status, "failed");
+    assert.equal((await getRow(dead)).status, "failed");
+    assert.equal((await getRow(ok)).status, "sent", "the rest of the batch still goes out");
+    assert.equal((await tasksFor(p.id)).tasks.length, 0);
+  } finally {
+    await db.execute(sql.raw(`drop trigger poison_${run} on task`));
+    await db.execute(sql.raw(`drop function pg_temp_poison_${run}()`));
+  }
+});
+
+test("a suppression read failure puts the claimed rows back to scheduled: no failure, no task, retried next run", async () => {
+  const { dispatchScheduledEmails } = await import("@/lib/scheduledEmail/dispatch");
+  const b = await mkBd("Blip");
+  const p = await mkPerson("blip");
+  const id = await schedule(b.id, p.id, 10 * MIN);
+  await setRow(id, `send_at = now() - interval '1 minute'`);
+  let sends = 0;
+  const deps = { ...(await realDeps(async () => (sends++, { messageId: "m" }))), loadSuppression: async () => { throw new Error("blip"); } };
+  await dispatchScheduledEmails(deps, { dryRun: false });
+  assert.equal(sends, 0);
+  assert.equal((await getRow(id)).status, "scheduled");
+  assert.equal((await tasksFor(p.id)).tasks.length, 0);
+  await dispatchScheduledEmails(await realDeps(async () => (sends++, { messageId: "m2" })), { dryRun: false });
+  assert.equal((await getRow(id)).status, "sent");
+  assert.equal(sends, 1);
+});
+
+test("markSent healing an outcome_unknown row closes its failure task with a task_completed activity", async () => {
+  const { markFailed, markSent } = await import("@/lib/scheduledEmail/queries");
+  const b = await mkBd("HealTask");
+  const p = await mkPerson("healtask");
+  const id = await schedule(b.id, p.id);
+  const other = await schedule(b.id, p.id, 70 * MIN);
+  await setRow(id, `status = 'sending'`);
+  await setRow(other, `status = 'sending'`);
+  await markFailed(id, "outcome_unknown");
+  await markFailed(other, "outcome_unknown");
+  await markSent(id, "gm-1");
+  const { tasks, acts } = await tasksFor(p.id);
+  assert.equal(tasks.filter((t) => t.status === "done").length, 1, "only the healed row's task");
+  assert.equal(tasks.filter((t) => t.status === "open").length, 1);
+  const { db } = await import("@/db");
+  const { activity } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  assert.equal((await db.select().from(activity).where(eq(activity.personId, p.id))).filter((a) => a.type === "task_completed").length, 1);
+  assert.equal(acts.length, 2);
+});
+
+test("a real opt-out (recordOptOutForMember -> suppressAddressInTx) cancels the pending scheduled rows to that address", async () => {
+  const { recordOptOutForMember } = await import("@/lib/sequences/optOutQueries");
+  const { db } = await import("@/db");
+  const { sequence, sequenceMember, emailSuppression } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const b = await mkBd("OptOut");
+  const p = await mkPerson("optout");
+  const { emailAccount } = await import("@/db/schema");
+  const [acc] = await db.insert(emailAccount).values({ bdId: b.id, emailAddress: `zz-sch-oo-@example.test` }).returning();
+  const [seq] = await db.insert(sequence).values({ name: `seq `, ownerBdId: b.id, emailAccountId: acc!.id, schedule: {} }).returning();
+  const [member] = await db.insert(sequenceMember).values({ sequenceId: seq!.id, personId: p.id, state: "drafted" }).returning();
+  const addr = `optout-${run}@prospect.test`;
+  const pending = await schedule(b.id, p.id, 10 * MIN);
+  const held = await schedule(b.id, p.id, 11 * MIN);
+  await setRow(pending, `to_address = '${addr}'`);
+  await setRow(held, `status = 'on_hold', to_address = '${addr.toUpperCase()}'`);
+  try {
+    const r = await recordOptOutForMember(b.id, member!.id);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.deepEqual([(await getRow(pending)).status, (await getRow(held)).status], ["cancelled", "cancelled"]);
+    assert.equal((await getRow(pending)).error, "recipient_suppressed");
+  } finally {
+    await db.delete(emailSuppression).where(eq(emailSuppression.value, addr));
+    await db.delete(sequence).where(eq(sequence.id, seq!.id));
+  }
 });

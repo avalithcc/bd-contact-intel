@@ -28,6 +28,7 @@ function fakeDeps(over: Partial<RunDeps> = {}) {
     markFailed: async (id, c) => void calls.push(`failed:${id}:${c}`),
     loadSuppression: async () => (calls.push("rules"), []),
     markCancelled: async (id, c) => void calls.push(`cancelled:${id}:${c}`),
+    releaseClaimed: async (ids) => void calls.push(`release:${ids.join(",")}`),
     ...over,
   };
   return { deps, calls };
@@ -101,13 +102,34 @@ test("the suppression list is read once per run, and not at all when nothing is 
   assert.equal(none.calls.includes("rules"), false);
 });
 
-test("a failing suppression read fails closed: nothing is sent and the claimed rows are failed with a provably-unsent code", async () => {
+test("a failing suppression read sends nothing and puts the claimed rows back to scheduled: no failure, no task", async () => {
   const { deps, calls } = fakeDeps({
-    claimDue: async () => [{ id: "a", toAddress: "a@x.test" }] as never,
+    claimDue: async () => [{ id: "a", toAddress: "a@x.test" }, { id: "b", toAddress: "b@x.test" }] as never,
     loadSuppression: async () => { throw new Error("db down"); },
   });
   const summary = await dispatchScheduledEmails(deps, { dryRun: false });
   assert.equal(calls.some((c) => c.startsWith("send:")), false);
-  assert.ok(calls.includes("failed:a:gmail_unavailable"));
-  assert.equal(summary.failed, 1);
+  assert.equal(calls.some((c) => c.startsWith("failed:")), false);
+  assert.ok(calls.includes("release:a,b"));
+  assert.deepEqual([summary.sent, summary.failed], [0, 0]);
+});
+
+test("a throwing markFailed or markCancelled never strands the rest of the batch", async () => {
+  const rows = [{ id: "a", toAddress: "a@x.test" }, { id: "b", toAddress: "b@x.test" }, { id: "c", toAddress: "c@x.test" }];
+  const { deps, calls } = fakeDeps({
+    claimDue: async () => rows as never,
+    loadSuppression: async () => [{ ruleKind: "address", value: "a@x.test" }],
+    markCancelled: async () => { throw new Error("db"); },
+    send: async (r) => {
+      calls2.push(r.id);
+      if (r.id === "b") throw new GmailSendError("reauth_required", "x");
+      return { messageId: "m" };
+    },
+    markFailed: async () => { throw new Error("db"); },
+  });
+  const calls2: string[] = [];
+  const summary = await dispatchScheduledEmails(deps, { dryRun: false });
+  assert.deepEqual(calls2, ["b", "c"]);
+  assert.ok(calls.includes("sent:c:m"));
+  assert.deepEqual([summary.sent, summary.failed, summary.cancelled], [1, 0, 0]);
 });

@@ -26,6 +26,9 @@ export function failureTaskTitle(personName: string): string {
   return name ? `Revisar envío programado fallido a ${name}` : "Revisar envío programado fallido";
 }
 
+/** Trailing marker that ties the task to its scheduled row (so a healed outcome_unknown can close it). */
+export const failureTaskRef = (scheduledId: string): string => `Ref: ${scheduledId}`;
+
 function reasonText(error: string | null): string {
   if (error === "gmail_not_connected") return "Gmail no está conectado: reconectá la cuenta y volvé a enviarlo desde Programados.";
   if (error === "gmail_unavailable") return "Gmail no aceptó el envío, así que el correo no salió. Podés reenviarlo desde Programados.";
@@ -39,7 +42,7 @@ export function buildFailureTask(row: FailedScheduledRow, now: Date): FailureTas
     actorBdId: row.bdId,
     assignedToBdId: row.bdId,
     title: failureTaskTitle(row.personName),
-    description: `Asunto: ${row.subject}. ${reasonText(row.error)}`,
+    description: `Asunto: ${row.subject}. ${reasonText(row.error)}\n${failureTaskRef(row.id)}`,
     dueAt: new Date(now.getTime()),
   };
 }

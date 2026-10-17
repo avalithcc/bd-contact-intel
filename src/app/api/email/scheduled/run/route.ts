@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isValidBearer } from "@/lib/cronAuth";
 import { dispatchScheduledEmails } from "@/lib/scheduledEmail/dispatch";
-import { claimDue, countDue, holdReplied, markCancelled, markFailed, markSent, sweepStale } from "@/lib/scheduledEmail/queries";
+import { claimDue, countDue, holdReplied, markCancelled, markFailed, markSent, releaseClaimed, sweepStale } from "@/lib/scheduledEmail/queries";
 import { sendScheduledEmail } from "@/lib/scheduledEmail/send";
 import { listSuppressionRules } from "@/lib/sequences/suppressionQueries";
 
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   }
   const dryRun = new URL(request.url).searchParams.get("dryRun") === "1";
   const summary = await dispatchScheduledEmails(
-    { holdReplied, claimDue, countDue, sweepStale, markSent, markFailed, markCancelled, loadSuppression: listSuppressionRules, send: sendScheduledEmail },
+    { holdReplied, claimDue, countDue, sweepStale, markSent, markFailed, markCancelled, releaseClaimed, loadSuppression: listSuppressionRules, send: sendScheduledEmail },
     { dryRun },
   );
   console.log("[scheduled-email]", JSON.stringify(summary));

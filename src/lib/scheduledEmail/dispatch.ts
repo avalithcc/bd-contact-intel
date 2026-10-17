@@ -25,6 +25,8 @@ export interface RunDeps {
   loadSuppression(): Promise<SuppressionRule[]>;
   /** 'sending' -> 'cancelled' with a fixed reason code; only valid BEFORE Gmail is called. */
   markCancelled(id: string, code: string): Promise<void>;
+  /** Back to 'scheduled'; only ever called before deps.send for those rows (nothing sent, so a retry is safe). */
+  releaseClaimed(ids: string[]): Promise<void>;
 }
 
 export const SUPPRESSED_CODE = "recipient_suppressed";
@@ -60,33 +62,39 @@ export async function dispatchScheduledEmails(deps: RunDeps, opts: { dryRun: boo
   let failed = 0;
   let cancelled = 0;
   let unrecorded = 0;
-  // Last-moment opt-out check, right before Gmail. If the list cannot be read we fail CLOSED (never send blind):
-  // the rows are failed with a provably-unsent code so the BD can resend.
+  // Last-moment opt-out check, right before Gmail. If the list cannot be read we fail CLOSED (never send blind): nothing
+  // has been sent yet (strictly before deps.send), so the claimed rows go back to 'scheduled' and the next run retries.
+  // That keeps at-most-once: a row is only ever released before any send attempt. No failure, no task.
   let rules: SuppressionRule[] | null = null;
   if (rows.length) {
     try {
       rules = await deps.loadSuppression();
     } catch (err) {
       console.error("[scheduled-email] suppression list unavailable", err);
+      await deps.releaseClaimed(rows.map((r) => r.id)).catch((e) => console.error("[scheduled-email] release failed", e));
+      return { dryRun: false, due: rows.length, held, sent, failed, cancelled, unrecorded, swept };
     }
   }
-  for (const row of rows) {
-    if (!rules) {
-      await deps.markFailed(row.id, "gmail_unavailable");
-      failed++;
-      continue;
+  // One bad bookkeeping call must never strand the rest of the claimed batch in 'sending'.
+  const safely = async (what: string, id: string, fn: () => Promise<void>): Promise<boolean> => {
+    try {
+      await fn();
+      return true;
+    } catch (err) {
+      console.error(`[scheduled-email] ${what} failed`, id, err);
+      return false;
     }
-    if (isSuppressed(row.toAddress, rules)) {
-      await deps.markCancelled(row.id, SUPPRESSED_CODE);
-      cancelled++;
+  };
+  for (const row of rows) {
+    if (rules && isSuppressed(row.toAddress, rules)) {
+      if (await safely("mark cancelled", row.id, () => deps.markCancelled(row.id, SUPPRESSED_CODE))) cancelled++;
       continue;
     }
     let messageId: string;
     try {
       ({ messageId } = await deps.send(row));
     } catch (err) {
-      await deps.markFailed(row.id, failureCode(err));
-      failed++;
+      if (await safely("mark failed", row.id, () => deps.markFailed(row.id, failureCode(err)))) failed++;
       continue;
     }
     // The mail is out. A bookkeeping error must never turn into markFailed: that would show a sent mail as unsent.

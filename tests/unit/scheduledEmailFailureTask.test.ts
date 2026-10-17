@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildFailureTask, failureTaskTitle } from "@/lib/scheduledEmail/failureTask";
+import { buildFailureTask, failureTaskRef, failureTaskTitle } from "@/lib/scheduledEmail/failureTask";
 
 const failed = { id: "s1", bdId: "bd1", personId: "p1", personName: "Ana Pérez", subject: "Hola", error: "outcome_unknown" };
 const NOW = new Date("2026-10-17T12:00:00Z");
@@ -31,4 +31,8 @@ test("the planner never mutates its input and is repeatable", () => {
   assert.deepEqual(buildFailureTask(input, when), buildFailureTask(input, when));
   assert.equal(when.getTime(), NOW.getTime());
   assert.notEqual(buildFailureTask(input, when).dueAt, when); // a copy, not the caller's Date
+});
+
+test("the description ends with the ref that ties the task to its scheduled row", () => {
+  assert.ok(buildFailureTask(failed, NOW).description!.endsWith(failureTaskRef("s1")));
 });
