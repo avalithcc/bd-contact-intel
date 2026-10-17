@@ -27,7 +27,7 @@ test("TIMELINE_PILL_KEYS has no LinkedIn or Tareas pill and groups the 5 interna
 });
 
 test("TIMELINE_PILL_GROUPS.email_sent includes reply_received (synced Gmail reply), grouped with email_sent not its own pill", () => {
-  assert.deepEqual([...TIMELINE_PILL_GROUPS.email_sent], ["email_sent", "reply_received", "auto_reply_received"]);
+  assert.deepEqual([...TIMELINE_PILL_GROUPS.email_sent], ["email_sent", "reply_received", "auto_reply_received", "email_bounced"]);
   assert.equal(isTimelinePillKey("reply_received"), false);
 });
 

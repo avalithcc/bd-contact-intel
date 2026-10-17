@@ -30,6 +30,7 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "email_sent",
   "reply_received",
   "auto_reply_received",
+  "email_bounced",
   "hunter_lookup",
   "status_change",
   "meeting_logged",

@@ -22,7 +22,7 @@
  * transaction.
  */
 import { classifyPosition } from "@/lib/roleGroups";
-import { mergeProperties, mergeProperty, emailStatusRank, type EmailStatus, type PropertyLoss } from "@/lib/identity/matcher";
+import { mergeProperties, mergeProperty, emailStatusRank, stickyBouncedSide, type EmailStatus, type PropertyLoss } from "@/lib/identity/matcher";
 import { isFreeMailDomain, splitEmail } from "@/lib/emailPatterns";
 import { pickOwnerByLastWorked, type OwnerTouch } from "@/lib/identity/ownerRule";
 import { parseConnectedOnDate } from "@/lib/migration/connectedOn";
@@ -347,7 +347,7 @@ export function pickEmailWinner<T extends { email: string | null; emailStatus: E
   const aCorp = corporate(a.email);
   const bCorp = corporate(b.email);
   if (aCorp !== bCorp) return aCorp ? a : b;
-  return emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus) ? b : a;
+  return stickyBouncedSide(a, b) ?? (emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus) ? b : a);
 }
 
 /** Same "email fields move together" rule as identity/resolve.ts's mergeEmailFields, adapted for two full person rows. */

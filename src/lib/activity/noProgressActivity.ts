@@ -28,4 +28,4 @@
  * queue fills with people who never answer, build a real retry cadence (back
  * in 2 days, not 7 or never); that needs attempt data, which did not exist yet.
  */
-export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal", "auto_reply_received"] as const;
+export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"] as const;

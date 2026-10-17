@@ -41,7 +41,7 @@ test("a reply_received synced into another BD's mailbox is hidden from a differe
 // the timeline directly. The flag must default to closed, so a caller that
 // forgets it can only under-reveal.
 test("an admin sees every conversation-content type from another BD", () => {
-  for (const type of ["email_sent", "reply_received", "auto_reply_received"]) {
+  for (const type of ["email_sent", "reply_received", "auto_reply_received", "email_bounced"]) {
     assert.equal(isTimelineEntryVisible({ type, actorBdId: "bd-a" }, "admin-bd", true), true, type);
   }
 });

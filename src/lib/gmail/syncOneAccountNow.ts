@@ -16,6 +16,8 @@ import { syncAccountIncremental } from "./syncAccount";
 import { backfillAccountFirstSync } from "./backfillAccount";
 import { BACKFILL_WINDOW_DAYS } from "./backfillWindow";
 import type { ThreadRefQuery } from "./threadAttribution";
+import { recordBounces } from "./bounceQueries";
+import type { ParsedBounce } from "./parseBounce";
 import {
   getKnownPersonsForAddresses,
   getOutboundThreadRefs,
@@ -65,6 +67,7 @@ export async function syncOneAccountNow(account: SyncableAccount, now: Date = ne
       getOutboundThreadRefs: (q: ThreadRefQuery) => getOutboundThreadRefs(account.bdId, q),
       getOwnMailboxAddresses,
     },
+    recordBounces: (bounces: ParsedBounce[]) => recordBounces(account.bdId, bounces),
     // Sequence reply handling rides on the write, behind its own try/catch (withSequenceReplies.ts).
     writeMessages: withSequenceReplies(
       (classified) => writeSyncedMessages(account.bdId, classified),

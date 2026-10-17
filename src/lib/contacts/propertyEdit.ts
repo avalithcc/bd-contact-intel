@@ -205,7 +205,8 @@ export function planPropertyEdit(
 
   if (property === "email") {
     const newNormalized = newValue === null ? null : newValue.toLowerCase();
-    const newStatus = "none";
+    // A bounce follows the ADDRESS: retyping the same one (only the letter case differs) keeps it, any other address starts clean.
+    const newStatus = person.emailStatus === "bounced" && newNormalized !== null && newNormalized === person.emailNormalized ? "bounced" : "none";
     const newSource = newValue === null ? null : "manual";
     personUpdate.emailNormalized = newNormalized;
     personUpdate.emailStatus = newStatus;
