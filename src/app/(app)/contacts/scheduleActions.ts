@@ -8,6 +8,7 @@ import { getCurrentBd } from "@/lib/queries";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { validateNewEmailInput } from "@/lib/contacts/newEmailInput";
 import { cancelScheduled, editScheduled, getOwnScheduled, scheduleEmail } from "@/lib/scheduledEmail/queries";
+import { sendScheduledNowChecked } from "@/lib/scheduledEmail/sendNow";
 import { checkRecipient } from "@/lib/scheduledEmail/recipient";
 import { isUuid } from "@/lib/uuid";
 import { actionFailure, type ContactActionResult } from "./actionErrors";
@@ -64,6 +65,17 @@ export async function cancelScheduledEmailAction(id: string): Promise<ContactAct
     if (!isUuid(id)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
     return await cancelScheduled({ id, bdId: me.id });
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/** "Enviar ahora" / "Enviar igual": the row goes out within the next minute. Needs a connected mailbox, like scheduling. */
+export async function sendScheduledNowAction(id: string): Promise<ContactActionResult> {
+  try {
+    if (!isUuid(id)) return { ok: false, reason: "not_found" };
+    const me = await getCurrentBd();
+    return await sendScheduledNowChecked({ id, bdId: me.id });
   } catch (err) {
     return actionFailure(err);
   }

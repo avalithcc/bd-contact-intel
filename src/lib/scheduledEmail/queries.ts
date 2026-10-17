@@ -2,17 +2,20 @@
  * DB side of scheduled-send. Every status change is ONE guarded UPDATE (`where status = ...`), so two concurrent callers
  * can never both win a row. Dates reach SQL only through drizzle columns or DB-side `now()`, never as raw JS Dates.
  */
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, scheduledEmail, type ScheduledEmail } from "@/db/schema";
+import { bd, emailAccount, person, scheduledEmail, type ScheduledEmail } from "@/db/schema";
 import {
   LOCK_MS,
+  MAX_PENDING,
   OPEN_STATUSES,
   PENDING_STATUSES,
   STALE_SENDING_MS,
   planSchedule,
   type ScheduleRefusal,
+  type ScheduledStatus,
 } from "./plan";
+import { replySnippet, type ScheduledItem } from "./view";
 
 export type ScheduleResult = { ok: true; id: string } | { ok: false; reason: ScheduleRefusal };
 export type EditResult = { ok: true } | { ok: false; reason: ScheduleRefusal | "not_found" };
@@ -98,15 +101,18 @@ export async function cancelScheduled(input: { id: string; bdId: string }): Prom
 const dueNow = sql`${scheduledEmail.status} = 'scheduled' and ${scheduledEmail.sendAt} <= now()`;
 // An inbound, non-automatic message from this person to this BD, newer than the row's baseline. A merge repoints
 // email_message_person to the survivor, so "this person" is the row's person plus every survivor up its merged_into_id chain.
-const repliedSinceBaseline = sql`exists (
-  select 1 from email_message em join email_message_person emp on emp.email_message_id = em.id
+const inboundSinceBaseline = sql`from email_message em join email_message_person emp on emp.email_message_id = em.id
   where em.bd_id = ${scheduledEmail.bdId}
     and emp.person_id in (
       with recursive pbc_chain(pbc_id) as (
         select ${scheduledEmail.personId}::uuid
         union select p.merged_into_id from person p join pbc_chain c on p.id = c.pbc_id where p.merged_into_id is not null)
       select pbc_id from pbc_chain)
-    and em.direction = 'inbound' and em.is_automatic = false and em.sent_at > ${scheduledEmail.replyBaselineAt})`;
+    and em.direction = 'inbound' and em.is_automatic = false and em.sent_at > ${scheduledEmail.replyBaselineAt}`;
+const repliedSinceBaseline = sql`exists (select 1 ${inboundSinceBaseline})`;
+// The newest such reply, for the card that explains why a row is on hold (only evaluated for on_hold rows).
+const latestReply = (column: "em.sent_at" | "left(em.body_text, 600)") =>
+  sql`case when ${scheduledEmail.status} = 'on_hold' then (select ${sql.raw(column)} ${inboundSinceBaseline} order by em.sent_at desc limit 1) end`;
 
 export async function countDue(): Promise<number> {
   const [row] = await db.select({ n: count() }).from(scheduledEmail).where(dueNow);
@@ -160,4 +166,87 @@ export async function sweepStale(): Promise<number> {
     .where(and(eq(scheduledEmail.status, "sending"), sql`${scheduledEmail.updatedAt} < now() - make_interval(secs => ${STALE_SENDING_MS / 1000})`))
     .returning({ id: scheduledEmail.id });
   return swept.length;
+}
+
+const LISTED: ScheduledStatus[] = ["scheduled", "sending", "on_hold", "failed"];
+const CANCELLED_VISIBLE_MS = 14 * 24 * 60 * 60_000;
+
+async function listItems(where: ReturnType<typeof and>): Promise<ScheduledItem[]> {
+  const rows = await db
+    .select({
+      row: scheduledEmail,
+      first: person.firstName,
+      last: person.lastName,
+      company: person.company,
+      actorName: bd.name,
+      replyAt: latestReply("em.sent_at").mapWith((v: unknown) => (v ? new Date(v as string) : null)),
+      replyText: latestReply("left(em.body_text, 600)").mapWith((v: unknown) => (v == null ? null : String(v))),
+    })
+    .from(scheduledEmail)
+    .innerJoin(person, eq(person.id, scheduledEmail.personId))
+    .innerJoin(bd, eq(bd.id, scheduledEmail.bdId))
+    .where(where)
+    .orderBy(asc(scheduledEmail.sendAt))
+    .limit(100);
+  return rows.map(({ row, first, last, company, actorName, replyAt, replyText }) => ({
+    id: row.id,
+    personId: row.personId,
+    personName: [first, last].filter(Boolean).join(" "),
+    company,
+    toAddress: row.toAddress,
+    subject: row.subject,
+    body: row.body,
+    sendAt: row.sendAt,
+    status: row.status as ScheduledStatus,
+    error: row.error,
+    createdAt: row.createdAt,
+    actorName,
+    replyAt,
+    replyText: replySnippet(replyText),
+    cancelledAt: row.status === "cancelled" ? row.updatedAt : null,
+  }));
+}
+
+/** The "Programados" screen: this BD's rows that are, or may still be, going out. */
+export const listOwnScheduled = (bdId: string) => listItems(and(eq(scheduledEmail.bdId, bdId), inArray(scheduledEmail.status, LISTED)));
+
+/** The contact record: this BD's open rows for the person, plus the cancellations of the last two weeks (the timeline line). */
+export const listScheduledForPerson = (personId: string, bdId: string) =>
+  listItems(
+    and(
+      eq(scheduledEmail.bdId, bdId),
+      eq(scheduledEmail.personId, personId),
+      or(
+        inArray(scheduledEmail.status, LISTED),
+        and(eq(scheduledEmail.status, "cancelled"), gt(scheduledEmail.updatedAt, new Date(Date.now() - CANCELLED_VISIBLE_MS))),
+      ),
+    ),
+  );
+
+export async function isGmailConnected(bdId: string): Promise<boolean> {
+  const [row] = await db.select({ status: emailAccount.status }).from(emailAccount).where(eq(emailAccount.bdId, bdId));
+  return row?.status === "connected";
+}
+
+/**
+ * "Enviar ahora" / "Enviar igual": the BD decided, so the row is due immediately; a held row's reply baseline restarts
+ * (the reply that paused it must not pause it again). Same ownership, lock window and cap rules as an edit.
+ */
+export async function sendScheduledNow(input: { id: string; bdId: string }): Promise<EditResult> {
+  const [row] = await db.select({ status: scheduledEmail.status }).from(scheduledEmail).where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId)));
+  if (!row) return { ok: false, reason: "not_found" };
+  const outcome = await db.transaction(async (tx) => {
+    if (row.status === "failed") {
+      await lockBd(tx, input.bdId); // returning to 'scheduled' adds to the pending count
+      if ((await countPending(input.bdId, tx)) >= MAX_PENDING) return { ok: false as const, reason: "schedule_cap_reached" as const };
+    }
+    const updated = await tx
+      .update(scheduledEmail)
+      // Only "Enviar igual" (a held row) forgives the reply that paused it; any other row keeps its baseline so holdReplied still guards it.
+      .set({ status: "scheduled", sendAt: sql`now()`, error: null, updatedAt: sql`now()`, replyBaselineAt: sql`case when ${scheduledEmail.status} = 'on_hold' then now() else ${scheduledEmail.replyBaselineAt} end` })
+      .where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId), inArray(scheduledEmail.status, [...OPEN_STATUSES]), changeable))
+      .returning({ id: scheduledEmail.id });
+    return updated.length ? { ok: true as const } : null;
+  });
+  return outcome ?? refusalFor(input.id, input.bdId);
 }

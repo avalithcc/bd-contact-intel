@@ -353,3 +353,131 @@ test("the REAL sender: exactly one email_sent activity when it goes out, none wh
   assert.equal((await emailSent(failP.id)).length, 0);
   assert.deepEqual([(await getRow(sentId)).status, (await getRow(heldId)).status, (await getRow(failId)).status], ["sent", "on_hold", "failed"]);
 });
+
+test("the listings show only the caller's open rows, with the reply that paused a held row", async () => {
+  const { db } = await import("@/db");
+  const { emailMessage, emailMessagePerson } = await import("@/db/schema");
+  const { holdReplied, listOwnScheduled, listScheduledForPerson, cancelScheduled } = await import("@/lib/scheduledEmail/queries");
+  const mine = await mkBd("List");
+  const other = await mkBd("ListOther");
+  const p = await mkPerson("listed");
+  const heldId = await schedule(mine.id, p.id, 60 * MIN, "En pausa");
+  const plainId = await schedule(mine.id, p.id, 120 * MIN, "Normal");
+  const cancelledId = await schedule(mine.id, p.id, 180 * MIN, "Cancelado");
+  await schedule(other.id, p.id, 60 * MIN, "De otro BD");
+  assert.equal((await cancelScheduled({ id: cancelledId, bdId: mine.id })).ok, true);
+  const [m] = await db.insert(emailMessage).values({
+    bdId: mine.id, gmailMessageId: `g-${randomUUID()}`, gmailThreadId: "t", direction: "inbound", personId: p.id, fromAddress: "x@prospect.test",
+    bodyText: "Gracias, lo vemos.\n\nEl lun escribió:\n> hola", sentAt: new Date(Date.now() + MIN), matchedEmail: "x@prospect.test", matchConfidence: "exact",
+  }).returning();
+  await db.insert(emailMessagePerson).values({ emailMessageId: m!.id, personId: p.id, matchedEmail: "x@prospect.test", matchConfidence: "exact" });
+  await setRow(heldId, `send_at = now() - interval '1 minute'`);
+  await holdReplied();
+
+  const own = await listOwnScheduled(mine.id);
+  assert.deepEqual(own.map((r) => r.subject).sort(), ["En pausa", "Normal"], "cancelled and other BDs' rows are not listed");
+  const held = own.find((r) => r.id === heldId)!;
+  assert.equal(held.status, "on_hold");
+  assert.equal(held.replyText, "Gracias, lo vemos.");
+  assert.ok(held.replyAt instanceof Date && held.sendAt instanceof Date && held.createdAt instanceof Date);
+  assert.equal(own.find((r) => r.id === plainId)!.replyText, null);
+
+  const forPerson = await listScheduledForPerson(p.id, mine.id);
+  assert.deepEqual(forPerson.map((r) => r.status).sort(), ["cancelled", "on_hold", "scheduled"]);
+  assert.ok(forPerson.find((r) => r.status === "cancelled")!.cancelledAt instanceof Date);
+});
+
+test("send now makes the row due immediately, restarts its reply baseline, and respects ownership, the lock and the cap", async () => {
+  const { sendScheduledNow } = await import("@/lib/scheduledEmail/queries");
+  const b = await mkBd("Now");
+  const other = await mkBd("NowOther");
+  const p = await mkPerson("now");
+  const id = await schedule(b.id, p.id, 60 * MIN);
+  assert.deepEqual(await sendScheduledNow({ id, bdId: other.id }), { ok: false, reason: "not_found" }, "someone else's row looks like none");
+  assert.deepEqual(await sendScheduledNow({ id, bdId: b.id }), { ok: true });
+  const row = await getRow(id);
+  assert.equal(row.status, "scheduled");
+  assert.ok(row.sendAt.getTime() <= Date.now() + 1000, "due now");
+
+  const held = await schedule(b.id, p.id, 60 * MIN);
+  await setRow(held, `status = 'on_hold', send_at = now() - interval '1 hour'`);
+  assert.deepEqual(await sendScheduledNow({ id: held, bdId: b.id }), { ok: true });
+  assert.equal((await getRow(held)).status, "scheduled");
+
+  const failed = await schedule(b.id, p.id, 60 * MIN);
+  await setRow(failed, `status = 'failed', error = 'gmail_not_connected'`);
+  assert.deepEqual(await sendScheduledNow({ id: failed, bdId: b.id }), { ok: true });
+  const back = await getRow(failed);
+  assert.deepEqual([back.status, back.error], ["scheduled", null]);
+
+  const locked = await schedule(b.id, p.id, 60 * MIN);
+  await setRow(locked, `send_at = now() + interval '1 minute'`);
+  assert.deepEqual(await sendScheduledNow({ id: locked, bdId: b.id }), { ok: false, reason: "schedule_locked" });
+});
+
+test("send now keeps a scheduled row's reply baseline (holdReplied still guards it) but restarts a held row's", async () => {
+  const { sendScheduledNow, holdReplied } = await import("@/lib/scheduledEmail/queries");
+  const { db } = await import("@/db");
+  const { emailMessage, emailMessagePerson } = await import("@/db/schema");
+  const b = await mkBd("Base");
+  const p = await mkPerson("base");
+  const reply = async () => {
+    const [m] = await db.insert(emailMessage).values({
+      bdId: b.id, gmailMessageId: `g-${randomUUID()}`, gmailThreadId: "t", direction: "inbound", personId: p.id, fromAddress: "x@prospect.test",
+      sentAt: new Date(Date.now() + 150), matchedEmail: "x@prospect.test", matchConfidence: "exact",
+    }).returning();
+    await db.insert(emailMessagePerson).values({ emailMessageId: m!.id, personId: p.id, matchedEmail: "x@prospect.test", matchConfidence: "exact" });
+    await new Promise((resolve) => setTimeout(resolve, 400)); // the release below lands after the reply
+  };
+  const plain = await schedule(b.id, p.id, 60 * MIN);
+  const before = (await getRow(plain)).replyBaselineAt.getTime();
+  assert.deepEqual(await sendScheduledNow({ id: plain, bdId: b.id }), { ok: true });
+  assert.equal((await getRow(plain)).replyBaselineAt.getTime(), before, "a scheduled row keeps its baseline");
+  await reply();
+  await holdReplied();
+  assert.equal((await getRow(plain)).status, "on_hold", "the reply that arrived after the click still pauses it");
+
+  assert.deepEqual(await sendScheduledNow({ id: plain, bdId: b.id }), { ok: true }); // "Enviar igual" on the held row
+  const released = await getRow(plain);
+  assert.ok(released.replyBaselineAt.getTime() > before, "a held row's baseline restarts");
+  await holdReplied();
+  assert.equal((await getRow(plain)).status, "scheduled", "the reply that paused it cannot pause it again");
+});
+
+test("send now and edit of a failed row both stop at the 50 cap", async () => {
+  const { sendScheduledNow, editScheduled } = await import("@/lib/scheduledEmail/queries");
+  const b = await mkBd("CapFailed");
+  const p = await mkPerson("capfailed");
+  for (let i = 0; i < 50; i++) await schedule(b.id, p.id, (10 + i) * MIN); // 50 pending
+  const { db } = await import("@/db");
+  const { scheduledEmail } = await import("@/db/schema");
+  const [f] = await db.insert(scheduledEmail).values({ bdId: b.id, personId: p.id, toAddress: "x@prospect.test", subject: "f", body: "b", sendAt: new Date(Date.now() - MIN), status: "failed", error: "gmail_not_connected" }).returning();
+  assert.deepEqual(await sendScheduledNow({ id: f!.id, bdId: b.id }), { ok: false, reason: "schedule_cap_reached" });
+  assert.deepEqual(await editScheduled({ id: f!.id, bdId: b.id, subject: "s", body: "b", sendAt: new Date(Date.now() + 30 * MIN) }), { ok: false, reason: "schedule_cap_reached" });
+  assert.equal((await getRow(f!.id)).status, "failed", "refused rows stay failed");
+});
+
+test("send now re-validates like an edit: a changed contact address, someone else's row and a dead mailbox are refused", async () => {
+  const { sendScheduledNowChecked } = await import("@/lib/scheduledEmail/sendNow");
+  const { db } = await import("@/db");
+  const { emailAccount, person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const b = await mkBd("Guard");
+  const other = await mkBd("GuardOther");
+  const p = await mkPerson("guard");
+  await db.insert(emailAccount).values({ bdId: b.id, emailAddress: `guard-${run}@sender.test`, status: "connected" });
+  const id = await schedule(b.id, p.id, 60 * MIN);
+  await setRow(id, `to_address = '${p.email}'`);
+  assert.deepEqual(await sendScheduledNowChecked({ id, bdId: other.id }), { ok: false, reason: "not_found" });
+
+  await db.update(person).set({ email: `changed-${run}@prospect.test`, emailNormalized: `changed-${run}@prospect.test` }).where(eq(person.id, p.id));
+  assert.deepEqual(await sendScheduledNowChecked({ id, bdId: b.id }), { ok: false, reason: "schedule_recipient_invalid" });
+  assert.equal((await getRow(id)).status, "scheduled");
+  assert.ok((await getRow(id)).sendAt.getTime() > Date.now() + 30 * MIN, "refused: the time did not move");
+
+  await db.update(person).set({ email: p.email, emailNormalized: p.email }).where(eq(person.id, p.id));
+  await db.update(emailAccount).set({ status: "revoked" }).where(eq(emailAccount.bdId, b.id));
+  assert.deepEqual(await sendScheduledNowChecked({ id, bdId: b.id }), { ok: false, reason: "gmail_not_connected" });
+  await db.update(emailAccount).set({ status: "connected" }).where(eq(emailAccount.bdId, b.id));
+  assert.deepEqual(await sendScheduledNowChecked({ id, bdId: b.id }), { ok: true });
+});
