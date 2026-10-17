@@ -356,6 +356,8 @@ test("only a connection-class failure holds the cursor, so an outage is retried"
 
 test("only connection or availability errors hold the cursor; contention and data errors do not", () => {
   for (const code of ["08006", "53300", "57P01", "ECONNRESET", "CONNECT_TIMEOUT"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), true, code);
+  for (const code of ["08000", "08001", "08003", "08004", "53100", "53200", "57P02", "57P03"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), true, code);
+  for (const code of ["08P01", "53400"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), false, code);
   for (const code of ["40P01", "55P03", "57014", "22P05", "23505"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), false, code);
   assert.equal(isTransientDbError(new Error("no code")), false);
   assert.equal(isTransientDbError(null), false);
