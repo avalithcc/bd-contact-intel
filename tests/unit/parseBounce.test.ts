@@ -90,6 +90,29 @@ test("without a Status field the enhanced code is read from the diagnostic, and 
   assert.equal(severityOf("", "550 5.1.1 no such user"), "hard");
 });
 
+test("an IP address is never read as a status code", () => {
+  const unknown = parseBounce(failedWith("", "host mx [10.2.45.7] said: 550 user unknown"));
+  assert.equal(unknown?.recipients[0]?.statusCode, null, "2.45.7 inside 10.2.45.7 is not a status");
+  assert.equal(unknown?.recipients[0]?.severity, "hard", "still hard through the user-unknown text");
+  const blocked = parseBounce(failedWith("", "relay 172.5.1.10 said: 550 5.7.1 blocked"));
+  assert.equal(blocked?.recipients[0]?.statusCode, "5.7.1");
+  assert.equal(blocked?.recipients[0]?.severity, "soft");
+});
+
+test("the body-text fallback ignores an IP address too", () => {
+  const m = postfixTextBody();
+  m.payload!.body = { data: Buffer.from("connect to [10.2.45.7]: 550 5.1.1 <bob@viejo-ejemplo.test>: User unknown", "utf8").toString("base64url") };
+  assert.equal(parseBounce(m)?.recipients[0]?.statusCode, "5.1.1");
+  m.payload!.body = { data: Buffer.from("connect to [10.2.45.7]: 550 <bob@viejo-ejemplo.test>: User unknown", "utf8").toString("base64url") };
+  assert.equal(parseBounce(m)?.recipients[0]?.statusCode, null);
+});
+
+test("Spanish and Portuguese unknown-user phrases make a bare 550 hard; a missing domain does not", () => {
+  for (const phrase of ["550 usuario no existe", "550 el buzón no existe", "550 usuário não existe", "550 caixa postal não existe"]) assert.equal(severityOf("5.0.0", phrase), "hard", phrase);
+  assert.equal(severityOf("5.0.0", "550 address rejected: domain does not exist"), "soft");
+  assert.equal(severityOf("5.0.0", "550 the recipient's domain does not exist"), "soft");
+});
+
 test("only the bad-address 5.1.x codes are hard", () => {
   for (const code of ["5.1.0", "5.1.1", "5.1.2", "5.1.4", "5.1.5", "5.1.6", "5.1.10"]) assert.equal(severityOf(code, "rejected"), "hard", code);
   for (const code of ["5.1.3", "5.1.7", "5.1.8", "5.1.9"]) assert.equal(severityOf(code, "rejected"), "soft", code);
