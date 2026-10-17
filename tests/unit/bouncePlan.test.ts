@@ -83,8 +83,14 @@ test("a notification not sent by mailer-daemon or postmaster is ignored, even wh
 test("a Return-Path with a real address means a person wrote it: only an absent or null path passes", () => {
   const withPath = (value: string) => parseBounce(failedWith("5.1.1", "no such user", { extraHeaders: { "Return-Path": value } }))!;
   assert.equal(planBounces([withPath("<attacker@evil.test>")], [sent()], new Set()).events.length, 0);
-  assert.equal(planBounces([withPath("<attacker@evil.test>")], [sent()], new Set()).unlinked, 1);
   assert.equal(planBounces([withPath("<>")], [sent()], new Set()).events.length, 1);
+  for (const path of ["<MAILER-DAEMON>", "<mailer-daemon@mx.example.test>", "<postmaster@contoso-ejemplo.test>", " < > "]) {
+    assert.equal(planBounces([withPath(path)], [sent()], new Set()).events.length, 1, path);
+  }
+  // Counted on its own, not as an unlinked notification.
+  const rejected = planBounces([withPath("<attacker@evil.test>")], [sent()], new Set());
+  assert.equal(rejected.returnPathRejected, 1);
+  assert.equal(rejected.unlinked, 0);
   assert.equal(planBounces([withPath("")], [sent()], new Set()).events.length, 1);
   assert.equal(planBounces([parseBounce(failedWith("5.1.1", "no such user"))!], [sent()], new Set()).events.length, 1);
 });

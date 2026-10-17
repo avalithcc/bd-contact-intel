@@ -34,6 +34,8 @@ export interface RecordBouncesResult {
   hard: number;
   soft: number;
   unlinked: number;
+  /** Rejected for a Return-Path naming a real address: counted apart from `unlinked` (a forgery signal). */
+  returnPathRejected: number;
   duplicates: number;
   /** Events for an address no live Contact holds: the address is still suppressed, but nothing was marked or logged. */
   noHolder: number;
@@ -69,7 +71,7 @@ async function readRecorded(tx: Tx, batch: readonly ParsedBounce[]): Promise<Set
 }
 
 export async function recordBounces(bdId: string, bounces: readonly ParsedBounce[]): Promise<RecordBouncesResult> {
-  const result: RecordBouncesResult = { hard: 0, soft: 0, unlinked: 0, duplicates: 0, noHolder: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 };
+  const result: RecordBouncesResult = { hard: 0, soft: 0, unlinked: 0, returnPathRejected: 0, duplicates: 0, noHolder: 0, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 };
   if (bounces.length === 0) return result;
   const outbound = await readOutbound(bdId, bounces);
   // Every notification of the tick is handled, MAX_BOUNCES_PER_RUN per transaction (never dropped).
@@ -77,7 +79,7 @@ export async function recordBounces(bdId: string, bounces: readonly ParsedBounce
     await recordChunk(bdId, bounces.slice(at, at + MAX_BOUNCES_PER_RUN), outbound, result);
   }
   // Counts only: no address, subject or id ever reaches the log.
-  const summary = `bounces: recorded=${result.hard + result.soft} skipped=${result.unlinked + result.duplicates + result.noHolder} failed=${result.failed}`;
+  const summary = `bounces: recorded=${result.hard + result.soft} skipped=${result.unlinked + result.duplicates + result.noHolder} failed=${result.failed} returnPathRejected=${result.returnPathRejected}`;
   if (result.failed > 0) console.warn(summary);
   else console.info(summary);
   return result;
@@ -88,6 +90,7 @@ async function recordChunk(bdId: string, batch: readonly ParsedBounce[], outboun
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`bounce:${bdId}`}, 0))`);
     const plan = planBounces(batch, outbound, await readRecorded(tx, batch));
     result.unlinked += plan.unlinked;
+    result.returnPathRejected += plan.returnPathRejected;
     result.duplicates += plan.duplicates;
 
     const byNotification = new Map<string, BounceEvent[]>();
