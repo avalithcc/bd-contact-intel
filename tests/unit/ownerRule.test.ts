@@ -102,7 +102,7 @@ test("the backfill's own source never reads as a manual edit", () => {
 // list, so these tests pin the list and its disagreement with the last-activity bar.
 
 test("dialling a number is not working the relationship: call_attempt is on the shared no-progress list (ownership and the follow-up clock both read it)", () => {
-  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], ["call_attempt", "lusha_reveal", "auto_reply_received"]);
+  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"]);
 });
 
 test("the ownership bar is stricter than the last-activity bar: a dialled attempt shows in one and not the other", () => {

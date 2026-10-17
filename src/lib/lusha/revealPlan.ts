@@ -56,6 +56,8 @@ function changes(p: RevealPerson, m: RevealMeta, next: Record<string, string | n
 export function planRevealedEmailWrite(person: RevealPerson, pick: Picked, meta: RevealMeta): RevealWritePlan {
   const reachable = isReachable({ personId: person.id, email: person.email, emailStatus: person.emailStatus, emailSource: person.emailSource, mergedIntoId: person.mergedIntoId, companyKey: null, clientStatus: null });
   if (!pick.ok || person.mergedIntoId || reachable) return NOTHING;
+  // The address that bounced is not a "new" email, however a vendor grades it.
+  if (person.emailStatus === "bounced" && pick.value.trim().toLowerCase() === person.emailNormalized) return NOTHING;
   const next = { email: pick.value, emailNormalized: pick.value.trim().toLowerCase(), emailStatus: "probable", emailSource: "lusha", emailConfidence: pick.confidence };
   return {
     personUpdate: { ...next, updatedAt: new Date(), updatedByBdId: meta.actorBdId },

@@ -33,7 +33,7 @@ export interface RosterDecision {
 }
 
 export function isReachable(c: RosterCandidate): boolean {
-  return !c.mergedIntoId && !!c.email?.trim() && c.emailStatus !== "none" && (c.emailSource !== "pattern_inferred" || c.emailStatus === "verified");
+  return !c.mergedIntoId && !!c.email?.trim() && c.emailStatus !== "none" && c.emailStatus !== "bounced" && (c.emailSource !== "pattern_inferred" || c.emailStatus === "verified");
 }
 
 /** Stateless guards (everything except duplicate and the company limit), shared with re-admission. */

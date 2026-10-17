@@ -58,7 +58,7 @@ export function buildRosterCandidatesQuery(opts: { limit: number; search?: strin
     ) h on h.open_it > 0
     where p.merged_into_id is null
       and btrim(coalesce(p.email, '')) <> ''
-      and p.email_status <> 'none'
+      and p.email_status not in ('none', 'bounced')
       and (p.email_source is distinct from 'pattern_inferred' or p.email_status = 'verified')
       and ${clientStatusSql} is null
       and not exists (

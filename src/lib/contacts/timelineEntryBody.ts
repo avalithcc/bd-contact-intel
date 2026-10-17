@@ -15,7 +15,9 @@
  * both shapes, not just the plain one.
  */
 import type { TimelineActivityType } from "@/lib/activity/queries";
+import { bounceEntryText } from "@/lib/contacts/bounceView";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { readBounceMetadata } from "@/lib/gmail/bouncePlan";
 import { taskActivityBody, type TaskActivityBodyLabels, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
 
 function taskActivityBodyLabels(l: ContactRecordLabels): TaskActivityBodyLabels {
@@ -127,6 +129,14 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
       const from = typeof metadata.from === "string" ? metadata.from : null;
       const parts = [subject, from].filter((v): v is string => Boolean(v));
       return parts.length > 0 ? parts.join(" · ") : l.timelineAutoReplyDefault;
+    }
+    // A delivery failure (gmail/bounceQueries.ts). The dedicated card in Timeline.tsx lays this out; this one-line form
+    // is what the generic renderers show. The address is masked here too.
+    case "email_bounced": {
+      const bounce = readBounceMetadata(metadata);
+      if (!bounce) return "";
+      const text = bounceEntryText(bounce, l);
+      return `${text.headline}. ${text.body}`;
     }
     case "hunter_lookup":
       return typeof metadata.hunterScore === "number"

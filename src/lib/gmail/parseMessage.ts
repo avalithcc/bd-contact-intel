@@ -16,6 +16,8 @@ export interface GmailApiHeader {
 
 export interface GmailApiMessagePart {
   mimeType?: string;
+  // Per-part headers: Gmail serves the fields of a delivery-status block and of an embedded original here.
+  headers?: GmailApiHeader[];
   body?: { data?: string; size?: number };
   parts?: GmailApiMessagePart[];
 }

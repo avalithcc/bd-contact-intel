@@ -134,5 +134,5 @@ test("fuq_activity excludes exactly the shared no-progress types from the last-t
   assert.ok(match, "the clock filters by type");
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
   assert.deepEqual(bound, [...NO_PROGRESS_ACTIVITY_TYPES]);
-  assert.deepEqual(bound, ["call_attempt", "lusha_reveal", "auto_reply_received"]);
+  assert.deepEqual(bound, ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"]);
 });

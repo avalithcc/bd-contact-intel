@@ -30,6 +30,7 @@ const deps = (write: (c: ClassifiedMessage[]) => Promise<{ inserted: number }>, 
   getNeverLogRules: async () => [], getPlatformSentIds: async () => new Set<string>(),
   threadPorts: { getOutboundThreadRefs: async () => [], getOwnMailboxAddresses: async () => [] },
   writeMessages: write,
+  recordBounces: async () => {},
 });
 
 test("a sync batch where the Sequence hook THROWS still writes its messages and advances the cursor", async () => {

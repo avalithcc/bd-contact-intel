@@ -271,6 +271,7 @@ test("sync wiring: an unmatched reply reaches writeMessages through syncAccountI
     getKnownPersons: async () => [], getNeverLogRules: async () => [], getPlatformSentIds: async () => new Set(),
     threadPorts: portsOf(async () => [ref({ gmailThreadId: "t-wire" })]),
     writeMessages: async (c) => { written = c; return { inserted: c.length }; },
+    recordBounces: async () => {},
   });
   assert.deepEqual(written.map((m) => [m.matches[0]?.personId, m.matches[0]?.matchConfidence]), [[JONATHAN, "thread"]]);
 });

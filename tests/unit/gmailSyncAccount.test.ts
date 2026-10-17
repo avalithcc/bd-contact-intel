@@ -11,6 +11,8 @@ import { syncAccountIncremental, type SyncAccountDeps } from "@/lib/gmail/syncAc
 import type { GmailClient, GmailHistoryResult } from "@/lib/gmail/client";
 import type { GmailApiMessage } from "@/lib/gmail/parseMessage";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "@/lib/gmail/classify";
+import type { ParsedBounce } from "@/lib/gmail/parseBounce";
+import { gmailHard511, outOfOffice } from "./bounceFixtures";
 
 function b64url(text: string): string {
   return Buffer.from(text, "utf8").toString("base64url");
@@ -80,6 +82,7 @@ function baseDeps(overrides: Partial<SyncAccountDeps> = {}): SyncAccountDeps {
     getPlatformSentIds: async () => new Set(),
     threadPorts: { getOutboundThreadRefs: async () => [], getOwnMailboxAddresses: async () => [] },
     writeMessages: async () => ({ inserted: 0 }),
+    recordBounces: async () => {},
     ...overrides,
   };
 }
@@ -308,4 +311,37 @@ test("a message that 404s is skipped and the rest of the batch still syncs", asy
   assert.equal(writeCalls[0]![0]!.gmailMessageId, "msg-ok");
   // The cursor still advances: the vanished message is never coming back.
   assert.equal(result.newHistoryId, "301");
+});
+
+// --- bounce detection --------------------------------------------------------
+
+function historyFor(...ids: string[]): GmailHistoryResult[] {
+  return [{ ok: true, page: { historyRecords: ids.map((id) => ({ messagesAdded: [{ message: { id, threadId: `thread-${id}` } }] })), historyId: "400" } }];
+}
+
+test("a delivery notification is handed to recordBounces even though no Contact matches the sender, and the message is not stored", async () => {
+  const seen: ParsedBounce[][] = [];
+  const written: ClassifiedMessage[][] = [];
+  const client = fakeClient({ historyPages: historyFor("dsn-1"), messagesById: { "dsn-1": gmailHard511() } });
+  const result = await syncAccountIncremental(
+    baseDeps({ client, writeMessages: async (m) => (written.push(m), { inserted: m.length }), recordBounces: async (b) => void seen.push([...b]) }),
+  );
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]![0]!.recipients[0]!.address, "lucia@acme-ejemplo.test");
+  assert.deepEqual(written, [], "the notification itself is never stored as an email_message");
+  assert.equal(result.newHistoryId, "400");
+});
+
+test("an out-of-office is not handed to recordBounces", async () => {
+  let called = false;
+  const client = fakeClient({ historyPages: historyFor("ooo-1"), messagesById: { "ooo-1": outOfOffice() } });
+  await syncAccountIncremental(baseDeps({ client, recordBounces: async () => void (called = true) }));
+  assert.equal(called, false);
+});
+
+test("when recording a bounce fails the cursor does not advance, so the next tick retries the same window", async () => {
+  const client = fakeClient({ historyPages: historyFor("dsn-1"), messagesById: { "dsn-1": gmailHard511() } });
+  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async () => { throw new Error("db down"); } }));
+  assert.equal(result.status, "ok");
+  assert.equal(result.newHistoryId, null);
 });

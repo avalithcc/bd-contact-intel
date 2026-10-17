@@ -31,6 +31,8 @@ export type MemberTrigger =
   | "discard"
   | "readmit"
   | "opt_out"
+  // The address hard-bounced: nobody can read what we send, so every live membership stops (gmail/bounceQueries.ts).
+  | "bounce"
   // Out-of-office and other automatic replies. Deliberately absent from every
   // rule below: an auto-reply must never move a member.
   | "auto_reply";
@@ -55,6 +57,7 @@ const RULES: Record<Exclude<MemberTrigger, "auto_reply">, Rule> = {
   // Unsubscribe reaches every live membership, including `replied`: that member
   // is a warm lead in Seguimientos and a BD could otherwise email them by hand.
   opt_out: { from: ["drafted", "approved", "sent", "no_reply", "replied"], to: "discarded" },
+  bounce: { from: ["drafted", "approved", "sent", "no_reply", "replied"], to: "discarded" },
 };
 
 export function canTransition(
@@ -68,6 +71,8 @@ export function canTransition(
   if (!rule.from.includes(from) || rule.to !== to) return false;
   // An opted-out address must never re-enter a sequence.
   if (trigger === "readmit" && context.discardReason === "opt_out") return false;
+  // A bounced address is on the suppression list too, but the member must not come back even if that row is removed.
+  if (trigger === "readmit" && context.discardReason === "bounce") return false;
   return true;
 }
 

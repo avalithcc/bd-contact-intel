@@ -16,6 +16,7 @@ import {
   type KnownPersonEmail,
   type NeverLogRule,
 } from "./classify";
+import { parseBounce, type ParsedBounce } from "./parseBounce";
 import { parseGmailMessage, type ParsedGmailMessage } from "./parseMessage";
 import type { GmailClient } from "./client";
 import { attributeUnmatchedByThread, type ThreadAttributionPorts } from "./threadAttribution";
@@ -34,6 +35,11 @@ export interface SyncAccountDeps {
   /** REQUIRED on purpose: an optional port that one caller forgets to wire ships the feature dead with no failing test. */
   threadPorts: ThreadAttributionPorts;
   writeMessages(classified: ClassifiedMessage[]): Promise<{ inserted: number }>;
+  /**
+   * Delivery notifications found in this run (bounceQueries.ts#recordBounces). REQUIRED for the same reason as
+   * `threadPorts`: a forgotten wire would ship bounce detection dead with no failing test.
+   */
+  recordBounces(bounces: ParsedBounce[]): Promise<unknown>;
 }
 
 export interface SyncAccountResult {
@@ -72,6 +78,7 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
 
   const ids = [...messageIds];
   const rawMessages: ParsedGmailMessage[] = [];
+  const bounces: ParsedBounce[] = [];
   // Ids we actually ASKED Gmail about. Distinct from `rawMessages.length`,
   // which counts only the ones that came back — see the cursor rule below.
   let attempted = 0;
@@ -86,7 +93,14 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
     // 2026-10-01: all three BDs, every tick, `messages.get failed: 404`.)
     const raw = await deps.client.getMessage(id);
     if (raw === null) continue;
-    rawMessages.push(parseGmailMessage(raw));
+    const parsed = parseGmailMessage(raw);
+    rawMessages.push(parsed);
+    // A notification matches no Contact (its sender is mailer-daemon), so it is read here, from the full payload, before
+    // classification drops it. Only machine-generated mail is looked at.
+    if (parsed.automated) {
+      const bounce = parseBounce(raw);
+      if (bounce) bounces.push(bounce);
+    }
   }
 
   const candidateAddresses = [
@@ -115,6 +129,19 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
   const toStore = classified.filter(shouldStoreClassifiedMessage);
   const writeResult = toStore.length > 0 ? await deps.writeMessages(toStore) : { inserted: 0 };
 
+  // After the write, so an outbound message stored in this same run is already there to link to. A failure must not abort
+  // the run (the messages above are stored), but it must not lose the notification either: the cursor stays put, and the
+  // retry is safe because recording is idempotent.
+  let bouncesRecorded = true;
+  if (bounces.length > 0) {
+    try {
+      await deps.recordBounces(bounces);
+    } catch {
+      bouncesRecorded = false;
+      console.error(`bounce recording failed for ${bounces.length} notification(s); the sync cursor is held back`);
+    }
+  }
+
   return {
     status: "ok",
     // Only advance the cursor once every page was drained AND every id the
@@ -132,7 +159,7 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
     // this file just fixed for a cursor stuck against a deleted message,
     // re-reading the same window every 2 minutes until Gmail expires the
     // history and forces a full re-baseline.
-    newHistoryId: exhausted && attempted === ids.length ? latestHistoryId : null,
+    newHistoryId: exhausted && attempted === ids.length && bouncesRecorded ? latestHistoryId : null,
     messagesFetched: rawMessages.length,
     messagesStored: writeResult.inserted,
   };

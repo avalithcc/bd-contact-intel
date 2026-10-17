@@ -25,8 +25,10 @@ import { normalizeNameKey } from "@/lib/leads/csv";
 import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import {
   buildNameCompanyKey,
+  emailStatusRank,
   matchIdentity,
   mergeProperty,
+  stickyBouncedSide,
   type EmailStatus,
   type IdentityIndex,
   type ReviewReason,
@@ -268,11 +270,10 @@ function mergeEmailFields(a: IdentityMergedFields, b: IdentityMergedFields): Pic
   IdentityMergedFields,
   "email" | "emailNormalized" | "emailStatus" | "emailConfidence" | "emailSource"
 > {
-  const rank: Record<EmailStatus, number> = { verified: 2, probable: 1, none: 0 };
   const aHas = !!a.email;
   const bHas = !!b.email;
   const winner =
-    aHas && !bHas ? a : bHas && !aHas ? b : !aHas && !bHas ? a : rank[b.emailStatus] > rank[a.emailStatus] ? b : a;
+    aHas && !bHas ? a : bHas && !aHas ? b : !aHas && !bHas ? a : (stickyBouncedSide(a, b) ?? (emailStatusRank(b.emailStatus) > emailStatusRank(a.emailStatus) ? b : a));
   return {
     email: winner.email,
     emailNormalized: winner.emailNormalized,

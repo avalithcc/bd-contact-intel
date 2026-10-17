@@ -18,7 +18,9 @@ import { splitEmail } from "@/lib/emailPatterns";
 export type PersonId = string;
 
 // Same vocabulary as contact.email_status / lead.email_status.
-export type EmailStatus = "verified" | "probable" | "none";
+// "bounced": a hard delivery failure was recorded for the stored address (gmail/bounceQueries.ts). Sticky: see
+// stickyBouncedSide.
+export type EmailStatus = "verified" | "probable" | "none" | "bounced";
 
 /**
  * Looks up existing Contacts by each matcher key. Implementations are
@@ -194,7 +196,19 @@ const EMAIL_STATUS_RANK: Record<EmailStatus, number> = {
   verified: 2,
   probable: 1,
   none: 0,
+  // Below probable: when the two sides hold DIFFERENT addresses, the one that still works wins.
+  bounced: 0,
 };
+
+/**
+ * When two sides of a merge hold the SAME address and one of them bounced, that side wins whatever the other's rank:
+ * a re-import of the same address must not bring a dead address back to "probable". Null when the rule does not apply.
+ */
+export function stickyBouncedSide<T extends { email: string | null; emailNormalized?: string | null; emailStatus: EmailStatus }>(a: T, b: T): T | null {
+  const key = (x: T) => (x.emailNormalized ?? x.email ?? "").trim().toLowerCase();
+  if (key(a) === "" || key(a) !== key(b)) return null;
+  return a.emailStatus === "bounced" ? a : b.emailStatus === "bounced" ? b : null;
+}
 
 /** Specificity helper for email-like fields — verified beats probable. */
 export function emailStatusRank(status: EmailStatus | null | undefined): number {

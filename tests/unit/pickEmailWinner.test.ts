@@ -73,7 +73,7 @@ function buildRows(): Row[] {
 
   // Both sides have an email -> rank by emailStatus (verified > probable >
   // none), ties favor a.
-  const rank: Record<EmailStatus, number> = { verified: 2, probable: 1, none: 0 };
+  const rank: Record<EmailStatus, number> = { verified: 2, probable: 1, none: 0, bounced: 0 };
   for (const a of candidatesWithEmail("a@corp.com")) {
     for (const b of candidatesWithEmail("b@corp.com")) {
       const winner: "a" | "b" = rank[b.emailStatus] > rank[a.emailStatus] ? "b" : "a";

@@ -210,6 +210,7 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   // under the same "Correos" pill as email_sent (TIMELINE_PILL_GROUPS).
   reply_received: "timelineFilterReplyReceived",
   auto_reply_received: "timelineFilterAutoReply",
+  email_bounced: "timelineFilterBounced",
   hunter_lookup: "timelineFilterHunter",
   status_change: "timelineFilterStatusChange",
   meeting_logged: "timelineFilterMeeting",
@@ -233,6 +234,7 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   // Same icon as email_sent — no new visual design for this entry type yet.
   reply_received: MailIcon,
   auto_reply_received: MailIcon,
+  email_bounced: MailIcon,
   hunter_lookup: SearchIcon,
   status_change: HistoryIcon,
   meeting_logged: MeetingIcon,
