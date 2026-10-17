@@ -10,6 +10,7 @@ import {
   pickEmail,
   isNumberFlagged,
   pickPhone,
+  pickPhones,
 } from "../../src/lib/lusha/parse";
 
 const fixture = (name: string): any => JSON.parse(readFileSync(join(__dirname, "fixtures", "lusha", name), "utf8"));
@@ -276,6 +277,28 @@ test("pickPhone fails closed with unparsable_value and keeps the raw payload", (
   assert.deepEqual(pickPhone(raw), { ok: false, reason: "unparsable_value", raw });
   assert.deepEqual(pickPhone([]), { ok: false, reason: "empty", raw: [] });
   assert.deepEqual(pickPhone("+10000000001"), { ok: false, reason: "unparsable_value", raw: "+10000000001" });
+});
+
+test("pickPhones returns the best non-mobile and the best mobile, work preferred, each by the usual ranking", () => {
+  const raw = [
+    { number: "+54 11 1000 0001", type: "direct", confidence: "A+" },
+    { number: "+54 11 1000 0002", type: "work", confidence: "C" },
+    { number: "+54 9 11 2000 0001", type: "mobile", confidence: "B" },
+    { number: "+54 9 11 2000 0002", type: "mobile", confidence: "A" },
+  ];
+  const out = pickPhones(raw);
+  assert.deepEqual(out.map((p) => p.ok && [p.value, p.type]), [["+54 11 1000 0002", "work"], ["+54 9 11 2000 0002", "mobile"]]);
+  assert.equal(pickPhone(raw).ok && (pickPhone(raw) as { value: string }).value, "+54 11 1000 0002", "the single pick is unchanged");
+});
+
+test("pickPhones: one bucket only, none, invalid entries and the same digits in both buckets", () => {
+  assert.deepEqual(pickPhones([{ number: "+54 9 11 2000 0001", type: "mobile" }]).map((p) => p.ok && p.type), ["mobile"]);
+  assert.deepEqual(pickPhones([{ number: "+54 11 1000 0001", type: "work" }]).map((p) => p.ok && p.type), ["work"]);
+  assert.deepEqual(pickPhones([]), []);
+  assert.deepEqual(pickPhones("x"), []);
+  assert.deepEqual(pickPhones([{ number: "12", type: "mobile" }, { number: "n/a", type: "work" }]), []);
+  const dup = pickPhones([{ number: "+54 11 1000 0001", type: "work" }, { number: "541110000001", type: "mobile" }]);
+  assert.deepEqual(dup.map((p) => p.ok && p.type), ["work"], "never the same digits twice");
 });
 
 // --- doNotCall: a flag belongs to a number, only a literal `true` counts, and a duplicate can never hide it --------------------

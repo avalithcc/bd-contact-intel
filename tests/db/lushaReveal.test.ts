@@ -441,6 +441,48 @@ test("a paid phone equal to a held number settles as already_held: charge record
   assert.equal((await db.select().from(activity).where(eq(activity.personId, p.id))).length, 0);
 });
 
+test("one phones reveal with a work and a mobile number fills both columns: one history row each, one ledger row, one activity", async () => {
+  const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
+  const { db } = await import("@/db");
+  const { activity, personPropertyHistory } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const p = await mkPerson("both");
+  await matchedSearch(p.id);
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  const phones = [{ number: "+54 9 11 5000 0002", type: "mobile", doNotCall: true }, { number: "+54 11 4000 0001", type: "work" }];
+  const out = await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones, creditsCharged: 5 });
+  assert.deepEqual([out?.outcome, out?.value, out?.writeFailed], ["revealed", "+54 11 4000 0001", false]);
+  const after = await personRow(p.id);
+  assert.deepEqual([after.phone, after.mobilePhone], ["+54 11 4000 0001", "+54 9 11 5000 0002"]);
+  const history = (await db.select().from(personPropertyHistory).where(eq(personPropertyHistory.personId, p.id))).filter((h) => h.source === "lusha_reveal");
+  assert.deepEqual(history.map((h) => h.property).sort(), ["mobilePhone", "phone"]);
+  assert.equal((await db.select().from(activity).where(eq(activity.personId, p.id))).length, 1);
+  const rows = (await ledger(p.id)).filter((x) => x.field === "phones");
+  assert.deepEqual([rows.length, rows[0].creditsCharged, rows[0].payload], [1, 5, { phones }]);
+});
+
+test("a stored phones reveal that failed to write applies BOTH numbers with no second charge", async () => {
+  const { reserve, settleReveal, applyStoredReveal } = await import("@/lib/lusha/revealDb");
+  const { db } = await import("@/db");
+  const { lushaReveal } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const p = await mkPerson("stored");
+  await matchedSearch(p.id);
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  assert.ok(r.ok);
+  await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones: [{ number: "+54 11 4000 0001", type: "work" }, { number: "+54 9 11 5000 0002", type: "mobile" }], creditsCharged: 5 });
+  // Park it as a failed write, then clear the columns the first write filled.
+  const { person } = await import("@/db/schema");
+  await db.update(lushaReveal).set({ errorCode: "write_failed" }).where(eq(lushaReveal.id, r.reservationId));
+  await db.update(person).set({ phone: null, mobilePhone: null }).where(eq(person.id, p.id));
+  const applied = await applyStoredReveal({ personId: p.id, field: "phones", actorBdId: bdId });
+  assert.equal(applied.ok, true);
+  const after = await personRow(p.id);
+  assert.deepEqual([after.phone, after.mobilePhone], ["+54 11 4000 0001", "+54 9 11 5000 0002"]);
+  assert.equal((await ledger(p.id)).find((x) => x.field === "phones")!.creditsCharged, 5);
+});
+
 test("failReservation can keep a paid raw value on the row, merged into the payload", async () => {
   const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("keep");

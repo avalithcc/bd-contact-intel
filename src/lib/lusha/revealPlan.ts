@@ -80,3 +80,26 @@ export function planRevealedPhoneWrite(person: RevealPerson, pick: Picked, meta:
     activity,
   };
 }
+
+/**
+ * One reveal, up to two numbers: mobile -> mobilePhone, anything else -> phone, each only into an EMPTY column and only
+ * when its digits are not already held (nor placed twice). With a single number left to place the D11 fallback applies;
+ * with two there is no fallback, so a full column simply skips its number. Never overwrites a value from another source.
+ */
+export function planRevealedPhonesWrite(person: RevealPerson, picks: readonly Picked[], meta: RevealMeta): RevealWritePlan {
+  const digits = (v: string | null) => (v ?? "").replace(/\D/g, "");
+  const seen = new Set([person.phone, person.mobilePhone].map(digits).filter(Boolean));
+  const ok = picks.filter((p): p is Extract<Picked, { ok: true }> => p.ok && isValidPhoneFormat(p.value));
+  if (person.mergedIntoId || ok.length === 0) return NOTHING;
+  const fresh = ok.filter((p) => !seen.has(digits(p.value)) && seen.add(digits(p.value)));
+  if (fresh.length === 0) return { ...NOTHING, alreadyHeld: true };
+  if (fresh.length === 1) return planRevealedPhoneWrite(person, fresh[0], meta);
+  const next: Record<string, string> = {};
+  for (const p of fresh) {
+    const column = p.type === "mobile" ? "mobilePhone" : "phone";
+    if (!person[column] && !(column in next)) next[column] = p.value;
+  }
+  const activity = activityOf(person, "phones", meta);
+  if (Object.keys(next).length === 0) return { personUpdate: null, historyRows: [], activity };
+  return { personUpdate: { ...next, updatedAt: new Date(), updatedByBdId: meta.actorBdId }, historyRows: changes(person, meta, next), activity };
+}

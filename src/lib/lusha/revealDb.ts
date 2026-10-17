@@ -10,9 +10,9 @@ import { activity, company, duplicateCandidate, lushaReveal, person, personPrope
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { isLushaEnabled } from "./adminDb";
 import { artDayWindow, planReservation } from "./cap";
-import { pickEmail, pickPhone } from "./parse";
+import { pickEmail, pickPhone, pickPhones } from "./parse";
 import type { CanRevealEntry, LushaField } from "./pricing";
-import { planRevealedEmailWrite, planRevealedPhoneWrite } from "./revealPlan";
+import { planRevealedEmailWrite, planRevealedPhonesWrite } from "./revealPlan";
 import type { Subject } from "./reveal";
 import { STRANDED_AFTER_MS, toLatestRows, type LatestRows } from "./revealState";
 
@@ -228,7 +228,7 @@ export async function settleReveal(
     if (!pick?.ok) return result;
     try {
       await tx.transaction(async (sp) => {
-        const applied = await writeToContact(sp, { ledgerId: input.reservationId, personId: row.personId, field: input.field, pick, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: input.creditsCharged });
+        const applied = await writeToContact(sp, { ledgerId: input.reservationId, personId: row.personId, field: input.field, pick, rawPhones: input.field === "phones" ? raw : undefined, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: input.creditsCharged });
         if (applied.alreadyHeld) result.outcome = "already_held";
         result.written = applied.written;
         result.duplicate = applied.duplicate;
@@ -253,11 +253,12 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  */
 async function writeToContact(
   sp: Tx,
-  i: { ledgerId: string; personId: string; field: "emails" | "phones"; pick: Extract<ReturnType<typeof pickEmail>, { ok: true }>; normalized: string | null; actorBdId: string; lushaId: string; creditsCharged: number | null },
+  i: { ledgerId: string; personId: string; field: "emails" | "phones"; pick: Extract<ReturnType<typeof pickEmail>, { ok: true }>; normalized: string | null; actorBdId: string; lushaId: string; creditsCharged: number | null; /** The full revealed phones: one reveal may place a work AND a mobile number. */ rawPhones?: unknown },
 ): Promise<{ alreadyHeld: boolean; written: RevealSettlement["written"]; duplicate: RevealSettlement["duplicate"] }> {
   const [p] = await sp.select().from(person).where(eq(person.id, i.personId)).for("update");
   if (!p) throw new Error("person not found");
-  const plan = (i.field === "emails" ? planRevealedEmailWrite : planRevealedPhoneWrite)(p, i.pick, { actorBdId: i.actorBdId, lushaId: i.lushaId, creditsCharged: i.creditsCharged });
+  const meta = { actorBdId: i.actorBdId, lushaId: i.lushaId, creditsCharged: i.creditsCharged };
+  const plan = i.field === "emails" ? planRevealedEmailWrite(p, i.pick, meta) : planRevealedPhonesWrite(p, i.rawPhones === undefined ? [i.pick] : pickPhones(i.rawPhones), meta);
   if (plan.alreadyHeld) await sp.update(lushaReveal).set({ outcome: "already_held", errorCode: "phone_already_held" }).where(eq(lushaReveal.id, i.ledgerId));
   if (plan.personUpdate) await sp.update(person).set(plan.personUpdate).where(eq(person.id, p.id));
   if (plan.historyRows.length) await sp.insert(personPropertyHistory).values(plan.historyRows);
@@ -320,7 +321,7 @@ export async function applyStoredReveal(
       await tx.update(lushaReveal).set({ state: "settled", outcome: pick.ok ? "revealed" : "no_value", value, valueNormalized: normalized, creditsCharged: charged, errorCode: pick.ok ? null : "unparsable_value", settledAt: new Date() }).where(eq(lushaReveal.id, row.id));
     }
     if (!pick.ok) return { ok: false, reason: "not_applicable" } as const;
-    const applied = await writeToContact(tx, { ledgerId: row.id, personId: row.personId, field: input.field, pick, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: charged });
+    const applied = await writeToContact(tx, { ledgerId: row.id, personId: row.personId, field: input.field, pick, rawPhones: input.field === "phones" ? payload.phones : undefined, normalized, actorBdId: input.actorBdId, lushaId: row.lushaContactId ?? "", creditsCharged: charged });
     await tx.update(lushaReveal).set({ value, valueNormalized: normalized, errorCode: applied.alreadyHeld ? "phone_already_held" : null, payload: sql`${lushaReveal.payload} - 'writeError'` }).where(eq(lushaReveal.id, row.id));
     return { ok: true, value, written: applied.written, duplicate: applied.duplicate } as const;
   });

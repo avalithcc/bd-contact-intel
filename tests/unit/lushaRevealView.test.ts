@@ -190,3 +190,24 @@ test("a flag is exposed for the phone column that holds the number and never for
   const v = build({ search: SEARCH, phones: phoneRow([entry({ doNotCall: true })]) }, { person: { mobilePhone: PHONE } });
   assert.deepEqual([v.phones.revealed?.column, v.phones.revealed?.doNotCall, v.emails.revealed], ["mobilePhone", true, null]);
 });
+
+// --- one reveal, two numbers ---------------------------------------------------------------------------------------------
+
+const WORK = "+54 11 4000 0001";
+const MOBILE = "+54 9 11 5000 0002";
+const twoRow = (work: Record<string, unknown>, mobile: Record<string, unknown>) =>
+  row({ id: "p1", field: "phones", outcome: "revealed", value: WORK, actorName: "Cristian Civita", settledAt: new Date("2026-10-14T15:00:00Z"), payload: { phones: [{ number: WORK, type: "work", ...work }, { number: MOBILE, type: "mobile", ...mobile }] } });
+
+test("a reveal that placed BOTH numbers marks both columns, each with its own do-not-call flag", () => {
+  const person = { phone: "541140000001", mobilePhone: MOBILE };
+  assert.deepEqual(build({ search: SEARCH, phones: twoRow({}, { doNotCall: true }) }, { person }).phones.revealed, { by: "Cristian Civita", at: "14 oct", column: "phone", also: { column: "mobilePhone", doNotCall: true } });
+  const v = build({ search: SEARCH, phones: twoRow({ doNotCall: true }, { doNotCall: false }) }, { person });
+  assert.deepEqual([v.phones.revealed?.doNotCall, v.phones.revealed?.also], [true, { column: "mobilePhone" }]);
+});
+
+test("a second Lusha number the Contact no longer holds, or never got, is not marked", () => {
+  const edited = build({ search: SEARCH, phones: twoRow({}, {}) }, { person: { phone: "541140000001", mobilePhone: "+54 9 11 999 9999" } });
+  assert.equal(edited.phones.revealed?.also, undefined);
+  const unplaced = build({ search: SEARCH, phones: twoRow({}, {}) }, { person: { phone: "+54 11 1111 1111", mobilePhone: "5491150000002" } });
+  assert.deepEqual([unplaced.phones.revealed?.column, unplaced.phones.revealed?.also], ["mobilePhone", undefined]);
+});

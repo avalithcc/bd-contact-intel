@@ -224,7 +224,19 @@ function choose(raw: unknown, valueKey: string, valid: (v: string) => boolean, c
 export const pickEmail = (raw: unknown, companyDomains: readonly string[] = []): Pick =>
   choose(raw, "email", (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), companyDomains);
 /** Fails closed: the phone shape was never measured, so an unexpected entry writes nothing. */
-export const pickPhone = (raw: unknown): Pick => choose(raw, "number", (v) => /^\+?[\d\s().-]+$/.test(v) && v.replace(/\D/g, "").length >= 7);
+const validPhone = (v: string) => /^\+?[\d\s().-]+$/.test(v) && v.replace(/\D/g, "").length >= 7;
+export const pickPhone = (raw: unknown): Pick => choose(raw, "number", validPhone);
+
+/**
+ * One reveal can hold a work and a mobile number: the best valid one per bucket ("mobile" vs everything else, work
+ * preferred inside the second), non-mobile first. The same digits are never returned twice (the non-mobile entry wins,
+ * as in pickPhone). Empty when nothing valid came back; the single pick above stays the ledger value.
+ */
+export function pickPhones(raw: unknown): Extract<Pick, { ok: true }>[] {
+  const typed = (mobile: boolean) => (Array.isArray(raw) ? raw.filter((e) => isRecord(e) && (str(e.type)?.toLowerCase() === "mobile") === mobile) : raw);
+  const picks = [choose(typed(false), "number", validPhone), choose(typed(true), "number", validPhone)].filter((p): p is Extract<Pick, { ok: true }> => p.ok);
+  return picks.filter((p, i) => picks.findIndex((q) => q.value.replace(/\D/g, "") === p.value.replace(/\D/g, "")) === i);
+}
 
 const digitsOf = (x: unknown): string => (typeof x === "string" ? x.replace(/\D/g, "") : "");
 

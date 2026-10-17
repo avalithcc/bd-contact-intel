@@ -23,7 +23,7 @@ export interface LushaFieldView {
   /** The identity was already confirmed with the other field: the reveal dialog only confirms the price. */
   confirmed: boolean;
   /** `doNotCall` is present ONLY when it is true (see doNotCallOf): there is no "clear" state to draw. */
-  revealed: { by: string | null; at: string | null; column: "email" | "phone" | "mobilePhone"; doNotCall?: true } | null;
+  revealed: { by: string | null; at: string | null; column: "email" | "phone" | "mobilePhone"; doNotCall?: true; /** The reveal placed a second number in the other phone column. */ also?: { column: "phone" | "mobilePhone"; doNotCall?: true } } | null;
   twin: { id: string; name: string } | null;
 }
 
@@ -84,10 +84,16 @@ export function buildLushaView(i: {
     }
     if (live.kind === "revealed") {
       if (own?.errorCode === "write_failed") return { ...out, twin: null, control: { kind: "apply", price: null, disabled: false }, note: "write_failed" };
-      const column = field === "emails" ? (person.emailSource === "lusha" && person.email?.trim().toLowerCase() === live.value?.trim().toLowerCase() ? "email" : null) : digits(person.phone) !== "" && digits(person.phone) === digits(live.value) ? "phone" : digits(person.mobilePhone) !== "" && digits(person.mobilePhone) === digits(live.value) ? "mobilePhone" : null;
+      const listed = (typeof own?.payload === "object" && own.payload !== null ? (own.payload as { phones?: unknown }) : {}).phones;
+      // One reveal may place two numbers: the columns that hold a number Lusha returned, the ledger value's column first.
+      const holds = (["phone", "mobilePhone"] as const).filter((c) => digits(person[c]) !== "" && (digits(person[c]) === digits(live.value) || (Array.isArray(listed) && listed.some((e) => digits((e as { number?: unknown } | null)?.number as string) === digits(person[c])))));
+      holds.sort((a, b) => Number(digits(person[b]) === digits(live.value)) - Number(digits(person[a]) === digits(live.value)));
+      const column = field === "emails" ? (person.emailSource === "lusha" && person.email?.trim().toLowerCase() === live.value?.trim().toLowerCase() ? "email" : null) : (holds[0] ?? null);
       // `column` is non-null only while the record still holds the revealed value, so an edited number never keeps a flag that described the old one.
-      const dnc = column !== null && field === "phones" && isNumberFlagged((typeof own?.payload === "object" && own.payload !== null ? (own.payload as { phones?: unknown }) : {}).phones, live.value);
-      return { ...out, revealed: column ? { by: own?.actorName ?? null, at: own?.settledAt ? i.formatDay(new Date(own.settledAt)) : null, column, ...(dnc ? { doNotCall: true as const } : {}) } : null };
+      const flaggedAt = (c: "phone" | "mobilePhone") => isNumberFlagged(listed, person[c]);
+      const dnc = column !== null && column !== "email" && flaggedAt(column);
+      const also = field === "phones" && holds[1] ? { column: holds[1], ...(flaggedAt(holds[1]) ? { doNotCall: true as const } : {}) } : null;
+      return { ...out, revealed: column ? { by: own?.actorName ?? null, at: own?.settledAt ? i.formatDay(new Date(own.settledAt)) : null, column, ...(dnc ? { doNotCall: true as const } : {}), ...(also ? { also } : {}) } : null };
     }
     // Never offered: a Contact that can already be sequenced, or one with no phone column left to place a number in.
     if (field === "emails" ? reachable : !!(person.phone && person.mobilePhone)) return out;
@@ -156,3 +162,17 @@ export function buildLushaView(i: {
 }
 
 type LedgerRowLike = LatestRows["emails"];
+
+export const lushaBadgeFor = (view: LushaView | null, key: string) =>
+  !!view && (key === "email" ? view.emails.revealed?.column === "email" : (key === "phone" || key === "mobilePhone") && (view.phones.revealed?.column === key || view.phones.revealed?.also?.column === key));
+
+/**
+ * Drawn ONLY when Lusha flagged the number (`doNotCall: true`). Never render anything for false or missing: Lusha checks the
+ * UK and US registries only, so "not flagged" over an Argentine number would read as "safe to call", which nobody can say.
+ * The flag counts only for the column that still holds the revealed number (the view already enforces it); a second
+ * revealed number carries its own flag.
+ */
+export const doNotCallFor = (view: LushaView | null, key: string) => {
+  const r = view?.phones.revealed;
+  return (key === "phone" || key === "mobilePhone") && (r?.column === key ? r.doNotCall === true : r?.also?.column === key && r.also.doNotCall === true);
+};
