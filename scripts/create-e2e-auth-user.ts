@@ -1,5 +1,5 @@
 /**
- * Creates (or repairs) the e2e login in the LOCAL Supabase Auth stack
+ * Creates (or repairs) the e2e logins (the BD account and an admin one) in the LOCAL Supabase Auth stack
  * (`supabase start`, see tests/e2e/README.md). Idempotent: run it after every
  * `supabase stop --no-backup` / stack rebuild.
  *
@@ -36,6 +36,7 @@ const execute = process.argv.includes("--execute");
 const url = process.env.E2E_SUPABASE_URL?.trim();
 const email = process.env.E2E_EMAIL?.trim();
 const password = process.env.E2E_PASSWORD;
+const adminEmail = (process.env.E2E_ADMIN_EMAIL?.trim() || "admin-e2e@avalith.net").toLowerCase();
 
 function serviceRoleKey(): string {
   const fromEnv = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -56,16 +57,20 @@ async function main() {
   // The local stack holds a handful of users, one page is enough.
   const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (error) throw new Error(`Cannot list local auth users: ${error.message}`);
-  const existing = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
 
-  console.log(`[e2e-auth] ${execute ? "EXECUTE" : "DRY RUN"}: ${existing ? "update" : "create"} ${email} on ${new URL(url!).origin}`);
-  if (!execute) return console.log("[e2e-auth] nothing written. Re-run with --execute.");
-
-  const result = existing
-    ? await supabase.auth.admin.updateUserById(existing.id, { password, email_confirm: true })
-    : await supabase.auth.admin.createUser({ email, password, email_confirm: true });
-  if (result.error) throw new Error(`Local auth write failed: ${result.error.message}`);
-  console.log(`[e2e-auth] ${existing ? "updated" : "created"} ${email} (email confirmed)`);
+  // The e2e login, plus a second one for the specs that need an admin session next to the BD (sequences-admin.spec.ts).
+  // Same password; the app role comes from the `bd` row, which that spec upserts itself.
+  for (const account of [email, adminEmail]) {
+    const existing = data.users.find((u) => u.email?.toLowerCase() === account.toLowerCase());
+    console.log(`[e2e-auth] ${execute ? "EXECUTE" : "DRY RUN"}: ${existing ? "update" : "create"} ${account} on ${new URL(url!).origin}`);
+    if (!execute) continue;
+    const result = existing
+      ? await supabase.auth.admin.updateUserById(existing.id, { password, email_confirm: true })
+      : await supabase.auth.admin.createUser({ email: account, password, email_confirm: true });
+    if (result.error) throw new Error(`Local auth write failed: ${result.error.message}`);
+    console.log(`[e2e-auth] ${existing ? "updated" : "created"} ${account} (email confirmed)`);
+  }
+  if (!execute) console.log("[e2e-auth] nothing written. Re-run with --execute.");
 }
 
 main().catch((e) => {
