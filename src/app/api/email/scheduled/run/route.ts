@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { isValidBearer } from "@/lib/cronAuth";
 import { dispatchScheduledEmails } from "@/lib/scheduledEmail/dispatch";
-import { claimDue, countDue, holdReplied, markFailed, markSent, sweepStale } from "@/lib/scheduledEmail/queries";
+import { claimDue, countDue, holdReplied, markCancelled, markFailed, markSent, sweepStale } from "@/lib/scheduledEmail/queries";
 import { sendScheduledEmail } from "@/lib/scheduledEmail/send";
+import { listSuppressionRules } from "@/lib/sequences/suppressionQueries";
 
 /**
  * Scheduled-send dispatcher. Called every minute by Supabase pg_cron (see openspec/changes/scheduled-send/pg_cron.sql);
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   }
   const dryRun = new URL(request.url).searchParams.get("dryRun") === "1";
   const summary = await dispatchScheduledEmails(
-    { holdReplied, claimDue, countDue, sweepStale, markSent, markFailed, send: sendScheduledEmail },
+    { holdReplied, claimDue, countDue, sweepStale, markSent, markFailed, markCancelled, loadSuppression: listSuppressionRules, send: sendScheduledEmail },
     { dryRun },
   );
   console.log("[scheduled-email]", JSON.stringify(summary));

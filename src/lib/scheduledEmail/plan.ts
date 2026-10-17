@@ -18,7 +18,7 @@ export const OPEN_STATUSES: readonly ScheduledStatus[] = ["scheduled", "on_hold"
 
 const TRANSITIONS: Record<ScheduledStatus, readonly ScheduledStatus[]> = {
   scheduled: ["sending", "on_hold", "cancelled"],
-  sending: ["sent", "failed"],
+  sending: ["sent", "failed", "cancelled"], // cancelled only before Gmail is called (a suppressed recipient)
   on_hold: ["scheduled", "cancelled"],
   failed: ["scheduled", "cancelled"],
   sent: [],

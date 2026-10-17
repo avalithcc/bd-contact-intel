@@ -54,6 +54,7 @@ test("state transitions: a failed or held row never goes back to sending by itse
   assert.equal(canTransition("scheduled", "on_hold"), true);
   assert.equal(canTransition("sending", "sent"), true);
   assert.equal(canTransition("sending", "failed"), true);
+  assert.equal(canTransition("sending", "cancelled"), true); // suppressed after the claim, before Gmail is called
   assert.equal(canTransition("failed", "sending"), false);
   assert.equal(canTransition("on_hold", "sending"), false);
   assert.equal(canTransition("failed", "scheduled"), true);

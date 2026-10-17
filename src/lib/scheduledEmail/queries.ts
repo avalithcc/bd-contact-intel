@@ -4,7 +4,10 @@
  */
 import { and, asc, count, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, emailAccount, person, scheduledEmail, type ScheduledEmail } from "@/db/schema";
+import { activity, bd, emailAccount, person, scheduledEmail, task, type ScheduledEmail } from "@/db/schema";
+import { recomputePersonStatus } from "@/lib/status/recompute";
+import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
+import { buildFailureTask } from "./failureTask";
 import {
   LOCK_MS,
   MAX_PENDING,
@@ -154,18 +157,72 @@ export async function markSent(id: string, gmailMessageId: string): Promise<void
     .where(and(eq(scheduledEmail.id, id), sql`(${scheduledEmail.status} = 'sending' or (${scheduledEmail.status} = 'failed' and ${scheduledEmail.error} = 'outcome_unknown'))`));
 }
 
-export async function markFailed(id: string, code: string): Promise<void> {
-  await db.update(scheduledEmail).set({ status: "failed", error: code, updatedAt: sql`now()` }).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "sending")));
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * One task (plus its task_created activity) per row that JUST turned 'failed', for the owning BD on the contact. Runs in
+ * the same transaction as that guarded UPDATE, so it is exactly-once per failure: a row that is no longer 'sending'
+ * returns nothing from the UPDATE and gets no task. Set-based (2 inserts for any number of rows). A merged contact's
+ * task lands on the live survivor. No audit_log: a failed send is not a consequential admin action.
+ */
+async function openFailureTasks(tx: Tx, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const rows = await tx
+    .select({
+      id: scheduledEmail.id, bdId: scheduledEmail.bdId, subject: scheduledEmail.subject, error: scheduledEmail.error,
+      personId: sql<string>`coalesce(${person.mergedIntoId}, ${person.id})`, first: person.firstName, last: person.lastName,
+    })
+    .from(scheduledEmail)
+    .innerJoin(person, eq(person.id, scheduledEmail.personId))
+    .where(inArray(scheduledEmail.id, ids));
+  const now = new Date();
+  const fields = rows.map((r) => buildFailureTask({ ...r, personName: [r.first, r.last].filter(Boolean).join(" ") }, now));
+  if (!fields.length) return;
+  const created = await tx.insert(task).values(fields).returning();
+  await tx.insert(activity).values(created.map((t) => buildTaskActivityRow("task_created", t, t.actorBdId!, { taskId: t.id, taskTitle: t.title })));
+  for (const personId of new Set(created.map((t) => t.personId!))) await recomputePersonStatus(tx, personId); // task_created is a non-touch type
 }
 
-/** A 'sending' row older than STALE_SENDING_MS belongs to a dead run: surfaced as failed, never retried. */
-export async function sweepStale(): Promise<number> {
-  const swept = await db
+export async function markFailed(id: string, code: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const failed = await tx
+      .update(scheduledEmail)
+      .set({ status: "failed", error: code, updatedAt: sql`now()` })
+      .where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "sending")))
+      .returning({ id: scheduledEmail.id });
+    await openFailureTasks(tx, failed.map((f) => f.id));
+  });
+}
+
+/** Last-moment cancel of a claimed row (suppressed recipient). Guarded on 'sending': nothing was sent. */
+export async function markCancelled(id: string, code: string): Promise<void> {
+  await db.update(scheduledEmail).set({ status: "cancelled", error: code, updatedAt: sql`now()` }).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.status, "sending")));
+}
+
+/**
+ * Cancels the not-yet-sent rows addressed to a just-suppressed address, inside the opt-out's own transaction. Rows already
+ * 'sending' are left to the dispatcher's last-moment check (they were claimed before the opt-out was visible).
+ */
+export async function cancelPendingForAddress(tx: Tx, normalizedAddress: string): Promise<number> {
+  const cancelled = await tx
     .update(scheduledEmail)
-    .set({ status: "failed", error: "outcome_unknown", updatedAt: sql`now()` })
-    .where(and(eq(scheduledEmail.status, "sending"), sql`${scheduledEmail.updatedAt} < now() - make_interval(secs => ${STALE_SENDING_MS / 1000})`))
+    .set({ status: "cancelled", error: "recipient_suppressed", updatedAt: sql`now()` })
+    .where(and(inArray(scheduledEmail.status, ["scheduled", "on_hold"]), sql`lower(trim(${scheduledEmail.toAddress})) = ${normalizedAddress}`))
     .returning({ id: scheduledEmail.id });
-  return swept.length;
+  return cancelled.length;
+}
+
+/** A 'sending' row older than STALE_SENDING_MS belongs to a dead run: surfaced as failed (and as a task), never retried. */
+export async function sweepStale(): Promise<number> {
+  return db.transaction(async (tx) => {
+    const swept = await tx
+      .update(scheduledEmail)
+      .set({ status: "failed", error: "outcome_unknown", updatedAt: sql`now()` })
+      .where(and(eq(scheduledEmail.status, "sending"), sql`${scheduledEmail.updatedAt} < now() - make_interval(secs => ${STALE_SENDING_MS / 1000})`))
+      .returning({ id: scheduledEmail.id });
+    await openFailureTasks(tx, swept.map((r) => r.id));
+    return swept.length;
+  });
 }
 
 const LISTED: ScheduledStatus[] = ["scheduled", "sending", "on_hold", "failed"];

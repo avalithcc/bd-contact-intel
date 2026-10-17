@@ -5,6 +5,7 @@
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { emailSuppression, person, sequenceMember, sequenceUnsubscribeToken } from "@/db/schema";
+import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { openPostingSql } from "@/lib/hiring/openPosting";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
 import { recipientMarket } from "@/lib/sequences/recipientMarket";
@@ -54,6 +55,8 @@ export async function suppressAddressInTx(
     .insert(emailSuppression)
     .values({ kind: "address", value: input.email, source: input.source, recordedByBdId: input.actorBdId, personId: input.personId, sequenceMemberId: input.sequenceMemberId })
     .onConflictDoNothing();
+  // An opted-out address must not receive a scheduled email either (same transaction as the suppression itself).
+  await cancelPendingForAddress(tx, input.email);
 
   const live = await tx
     .select({ id: sequenceMember.id, state: sequenceMember.state, personId: sequenceMember.personId, sequenceId: sequenceMember.sequenceId })

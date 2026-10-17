@@ -55,7 +55,16 @@ async function activityCount(personId: string) {
 }
 async function realDeps(send: (row: { id: string }) => Promise<{ messageId: string }>) {
   const q = await import("@/lib/scheduledEmail/queries");
-  return { holdReplied: q.holdReplied, claimDue: q.claimDue, countDue: q.countDue, sweepStale: q.sweepStale, markSent: q.markSent, markFailed: q.markFailed, send };
+  const { listSuppressionRules } = await import("@/lib/sequences/suppressionQueries");
+  return { holdReplied: q.holdReplied, claimDue: q.claimDue, countDue: q.countDue, sweepStale: q.sweepStale, markSent: q.markSent, markFailed: q.markFailed, markCancelled: q.markCancelled, loadSuppression: listSuppressionRules, send };
+}
+async function tasksFor(personId: string) {
+  const { db } = await import("@/db");
+  const { task, activity } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const tasks = await db.select().from(task).where(eq(task.personId, personId));
+  const acts = (await db.select().from(activity).where(eq(activity.personId, personId))).filter((a) => a.type === "task_created");
+  return { tasks, acts };
 }
 
 after(async () => {
@@ -216,7 +225,97 @@ test("a failed send keeps its text, is never resent, and an unconfirmed crash is
   const swept = await getRow(crashed);
   assert.equal(swept.status, "failed");
   assert.equal(swept.error, "outcome_unknown");
-  assert.equal(await activityCount(p.id), 0);
+  // No email_sent/touch activity; only the two follow-up tasks' task_created rows (one per failed row).
+  const { tasks, acts } = await tasksFor(p.id);
+  assert.equal(tasks.length, 2);
+  assert.equal(acts.length, 2);
+  assert.equal(await activityCount(p.id), 2);
+});
+
+test("a failed or swept row opens exactly one task for the owning BD with an activity, and reruns never duplicate it", async () => {
+  const { dispatchScheduledEmails } = await import("@/lib/scheduledEmail/dispatch");
+  const { GmailSendError } = await import("@/lib/gmail/errors");
+  const b = await mkBd("TaskOwner");
+  const p = await mkPerson("taskp");
+  const dead = await schedule(b.id, p.id, 10 * MIN);
+  const crashed = await schedule(b.id, p.id, 11 * MIN);
+  await setRow(dead, `send_at = now() - interval '1 minute'`);
+  await setRow(crashed, `status = 'sending', send_at = now() - interval '30 minutes', updated_at = now() - interval '20 minutes'`);
+  const deps = await realDeps(async () => { throw new GmailSendError("reauth_required", "x"); });
+  for (let i = 0; i < 3; i++) await dispatchScheduledEmails(deps, { dryRun: false });
+  const { tasks, acts } = await tasksFor(p.id);
+  assert.equal(tasks.length, 2, "one per failed row, not per run");
+  assert.ok(tasks.every((t) => t.assignedToBdId === b.id && t.actorBdId === b.id && t.status === "open"));
+  assert.ok(tasks.every((t) => t.title.startsWith("Revisar envío programado fallido a taskp")));
+  assert.equal(acts.length, 2);
+  assert.ok(acts.every((a) => a.actorBdId === b.id));
+  const { db } = await import("@/db");
+  const { auditLog } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  assert.equal((await db.select().from(auditLog).where(eq(auditLog.actorBdId, b.id))).length, 0, "no audit_log row");
+});
+
+test("a failed row of a merged contact puts its task on the live survivor", async () => {
+  const { markFailed } = await import("@/lib/scheduledEmail/queries");
+  const { db } = await import("@/db");
+  const { person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const b = await mkBd("MergeTask");
+  const old = await mkPerson("mold");
+  const live = await mkPerson("mlive");
+  const id = await schedule(b.id, old.id);
+  await db.update(person).set({ mergedIntoId: live.id }).where(eq(person.id, old.id));
+  await setRow(id, `status = 'sending'`);
+  await markFailed(id, "outcome_unknown");
+  assert.equal((await tasksFor(live.id)).tasks.length, 1);
+  assert.equal((await tasksFor(old.id)).tasks.length, 0);
+});
+
+test("a suppressed recipient is cancelled at dispatch time and Gmail is never called (address and domain rules)", async () => {
+  const { dispatchScheduledEmails } = await import("@/lib/scheduledEmail/dispatch");
+  const { insertSuppression } = await import("@/lib/sequences/suppressionQueries");
+  const { db } = await import("@/db");
+  const { emailSuppression } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const b = await mkBd("Supp");
+  const p = await mkPerson("supp");
+  const byAddress = await schedule(b.id, p.id, 10 * MIN);
+  const byDomain = await schedule(b.id, p.id, 11 * MIN);
+  await setRow(byAddress, `send_at = now() - interval '1 minute', to_address = 'Opted-${run}@prospect.test'`);
+  await setRow(byDomain, `send_at = now() - interval '1 minute', to_address = 'x@dom-${run}.test'`);
+  await insertSuppression({ kind: "address", rawValue: `opted-${run}@prospect.test`, source: "manual" });
+  await insertSuppression({ kind: "domain", rawValue: `dom-${run}.test`, source: "manual" });
+  let calls = 0;
+  const summary = await dispatchScheduledEmails(await realDeps(async () => (calls++, { messageId: "m" })), { dryRun: false });
+  assert.equal(calls, 0);
+  assert.equal(summary.cancelled, 2);
+  for (const id of [byAddress, byDomain]) {
+    const row = await getRow(id);
+    assert.equal(row.status, "cancelled");
+    assert.equal(row.error, "recipient_suppressed");
+  }
+  assert.equal((await tasksFor(p.id)).tasks.length, 0, "a suppression is not a failure: no task");
+  await db.delete(emailSuppression).where(eq(emailSuppression.value, `opted-${run}@prospect.test`));
+  await db.delete(emailSuppression).where(eq(emailSuppression.value, `dom-${run}.test`));
+});
+
+test("recording an opt-out cancels the pending scheduled rows to that address, and leaves sent and other rows alone", async () => {
+  const { cancelPendingForAddress } = await import("@/lib/scheduledEmail/queries");
+  const { db } = await import("@/db");
+  const b = await mkBd("Hook");
+  const p = await mkPerson("hook");
+  const addr = `hook-${run}@prospect.test`;
+  const pending = await schedule(b.id, p.id, 10 * MIN);
+  const held = await schedule(b.id, p.id, 11 * MIN);
+  const sent = await schedule(b.id, p.id, 12 * MIN);
+  const other = await schedule(b.id, p.id, 13 * MIN);
+  await setRow(pending, `to_address = ' ${addr.toUpperCase()} '`);
+  await setRow(held, `status = 'on_hold', to_address = '${addr}'`);
+  await setRow(sent, `status = 'sent', to_address = '${addr}'`);
+  const n = await db.transaction((tx) => cancelPendingForAddress(tx, addr));
+  assert.equal(n, 2);
+  assert.deepEqual([(await getRow(pending)).status, (await getRow(held)).status, (await getRow(sent)).status, (await getRow(other)).status], ["cancelled", "cancelled", "sent", "scheduled"]);
+  assert.equal((await getRow(pending)).error, "recipient_suppressed");
 });
 
 test("an edited held or failed row goes back to scheduled with a fresh reply baseline", async () => {
@@ -341,7 +440,8 @@ test("the REAL sender: exactly one email_sent activity when it goes out, none wh
   }) as typeof fetch;
   try {
     const q = await import("@/lib/scheduledEmail/queries");
-    await dispatchScheduledEmails({ ...q, send: sendScheduledEmail }, { dryRun: false });
+    const { listSuppressionRules } = await import("@/lib/sequences/suppressionQueries");
+    await dispatchScheduledEmails({ ...q, loadSuppression: listSuppressionRules, send: sendScheduledEmail }, { dryRun: false });
   } finally {
     globalThis.fetch = realFetch;
     cache.revalidatePath = realRevalidate;
