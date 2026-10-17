@@ -19,7 +19,7 @@
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, emailMessage, emailSuppression, person, personPropertyHistory, sequence, sequenceMember } from "@/db/schema";
-import { isTransientDbError } from "./bounceErrors";
+import { isContentionDbError, isTransientDbError } from "./bounceErrors";
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { canTransition, MEMBER_STATES, type MemberState } from "@/lib/sequences/memberState";
 import { bounceKey, buildBounceMetadata, planBounces, type BounceEffects, type BounceEvent, type OutboundCandidate } from "./bouncePlan";
@@ -94,18 +94,28 @@ async function recordChunk(bdId: string, batch: readonly ParsedBounce[], outboun
     for (const event of plan.events) byNotification.set(event.dsnGmailMessageId, [...(byNotification.get(event.dsnGmailMessageId) ?? []), event]);
     for (const events of byNotification.values()) {
       // One savepoint per notification: a failure rolls back only that notification's writes, and the rest go on.
+      const attempt = () => tx.transaction((sp) => recordNotification(sp, bdId, events));
       try {
-        const done = await tx.transaction((sp) => recordNotification(sp, bdId, events));
+        let done;
+        try {
+          done = await attempt();
+        } catch (error) {
+          // Contention (deadlock, lock or statement timeout) gets exactly one more try in this tick.
+          if (!isContentionDbError(error)) throw error;
+          done = await attempt();
+        }
         result.hard += done.hard;
         result.soft += done.soft;
         result.scheduledCancelled += done.scheduledCancelled;
         result.membersDiscarded += done.membersDiscarded;
         result.noHolder += done.noHolder;
       } catch (error) {
-        // Contention or an outage is not this notification's fault: abort the chunk so the sync holds its cursor and the
-        // whole tick is retried (recording is idempotent). Only a data error is skipped.
+        // An outage is not this notification's fault: abort the chunk so the sync holds its cursor and the tick is retried
+        // (recording is idempotent). Anything else, a second contention included, skips this one and lets the cursor
+        // advance: contention can recur on every tick, and a stuck cursor costs more than one lost bounce.
         if (isTransientDbError(error)) throw error;
         result.failed += 1;
+        console.error(`bounce notification skipped after a database error (${(error as { code?: string }).code ?? "no code"})`);
       }
     }
   });

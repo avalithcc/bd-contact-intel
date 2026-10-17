@@ -12,7 +12,7 @@ import type { GmailClient, GmailHistoryResult } from "@/lib/gmail/client";
 import type { GmailApiMessage } from "@/lib/gmail/parseMessage";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "@/lib/gmail/classify";
 import type { ParsedBounce } from "@/lib/gmail/parseBounce";
-import { isTransientDbError } from "@/lib/gmail/bounceErrors";
+import { isContentionDbError, isTransientDbError } from "@/lib/gmail/bounceErrors";
 import { gmailHard511, outOfOffice } from "./bounceFixtures";
 
 function b64url(text: string): string {
@@ -354,17 +354,22 @@ test("only a connection-class failure holds the cursor, so an outage is retried"
   assert.equal(result.newHistoryId, null);
 });
 
-test("deadlocks and lock or statement timeouts are transient; data errors are not", () => {
-  for (const code of ["40P01", "55P03", "57014", "08006", "ECONNRESET"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), true, code);
-  for (const code of ["22P05", "23505", "22021"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), false, code);
+test("only connection or availability errors hold the cursor; contention and data errors do not", () => {
+  for (const code of ["08006", "53300", "57P01", "ECONNRESET", "CONNECT_TIMEOUT"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), true, code);
+  for (const code of ["40P01", "55P03", "57014", "22P05", "23505"]) assert.equal(isTransientDbError(Object.assign(new Error("x"), { code })), false, code);
   assert.equal(isTransientDbError(new Error("no code")), false);
   assert.equal(isTransientDbError(null), false);
 });
 
-test("a deadlock raised while recording holds the cursor, so the tick retries the same window", async () => {
+test("deadlock, lock timeout and statement timeout are contention: retried once, never held", () => {
+  for (const code of ["40P01", "55P03", "57014"]) assert.equal(isContentionDbError(Object.assign(new Error("x"), { code })), true, code);
+  for (const code of ["08006", "22P05", "23505"]) assert.equal(isContentionDbError(Object.assign(new Error("x"), { code })), false, code);
+});
+
+test("a persistent statement timeout never holds the cursor: it advances", async () => {
   const client = fakeClient({ historyPages: historyFor("dsn-1"), messagesById: { "dsn-1": gmailHard511() } });
-  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async () => { throw Object.assign(new Error("deadlock detected"), { code: "40P01" }); } }));
-  assert.equal(result.newHistoryId, null);
+  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async () => { throw Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" }); } }));
+  assert.equal(result.newHistoryId, "400");
 });
 
 test("a parser throw on one notification does not abort the sync: the others are recorded and the cursor advances", async () => {
