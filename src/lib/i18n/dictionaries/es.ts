@@ -58,6 +58,7 @@ export const es: typeof en = {
     founder: "Fundador",
     partner: "Socio",
     c_level: "C-Level",
+    assistant_c_level: "Asistente de C-Level",
     vp: "VP",
     head: "Head",
     director: "Director",

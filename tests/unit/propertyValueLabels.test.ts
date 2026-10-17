@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CONTACT_TYPES, contactTypeLabel } from "@/lib/contacts/contactType";
-import { SENIORITY_KEYS, normalizeSeniorityKey, seniorityLabel } from "@/lib/contacts/seniority";
+import { buildActiveFilterChips } from "@/lib/contacts/filterChips";
+import { SENIORITY_KEYS, normalizeSeniorityKey, seniorityLabel, seniorityOptions } from "@/lib/contacts/seniority";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 
@@ -35,4 +36,47 @@ test("contactTypeLabel uses the dictionary labels when given, and keeps unknown 
   assert.equal(contactTypeLabel("BUYER-CHAMPION", "—", en.contactTypes), "Buyer / champion");
   assert.equal(contactTypeLabel("INFLUENCER", "—", es.contactTypes), "Influenciador");
   assert.equal(contactTypeLabel("DECISION-MAKER", "—", en.contactTypes), "DECISION-MAKER");
+});
+
+const PRODUCTION_SENIORITIES: [stored: string, es: string, en: string][] = [
+  ["Senior", "Senior", "Senior"],
+  ["Manager", "Gerente", "Manager"],
+  ["Owner", "Propietario", "Owner"],
+  ["CLevel", "C-Level", "C-Level"],
+  ["Director", "Director", "Director"],
+  ["Partner", "Socio", "Partner"],
+  ["VP", "VP", "VP"],
+  ["Junior", "Junior", "Junior"],
+  ["Assistant C-Level", "Asistente de C-Level", "C-Level assistant"],
+];
+
+test("every seniority value found in production maps to a label in es and en", () => {
+  for (const [stored, labelEs, labelEn] of PRODUCTION_SENIORITIES) {
+    assert.equal(seniorityLabel(stored, es.seniorities), labelEs, stored);
+    assert.equal(seniorityLabel(stored, en.seniorities), labelEn, stored);
+  }
+  assert.equal(seniorityLabel("", es.seniorities), "—");
+});
+
+test("seniority filter options send the raw stored value and only localize the text", () => {
+  const stored = PRODUCTION_SENIORITIES.map(([s]) => s);
+  const options = seniorityOptions(stored, es.seniorities);
+  assert.deepEqual(options.map((o) => o.value), stored);
+  assert.deepEqual(options.find((o) => o.value === "CLevel"), { value: "CLevel", label: "C-Level" });
+});
+
+test("a seniority chip shows the label but the filter value stays the stored one", () => {
+  const filters = { seniority: "CLevel" };
+  const chips = buildActiveFilterChips(filters, {
+    ownerLabel: (v) => v,
+    statusLabel: (s) => s,
+    emailStatusLabel: (s) => s,
+    marketLabel: (m) => m,
+    roleGroupLabel: (k) => k,
+    bdName: (id) => id,
+    seniorityLabel: (v) => seniorityLabel(v, es.seniorities),
+  });
+  assert.equal(chips[0].field, "seniority");
+  assert.equal(chips[0].valueText, "C-Level");
+  assert.equal(filters.seniority, "CLevel");
 });

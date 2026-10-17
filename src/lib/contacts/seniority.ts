@@ -11,6 +11,7 @@ export const SENIORITY_KEYS = [
   "founder",
   "partner",
   "c_level",
+  "assistant_c_level",
   "vp",
   "head",
   "director",
@@ -23,6 +24,9 @@ export const SENIORITY_KEYS = [
 ] as const;
 
 export type SeniorityKey = (typeof SENIORITY_KEYS)[number];
+
+/** Spellings seen in production whose normalized form differs from the key they mean. */
+const SENIORITY_ALIASES: Record<string, SeniorityKey> = { clevel: "c_level" };
 
 export function normalizeSeniorityKey(value: string): string {
   return value
@@ -38,6 +42,15 @@ export function seniorityLabel(
   empty = "—",
 ): string {
   if (!value || !value.trim()) return empty;
-  const key = normalizeSeniorityKey(value);
+  const normalized = normalizeSeniorityKey(value);
+  const key = SENIORITY_ALIASES[normalized] ?? normalized;
   return (SENIORITY_KEYS as readonly string[]).includes(key) ? labels[key as SeniorityKey] : value;
+}
+
+/** Filter select options: the stored value is what the filter sends, only the text is localized. */
+export function seniorityOptions(
+  stored: readonly string[],
+  labels: Record<SeniorityKey, string>,
+): { value: string; label: string }[] {
+  return stored.map((v) => ({ value: v, label: seniorityLabel(v, labels) }));
 }

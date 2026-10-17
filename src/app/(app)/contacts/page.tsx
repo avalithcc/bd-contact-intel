@@ -65,7 +65,7 @@ import {
 } from "@/lib/contacts/outreachViewParams";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
 import { CONTACT_TYPES, contactTypeLabel } from "@/lib/contacts/contactType";
-import { seniorityLabel } from "@/lib/contacts/seniority";
+import { seniorityLabel, seniorityOptions } from "@/lib/contacts/seniority";
 import { COMPANY_CATEGORIES } from "@/lib/companyCategories";
 import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
@@ -796,7 +796,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               { value: "90", label: l.filterLastActivity90d },
             ]}
             industryGroupOptions={filterOptions.industryGroups.map((v) => ({ value: v, label: v }))}
-            seniorityOptions={filterOptions.seniorities.map((v) => ({ value: v, label: seniorityLabel(v, dict.seniorities) }))}
+            seniorityOptions={seniorityOptions(filterOptions.seniorities, dict.seniorities)}
             labels={{
               addFilterLabel: l.filtersPanelLabel,
               removeFilterLabel: l.filterRemoveLabel,

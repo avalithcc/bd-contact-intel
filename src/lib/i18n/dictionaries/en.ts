@@ -146,6 +146,7 @@ export const en = {
     founder: "Founder",
     partner: "Partner",
     c_level: "C-Level",
+    assistant_c_level: "C-Level assistant",
     vp: "VP",
     head: "Head",
     director: "Director",
