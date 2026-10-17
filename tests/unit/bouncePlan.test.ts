@@ -30,9 +30,11 @@ test("a spoofed notification (nothing we sent, or sent to someone else) does not
   assert.equal(plan.unlinked, 1);
 });
 
-test("linking by thread alone works, and so does linking by Message-ID alone", () => {
+test("a thread match alone no longer links: our own Message-ID must appear in the notification", () => {
   const byThread = sent({ rfcMessageId: null });
-  assert.equal(planBounces([parsed(gmailHard511())], [byThread], new Set()).events.length, 1);
+  assert.equal(planBounces([parsed(gmailHard511())], [byThread], new Set()).events.length, 0);
+  const otherId = sent({ rfcMessageId: "<someone-elses@mail.gmail.com>" });
+  assert.equal(planBounces([parsed(gmailHard511())], [otherId], new Set()).events.length, 0);
   const byRfc = sent({ gmailThreadId: "another-thread" });
   assert.equal(planBounces([parsed(gmailHard511())], [byRfc], new Set()).events.length, 1);
   const neither = sent({ gmailThreadId: "another-thread", rfcMessageId: "<other@x>" });
@@ -76,6 +78,15 @@ test("a notification not sent by mailer-daemon or postmaster is ignored, even wh
   assert.equal(plan.unlinked, 1);
   const postmaster = parseBounce(failedWith("5.1.1", "no such user", { from: "Postmaster <PostMaster@otro-dominio.test>" }))!;
   assert.equal(planBounces([postmaster], [sent()], new Set()).events.length, 1);
+});
+
+test("a Return-Path with a real address means a person wrote it: only an absent or null path passes", () => {
+  const withPath = (value: string) => parseBounce(failedWith("5.1.1", "no such user", { extraHeaders: { "Return-Path": value } }))!;
+  assert.equal(planBounces([withPath("<attacker@evil.test>")], [sent()], new Set()).events.length, 0);
+  assert.equal(planBounces([withPath("<attacker@evil.test>")], [sent()], new Set()).unlinked, 1);
+  assert.equal(planBounces([withPath("<>")], [sent()], new Set()).events.length, 1);
+  assert.equal(planBounces([withPath("")], [sent()], new Set()).events.length, 1);
+  assert.equal(planBounces([parseBounce(failedWith("5.1.1", "no such user"))!], [sent()], new Set()).events.length, 1);
 });
 
 test("a thread match alone is not enough: the notification must also carry a Message-ID reference", () => {
