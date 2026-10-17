@@ -16,6 +16,7 @@ import {
   type KnownPersonEmail,
   type NeverLogRule,
 } from "./classify";
+import { isTransientDbError } from "./bounceErrors";
 import { parseBounce, type ParsedBounce } from "./parseBounce";
 import { parseGmailMessage, type ParsedGmailMessage } from "./parseMessage";
 import type { GmailClient } from "./client";
@@ -98,8 +99,13 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
     // A notification matches no Contact (its sender is mailer-daemon), so it is read here, from the full payload, before
     // classification drops it. Only machine-generated mail is looked at.
     if (parsed.automated) {
-      const bounce = parseBounce(raw);
-      if (bounce) bounces.push(bounce);
+      // Per message: one malformed notification must cost that notification only, never the run.
+      try {
+        const bounce = parseBounce(raw);
+        if (bounce) bounces.push(bounce);
+      } catch {
+        console.error("bounce parse failed for one notification; skipped");
+      }
     }
   }
 
@@ -129,16 +135,17 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
   const toStore = classified.filter(shouldStoreClassifiedMessage);
   const writeResult = toStore.length > 0 ? await deps.writeMessages(toStore) : { inserted: 0 };
 
-  // After the write, so an outbound message stored in this same run is already there to link to. A failure must not abort
-  // the run (the messages above are stored), but it must not lose the notification either: the cursor stays put, and the
-  // retry is safe because recording is idempotent.
+  // After the write, so an outbound message stored in this same run is already there to link to. recordBounces isolates
+  // each notification itself, so what reaches here is a whole-batch failure. A data error must never hold the cursor
+  // (a poison notification would stick this BD's sync for good: losing one bounce beats that). Only an outage is retried,
+  // which is safe because recording is idempotent.
   let bouncesRecorded = true;
   if (bounces.length > 0) {
     try {
       await deps.recordBounces(bounces);
-    } catch {
-      bouncesRecorded = false;
-      console.error(`bounce recording failed for ${bounces.length} notification(s); the sync cursor is held back`);
+    } catch (error) {
+      bouncesRecorded = !isTransientDbError(error);
+      console.error(`bounce recording failed for ${bounces.length} notification(s); ${bouncesRecorded ? "skipped" : "the sync cursor is held back"}`);
     }
   }
 

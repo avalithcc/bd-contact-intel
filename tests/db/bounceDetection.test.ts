@@ -86,7 +86,7 @@ test("a hard bounce marks the person, suppresses the address, stops the sequence
   const { recordBounces } = await import("@/lib/gmail/bounceQueries");
   const s = await seed();
   const result = await recordBounces(s.bdId, [await hard(s)]);
-  assert.deepEqual(result, { hard: 1, soft: 0, unlinked: 0, duplicates: 0, scheduledCancelled: 1, membersDiscarded: 1 });
+  assert.deepEqual(result, { hard: 1, soft: 0, unlinked: 0, duplicates: 0, failed: 0, scheduledCancelled: 1, membersDiscarded: 1 });
   const after = await state(s);
   assert.equal(after.status, "bounced");
   assert.equal(after.suppressions.length, 1);
@@ -115,7 +115,7 @@ test("re-syncing the same notification changes nothing", async () => {
   const s = await seed();
   await recordBounces(s.bdId, [await hard(s)]);
   const again = await recordBounces(s.bdId, [await hard(s)]);
-  assert.deepEqual(again, { hard: 0, soft: 0, unlinked: 0, duplicates: 1, scheduledCancelled: 0, membersDiscarded: 0 });
+  assert.deepEqual(again, { hard: 0, soft: 0, unlinked: 0, duplicates: 1, failed: 0, scheduledCancelled: 0, membersDiscarded: 0 });
   const after = await state(s);
   assert.equal(after.activities.length, 1);
   assert.equal(after.suppressions.length, 1);
@@ -171,4 +171,32 @@ test("a notification arriving in another BD's mailbox does not count: only the s
   const result = await recordBounces(other.bdId, [await hard(s)]);
   assert.equal(result.unlinked, 1);
   assert.equal((await state(s)).status, "verified");
+});
+
+test("every notification in a tick is processed, in chunks, none dropped", async () => {
+  const { recordBounces, MAX_BOUNCES_PER_RUN } = await import("@/lib/gmail/bounceQueries");
+  const s = await seed();
+  const total = MAX_BOUNCES_PER_RUN * 2 + 20;
+  const batch = [];
+  for (let k = 0; k < total; k++) batch.push(await soft(s, `dsn-bulk-${run}-${s.i}-${k}`));
+  const result = await recordBounces(s.bdId, batch);
+  assert.equal(result.soft, total);
+  assert.equal((await state(s)).activities.length, total);
+});
+
+test("one bad notification among several costs only itself: its writes roll back, the others are recorded", async () => {
+  const { recordBounces } = await import("@/lib/gmail/bounceQueries");
+  const s = await seed();
+  const bad = await hard(s, `dsn-bad-${run}-${s.i}`);
+  bad.recipients[0]!.diagnostic = "boom\u0000"; // jsonb refuses a NUL: the entry insert fails after the status was set
+  const good = await soft(s, `dsn-good-${run}-${s.i}`);
+  const result = await recordBounces(s.bdId, [bad, good]);
+  assert.equal(result.failed, 1);
+  assert.equal(result.soft, 1);
+  const after = await state(s);
+  assert.equal(after.status, "verified", "the failed notification's status change was rolled back with it");
+  assert.equal(after.suppressions.length, 0);
+  assert.equal(after.member.state, "sent");
+  assert.equal(after.sched.status, "scheduled");
+  assert.equal(after.activities.length, 1);
 });

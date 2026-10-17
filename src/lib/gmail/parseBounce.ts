@@ -30,6 +30,8 @@ export interface ParsedBounce {
   dsnGmailMessageId: string;
   gmailThreadId: string;
   occurredAt: Date;
+  /** The notification's own sender (From), lower-cased: bouncePlan accepts only mailer-daemon / postmaster. */
+  fromAddress: string;
   /** Message-IDs the notification points at: In-Reply-To, References and the embedded original's own Message-ID. */
   linkRfcIds: string[];
   originalSubject: string | null;
@@ -80,21 +82,31 @@ export function bounceReasonKey(statusCode: string | null, diagnostic: string | 
   if (/^[45]\.2\.2$/.test(code)) return "mailbox_full";
   if (/^[45]\.2\.3$|^[45]\.3\.4$/.test(code)) return "too_large";
   if (/^[45]\.7\./.test(code)) return "blocked";
-  if (code === "" && /user unknown|does not exist|no such user|recipient not found/i.test(diagnostic ?? "")) return "mailbox_not_found";
+  if ((code === "" || code === "5.0.0") && /user unknown|does not exist|no such user|recipient not found/i.test(diagnostic ?? "")) return "mailbox_not_found";
   return "other";
 }
 
-function severityOf(action: string | undefined, statusCode: string | null, fallbackHard: boolean): BounceSeverity | null {
-  if (action === "failed") return "hard";
+const UNKNOWN_USER = /user unknown|unknown user|no such user|does not exist|mailbox (not found|unavailable)|address not found|invalid recipient|recipient not found/i;
+
+/**
+ * Hard means "this address is dead": a bad-address status (5.1.x), or a bare 5.0.0 / 550 whose text says the user or
+ * mailbox does not exist. Everything else (policy or spam blocks 5.7.x, a full mailbox, every 4.x, a "failed" action
+ * with a transient status) is soft: it is logged, but the address is not suppressed. Wrongly killing a live contact
+ * costs far more than waiting for the next notification.
+ */
+function severityOf(action: string | undefined, statusCode: string | null, diagnostic: string | null): BounceSeverity | null {
+  if (statusCode?.[0] === "2" || (action !== undefined && action !== "failed" && action !== "delayed")) return null;
   if (action === "delayed") return "soft";
-  if (action && action !== "failed") return statusCode?.[0] === "5" ? "hard" : statusCode?.[0] === "4" ? "soft" : null;
-  if (statusCode?.[0] === "5") return "hard";
-  if (statusCode?.[0] === "4") return "soft";
-  return statusCode === null && fallbackHard ? "hard" : null;
+  if (statusCode && /^5\.1\./.test(statusCode)) return "hard";
+  const bareReject = statusCode === "5.0.0" || (statusCode === null && /\b550\b/.test(diagnostic ?? ""));
+  return bareReject && UNKNOWN_USER.test(diagnostic ?? "") ? "hard" : "soft";
 }
 
+/** Control characters (a NUL breaks jsonb) and lone surrogates never reach storage. */
+const clean = (value: string): string => value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").replace(/[\uD800-\uDFFF]/g, "");
+
 const cleanAddress = (value: string | undefined) => extractEmailAddresses((value ?? "").replace(/^\s*[a-z0-9-]+\s*;\s*/i, ""))[0] ?? null;
-const cleanDiagnostic = (value: string | undefined) => (value ? value.replace(/^\s*smtp\s*;\s*/i, "").slice(0, MAX_DIAGNOSTIC) : null);
+const cleanDiagnostic = (value: string | undefined) => (value ? clean(value.replace(/^\s*smtp\s*;\s*/i, "")).slice(0, MAX_DIAGNOSTIC) : null);
 
 export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
   const top = fieldsOfHeaders(message.payload?.headers);
@@ -129,9 +141,9 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
     const address = cleanAddress(block.get("final-recipient")) ?? cleanAddress(block.get("original-recipient"));
     if (!address) continue;
     const statusCode = STATUS_CODE.exec(block.get("status") ?? "")?.[1] ?? null;
-    const severity = severityOf(block.get("action")?.toLowerCase(), statusCode, false);
-    if (!severity) continue;
     const diagnostic = cleanDiagnostic(block.get("diagnostic-code"));
+    const severity = severityOf(block.get("action")?.toLowerCase(), statusCode, diagnostic);
+    if (!severity) continue;
     const originalAddress = cleanAddress(block.get("original-recipient"));
     add({ address, originalAddress: originalAddress && originalAddress !== address ? originalAddress : null, severity, statusCode, reasonKey: bounceReasonKey(statusCode, diagnostic), diagnostic });
   }
@@ -142,8 +154,9 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
     const text = `${plainText}\n${message.payload?.body?.data ? decode(message.payload.body.data) : ""}`;
     const statusCode = STATUS_CODE.exec(text)?.[1] ?? null;
     const delayed = /\(delay\)|delayed|warning/i.test(top.get("subject") ?? "");
-    const severity = severityOf(delayed ? "delayed" : undefined, statusCode, true);
-    const diagnostic = statusCode ? (new RegExp(`.{0,60}${statusCode.replace(/\./g, "\\.")}.{0,120}`).exec(text)?.[0].trim() ?? null) : null;
+    const snippet = statusCode ? (new RegExp(`.{0,60}${statusCode.replace(/\./g, "\\.")}.{0,120}`).exec(text)?.[0].trim() ?? "") : text.trim().slice(0, MAX_DIAGNOSTIC);
+    const diagnostic = snippet ? clean(snippet).slice(0, MAX_DIAGNOSTIC) : null;
+    const severity = severityOf(delayed ? "delayed" : "failed", statusCode, diagnostic);
     if (severity) for (const address of failed) add({ address, originalAddress: null, severity, statusCode, reasonKey: bounceReasonKey(statusCode, diagnostic), diagnostic });
   }
   if (recipients.length === 0) return null;
@@ -158,9 +171,11 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
   return {
     dsnGmailMessageId: message.id,
     gmailThreadId: message.threadId,
-    occurredAt: new Date(Number(message.internalDate)),
+    // A missing internalDate must not throw later at toISOString(): fall back to "now" (the sync time).
+    occurredAt: Number.isFinite(Number(message.internalDate)) && message.internalDate !== "" ? new Date(Number(message.internalDate)) : new Date(),
+    fromAddress: extractEmailAddresses(top.get("from"))[0] ?? "",
     linkRfcIds,
-    originalSubject: originals.map((o) => o.get("subject")).find((s) => !!s) ?? null,
+    originalSubject: clean(originals.map((o) => o.get("subject")).find((s) => !!s) ?? "") || null,
     recipients,
   };
 }

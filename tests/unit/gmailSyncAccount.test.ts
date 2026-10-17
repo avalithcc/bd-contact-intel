@@ -339,9 +339,28 @@ test("an out-of-office is not handed to recordBounces", async () => {
   assert.equal(called, false);
 });
 
-test("when recording a bounce fails the cursor does not advance, so the next tick retries the same window", async () => {
+test("a data error while recording a bounce never holds the cursor: one bad notification must not stick the sync", async () => {
   const client = fakeClient({ historyPages: historyFor("dsn-1"), messagesById: { "dsn-1": gmailHard511() } });
-  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async () => { throw new Error("db down"); } }));
+  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async () => { throw new Error('unsupported Unicode escape sequence'); } }));
   assert.equal(result.status, "ok");
+  assert.equal(result.newHistoryId, "400");
+});
+
+test("only a connection-class failure holds the cursor, so an outage is retried", async () => {
+  const client = fakeClient({ historyPages: historyFor("dsn-1"), messagesById: { "dsn-1": gmailHard511() } });
+  const outage = Object.assign(new Error("connection terminated"), { code: "08006" });
+  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async () => { throw outage; } }));
   assert.equal(result.newHistoryId, null);
+});
+
+test("a parser throw on one notification does not abort the sync: the others are recorded and the cursor advances", async () => {
+  const poisoned = gmailHard511({ id: "dsn-bad" });
+  // A non-string body makes the delivery-status reader throw; parseGmailMessage never decodes that part.
+  poisoned.payload!.parts![1]!.body = { data: 123 as unknown as string };
+  const client = fakeClient({ historyPages: historyFor("dsn-bad", "dsn-ok"), messagesById: { "dsn-bad": poisoned, "dsn-ok": gmailHard511({ id: "dsn-ok" }) } });
+  const seen: ParsedBounce[][] = [];
+  const result = await syncAccountIncremental(baseDeps({ client, recordBounces: async (b) => void seen.push([...b]) }));
+  assert.equal(result.status, "ok");
+  assert.equal(result.newHistoryId, "400");
+  assert.deepEqual(seen.map((b) => b.map((x) => x.dsnGmailMessageId)), [["dsn-ok"]]);
 });
