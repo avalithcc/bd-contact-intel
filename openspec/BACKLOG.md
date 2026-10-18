@@ -452,10 +452,14 @@ means the HTTP call was made, not that the sync succeeded; and a timestamp that
 advances on failure is worse than none.
 
 Still open:
-- **No fleet view for the owner.** #292 deliberately did not build an admin
-  overview of every BD's sync health (PR "Notes for the owner"). The banner
-  and alert are per-BD, so — inferred from the PR, not exercised — nothing
-  tells the owner when a *different* BD's sync dies.
+- ~~**No fleet view for the owner.**~~ **Shipped 2026-10-18** (`49fa5b75`):
+  `/admin/gmail` ("Estado de Gmail") lists every BD's connection, sync health,
+  last email sent or received, and hard/soft bounces, with per-column hover
+  tooltips (`src/components/Tooltip.tsx`). Admins can send an audited
+  connection reminder (`src/lib/gmail/manualReminder.ts`), and the sidebar
+  shows how many BDs need attention (`src/lib/gmail/fleetAttention.ts`).
+  Migration 0052 (`email_message (bd_id, sent_at DESC)`) applied to prod
+  2026-10-18.
 - Mariel's Gmail connection: **resolved** — `connected` since 2026-10-01 13:02
   UTC with both scopes. (Corrected 2026-10-01: this entry said she could not
   connect, rejected with `Error 403: org_internal` (2026-09-30), because the
