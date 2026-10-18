@@ -17,6 +17,7 @@
     "test:db": "npx tsx --test tests/db/**/*.test.ts",
     "test:unit": "npx tsx --test tests/unit/**/*.test.ts",
     "test:e2e": "playwright test",
+    "smoke": "DATABASE_URL=postgres://localhost:5432/bd_contact_intel_e2e playwright test tests/e2e/smoke.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
