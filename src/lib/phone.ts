@@ -12,6 +12,12 @@
  * total (rejects obvious non-numbers like a 3-digit extension typo without
  * being so strict it rejects a real short-country-code international
  * number).
+ *
+ * Normalization to E.164 does NOT live here: it needs libphonenumber's full
+ * metadata, which must stay out of the client bundle this file is imported
+ * into. See src/lib/phoneNormalize.ts (server-only). The "no reformatting"
+ * notes below describe DISPLAY: the stored value is already E.164 where it
+ * could be normalized, and is shown as stored.
  */
 
 const ALLOWED_CHARS_RE = /^\+?[0-9 ()-]+$/;
@@ -32,7 +38,7 @@ export function isValidPhoneFormat(raw: string): boolean {
   return countDigits(trimmed) >= MIN_DIGITS;
 }
 
-/** Trims `raw`, preserving the entered format otherwise — no reformatting,
+/** Trims `raw`, preserving the stored format — no display reformatting,
  * so the BD's own entry (e.g. "011 4123-4567" vs "+54 11 4123-4567") is what
  * renders back. */
 export function formatPhoneForDisplay(raw: string): string {
