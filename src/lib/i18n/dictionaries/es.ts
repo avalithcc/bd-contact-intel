@@ -764,6 +764,7 @@ export const es: typeof en = {
     errorNotFound: "No se encontró este contacto.",
     errorMerged: "Este contacto fue fusionado con otro. Abrir el contacto vigente.",
     errorInvalidEmail: "Ese valor no parece un correo electrónico válido.",
+    errorMultipleRecipients: "Solo se puede enviar a un destinatario: este correo tiene varias direcciones.",
     errorInvalidPhone: "Ese valor no parece un número de teléfono válido.",
     errorInvalidProfileKey: "Tiene que ser el enlace de un perfil personal de linkedin.com (linkedin.com/in/…).",
     errorProfileKeyTaken: "Ese perfil ya pertenece a otro contacto. No se puede repetir en dos contactos.",

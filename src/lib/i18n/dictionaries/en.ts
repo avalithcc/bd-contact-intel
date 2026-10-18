@@ -839,6 +839,7 @@ export const en = {
     errorNotFound: "This contact could not be found.",
     errorMerged: "This contact was merged into another one. Open the current contact.",
     errorInvalidEmail: "That doesn't look like a valid email address.",
+    errorMultipleRecipients: "Only one recipient is allowed: this email has several addresses.",
     errorInvalidPhone: "That doesn't look like a valid phone number.",
     errorInvalidProfileKey: "It has to be the link of a personal linkedin.com profile (linkedin.com/in/…).",
     errorProfileKeyTaken: "That profile already belongs to another contact. It can't be on two contacts.",

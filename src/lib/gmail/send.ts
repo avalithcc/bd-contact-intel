@@ -7,6 +7,7 @@ import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { revalidatePath } from "next/cache";
 import { recordSentEmail } from "@/lib/gmail/sentEmailQueries";
 import { readSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
+import { assertSingleRecipient } from "@/lib/gmail/recipient";
 import { assertSafeExtraHeader, assertSafeHeaderValue, buildSendPayload, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
 
 // Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
@@ -36,6 +37,7 @@ type EmailAccountRow = typeof emailAccount.$inferSelect;
 // Fail fast on the untrusted recipient, before any DB read or token refresh.
 function assertSafeSendInput({ to, reply, extraHeaders }: SendGmailBody) {
   assertSafeHeaderValue("To", to);
+  assertSingleRecipient(to);
   for (const line of extraHeaders ?? []) assertSafeExtraHeader(line);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);

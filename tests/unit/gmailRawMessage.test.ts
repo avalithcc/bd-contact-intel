@@ -20,7 +20,7 @@ function parseEntity(entity: string): DecodedPart {
   const idx = entity.indexOf("\r\n\r\n");
   assert.notEqual(idx, -1, "entity must separate headers from body with CRLF CRLF");
   const headers: Record<string, string> = {};
-  for (const line of entity.slice(0, idx).split("\r\n")) {
+  for (const line of entity.slice(0, idx).replace(/\r\n[ \t]+/g, " ").split("\r\n")) {
     const colon = line.indexOf(":");
     headers[line.slice(0, colon).toLowerCase()] = line.slice(colon + 1).trim();
   }
@@ -29,9 +29,16 @@ function parseEntity(entity: string): DecodedPart {
 }
 
 function decodeSubject(value: string): string {
-  const m = /^=\?UTF-8\?B\?(.+)\?=$/.exec(value);
-  assert.ok(m, "subject must be an RFC 2047 base64 encoded-word");
-  return Buffer.from(m[1], "base64").toString("utf8");
+  // Header values arrive unfolded (parseEntity), so several encoded-words are separated by one space.
+  const words = value.split(" ").filter(Boolean);
+  assert.ok(words.length > 0);
+  return words
+    .map((w) => {
+      const m = /^=\?UTF-8\?B\?(.*)\?=$/.exec(w);
+      assert.ok(m, "subject must be RFC 2047 base64 encoded-words");
+      return Buffer.from(m[1], "base64").toString("utf8");
+    })
+    .join("");
 }
 
 function decode(raw: string) {
@@ -195,11 +202,11 @@ for (const [name, bad] of BAD_VALUES) {
 }
 
 test("header guard: a normal address, and a display-name form, still work", () => {
-  for (const addr of ["lead@example.com", '"Doe, Jane" <jane@example.com>']) {
-    const d = decode(buildRawMessage(addr, addr, "S", { body: "x" }));
-    assert.equal(d.top.headers.to, addr);
-    assert.equal(d.top.headers.from, addr);
-  }
+  // From may carry a display name (it is the account's own); To is always one bare address.
+  const from = '"Doe, Jane" <jane@example.com>';
+  const d = decode(buildRawMessage(from, "lead@example.com", "S", { body: "x" }));
+  assert.equal(d.top.headers.to, "lead@example.com");
+  assert.equal(d.top.headers.from, from);
 });
 
 test("header guard: a subject with CRLF is neutralised by base64, not rejected", () => {
@@ -207,7 +214,7 @@ test("header guard: a subject with CRLF is neutralised by base64, not rejected",
   const d = decode(buildRawMessage(FROM, TO, subject, { body: "x" }));
   assert.equal(decodeSubject(d.top.headers.subject), subject);
   assert.equal(d.top.headers.bcc, undefined);
-  assert.match(d.top.headers.subject, /^=\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=$/);
+  assert.match(d.top.headers.subject, /^=\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=( =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=)*$/);
 });
 
 // ---- Hidden content must not leak into the text/plain alternative ----

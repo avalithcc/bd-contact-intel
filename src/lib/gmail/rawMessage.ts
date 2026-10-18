@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { htmlToOutboundText } from "@/lib/gmail/outboundText";
+import { assertSingleRecipient } from "@/lib/gmail/recipient";
+import { foldSubjectHeader } from "@/lib/gmail/subjectEncoding";
 
 /**
  * Builds the RFC 5322 message handed to the Gmail API `raw` field.
@@ -139,6 +141,7 @@ export function buildRawMessage(
 ): string {
   assertSafeHeaderValue("From", from);
   assertSafeHeaderValue("To", to);
+  assertSingleRecipient(to);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
@@ -148,7 +151,7 @@ export function buildRawMessage(
   const threading = reply
     ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
     : [];
-  const envelope = [`From: ${from}`, `To: ${to}`, `Subject: ${encodedSubject}`, ...threading, ...extraHeaders, "MIME-Version: 1.0"];
+  const envelope = [`From: ${from}`, `To: ${to}`, foldSubjectHeader(subject), ...threading, ...extraHeaders, "MIME-Version: 1.0"];
 
   let message: string;
   if (content.bodyHtml === undefined) {

@@ -86,6 +86,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorNotFound;
     case "invalid_email":
       return l.errorInvalidEmail;
+    case "multiple_recipients":
+      return l.errorMultipleRecipients;
     case "invalid_phone":
       return l.errorInvalidPhone;
     case "invalid_profile_key":

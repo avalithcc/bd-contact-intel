@@ -5,7 +5,7 @@ import { getOwnScheduled, isGmailConnected, sendScheduledNow, type EditResult } 
  * "Enviar ahora" / "Enviar igual" with the same re-validation as an edit: the stored recipient must still be one of the
  * Contact's own addresses (it may have changed since scheduling), and the mailbox must be connected.
  */
-export async function sendScheduledNowChecked(input: { id: string; bdId: string }): Promise<EditResult | { ok: false; reason: "gmail_not_connected" | "invalid_email" | "schedule_recipient_invalid" }> {
+export async function sendScheduledNowChecked(input: { id: string; bdId: string }): Promise<EditResult | { ok: false; reason: "gmail_not_connected" | "invalid_email" | "multiple_recipients" | "schedule_recipient_invalid" }> {
   const own = await getOwnScheduled(input.id, input.bdId);
   if (!own) return { ok: false, reason: "not_found" };
   const recipient = await checkRecipient(own.personId, own.toAddress);

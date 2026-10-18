@@ -35,6 +35,8 @@ export type ContactActionErrorReason =
   | "not_found"
   | "merged"
   | "invalid_email"
+  // `To` holds several addresses (comma, semicolon or space separated); the product sends to exactly one.
+  | "multiple_recipients"
   | "invalid_phone"
   | "invalid_profile_key"
   // The LinkedIn profile already belongs to another contact; the failure also
@@ -149,6 +151,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof InvalidContactTypeError) return "invalid_contact_type";
   if (err instanceof PropertyNotEditableError) return "not_editable";
   if (err instanceof GmailSendError) {
+    if (err.kind === "invalid_recipient") return err.header === "multiple" ? "multiple_recipients" : "invalid_email";
     if (err.kind === "not_connected") return "gmail_not_connected";
     if (err.kind === "reauth_required") return "gmail_reauth";
     if (err.kind === "invalid_header") {

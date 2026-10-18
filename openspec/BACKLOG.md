@@ -128,8 +128,8 @@ started.
   `replySubject()` derives theirs from the thread and may legitimately return
   `"Re:"`. That left Send disabled with no visible reason, which the owner
   resolved from a mockup (`openspec/changes/email-subject-required/mockups/`)
-  in favour of a contextual warn hint (#317). Still open: the recipient address
-  shape is not validated (`sendContactEmailAction`).
+  in favour of a contextual warn hint (#317). The recipient address
+  shape is now validated for every send (2026-10-18, `src/lib/gmail/recipient.ts`).
 - Screenshot hygiene (#315, 2026-10-03). `screenshoots/` (95 files, 14 MB) and
   `bugs_ss/` were untracked and in no `.gitignore`. Now the directory contents
   are ignored except the 16 shots an openspec checklist actually cites (1.65 MB),
@@ -506,12 +506,16 @@ Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
   to a synced thread from the contact record (`sendThreadReplyAction`, planned by
   `planThreadReply`, `contacts/actions.ts:409-427`). A NEW email still starts a
   new thread, as it should.
-- Single `to` only — no CC, no BCC, no attachments. A multi-recipient `To`
-  string (`a@x.com, b@y.com`) **passes** the header-injection guard
-  (`assertSafeHeaderValue` rejects only CR, LF and NUL); #271 recorded this as
-  pre-existing and left it.
-- Long subjects are one RFC 2047 encoded-word (over 75 characters; #271 known
-  gap).
+- Single `to` only — no CC, no BCC, no attachments. ~~A multi-recipient `To`
+  string passes the guard~~ — fixed 2026-10-18: `buildRawMessage` and
+  `assertSafeSendInput` call `assertSingleRecipient`, so every path (new email,
+  thread reply, scheduled, sequences) rejects a list or a malformed address
+  (`invalid_recipient`; Spanish copy via `multiple_recipients` / `invalid_email`).
+  Consequence: replying to a synced thread whose last message went to several
+  people now fails with "varias direcciones"; reply from Gmail.
+- ~~Long subjects are one RFC 2047 encoded-word~~ — fixed 2026-10-18
+  (`subjectEncoding.ts`): folded into words of at most 75 chars, cut on
+  code-point boundaries.
 
 Open and done:
 - **HTML send — done (#271).** `multipart/alternative`, with the plain-text

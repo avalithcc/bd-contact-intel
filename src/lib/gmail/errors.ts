@@ -54,7 +54,9 @@ export type GmailSendErrorKind =
   | "send_failed"
   // A raw-interpolated header value (To/From) contained CR, LF or NUL —
   // header-injection attempt or corrupt imported data. Rejected, never sanitised.
-  | "invalid_header";
+  | "invalid_header"
+  // `To` is not exactly one valid bare address; `header` carries "malformed" | "multiple" (gmail/recipient.ts).
+  | "invalid_recipient";
 
 export class GmailSendError extends Error {
   constructor(
