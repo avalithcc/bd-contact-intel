@@ -2511,6 +2511,7 @@ export const en = {
     errorSend: "The reminder could not be sent. Try again.",
     errorAlreadySent: "A reminder was already sent to {name} today.",
     errorNotEligible: "{name} no longer needs a reminder.",
+    errorAuditFailed: "The reminder was sent, but it was not recorded. Check the log before sending it again.",
     errorGeneric: "The reminder could not be sent. Try again.",
     alertReconnectTitle: "{name} · Reconnect",
     alertReconnectSince: "Their Gmail has not synced since {since}.",

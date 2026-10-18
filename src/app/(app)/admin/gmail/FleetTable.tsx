@@ -195,6 +195,7 @@ function Row({ row, d, now, locale }: { row: FleetRow; d: FleetDict; now: Date; 
               errorSend: d.errorSend,
               errorAlreadySent: d.errorAlreadySent,
               errorNotEligible: d.errorNotEligible,
+              errorAuditFailed: d.errorAuditFailed,
             }}
           />
         )}

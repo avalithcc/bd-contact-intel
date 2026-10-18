@@ -19,7 +19,17 @@ export interface GmailFleetAccountJson {
 
 const toDate = (iso: string | null): Date | null => (iso ? new Date(iso) : null);
 
+/** Never throws: the shell calls this on every admin page, so bad data must cost a pill, not the page. */
 export function gmailAttentionCount(rows: readonly GmailFleetAccountJson[] | null | undefined, now: Date): number {
+  try {
+    return countRows(rows, now);
+  } catch (error) {
+    console.error("[gmail-fleet] could not classify the Gmail accounts for the sidebar pill; showing none", error);
+    return 0;
+  }
+}
+
+function countRows(rows: readonly GmailFleetAccountJson[] | null | undefined, now: Date): number {
   const accounts = (rows ?? []).map(
     (r): FleetAccount | null =>
       r.has

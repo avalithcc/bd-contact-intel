@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getSiteUrl } from "@/lib/config/siteUrl";
 import { sendManualReminder, type ManualReminderResult } from "@/lib/gmail/manualReminder";
-import { claimGmailReminderManual, getReminderRows, markGmailReminderFailed, markGmailReminderSentAudited } from "@/lib/gmail/reminderQueries";
+import { claimGmailReminderManual, getReminderRows, markGmailReminderFailed, markGmailReminderSent, markGmailReminderSentAudited } from "@/lib/gmail/reminderQueries";
 import { sendDigestEmail } from "@/lib/mailer/smtpMailer";
 import { isUuid } from "@/lib/uuid";
 
@@ -23,9 +23,10 @@ export async function sendGmailReminderAction(bdId: string): Promise<ManualRemin
       send: sendDigestEmail,
       claim: claimGmailReminderManual,
       markSentAudited: (claimId, audit) => markGmailReminderSentAudited(claimId, audit),
+      markSent: (claimId) => markGmailReminderSent(claimId),
       markFailed: markGmailReminderFailed,
     },
   );
-  if (result.ok) revalidatePath("/admin/gmail");
+  if (result.ok || result.reason === "audit_failed") revalidatePath("/admin/gmail");
   return result;
 }

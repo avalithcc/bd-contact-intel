@@ -27,12 +27,16 @@ export interface ManualReminderDeps {
   claim(bdId: string, sentOn: string, reminderNumber: number): Promise<string | null>;
   /** Marks the claim sent AND writes the audit row, atomically. */
   markSentAudited(claimId: string, audit: ManualReminderAudit): Promise<void>;
+  /** Marks the claim sent without the audit row: the fallback when the audited step fails after the mail went out. */
+  markSent(claimId: string): Promise<void>;
   markFailed(claimId: string, sanitizedError: string): Promise<void>;
 }
 
 export type ManualReminderResult =
   | { ok: true; number: number }
-  | { ok: false; reason: "not_found" | "not_eligible" | "already_sent_today" | "send_failed" };
+  | { ok: false; reason: "not_found" | "not_eligible" | "already_sent_today" | "send_failed" }
+  /** The mail WAS sent but its audit row could not be written: not a success, and the admin must be told. */
+  | { ok: false; reason: "audit_failed"; number: number };
 
 export async function sendManualReminder(
   input: { admin: { id: string; role: string }; bdId: string; now: Date; siteUrl: string },
@@ -43,6 +47,7 @@ export async function sendManualReminder(
   if (!rows.some((r) => r.rm_bd_id === input.bdId)) return { ok: false, reason: "not_found" };
 
   let claimed: { number: number; sentOn: string } | null = null;
+  let auditFailed = false;
   const outcome = await runGmailReminders(
     { rows, now: input.now, siteUrl: input.siteUrl, dryRun: false, onlyBdId: input.bdId },
     {
@@ -52,13 +57,29 @@ export async function sendManualReminder(
         if (id) claimed = { number, sentOn };
         return id;
       },
-      markSent: (claimId) => deps.markSentAudited(claimId, { actorBdId: input.admin.id, bdId: input.bdId, number: claimed!.number, sentOn: claimed!.sentOn }),
+      markSent: async (claimId) => {
+        const audit = { actorBdId: input.admin.id, bdId: input.bdId, number: claimed!.number, sentOn: claimed!.sentOn };
+        try {
+          await deps.markSentAudited(claimId, audit);
+        } catch (error) {
+          // The mail is out and cannot be recalled. The audited step is one transaction, so nothing was written: still record
+          // the claim as sent, or tomorrow's cron would send the same reminder number again.
+          auditFailed = true;
+          console.error("[gmail-reminders] manual reminder SENT but the audit row could not be written; check audit_log before resending", JSON.stringify({ bdId: input.bdId, actorBdId: input.admin.id, number: audit.number, sentOn: audit.sentOn }), error);
+          try {
+            await deps.markSent(claimId);
+          } catch (markError) {
+            console.error("[gmail-reminders] manual reminder SENT but its claim could not be marked sent either; the cron may resend this number", JSON.stringify({ bdId: input.bdId, number: audit.number }), markError);
+          }
+        }
+      },
       markFailed: deps.markFailed,
     },
   );
 
   const mine = outcome.results.filter((r) => r.bdId === input.bdId);
   const delivered = mine.find((r) => r.sent && r.number !== undefined);
+  if (delivered && auditFailed) return { ok: false, reason: "audit_failed", number: delivered.number! };
   if (delivered) return { ok: true, number: delivered.number! };
   if (mine.some((r) => r.skippedReason === "already_claimed")) return { ok: false, reason: "already_sent_today" };
   if (mine.some((r) => r.skippedReason === "send_failed")) return { ok: false, reason: "send_failed" };

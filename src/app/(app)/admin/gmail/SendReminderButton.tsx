@@ -12,6 +12,7 @@ export interface SendReminderLabels {
   errorSend: string;
   errorAlreadySent: string;
   errorNotEligible: string;
+  errorAuditFailed: string;
 }
 
 const fill = (template: string, values: Record<string, string | number>) => template.replace(/\{(\w+)\}/g, (_, k: string) => String(values[k] ?? ""));
@@ -33,6 +34,7 @@ export function SendReminderButton({ bdId, name, labels: l }: { bdId: string; na
         result = { ok: false, reason: "send_failed" };
       }
       if (result.ok) showToast(fill(l.toastSent, { name, n: result.number }));
+      else if (result.reason === "audit_failed") showToast(fill(l.errorAuditFailed, { name, n: result.number }), "error");
       else if (result.reason === "already_sent_today") showToast(fill(l.errorAlreadySent, { name }), "error");
       else if (result.reason === "send_failed") showToast(l.errorSend, "error");
       else showToast(fill(l.errorNotEligible, { name }), "error");

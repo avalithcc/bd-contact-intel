@@ -80,6 +80,7 @@ function manualFakes(rows: ReminderRow[], over: Partial<ManualReminderDeps> = {}
       marks.push(`sent:${claimId}`);
       audits.push(audit);
     },
+    markSent: async (claimId) => void marks.push(`sent-unaudited:${claimId}`),
     markFailed: async (claimId, err) => void marks.push(`failed:${claimId}:${err}`),
     ...over,
   };
@@ -122,4 +123,45 @@ test("a failed send is marked failed, reported, and never audited", async () => 
   assert.equal(f.audits.length, 0);
   assert.equal(f.marks.length, 1);
   assert.match(f.marks[0]!, /^failed:claim-a:/);
+});
+
+test("when the mail went out but the audit could not be written, the result says so, the claim is still marked sent (no resend tomorrow) and it is logged loudly", async () => {
+  const logged: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void logged.push(args);
+  try {
+    const f = manualFakes([admin, row("a")], {
+      markSentAudited: async () => {
+        throw new Error("audit insert failed");
+      },
+    });
+    const r = await sendManualReminder({ admin: ADMIN, bdId: "a", now: NOW, siteUrl: SITE }, f.deps);
+    assert.deepEqual(r, { ok: false, reason: "audit_failed", number: 1 });
+    assert.equal(f.sent.length, 1, "the mail did go out");
+    assert.deepEqual(f.marks, ["sent-unaudited:claim-a"], "the series must count it");
+    const line = logged.map((a) => a.map(String).join(" ")).join("\n");
+    assert.match(line, /audit/i);
+    assert.match(line, /"bdId":"a"/);
+    assert.match(line, /"number":1/);
+  } finally {
+    console.error = original;
+  }
+});
+
+test("if even the fallback mark fails the result is still audit_failed, never success", async () => {
+  const original = console.error;
+  console.error = () => undefined;
+  try {
+    const f = manualFakes([admin, row("a")], {
+      markSentAudited: async () => {
+        throw new Error("db down");
+      },
+      markSent: async () => {
+        throw new Error("db down");
+      },
+    });
+    assert.deepEqual(await sendManualReminder({ admin: ADMIN, bdId: "a", now: NOW, siteUrl: SITE }, f.deps), { ok: false, reason: "audit_failed", number: 1 });
+  } finally {
+    console.error = original;
+  }
 });

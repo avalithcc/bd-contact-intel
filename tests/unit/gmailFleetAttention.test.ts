@@ -28,3 +28,15 @@ test("a BD with no account row counts (never connected); a connection error coun
 test("it agrees with the fleet summary's idea of healthy: the same classifier decides both", () => {
   assert.equal(gmailAttentionCount([healthy, healthy], NOW), 0);
 });
+
+test("bad data never throws: the pill falls back to 0 and the error is logged", () => {
+  const original = console.error;
+  const logged: unknown[][] = [];
+  console.error = (...args: unknown[]) => void logged.push(args);
+  try {
+    assert.equal(gmailAttentionCount({ not: "an array" } as unknown as GmailFleetAccountJson[], NOW), 0);
+    assert.equal(logged.length, 1);
+  } finally {
+    console.error = original;
+  }
+});

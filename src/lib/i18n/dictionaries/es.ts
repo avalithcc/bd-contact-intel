@@ -2501,6 +2501,7 @@ export const es: typeof en = {
     errorSend: "No se pudo enviar el recordatorio. Inténtalo de nuevo.",
     errorAlreadySent: "Ya se envió un recordatorio a {name} hoy.",
     errorNotEligible: "{name} ya no necesita un recordatorio.",
+    errorAuditFailed: "El recordatorio se envió, pero no quedó registrado. Revisa el registro antes de reenviarlo.",
     errorGeneric: "No se pudo enviar el recordatorio. Inténtalo de nuevo.",
     alertReconnectTitle: "{name} · Reconectar",
     alertReconnectSince: "Su Gmail no sincroniza desde {since}.",
