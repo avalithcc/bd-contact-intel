@@ -1,15 +1,9 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 
 /**
- * Pure E.164 normalizer for `person.phone` / `person.mobile_phone`. Server-only
- * on purpose: it pulls in libphonenumber-js's full metadata (the `max` build,
- * because `isValid` must tell real ranges from look-alikes), which must not
- * reach the client bundle that imports src/lib/phone.ts.
- *
- * The contract is conservative: a value is rewritten only when the result is a
- * number libphonenumber calls VALID and nothing had to be guessed beyond the
- * documented Argentine rule. Everything else is `flagged` with a reason and
- * the caller leaves the stored text alone.
+ * Pure E.164 normalizer for `person.phone` / `person.mobile_phone`. Server-only: the `max` metadata must stay out of
+ * the client bundle that imports src/lib/phone.ts. A value is rewritten only when libphonenumber calls the result
+ * valid; everything else is `flagged` and the caller leaves the stored text alone.
  */
 
 export type PhoneColumn = "phone" | "mobilePhone";
@@ -23,27 +17,19 @@ export interface PhoneContext {
 }
 
 export type PhoneRule =
-  /** Already `+digits`: left exactly as stored. */
   | "already_e164"
-  /** `+` kept, separators removed. */
   | "separators_stripped"
-  /** Leading `00` read as `+`, separators removed. */
   | "intl_00_prefix"
-  /** Argentine 10-digit local mobile: `+549` + number. */
   | "ar_mobile_local"
-  /** Argentine 10-digit local landline: `+54` + number. */
   | "ar_phone_local"
-  /** Digits only, an obvious country code and a length that matches. */
   | "country_code_prefixed";
 
 export type PhoneFlagReason =
   | "empty"
   /** Letters, extension markers or other characters a number never has. */
   | "text_or_extension"
-  /** Two numbers in one cell. */
   | "multiple_numbers"
   | "misplaced_plus"
-  /** Fewer digits than any real number (a lone "0"). */
   | "too_few_digits"
   | "too_many_digits"
   | "invalid_number"

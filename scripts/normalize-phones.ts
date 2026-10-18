@@ -20,18 +20,19 @@
  * UPDATE ... FROM (VALUES ...) per batch and column. Each update is guarded by
  * `column = old value`, so a number a BD edited since the read is skipped, not
  * overwritten. ONE `audit_log` row (action `normalize_person_phones`) records
- * the per-rule counts, the flagged counts and `previous`: the old value keyed
- * by person id then column. `person.updated_at` is left alone (a format-only
+ * the per-rule counts, the flagged counts, `previous` (old value) and `written`
+ * (new value), both keyed by person id then column. `person.updated_at` is left alone (a format-only
  * rewrite is not an edit).
  *
  * Idempotent: a second run finds only already-E.164 values and writes nothing.
  *
- * Revert (restores exactly the columns this run changed; <audit id> is the
- * audit_log row):
- *   with a as (select metadata->'previous' as prev from audit_log where id = '<audit id>')
+ * Revert: restores the old value only where the column still holds the value
+ * this run wrote (`written`), so a number a BD edited afterwards is never
+ * overwritten. <audit id> is the audit_log row:
+ *   with a as (select metadata->'previous' as prev, metadata->'written' as wrote from audit_log where id = '<audit id>')
  *   update person p set
- *     phone = case when a.prev->p.id::text ? 'phone' then a.prev->p.id::text->>'phone' else p.phone end,
- *     mobile_phone = case when a.prev->p.id::text ? 'mobilePhone' then a.prev->p.id::text->>'mobilePhone' else p.mobile_phone end
+ *     phone = case when a.prev->p.id::text ? 'phone' and p.phone = a.wrote->p.id::text->>'phone' then a.prev->p.id::text->>'phone' else p.phone end,
+ *     mobile_phone = case when a.prev->p.id::text ? 'mobilePhone' and p.mobile_phone = a.wrote->p.id::text->>'mobilePhone' then a.prev->p.id::text->>'mobilePhone' else p.mobile_phone end
  *   from a where a.prev ? p.id::text;
  *
  * Usage (dry run is the default):
@@ -44,7 +45,7 @@ import { auditLog } from "../src/db/schema";
 import {
   newTally,
   planPhonePage,
-  previousValues,
+  valuesByPerson,
   type PersonPhoneRow,
   type PhoneChange,
   type PhoneFlag,
@@ -54,6 +55,7 @@ import {
 const BATCH_SIZE = 1000;
 const AUDIT_ACTION = "normalize_person_phones";
 const DEFAULT_FLAGGED_PER_REASON = 10;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function parseArgs(argv: string[]) {
   let execute = false;
@@ -170,6 +172,10 @@ async function main() {
     return;
   }
 
+  if (!UUID_RE.test(actor!)) throw new Error("--actor must be a bd uuid");
+  const [actorRow] = await db.execute<{ id: string }>(sql`select id::text as id from bd where id = ${actor}::uuid`);
+  if (!actorRow) throw new Error(`--actor ${actor} is not a bd row; nothing was scanned or written`);
+
   const result = await db.transaction(async (tx) => {
     const r = await scan(tx, (changes) => writeBatch(tx, changes));
     if (r.applied.length > 0) {
@@ -182,7 +188,8 @@ async function main() {
           updated: r.applied.length,
           byRule: r.tally.rules,
           flagged: r.tally.flagged,
-          previous: previousValues(r.applied),
+          previous: valuesByPerson(r.applied, "oldValue"),
+          written: valuesByPerson(r.applied, "newValue"),
         },
       });
     }

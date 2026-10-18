@@ -1,10 +1,6 @@
 import { normalizePhone, type PhoneColumn, type PhoneFlagReason, type PhoneRule } from "@/lib/phoneNormalize";
 
-/**
- * Pure planner for scripts/normalize-phones.ts. Reads rows, never mutates
- * them, and tallies into a caller-owned object so a dry run and an execute
- * share one code path.
- */
+/** Pure planner for scripts/normalize-phones.ts: never mutates its input; a dry run and an execute share it. */
 
 export const PHONE_COLUMNS: readonly PhoneColumn[] = ["phone", "mobilePhone"];
 
@@ -77,9 +73,9 @@ export function planPhonePage(rows: readonly PersonPhoneRow[], tally: PhoneTally
   return { changes, flags };
 }
 
-/** Old values keyed by person id then column: the shape stored in the audit row and read back by the revert SQL. */
-export function previousValues(changes: readonly PhoneChange[]): Record<string, Partial<Record<PhoneColumn, string>>> {
+/** Values keyed by person id then column: `oldValue` for the revert's restore, `newValue` for its "still what we wrote" guard. */
+export function valuesByPerson(changes: readonly PhoneChange[], which: "oldValue" | "newValue"): Record<string, Partial<Record<PhoneColumn, string>>> {
   const out: Record<string, Partial<Record<PhoneColumn, string>>> = {};
-  for (const c of changes) (out[c.id] ??= {})[c.column] = c.oldValue;
+  for (const c of changes) (out[c.id] ??= {})[c.column] = c[which];
   return out;
 }

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { maskPhoneShape, newTally, planPhonePage, previousValues, tallyKey, type PersonPhoneRow } from "../../src/lib/phoneNormalizeBackfill";
+import { maskPhoneShape, newTally, planPhonePage, valuesByPerson, tallyKey, type PersonPhoneRow } from "../../src/lib/phoneNormalizeBackfill";
 
 const rows = (): PersonPhoneRow[] => [
   { id: "p1", sourceKey: "dff-2026", country: null, phone: null, mobilePhone: "1155555555" },
@@ -47,10 +47,11 @@ describe("planPhonePage", () => {
   });
 });
 
-describe("previousValues and masking", () => {
+describe("valuesByPerson and masking", () => {
   it("keys old values by person id then column", () => {
     const { changes } = planPhonePage(rows(), newTally());
-    assert.deepEqual(previousValues(changes), { p1: { mobilePhone: "1155555555" }, p2: { phone: "+54 11 5555-5555" } });
+    assert.deepEqual(valuesByPerson(changes, "oldValue"), { p1: { mobilePhone: "1155555555" }, p2: { phone: "+54 11 5555-5555" } });
+    assert.deepEqual(valuesByPerson(changes, "newValue"), { p1: { mobilePhone: "+5491155555555" }, p2: { phone: "+541155555555" } });
   });
   it("masks digits and letters, keeps punctuation", () => {
     assert.equal(maskPhoneShape("+54.9.11 Ana"), "+99.9.99 aaa");

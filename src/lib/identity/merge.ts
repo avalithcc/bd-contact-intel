@@ -26,7 +26,7 @@ import { mergeProperties, mergeProperty, emailStatusRank, stickyBouncedSide, typ
 import { isFreeMailDomain, splitEmail } from "@/lib/emailPatterns";
 import { pickOwnerByLastWorked, type OwnerTouch } from "@/lib/identity/ownerRule";
 import { parseConnectedOnDate } from "@/lib/migration/connectedOn";
-import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
+import { normalizePhone, normalizePhoneForWrite } from "@/lib/phoneNormalize";
 
 // --- Row shapes (subset of src/db/schema.ts's person/personBdConnection) ---
 
@@ -827,6 +827,20 @@ export interface UnmergePlan {
 }
 
 /**
+ * "Still what the merge wrote" for a survivor field. A phone is compared through the normalizer, because the E.164
+ * backfill rewrites survivor numbers after the merge recorded the raw `after`; if either side cannot be
+ * normalized the comparison is plain equality.
+ */
+function survivorFieldUnchanged(field: string, current: PersonFieldValue, after: PersonFieldValue, survivor: MergePersonFields): boolean {
+  if (current === after) return true;
+  if ((field !== "phone" && field !== "mobilePhone") || typeof current !== "string" || typeof after !== "string") return false;
+  const ctx = { column: field, source: survivor.sourceKey, country: survivor.country } as const;
+  const a = normalizePhone(current, ctx);
+  const b = normalizePhone(after, ctx);
+  return !("flagged" in a) && !("flagged" in b) && a.value === b.value;
+}
+
+/**
  * Replays a `MergeSnapshot` in reverse (task 6.2 + fresh-review safe-unmerge
  * fix): restores the merged person's row fully (it was hidden, nothing could
  * have changed it), but only reverts a survivor field or same-BD connection
@@ -842,7 +856,7 @@ export function planUnmerge(snapshot: MergeSnapshot, context: UnmergeContext): U
   const survivorFieldsKept: FieldKept[] = [];
   for (const change of snapshot.survivorFieldChanges) {
     const current = context.currentSurvivor[change.field] as PersonFieldValue;
-    if (current === change.after) {
+    if (survivorFieldUnchanged(change.field, current, change.after as PersonFieldValue, context.currentSurvivor)) {
       survivorFieldReverts.push({ field: change.field, from: change.after, to: change.before });
     } else {
       survivorFieldsKept.push({ field: change.field, currentValue: current });

@@ -85,6 +85,18 @@ test("a carried phone shows up in survivorFieldChanges and unmerge reverts it", 
   assert.ok(un.survivorFieldReverts.some((r) => r.field === "phone" && r.to === null));
 });
 
+test("unmerge still reverts a survivor phone the E.164 backfill rewrote after the merge, and still keeps a real edit", () => {
+  const survivor = p("s");
+  const plan = planMerge(input(survivor, p("m", { phone: "+54 9 11 4590-2294" })));
+  // A snapshot written before normalize-on-write: the raw `after` the merge recorded.
+  const legacy = { ...plan.snapshot, survivorFieldChanges: plan.snapshot.survivorFieldChanges.map((c) => ({ ...c, after: "+54 9 11 4590-2294" })) };
+  const revert = (phone: string) => planUnmerge(legacy, { currentSurvivor: { ...survivor, phone }, currentSurvivorConnections: [] });
+  assert.ok(revert("+5491145902294").survivorFieldReverts.some((r) => r.field === "phone" && r.to === null));
+  const edited = revert("+5491100000000");
+  assert.equal(edited.survivorFieldReverts.some((r) => r.field === "phone"), false);
+  assert.ok(edited.survivorFieldsKept.some((k) => k.field === "phone"));
+});
+
 test("planMerge does not mutate its inputs and is repeatable", () => {
   const i = input(p("s"), p("m", { phone: "+54 9 11 4590-2294" }));
   const before = JSON.stringify(i);
