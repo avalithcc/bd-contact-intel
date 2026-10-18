@@ -90,6 +90,9 @@ started.
 
 ## Shipped
 
+- Shipped 2026-10-17: bounce detection (hard bounces only, `5.1.x`, anti-spoof
+  rules, no backfill; see **Bounce detection**). Lusha per BD shipped 2026-10-16
+  (switch + usage report at `/admin/lusha`; see **Lusha per BD**).
 - Shipped 2026-10-17: scheduled send (the Programados screen and the contact
   timeline cards), scheduled sends auto-cancelled on opt-out with a failure
   task, Lusha reveal storing both the work and the mobile phone, and new e2e
@@ -460,8 +463,8 @@ Owner asked for three things: send mail from the CRM, a per-BD HTML signature
 on outgoing mail, and open/engagement notifications "like HubSpot". All three
 turned out to share one root blocker, and the first one is already built.
 **Status 2026-10-01: the blocker is gone and two of the three are shipped**
-(HTML send #271, per-BD signature #286); threading, tracking and notifications
-are not built.
+(HTML send #271, per-BD signature #286); tracking and notifications are not
+built. (Threading shipped later: `d719cd11`, `0506459b`, checked 2026-10-18.)
 
 **What already exists.** `src/lib/gmail/send.ts#sendGmailMessage({ bdId, to,
 subject, personId, … })` — now taking either `body` (plain text) or `bodyHtml`
@@ -482,11 +485,12 @@ absent from both parts — when HTML is supplied; text-only still yields a singl
 Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
 `In-Reply-To`, `References`, `Cc`, `Bcc` or attachment handling under
 `src/lib/gmail`):
-- No `In-Reply-To`/`References` headers, so a reply from the CRM starts a NEW
-  Gmail thread instead of continuing the conversation the BD is answering.
-  This also means the sync side can log it as an unrelated message. (PR #293,
-  open and unmerged on 2026-10-01, is titled "reply to a synced email thread
-  from the contact record" — it may close this; unverified.)
+- ~~No `In-Reply-To`/`References` headers~~ — fixed (checked 2026-10-18):
+  `d719cd11` sends real replies with `In-Reply-To`, `References` and `threadId`
+  (`src/lib/gmail/rawMessage.ts:143-149`, `send.ts:41`), and `0506459b` replies
+  to a synced thread from the contact record (`sendThreadReplyAction`, planned by
+  `planThreadReply`, `contacts/actions.ts:409-427`). A NEW email still starts a
+  new thread, as it should.
 - Single `to` only — no CC, no BCC, no attachments. A multi-recipient `To`
   string (`a@x.com, b@y.com`) **passes** the header-injection guard
   (`assertSafeHeaderValue` rejects only CR, LF and NUL); #271 recorded this as
@@ -509,9 +513,9 @@ Open and done:
   "there is no column for it today — `bd` is only (`id`, `name`, `email`,
   `role`)".) Only 1 of 4 `bd` rows has one set (measured 2026-10-01): Macarena
   and Mariel have none, so their mail still goes out as single-part plain text.
-- **Threading — open.** Capture the Gmail `Message-ID` of the message being
-  replied to (the sync store already has `email_message`) and set the reply
-  headers.
+- **Threading — done** (`d719cd11`, `0506459b`; checked 2026-10-18). The reply
+  headers come from the synced `email_message` row. Not smoke-tested against a
+  real mailbox by this pass: unverified.
 - **Open and click tracking — not built** (re-checked 2026-10-01: `src/app/api`
   holds only `gmail`, `hiring`, `leads`, `signals` and `tasks`; there is no
   public pixel endpoint and no link rewriting). Needs the HTML part (now
@@ -788,10 +792,16 @@ decision on the brief (unverified).
   recommendation for both is to keep them; the free-tier terms it cites were
   not re-verified: unverified.
 
-### Bounce detection — built, awaiting owner OK
-Built on branch `bounce-detection-preview`, not merged: about 735 code lines,
-over the 400-line budget, so it needs the owner's OK. Known trade-offs: an
-Exchange/M365 `550 5.4.1` stays a soft bounce; NDRs from
+### Bounce detection — shipped 2026-10-17
+Merged to `main` 2026-10-17 (`318282aa`..`37b28107`, plus the record/list/timeline
+display in `60083224`). Gmail sync reads delivery notifications
+(`src/lib/gmail/parseBounce.ts`, `bounceQueries.ts`), treats only bad-address
+codes (`5.1.x`) and explicit unknown-user text as a HARD bounce, applies the
+anti-spoof rules (a system sender, our own Message-ID referenced, a null
+Return-Path tied to the sender host), and stops sending to the dead address.
+The bounced email shows on the contact record, in the list and in the timeline
+(`BounceTimelineCard.tsx`). Still true by design, so still open as trade-offs:
+an Exchange/M365 `550 5.4.1` stays a soft bounce; NDRs from
 `MicrosoftExchange…@tenant` senders are ignored; there is no backfill of
 historical bounces.
 
@@ -835,9 +845,22 @@ The shape, which had never been seen:
    mobile number, and the type is compared case-insensitively (`da42b3a8`,
    `b9d4b84d`).
 
-`countryIso2` is also discarded; it would be useful for formatting.
+`countryIso2` is also discarded; it would be useful for formatting. (Re-checked
+2026-10-18: `rg countryIso2 src` finds nothing, so it is still not stored. The
+`doNotCall` flag IS now read: `src/lib/lusha/parse.ts:247`, `doNotCallDb.ts`,
+`doNotCallWarning.ts`, so finding 1's "nothing reads it" is out of date.)
 
-### Lusha per BD: enable/disable from admin, and a consumption report
+### Lusha per BD: enable/disable from admin, and a consumption report — shipped 2026-10-16, cap still global
+
+**Status 2026-10-18 (checked in code): the switch and the consumption report
+are both shipped** (merge `2d517df6`, "lusha-per-bd"). `bd.lusha_enabled`
+(migration `0047`; existing BDs kept access, new BDs default to false) is
+flipped from `/admin/lusha` (`LushaSwitch.tsx`, `setLushaEnabled` in
+`src/lib/lusha/adminDb.ts`, written together with an `audit_log` row). The same
+screen holds the per-BD usage report by week/month/quarter
+(`src/lib/lusha/usageReport.ts`). **Still open:** the daily cap is still the
+global module constant (`src/lib/lusha/cap.ts`); a per-BD cap was never decided.
+The original brief follows.
 
 Owner decision, 2026-10-15: **a new BD starts DISABLED.** Access to a paid
 endpoint is granted deliberately, never inherited by existing by default.
@@ -1729,9 +1752,18 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-17
 - The e2e login setup times out on a cold dev server (flaky).
-- `email_account.reconnect_banner_dismissed_at` is unused.
+- `email_account.reconnect_banner_dismissed_at` is unused. (Checked 2026-10-18:
+  only declared, `src/db/schema.ts:1411`, and created/retyped by migrations
+  0027 and 0033; nothing in `src/` reads or writes it, and 0 production rows
+  have it set.)
 - `listAllSequences` has no limit.
-- The role-group backfill has not been run.
+- ~~The role-group backfill has not been run.~~ Wrong as written (checked
+  2026-10-18): `scripts/backfill-person-role-groups.ts` has been executed 4
+  times (4 `audit_log` rows `backfill_person_role_groups`, last 2026-10-02
+  14:12 UTC), and 27,737 of 27,802 persons have a `role_group`; the
+  65 nulls all have no job title. Whether the stored groups still
+  match today's `classifyPosition` is unverified; the legacy
+  `scripts/backfill-role-groups.ts` targets `contact` only.
 - Split contact groups do not appear in the Duplicados queue.
 - There is no lint script, and unused imports are not caught.
 
