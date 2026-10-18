@@ -12,6 +12,7 @@
 import { and, asc, desc, eq, exists, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
+import { phoneSearchCondition } from "@/lib/search/phoneCondition";
 import { activity, bd, company, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
@@ -163,7 +164,11 @@ export function searchCondition(q: string) {
       termContainsSql(person.email, token),
     ),
   );
-  return and(...tokenConditions);
+  const nameAndEmail = and(...tokenConditions);
+  // A digits-only query (any local or international phone form) also matches person.phone / mobile_phone. The whole
+  // `q` is parsed, not the tokens: "11 5555 5555" is one number, not three words.
+  const phone = phoneSearchCondition(q);
+  return phone ? or(nameAndEmail, phone) : nameAndEmail;
 }
 
 export interface ContactListRow {
