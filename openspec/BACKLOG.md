@@ -130,7 +130,7 @@ started.
   written; why (overwritten, merged away) was not investigated: unverified.
   Hunter stage 2 (paid lookup) stays deferred — a cost/deliverability call for
   the owner (unverified here: it is a decision, not something the code or data
-  can confirm).
+  can confirm). Owner decision 2026-10-18: not now; stays TODO.
 - Default pipeline stage: 14,255 companies backfilled — 2 `won` / 831
   `qualified` / 13,422 `prospect` (#205); new companies now default to
   `prospect`. (Corrected 2026-10-01: those are the backfill-time figures.
@@ -526,10 +526,10 @@ Open and done:
   a human reading anything, and a recipient who blocks images never fires one.
   HubSpot lives with the same imprecision. Decide up front whether an
   approximate signal is worth a tracking pixel on mail sent over a BD's own
-  address, and what it does to deliverability.
+  address, and what it does to deliverability. Owner decision 2026-10-18: deferred; stays TODO.
 - **Notifications — not specified, not built.** Where does an open surface —
   the contact timeline, a badge, the daily digest that already exists? Blocked
-  on the tracking decision above.
+  on the tracking decision above. Owner decision 2026-10-18: deferred together with tracking; stays TODO.
 
 ## Layer 3 — the pipeline nobody is using yet
 
@@ -640,6 +640,10 @@ to be answered first — and it cannot be answered by digits alone, since a
 The hotel import adds the opposite problem: numbers that arrive with a dial
 code which disagrees with the contact's country — see **Known defects →
 hotel-phone-dial-codes**.
+Owner decision 2026-10-18: normalization to E.164 is APPROVED; dry-run plan
+measured 2026-10-18 (~2,074 values strippable to +digits without inference, ~890
+DFF 10-digit mobiles need an Argentina assumption pending owner OK).
+Implementation pending that OK.
 
 Output (done): a decision brief in `openspec/decisions/` covering the three
 options with real pricing, the recording/consent constraint, what changes in
@@ -849,6 +853,8 @@ The shape, which had never been seen:
 2026-10-18: `rg countryIso2 src` finds nothing, so it is still not stored. The
 `doNotCall` flag IS now read: `src/lib/lusha/parse.ts:247`, `doNotCallDb.ts`,
 `doNotCallWarning.ts`, so finding 1's "nothing reads it" is out of date.)
+Owner decision 2026-10-18: keep the current behaviour for `doNotCall` (warning only,
+no block).
 
 ### Lusha per BD: enable/disable from admin, and a consumption report — shipped 2026-10-16, cap still global
 
@@ -860,6 +866,7 @@ flipped from `/admin/lusha` (`LushaSwitch.tsx`, `setLushaEnabled` in
 screen holds the per-BD usage report by week/month/quarter
 (`src/lib/lusha/usageReport.ts`). **Still open:** the daily cap is still the
 global module constant (`src/lib/lusha/cap.ts`); a per-BD cap was never decided.
+Owner decision 2026-10-18: the daily cap stays global.
 The original brief follows.
 
 Owner decision, 2026-10-15: **a new BD starts DISABLED.** Access to a paid
@@ -967,7 +974,8 @@ what the owner would see).
   persons) whose email cannot be split reliably (`gusoliva@`,
   `maria.laura.fantoni@`, digits, initials), measured 2026-10-01. (Corrected
   2026-10-01: this said 233, "not re-verified this pass — no database access".)
-  Needs another source (LinkedIn, enrichment) or a BD.
+  Needs another source (LinkedIn, enrichment) or a BD. Owner decision 2026-10-18: deferred, together
+  with the 244 duplicate pairs, for a joint human review later; stays TODO.
 - Duplicate pairs open in `/admin/duplicates` — see **duplicates queue**
   below; the "11 pairs" figure recorded here previously is stale (see that
   entry for why and for the current count).
@@ -989,6 +997,8 @@ Found by the launch-readiness audit (2026-09-30), fixed and merged the same
 day (#247) — see **Shipped** above for the three bugs and their fixes.
 
 ### duplicates queue — 244 open, 98 merged, 2 dismissed (re-measured 2026-10-01)
+Owner decision 2026-10-18: deferred for a joint human review later (with the 230 nameless
+contacts); stays TODO.
 Previously recorded as 353 open pairs with a recommendation to dismiss 9
 pairs whose two sides had different **verified** emails, on the premise that
 two differing verified emails mean two different people. **That premise was
@@ -1091,7 +1101,8 @@ Two pieces of work, and they were independent — both are done:
    still has no phone** while its merged-away row holds a number — the value is
    dot-separated (`+54.9.11…`) and fails `src/lib/phone.ts` validation, so the
    script reports it and never writes it. That is the "35th". It needs a human to
-   decide whether to normalize and restore it; the merge happened 2026-09-30
+   decide whether to normalize and restore it (Owner decision 2026-10-18: it will be normalized
+  together with the E.164 work); the merge happened 2026-09-30
    22:11 UTC, before the fix. (Corrected 2026-10-01: this said "recover the 35";
    the real figure is 34 recovered plus 1 invalid.)
 2. **Stop it recurring — done (#272).** Both phone columns are in
@@ -1176,6 +1187,9 @@ dropping a column in production is irreversible. The README states that it used
 no database access (only the owner's measurement); the 0-of-24 figure above is
 the first measured one. A new migration will also need a hand-set journal `when`
 — see **drizzle journal is future-dated** below.
+Owner decision 2026-10-18: drop APPROVED. Code commit (reads/writes removed) and
+migration `drizzle/0050_task_drop_legacy_subject_columns.sql` (+ `_rollback.sql`) are
+built; NOT yet applied to production.
 
 ### hotel-phone-dial-codes — 15 contacts whose dial code disagrees with their country (2026-10-01)
 The hotel import stored each number as it arrived and flagged rows whose dial
@@ -1193,6 +1207,7 @@ except 52 → 55), 3 unusable, 1 probably wrong. In 5 rows the contact has anoth
 good number, so the bad number is the thing to drop, not the contact. **Nothing
 was changed**; confirming the typo needs a first call. The README's per-row
 judgements are format-based inference, not calls: unverified beyond the counts.
+Owner decision 2026-10-18: leave the 15 as they are.
 
 ### hotel-role-groups — 51 contacts in `role_group: other`, and a vocabulary gap in `classifyPosition` (2026-10-01)
 Measured 2026-10-01 over the 147 hotel contacts: `sales_bd` 51, `other` 51,
@@ -1212,6 +1227,8 @@ into `sales_bd`**: that is the group the default view hides, so it would hide
 about 17 more hotel contacts (51 → ~68) from the list Mariel works. The
 README recommends not creating a dedicated hotel group yet. Not implemented;
 `classifyPosition` and the hide rule are unchanged.
+Owner decision 2026-10-18: leave the Revenue, Finance and guest-operations hotel
+roles as they are (no change).
 
 **Correction to the README's headline finding** (2026-10-01, after #284): the
 README says 51 of 147 hotel contacts do not appear in Mariel's default view,
@@ -1581,7 +1598,8 @@ because their first label is in `UNOWNABLE_MAIL_ROOTS` — the roots rule is coa
 than any criterion the comment states, and it wins. So `zoho.com` is permitted by
 an accident of the first-label rule, not by a principled test applied across the
 board. **Open, no owner decision yet:** whether the validator should also stop
-refusing `proton.me` and `yandex.com`. Widening it has a measured cost on the
+refusing `proton.me` and `yandex.com`. Owner decision 2026-10-18: keep refusing both as company
+domains; no change. Widening it has a measured cost on the
 matching side and is a separate call — do not re-open them on the strength of the
 zoho.com reasoning alone.
 
@@ -1686,7 +1704,12 @@ importer may MATCH, GROUP or INFER on it.
 **Existing damage, measured read-only against production 2026-10-13.** Of 2,701
 companies with a non-null domain, 1 holds a domain `isFreeMailDomain` flags:
 `hotmail` -> `hotmail.com.ar`, 1 contact. 0 on any of the six ISP roots. No two
-companies share a free-mail domain. Not cleaned up: that is the owner's call.
+companies share a free-mail domain. **RESOLVED (2026-10-18):** it is already
+cleaned up in production. `scripts/clear-non-company-employers.ts` deleted it: the
+`clear_non_company_employers` audit_log row of 2026-10-13 12:27 UTC lists it in
+`deletedCompanies` (key `hotmail`, domain `hotmail.com.ar`, 1 person, 0 leads/tasks/
+activities), and `select ... from company where domain='hotmail.com.ar'` returns 0
+rows today. Owner decision 2026-10-18: it was a person, not a company (confirmed by the owner); cleanup approved.
 
 ### e2e suite runs against production
 Found while reconciling #287: the revived e2e suite logs in as a test account
