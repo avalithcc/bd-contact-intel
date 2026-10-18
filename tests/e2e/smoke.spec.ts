@@ -46,10 +46,12 @@ test.describe('render smoke', () => {
 
   for (const [url, label] of pages) {
     test(`${label} renders`, async ({ page }) => {
-      const response = await page.goto(url);
+      // One visit, with a budget sized for a cold `next dev` compile of the route.
+      test.setTimeout(120_000);
+      const response = await page.goto(url, { timeout: 90_000 });
       await page.waitForLoadState('networkidle');
       expect(response?.status(), `${label}: HTTP status`).toBeLessThan(500);
-      await gotoAuthed(page, url);
+      await expect(page, `Redirected to /login while opening ${url}: the saved session is missing or stale`).not.toHaveURL(/\/login/);
       await expectRendered(page, consoleErrors, label);
     });
   }
