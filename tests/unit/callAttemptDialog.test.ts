@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CallAttemptResolvedError, planAttemptCall } from "@/lib/contacts/callAttempt";
 import { CallOccurredAtInFutureError, CallOutcomeRequiredError } from "@/lib/contacts/call";
-import { callDialogDefaults, followUpTitle } from "@/lib/contacts/callDialog";
+import { callDialogDefaults, followUpChecked, followUpTitle } from "@/lib/contacts/callDialog";
 
 const NOW = new Date("2026-10-05T15:00:00.000Z");
 const attempt = { createdAt: new Date("2026-10-05T14:00:00.000Z"), metadata: { number: "+5491141234567", field: "mobile_phone" } };
@@ -41,6 +41,15 @@ test("the dialog rejects a missing outcome, a future time and an attempt that al
 
 test("the dialog opens with now on the Argentina wall clock and a follow-up three days out", () => {
   assert.deepEqual(callDialogDefaults(new Date("2026-10-18T14:42:00.000Z")), { date: "2026-10-18", time: "11:42", followUpDue: "2026-10-21" });
+});
+
+test("the follow-up box is checked only for connected and follows the outcome until toggled by hand", () => {
+  assert.equal(followUpChecked("", false, false), false);
+  assert.equal(followUpChecked("connected", false, false), true);
+  assert.equal(followUpChecked("no_answer", false, true), false);
+  assert.equal(followUpChecked("voicemail", false, true), false);
+  assert.equal(followUpChecked("no_answer", true, true), true);
+  assert.equal(followUpChecked("connected", true, false), false);
 });
 
 test("the follow-up title is filled with the contact name", () => {
