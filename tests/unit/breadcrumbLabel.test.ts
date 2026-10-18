@@ -19,6 +19,7 @@ test("names each section instead of falling back to Contactos", () => {
 test("keeps the sections that already worked", () => {
   assert.equal(resolveBreadcrumbKey("/contacts"), "leads");
   assert.equal(resolveBreadcrumbKey("/contacts/abc-123"), "leads");
+  assert.equal(resolveBreadcrumbKey("/capture/linkedin"), "leads");
   assert.equal(resolveBreadcrumbKey("/companies"), "companies");
   assert.equal(resolveBreadcrumbKey("/companies/acme"), "companies");
   assert.equal(resolveBreadcrumbKey("/tasks"), "tasks");

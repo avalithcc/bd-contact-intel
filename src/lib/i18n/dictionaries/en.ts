@@ -1391,6 +1391,23 @@ export const en = {
     notAuthorizedError: "This account can't sign in here. Ask an administrator for access.",
   },
 
+  // /capture/linkedin: the "invalid link" screen (linkedin-exists-check mockup, section 4).
+  linkedinCapture: {
+    eyebrow: "Save from LinkedIn",
+    title: "invalid link",
+    heading: "This link is not a LinkedIn profile",
+    reasonCompany: "This is a company page, not a person's.",
+    reasonGeneral: "You are on a general LinkedIn page. Open a person's profile.",
+    reasonNotLinkedin: "The link is not from LinkedIn.",
+    reasonMissing: "We did not receive any LinkedIn link.",
+    receivedPrefix: "We received",
+    openProfileBefore: "Open a person's profile (",
+    openProfileExample: "linkedin.com/in/…",
+    openProfileAfter: ") and press the button again.",
+    goToContacts: "Go to contacts",
+    createWithoutLink: "Create contact without a link",
+  },
+
   forgotPassword: {
     eyebrow: "// recover access",
     title: "Reset password",

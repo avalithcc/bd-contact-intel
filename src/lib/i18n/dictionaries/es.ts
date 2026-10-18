@@ -1344,6 +1344,23 @@ export const es: typeof en = {
     notAuthorizedError: "Esta cuenta no puede iniciar sesión aquí. Pídele acceso a un administrador.",
   },
 
+  // /capture/linkedin: the "enlace no válido" screen (linkedin-exists-check mockup, section 4).
+  linkedinCapture: {
+    eyebrow: "Guardar desde LinkedIn",
+    title: "enlace no válido",
+    heading: "Este enlace no es un perfil de LinkedIn",
+    reasonCompany: "Es la página de una empresa, no de una persona.",
+    reasonGeneral: "Estás en una página general de LinkedIn. Abre el perfil de una persona.",
+    reasonNotLinkedin: "El enlace no es de LinkedIn.",
+    reasonMissing: "No recibimos ningún enlace de LinkedIn.",
+    receivedPrefix: "Recibimos",
+    openProfileBefore: "Abre el perfil de una persona (",
+    openProfileExample: "linkedin.com/in/…",
+    openProfileAfter: ") y vuelve a pulsar el botón.",
+    goToContacts: "Ir a contactos",
+    createWithoutLink: "Crear contacto sin enlace",
+  },
+
   forgotPassword: {
     eyebrow: "// recuperar acceso",
     title: "Recuperar contraseña",
