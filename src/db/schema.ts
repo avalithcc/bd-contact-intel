@@ -811,6 +811,14 @@ export const person = pgTable(
     byMobilePhoneDigits: index("person_mobile_phone_digits_idx").on(
       sql`(regexp_replace(${t.mobilePhone}, '\\D', '', 'g'))`,
     ),
+    // Suffix indexes (migration 0051): phone search compares the last 8 digits by equality, which the full-digits
+    // indexes above cannot serve (a btree only helps a prefix or the whole value). See src/lib/search/phoneQuery.ts.
+    byPhoneDigitsSuffix: index("person_phone_digits_suffix_idx").on(
+      sql`(right(regexp_replace(${t.phone}, '\\D', '', 'g'), 8))`,
+    ),
+    byMobilePhoneDigitsSuffix: index("person_mobile_phone_digits_suffix_idx").on(
+      sql`(right(regexp_replace(${t.mobilePhone}, '\\D', '', 'g'), 8))`,
+    ),
   }),
 );
 
