@@ -508,11 +508,12 @@ Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
   new thread, as it should.
 - Single `to` only — no CC, no BCC, no attachments. ~~A multi-recipient `To`
   string passes the guard~~ — fixed 2026-10-18: `buildRawMessage` and
-  `assertSafeSendInput` call `assertSingleRecipient`, so every path (new email,
-  thread reply, scheduled, sequences) rejects a list or a malformed address
-  (`invalid_recipient`; Spanish copy via `multiple_recipients` / `invalid_email`).
-  Consequence: replying to a synced thread whose last message went to several
-  people now fails with "varias direcciones"; reply from Gmail.
+  `assertSafeSendInput` call `assertRecipients`, so a new email, a scheduled
+  send and sequences reject a list or a malformed address (`invalid_recipient`;
+  Spanish copy via `multiple_recipients` / `invalid_email`). A thread reply
+  (`sendThreadReplyAction`, a scheduled reply) opts in with
+  `allowRecipientList` and may go to up to 20 stored addresses, each one
+  validated; one bad address rejects the whole send.
 - ~~Long subjects are one RFC 2047 encoded-word~~ — fixed 2026-10-18
   (`subjectEncoding.ts`): folded into words of at most 75 chars, cut on
   code-point boundaries.

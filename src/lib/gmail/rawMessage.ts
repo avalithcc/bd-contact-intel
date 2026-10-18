@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { htmlToOutboundText } from "@/lib/gmail/outboundText";
-import { assertSingleRecipient } from "@/lib/gmail/recipient";
+import { assertRecipients } from "@/lib/gmail/recipient";
 import { foldSubjectHeader } from "@/lib/gmail/subjectEncoding";
 
 /**
@@ -138,10 +138,12 @@ export function buildRawMessage(
   boundaryRandom?: () => string,
   reply?: ThreadingHeaders,
   extraHeaders: string[] = [],
+  // Only a thread reply may carry several recipients (see assertRecipients); everything else is exactly one.
+  allowRecipientList = false,
 ): string {
   assertSafeHeaderValue("From", from);
   assertSafeHeaderValue("To", to);
-  assertSingleRecipient(to);
+  assertRecipients(to, { allowList: allowRecipientList });
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
@@ -192,7 +194,8 @@ export function buildSendPayload(
   content: MessageContent,
   reply?: ReplyTarget,
   extraHeaders?: string[],
+  allowRecipientList = false,
 ): string {
-  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders);
+  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders, allowRecipientList);
   return JSON.stringify(reply ? { raw, threadId: reply.threadId } : { raw });
 }

@@ -20,5 +20,5 @@ export async function sendScheduledEmail(row: ClaimedEmail): Promise<{ messageId
   const plan = planThreadReply(await getThreadReplySource(row.bdId, survivor.id, row.replyThreadId));
   // Provably not sent (status 400 keeps failureCode off "outcome_unknown").
   if (!plan.ok) throw new GmailSendError("send_failed", "reply_unavailable", undefined, 400);
-  return sendGmailMessage({ ...base, to: plan.to, subject: plan.subject, reply: { threadId: plan.threadId, inReplyTo: plan.inReplyTo, references: plan.references } });
+  return sendGmailMessage({ ...base, to: plan.to, subject: plan.subject, allowRecipientList: true, reply: { threadId: plan.threadId, inReplyTo: plan.inReplyTo, references: plan.references } });
 }

@@ -27,8 +27,27 @@ export function checkRecipientShape(to: string): RecipientShape {
   return localOk && domainOk ? { ok: true } : { ok: false, reason: "malformed" };
 }
 
-/** Throws `invalid_recipient` (the reason rides in `header`: "malformed" | "multiple"). Nothing is sent. */
-export function assertSingleRecipient(to: string): void {
-  const shape = checkRecipientShape(to);
-  if (!shape.ok) throw new GmailSendError("invalid_recipient", `The To address is not a single valid email (${shape.reason})`, shape.reason);
+/** Gmail sync stores the real To list of a message; a thread reply may go to all of them, up to this many. */
+export const MAX_REPLY_RECIPIENTS = 20;
+
+function fail(reason: "malformed" | "multiple"): never {
+  throw new GmailSendError("invalid_recipient", `The To address is not a valid recipient (${reason})`, reason);
 }
+
+/**
+ * Throws `invalid_recipient` (the reason rides in `header`: "malformed" | "multiple"). Nothing is sent.
+ * Default: exactly one address. `allowList` is ONLY for a thread reply: a comma/semicolon list where EACH address
+ * passes the single-address check, at most MAX_REPLY_RECIPIENTS.
+ */
+export function assertRecipients(to: string, opts: { allowList?: boolean } = {}): void {
+  if (!opts.allowList) {
+    const shape = checkRecipientShape(to);
+    if (!shape.ok) fail(shape.reason);
+    return;
+  }
+  const items = to.split(/[,;]/).map((s) => s.trim());
+  if (items.length === 0 || items.some((a) => !a || !checkRecipientShape(a).ok)) fail("malformed");
+  if (items.length > MAX_REPLY_RECIPIENTS) fail("multiple");
+}
+
+export const assertSingleRecipient = (to: string): void => assertRecipients(to);

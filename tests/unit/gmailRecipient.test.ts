@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertSingleRecipient, checkRecipientShape } from "@/lib/gmail/recipient";
+import { assertRecipients, assertSingleRecipient, checkRecipientShape, MAX_REPLY_RECIPIENTS } from "@/lib/gmail/recipient";
 import { encodeSubjectWords, foldSubjectHeader } from "@/lib/gmail/subjectEncoding";
 import { buildRawMessage } from "@/lib/gmail/rawMessage";
 import { GmailSendError } from "@/lib/gmail/errors";
@@ -93,4 +93,27 @@ test("folded Subject header: lines within 78 chars, continuation lines start wit
 
 test("encoding is deterministic", () => {
   assert.deepEqual(encodeSubjectWords(LONG[0]), encodeSubjectWords(LONG[0]));
+});
+
+// ---- Thread reply: an explicit opt-in allows a list, each address validated ----
+
+const THREE = "a@x.com, b@y.com; c@z.org";
+
+test("thread reply: 3 valid addresses pass only with allowRecipientList", () => {
+  assert.doesNotThrow(() => buildRawMessage("f@x.com", THREE, "Re: S", { body: "x" }, undefined, { inReplyTo: "<m@x>", references: "<m@x>" }, [], true));
+  assert.throws(() => buildRawMessage("f@x.com", THREE, "Re: S", { body: "x" }, undefined, { inReplyTo: "<m@x>", references: "<m@x>" }), (e: unknown) => e instanceof GmailSendError && e.kind === "invalid_recipient");
+});
+
+test("thread reply: one bad address in the list fails, as does an empty item or a CR/LF", () => {
+  for (const bad of ["a@x.com, nope, c@z.org", "a@x.com,,c@z.org", "a@x.com, b@y.com,", "a@x.com, Jane <b@y.com>"]) {
+    assert.throws(() => assertRecipients(bad, { allowList: true }), (e: unknown) => e instanceof GmailSendError && e.kind === "invalid_recipient", bad);
+  }
+  assert.throws(() => buildRawMessage("f@x.com", "a@x.com, b@y.com\r\nBcc: e@x.com", "S", { body: "x" }, undefined, undefined, [], true), (e: unknown) => e instanceof GmailSendError && e.kind === "invalid_header");
+});
+
+test("new email: 2 addresses fail; the reply list is capped", () => {
+  assert.throws(() => assertRecipients("a@x.com, b@y.com"), (e: unknown) => e instanceof GmailSendError && e.header === "multiple");
+  const many = (n: number) => Array.from({ length: n }, (_, i) => `u${i}@x.com`).join(", ");
+  assert.doesNotThrow(() => assertRecipients(many(MAX_REPLY_RECIPIENTS), { allowList: true }));
+  assert.throws(() => assertRecipients(many(MAX_REPLY_RECIPIENTS + 1), { allowList: true }));
 });

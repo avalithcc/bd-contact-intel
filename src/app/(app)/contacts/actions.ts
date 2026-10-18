@@ -424,6 +424,7 @@ export async function sendThreadReplyAction(
       subject: plan.subject,
       ...composeEmailBody(body.trim(), me.signatureHtml),
       personId,
+      allowRecipientList: true,
       reply: { threadId: plan.threadId, inReplyTo: plan.inReplyTo, references: plan.references },
     });
     revalidatePath(`/contacts/${personId}`);

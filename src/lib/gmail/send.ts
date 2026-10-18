@@ -7,7 +7,7 @@ import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { revalidatePath } from "next/cache";
 import { recordSentEmail } from "@/lib/gmail/sentEmailQueries";
 import { readSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
-import { assertSingleRecipient } from "@/lib/gmail/recipient";
+import { assertRecipients } from "@/lib/gmail/recipient";
 import { assertSafeExtraHeader, assertSafeHeaderValue, buildSendPayload, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
 
 // Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
@@ -23,6 +23,8 @@ type SendGmailBody = {
   personId?: string;
   // Present only when continuing an existing thread (see replyThread.ts).
   reply?: ReplyTarget;
+  // True ONLY for a thread reply, whose recipients come from the stored thread and may be several.
+  allowRecipientList?: boolean;
   // Complete `Name: value` header lines (Sequence List-Unsubscribe pair).
   extraHeaders?: string[];
   // Extra keys for the `email_sent` activity (Sequence id + step). Merged
@@ -35,9 +37,9 @@ type SendGmailInput = { bdId: string } & SendGmailBody;
 type EmailAccountRow = typeof emailAccount.$inferSelect;
 
 // Fail fast on the untrusted recipient, before any DB read or token refresh.
-function assertSafeSendInput({ to, reply, extraHeaders }: SendGmailBody) {
+function assertSafeSendInput({ to, reply, extraHeaders, allowRecipientList }: SendGmailBody) {
   assertSafeHeaderValue("To", to);
-  assertSingleRecipient(to);
+  assertRecipients(to, { allowList: allowRecipientList });
   for (const line of extraHeaders ?? []) assertSafeExtraHeader(line);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
@@ -72,7 +74,7 @@ export async function sendGmailMessageFromAccount(input: { accountId: string } &
 // here, so there is a single copy of this logic. The sender is always the
 // row's own address, never a literal.
 async function sendFromAccountRow(account: EmailAccountRow | undefined, input: SendGmailBody) {
-  const { to, subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata } = input;
+  const { to, subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata, allowRecipientList } = input;
   const content: MessageContent =
     input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
 
@@ -151,7 +153,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
         Authorization: `Bearer ${access_token}`,
         "Content-Type": "application/json",
       },
-      body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders),
+      body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList),
     },
   );
 
