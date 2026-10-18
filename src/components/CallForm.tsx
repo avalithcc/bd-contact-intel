@@ -1,7 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
-import { followUpChecked } from "@/lib/contacts/callDialog";
+import { useId, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { CallIcon } from "@/components/icons";
 import { CALL_OUTCOME_CODES, type CallOutcomeCode } from "@/lib/contacts/call";
@@ -96,8 +95,7 @@ export function CallForm({
   const [date, setDate] = useState(dial?.date ?? "");
   const [time, setTime] = useState(dial?.time ?? "");
   const [notes, setNotes] = useState("");
-  const [followUpOn, setFollowUpOn] = useState(false);
-  const followUpTouched = useRef(false);
+  const [followUpOn, setFollowUpOn] = useState(Boolean(dial));
   const [followTitle, setFollowTitle] = useState(dial?.followUp.title ?? "");
   const [followDue, setFollowDue] = useState(dial?.followUp.dueDate ?? "");
 
@@ -155,11 +153,7 @@ export function CallForm({
         <label className="label" htmlFor={`${ids}-outcome`}>
           {l.callOutcomeLabel}
         </label>
-        <select id={`${ids}-outcome`} className="select" value={outcome} onChange={(e) => {
-            const value = e.target.value;
-            setOutcome(value);
-            setFollowUpOn((cur) => followUpChecked(value, followUpTouched.current, cur));
-          }} disabled={busy}>
+        <select id={`${ids}-outcome`} className="select" value={outcome} onChange={(e) => setOutcome(e.target.value)} disabled={busy}>
           <option value="">{l.callOutcomePlaceholder}</option>
           {CALL_OUTCOME_CODES.map((code) => (
             <option key={code} value={code}>
@@ -191,10 +185,7 @@ export function CallForm({
       {dial && (
         <div>
           <div className="check">
-            <input id={`${ids}-follow`} type="checkbox" checked={followUpOn} onChange={(e) => {
-                followUpTouched.current = true;
-                setFollowUpOn(e.target.checked);
-              }} disabled={busy} />
+            <input id={`${ids}-follow`} type="checkbox" checked={followUpOn} onChange={(e) => setFollowUpOn(e.target.checked)} disabled={busy} />
             <label htmlFor={`${ids}-follow`}>{dial.followUp.toggleLabel}</label>
           </div>
           {followUpOn && (

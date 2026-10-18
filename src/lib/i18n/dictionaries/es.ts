@@ -1553,7 +1553,7 @@ export const es: typeof en = {
     followUpTitleLabel: "Título",
     followUpDueLabel: "Vence",
     followUpTitleDefault: "Llamar de nuevo a {name}",
-    followUpError: "La llamada quedó guardada, pero no se pudo crear la tarea. Puedes agregarla manualmente.",
+    followUpError: "La llamada se registró, pero no se pudo crear la tarea.",
     followUpSaved: "Tarea creada.",
   },
 

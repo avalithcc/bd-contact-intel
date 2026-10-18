@@ -15,14 +15,6 @@ export function callDialogDefaults(now: Date): { date: string; time: string; fol
   return { date, time: `${two(p.hour)}:${two(p.minute)}`, followUpDue: addDaysToDateString(date, CALL_FOLLOW_UP_DAYS) };
 }
 
-/**
- * The follow-up box is ticked by default only for a conversation ("connected");
- * once the BD toggles it by hand, their choice wins over any later outcome change.
- */
-export function followUpChecked(outcome: string, touchedByHand: boolean, current: boolean): boolean {
-  return touchedByHand ? current : outcome === "connected";
-}
-
 export function followUpTitle(template: string, name: string): string {
   return template.replace("{name}", name);
 }
