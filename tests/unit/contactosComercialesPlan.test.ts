@@ -27,7 +27,7 @@ test("a new contact is created for Mariel under the import source, with phones v
   assert.equal(p.email, "Ana@Acme.example");
   assert.equal(p.emailNormalized, "ana@acme.example");
   assert.equal(p.status, "new");
-  assert.equal(p.phone, "+54 9 11 5555 0100");
+  assert.equal(p.phone, "+5491155550100");
   assert.equal(p.mobilePhone, "617-555-0102");
   assert.equal(p.company, "Acme Corp");
   assert.equal(p.companyKey, "acme");
@@ -56,10 +56,10 @@ test("an inferred name is recorded as a findable history marker on the created p
 test("an existing contact with no number gets the phone filled and a history row; nothing else", () => {
   const plan = buildComercialPlan([r({ email: "ANA@acme.example", firstName: "Other", phones: ["+54 9 11 5555 0100", "+54 9 11 5555 0101"] })], ctx([person({ emailNormalized: "ana@acme.example" })]), genId);
   assert.equal(plan.creates.length, 0);
-  assert.deepEqual(plan.fills, [{ personId: "11111111-1111-4111-8111-111111111111", phone: "+54 9 11 5555 0100", mobilePhone: "+54 9 11 5555 0101" }]);
+  assert.deepEqual(plan.fills, [{ personId: "11111111-1111-4111-8111-111111111111", phone: "+5491155550100", mobilePhone: "+5491155550101" }]);
   assert.deepEqual(plan.historyRows.map((h) => [h.property, h.oldValue, h.newValue, h.source]), [
-    ["phone", null, "+54 9 11 5555 0100", "import"],
-    ["mobilePhone", null, "+54 9 11 5555 0101", "import"],
+    ["phone", null, "+5491155550100", "import"],
+    ["mobilePhone", null, "+5491155550101", "import"],
   ]);
   assert.equal(plan.report.matched, 1);
 });
@@ -74,7 +74,7 @@ test("an existing contact that already has any number is skipped and counted, ne
 
 test("invalid numbers store nothing and are counted", () => {
   const plan = buildComercialPlan([r({ email: "a@x.example", phones: ["12345", "+54 9 11 5555 0100"] })], ctx(), genId);
-  assert.equal(plan.creates[0]!.phone, "+54 9 11 5555 0100");
+  assert.equal(plan.creates[0]!.phone, "+5491155550100");
   assert.equal(plan.creates[0]!.mobilePhone, null);
   assert.equal(plan.report.invalidNumbers, 1);
 });

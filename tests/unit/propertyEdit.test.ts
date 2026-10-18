@@ -7,7 +7,9 @@
  * and writes both the person update and the history row in one transaction.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 import {
   EDITABLE_PERSON_PROPERTIES,
   InvalidContactTypeError,
@@ -137,19 +139,35 @@ test("phone and mobilePhone are editable properties", () => {
 });
 
 test("a valid phone edit produces a plain personUpdate/history row, no derived columns", () => {
-  const plan = planPropertyEdit(BASE_PERSON, "mobilePhone", "+54 9 11 4123-4567", "bd-1");
+  const plan = planPropertyEdit(BASE_PERSON, "mobilePhone", "+54 9 11 4123-4567", "bd-1", normalizePhoneForWrite);
   assert.equal(plan.changed, true);
-  assert.equal(plan.personUpdate?.mobilePhone, "+54 9 11 4123-4567");
+  assert.equal(plan.personUpdate?.mobilePhone, "+5491141234567");
   assert.deepEqual(plan.historyRows, [
     {
       personId: BASE_PERSON.id,
       property: "mobilePhone",
       oldValue: null,
-      newValue: "+54 9 11 4123-4567",
+      newValue: "+5491141234567",
       changedByBdId: "bd-1",
       source: "edit",
     },
   ]);
+});
+
+test("a phone that cannot be normalized is stored as typed, never rejected for it", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "phone", "011 4123-4567", "bd-1", normalizePhoneForWrite);
+  assert.equal(plan.personUpdate?.phone, "011 4123-4567");
+});
+
+test("a local number is completed only with an Argentine context", () => {
+  const dff = { ...BASE_PERSON, sourceKey: "dff-2026" };
+  assert.equal(planPropertyEdit(dff, "mobilePhone", "1155555555", "bd-1", normalizePhoneForWrite).personUpdate?.mobilePhone, "+5491155555555");
+  assert.equal(planPropertyEdit(BASE_PERSON, "mobilePhone", "1155555555", "bd-1", normalizePhoneForWrite).personUpdate?.mobilePhone, "1155555555");
+});
+
+test("re-saving the same number in another format is a no-op once stored as E.164", () => {
+  const stored = { ...BASE_PERSON, phone: "+541140000000" };
+  assert.equal(planPropertyEdit(stored, "phone", "+54 11 4000-0000", "bd-1", normalizePhoneForWrite).changed, false);
 });
 
 test("clearing a phone property is always allowed (no format check on blank)", () => {
@@ -515,4 +533,10 @@ test("saving an unchanged jobTitle with an in-sync roleGroup is a no-op", () => 
     personUpdate: null,
     historyRows: [],
   });
+});
+
+test("the DB layer wires the phone normalizer, and the pure module never imports it (it reaches client bundles)", () => {
+  assert.match(readFileSync("src/lib/contacts/propertyEditDb.ts", "utf8"), /planPropertyEdit\(row, property, rawNewValue, changedByBdId, normalizePhoneForWrite\)/);
+  assert.doesNotMatch(readFileSync("src/lib/contacts/propertyEdit.ts", "utf8"), /import \{[^}]*\} from "@\/lib\/phoneNormalize"/);
+  assert.equal(planPropertyEdit(BASE_PERSON, "mobilePhone", "+54 9 11 4123-4567", "bd-1").personUpdate?.mobilePhone, "+54 9 11 4123-4567", "without a normalizer the value is stored as typed");
 });

@@ -34,9 +34,9 @@ test("phone restores clear only columns that still hold the filled value", () =>
   const existing: ExistingPerson[] = [{ id: B, emailNormalized: "b@x.example", phone: null, mobilePhone: null }];
   const made = buildComercialPlan([{ firstName: "B", lastName: null, company: null, lastContact: null, email: "b@x.example", phones: ["+54 9 11 5555 0100", "+54 9 11 5555 0101"], nameInferred: false }], { ownerBdId: A, existing, companyAliasByKey: new Map() });
   const fills = made.historyRows.map((h) => ({ personId: h.personId, property: h.property, filledValue: h.newValue! }));
-  const same = planRevert({ createdIds: [], facts: new Map(), fills, currentPhones: new Map([[B, { phone: "+54 9 11 5555 0100", mobilePhone: "+54 9 11 5555 0101" }]]) });
+  const same = planRevert({ createdIds: [], facts: new Map(), fills, currentPhones: new Map([[B, { phone: "+5491155550100", mobilePhone: "+5491155550101" }]]) });
   assert.deepEqual(same.clears, [{ personId: B, phone: true, mobilePhone: true }]);
-  const edited = planRevert({ createdIds: [], facts: new Map(), fills, currentPhones: new Map([[B, { phone: "999999", mobilePhone: "+54 9 11 5555 0101" }]]) });
+  const edited = planRevert({ createdIds: [], facts: new Map(), fills, currentPhones: new Map([[B, { phone: "999999", mobilePhone: "+5491155550101" }]]) });
   assert.deepEqual(edited.clears, [{ personId: B, phone: false, mobilePhone: true }]);
   assert.equal(edited.changedSince, 1);
 });

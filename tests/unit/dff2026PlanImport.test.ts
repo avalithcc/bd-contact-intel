@@ -76,7 +76,7 @@ test("creates a new person owned by Mariel, status new, sourceKey dff-2026", () 
     emailNormalized: "juan.perez@example.com",
     emailStatus: "probable",
     emailSource: "dff-2026",
-    mobilePhone: "1122334455",
+    mobilePhone: "+5491122334455",
     company: "Acme Corp",
     companyKey: normalizeCompanyKey("Acme Corp"),
     jobTitle: "Manager",
@@ -100,7 +100,7 @@ test("existing person: fills only currently-empty fields, never overwrites a non
   assert.equal(update.personUpdate.lastName, undefined); // was "Perez" -> untouched
   assert.equal(update.personUpdate.jobTitle, "Manager");
   assert.equal(update.personUpdate.roleGroup, classifyPosition("Manager"));
-  assert.equal(update.personUpdate.mobilePhone, "1122334455");
+  assert.equal(update.personUpdate.mobilePhone, "+5491122334455");
   assert.equal(update.personUpdate.companyKey, normalizeCompanyKey("Acme Corp"));
   assert.equal(update.personUpdate.ownerBdId, MARIEL); // was unowned
   assert.equal(plan.report.existingNewlyOwned, 1);
@@ -208,7 +208,7 @@ test("phone: rejects a too-short value, writes a valid one raw/unformatted, trac
   const rejected = plan.creates.find((c) => c.email === "a@x.com")!;
   const accepted = plan.creates.find((c) => c.email === "b@x.com")!;
   assert.equal(rejected.mobilePhone, null);
-  assert.equal(accepted.mobilePhone, "1122334455"); // stored raw, never reformatted
+  assert.equal(accepted.mobilePhone, "+5491122334455"); // DFF is Argentine: +549 (owner decision 2026-10-18)
 });
 
 test("every record is imported unconditionally — no scope/attendance filtering", () => {

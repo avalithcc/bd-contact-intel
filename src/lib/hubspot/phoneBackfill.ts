@@ -17,6 +17,7 @@
  * predate migration 0016's phone columns, not a re-sync.
  */
 import { hubspotLegacyId } from "@/lib/hubspot/uuidv5";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 
 function blank(value: string | undefined): string | null {
   const trimmed = value?.trim();
@@ -97,11 +98,11 @@ export function planPhoneBackfill(
     const update: PhoneBackfillUpdate = { personId: existing.personId };
     let changed = false;
     if (existing.phone === null && row.phone !== null) {
-      update.phone = row.phone;
+      update.phone = normalizePhoneForWrite(row.phone, { column: "phone" });
       changed = true;
     }
     if (existing.mobilePhone === null && row.mobilePhone !== null) {
-      update.mobilePhone = row.mobilePhone;
+      update.mobilePhone = normalizePhoneForWrite(row.mobilePhone, { column: "mobilePhone" });
       changed = true;
     }
 

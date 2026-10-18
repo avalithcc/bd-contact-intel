@@ -24,6 +24,7 @@ import { normalizeCompanyKey } from "@/lib/companyCategories";
 import type { EmailStatus } from "@/lib/identity/matcher";
 import { planHubSpotRefill, stripOwnerFromRefill } from "@/lib/hubspot/refill";
 import { isValidPhoneFormat, formatPhoneForDisplay } from "@/lib/phone";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 import { classifyPosition } from "@/lib/roleGroups";
 import type { AttendeeRecord } from "./buildAttendeeRecords";
 
@@ -131,10 +132,11 @@ function explainPhoneRejection(raw: string): PhoneRejection["reason"] {
   return "unknown";
 }
 
-/** Validates + records phone stats; never reformats a value that passes
- * (owner decision 2026-09-30: store raw, trimmed/control-stripped only —
- * no +54 prefixing, since a mobile can't be told apart from a landline by
- * digit count alone and the rewrite would not be reversible). */
+/** Validates + records phone stats. The stored value is E.164 when it can be
+ * (owner decision 2026-10-18, superseding the 2026-09-30 "store raw" rule: a
+ * DFF 10-digit mobile is Argentine, so it gets +549; src/lib/phoneNormalize.ts
+ * owns the rules). A value that cannot be normalized is stored trimmed, as
+ * before. Validation still judges the raw value. */
 function resolvePhone(raw: string | null, email: string, report: ImportReport): string | null {
   if (!raw) return null;
   const digitLength = countDigits(raw);
@@ -144,7 +146,7 @@ function resolvePhone(raw: string | null, email: string, report: ImportReport): 
     return null;
   }
   report.phonesWritten++;
-  return formatPhoneForDisplay(raw);
+  return normalizePhoneForWrite(formatPhoneForDisplay(raw), { column: "mobilePhone", source: DFF_2026_SOURCE_KEY });
 }
 
 /**

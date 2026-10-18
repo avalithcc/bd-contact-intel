@@ -17,6 +17,7 @@
  * extractor dedupes with.
  */
 import { phoneKey, type PhoneCandidate, type PhoneKind } from "./extract";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 
 export interface ExtractedMessage {
   messageId: string;
@@ -53,7 +54,7 @@ export interface SignaturePhonePlan {
 const blank = (v: string | null) => (v ?? "").trim() === "";
 type Found = { value: string; kinds: Set<PhoneKind>; messageIds: Set<string>; inferred: boolean; explicit: boolean };
 const kindOf = (n: Found): PhoneKind => (n.kinds.size === 1 ? [...n.kinds][0]! : "generic");
-const fillOf = (personId: string, column: SignaturePhoneFill["column"], n: Found): SignaturePhoneFill => ({ personId, column, value: n.value, supportingMessages: n.messageIds.size, ...(column === "phone" && n.inferred && !n.explicit ? { landlineInferred: true as const } : {}) });
+const fillOf = (personId: string, column: SignaturePhoneFill["column"], n: Found): SignaturePhoneFill => ({ personId, column, value: normalizePhoneForWrite(n.value, { column }), supportingMessages: n.messageIds.size, ...(column === "phone" && n.inferred && !n.explicit ? { landlineInferred: true as const } : {}) });
 
 export function planSignaturePhones(messages: readonly ExtractedMessage[], persons: ReadonlyMap<string, PersonPhoneState>): SignaturePhonePlan {
   const byPerson = new Map<string, Map<string, Found>>();

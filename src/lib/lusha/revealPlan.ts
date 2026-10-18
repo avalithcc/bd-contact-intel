@@ -5,10 +5,15 @@
 
 import type { NewActivity, NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
 import { isValidPhoneFormat } from "@/lib/phone";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 import { isReachable } from "@/lib/sequences/rosterGuards";
 import { isMobileType, type Pick as Picked } from "./parse";
 
-export type RevealPerson = Pick<Person, "id" | "email" | "emailNormalized" | "emailStatus" | "emailSource" | "emailConfidence" | "mergedIntoId" | "phone" | "mobilePhone">;
+export type RevealPerson = Pick<Person, "id" | "email" | "emailNormalized" | "emailStatus" | "emailSource" | "emailConfidence" | "mergedIntoId" | "phone" | "mobilePhone"> & { sourceKey?: string | null; country?: string | null };
+
+/** The value to store in `column`: E.164 when it can be, else as the provider sent it. */
+const storedPhone = (person: RevealPerson, column: "phone" | "mobilePhone", value: string) =>
+  normalizePhoneForWrite(value, { column, source: person.sourceKey, country: person.country });
 
 export interface RevealMeta {
   actorBdId: string;
@@ -76,9 +81,10 @@ export function planRevealedPhoneWrite(person: RevealPerson, pick: Picked, meta:
   const column = !person[first] ? first : !person[other] ? other : null;
   const activity = activityOf(person, "phones", meta);
   if (!column) return { personUpdate: null, historyRows: [], activity };
+  const value = storedPhone(person, column, pick.value);
   return {
-    personUpdate: { [column]: pick.value, updatedAt: new Date(), updatedByBdId: meta.actorBdId },
-    historyRows: changes(person, meta, { [column]: pick.value }),
+    personUpdate: { [column]: value, updatedAt: new Date(), updatedByBdId: meta.actorBdId },
+    historyRows: changes(person, meta, { [column]: value }),
     activity,
   };
 }
@@ -99,7 +105,7 @@ export function planRevealedPhonesWrite(person: RevealPerson, picks: readonly Pi
   const next: Record<string, string> = {};
   for (const p of fresh) {
     const column = isMobileType(p.type) ? "mobilePhone" : "phone";
-    if (!person[column] && !(column in next)) next[column] = p.value;
+    if (!person[column] && !(column in next)) next[column] = storedPhone(person, column, p.value);
   }
   const activity = activityOf(person, "phones", meta);
   if (Object.keys(next).length === 0) return { personUpdate: null, historyRows: [], activity };

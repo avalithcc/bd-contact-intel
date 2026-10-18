@@ -38,7 +38,7 @@ test("planPhoneBackfill fills phone/mobilePhone only for a matched person with b
   const existing = new Map([[legacyId, existingRow({ legacyId, personId: P1 })]]);
 
   const plan = planPhoneBackfill(rows, existing);
-  assert.deepEqual(plan.updates, [{ personId: P1, phone: "+54 11 4000-0000", mobilePhone: "+54 9 11 4123-4567" }]);
+  assert.deepEqual(plan.updates, [{ personId: P1, phone: "+541140000000", mobilePhone: "+5491141234567" }]);
   assert.equal(plan.matched, 1);
   assert.equal(plan.skippedNoMatch, 0);
   assert.equal(plan.skippedNoNewData, 0);
@@ -65,7 +65,7 @@ test("planPhoneBackfill fills only the empty one of phone/mobilePhone, leaving t
   ]);
 
   const plan = planPhoneBackfill(rows, existing);
-  assert.deepEqual(plan.updates, [{ personId: P1, mobilePhone: "+54 9 11 4123-4567" }]);
+  assert.deepEqual(plan.updates, [{ personId: P1, mobilePhone: "+5491141234567" }]);
 });
 
 test("planPhoneBackfill counts a row with no matching person_id_map entry as skippedNoMatch, writes nothing", () => {
@@ -98,8 +98,8 @@ test("planPhoneBackfill processes multiple rows independently", () => {
   ]);
   const plan = planPhoneBackfill(rows, existing);
   assert.deepEqual(plan.updates, [
-    { personId: P1, phone: "+54 11 1111-1111" },
-    { personId: P2, mobilePhone: "+54 9 11 2222-2222" },
+    { personId: P1, phone: "+541111111111" },
+    { personId: P2, mobilePhone: "+5491122222222" },
   ]);
   assert.equal(plan.matched, 2);
 });

@@ -113,3 +113,8 @@ test("a mix with an unlabelled + number is an ambiguous set: no write", () => {
   const plan = planSignaturePhones([msg("m1", "p1", "Tel fijo: 4123 4567\n+54 11 5555 0002")], new Map([["p1", EMPTY]]));
   assert.deepEqual([plan.fills.length, plan.skippedConflictKindUnstated], [0, 1]);
 });
+
+test("a number with a country code is filled as E.164; a local one is filled as typed", () => {
+  const plan = planSignaturePhones([msg("m1", "p1", "Cel: +54 9 11 5555-0002"), msg("m2", "p2", "Cel: 11 5555-0002")], new Map([["p1", EMPTY], ["p2", EMPTY]]));
+  assert.deepEqual(plan.fills.map((f) => [f.personId, f.value]), [["p1", "+5491155550002"], ["p2", "11 5555-0002"]]);
+});

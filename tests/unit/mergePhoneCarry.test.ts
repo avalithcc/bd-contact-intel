@@ -55,10 +55,10 @@ function input(survivor: MergePersonFields, merged: MergePersonFields): PlanMerg
 }
 
 const FILL_CASES: ReadonlyArray<{ name: string; s: Partial<MergePersonFields>; m: Partial<MergePersonFields>; phone: string | null; mobile: string | null }> = [
-  { name: "Tito: both stranded on merged", s: {}, m: { phone: "+54 (11) 4118 8080", mobilePhone: "+54 (911) 6213 0024" }, phone: "+54 (11) 4118 8080", mobile: "+54 (911) 6213 0024" },
-  { name: "Ortega: phone only", s: {}, m: { phone: "+54 9 11 4590-2294" }, phone: "+54 9 11 4590-2294", mobile: null },
+  { name: "Tito: both stranded on merged", s: {}, m: { phone: "+54 (11) 4118 8080", mobilePhone: "+54 (911) 6213 0024" }, phone: "+541141188080", mobile: "+5491162130024" },
+  { name: "Ortega: phone only", s: {}, m: { phone: "+54 9 11 4590-2294" }, phone: "+5491145902294", mobile: null },
   { name: "Uauy: mobile only", s: {}, m: { mobilePhone: "994489460" }, phone: null, mobile: "994489460" },
-  { name: "whitespace survivor counts as blank", s: { phone: "  " }, m: { phone: "+1 (954) 837-6436" }, phone: "+1 (954) 837-6436", mobile: null },
+  { name: "whitespace survivor counts as blank", s: { phone: "  " }, m: { phone: "+1 (954) 837-6436" }, phone: "+19548376436", mobile: null },
   { name: "survivor non-empty is never overwritten", s: { phone: "+56 2 2938 0805" }, m: { phone: "+56 2 2938 9999", mobilePhone: "+56 9 1111 2222" }, phone: "+56 2 2938 0805", mobile: "+56 9 1111 2222" },
   { name: "both blank stays blank", s: {}, m: {}, phone: null, mobile: null },
 ];
@@ -80,7 +80,7 @@ test("a carried phone shows up in survivorFieldChanges and unmerge reverts it", 
   const survivor = p("s");
   const plan = planMerge(input(survivor, p("m", { phone: "+54 9 11 4590-2294" })));
   const change = plan.snapshot.survivorFieldChanges.find((c) => c.field === "phone");
-  assert.deepEqual(change, { field: "phone", before: null, after: "+54 9 11 4590-2294" });
+  assert.deepEqual(change, { field: "phone", before: null, after: "+5491145902294" });
   const un = planUnmerge(plan.snapshot, { currentSurvivor: { ...survivor, ...plan.survivorUpdate }, currentSurvivorConnections: [] });
   assert.ok(un.survivorFieldReverts.some((r) => r.field === "phone" && r.to === null));
 });
@@ -92,4 +92,11 @@ test("planMerge does not mutate its inputs and is repeatable", () => {
   const second = planMerge(i);
   assert.equal(JSON.stringify(i), before);
   assert.deepEqual(second.survivorUpdate, first.survivorUpdate);
+});
+
+test("planMerge phones: the merged row's Argentine context completes a local number; with none it is carried as typed", () => {
+  const dff = planMerge(input(p("s"), p("m", { sourceKey: "dff-2026", mobilePhone: "1155555555" })));
+  assert.equal(dff.survivorUpdate.mobilePhone, "+5491155555555");
+  const other = planMerge(input(p("s"), p("m", { sourceKey: "csv", mobilePhone: "1155555555" })));
+  assert.equal(other.survivorUpdate.mobilePhone, "1155555555");
 });

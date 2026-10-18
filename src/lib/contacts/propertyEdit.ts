@@ -19,6 +19,7 @@ import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import { isContactType } from "@/lib/contacts/contactType";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
+import type { PhoneContext } from "@/lib/phoneNormalize";
 import { normalizeLinkedinProfileKey, type LinkedinProfileKeyRejection } from "@/lib/contacts/linkedinProfile";
 
 export type InvalidEmailReason = "invalid_format";
@@ -117,10 +118,20 @@ export interface PropertyEditPlan {
   historyRows: HistoryRow[];
 }
 
+/**
+ * Injected, never imported: this module reaches client bundles through
+ * actionErrors.ts (the error classes), and the normalizer carries libphonenumber's
+ * metadata. propertyEditDb.ts (server) passes normalizePhoneForWrite.
+ */
+export type PhoneWriteNormalizer = (raw: string, ctx: PhoneContext) => string;
+
 export type EditablePersonForPlan = Pick<
   Person,
   "id" | EditablePersonProperty | "roleGroup" | "emailNormalized" | "emailStatus" | "emailSource"
->;
+> & {
+  /** Argentine-context phone completion reads it; absent means no context. */
+  sourceKey?: string | null;
+};
 
 function historyRow(
   personId: string,
@@ -155,6 +166,7 @@ export function planPropertyEdit(
   property: EditablePersonProperty,
   rawNewValue: string,
   changedByBdId: string,
+  normalizePhone?: PhoneWriteNormalizer,
 ): PropertyEditPlan {
   const trimmed = rawNewValue.trim();
   let newValue = trimmed === "" ? null : trimmed;
@@ -164,6 +176,13 @@ export function planPropertyEdit(
     const key = normalizeLinkedinProfileKey(newValue);
     if (!key.ok) throw new InvalidProfileKeyError(key.reason);
     newValue = key.value;
+  }
+  if (normalizePhone && PHONE_PROPERTIES.has(property) && newValue !== null && isValidPhoneFormat(newValue)) {
+    // Normalized BEFORE the no-op check, like profileKey: re-saving a stored
+    // E.164 number in another layout must not write a history row. Validation
+    // still judges the typed value (below), so what a BD can enter is unchanged
+    // and a value that cannot be normalized is stored as typed.
+    newValue = normalizePhone(newValue, { column: property === "phone" ? "phone" : "mobilePhone", source: person.sourceKey, country: person.country });
   }
   const oldValue = person[property] ?? null;
 

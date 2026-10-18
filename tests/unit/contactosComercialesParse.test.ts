@@ -65,9 +65,9 @@ test("a footnote line mentioning the marker does not flag the previous row", () 
 
 test("phone shapes: the dialable part is kept and extensions are flagged", () => {
   const cases: [string, string | null, boolean, boolean][] = [
-    ["+54 9 11 7887 0779", "+54 9 11 7887 0779", false, false],
-    ["+1 (754) 241-0674", "+1 (754) 241-0674", false, false],
-    ["+54 223 628 8500 ext 1016", "+54 223 628 8500", true, false],
+    ["+54 9 11 7887 0779", "+5491178870779", false, false],
+    ["+1 (754) 241-0674", "+17542410674", false, false],
+    ["+54 223 628 8500 ext 1016", "+542236288500", true, false],
     ["617-340-3850 ext 120", "617-340-3850", true, false],
     ["617-340-3850 EXT. 7", "617-340-3850", true, false],
     ["12345", null, false, true],

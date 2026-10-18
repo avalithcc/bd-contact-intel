@@ -102,9 +102,9 @@ test("the planners never mutate their inputs and are repeatable", () => {
 });
 
 test("phone: mobile goes to mobilePhone, anything else to phone", () => {
-  assert.equal(planRevealedPhoneWrite(person(), phonePick([{ number: "+54 11 5555 5555", type: "mobile" }]), META).personUpdate?.mobilePhone, "+54 11 5555 5555");
+  assert.equal(planRevealedPhoneWrite(person(), phonePick([{ number: "+54 11 5555 5555", type: "mobile" }]), META).personUpdate?.mobilePhone, "+541155555555");
   const direct = planRevealedPhoneWrite(person(), phonePick([{ number: "+54 11 5555 5555", type: "direct" }]), META);
-  assert.equal(direct.personUpdate?.phone, "+54 11 5555 5555");
+  assert.equal(direct.personUpdate?.phone, "+541155555555");
   assert.equal(direct.personUpdate?.mobilePhone, undefined);
   assert.equal(direct.historyRows[0]?.source, "lusha_reveal");
 });
@@ -112,7 +112,7 @@ test("phone: mobile goes to mobilePhone, anything else to phone", () => {
 test("phone: the occupied target falls back to the other column when empty", () => {
   const mobile = phonePick([{ number: "+54 11 5555 5555", type: "mobile" }]);
   const plan = planRevealedPhoneWrite(person({ mobilePhone: "+54 11 1111 1111" }), mobile, META);
-  assert.equal(plan.personUpdate?.phone, "+54 11 5555 5555");
+  assert.equal(plan.personUpdate?.phone, "+541155555555");
   assert.equal(plan.personUpdate?.mobilePhone, undefined);
 });
 
@@ -144,51 +144,53 @@ test("a revealed phone whose digits equal a held phone writes nothing and says i
     assert.deepEqual([plan.personUpdate, plan.historyRows, plan.activity, plan.alreadyHeld], [null, [], null, true], JSON.stringify(held));
   }
   // A different number is still placed in the free column.
-  assert.equal(planRevealedPhoneWrite(person({ phone: "+54 11 4444 4444" }), pick, META).personUpdate?.mobilePhone, "+54 (11) 5555-5555");
+  assert.equal(planRevealedPhoneWrite(person({ phone: "+54 11 4444 4444" }), pick, META).personUpdate?.mobilePhone, "+541155555555");
 });
 
 // --- two numbers from ONE reveal --------------------------------------------------------------------------------------------
 
 const W = { number: "+54 11 4000 0001", type: "work" };
 const M = { number: "+54 9 11 5000 0002", type: "mobile" };
+const WN = "+541140000001"; // the E.164 form stored for W
+const MN = "+5491150000002"; // the E.164 form stored for M
 const both = (p: RevealPerson, list: unknown[]) => planRevealedPhonesWrite(p, pickPhones(list), META);
 const cols = (plan: ReturnType<typeof both>) => plan.historyRows.map((h) => [h.property, h.newValue, h.source]);
 
 test("phones: work + mobile fill both columns, one history row each, one activity", () => {
   const plan = both(person(), [M, W]);
-  assert.deepEqual(plan.personUpdate && [plan.personUpdate.phone, plan.personUpdate.mobilePhone], [W.number, M.number]);
-  assert.deepEqual(cols(plan), [["phone", W.number, "lusha_reveal"], ["mobilePhone", M.number, "lusha_reveal"]]);
+  assert.deepEqual(plan.personUpdate && [plan.personUpdate.phone, plan.personUpdate.mobilePhone], [WN, MN]);
+  assert.deepEqual(cols(plan), [["phone", WN, "lusha_reveal"], ["mobilePhone", MN, "lusha_reveal"]]);
   assert.equal(plan.activity?.metadata.field, "phones");
 });
 
 test("phones: only mobile or only work behave as the single write", () => {
-  assert.equal(both(person(), [M]).personUpdate?.mobilePhone, M.number);
-  assert.equal(both(person(), [W]).personUpdate?.phone, W.number);
-  assert.equal(both(person({ phone: "111 1111111" }), [M]).personUpdate?.mobilePhone, M.number);
-  assert.equal(both(person({ phone: "111 1111111" }), [W]).personUpdate?.mobilePhone, W.number, "single-number fallback is kept");
+  assert.equal(both(person(), [M]).personUpdate?.mobilePhone, MN);
+  assert.equal(both(person(), [W]).personUpdate?.phone, WN);
+  assert.equal(both(person({ phone: "111 1111111" }), [M]).personUpdate?.mobilePhone, MN);
+  assert.equal(both(person({ phone: "111 1111111" }), [W]).personUpdate?.mobilePhone, WN, "single-number fallback is kept");
 });
 
 test("phones: two works place only the best one", () => {
   const plan = both(person(), [W, { number: "+54 11 4000 0009", type: "work" }]);
-  assert.deepEqual(cols(plan), [["phone", W.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(plan), [["phone", WN, "lusha_reveal"]]);
   assert.equal(plan.personUpdate?.mobilePhone, undefined);
 });
 
 test("phones: a number already held (by digits) is skipped and never placed twice", () => {
   const plan = both(person({ phone: "+54 (11) 4000-0001" }), [W, M]);
-  assert.deepEqual(cols(plan), [["mobilePhone", M.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(plan), [["mobilePhone", MN, "lusha_reveal"]]);
   assert.equal(plan.alreadyHeld, undefined);
   const all = both(person({ phone: "541140000001", mobilePhone: "5491150000002" }), [W, M]);
   assert.deepEqual([all.personUpdate, all.historyRows, all.activity, all.alreadyHeld], [null, [], null, true]);
   const same = planRevealedPhonesWrite(person(), [phonePick([W]), phonePick([{ ...W, number: "541140000001" }])], META);
-  assert.deepEqual(cols(same), [["phone", W.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(same), [["phone", WN, "lusha_reveal"]]);
 });
 
 test("phones: a column already full is never overwritten; the other number still lands", () => {
   const phoneFull = both(person({ phone: "111 1111111" }), [W, M]);
-  assert.deepEqual(cols(phoneFull), [["mobilePhone", M.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(phoneFull), [["mobilePhone", MN, "lusha_reveal"]]);
   const mobileFull = both(person({ mobilePhone: "222 2222222" }), [W, M]);
-  assert.deepEqual(cols(mobileFull), [["phone", W.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(mobileFull), [["phone", WN, "lusha_reveal"]]);
   const full = both(person({ phone: "111 1111111", mobilePhone: "222 2222222" }), [W, M]);
   assert.deepEqual([full.personUpdate, full.historyRows], [null, []]);
   assert.equal(full.activity?.metadata.field, "phones");
@@ -208,17 +210,24 @@ test("phones: the planner is repeatable and mutates nothing", () => {
 test("phones: the type is compared case-insensitively end to end (Mobile / MOBILE are mobile)", () => {
   for (const type of ["Mobile", "MOBILE"]) {
     const plan = both(person(), [{ ...M, type }, { ...W, type: "Work" }]);
-    assert.deepEqual(plan.personUpdate && [plan.personUpdate.phone, plan.personUpdate.mobilePhone], [W.number, M.number], type);
+    assert.deepEqual(plan.personUpdate && [plan.personUpdate.phone, plan.personUpdate.mobilePhone], [WN, MN], type);
     assert.deepEqual(cols(plan).map((c) => c[0]).sort(), ["mobilePhone", "phone"]);
     // The single-number planner agrees.
-    assert.equal(planRevealedPhoneWrite(person(), phonePick([{ ...M, type }]), META).personUpdate?.mobilePhone, M.number);
+    assert.equal(planRevealedPhoneWrite(person(), phonePick([{ ...M, type }]), META).personUpdate?.mobilePhone, MN);
   }
 });
 
 test("phones: two fresh numbers with one target column already full from another source (mixed-case types)", () => {
   const mobile = { ...M, type: "Mobile" };
   const phoneFull = both(person({ phone: "111 1111111" }), [mobile, W]);
-  assert.deepEqual(cols(phoneFull), [["mobilePhone", M.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(phoneFull), [["mobilePhone", MN, "lusha_reveal"]]);
   const mobileFull = both(person({ mobilePhone: "222 2222222" }), [mobile, W]);
-  assert.deepEqual(cols(mobileFull), [["phone", W.number, "lusha_reveal"]]);
+  assert.deepEqual(cols(mobileFull), [["phone", WN, "lusha_reveal"]]);
+});
+
+test("phone: the stored value is E.164 when the provider's layout can be normalized, as received when not", () => {
+  const plan = planRevealedPhoneWrite(person(), phonePick([{ number: "+54 (11) 5555-5555", type: "mobile" }]), META);
+  assert.equal(plan.personUpdate?.mobilePhone, "+541155555555");
+  assert.equal(plan.historyRows[0]?.newValue, "+541155555555");
+  assert.equal(planRevealedPhoneWrite(person(), phonePick([{ number: "011 5555-5555", type: "mobile" }]), META).personUpdate?.mobilePhone, "011 5555-5555");
 });

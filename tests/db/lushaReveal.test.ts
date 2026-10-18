@@ -454,7 +454,7 @@ test("one phones reveal with a work and a mobile number fills both columns: one 
   const out = await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones, creditsCharged: 5 });
   assert.deepEqual([out?.outcome, out?.value, out?.writeFailed], ["revealed", "+54 11 4000 0001", false]);
   const after = await personRow(p.id);
-  assert.deepEqual([after.phone, after.mobilePhone], ["+54 11 4000 0001", "+54 9 11 5000 0002"]);
+  assert.deepEqual([after.phone, after.mobilePhone], ["+541140000001", "+5491150000002"]);
   const history = (await db.select().from(personPropertyHistory).where(eq(personPropertyHistory.personId, p.id))).filter((h) => h.source === "lusha_reveal");
   assert.deepEqual(history.map((h) => h.property).sort(), ["mobilePhone", "phone"]);
   assert.equal((await db.select().from(activity).where(eq(activity.personId, p.id))).length, 1);
@@ -479,7 +479,7 @@ test("a stored phones reveal that failed to write applies BOTH numbers with no s
   const applied = await applyStoredReveal({ personId: p.id, field: "phones", actorBdId: bdId });
   assert.equal(applied.ok, true);
   const after = await personRow(p.id);
-  assert.deepEqual([after.phone, after.mobilePhone], ["+54 11 4000 0001", "+54 9 11 5000 0002"]);
+  assert.deepEqual([after.phone, after.mobilePhone], ["+541140000001", "+5491150000002"]);
   assert.equal((await ledger(p.id)).find((x) => x.field === "phones")!.creditsCharged, 5);
 });
 

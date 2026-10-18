@@ -26,6 +26,7 @@ import { mergeProperties, mergeProperty, emailStatusRank, stickyBouncedSide, typ
 import { isFreeMailDomain, splitEmail } from "@/lib/emailPatterns";
 import { pickOwnerByLastWorked, type OwnerTouch } from "@/lib/identity/ownerRule";
 import { parseConnectedOnDate } from "@/lib/migration/connectedOn";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 
 // --- Row shapes (subset of src/db/schema.ts's person/personBdConnection) ---
 
@@ -383,6 +384,17 @@ function fillBlank(survivorValue: string | null, mergedValue: string | null): { 
 }
 
 /**
+ * Phone variant of fillBlank. A number copied onto a blank survivor is stored as E.164 when it can be (the merged
+ * row's own source and country decide the Argentine rule); a kept survivor value is never rewritten. The snapshot
+ * records the written value, so unmerge's "still equals what the merge wrote" check holds.
+ */
+function fillPhone(column: "phone" | "mobilePhone", survivor: MergePersonFields, merged: MergePersonFields): { value: string | null; loss: string | null } {
+  const result = fillBlank(survivor[column], merged[column]);
+  const filled = (survivor[column] ?? "").trim() === "" && result.value !== null && result.value === merged[column];
+  return filled ? { ...result, value: normalizePhoneForWrite(result.value, { column, source: merged.sourceKey, country: merged.country }) } : result;
+}
+
+/**
  * Owner on merge: a manual assignment is sticky (survivor's first, then
  * merged's), otherwise the BD who worked the contact last wins (see
  * ownerRule.ts; replaces R3's earliest-connector rule). Undecided keeps the
@@ -592,8 +604,8 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     propertyLosses.push({ property: "jobTitle", value: jobTitleResult.loser.value });
   }
   if (emailResult.loss) propertyLosses.push(emailResult.loss);
-  const phoneResult = fillBlank(survivor.phone, merged.phone);
-  const mobileResult = fillBlank(survivor.mobilePhone, merged.mobilePhone);
+  const phoneResult = fillPhone("phone", survivor, merged);
+  const mobileResult = fillPhone("mobilePhone", survivor, merged);
   if (phoneResult.loss) propertyLosses.push({ property: "phone", value: phoneResult.loss });
   if (mobileResult.loss) propertyLosses.push({ property: "mobilePhone", value: mobileResult.loss });
   const contactTypeResult = fillBlank(survivor.contactType, merged.contactType);

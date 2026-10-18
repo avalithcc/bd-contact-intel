@@ -17,6 +17,7 @@ import {
   type LocationEditFields,
 } from "@/lib/contacts/propertyEdit";
 import { assertContactEditable } from "@/lib/contacts/mergeGuard";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 import {
   ContactNotFoundError,
   ProfileKeyTakenError,
@@ -106,7 +107,7 @@ async function writeContactProperty(
     if (!row) throw new ContactNotFoundError(personId);
     assertContactEditable(row);
 
-    const plan = planPropertyEdit(row, property, rawNewValue, changedByBdId);
+    const plan = planPropertyEdit(row, property, rawNewValue, changedByBdId, normalizePhoneForWrite);
     if (!plan.changed) return row;
 
     const newKey = property === "profileKey" ? (plan.personUpdate?.profileKey ?? null) : null;

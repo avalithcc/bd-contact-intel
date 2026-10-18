@@ -20,6 +20,9 @@ const SERVER_ONLY_FILE = path.resolve("src/lib/whatsapp.ts");
 const SERVER_ONLY_PACKAGE = "libphonenumber-js";
 
 const USE_CLIENT = /^\s*(?:(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)\s*)*["']use client["']/;
+// A "use server" module is a boundary: imported from client code the bundler swaps its body for RPC stubs, so what it
+// imports never ships to the browser. The walk stops there instead of flagging every server action's dependencies.
+const USE_SERVER = /^\s*(?:(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)\s*)*["']use server["']/;
 const SPECIFIER = /(?:^|\n)\s*(?:import|export)\s+(?!type\b)[^"';]*?from\s*["']([^"']+)["']|(?:^|\n)\s*import\s*["']([^"']+)["']|\bimport\(\s*["']([^"']+)["']\s*\)/g;
 
 export interface Fs {
@@ -42,6 +45,7 @@ export function findServerOnlyChain(entry: string, fs: Fs): string[] | null {
   const walk = (file: string, chain: string[]): string[] | null => {
     if (seen.has(file)) return null;
     seen.add(file);
+    if (file !== entry && USE_SERVER.test(fs.read(file))) return null;
     for (const m of fs.read(file).matchAll(SPECIFIER)) {
       const spec = m[1] ?? m[2] ?? m[3];
       if (spec === SERVER_ONLY_PACKAGE || spec.startsWith(`${SERVER_ONLY_PACKAGE}/`)) return [...chain, spec];
@@ -85,11 +89,15 @@ test("the tripwire itself: finds direct, transitive and package imports, ignores
     [path.resolve("src/c.tsx")]: "'use client'\nimport type { W } from \"@/lib/whatsapp\";\nimport { y } from \"./d\";",
     [path.resolve("src/d.ts")]: "export const y = 1;",
     [path.resolve("src/e.tsx")]: '"use client";\nimport lib from "libphonenumber-js";',
+    [path.resolve("src/f.tsx")]: '"use client";\nimport { act } from "./actions";',
+    [path.resolve("src/actions.ts")]: '"use server";\nimport { whatsappLink } from "@/lib/whatsapp";',
   };
   const fs: Fs = { read: (f) => files[f], exists: (f) => f in files };
   assert.deepEqual(findServerOnlyChain(path.resolve("src/a.tsx"), fs)?.map((c) => path.relative(".", c)), ["src/a.tsx", "src/b.ts", "src/lib/whatsapp.ts"]);
   assert.equal(findServerOnlyChain(path.resolve("src/c.tsx"), fs), null);
   assert.ok(findServerOnlyChain(path.resolve("src/e.tsx"), fs));
+  assert.equal(findServerOnlyChain(path.resolve("src/f.tsx"), fs), null, "a use-server module is a boundary");
+  assert.ok(findServerOnlyChain(path.resolve("src/actions.ts"), fs), "but a server action that imports it directly as the entry still reports");
   assert.ok(USE_CLIENT.test(files[path.resolve("src/a.tsx")]));
   assert.ok(USE_CLIENT.test(files[path.resolve("src/c.tsx")]));
 });

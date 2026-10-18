@@ -162,3 +162,11 @@ describe("normalizePhoneForWrite", () => {
     assert.equal(normalizePhoneForWrite(undefined, phone), undefined);
   });
 });
+
+describe("DFF source key" , () => {
+  it("is the same string the importer stamps on its rows", async () => {
+    const { DFF_2026_SOURCE_KEY: imported } = await import("../../src/lib/dff2026/planImport");
+    const { DFF_2026_SOURCE_KEY: here } = await import("../../src/lib/phoneNormalize");
+    assert.equal(here, imported);
+  });
+});

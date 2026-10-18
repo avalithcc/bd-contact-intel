@@ -12,6 +12,7 @@
  * or the "(inferido del mail)" marker in the APELLIDO column.
  */
 import { isValidPhoneFormat } from "@/lib/phone";
+import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 
 export interface ComercialRow {
   firstName: string | null;
@@ -130,5 +131,5 @@ export function normalizeComercialPhone(raw: string): ComercialPhone {
 }
 
 function check(value: string, extensionDropped: boolean): ComercialPhone {
-  return isValidPhoneFormat(value) ? { value, extensionDropped, invalid: false } : { value: null, extensionDropped: false, invalid: true };
+  return isValidPhoneFormat(value) ? { value: normalizePhoneForWrite(value, { column: "phone" }), extensionDropped, invalid: false } : { value: null, extensionDropped: false, invalid: true };
 }
