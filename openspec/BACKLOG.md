@@ -1839,7 +1839,6 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   65 nulls all have no job title. Whether the stored groups still
   match today's `classifyPosition` is unverified; the legacy
   `scripts/backfill-role-groups.ts` targets `contact` only.
-- Split contact groups do not appear in the Duplicados queue.
 - ~~There is no lint script, and unused imports are not caught.~~ Fixed 2026-10-18: `npm run lint` (`tsc --noEmit --noUnusedLocals`, no new dependency; not wired into the Vercel build). Unused parameters are not checked.
 
 ## Deferred from crm-hubspot-ux
