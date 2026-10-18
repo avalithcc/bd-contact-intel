@@ -27,7 +27,14 @@ setup('authenticate', async ({ page }) => {
     if (refusal) throw new Error(refusal);
   }
 
-  await page.goto('/login');
+  // `next dev` compiles a route on its first visit, and login and the
+  // post-login landing are the first two compiles of a cold server. Warm the
+  // login route with a budget sized for that, and give the landing assertion
+  // below the same kind of budget. Only this setup test is affected; global
+  // timeouts stay as they are.
+  setup.setTimeout(240_000);
+  await page.request.get('/login', { timeout: 120_000 });
+  await page.goto('/login', { timeout: 120_000 });
   await page.fill('#email', email);
   await page.fill('#password', password);
   // The sidebar's locale and theme switchers are also submit buttons, so this
@@ -38,7 +45,7 @@ setup('authenticate', async ({ page }) => {
   // Surface whatever the form said, otherwise a bad credential looks like a
   // mysterious timeout.
   try {
-    await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+    await expect(page).not.toHaveURL(/\/login/, { timeout: 90_000 });
   } catch (err) {
     const shown = await page.locator('main, body').first().innerText();
     throw new Error(
