@@ -18,7 +18,8 @@ import {
 } from "../actions";
 import { scheduleContactEmailAction } from "../scheduleActions";
 import { ScheduleEmailDialog } from "./ScheduleEmailDialog";
-import { CALL_OUTCOME_CODES, MANUAL_CALL_DIRECTION, type CallOutcomeCode } from "@/lib/contacts/call";
+import { MANUAL_CALL_DIRECTION } from "@/lib/contacts/call";
+import { CallForm } from "@/components/CallForm";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
@@ -72,14 +73,6 @@ export interface QuickActionsProps {
 }
 
 type QuickAction = "call" | "email" | "schedule" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
-
-const CALL_OUTCOME_LABEL_KEY: Record<CallOutcomeCode, keyof ContactRecordLabels> = {
-  connected: "callOutcomeConnected",
-  busy: "callOutcomeBusy",
-  no_answer: "callOutcomeNoAnswer",
-  voicemail: "callOutcomeVoicemail",
-  wrong_number: "callOutcomeWrongNumber",
-};
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -280,9 +273,9 @@ export function QuickActions({
         <CallForm
           labels={l}
           busy={busy}
-          error={error}
+          error={error && <ErrorNotice labels={l} error={error} />}
           onCancel={closeQuickAction}
-          onSubmit={async (outcome, date, time, notes) => {
+          onSubmit={async ({ outcome, date, time, notes }) => {
             setBusy(true);
             setError(null);
             // Direction has no control on purpose: a hand-logged call is outbound,
@@ -727,121 +720,6 @@ function EmailForm({
           disabled={busy}
         />
       </div>
-    </Dialog>
-  );
-}
-
-export function CallForm({
-  labels: l,
-  busy,
-  error,
-  onCancel,
-  onSubmit,
-}: ComposerProps & {
-  onSubmit: (outcome: string, date: string, time: string, notes: string) => void;
-}) {
-  const ids = useId();
-  const [outcome, setOutcome] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [notes, setNotes] = useState("");
-
-  // Client-side "no future call" guard (fresh-review WARNING fix) —
-  // mirrors planCall's server-side FUTURE_CLOCK_SKEW_TOLERANCE_MS check
-  // (src/lib/contacts/call.ts), which is the actual source of truth; this
-  // only keeps the date/time pickers from offering an obviously-rejected
-  // value in the first place. `timeMax` only applies when the picked date
-  // is today (or still blank, which defaults to today) — a past date has
-  // no future hour to guard against.
-  const now = new Date();
-  const dateMax = now.toISOString().slice(0, 10);
-  const timeMax = date === "" || date === dateMax ? now.toTimeString().slice(0, 5) : undefined;
-
-  return (
-    <Dialog
-      open
-      onClose={onCancel}
-      closeDisabled={busy}
-      title={l.callSubmit}
-      footer={
-        <>
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
-            {l.cancel}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy || !outcome}
-            onClick={() => outcome && onSubmit(outcome, date, time, notes)}
-          >
-            {l.callSubmit}
-          </button>
-        </>
-      }
-    >
-      {error && <ErrorNotice labels={l} error={error} />}
-      <div className="field">
-        <label className="label" htmlFor={`${ids}-outcome`}>
-          {l.callOutcomeLabel}
-        </label>
-        <select
-          id={`${ids}-outcome`}
-          className="select"
-          value={outcome}
-          onChange={(e) => setOutcome(e.target.value)}
-          disabled={busy}
-        >
-          <option value="">{l.callOutcomePlaceholder}</option>
-          {CALL_OUTCOME_CODES.map((code) => (
-            <option key={code} value={code}>
-              {l[CALL_OUTCOME_LABEL_KEY[code]] as string}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="form-grid">
-        <div className="field">
-          <label className="label" htmlFor={`${ids}-date`}>
-            {l.callDateLabel}
-          </label>
-          <input
-            id={`${ids}-date`}
-            className="input"
-            type="date"
-            value={date}
-            max={dateMax}
-            onChange={(e) => setDate(e.target.value)}
-            disabled={busy}
-          />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${ids}-time`}>
-            {l.callTimeLabel}
-          </label>
-          <input
-            id={`${ids}-time`}
-            className="input"
-            type="time"
-            value={time}
-            max={timeMax}
-            onChange={(e) => setTime(e.target.value)}
-            disabled={busy}
-          />
-        </div>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor={`${ids}-notes`}>
-          {l.callNotesLabel}
-        </label>
-        <textarea
-          id={`${ids}-notes`}
-          className="textarea"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          disabled={busy}
-        />
-      </div>
-      <p className="help">{l.callHelp}</p>
     </Dialog>
   );
 }
