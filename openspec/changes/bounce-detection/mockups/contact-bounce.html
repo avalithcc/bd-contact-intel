@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Correo rebotado en la ficha · avalith. inteligencia de contactos BD (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item active" aria-current="page" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16,642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="../../crm-hubspot-ux/mockups/contacts.html">Contactos</a><span class="sep">/</span><span>Valentina Rojas</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo electrónico"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-primary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/contacts.html#new-contact"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacto</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tarea</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/contact-record.html#log-note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Nota en un contacto</a>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+</div>
+</details>
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a5">MR</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Martín Rivas</strong><br><span class="meta">BD</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/account-email.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Conexión de Gmail</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/login.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Cerrar sesión</a>
+</div>
+</details>
+</div>
+</header>
+<div class="record-main">
+
+<div class="mock-note" role="note"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota de mockup.</strong> Cómo se ve un correo rebotado en la ficha de contacto y en la lista. Referencia: HubSpot marca &ldquo;Email bounced&rdquo; en la propiedad del correo y en la línea de tiempo. Datos inventados. Solo usa clases existentes de <span class="mono">styles.css</span> (misma fuente que <span class="mono">design-system.css</span>). <strong>Única pieza que falta:</strong> no existe una clase de tooltip; el detalle del rebote se muestra con el atributo nativo <span class="mono">title</span> y, además, como línea visible <span class="mono">.hint</span> debajo del valor.</div><span class="tag tag-scope">En alcance: bounce-detection</span></div></div>
+
+<!-- ============ 1. Hard bounce: email property row ============ -->
+<div class="section-title" id="s1">1. Rebote definitivo: propiedad &ldquo;Correo electrónico&rdquo;</div>
+<div class="grid-2">
+<div class="card"><div class="card-body">
+<div class="small meta">Antes: correo verificado (estado actual)</div>
+<dl class="props">
+<div class="prop"><dt>Correo electrónico</dt><dd>lucia.fernandez@acme-ejemplo.com <span class="badge badge-verified">Verificado</span><span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd><dd class="hint">Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago</dd></div>
+</dl>
+</div></div>
+<div class="card"><div class="card-body">
+<div class="small meta">Después: rebote definitivo (reemplaza al indicador de verificado)</div>
+<dl class="props">
+<div class="prop"><dt>Correo electrónico</dt><dd>lucia.fernandez@acme-ejemplo.com <span class="badge badge-danger" title="Rebotó el 14 oct · casilla inexistente (5.1.1)">Rebotado</span><span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd><dd class="hint">Rebotó el 14 oct · casilla inexistente (5.1.1)</dd></div>
+</dl>
+<div class="alert alert-danger mt-lg" role="status"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><div><div class="title">Este correo está en la lista de supresión</div>Las secuencias y los envíos programados a esta dirección quedan detenidos. Para volver a escribirle, cargá un correo nuevo: el rebotado no se puede reactivar.</div></div>
+</div></div>
+</div>
+<p class="help mt-md">El badge usa <span class="mono">badge badge-danger</span> (mismo lugar que <span class="mono">badge-verified</span>): ambos nunca conviven. El tooltip nativo repite el motivo para quien pasa el cursor sobre el badge.</p>
+
+<!-- ============ 2 & 3. Timeline ============ -->
+<div class="section-title mt-2xl" id="s2">2 y 3. Línea de tiempo: rebote definitivo y rebote temporal</div>
+<div class="timeline-toolbar" role="group" aria-label="Filtrar por tipo de actividad">
+<button class="filter-pill on">Todo <span class="n">6</span></button>
+<button class="filter-pill"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Correos <span class="n">3</span></button>
+</div>
+<div class="tl-group">Octubre 2026</div>
+<div class="tl">
+
+<div class="tl-item"><div class="tl-icon discard"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">El mail a l***@acme-ejemplo.com rebotó (definitivo)</span><span class="badge badge-danger no-dot">Rebotado</span><span class="when">14 oct, 09:41</span></div>
+<div class="tl-body">Motivo: casilla inexistente (5.1.1). Asunto original: <strong>Squads nearshore para Acme Ejemplo</strong>.
+<div class="row wrap mt-md"><span class="chip"><span class="k">Efecto</span> Se frenó la secuencia &ldquo;Outreach CTO Q4&rdquo;</span><span class="chip"><span class="k">Efecto</span> Se canceló 1 envío programado</span><span class="chip"><span class="k">Efecto</span> Dirección agregada a la lista de supresión</span></div></div></div></div>
+
+<div class="tl-item"><div class="tl-icon system"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card system">
+<div class="tl-head"><span class="what">Entrega demorada: casilla llena (4.2.2)</span><span class="badge badge-neutral no-dot">Temporal</span><span class="when">9 oct, 16:12</span></div>
+<div class="tl-body">El mail a l***@acme-ejemplo.com todavía no se entregó. Gmail sigue reintentando. Asunto original: <strong>Seguimiento: squads nearshore</strong>. No hace falta hacer nada: si el rebote pasa a definitivo, lo vas a ver acá.</div></div></div>
+
+<div class="tl-item"><div class="tl-icon email"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Hilo de correo · Squads nearshore para Acme Ejemplo</span><span class="badge badge-info no-dot">1 mensaje</span><span class="when">14 oct, 09:40</span></div>
+<div class="tl-body">Enviado por Cristian Civita desde la secuencia &ldquo;Outreach CTO Q4&rdquo;.</div></div></div>
+
+</div>
+<p class="help mt-md">Definitivo: tarjeta normal, ícono <span class="mono">tl-icon discard</span> (tono de peligro) y badge <span class="mono">badge-danger</span>. Temporal: tarjeta <span class="mono">tl-card system</span> (tono neutro, borde punteado), badge <span class="mono">badge-neutral</span>, sin badge en la propiedad del correo (la fila de la sección 1 sigue como &ldquo;Verificado&rdquo;).</p>
+
+<div class="card flat mt-lg"><div class="card-body">
+<div class="small meta">Fila del correo mientras hay un rebote temporal (sin badge nuevo)</div>
+<dl class="props">
+<div class="prop"><dt>Correo electrónico</dt><dd>lucia.fernandez@acme-ejemplo.com <span class="badge badge-verified">Verificado</span><span class="edit"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></dd><dd class="hint">Hunter · 96 % de confianza · actualizado por Cristian Civita, 20 ago</dd></div>
+</dl></div></div>
+
+<!-- ============ 4. List row ============ -->
+<div class="section-title mt-2xl" id="s4">4. Lista de contactos: columna &ldquo;Correo&rdquo;</div>
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Nombre</th><th>Empresa</th><th>Estado</th><th>Correo</th></tr></thead>
+<tbody>
+<tr><td><div class="cell-person"><span class="avatar a2">MG</span><div><a class="name" href="#">Martina Gómez</a><div class="sub">CTO</div></div></div></td>
+<td class="nowrap"><span class="soft">Acme Ejemplo</span></td>
+<td><span class="badge badge-contacted">Contactado</span></td>
+<td class="nowrap"><span class="badge badge-verified">Verificado</span> <span class="meta">martina.gomez@acme-ejemplo.com</span></td></tr>
+<tr><td><div class="cell-person"><span class="avatar a1">LF</span><div><a class="name" href="#">Lucía Fernández</a><div class="sub">VP de Ingeniería</div></div></div></td>
+<td class="nowrap"><span class="soft">Acme Ejemplo</span></td>
+<td><span class="badge badge-contacted">Contactado</span></td>
+<td class="nowrap"><span class="badge badge-danger" title="Rebotó el 14 oct · casilla inexistente (5.1.1)">Rebotado</span> <span class="meta" style="text-decoration: line-through;">lucia.fernandez@acme-ejemplo.com</span></td></tr>
+<tr><td><div class="cell-person"><span class="avatar a4">TB</span><div><a class="name" href="#">Tomás Benítez</a><div class="sub">Head of Platform</div></div></div></td>
+<td class="nowrap"><span class="soft">Acme Ejemplo</span></td>
+<td><span class="badge badge-new">Nuevo</span></td>
+<td class="nowrap"><span class="badge badge-probable">Probable</span> <span class="meta">tomas.benitez@acme-ejemplo.com</span></td></tr>
+</tbody></table></div>
+<p class="help mt-md">Opción elegida (la menos ruidosa): el mismo badge del lugar del indicador de verificación, ahora <span class="mono">badge-danger</span>, más la dirección tachada en <span class="mono">meta</span>. No se agrega columna ni ícono. El rebote temporal no cambia la fila. <strong>Observación para el dueño:</strong> el tachado usa <span class="mono">text-decoration</span> en línea porque no hay una clase utilitaria de tachado (existe solo dentro de <span class="mono">badge-discarded</span>); si se aprueba, conviene sumar una clase mínima o quitar el tachado y dejar solo el badge.</p>
+
+</div>
+</div>
+</body>
+</html>
