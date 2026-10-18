@@ -90,6 +90,21 @@ started.
 
 ## Shipped
 
+- Shipped 2026-10-18: (1) task legacy columns dropped (migration 0050 applied
+  to production). (2) Phone E.164 normalization, normalize on write
+  (`d6152619`..`f1b65eee`); the production backfill ran 2026-10-18 and changed
+  3,092 values (audit_log `2db6e75c-b2ed-4a71-9bf1-23f724da0caa`; revert SQL in
+  the `scripts/normalize-phones.ts` header). About 580 values were flagged and
+  left untouched, by reason: possible_not_valid 188, no_country_code 112,
+  invalid_number 71, needs_review 37, ar_area_code_unknown 26, text_or_extension
+  21, multiple_numbers 13, ambiguous_country 13, too_few_digits 10,
+  misplaced_plus 2. (3) LinkedIn exists-check: bookmarklet in /account
+  "Herramientas", `/capture/linkedin` route, "Ya está en el CRM" notice and a
+  prefilled `NewContactDialog` (`09982345`..`d3cab4a6`); the owner approved a
+  size exception over the 400-line budget. (4) Click-to-call option (b):
+  "Más detalles…" on the call outcome bar opens the call form prefilled, a
+  dialled-number line, the follow-up task ticked only for connected calls, and
+  the toast reads "Llamando con tu app de teléfono…" (`2688d373`..`632069f9`).
 - Shipped 2026-10-17: bounce detection (hard bounces only, `5.1.x`, anti-spoof
   rules, no backfill; see **Bounce detection**). Lusha per BD shipped 2026-10-16
   (switch + usage report at `/admin/lusha`; see **Lusha per BD**).
@@ -595,7 +610,9 @@ and 61 landlines (measured 2026-10-01); `person.mobile_phone`/`phone` are
 already surfaced, editable and exported. Calling is suddenly the channel with
 the most raw material — and `activity` has had a `call` type with an
 `occurredAt` metadata path since the beginning, yet production holds **2
-logged calls** (measured 2026-10-01, both Mariel, 2026-10-01). (Corrected
+logged calls** (measured 2026-10-01, both Mariel, 2026-10-01; that figure
+predates the one-tap bar `call-logging-one-tap`, which was already shipped).
+(Corrected
 2026-10-01: this said "zero logged calls". Both rows' free-text notes read as a
 WhatsApp and an email follow-up, not a phone call — which, if representative of
 two rows, suggests the call form is being used as a generic "I touched this
@@ -644,6 +661,13 @@ Owner decision 2026-10-18: normalization to E.164 is APPROVED; dry-run plan
 measured 2026-10-18 (~2,074 values strippable to +digits without inference, ~890
 DFF 10-digit mobiles need an Argentina assumption pending owner OK).
 Implementation pending that OK.
+**Done 2026-10-18:** normalize on write (`d6152619`..`f1b65eee`) and the
+production backfill changed 3,092 values (audit_log
+`2db6e75c-b2ed-4a71-9bf1-23f724da0caa`; revert SQL in the
+`scripts/normalize-phones.ts` header). About 580 flagged values were left
+untouched; the by-reason counts are in **Shipped**.
+Owner decision 2026-10-18: option (b) — keep the one-tap bar and add "Más
+detalles…" with the full form; no paid dialer. Shipped 2026-10-18.
 
 Output (done): a decision brief in `openspec/decisions/` covering the three
 options with real pricing, the recording/consent constraint, what changes in
@@ -766,6 +790,9 @@ someone new" half that has no legal, free, self-hosted answer.
    the broad phrasing also rules out things nobody intends to rule out.
 
 None of the above needs a decision today. Step 1 stands on its own.
+Owner decision 2026-10-18: build the free half (URL-only exists check). Shipped
+2026-10-18 as a bookmarklet. The paid enrichment half stays declined. Whether the
+bookmarklet works under linkedin.com's CSP is unverified until the owner tests it.
 
 Superseded: `openspec/decisions/2026-09-30-linkedin-extension-research.md`
 (no-go) and `2026-09-30-linkedin-extension-brief.md` (conditional go). Both
@@ -795,6 +822,8 @@ decision on the brief (unverified).
   finding is that there are exactly two model call sites and its
   recommendation for both is to keep them; the free-tier terms it cites were
   not re-verified: unverified.
+- Owner decision 2026-10-18: keep both call sites as they are (Sonnet for
+  outreach, Haiku for startup classification). Closed.
 
 ### Bounce detection — shipped 2026-10-17
 Merged to `main` 2026-10-17 (`318282aa`..`37b28107`, plus the record/list/timeline
@@ -1102,7 +1131,10 @@ Two pieces of work, and they were independent — both are done:
    dot-separated (`+54.9.11…`) and fails `src/lib/phone.ts` validation, so the
    script reports it and never writes it. That is the "35th". It needs a human to
    decide whether to normalize and restore it (Owner decision 2026-10-18: it will be normalized
-  together with the E.164 work); the merge happened 2026-09-30
+  together with the E.164 work. Checked 2026-10-18 after the backfill: dotted
+  `+54.9.11…` values were stripped by the backfill, but this one sits on a
+  merged-away row and was NOT touched, because only live rows are processed; the
+  survivor still has no phone); the merge happened 2026-09-30
    22:11 UTC, before the fix. (Corrected 2026-10-01: this said "recover the 35";
    the real figure is 34 recovered plus 1 invalid.)
 2. **Stop it recurring — done (#272).** Both phone columns are in
@@ -1207,7 +1239,9 @@ except 52 → 55), 3 unusable, 1 probably wrong. In 5 rows the contact has anoth
 good number, so the bad number is the thing to drop, not the contact. **Nothing
 was changed**; confirming the typo needs a first call. The README's per-row
 judgements are format-based inference, not calls: unverified beyond the counts.
-Owner decision 2026-10-18: leave the 15 as they are.
+Owner decision 2026-10-18: leave the 15 as they are. The E.164 backfill ran
+2026-10-18 (see **click-to-call**); these 15 were not part of a decision to
+change, so they stay as is.
 
 ### hotel-role-groups — 51 contacts in `role_group: other`, and a vocabulary gap in `classifyPosition` (2026-10-01)
 Measured 2026-10-01 over the 147 hotel contacts: `sales_bd` 51, `other` 51,
@@ -1618,12 +1652,16 @@ and `rg -c tutanota src/ tests/` returns nothing.
 `mac.com` or `mail.com` as their domain. No agent in that session had a
 `DATABASE_URL`, and `.env*` is blocked by design. The read-only query is
 `select domain, count(*) from company where domain in ('zoho.com','me.com','mac.com','mail.com') group by domain;`
+Closed 2026-10-18: this query only supported the zoho decision, which the owner
+dropped; it will not be run.
 
 **Pre-existing gap in the BROAD list, found while doing this and deliberately NOT
 widened:** `zoho` is not in `FREE_MAIL_ROOTS`, so the broad predicate only ever
 caught `zoho.com` exactly — `zoho.eu` and the other country variants already slip
 through identity matching. Adding the root would have a measurable cost (it would
 stop Zoho-hosted contacts from being matched at all) and is a separate decision.
+Dropped by owner 2026-10-18 ("no me sirve zoho, sacalo"): `zoho` is not added to
+`FREE_MAIL_ROOTS`; no change.
 
 **Worry checked, first answer WRONG, corrected 2026-10-13: "a company on
 `fibertel.com.ar` would swallow every Fibertel customer."** An earlier version of
@@ -1774,6 +1812,11 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-17
+- **Phone search — ready to build, small.** The CRM has no phone search:
+  `searchCondition` covers only names, company and email, and nothing uses the
+  `regexp_replace` digit indexes. Searching should match a local form like
+  `11 5555 5555` against stored E.164 `+5491155555555`. (Noted 2026-10-18, after
+  the E.164 backfill made stored phones uniform.)
 - The e2e login setup times out on a cold dev server (flaky).
 - `email_account.reconnect_banner_dismissed_at` is unused. (Checked 2026-10-18:
   only declared, `src/db/schema.ts:1411`, and created/retyped by migrations
