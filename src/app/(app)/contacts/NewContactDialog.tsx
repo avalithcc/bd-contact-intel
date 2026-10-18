@@ -7,9 +7,10 @@
  * convention as BulkGenerateMessagesButton.tsx — no full-page round trip
  * needed to show the duplicate-warning banner inline.
  */
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { CheckIcon } from "@/components/icons";
+import { withoutQueryParams } from "@/lib/contacts/linkedinCapture";
 import { createContactAction, type CreateContactResult } from "./createContactActions";
 import type { NewContactFormInput } from "@/lib/contacts/createContact";
 
@@ -71,6 +72,8 @@ export function NewContactDialog({
   renderTrigger?: (onClick: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
   const [pending, setPending] = useState(false);
   const emptyInput: NewContactFormInput = {
@@ -83,6 +86,10 @@ export function NewContactDialog({
 
   function close() {
     setOpen(false);
+    // Opened from /contacts?new=1&linkedin=…: drop those params so a refresh does not reopen the dialog.
+    if (searchParams.has("new") || searchParams.has("linkedin")) {
+      router.replace(withoutQueryParams(pathname, searchParams.toString(), ["new", "linkedin"]));
+    }
     setResult(null);
     setInput(emptyInput);
   }

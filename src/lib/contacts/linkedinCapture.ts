@@ -84,3 +84,11 @@ export function linkedinPrefill(value: string | undefined): string | undefined {
 export function isCaptureNextPath(next: string): boolean {
   return next === "/capture/linkedin" || next.startsWith("/capture/linkedin?");
 }
+
+/** `pathname` + `search` minus the given params, so a refresh does not replay a one-shot link. */
+export function withoutQueryParams(pathname: string, search: string, keys: readonly string[]): string {
+  const params = new URLSearchParams(search);
+  for (const key of keys) params.delete(key);
+  const rest = params.toString();
+  return rest ? `${pathname}?${rest}` : pathname;
+}

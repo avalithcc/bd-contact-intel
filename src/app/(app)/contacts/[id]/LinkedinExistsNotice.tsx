@@ -1,10 +1,11 @@
 "use client";
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { CloseIcon, InfoIcon } from "@/components/icons";
-import type { NoticeOwner } from "@/lib/contacts/linkedinCapture";
+import { withoutQueryParams, type NoticeOwner } from "@/lib/contacts/linkedinCapture";
 
 export interface LinkedinExistsNoticeLabels {
   title: string;
@@ -18,7 +19,7 @@ export interface LinkedinExistsNoticeLabels {
 /**
  * "Ya está en el CRM" (linkedin-exists-check mockup, section 2): shown on the
  * record when the bookmarklet found the person (`?from=linkedin`). Dismissible,
- * with no persistence — a reload shows it again, which is the intent.
+ * no stored state: dismissing removes ?from=linkedin from the URL, so a refresh does not bring it back.
  */
 export function LinkedinExistsNotice({
   labels,
@@ -30,6 +31,9 @@ export function LinkedinExistsNotice({
   owner: { id: string; name: string } | null;
 }) {
   const [open, setOpen] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   if (!open) return null;
 
   return (
@@ -52,7 +56,11 @@ export function LinkedinExistsNotice({
           </>
         )}
       </div>
-      <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={labels.close} onClick={() => setOpen(false)}>
+      <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={labels.close} onClick={() => {
+          setOpen(false);
+          // Drop ?from=linkedin so a refresh does not bring the notice back.
+          router.replace(withoutQueryParams(pathname, searchParams.toString(), ["from"]));
+        }}>
         <CloseIcon className="icon" />
       </button>
     </div>

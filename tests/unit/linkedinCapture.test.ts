@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { captureRedirectPath, isCaptureNextPath, isFromLinkedin, linkedinPrefill, noticeOwnerVariant, parseCaptureUrl } from "@/lib/contacts/linkedinCapture";
+import { captureRedirectPath, withoutQueryParams, isCaptureNextPath, isFromLinkedin, linkedinPrefill, noticeOwnerVariant, parseCaptureUrl } from "@/lib/contacts/linkedinCapture";
 import { buildBookmarkletHref, resolveAppOrigin } from "@/lib/contacts/linkedinBookmarklet";
 import { sanitizeNextPath } from "@/lib/auth/nextPath";
 
@@ -110,4 +110,11 @@ test("the login hint shows only when the sanitized next points at the capture ro
   assert.equal(isCaptureNextPath("/capture/linkedin?url=https%3A%2F%2Flinkedin.com%2Fin%2Fx"), true);
   assert.equal(isCaptureNextPath("/capture/linkedin"), true);
   for (const v of ["/", "/contacts", "/capture/linkedinx", "/x/capture/linkedin"]) assert.equal(isCaptureNextPath(v), false, v);
+});
+
+test("clearing the capture params keeps every other query param", () => {
+  assert.equal(withoutQueryParams("/contacts", "new=1&linkedin=https%3A%2F%2Flinkedin.com%2Fin%2Fx&view=mine&page=2", ["new", "linkedin"]), "/contacts?view=mine&page=2");
+  assert.equal(withoutQueryParams("/contacts", "new=1&linkedin=x", ["new", "linkedin"]), "/contacts");
+  assert.equal(withoutQueryParams("/contacts/abc", "from=linkedin", ["from"]), "/contacts/abc");
+  assert.equal(withoutQueryParams("/contacts/abc", "", ["from"]), "/contacts/abc");
 });
