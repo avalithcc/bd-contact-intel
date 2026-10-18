@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "email_message_bd_sent_idx" ON "email_message" USING btree ("bd_id","sent_at" DESC NULLS LAST);

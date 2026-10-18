@@ -55,7 +55,19 @@ function businessDaysElapsed(from: Date, to: Date, n: number): boolean {
   return count >= n;
 }
 
-function planOne(c: ReminderCandidate, now: Date): ReminderDecision {
+/** The Argentina calendar day (`YYYY-MM-DD`) on which `n` business days after `from` have elapsed: the first day `businessDaysElapsed(from, day, n)` holds. */
+export function reminderDueOn(from: Date, n: number): string {
+  let day = argentinaCalendarDate(from);
+  let count = 0;
+  while (count < n) {
+    day = addDaysToDateString(day, 1);
+    const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) count++;
+  }
+  return day;
+}
+
+function planOne(c: ReminderCandidate, now: Date, ignoreSchedule = false): ReminderDecision {
   const skip = (reason: ReminderSkipReason): ReminderDecision => ({ bdId: c.bdId, action: "skip", reason });
   if (c.role === "admin") return skip("admin");
   if (c.excluded) return skip("excluded");
@@ -70,10 +82,18 @@ function planOne(c: ReminderCandidate, now: Date): ReminderDecision {
     last === null
       ? businessDaysElapsed(seenAt, now, FIRST_REMINDER_AFTER_DAYS)
       : businessDaysElapsed(last, now, REMINDER_SPACING_DAYS);
-  if (!due) return skip("not_due");
+  if (!due && !ignoreSchedule) return skip("not_due");
 
   const number = (series.length + 1) as 1 | 2 | 3;
   return { bdId: c.bdId, action: "send", number, notifyOwner: number === MAX_REMINDERS_PER_SERIES };
+}
+
+/**
+ * An admin pressing "Enviar recordatorio" on the fleet view: the same decision as the cron minus the schedule, so the next
+ * reminder of the series goes out now. Every other guard (admin, excluded, healthy Gmail, complete series) still applies.
+ */
+export function planManualReminder(candidate: ReminderCandidate, now: Date): ReminderDecision {
+  return planOne(candidate, now, true);
 }
 
 export function planGmailReminders(candidates: readonly ReminderCandidate[], now: Date): ReminderDecision[] {

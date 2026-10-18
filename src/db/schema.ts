@@ -1491,6 +1491,8 @@ export const emailMessage = pgTable(
     bdGmailMessageUnique: unique("email_message_bd_gmail_message_unique").on(t.bdId, t.gmailMessageId),
     byBdThread: index("email_message_bd_thread_idx").on(t.bdId, t.gmailThreadId),
     byBdPerson: index("email_message_bd_person_idx").on(t.bdId, t.personId),
+    // Newest synced email per BD (the admin Gmail fleet view, drizzle/0051): a top-1 lookup per bd_id instead of reading and sorting every message of the BD.
+    byBdSent: index("email_message_bd_sent_idx").on(t.bdId, t.sentAt.desc()),
   }),
 );
 
