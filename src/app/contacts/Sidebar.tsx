@@ -30,6 +30,7 @@ import {
   SendIcon,
   BoltIcon,
   ClockIcon,
+  MailIcon,
 } from "@/components/icons";
 
 /** Longest a clicked item stays highlighted without the route committing. */
@@ -302,6 +303,15 @@ export function Sidebar({
           >
             <BoltIcon className="icon" />
             {labels.lushaByBd}
+          </Link>
+          <Link
+            href="/admin/gmail"
+            className={`nav-item${isActive("/admin/gmail") ? " active" : ""}`}
+            aria-current={isActive("/admin/gmail") ? "page" : undefined}
+            onClick={markPending("/admin/gmail")}
+          >
+            <MailIcon className="icon" />
+            {labels.gmailStatus}
           </Link>
         </div>
       )}

@@ -6,7 +6,7 @@ import { placeBubble } from "@/lib/ui/tooltipPosition";
 
 (globalThis as { React?: unknown }).React = React;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Tooltip } = require("@/components/Tooltip") as typeof import("@/components/Tooltip");
+const { Tooltip, TooltipText } = require("@/components/Tooltip") as typeof import("@/components/Tooltip");
 
 const VIEWPORT = { width: 1024, height: 768 };
 const BUBBLE = { width: 280, height: 100 };
@@ -37,20 +37,23 @@ test("when neither side fits it stays below rather than going off the top", () =
   assert.equal(p.placement, "below");
 });
 
-test("the trigger is focusable and described by a role=tooltip bubble that exists in the markup, hidden", () => {
+test("the trigger is focusable and points at the bubble by id (the bubble itself is portaled after mount)", () => {
   const html = renderToStaticMarkup(
-    createElement(Tooltip, { title: "Conexión", body: "Si Gmail está autorizado.", action: "Usa el botón.", actionLabel: "Qué hacer:", variant: "header", children: "Conexión" }),
+    createElement(Tooltip, { title: "Conexión", body: "Si Gmail está autorizado.", actionLabel: "Qué hacer:", variant: "header", children: "Conexión" }),
   );
-  const describedBy = /aria-describedby="([^"]+)"/.exec(html)?.[1];
-  assert.ok(describedBy, "the trigger has aria-describedby");
-  assert.match(html, new RegExp(`role="tooltip"[^>]*id="${describedBy}"|id="${describedBy}"[^>]*role="tooltip"`));
+  assert.match(html, /aria-describedby="[^"]+"/);
   assert.match(html, /tabindex="0"/);
-  assert.match(html, /hidden=""/);
-  assert.match(html, /<strong>Qué hacer:<\/strong> Usa el botón\./);
   assert.match(html, /tip-hdr/);
+  assert.match(html, /tip-q/);
+});
+
+test("the bubble text carries the title, the body and the 'what to do' line", () => {
+  const html = renderToStaticMarkup(createElement(TooltipText, { title: "Conexión", body: "Si Gmail está autorizado.", action: "Usa el botón.", actionLabel: "Qué hacer:" }));
+  assert.match(html, /<strong>Conexión<\/strong><br\/>Si Gmail está autorizado\./);
+  assert.match(html, /<strong>Qué hacer:<\/strong> Usa el botón\./);
 });
 
 test("a tooltip without an action line renders no 'what to do' row", () => {
-  const html = renderToStaticMarkup(createElement(Tooltip, { title: "Último email", body: "Fecha del último email.", actionLabel: "Qué hacer:", children: "x" }));
+  const html = renderToStaticMarkup(createElement(TooltipText, { title: "Último email", body: "Fecha del último email.", actionLabel: "Qué hacer:" }));
   assert.doesNotMatch(html, /Qué hacer/);
 });
