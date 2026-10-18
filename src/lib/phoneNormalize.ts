@@ -1,4 +1,4 @@
-import { parsePhoneNumberFromString } from "libphonenumber-js/max";
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/max";
 
 /**
  * Pure E.164 normalizer for `person.phone` / `person.mobile_phone`. Server-only: the `max` metadata must stay out of
@@ -14,6 +14,8 @@ export interface PhoneContext {
   source?: string | null;
   /** `person.country`, free text. */
   country?: string | null;
+  /** ISO 3166-1 alpha-2 the data provider reported for this very number (Lusha `countryIso2`). */
+  countryIso2?: string | null;
 }
 
 export type PhoneRule =
@@ -22,7 +24,9 @@ export type PhoneRule =
   | "intl_00_prefix"
   | "ar_mobile_local"
   | "ar_phone_local"
-  | "country_code_prefixed";
+  | "country_code_prefixed"
+  /** A national number made valid by the provider-reported country. */
+  | "provider_country";
 
 export type PhoneFlagReason =
   | "empty"
@@ -61,8 +65,8 @@ function foldCountry(country: string): string {
 }
 
 /** Argentine context: the DFF 2026 import, or a person recorded in Argentina. */
-export function isArgentineContext(source: string | null | undefined, country: string | null | undefined): boolean {
-  if (source === DFF_2026_SOURCE_KEY) return true;
+export function isArgentineContext(source: string | null | undefined, country: string | null | undefined, countryIso2?: string | null): boolean {
+  if (source === DFF_2026_SOURCE_KEY || countryIso2 === "AR") return true;
   if (!country) return false;
   const folded = foldCountry(country);
   return folded === "argentina" || folded === "ar";
@@ -121,7 +125,7 @@ export function normalizePhone(raw: string, ctx: PhoneContext): PhoneNormalizati
     return validE164(candidate) ? { value: candidate, rule: "intl_00_prefix" } : { flagged: true, reason: whyNotValid(candidate) };
   }
 
-  if (isArgentineContext(ctx.source, ctx.country) && digits.length === AR_LOCAL_LENGTH && !digits.startsWith("0")) {
+  if (isArgentineContext(ctx.source, ctx.country, ctx.countryIso2) && digits.length === AR_LOCAL_LENGTH && !digits.startsWith("0")) {
     const mobile = ctx.column === "mobilePhone";
     const candidate = mobile ? `+549${digits}` : `+54${digits}`;
     if (validE164(candidate)) return { value: candidate, rule: mobile ? "ar_mobile_local" : "ar_phone_local" };
@@ -133,9 +137,18 @@ export function normalizePhone(raw: string, ctx: PhoneContext): PhoneNormalizati
     if (validE164(candidate)) {
       return isAmbiguousCountry(candidate, ctx) ? { flagged: true, reason: "ambiguous_country" } : { value: candidate, rule: "country_code_prefixed" };
     }
+    const provider = providerCountryNumber(digits, ctx);
+    if (provider) return provider;
     return { flagged: true, reason: whyNotValid(candidate) === "possible_not_valid" ? "possible_not_valid" : "no_country_code" };
   }
-  return { flagged: true, reason: "no_country_code" };
+  return providerCountryNumber(digits, ctx) ?? { flagged: true, reason: "no_country_code" };
+}
+
+/** A national number read in the country the provider reported for it; null unless libphonenumber calls the result valid. */
+function providerCountryNumber(digits: string, ctx: PhoneContext): PhoneNormalization | null {
+  if (!ctx.countryIso2) return null;
+  const parsed = parsePhoneNumberFromString(digits, ctx.countryIso2 as CountryCode);
+  return parsed?.isValid() ? { value: parsed.number, rule: "provider_country" } : null;
 }
 
 /**

@@ -181,3 +181,12 @@ describe("DFF source key" , () => {
     assert.equal(here, imported);
   });
 });
+
+describe("provider country (Lusha countryIso2)", () => {
+  it("makes a national number valid in that country", () => {
+    assert.deepEqual(normalizePhone("(212) 555-0123", { column: "mobilePhone", countryIso2: "US" }), { value: "+12125550123", rule: "provider_country" });
+    assert.deepEqual(normalizePhone("11 5555 5555", { column: "phone", countryIso2: "AR" }), { value: "+541155555555", rule: "ar_phone_local" });
+    assert.deepEqual(normalizePhone("(212) 555-0123", { column: "phone", countryIso2: "FR" }), { flagged: true, reason: "no_country_code" });
+    assert.deepEqual(normalizePhone("(212) 555-0123", { column: "phone" }), { flagged: true, reason: "no_country_code" });
+  });
+});

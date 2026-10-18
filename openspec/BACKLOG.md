@@ -883,7 +883,7 @@ The shape, which had never been seen:
    mobile number, and the type is compared case-insensitively (`da42b3a8`,
    `b9d4b84d`).
 
-`countryIso2` is also discarded; it would be useful for formatting. (Re-checked
+`countryIso2` was discarded; **fixed 2026-10-18**: it is read from the raw payload (already stored, no column or migration), carried on the pick, and passed to `normalizePhoneForWrite` as the country of that number. (Re-checked
 2026-10-18: `rg countryIso2 src` finds nothing, so it is still not stored. The
 `doNotCall` flag IS now read: `src/lib/lusha/parse.ts:247`, `doNotCallDb.ts`,
 `doNotCallWarning.ts`, so finding 1's "nothing reads it" is out of date.)

@@ -140,13 +140,14 @@ export function parseEnrichResponse(body: unknown, lushaId: string): EnrichOutco
 }
 
 export type Pick =
-  | { ok: true; value: string; type: string | null; confidence: number | null; raw: unknown }
+  | { ok: true; value: string; type: string | null; confidence: number | null; /** ISO 3166-1 alpha-2 Lusha reports for a phone entry (upper-cased); null when absent or malformed. */ countryIso2: string | null; raw: unknown }
   | { ok: false; reason: "empty" | "unparsable_value"; raw: unknown };
 
 interface Candidate {
   value: string;
   type: string | null;
   confidence: number;
+  countryIso2: string | null;
   /** Rank of the company domain this value is on, 0 when on none of them (always 0 for a phone). */
   companyDomain: number;
 }
@@ -164,6 +165,12 @@ const confidenceOf = (x: unknown): number => {
   const grade = /^([A-F])([+-]?)$/.exec(typeof x === "string" ? x.trim().toUpperCase() : "");
   if (!grade) return -Infinity;
   return Math.round((("FEDCBA".indexOf(grade[1]) * 3 + (grade[2] === "+" ? 3 : grade[2] === "-" ? 1 : 2)) / 18) * 100);
+};
+
+/** Lusha's `countryIso2`: exactly two letters, upper-cased; anything else is no country at all. */
+const iso2Of = (x: unknown): string | null => {
+  const s = str(x);
+  return s && /^[A-Za-z]{2}$/.test(s) ? s.toUpperCase() : null;
 };
 
 /** "www.Alephee.com", "https://alephee.com/" and "alephee.com" are one company. */
@@ -211,13 +218,13 @@ function choose(raw: unknown, valueKey: string, valid: (v: string) => boolean, c
     for (const e of raw) {
       const value = isRecord(e) ? str(e[valueKey]) : null;
       if (!isRecord(e) || !value || !valid(value)) continue;
-      candidates.push({ value, type: str(e.type), confidence: confidenceOf(e.confidence), companyDomain: ranked.get(hostOf(value)) ?? 0 });
+      candidates.push({ value, type: str(e.type), confidence: confidenceOf(e.confidence), countryIso2: iso2Of(e.countryIso2), companyDomain: ranked.get(hostOf(value)) ?? 0 });
     }
   }
   if (candidates.length === 0) return { ok: false, reason: "unparsable_value", raw };
   let best = candidates[0];
   for (const c of candidates.slice(1)) if (outranks(c, best)) best = c;
-  return { ok: true, value: best.value, type: best.type, confidence: Number.isFinite(best.confidence) ? best.confidence : null, raw };
+  return { ok: true, value: best.value, type: best.type, confidence: Number.isFinite(best.confidence) ? best.confidence : null, countryIso2: best.countryIso2, raw };
 }
 
 /** `companyDomains`: strongest first — the Contact's company domain on OUR side, then Lusha's (see choose). */

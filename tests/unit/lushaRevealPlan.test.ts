@@ -231,3 +231,33 @@ test("phone: the stored value is E.164 when the provider's layout can be normali
   assert.equal(plan.historyRows[0]?.newValue, "+541155555555");
   assert.equal(planRevealedPhoneWrite(person(), phonePick([{ number: "011 5555-5555", type: "mobile" }]), META).personUpdate?.mobilePhone, "011 5555-5555");
 });
+
+test("countryIso2 from the reveal is surfaced on the pick and used as the country context for a local-format number", () => {
+  const pick = phonePick([{ number: "(212) 555-0123", type: "mobile", countryIso2: "US" }]);
+  assert.equal(pick.ok && pick.countryIso2, "US");
+  const plan = planRevealedPhoneWrite(person(), pick, META);
+  assert.equal(plan.personUpdate?.mobilePhone, "+12125550123");
+  const without = planRevealedPhoneWrite(person(), phonePick([{ number: "(212) 555-0123", type: "mobile" }]), META);
+  assert.equal(without.personUpdate?.mobilePhone, "(212) 555-0123", "no country context: stored as sent");
+});
+
+test("a lowercase countryIso2 is normalized and a malformed one is ignored", () => {
+  const ok = phonePick([{ number: "2125550123", type: "mobile", countryIso2: "us" }]);
+  assert.equal(ok.ok && ok.countryIso2, "US");
+  const bad = phonePick([{ number: "2125550123", type: "mobile", countryIso2: "USA" }]);
+  assert.equal(bad.ok && bad.countryIso2, null);
+});
+
+test("planRevealedPhonesWrite uses each number's own country, twice with the same input gives the same plan", () => {
+  const picks = pickPhones([
+    { number: "(212) 555-0123", type: "mobile", countryIso2: "US" },
+    { number: "(212) 555-0199", type: "work", countryIso2: "US" },
+  ]);
+  const p = Object.freeze(person());
+  const a = planRevealedPhonesWrite(p, picks, META);
+  const b = planRevealedPhonesWrite(p, picks, META);
+  assert.equal(a.personUpdate?.mobilePhone, "+12125550123");
+  assert.equal(a.personUpdate?.phone, "+12125550199");
+  assert.equal(b.personUpdate?.mobilePhone, a.personUpdate?.mobilePhone);
+  assert.equal(b.personUpdate?.phone, a.personUpdate?.phone);
+});
