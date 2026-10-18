@@ -12,8 +12,8 @@
     "dev:reset": "tsx scripts/dev-setup.ts --reset",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit --noUnusedLocals",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p extension",
+    "lint": "tsc --noEmit --noUnusedLocals && tsc --noEmit --noUnusedLocals -p extension",
     "test:db": "npx tsx --test tests/db/**/*.test.ts",
     "test:unit": "npx tsx --test tests/unit/**/*.test.ts",
     "test:e2e": "playwright test",
@@ -21,7 +21,9 @@
     "test:e2e:ui": "playwright test --ui",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "extension:build": "tsx extension/build/build.ts",
+    "extension:build:dev": "tsx extension/build/build.ts --dev"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.87",
@@ -51,6 +53,7 @@
     "@types/react-dom": "^19.0.2",
     "@types/sanitize-html": "2.16.2",
     "drizzle-kit": "^0.28.1",
+    "esbuild": "^0.19.12",
     "tsx": "^4.23.15",
     "typescript": "^5.7.2"
   }

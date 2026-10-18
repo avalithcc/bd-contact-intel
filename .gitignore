@@ -39,3 +39,7 @@ screenshoots/*
 
 # Ad-hoc screenshots the owner drops in while testing; nothing cites them.
 bugs_ss/
+
+# LinkedIn extension build output (npm run extension:build)
+/extension/dist/
+/extension/dist-dev/
