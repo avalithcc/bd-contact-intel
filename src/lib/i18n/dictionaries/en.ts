@@ -1581,6 +1581,15 @@ export const en = {
     attemptSaved: "Attempt logged",
     recordError: "The call attempt could not be recorded.",
     saveError: "The outcome could not be saved. Try again.",
+    calling: "Calling with your phone app…",
+    details: "More details…",
+    dialLine: "Call to",
+    followUpToggle: "Create follow-up task",
+    followUpTitleLabel: "Title",
+    followUpDueLabel: "Due",
+    followUpTitleDefault: "Call {name} again",
+    followUpError: "The call was logged, but the task could not be created.",
+    followUpSaved: "Task created.",
   },
 
   connectionBanner: {
