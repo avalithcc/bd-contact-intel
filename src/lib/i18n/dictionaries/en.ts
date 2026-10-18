@@ -749,6 +749,12 @@ export const en = {
   // src/lib/contacts/labels.ts), and ClientStrings<T> forbids formatter
   // functions in a client-bound slice.
   contactRecord: {
+    linkedinNoticeTitle: "Already in the CRM",
+    linkedinNoticeBody: "This person already exists: we found them by the LinkedIn link.",
+    linkedinNoticeOwnerOther: "Owner:",
+    linkedinNoticeOwnerMine: "This contact is yours.",
+    linkedinNoticeNoOwner: "No owner yet.",
+    linkedinNoticeClose: "Dismiss notice",
     tabActivity: "Activity",
     tabOverview: "Overview",
     aboutSectionTitle: "About this contact",
@@ -1389,6 +1395,7 @@ export const en = {
     forgotPasswordLink: "Forgot your password?",
     expiredLinkError: "That link expired or is invalid. Request a new one.",
     notAuthorizedError: "This account can't sign in here. Ask an administrator for access.",
+    captureHint: "Sign in to continue with the LinkedIn profile you sent.",
   },
 
   // /capture/linkedin: the "invalid link" screen (linkedin-exists-check mockup, section 4).
@@ -2628,6 +2635,8 @@ export const en = {
     newContactExistingMatchBody: "{name} is already in the base, matched by LinkedIn or verified email — no duplicate was created.",
     newContactBlockedOwnCompany: "This looks like an Avalith teammate, not an external contact.",
     newContactInvalidRequiresName: "Enter at least a first or last name.",
+    newContactFromLinkedinTitle: "This person is not in the CRM yet",
+    newContactFromLinkedinBody: "The LinkedIn link is already filled in. Type the name and company to create them.",
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

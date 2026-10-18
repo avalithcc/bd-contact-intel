@@ -9,6 +9,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CheckIcon } from "@/components/icons";
 import { createContactAction, type CreateContactResult } from "./createContactActions";
 import type { NewContactFormInput } from "@/lib/contacts/createContact";
 
@@ -31,6 +32,9 @@ export interface NewContactDialogLabels {
   existingMatchBody: string;
   blockedOwnCompany: string;
   invalidRequiresName: string;
+  /** Only needed when `initialLinkedin` is passed (opened from /capture/linkedin). */
+  fromLinkedinTitle?: string;
+  fromLinkedinBody?: string;
 }
 
 const EMPTY_INPUT: NewContactFormInput = { firstName: "", lastName: "", linkedinUrl: "", email: "", company: "" };
@@ -48,20 +52,32 @@ const EMPTY_INPUT: NewContactFormInput = { firstName: "", lastName: "", linkedin
  * `.qa-icon` icon-button style (company-record.html:66), not a standalone
  * primary button, while `/contacts`' own "Nuevo contacto" trigger keeps the
  * default. Receives the same `onClick` the default button would use.
+ *
+ * `initialLinkedin` + `defaultOpen` (linkedin-exists-check): `/contacts?new=1&linkedin=…`
+ * (the bookmarklet found nobody) opens the dialog already showing the link, with
+ * the "aún no está en el CRM" notice. The caller passes a URL it has validated.
  */
 export function NewContactDialog({
   labels: l,
   initialCompany,
+  initialLinkedin,
+  defaultOpen = false,
   renderTrigger,
 }: {
   labels: NewContactDialogLabels;
   initialCompany?: string;
+  initialLinkedin?: string;
+  defaultOpen?: boolean;
   renderTrigger?: (onClick: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [pending, setPending] = useState(false);
-  const emptyInput = initialCompany ? { ...EMPTY_INPUT, company: initialCompany } : EMPTY_INPUT;
+  const emptyInput: NewContactFormInput = {
+    ...EMPTY_INPUT,
+    ...(initialCompany ? { company: initialCompany } : {}),
+    ...(initialLinkedin ? { linkedinUrl: initialLinkedin } : {}),
+  };
   const [input, setInput] = useState<NewContactFormInput>(emptyInput);
   const [result, setResult] = useState<CreateContactResult | null>(null);
 
@@ -102,6 +118,15 @@ export function NewContactDialog({
               </button>
             </div>
             <div className="dialog-body">
+              {initialLinkedin && l.fromLinkedinTitle && !result && (
+                <div className="alert alert-success" role="status">
+                  <CheckIcon className="icon" />
+                  <div>
+                    <div className="title">{l.fromLinkedinTitle}</div>
+                    {l.fromLinkedinBody}
+                  </div>
+                </div>
+              )}
               <div className="form-grid">
                 <div className="field">
                   <label className="label" htmlFor="nc-f">
@@ -110,6 +135,7 @@ export function NewContactDialog({
                   <input
                     className="input"
                     id="nc-f"
+                    autoFocus={Boolean(initialLinkedin)}
                     value={input.firstName}
                     onChange={(e) => setInput((s) => ({ ...s, firstName: e.target.value }))}
                   />

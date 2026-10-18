@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
 import { sanitizeNextPath } from "@/lib/auth/nextPath";
+import { isCaptureNextPath } from "@/lib/contacts/linkedinCapture";
+import { InfoIcon } from "@/components/icons";
 import { PASSWORD_RESET_ENABLED } from "@/lib/auth/passwordReset";
 import { ALLOWED_WORK_EMAIL_DOMAIN } from "@/lib/auth/allowedEmail";
 
@@ -73,6 +75,12 @@ export function LoginForm({
         <span className="dot">.</span>
       </h1>
       <form className="panel mt-xl" onSubmit={signIn}>
+        {isCaptureNextPath(safeNext) && (
+          <div className="alert alert-info mb-lg" role="status">
+            <InfoIcon className="icon" />
+            <div>{dict.login.captureHint}</div>
+          </div>
+        )}
         <div className="mb-lg">
           <label htmlFor="email">{dict.login.workEmail}</label>
           <input

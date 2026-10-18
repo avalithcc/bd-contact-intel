@@ -46,6 +46,8 @@ import { seniorityLabel } from "@/lib/contacts/seniority";
 import { ContactSequenceBlock } from "./ContactSequenceBlock";
 import { ChangeCompanyButton } from "./ChangeCompanyButton";
 import { RecordTabs } from "./RecordTabs";
+import { LinkedinExistsNotice } from "./LinkedinExistsNotice";
+import { isFromLinkedin, noticeOwnerVariant } from "@/lib/contacts/linkedinCapture";
 import { Timeline } from "./Timeline";
 import { Overview } from "./Overview";
 import { ConversationHistoryCard } from "./ConversationHistoryCard";
@@ -88,7 +90,7 @@ export const maxDuration = 60;
 
 interface ContactRecordPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ activityType?: string; openAction?: string }>;
+  searchParams: Promise<{ activityType?: string; openAction?: string; from?: string }>;
 }
 
 // Board drag/keyboard-menu targets (task 10.5, 14.1) plus the follow-up
@@ -112,12 +114,13 @@ function isOpenActionParam(value: string | undefined): value is OpenActionParam 
  */
 export default async function ContactRecordPage({ params, searchParams }: ContactRecordPageProps) {
   const { id } = await params;
-  const { activityType: rawActivityType, openAction: rawOpenAction } = await searchParams;
+  const { activityType: rawActivityType, openAction: rawOpenAction, from } = await searchParams;
+  const fromLinkedin = isFromLinkedin(from);
   const openAction = isOpenActionParam(rawOpenAction) ? rawOpenAction : null;
   const result = await getContactRecord(id);
 
   if (result.kind === "not_found") notFound();
-  if (result.kind === "redirect") redirect(`/contacts/${result.personId}`);
+  if (result.kind === "redirect") redirect(`/contacts/${result.personId}${fromLinkedin ? "?from=linkedin" : ""}`);
 
   const { record } = result;
   const dict = await getDictionary();
@@ -475,6 +478,22 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
 
         <div className="record-main">
           <RecordTabs
+            notice={
+              fromLinkedin ? (
+                <LinkedinExistsNotice
+                  labels={{
+                    title: l.linkedinNoticeTitle,
+                    body: l.linkedinNoticeBody,
+                    ownerOther: l.linkedinNoticeOwnerOther,
+                    ownerMine: l.linkedinNoticeOwnerMine,
+                    noOwner: l.linkedinNoticeNoOwner,
+                    close: l.linkedinNoticeClose,
+                  }}
+                  variant={noticeOwnerVariant(record.person.ownerBdId, record.ownerName, me.id)}
+                  owner={record.person.ownerBdId && record.ownerName ? { id: record.person.ownerBdId, name: record.ownerName } : null}
+                />
+              ) : undefined
+            }
             tabs={[
               {
                 id: "activity",

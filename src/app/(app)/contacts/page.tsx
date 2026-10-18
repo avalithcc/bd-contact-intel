@@ -49,6 +49,7 @@ import { appendAdHocFilterParams, contactFilterParamsFromSearchParams } from "@/
 import { FilterMenu } from "./FilterMenu";
 import { deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
+import { linkedinPrefill } from "@/lib/contacts/linkedinCapture";
 import { NewContactDialog, type NewContactDialogLabels } from "./NewContactDialog";
 import { SaveViewDialog } from "./SaveViewDialog";
 import { buildSaveViewSummary } from "@/lib/contacts/filterChips";
@@ -86,6 +87,9 @@ interface ContactsPageProps {
     columns?: string;
     bulkResult?: string;
     bulkLimited?: string;
+    // /capture/linkedin found nobody: open "Nuevo contacto" with the link loaded.
+    new?: string;
+    linkedin?: string;
     layout?: string;
     // Ad-hoc filter panel (task 13.3 parity gaps), layered on top of the
     // active view's filters — see applyAdHocContactFilterOverrides.
@@ -415,6 +419,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     existingMatchBody: l.newContactExistingMatchBody,
     blockedOwnCompany: l.newContactBlockedOwnCompany,
     invalidRequiresName: l.newContactInvalidRequiresName,
+    fromLinkedinTitle: l.newContactFromLinkedinTitle,
+    fromLinkedinBody: l.newContactFromLinkedinBody,
   };
 
   // Table/board toggle (task 14.1; design.md "Routes": "`?layout=board`
@@ -668,7 +674,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <Link href="/contacts/import" className="btn btn-secondary">
             {dict.contactsImport.pageTitle}
           </Link>
-          <NewContactDialog labels={newContactLabels} />
+          <NewContactDialog labels={newContactLabels} defaultOpen={sp.new === "1"} initialLinkedin={linkedinPrefill(sp.linkedin)} />
         </div>
       </div>
 

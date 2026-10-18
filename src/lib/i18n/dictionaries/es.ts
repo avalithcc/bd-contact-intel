@@ -672,6 +672,12 @@ export const es: typeof en = {
   },
 
   contactRecord: {
+    linkedinNoticeTitle: "Ya está en el CRM",
+    linkedinNoticeBody: "Esta persona ya existe: la encontramos por el enlace de LinkedIn.",
+    linkedinNoticeOwnerOther: "Responsable:",
+    linkedinNoticeOwnerMine: "Este contacto es tuyo.",
+    linkedinNoticeNoOwner: "Sin responsable todavía.",
+    linkedinNoticeClose: "Cerrar aviso",
     tabActivity: "Actividad",
     tabOverview: "Resumen",
     aboutSectionTitle: "Sobre este contacto",
@@ -1342,6 +1348,7 @@ export const es: typeof en = {
     forgotPasswordLink: "¿Olvidaste tu contraseña?",
     expiredLinkError: "El enlace venció o no es válido. Solicitá uno nuevo.",
     notAuthorizedError: "Esta cuenta no puede iniciar sesión aquí. Pídele acceso a un administrador.",
+    captureHint: "Inicia sesión para continuar con el perfil de LinkedIn que enviaste.",
   },
 
   // /capture/linkedin: the "enlace no válido" screen (linkedin-exists-check mockup, section 4).
@@ -2614,6 +2621,8 @@ export const es: typeof en = {
     newContactExistingMatchBody: "{name} ya está en la base, identificado por LinkedIn o correo verificado — no se creó un duplicado.",
     newContactBlockedOwnCompany: "Parece ser una persona de Avalith, no un contacto externo.",
     newContactInvalidRequiresName: "Ingresá al menos un nombre o apellido.",
+    newContactFromLinkedinTitle: "Esta persona aún no está en el CRM",
+    newContactFromLinkedinBody: "El enlace de LinkedIn ya está cargado. Escribe el nombre y la empresa para crearla.",
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0
