@@ -1588,7 +1588,7 @@ export const en = {
     followUpTitleLabel: "Title",
     followUpDueLabel: "Due",
     followUpTitleDefault: "Call {name} again",
-    followUpError: "The call was logged, but the task could not be created.",
+    followUpError: "The call was saved, but the task could not be created. You can add it manually.",
     followUpSaved: "Task created.",
   },
 
