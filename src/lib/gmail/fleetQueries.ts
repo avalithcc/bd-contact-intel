@@ -4,7 +4,7 @@
  * bounces split by severity and the failed scheduled sends, each aggregated to at most one row per BD BEFORE it joins, so
  * nothing fans out. Decisions live in the pure fleetView.ts; this file only reads.
  *
- * Plan on production (2026-10-18, 5 BDs, 3,208 messages): the newest-email lateral is a top-1 per BD (migration 0051 adds
+ * Plan on production (2026-10-18, 5 BDs, 3,208 messages): the newest-email lateral is a top-1 per BD (migration 0052 adds
  * email_message_bd_sent_idx so it stays one index probe per BD as the table grows; before it, 3.6 ms and 2,115 buffers by
  * sorting every message of each BD); bounces use activity_type_idx; failed sends use scheduled_email_bd_status_idx.
  */

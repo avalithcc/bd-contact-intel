@@ -1,5 +1,5 @@
 /**
- * getGmailFleetHealth (admin "Estado de Gmail") against a scratch database with migration 0051 applied. Opt-in and fail-closed:
+ * getGmailFleetHealth (admin "Estado de Gmail") against a scratch database with migration 0052 applied. Opt-in and fail-closed:
  * `npm run test:db`, DATABASE_URL a local `_e2e` database. Never calls Gmail. Everything is created under a per-run token and
  * removed.
  */
