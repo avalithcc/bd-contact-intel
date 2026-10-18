@@ -25,7 +25,7 @@
  */
 import { and, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activity, auditLog, contact, lead, migrationRun, signal, task } from "@/db/schema";
+import { activity, auditLog, contact, lead, migrationRun, signal } from "@/db/schema";
 import type { CatchUpContactRow, CatchUpLeadRow } from "./catchUpPlanner";
 import type { FinalizeCatchUpExecuteInput } from "./catchUpRun";
 import { contactRowsToIdentityRows, leadRowsToIdentityRows } from "@/lib/identity/ingestWrite";
@@ -212,7 +212,8 @@ export async function finalizeCatchUpExecute(input: FinalizeCatchUpExecuteInput)
     // Set-based re-point: any activity/task/signal row still carrying a null
     // person_id, for EITHER legacy subject (contact or lead), gets one
     // through the map this run (or an earlier one) just wrote.
-    for (const table of [activity, task, signal]) {
+    // `task` is not re-pointed: its legacy contact_id/lead_id columns were dropped (always null).
+    for (const table of [activity, signal]) {
       await tx.execute(sql`
         UPDATE ${table} AS r
         SET person_id = m.person_id

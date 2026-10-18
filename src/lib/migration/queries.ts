@@ -21,7 +21,6 @@ import {
   personBdConnection,
   personIdMap,
   signal,
-  task,
 } from "@/db/schema";
 import { assertApprovable, MigrationApproveBlockedError } from "./approveGuard";
 import type { CollapseContactRow, CollapsePlan } from "./collapsePlanner";
@@ -519,7 +518,8 @@ export async function finalizeFoldExecute(input: FinalizeFoldExecuteInput): Prom
     // Set-based re-point: every activity/task/signal row still carrying a
     // legacy leadId with no person_id gets one through the map this run (or
     // an earlier one) just wrote — never one UPDATE per row.
-    for (const table of [activity, task, signal]) {
+    // `task` is not re-pointed: its legacy lead_id column was dropped (always null).
+    for (const table of [activity, signal]) {
       await tx.execute(sql`
         UPDATE ${table} AS r
         SET person_id = m.person_id

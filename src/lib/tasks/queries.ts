@@ -2,9 +2,6 @@ import { and, asc, desc, eq, isNotNull, isNull, lt, sql, type SQL } from "drizzl
 import { db } from "@/db";
 import { activity, bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
-import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
-import { personIdLookupSql } from "@/lib/identity/resolveDb";
-import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import type { TaskSubjectInput } from "@/lib/tasks/subject";
 // The error class itself lives in assignee.ts (a DB-free module), not here —
 // see that file's doc comment for why (src/app/(app)/contacts/actionErrors.ts
@@ -15,9 +12,7 @@ import { combineOpenAndDoneTasks } from "@/lib/contacts/timelineTasks";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 
 export interface TaskFilters {
-  leadId?: string;
   companyKey?: string;
-  contactId?: string;
   assignedToBdId?: string;
   status?: "open" | "done" | "cancelled";
 }
@@ -37,9 +32,7 @@ export interface TaskRow extends Task, TaskSubjectInput {
 function taskSubjectSelect() {
   return {
     id: task.id,
-    leadId: task.leadId,
     companyKey: task.companyKey,
-    contactId: task.contactId,
     personId: task.personId,
     actorBdId: task.actorBdId,
     assignedToBdId: task.assignedToBdId,
@@ -78,16 +71,8 @@ export async function getTasks(
 ): Promise<TasksPage> {
   const conditions: SQL[] = [];
 
-  if (filters.leadId) {
-    conditions.push(eq(task.leadId, filters.leadId));
-  }
-
   if (filters.companyKey) {
     conditions.push(eq(task.companyKey, filters.companyKey));
-  }
-
-  if (filters.contactId) {
-    conditions.push(eq(task.contactId, filters.contactId));
   }
 
   if (filters.assignedToBdId) {
@@ -208,9 +193,7 @@ export interface TasksForPerson {
  * normalizes both to `Date`. */
 type TaskWindowRow = {
   id: string;
-  leadId: string | null;
   companyKey: string | null;
-  contactId: string | null;
   personId: string | null;
   actorBdId: string | null;
   assignedToBdId: string | null;
@@ -249,9 +232,7 @@ function toDate(value: Date | string): Date {
 function toTaskRow(row: TaskWindowRow): TaskRow {
   return {
     id: row.id,
-    leadId: row.leadId,
     companyKey: row.companyKey,
-    contactId: row.contactId,
     personId: row.personId,
     actorBdId: row.actorBdId,
     assignedToBdId: row.assignedToBdId,
@@ -322,9 +303,7 @@ export async function getTasksForPerson(personId: string): Promise<TasksForPerso
     with ranked as (
       select
         task.id as "id",
-        task.lead_id as "leadId",
         task.company_key as "companyKey",
-        task.contact_id as "contactId",
         task.person_id as "personId",
         task.actor_bd_id as "actorBdId",
         task.assigned_to_bd_id as "assignedToBdId",
@@ -465,10 +444,7 @@ export async function assertAssigneeExists(assignedToBdId: string, creatorBdId: 
  * insert inside its transaction; a bare call still writes through `db`.
  */
 export async function createTask(input: NewTask, exec: Pick<typeof db, "insert"> = db): Promise<Task> {
-  const lookup = input.personId == null ? resolvePersonIdLookup(input) : null;
-  const values =
-    lookup && isIdentityDualWriteEnabled() ? { ...input, personId: personIdLookupSql(lookup) } : input;
-  const [row] = await exec.insert(task).values(values).returning();
+  const [row] = await exec.insert(task).values(input).returning();
   return row!;
 }
 

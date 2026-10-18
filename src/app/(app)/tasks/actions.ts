@@ -23,9 +23,7 @@ export async function searchTaskSubjectsAction(query: string): Promise<TaskSubje
 export async function createTaskAction(input: {
   title: string;
   description?: string;
-  leadId?: string;
   companyKey?: string;
-  contactId?: string;
   // Unified-Contact subject (design D1); record page's quick actions (9.2).
   personId?: string;
   dueAt?: Date;

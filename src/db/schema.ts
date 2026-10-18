@@ -1309,11 +1309,9 @@ export const task = pgTable(
   "task",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    leadId: uuid("lead_id").references(() => lead.id, { onDelete: "cascade" }),
     companyKey: text("company_key").references(() => company.companyKey, {
       onDelete: "cascade",
     }),
-    contactId: uuid("contact_id"),
     // Unified-Contact subject FK (design D1) — see activity.personId comment.
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "cascade",
@@ -1334,9 +1332,7 @@ export const task = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    byLead: index("task_lead_idx").on(t.leadId),
     byCompany: index("task_company_idx").on(t.companyKey),
-    byContact: index("task_contact_idx").on(t.contactId),
     byPerson: index("task_person_idx").on(t.personId),
     byAssignee: index("task_assignee_idx").on(t.assignedToBdId),
     byStatus: index("task_status_idx").on(t.status),

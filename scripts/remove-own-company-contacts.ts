@@ -20,7 +20,6 @@
  *    automatically:
  *      - linkedin_scrape_job (contact_id)
  *      - signal (contact_id)
- *      - task (contact_id)
  *      - activity (contact_id)
  *      - conversation (bd_id + peer_profile_key), which cascades its own
  *        `message` rows via the real `message.conversation_id` FK.
@@ -152,12 +151,6 @@ async function main() {
         .select({ count: sql<number>`count(*)` })
         .from(signal)
         .where(inArray(signal.contactId, ownContactIds))
-    : [{ count: 0 }];
-  const [taskCount] = ownContactIds.length
-    ? await db
-        .select({ count: sql<number>`count(*)` })
-        .from(task)
-        .where(inArray(task.contactId, ownContactIds))
     : [{ count: 0 }];
   const [activityCount] = ownContactIds.length
     ? await db
@@ -360,7 +353,6 @@ async function main() {
     if (ownContactIds.length) {
       await tx.delete(linkedinScrapeJob).where(inArray(linkedinScrapeJob.contactId, ownContactIds));
       await tx.delete(signal).where(inArray(signal.contactId, ownContactIds));
-      await tx.delete(task).where(inArray(task.contactId, ownContactIds));
       await tx.delete(activity).where(inArray(activity.contactId, ownContactIds));
     }
     if (conversationIds.length) {
