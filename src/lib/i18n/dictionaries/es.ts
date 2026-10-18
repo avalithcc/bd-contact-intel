@@ -1547,6 +1547,15 @@ export const es: typeof en = {
     attemptSaved: "Intento registrado",
     recordError: "No se pudo registrar el intento de llamada.",
     saveError: "No se pudo guardar el resultado. Inténtalo de nuevo.",
+    calling: "Llamando con tu app de teléfono…",
+    details: "Más detalles…",
+    dialLine: "Llamada a",
+    followUpToggle: "Crear tarea de seguimiento",
+    followUpTitleLabel: "Título",
+    followUpDueLabel: "Vence",
+    followUpTitleDefault: "Llamar de nuevo a {name}",
+    followUpError: "La llamada se registró, pero no se pudo crear la tarea.",
+    followUpSaved: "Tarea creada.",
   },
 
   // Shell banner for the three cases where the BD's Gmail stops feeding the

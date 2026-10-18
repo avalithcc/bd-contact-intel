@@ -962,6 +962,30 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* "Más detalles…" dialog (click-to-call-log): read-only dialled line and the follow-up task fields. */
+.dial-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+}
+.dial-line .mono {
+  font-weight: 600;
+}
+.dial-line .meta {
+  margin-left: auto;
+}
+.followup {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: var(--space-lg);
+  margin-top: var(--space-sm);
+  padding-left: var(--space-xl);
+}
 /* "Hablé" opens the optional note in the same bar. */
 .outcome .onote-form {
   display: flex;
