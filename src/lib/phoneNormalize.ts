@@ -39,7 +39,9 @@ export type PhoneFlagReason =
   /** Digits only, no recognizable country code and no Argentine context. */
   | "no_country_code"
   /** Argentine context, but the area code is unknown or absent (e.g. `15…`). */
-  | "ar_area_code_unknown";
+  | "ar_area_code_unknown"
+  /** Digits-only value whose country code is a guess: from the Argentine DFF source, or +1/Peru without a matching person country. */
+  | "ambiguous_country";
 
 export type PhoneNormalization = { value: string; rule: PhoneRule } | { flagged: true; reason: PhoneFlagReason };
 
@@ -79,6 +81,21 @@ function whyNotValid(candidate: string): PhoneFlagReason {
   return parsed.isPossible() ? "possible_not_valid" : "invalid_number";
 }
 
+const CORROBORATING_COUNTRIES: Record<string, readonly string[]> = {
+  US: ["united states", "usa", "us", "estados unidos", "eeuu", "ee.uu."],
+  CA: ["canada", "ca"],
+  PE: ["peru", "pe"],
+};
+
+/** A digits-only value is not trusted when its source is Argentine (DFF) or when it reads as +1 / Peru and the person's country does not say so. */
+function isAmbiguousCountry(candidate: string, ctx: PhoneContext): boolean {
+  if (ctx.source === DFF_2026_SOURCE_KEY) return true;
+  const parsed = parsePhoneNumberFromString(candidate);
+  if (parsed?.countryCallingCode !== "1" && parsed?.country !== "PE") return false;
+  const names = CORROBORATING_COUNTRIES[parsed.country ?? ""] ?? [];
+  return !ctx.country || !names.includes(foldCountry(ctx.country));
+}
+
 export function normalizePhone(raw: string, ctx: PhoneContext): PhoneNormalization {
   // "(+54) 9 11 ..." is a country code in parens, not a misplaced plus.
   const trimmed = raw.trim().replace(/^\(\s*(\+[0-9\s]+)\)/, "$1");
@@ -113,7 +130,9 @@ export function normalizePhone(raw: string, ctx: PhoneContext): PhoneNormalizati
 
   if (!digits.startsWith("0") && OBVIOUS_CALLING_CODES.some((code) => digits.startsWith(code))) {
     const candidate = `+${digits}`;
-    if (validE164(candidate)) return { value: candidate, rule: "country_code_prefixed" };
+    if (validE164(candidate)) {
+      return isAmbiguousCountry(candidate, ctx) ? { flagged: true, reason: "ambiguous_country" } : { value: candidate, rule: "country_code_prefixed" };
+    }
     return { flagged: true, reason: whyNotValid(candidate) === "possible_not_valid" ? "possible_not_valid" : "no_country_code" };
   }
   return { flagged: true, reason: "no_country_code" };

@@ -91,6 +91,17 @@ describe("normalizePhone rule 4: digits-only with an obvious country code", () =
     ok("541155555555", phone, "+541155555555", "country_code_prefixed");
     ok("5491155555555", mobile, "+5491155555555", "country_code_prefixed");
   });
+  it("flags a DFF value that is not the Argentine local shape instead of guessing a country", () => {
+    flagged("14155552671", dffMobile, "ambiguous_country");
+    flagged("56987654321", dffMobile, "ambiguous_country");
+  });
+  it("flags +1 and Peru detections unless the person's country corroborates them", () => {
+    flagged("14155552671", { column: "mobilePhone", source: "hubspot_import" }, "ambiguous_country");
+    flagged("14155552671", { column: "mobilePhone", country: "Argentina" }, "ambiguous_country");
+    flagged("5112345678", phone, "ambiguous_country");
+    ok("14155552671", { column: "mobilePhone", country: "United States" }, "+14155552671", "country_code_prefixed");
+    ok("5112345678", { column: "phone", country: "Perú" }, "+5112345678", "country_code_prefixed");
+  });
   it("flags a wrong length for the code instead of guessing", () => {
     flagged("57300123456", mobile, "no_country_code");
     flagged("5730012345678", mobile, "possible_not_valid");
