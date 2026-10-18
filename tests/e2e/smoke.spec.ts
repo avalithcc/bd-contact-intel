@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { gotoAuthed, skipWithoutCredentials } from './helpers';
+import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 import { es } from '../../src/lib/i18n/dictionaries/es';
 import { en } from '../../src/lib/i18n/dictionaries/en';
 
@@ -69,5 +69,34 @@ test.describe('render smoke', () => {
     await page.waitForLoadState('networkidle');
     expect(response?.status(), 'contact record: HTTP status').toBeLessThan(500);
     await expectRendered(page, consoleErrors, 'contact record');
+  });
+
+  test('phone click opens the outcome bar and the call dialog', async ({ page }) => {
+    // Clicking a phone records a call attempt (a write), so scratch database only.
+    skipUnlessWritesAllowed();
+    test.setTimeout(120_000);
+    await gotoAuthed(page, '/contacts?view=all');
+    const hrefs = await page.locator('a[href^="/contacts/"]').evaluateAll((els) => els.map((el) => el.getAttribute('href') ?? ''));
+    const hrefsWithId = hrefs.filter((h) => /^\/contacts\/[0-9a-f-]{36}$/.test(h));
+    test.skip(hrefsWithId.length === 0, 'No contacts in the database to open.');
+    // Not every contact has a phone: take the first one that does.
+    let phone = page.locator('a.num[href^="tel:"]').first();
+    for (const href of hrefsWithId.slice(0, 15)) {
+      await page.goto(href, { timeout: 90_000 });
+      await page.waitForLoadState('networkidle');
+      if ((await phone.count()) > 0) break;
+    }
+    test.skip((await phone.count()) === 0, 'No contact with a phone number to click.');
+    // Keep the browser on the page: cancel the tel: navigation, the React onClick still runs.
+    await page.evaluate(() => document.addEventListener('click', (e) => {
+      if ((e.target as Element).closest('a[href^="tel:"]')) e.preventDefault();
+    }, true));
+    await phone.click();
+    const bar = page.locator('.outcome');
+    await expect(bar).toBeVisible({ timeout: 15_000 });
+    await bar.getByRole('button', { name: es.callAttempt.details }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    expect(page.url()).toMatch(/\/contacts\//);
+    await expectRendered(page, consoleErrors, 'call dialog');
   });
 });
