@@ -117,3 +117,13 @@ test("new email: 2 addresses fail; the reply list is capped", () => {
   assert.doesNotThrow(() => assertRecipients(many(MAX_REPLY_RECIPIENTS), { allowList: true }));
   assert.throws(() => assertRecipients(many(MAX_REPLY_RECIPIENTS + 1), { allowList: true }));
 });
+
+test("internationalized domains (punycode labels, even a TLD ending in a digit) are valid; an IP-like or numeric TLD is not", () => {
+  for (const a of ["user@xn--80ak6aa92e.com", "a@b.xn--11b4c3d", "a@b.xn--p1ai"]) assert.deepEqual(checkRecipientShape(a), { ok: true }, a);
+  for (const a of ["a@1.2.3.4", "a@b.123", "a@-b.com", "a@b-.com"]) assert.deepEqual(checkRecipientShape(a), { ok: false, reason: "malformed" }, a);
+});
+
+test("the To header carries the trimmed address", () => {
+  const raw = Buffer.from(buildRawMessage("f@x.com", "  a@x.com \t", "S", { body: "x" }), "base64url").toString("utf8");
+  assert.match(raw, /\r\nTo: a@x\.com\r\n/);
+});

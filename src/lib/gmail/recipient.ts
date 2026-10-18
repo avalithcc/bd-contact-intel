@@ -23,7 +23,7 @@ export function checkRecipientShape(to: string): RecipientShape {
   const { localPart, domain } = parts;
   const labels = domain.split(".");
   const localOk = LOCAL_CHARS.test(localPart) && !localPart.startsWith(".") && !localPart.endsWith(".") && !localPart.includes("..");
-  const domainOk = labels.length >= 2 && labels.every((l) => DOMAIN_LABEL.test(l)) && /[a-z]{2,}$/.test(labels[labels.length - 1]);
+  const domainOk = labels.length >= 2 && labels.every((l) => DOMAIN_LABEL.test(l)) && labels[labels.length - 1].length >= 2 && !/^[0-9]+$/.test(labels[labels.length - 1]); // punycode (xn--...) labels pass; a numeric TLD (an IP) does not
   return localOk && domainOk ? { ok: true } : { ok: false, reason: "malformed" };
 }
 

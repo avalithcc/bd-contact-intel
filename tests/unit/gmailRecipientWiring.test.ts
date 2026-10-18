@@ -4,6 +4,8 @@ import { contactActionErrorReason } from "@/app/(app)/contacts/actionErrors";
 import { contactActionErrorMessage } from "@/lib/contacts/labels";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { assertSingleRecipient } from "@/lib/gmail/recipient";
+import { stateOf } from "@/lib/scheduledEmail/view";
+import { buildFailureTask } from "@/lib/scheduledEmail/failureTask";
 import { dispatchScheduledEmails, failureCode, type RunDeps } from "@/lib/scheduledEmail/dispatch";
 
 function thrownBy(to: string): unknown {
@@ -41,7 +43,11 @@ test("a stored scheduled row with a bad address fails cleanly: marked failed, th
     releaseClaimed: async () => undefined,
   };
   const summary = await dispatchScheduledEmails(deps, { dryRun: false });
-  assert.deepEqual(calls, ["failed:bad:gmail_unavailable", "sent:ok"]);
+  assert.deepEqual(calls, ["failed:bad:invalid_recipient", "sent:ok"]);
   assert.deepEqual([summary.sent, summary.failed], [1, 1]);
-  assert.equal(failureCode(thrownBy("nope")), "gmail_unavailable");
+  assert.equal(failureCode(thrownBy("nope")), "invalid_recipient");
+  assert.equal(stateOf({ status: "failed", sendAt: new Date(0), error: "invalid_recipient" }, new Date(1e12)), "failed_other");
+  const task = buildFailureTask({ id: "i", personId: "p", bdId: "b", personName: "Ana", subject: "S", error: "invalid_recipient" } as never, new Date(0));
+  assert.match(task.description, /La dirección del destinatario no es válida/);
+  assert.doesNotMatch(task.description, /Corrigela|Corregí|volvé/);
 });

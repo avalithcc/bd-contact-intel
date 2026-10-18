@@ -74,7 +74,8 @@ export async function sendGmailMessageFromAccount(input: { accountId: string } &
 // here, so there is a single copy of this logic. The sender is always the
 // row's own address, never a literal.
 async function sendFromAccountRow(account: EmailAccountRow | undefined, input: SendGmailBody) {
-  const { to, subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata, allowRecipientList } = input;
+  const { subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata, allowRecipientList } = input;
+  const to = input.to.trim(); // the guard ran on the raw value (assertSafeSendInput); the stored and sent address is the trimmed one
   const content: MessageContent =
     input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
 

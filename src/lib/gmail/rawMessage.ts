@@ -132,7 +132,7 @@ function foldIdList(name: string, value: string): string {
  */
 export function buildRawMessage(
   from: string,
-  to: string,
+  rawTo: string,
   subject: string,
   content: MessageContent,
   boundaryRandom?: () => string,
@@ -142,14 +142,14 @@ export function buildRawMessage(
   allowRecipientList = false,
 ): string {
   assertSafeHeaderValue("From", from);
-  assertSafeHeaderValue("To", to);
+  assertSafeHeaderValue("To", rawTo); // on the untrimmed value: edge CR/LF is rejected, not silently dropped
+  const to = rawTo.trim();
   assertRecipients(to, { allowList: allowRecipientList });
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
   }
   for (const line of extraHeaders) assertSafeExtraHeader(line);
-  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
   const threading = reply
     ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
     : [];

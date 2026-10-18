@@ -48,6 +48,7 @@ export interface RunSummary {
 export function failureCode(err: unknown): string {
   if (err instanceof GmailSendError) {
     if (err.kind === "not_connected" || err.kind === "reauth_required") return "gmail_not_connected";
+    if (err.kind === "invalid_recipient") return "invalid_recipient"; // rejected before Gmail: provably not sent
     if (err.kind !== "send_failed" || (err.status !== undefined && err.status < 500)) return "gmail_unavailable"; // provably not sent
   }
   return "outcome_unknown"; // 5xx, network, or a failure after Gmail may have accepted it

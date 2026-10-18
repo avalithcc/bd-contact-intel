@@ -33,7 +33,7 @@ export function stateOf(row: { status: ScheduledStatus; sendAt: Date; error: str
   if (row.status === "on_hold") return "on_hold";
   if (row.status === "failed") {
     if (row.error === "gmail_not_connected") return "failed_gmail";
-    return row.error === "gmail_unavailable" ? "failed_other" : "failed_unconfirmed"; // unknown or legacy codes are treated as unconfirmed
+    return row.error === "gmail_unavailable" || row.error === "invalid_recipient" ? "failed_other" : "failed_unconfirmed"; // unknown or legacy codes are treated as unconfirmed
   }
   return isLocked(row, now) ? "locked" : "scheduled";
 }
