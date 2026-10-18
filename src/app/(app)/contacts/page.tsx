@@ -50,6 +50,7 @@ import { FilterMenu } from "./FilterMenu";
 import { deleteSavedViewAction } from "./viewActions";
 import { ColumnPicker } from "./ColumnPicker";
 import { linkedinPrefill } from "@/lib/contacts/linkedinCapture";
+import { parseProfilePrefill } from "@/lib/contacts/linkedinProfilePrefill";
 import { NewContactDialog, type NewContactDialogLabels } from "./NewContactDialog";
 import { SaveViewDialog } from "./SaveViewDialog";
 import { buildSaveViewSummary } from "@/lib/contacts/filterChips";
@@ -90,6 +91,11 @@ interface ContactsPageProps {
     // /capture/linkedin found nobody: open "Nuevo contacto" with the link loaded.
     new?: string;
     linkedin?: string;
+    // LinkedIn extension prefill (see linkedinProfilePrefill.ts); prefixed so they never collide with list filters.
+    li_name?: string;
+    li_title?: string;
+    li_company?: string;
+    li_location?: string;
     layout?: string;
     // Ad-hoc filter panel (task 13.3 parity gaps), layered on top of the
     // active view's filters — see applyAdHocContactFilterOverrides.
@@ -402,6 +408,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     linkedinHelp: l.newContactLinkedinHelp,
     emailLabel: l.newContactEmail,
     companyLabel: l.newContactCompany,
+    jobTitleLabel: l.newContactJobTitle,
+    locationLabel: l.newContactLocation,
     cancelLabel: l.newContactCancel,
     createLabel: l.newContactCreate,
     createAnywayLabel: l.newContactCreateAnyway,
@@ -414,6 +422,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     invalidRequiresName: l.newContactInvalidRequiresName,
     fromLinkedinTitle: l.newContactFromLinkedinTitle,
     fromLinkedinBody: l.newContactFromLinkedinBody,
+    fromLinkedinBadge: l.newContactFromLinkedinBadge,
+    reviewTitle: l.newContactReviewTitle,
+    reviewBody: l.newContactReviewBody,
+    companyNotRead: l.newContactCompanyNotRead,
+    fieldNotRead: l.newContactFieldNotRead,
   };
 
   // Table/board toggle (task 14.1; design.md "Routes": "`?layout=board`
@@ -667,7 +680,12 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <Link href="/contacts/import" className="btn btn-secondary">
             {dict.contactsImport.pageTitle}
           </Link>
-          <NewContactDialog labels={newContactLabels} defaultOpen={sp.new === "1"} initialLinkedin={linkedinPrefill(sp.linkedin)} />
+          <NewContactDialog
+            labels={newContactLabels}
+            defaultOpen={sp.new === "1"}
+            initialLinkedin={linkedinPrefill(sp.linkedin)}
+            initialPrefill={parseProfilePrefill({ name: sp.li_name, title: sp.li_title, company: sp.li_company, location: sp.li_location })}
+          />
         </div>
       </div>
 

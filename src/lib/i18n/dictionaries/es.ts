@@ -2832,6 +2832,14 @@ export const es: typeof en = {
     newContactInvalidRequiresName: "Ingresá al menos un nombre o apellido.",
     newContactFromLinkedinTitle: "Esta persona aún no está en el CRM",
     newContactFromLinkedinBody: "El enlace de LinkedIn ya está cargado. Escribe el nombre y la empresa para crearla.",
+    newContactJobTitle: "Cargo",
+    newContactLocation: "Ubicación",
+    newContactFromLinkedinBadge: "Desde LinkedIn",
+    newContactReviewTitle: "Revisa los datos antes de guardar",
+    newContactReviewBody:
+      "Los campos marcados “Desde LinkedIn” se leyeron del perfil. Corrígelos si hace falta. Lo que no se pudo leer queda vacío.",
+    newContactCompanyNotRead: "No se pudo leer del perfil. Complétala si la conoces.",
+    newContactFieldNotRead: "No se pudo leer del perfil. Complétalo si lo conoces.",
     bulkLimitedNotice: "Solo se aplicó a los primeros 200 seleccionados.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

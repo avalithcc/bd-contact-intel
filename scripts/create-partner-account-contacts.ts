@@ -85,6 +85,9 @@ function toFields(row: PlannedPartnerAccountContactRow): NewContactFields {
     emailStatus: "probable",
     company: row.company,
     companyKey: row.companyKey,
+    jobTitle: null,
+    city: null,
+    country: null,
   };
 }
 

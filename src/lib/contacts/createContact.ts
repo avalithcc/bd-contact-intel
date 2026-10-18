@@ -17,6 +17,7 @@
  */
 import { normalizeProfileKey } from "@/lib/csv";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
+import { splitLocation } from "@/lib/contacts/locationSplit";
 import type { EmailStatus, MatchableRow, MatchResult, ReviewReason } from "@/lib/identity/matcher";
 
 export interface NewContactFormInput {
@@ -25,6 +26,10 @@ export interface NewContactFormInput {
   linkedinUrl: string;
   email: string;
   company: string;
+  /** Free text; optional so callers that never show "Cargo" keep compiling. */
+  jobTitle?: string;
+  /** Free text "City, Country"; split into city/country by `splitLocation`. */
+  location?: string;
 }
 
 export interface NewContactFields {
@@ -35,7 +40,13 @@ export interface NewContactFields {
   emailStatus: EmailStatus;
   company: string | null;
   companyKey: string | null;
+  jobTitle: string | null;
+  city: string | null;
+  country: string | null;
 }
+
+/** Same ceiling as the extension prefill; the form has no maxlength of its own. */
+const FREE_TEXT_MAX = 200;
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();
@@ -51,6 +62,7 @@ function blankToNull(value: string): string | null {
 export function buildNewContactFields(input: NewContactFormInput): NewContactFields {
   const email = blankToNull(input.email);
   const company = blankToNull(input.company);
+  const { city, country } = splitLocation(input.location?.slice(0, FREE_TEXT_MAX));
   return {
     firstName: blankToNull(input.firstName),
     lastName: blankToNull(input.lastName),
@@ -59,6 +71,9 @@ export function buildNewContactFields(input: NewContactFormInput): NewContactFie
     emailStatus: email ? "probable" : "none",
     company,
     companyKey: company ? normalizeCompanyKey(company) : null,
+    jobTitle: blankToNull((input.jobTitle ?? "").slice(0, FREE_TEXT_MAX)),
+    city,
+    country,
   };
 }
 

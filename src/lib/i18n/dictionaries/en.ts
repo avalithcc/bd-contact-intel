@@ -2846,6 +2846,14 @@ export const en = {
     newContactInvalidRequiresName: "Enter at least a first or last name.",
     newContactFromLinkedinTitle: "This person is not in the CRM yet",
     newContactFromLinkedinBody: "The LinkedIn link is already filled in. Type the name and company to create them.",
+    newContactJobTitle: "Job title",
+    newContactLocation: "Location",
+    newContactFromLinkedinBadge: "From LinkedIn",
+    newContactReviewTitle: "Review the details before saving",
+    newContactReviewBody:
+      "Fields marked “From LinkedIn” were read from the profile. Correct them if needed. Anything that could not be read is left empty.",
+    newContactCompanyNotRead: "Could not be read from the profile. Fill it in if you know it.",
+    newContactFieldNotRead: "Could not be read from the profile. Fill it in if you know it.",
     bulkLimitedNotice: "Only applied to the first 200 selected rows.",
     bulkResultOwner: (assigned: number, skipped: number) =>
       skipped > 0

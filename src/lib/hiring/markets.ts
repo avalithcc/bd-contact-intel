@@ -42,6 +42,31 @@ function matchesRules(normalized: string, rules: MarketRules): boolean {
   return rules.tokens.some((token) => tokens.has(token));
 }
 
+/**
+ * Country names this business tracks (LATAM), lowercase and diacritics-free.
+ * Also the only country list the contact form trusts when it splits a LinkedIn
+ * location into city and country (src/lib/contacts/locationSplit.ts).
+ */
+export const LATAM_COUNTRY_NAMES: readonly string[] = [
+  "argentina",
+  "uruguay",
+  "chile",
+  "paraguay",
+  "bolivia",
+  "peru",
+  "ecuador",
+  "colombia",
+  "venezuela",
+  "brazil",
+  "brasil",
+  "mexico",
+  "costa rica",
+  "panama",
+  "guatemala",
+  "dominican republic",
+  "republica dominicana",
+];
+
 // LATAM: the 15 countries this business currently tracks contacts/companies
 // in, their main cities, and bare ISO-ish country codes as ATS providers
 // commonly emit them (e.g. Lever's "Palermo, CABA, AR").
@@ -57,23 +82,7 @@ function matchesRules(normalized: string, rules: MarketRules): boolean {
 // target company's postings start getting misclassified this way.
 const LATAM_RULES: MarketRules = {
   phrases: [
-    "argentina",
-    "uruguay",
-    "chile",
-    "paraguay",
-    "bolivia",
-    "peru",
-    "ecuador",
-    "colombia",
-    "venezuela",
-    "brazil",
-    "brasil",
-    "mexico",
-    "costa rica",
-    "panama",
-    "guatemala",
-    "dominican republic",
-    "republica dominicana",
+    ...LATAM_COUNTRY_NAMES,
     // Main cities (also reachable via the country phrase above when both
     // appear, but a posting sometimes lists only the city).
     "buenos aires",
@@ -418,4 +427,15 @@ export function isOffshoreHub(location: string | null | undefined): boolean {
  */
 export function isOffshoreHeavy(offshoreItCount: number, latamItCount: number): boolean {
   return offshoreItCount > latamItCount;
+}
+
+/**
+ * True when `text` is exactly a country name this app already recognizes
+ * (LATAM list plus "united states"), ignoring case and diacritics. Exact match
+ * only: "Greater Buenos Aires" or "Miami, FL" are not countries.
+ */
+export function isKnownCountryName(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const normalized = normalizeText(text).trim().replace(/\s+/g, " ");
+  return normalized === "united states" || LATAM_COUNTRY_NAMES.includes(normalized);
 }

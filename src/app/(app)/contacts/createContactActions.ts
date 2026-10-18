@@ -103,7 +103,10 @@ export async function createContactAction(
           emailStatus: fields.emailStatus,
           company: fields.company,
           companyKey: fields.companyKey,
-          roleGroup: classifyPosition(null),
+          jobTitle: fields.jobTitle,
+          city: fields.city,
+          country: fields.country,
+          roleGroup: classifyPosition(fields.jobTitle),
           ownerBdId: me.id,
           sourceKey: "manual",
         });

@@ -9,8 +9,9 @@
  */
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { CheckIcon } from "@/components/icons";
+import { CheckIcon, InfoIcon } from "@/components/icons";
 import { withoutQueryParams } from "@/lib/contacts/linkedinCapture";
+import { PREFILL_PARAM_KEYS, type ProfilePrefill } from "@/lib/contacts/linkedinProfilePrefill";
 import { createContactAction, type CreateContactResult } from "./createContactActions";
 import type { NewContactFormInput } from "@/lib/contacts/createContact";
 
@@ -23,6 +24,8 @@ export interface NewContactDialogLabels {
   linkedinHelp: string;
   emailLabel: string;
   companyLabel: string;
+  jobTitleLabel: string;
+  locationLabel: string;
   cancelLabel: string;
   createLabel: string;
   createAnywayLabel: string;
@@ -36,9 +39,27 @@ export interface NewContactDialogLabels {
   /** Only needed when `initialLinkedin` is passed (opened from /capture/linkedin). */
   fromLinkedinTitle?: string;
   fromLinkedinBody?: string;
+  /** Only needed when `initialPrefill` is passed (opened by the LinkedIn extension). */
+  fromLinkedinBadge?: string;
+  reviewTitle?: string;
+  reviewBody?: string;
+  companyNotRead?: string;
+  fieldNotRead?: string;
 }
 
-const EMPTY_INPUT: NewContactFormInput = { firstName: "", lastName: "", linkedinUrl: "", email: "", company: "" };
+const EMPTY_INPUT: NewContactFormInput = {
+  firstName: "",
+  lastName: "",
+  linkedinUrl: "",
+  email: "",
+  company: "",
+  jobTitle: "",
+  location: "",
+};
+
+/** Fields the LinkedIn extension can fill; each one wears the "Desde LinkedIn" badge until the BD edits it. */
+type PrefillField = keyof ProfilePrefill;
+const PREFILL_FIELDS: readonly PrefillField[] = ["firstName", "lastName", "company", "jobTitle", "location"];
 
 /**
  * `initialCompany` (mockup-port c03): the company record's "Contacto" quick
@@ -57,17 +78,23 @@ const EMPTY_INPUT: NewContactFormInput = { firstName: "", lastName: "", linkedin
  * `initialLinkedin` + `defaultOpen` (linkedin-exists-check): `/contacts?new=1&linkedin=…`
  * (the bookmarklet found nobody) opens the dialog already showing the link, with
  * the "aún no está en el CRM" notice. The caller passes a URL it has validated.
+ *
+ * `initialPrefill` (linkedin-extension): the basics the extension read from the profile when the BD pressed
+ * "Agregar al CRM". Already cleaned and capped by parseProfilePrefill. Each non-empty field carries a
+ * "Desde LinkedIn" badge that disappears when the BD edits it; an empty one says it could not be read.
  */
 export function NewContactDialog({
   labels: l,
   initialCompany,
   initialLinkedin,
+  initialPrefill,
   defaultOpen = false,
   renderTrigger,
 }: {
   labels: NewContactDialogLabels;
   initialCompany?: string;
   initialLinkedin?: string;
+  initialPrefill?: ProfilePrefill;
   defaultOpen?: boolean;
   renderTrigger?: (onClick: () => void) => React.ReactNode;
 }) {
@@ -80,18 +107,54 @@ export function NewContactDialog({
     ...EMPTY_INPUT,
     ...(initialCompany ? { company: initialCompany } : {}),
     ...(initialLinkedin ? { linkedinUrl: initialLinkedin } : {}),
+    ...(initialPrefill ?? {}),
   };
+  const prefilledFields = (): Set<PrefillField> =>
+    new Set(initialPrefill ? PREFILL_FIELDS.filter((field) => initialPrefill[field] !== "") : []);
   const [input, setInput] = useState<NewContactFormInput>(emptyInput);
+  // Fields still showing the value read from LinkedIn; editing one removes it.
+  const [fromLinkedin, setFromLinkedin] = useState<Set<PrefillField>>(prefilledFields);
   const [result, setResult] = useState<CreateContactResult | null>(null);
 
   function close() {
     setOpen(false);
     // Opened from /contacts?new=1&linkedin=…: drop those params so a refresh does not reopen the dialog.
-    if (searchParams.has("new") || searchParams.has("linkedin")) {
-      router.replace(withoutQueryParams(pathname, searchParams.toString(), ["new", "linkedin"]));
+    if (searchParams.has("new") || searchParams.has("linkedin") || PREFILL_PARAM_KEYS.some((key) => searchParams.has(key))) {
+      router.replace(withoutQueryParams(pathname, searchParams.toString(), ["new", "linkedin", ...PREFILL_PARAM_KEYS]));
     }
     setResult(null);
     setInput(emptyInput);
+    setFromLinkedin(prefilledFields());
+  }
+
+  function edit(field: keyof NewContactFormInput, value: string) {
+    setInput((s) => ({ ...s, [field]: value }));
+    setFromLinkedin((prev) => {
+      if (!prev.has(field as PrefillField)) return prev;
+      const next = new Set(prev);
+      next.delete(field as PrefillField);
+      return next;
+    });
+  }
+
+  /** Label text plus the badge / "could not be read" hint for a field the extension may have filled. */
+  function fieldLabel(field: PrefillField, htmlFor: string, text: string) {
+    return (
+      <label className="label" htmlFor={htmlFor}>
+        {text}
+        {fromLinkedin.has(field) && l.fromLinkedinBadge && (
+          <>
+            {" "}
+            <span className="badge badge-outline no-dot">{l.fromLinkedinBadge}</span>
+          </>
+        )}
+      </label>
+    );
+  }
+  function notReadHelp(field: PrefillField) {
+    if (!initialPrefill || initialPrefill[field] !== "" || input[field] !== "") return null;
+    const text = field === "company" ? l.companyNotRead : l.fieldNotRead;
+    return text ? <span className="help">{text}</span> : null;
   }
 
   async function submit(confirmDuplicate: boolean) {
@@ -125,38 +188,43 @@ export function NewContactDialog({
               </button>
             </div>
             <div className="dialog-body">
-              {initialLinkedin && l.fromLinkedinTitle && !result && (
-                <div className="alert alert-success" role="status">
-                  <CheckIcon className="icon" />
+              {initialPrefill && l.reviewTitle && !result ? (
+                <div className="alert alert-info" role="status">
+                  <InfoIcon className="icon" />
                   <div>
-                    <div className="title">{l.fromLinkedinTitle}</div>
-                    {l.fromLinkedinBody}
+                    <div className="title">{l.reviewTitle}</div>
+                    {l.reviewBody}
                   </div>
                 </div>
+              ) : (
+                initialLinkedin &&
+                l.fromLinkedinTitle &&
+                !result && (
+                  <div className="alert alert-success" role="status">
+                    <CheckIcon className="icon" />
+                    <div>
+                      <div className="title">{l.fromLinkedinTitle}</div>
+                      {l.fromLinkedinBody}
+                    </div>
+                  </div>
+                )
               )}
               <div className="form-grid">
                 <div className="field">
-                  <label className="label" htmlFor="nc-f">
-                    {l.firstNameLabel}
-                  </label>
+                  {fieldLabel("firstName", "nc-f", l.firstNameLabel)}
                   <input
                     className="input"
                     id="nc-f"
                     autoFocus={Boolean(initialLinkedin)}
                     value={input.firstName}
-                    onChange={(e) => setInput((s) => ({ ...s, firstName: e.target.value }))}
+                    onChange={(e) => edit("firstName", e.target.value)}
                   />
+                  {notReadHelp("firstName")}
                 </div>
                 <div className="field">
-                  <label className="label" htmlFor="nc-l">
-                    {l.lastNameLabel}
-                  </label>
-                  <input
-                    className="input"
-                    id="nc-l"
-                    value={input.lastName}
-                    onChange={(e) => setInput((s) => ({ ...s, lastName: e.target.value }))}
-                  />
+                  {fieldLabel("lastName", "nc-l", l.lastNameLabel)}
+                  <input className="input" id="nc-l" value={input.lastName} onChange={(e) => edit("lastName", e.target.value)} />
+                  {notReadHelp("lastName")}
                 </div>
               </div>
               <div className="field">
@@ -168,7 +236,7 @@ export function NewContactDialog({
                   id="nc-li"
                   placeholder="https://www.linkedin.com/in/…"
                   value={input.linkedinUrl}
-                  onChange={(e) => setInput((s) => ({ ...s, linkedinUrl: e.target.value }))}
+                  onChange={(e) => edit("linkedinUrl", e.target.value)}
                 />
                 <span className="help">{l.linkedinHelp}</span>
               </div>
@@ -177,23 +245,24 @@ export function NewContactDialog({
                   <label className="label" htmlFor="nc-e">
                     {l.emailLabel}
                   </label>
-                  <input
-                    className="input"
-                    id="nc-e"
-                    value={input.email}
-                    onChange={(e) => setInput((s) => ({ ...s, email: e.target.value }))}
-                  />
+                  <input className="input" id="nc-e" value={input.email} onChange={(e) => edit("email", e.target.value)} />
                 </div>
                 <div className="field">
-                  <label className="label" htmlFor="nc-c">
-                    {l.companyLabel}
-                  </label>
-                  <input
-                    className="input"
-                    id="nc-c"
-                    value={input.company}
-                    onChange={(e) => setInput((s) => ({ ...s, company: e.target.value }))}
-                  />
+                  {fieldLabel("company", "nc-c", l.companyLabel)}
+                  <input className="input" id="nc-c" value={input.company} onChange={(e) => edit("company", e.target.value)} />
+                  {notReadHelp("company")}
+                </div>
+              </div>
+              <div className="form-grid">
+                <div className="field">
+                  {fieldLabel("jobTitle", "nc-j", l.jobTitleLabel)}
+                  <input className="input" id="nc-j" value={input.jobTitle ?? ""} onChange={(e) => edit("jobTitle", e.target.value)} />
+                  {notReadHelp("jobTitle")}
+                </div>
+                <div className="field">
+                  {fieldLabel("location", "nc-u", l.locationLabel)}
+                  <input className="input" id="nc-u" value={input.location ?? ""} onChange={(e) => edit("location", e.target.value)} />
+                  {notReadHelp("location")}
                 </div>
               </div>
 

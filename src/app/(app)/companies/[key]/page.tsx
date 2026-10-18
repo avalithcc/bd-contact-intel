@@ -170,6 +170,8 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     linkedinHelp: dict.contactList.newContactLinkedinHelp,
     emailLabel: dict.contactList.newContactEmail,
     companyLabel: dict.contactList.newContactCompany,
+    jobTitleLabel: dict.contactList.newContactJobTitle,
+    locationLabel: dict.contactList.newContactLocation,
     cancelLabel: dict.contactList.newContactCancel,
     createLabel: dict.contactList.newContactCreate,
     createAnywayLabel: dict.contactList.newContactCreateAnyway,
