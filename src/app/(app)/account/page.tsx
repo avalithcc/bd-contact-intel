@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { getCurrentBd, getMessageImportStats } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { db } from "@/db";
@@ -11,9 +10,8 @@ import { MailIcon, LockIcon, LinkedInIcon, ChevronRightIcon } from "@/components
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { gmailConnectionState } from "@/lib/gmail/connectionState";
 import { formatArgentinaDayMonth } from "@/lib/i18n/format";
-import { getSiteUrl } from "@/lib/config/siteUrl";
-import { buildBookmarkletHref, resolveAppOrigin } from "@/lib/contacts/linkedinBookmarklet";
-import { LinkedinBookmarklet } from "./LinkedinBookmarklet";
+import { resolveExtensionStoreUrl } from "@/lib/extension/install";
+import { ExtensionTool } from "./ExtensionTool";
 import { SignOutButton } from "../../SignOutButton";
 import { SignatureEditor } from "./SignatureEditor";
 import styles from "./page.module.css";
@@ -47,14 +45,8 @@ export default async function AccountPage() {
   const numberFormat = new Intl.NumberFormat("es-AR");
   // Same state function as /account/email, so the two pages always agree.
   const gmailState = gmailConnectionState(getGmailOAuthConfig().ok, account?.status);
-  // The bookmarklet points at the origin the BD is on right now, so a preview deployment installs one for itself.
-  const requestHeaders = await headers();
-  const bookmarkletHref = buildBookmarkletHref(
-    resolveAppOrigin(
-      { host: requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"), forwardedProto: requestHeaders.get("x-forwarded-proto") },
-      getSiteUrl(),
-    ),
-  );
+  // Read at request time on the server; undefined until the owner publishes the store listing (extension/README.md).
+  const extensionStoreUrl = resolveExtensionStoreUrl(process.env.NEXT_PUBLIC_EXTENSION_STORE_URL);
 
   return (
     <main className={styles.page}>
@@ -125,53 +117,23 @@ export default async function AccountPage() {
 
       <div className={styles.card} id="herramientas">
         <h3 className={styles.cardHeader}>{l.toolsTitle}</h3>
-        <div className="stack">
-          <div className="row row-lg">
-            <span className={styles.toolIcon}>
-              <LinkedInIcon className="icon" />
-            </span>
-            <div className="grow">
-              <strong>{l.linkedinToolTitle}</strong>
-              <p className="meta">{l.linkedinToolBody}</p>
-            </div>
-          </div>
-          <div className={styles.step}>
-            <span className={styles.stepN}>1</span>
-            <div className="grow">
-              <strong>{l.toolStep1Title}</strong>
-              <div className="mt-md">
-                <LinkedinBookmarklet bookmarkletHref={bookmarkletHref} label={l.toolBookmarkletLabel} helpId="bm-help" />
-              </div>
-              <p className="help" id="bm-help">
-                {l.toolBookmarkBarHelpLead} <kbd>Ctrl</kbd> + <kbd>Mayús</kbd> + <kbd>B</kbd> {l.toolBookmarkBarHelpMac} <kbd>⌘</kbd> +{" "}
-                <kbd>Mayús</kbd> + <kbd>B</kbd>). {l.toolBookmarkBarHelpTail}
-              </p>
-            </div>
-          </div>
-          <div className={styles.step}>
-            <span className={styles.stepN}>2</span>
-            <div className="grow">
-              <strong>{l.toolStep2Title}</strong>
-              <p className="meta">{l.toolStep2Body}</p>
-            </div>
-          </div>
-          <div className="alert alert-neutral">
-            <LockIcon className="icon" />
-            <div>
-              <div className="title">{l.toolPrivacyTitle}</div>
-              {l.toolPrivacyBody}
-            </div>
-          </div>
-          <details>
-            <summary className="btn btn-ghost btn-sm">{l.toolCodeSummary}</summary>
-            <div className="field mt-md">
-              <label className="label" htmlFor="bm-code">
-                {l.toolCodeLabel}
-              </label>
-              <textarea className="textarea mono" id="bm-code" rows={3} readOnly defaultValue={bookmarkletHref} />
-            </div>
-          </details>
-        </div>
+        <ExtensionTool
+          storeUrl={extensionStoreUrl}
+          labels={{
+            title: l.extensionTitle,
+            body: l.extensionBody,
+            install: l.extensionInstall,
+            storeSoon: l.extensionStoreSoon,
+            step1Title: l.extensionStep1Title,
+            step1Body: l.extensionStep1Body,
+            step2Title: l.extensionStep2Title,
+            step2Body: l.extensionStep2Body,
+            installedBadge: l.extensionInstalledBadge,
+            installedMeta: l.extensionInstalledMeta,
+            privacyTitle: l.toolPrivacyTitle,
+            privacyBody: l.toolPrivacyBody,
+          }}
+        />
       </div>
 
       <div className={styles.card}>

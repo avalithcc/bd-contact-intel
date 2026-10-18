@@ -1,6 +1,6 @@
 /**
  * Decisions of the `/capture/linkedin?url=…` route (linkedin-exists-check
- * mockup). The bookmarklet sends ONLY the page URL, so everything is decided
+ * mockup). Old bookmarklet favorites send ONLY the page URL, so everything is decided
  * from that string: validate it as a personal profile, normalize it to the
  * same `profile_key` the importers write, and pick where to send the BD.
  * Pure, no I/O.

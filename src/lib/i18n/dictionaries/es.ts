@@ -1422,22 +1422,21 @@ export const es: typeof en = {
     passwordRowTitle: "Contraseña",
     passwordRowMeta: "Actualizá tu contraseña de acceso",
     toolsTitle: "Herramientas",
-    linkedinToolTitle: "Guardar desde LinkedIn",
-    linkedinToolBody:
-      "Un botón para tu barra de marcadores. Desde un perfil de LinkedIn, un clic comprueba si la persona ya está en el CRM.",
-    toolStep1Title: "Arrastra este botón a tu barra de marcadores",
-    toolBookmarkletLabel: "Guardar en el CRM",
-    toolBookmarkBarHelpLead: "Si no ves la barra de marcadores, actívala con",
-    toolBookmarkBarHelpMac: "(en Mac,",
-    toolBookmarkBarHelpTail: "No lo pulses aquí: solo funciona sobre un perfil de LinkedIn.",
-    toolStep2Title: "Abre un perfil de LinkedIn y pulsa el botón",
-    toolStep2Body:
-      "Se abre el CRM en una pestaña nueva. Si la persona ya existe, ves su ficha. Si no, se abre “Nuevo contacto” con el enlace cargado.",
-    toolPrivacyTitle: "Qué envía y qué no",
-    toolPrivacyBody:
-      "Solo envía la dirección (URL) del perfil. No lee la página de LinkedIn ni copia nombre, cargo o empresa: esos datos los escribes tú.",
-    toolCodeSummary: "Ver el código del botón",
-    toolCodeLabel: "Dirección del marcador (para copiar a mano)",
+    extensionTitle: "Extensión para Chrome, Edge y Brave",
+    extensionBody:
+      "Al abrir un perfil de LinkedIn, una tarjeta te dice si la persona ya está en el CRM y te lleva a su ficha o a crearla, sin salir de la página.",
+    extensionInstall: "Instalar extensión",
+    extensionStoreSoon: "Disponible pronto en la Chrome Web Store",
+    extensionStep1Title: "Instálala una sola vez",
+    extensionStep1Body:
+      "Se abre la tienda de tu navegador. Pulsa “Agregar” y listo; no hay que arrastrar nada ni mostrar la barra de marcadores.",
+    extensionStep2Title: "Abre cualquier perfil de LinkedIn",
+    extensionStep2Body:
+      "La tarjeta aparece sola a la derecha. Si ya iniciaste sesión en el CRM, verás el resultado al instante.",
+    extensionInstalledBadge: "Instalada",
+    extensionInstalledMeta: "Versión {version} · abre cualquier perfil de LinkedIn para ver la tarjeta.",
+    toolPrivacyTitle: "Privacidad",
+    toolPrivacyBody: "Solo lee los datos básicos del perfil que agregas, cuando pulsas Agregar.",
     importTitle: "Importación",
     linkedinMessagesRowTitle: "Mensajes de LinkedIn",
     linkedinMessagesRowMeta: (messages: string, conversations: string, lastImport: string) =>

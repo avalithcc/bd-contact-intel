@@ -12,8 +12,9 @@ interface CaptureLinkedinPageProps {
 }
 
 /**
- * Landing of the "Guardar desde LinkedIn" bookmarklet (linkedin-exists-check
- * mockup). Receives only a URL: a personal profile is normalized to its
+ * Landing of the old "Guardar desde LinkedIn" bookmarklet (linkedin-exists-check
+ * mockup). The bookmarklet UI was replaced by the browser extension, but bookmarks
+ * and favorites people already saved keep pointing here, so the route stays. Receives only a URL: a personal profile is normalized to its
  * `profile_key`, looked up (merged keys included) and redirected to the record
  * or to "Nuevo contacto"; anything else renders the "enlace no válido" screen.
  * Never fetches LinkedIn. Behind the same session gate as every `(app)` route;

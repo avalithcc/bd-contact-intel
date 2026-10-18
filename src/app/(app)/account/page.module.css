@@ -202,7 +202,3 @@
   font-weight: 700;
   font-size: var(--text-sm);
 }
-
-.grab {
-  cursor: grab;
-}

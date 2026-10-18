@@ -1,12 +1,12 @@
 /**
  * Unit tests for src/lib/contacts/linkedinCapture.ts (the /capture/linkedin
- * route's decisions) and src/lib/contacts/linkedinBookmarklet.ts. The bookmarklet
- * only ever sends a URL, so every decision here is made from that URL alone.
+ * route's decisions). The route is kept for old bookmarks and favorites (the
+ * "Guardar desde LinkedIn" bookmarklet was replaced by the browser extension);
+ * it only ever receives a URL, so every decision here is made from that URL alone.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { captureRedirectPath, withoutQueryParams, isCaptureNextPath, isFromLinkedin, linkedinPrefill, noticeOwnerVariant, parseCaptureUrl } from "@/lib/contacts/linkedinCapture";
-import { buildBookmarkletHref, resolveAppOrigin } from "@/lib/contacts/linkedinBookmarklet";
 import { sanitizeNextPath } from "@/lib/auth/nextPath";
 
 test("a person profile URL becomes the same profile_key the importers write", () => {
@@ -62,21 +62,6 @@ test("a live person sends the BD to the record with ?from=linkedin", () => {
 test("nobody found opens the new-contact dialog with the encoded URL", () => {
   const input = { profileKey: "linkedin.com/in/x", linkedinUrl: "https://linkedin.com/in/x" };
   assert.equal(captureRedirectPath(input, null), "/contacts?new=1&linkedin=https%3A%2F%2Flinkedin.com%2Fin%2Fx");
-});
-
-test("the bookmarklet reads only location.href and opens the app origin", () => {
-  const href = buildBookmarkletHref("https://crm.avalith.net");
-  assert.ok(href.startsWith("javascript:"));
-  assert.ok(href.includes("https://crm.avalith.net/capture/linkedin?url="));
-  assert.ok(href.includes("encodeURIComponent(location.href)"));
-  assert.ok(!/document\.|innerHTML|fetch|XMLHttpRequest/.test(href), "must not read the page or call out");
-});
-
-test("the app origin comes from the request host, else the configured site URL", () => {
-  assert.equal(resolveAppOrigin({ host: "crm.avalith.net", forwardedProto: "https" }, "https://fallback.test"), "https://crm.avalith.net");
-  assert.equal(resolveAppOrigin({ host: "localhost:3000", forwardedProto: null }, "https://fallback.test"), "http://localhost:3000");
-  assert.equal(resolveAppOrigin({ host: null, forwardedProto: null }, "https://fallback.test"), "https://fallback.test");
-  assert.equal(resolveAppOrigin({ host: "evil.com/x y", forwardedProto: "https" }, "https://fallback.test"), "https://fallback.test");
 });
 
 test("/capture/linkedin?url=… survives the login ?next= round trip", () => {
