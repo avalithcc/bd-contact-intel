@@ -6,7 +6,7 @@ import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { CallAttemptProvider } from "@/components/CallAttemptProvider";
-import { pickCallFormLabels } from "@/components/CallForm";
+import { pickCallFormLabels } from "@/lib/contacts/callFormLabels";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
 import { ConnectionBanner } from "@/components/ConnectionBanner";
 import { formatSince } from "@/lib/gmail/connectionBanner";

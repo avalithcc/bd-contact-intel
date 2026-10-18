@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { CallForm, type CallFormLabels } from "@/components/CallForm";
+import { CallForm } from "@/components/CallForm";
+import type { CallFormLabels } from "@/lib/contacts/callFormLabels";
 import { callDialogDefaults, followUpTitle } from "@/lib/contacts/callDialog";
 import { settleAction } from "@/lib/contacts/actionOutcome";
 import { CallIcon } from "@/components/icons";

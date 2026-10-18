@@ -6,6 +6,7 @@ import { Dialog } from "@/components/Dialog";
 import { CallIcon } from "@/components/icons";
 import { CALL_OUTCOME_CODES, type CallOutcomeCode } from "@/lib/contacts/call";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import type { CallFormLabels } from "@/lib/contacts/callFormLabels";
 
 const CALL_OUTCOME_LABEL_KEY = {
   connected: "callOutcomeConnected",
@@ -15,43 +16,6 @@ const CALL_OUTCOME_LABEL_KEY = {
   wrong_number: "callOutcomeWrongNumber",
 } as const satisfies Record<CallOutcomeCode, keyof ContactRecordLabels>;
 
-/** The strings CallForm needs. Narrow on purpose: the app shell mounts the dialog, so it must not carry the whole record dictionary. */
-export type CallFormLabels = Pick<
-  ContactRecordLabels,
-  | "callSubmit"
-  | "cancel"
-  | "callOutcomeLabel"
-  | "callOutcomePlaceholder"
-  | "callOutcomeConnected"
-  | "callOutcomeBusy"
-  | "callOutcomeNoAnswer"
-  | "callOutcomeVoicemail"
-  | "callOutcomeWrongNumber"
-  | "callDateLabel"
-  | "callTimeLabel"
-  | "callNotesLabel"
-  | "callHelp"
-  | "errorCallOccurredAtInFuture"
->;
-
-export function pickCallFormLabels(l: CallFormLabels): CallFormLabels {
-  return {
-    callSubmit: l.callSubmit,
-    cancel: l.cancel,
-    callOutcomeLabel: l.callOutcomeLabel,
-    callOutcomePlaceholder: l.callOutcomePlaceholder,
-    callOutcomeConnected: l.callOutcomeConnected,
-    callOutcomeBusy: l.callOutcomeBusy,
-    callOutcomeNoAnswer: l.callOutcomeNoAnswer,
-    callOutcomeVoicemail: l.callOutcomeVoicemail,
-    callOutcomeWrongNumber: l.callOutcomeWrongNumber,
-    callDateLabel: l.callDateLabel,
-    callTimeLabel: l.callTimeLabel,
-    callNotesLabel: l.callNotesLabel,
-    callHelp: l.callHelp,
-    errorCallOccurredAtInFuture: l.errorCallOccurredAtInFuture,
-  };
-}
 
 export interface CallFormValues {
   outcome: string;
