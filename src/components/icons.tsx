@@ -181,6 +181,16 @@ export function MailIcon({ className }: { className?: string }) {
   );
 }
 
+/** Help "?" in a circle; the column-header hint of the Tooltip component (gmail-sync-fleet mockup). */
+export function HelpCircleIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" />
+    </Svg>
+  );
+}
+
 export function LockIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>
