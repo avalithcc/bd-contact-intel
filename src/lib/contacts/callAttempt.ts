@@ -16,7 +16,13 @@
  * of the DIAL (the attempt's `created_at`), not the moment of the click on the
  * bar: a call confirmed hours later must still sort where it happened.
  */
-import { CallOutcomeRequiredError, MANUAL_CALL_DIRECTION, type CallActivityMetadata } from "@/lib/contacts/call";
+import {
+  CallOutcomeRequiredError,
+  MANUAL_CALL_DIRECTION,
+  planCall,
+  type CallActivityMetadata,
+  type CallOutcomeCode,
+} from "@/lib/contacts/call";
 
 export const CALL_ATTEMPT_TYPE = "call_attempt";
 
@@ -115,4 +121,28 @@ export function planAttemptResolution(
       number: typeof meta.number === "string" ? meta.number : null,
     },
   };
+}
+
+export interface AttemptCallInput {
+  outcome: string;
+  date: string;
+  time: string;
+  notes: string;
+}
+
+/**
+ * "Más detalles…": the full call form settles the attempt the tel: click
+ * recorded. Unlike the bar it accepts every call outcome and the BD's own
+ * date/time, but it still writes ONE `call` row that carries the dialled
+ * number, and the attempt is closed and folded into it.
+ */
+export function planAttemptCall(
+  attempt: { createdAt: Date; metadata: unknown },
+  input: AttemptCallInput,
+  now: Date = new Date(),
+): { attemptPatch: { outcome: CallOutcomeCode }; call: CallActivityMetadata & { number: string | null } } {
+  const meta = (attempt.metadata ?? {}) as Record<string, unknown>;
+  if (typeof meta.outcome === "string") throw new CallAttemptResolvedError();
+  const call = planCall(input.outcome, MANUAL_CALL_DIRECTION, input.date, input.time, input.notes, now);
+  return { attemptPatch: { outcome: call.outcome }, call: { ...call, number: typeof meta.number === "string" ? meta.number : null } };
 }
