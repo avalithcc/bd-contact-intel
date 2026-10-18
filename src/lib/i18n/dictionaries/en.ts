@@ -1466,6 +1466,23 @@ export const en = {
     badgeConnected: "Connected",
     passwordRowTitle: "Password",
     passwordRowMeta: "Update your sign-in password",
+    toolsTitle: "Tools",
+    linkedinToolTitle: "Save from LinkedIn",
+    linkedinToolBody:
+      "A button for your bookmarks bar. From a LinkedIn profile, one click checks whether the person is already in the CRM.",
+    toolStep1Title: "Drag this button to your bookmarks bar",
+    toolBookmarkletLabel: "Save to CRM",
+    toolBookmarkBarHelpLead: "If you can't see the bookmarks bar, turn it on with",
+    toolBookmarkBarHelpMac: "(on Mac,",
+    toolBookmarkBarHelpTail: "Don't press it here: it only works on a LinkedIn profile.",
+    toolStep2Title: "Open a LinkedIn profile and press the button",
+    toolStep2Body:
+      "The CRM opens in a new tab. If the person exists, you see their record. If not, \"New contact\" opens with the link filled in.",
+    toolPrivacyTitle: "What it sends and what it doesn't",
+    toolPrivacyBody:
+      "It only sends the profile address (URL). It does not read the LinkedIn page or copy name, title or company: you type those.",
+    toolCodeSummary: "View the button code",
+    toolCodeLabel: "Bookmark address (to copy by hand)",
     importTitle: "Import",
     linkedinMessagesRowTitle: "LinkedIn messages",
     linkedinMessagesRowMeta: (messages: string, conversations: string, lastImport: string) =>
