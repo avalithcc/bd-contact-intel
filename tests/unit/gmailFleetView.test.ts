@@ -5,6 +5,7 @@ import {
   classifyAccount,
   countAttention,
   filterFleet,
+  isNewFleetBd,
   parseFleetFilter,
   summarizeFleet,
   type FleetAccount,
@@ -153,4 +154,9 @@ test("the send button is for non-admin BDs who need a reconnect or never connect
 test("a due reminder is flagged so the page can say it goes out on the next run", () => {
   const row = buildFleetRow(raw({ account: null, lastSeenAt: daysAgo(10) }), NOW);
   assert.equal(row.reminder.kind === "series" && row.reminder.due, true);
+});
+
+test("a BD created in the last 14 days is new", () => {
+  assert.equal(isNewFleetBd({ createdAt: daysAgo(3) }, NOW), true);
+  assert.equal(isNewFleetBd({ createdAt: daysAgo(14) }, NOW), false);
 });

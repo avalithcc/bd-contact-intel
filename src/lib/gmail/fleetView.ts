@@ -162,6 +162,10 @@ export function filterFleet(rows: readonly FleetRow[], filter: FleetFilter): Fle
   return [...rows];
 }
 
+/** A BD created in the last 14 days gets the "Nueva" badge (same window as the Lusha screen). */
+export const NEW_BD_DAYS = 14;
+export const isNewFleetBd = (row: Pick<FleetRaw, "createdAt">, now: Date): boolean => now.getTime() - row.createdAt.getTime() < NEW_BD_DAYS * 86_400_000;
+
 /** The sidebar counter: how many BDs would show up under "Necesitan atención". */
 export function countAttention(accounts: readonly (FleetAccount | null)[], now: Date): number {
   return accounts.filter((a) => !isHealthy(classifyAccount(a, now))).length;
