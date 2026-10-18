@@ -351,6 +351,13 @@
       "when": 1793737471556,
       "tag": "0049_scheduled_email",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793823871556,
+      "tag": "0050_task_drop_legacy_subject_columns",
+      "breakpoints": true
     }
   ]
 }
