@@ -6,8 +6,6 @@ import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { CallAttemptProvider } from "@/components/CallAttemptProvider";
-import { pickCallFormLabels } from "@/components/CallForm";
-import { pickContactRecordLabels } from "@/lib/contacts/labels";
 import { ConnectionBanner } from "@/components/ConnectionBanner";
 import { formatSince } from "@/lib/gmail/connectionBanner";
 import { gmailConfigOkOrWarnOnce } from "@/lib/gmail/config";
@@ -47,8 +45,6 @@ export default async function AppLayout({
   const locale = await getLocale();
   const dict = t(locale);
   const labels = pickNavLabels(dict);
-  const recordLabels = pickContactRecordLabels(dict);
-  const callDetails = { form: pickCallFormLabels(recordLabels), phone: recordLabels.propPhone, mobile: recordLabels.propMobilePhone };
   const searchLabels = pickTopBarSearchLabels(dict);
   const me = await getCurrentBd();
   const now = new Date();
@@ -56,7 +52,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
-      <CallAttemptProvider labels={dict.callAttempt} details={callDetails}>
+      <CallAttemptProvider labels={dict.callAttempt}>
         <div className="app">
           <Sidebar
             labels={labels}

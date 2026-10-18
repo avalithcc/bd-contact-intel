@@ -2,16 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { usePathname, useRouter } from "next/navigation";
-import { CallForm, type CallFormLabels } from "@/components/CallForm";
-import { callDialogDefaults, followUpTitle } from "@/lib/contacts/callDialog";
-import { settleAction } from "@/lib/contacts/actionOutcome";
+import { usePathname } from "next/navigation";
 import { CallIcon } from "@/components/icons";
 import { useToast } from "@/components/ToastProvider";
 import { CALL_ATTEMPT_NOTE_MAX_LENGTH } from "@/lib/contacts/callAttempt";
 import { mayOpenBar, mayRestoreBar } from "@/lib/contacts/callBarGuard";
-import type { DialledField } from "@/lib/contacts/callAttempt";
-import { addContactTaskAction, recordCallAttemptAction, resolveCallAttemptAction, settleCallAttemptAction } from "@/app/(app)/contacts/actions";
+import { recordCallAttemptAction, resolveCallAttemptAction } from "@/app/(app)/contacts/actions";
 
 export interface CallAttemptLabels {
   barLabel: string;
@@ -25,22 +21,6 @@ export interface CallAttemptLabels {
   attemptSaved: string;
   recordError: string;
   saveError: string;
-  calling: string;
-  details: string;
-  dialLine: string;
-  followUpToggle: string;
-  followUpTitleLabel: string;
-  followUpDueLabel: string;
-  followUpTitleDefault: string;
-  followUpError: string;
-  followUpSaved: string;
-}
-
-/** Strings of the "Más detalles…" dialog, picked from the record dictionary by the shell. */
-export interface CallDetailsLabels {
-  form: CallFormLabels;
-  phone: string;
-  mobile: string;
 }
 
 export interface CallTarget {
@@ -56,8 +36,6 @@ interface OpenBar {
   personName: string;
   step: "ask" | "note";
   busy: boolean;
-  number: string;
-  field: DialledField;
 }
 
 const CallAttemptContext = createContext<{ startCall: (target: CallTarget) => void } | null>(null);
@@ -73,24 +51,13 @@ export function useCallAttempt() {
  * and never nags: leaving the page (or Escape) drops the bar, and the attempt
  * simply stays without an outcome.
  */
-export function CallAttemptProvider({
-  labels,
-  details: detailLabels,
-  children,
-}: {
-  labels: CallAttemptLabels;
-  details: CallDetailsLabels;
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
+export function CallAttemptProvider({ labels, children }: { labels: CallAttemptLabels; children: React.ReactNode }) {
   const { showToast } = useToast();
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
   const [bar, setBar] = useState<OpenBar | null>(null);
   const [note, setNote] = useState("");
-  // "Más detalles…": the full call form, for the attempt the bar was asking about.
-  const [detail, setDetail] = useState<{ bar: OpenBar; now: Date; busy: boolean; error: string | null } | null>(null);
   const [region, setRegion] = useState<HTMLElement | null>(null);
   const inFlight = useRef(new Set<string>());
   // The attempt whose bar is open right now; null once dismissed or left behind.
@@ -108,7 +75,6 @@ export function CallAttemptProvider({
   useEffect(() => setRegion(document.getElementById("toast-region")), []);
 
   useEffect(dismiss, [pathname, dismiss]);
-  useEffect(() => setDetail(null), [pathname]);
 
   // Announce by moving focus to the first answer when the bar opens.
   useEffect(() => {
@@ -134,7 +100,6 @@ export function CallAttemptProvider({
       if (inFlight.current.has(key)) return;
       inFlight.current.add(key);
       const pathnameAtDial = pathnameRef.current;
-      showToast(labels.calling);
       recordCallAttemptAction(target.personId, target.number)
         .then((result) => {
           if (!result.ok) return showToast(labels.recordError, "error");
@@ -142,20 +107,12 @@ export function CallAttemptProvider({
           if (!mayOpenBar(pathnameAtDial, pathnameRef.current)) return;
           setNote("");
           openAttempt.current = result.attemptId;
-          setBar({
-            attemptId: result.attemptId,
-            personId: target.personId,
-            personName: target.personName,
-            step: "ask",
-            busy: false,
-            number: target.number,
-            field: result.field,
-          });
+          setBar({ attemptId: result.attemptId, personId: target.personId, personName: target.personName, step: "ask", busy: false });
         })
         .catch(() => showToast(labels.recordError, "error"))
         .finally(() => inFlight.current.delete(key));
     },
-    [labels.calling, labels.recordError, showToast],
+    [labels.recordError, showToast],
   );
 
   async function answer(outcome: "connected" | "no_answer" | "voicemail") {
@@ -175,27 +132,6 @@ export function CallAttemptProvider({
       setBar({ ...open, busy: false });
       showToast(labels.saveError, "error");
     }
-  }
-
-  async function submitDetails(values: Parameters<React.ComponentProps<typeof CallForm>["onSubmit"]>[0]) {
-    if (!detail || detail.busy) return;
-    const { bar: open } = detail;
-    setDetail({ ...detail, busy: true, error: null });
-    const result = await settleAction(() => settleCallAttemptAction(open.attemptId, open.personId, values.outcome, values.date, values.time, values.notes));
-    if (!result.ok) {
-      if (result.reason === "unconfirmed") router.refresh();
-      const message = result.reason === "call_occurred_at_in_future" ? detailLabels.form.errorCallOccurredAtInFuture : labels.saveError;
-      setDetail({ ...detail, busy: false, error: message });
-      return showToast(message, "error");
-    }
-    setDetail(null);
-    showToast(labels.callSaved);
-    if (values.followUp) {
-      const due = values.followUp.dueDate ? new Date(values.followUp.dueDate) : undefined;
-      const task = await settleAction(() => addContactTaskAction(open.personId, values.followUp!.title, due));
-      showToast(task.ok ? labels.followUpSaved : labels.followUpError, task.ok ? "success" : "error");
-    }
-    router.refresh();
   }
 
   return (
@@ -220,17 +156,6 @@ export function CallAttemptProvider({
                   </button>
                   <button className="obtn" type="button" disabled={bar.busy} onClick={() => answer("voicemail")}>
                     {labels.voicemail}
-                  </button>
-                  <button
-                    className="obtn"
-                    type="button"
-                    disabled={bar.busy}
-                    onClick={() => {
-                      setDetail({ bar, now: new Date(), busy: false, error: null });
-                      dismiss();
-                    }}
-                  >
-                    {labels.details}
                   </button>
                 </span>
               </>
@@ -261,29 +186,6 @@ export function CallAttemptProvider({
           </div>,
           region,
         )}
-      {detail && (
-        <CallForm
-          labels={detailLabels.form}
-          busy={detail.busy}
-          error={detail.error && <div className="error-text" role="alert">{detail.error}</div>}
-          onCancel={() => setDetail(null)}
-          onSubmit={submitDetails}
-          dial={{
-            line: labels.dialLine,
-            name: detail.bar.personName,
-            number: detail.bar.number,
-            fieldLabel: detail.bar.field === "mobile_phone" ? detailLabels.mobile : detailLabels.phone,
-            ...callDialogDefaults(detail.now),
-            followUp: {
-              toggleLabel: labels.followUpToggle,
-              titleLabel: labels.followUpTitleLabel,
-              dueLabel: labels.followUpDueLabel,
-              title: followUpTitle(labels.followUpTitleDefault, detail.bar.personName),
-              dueDate: callDialogDefaults(detail.now).followUpDue,
-            },
-          }}
-        />
-      )}
     </CallAttemptContext.Provider>
   );
 }
