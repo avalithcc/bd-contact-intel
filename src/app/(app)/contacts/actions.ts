@@ -19,8 +19,7 @@ import { logUnsafeReplyHeader, planThreadReply } from "@/lib/gmail/replyThread";
 import { getThreadReplySource } from "@/lib/gmail/threadMessages";
 import { planMeeting } from "@/lib/contacts/meeting";
 import { planCall } from "@/lib/contacts/call";
-import { recordCallAttempt, resolveCallAttempt, settleCallAttempt } from "@/lib/contacts/callAttemptDb";
-import type { DialledField } from "@/lib/contacts/callAttempt";
+import { recordCallAttempt, resolveCallAttempt } from "@/lib/contacts/callAttemptDb";
 import { planDiscard } from "@/lib/contacts/discard";
 import { addManualSignal } from "@/lib/contacts/manualSignalDb";
 import { bulkAssignOwner } from "@/lib/contacts/bulkOwnerDb";
@@ -289,7 +288,7 @@ export async function logCallAction(
   }
 }
 
-export type CallAttemptActionResult = { ok: true; attemptId: string; field: DialledField } | { ok: false };
+export type CallAttemptActionResult = { ok: true; attemptId: string } | { ok: false };
 
 /**
  * The `tel:` click (call-logging-one-tap, variant A): records a `call_attempt`
@@ -302,7 +301,7 @@ export async function recordCallAttemptAction(personId: string, number: string):
     const me = await getCurrentBd();
     const attempt = await recordCallAttempt(personId, me.id, number);
     revalidatePath(`/contacts/${personId}`);
-    return { ok: true, attemptId: attempt.attemptId, field: attempt.field };
+    return { ok: true, attemptId: attempt.attemptId };
   } catch (err) {
     unstable_rethrow(err);
     console.error("[contacts] call attempt not recorded", err);
@@ -321,31 +320,6 @@ export async function resolveCallAttemptAction(
     if (!isUuid(attemptId) || !isUuid(personId)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
     await resolveCallAttempt(attemptId, personId, me.id, outcome, notes);
-    revalidatePath(`/contacts/${personId}`);
-    revalidatePath("/contacts");
-    return { ok: true };
-  } catch (err) {
-    return actionFailure(err);
-  }
-}
-
-/**
- * "Más detalles…" on the outcome bar: the full call form settles the SAME
- * attempt (one `call` row carrying the dialled number, the attempt folded into
- * it). Same errors and future-date guard as `logCallAction`.
- */
-export async function settleCallAttemptAction(
-  attemptId: string,
-  personId: string,
-  outcome: string,
-  date: string,
-  time: string,
-  notes: string,
-): Promise<ContactActionResult> {
-  try {
-    if (!isUuid(attemptId) || !isUuid(personId)) return { ok: false, reason: "not_found" };
-    const me = await getCurrentBd();
-    await settleCallAttempt(attemptId, personId, me.id, { outcome, date, time, notes });
     revalidatePath(`/contacts/${personId}`);
     revalidatePath("/contacts");
     return { ok: true };

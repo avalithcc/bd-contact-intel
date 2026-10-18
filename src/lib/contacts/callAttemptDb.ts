@@ -20,11 +20,8 @@ import {
   CallAttemptResolvedError,
   dedupeCutoff,
   findDuplicateAttempt,
-  planAttemptCall,
   planAttemptMetadata,
   planAttemptResolution,
-  type AttemptCallInput,
-  type DialledField,
   resolveDialledField,
 } from "@/lib/contacts/callAttempt";
 
@@ -48,8 +45,6 @@ export interface RecordedAttempt {
   dialledAt: string;
   /** True when this click was folded into an attempt already recorded for the same dial. */
   duplicate: boolean;
-  /** Which of the contact's stored numbers was dialled. */
-  field: DialledField;
 }
 
 export async function recordCallAttempt(
@@ -88,19 +83,27 @@ export async function recordCallAttempt(
     .filter((r) => r.attemptId && r.attemptAt)
     .map((r) => ({ id: r.attemptId!, actorBdId: r.attemptActor, number: r.attemptNumber, createdAt: r.attemptAt! }));
   const duplicate = findDuplicateAttempt(recent, { bdId, number: rawNumber }, now);
-  if (duplicate) return { attemptId: duplicate.id, dialledAt: duplicate.createdAt.toISOString(), duplicate: true, field };
+  if (duplicate) return { attemptId: duplicate.id, dialledAt: duplicate.createdAt.toISOString(), duplicate: true };
 
   const [row] = await db
     .insert(activity)
     .values({ type: CALL_ATTEMPT_TYPE, personId, actorBdId: bdId, metadata: planAttemptMetadata(rawNumber, field) })
     .returning({ id: activity.id, createdAt: activity.createdAt });
-  return { attemptId: row!.id, dialledAt: row!.createdAt.toISOString(), duplicate: false, field };
+  return { attemptId: row!.id, dialledAt: row!.createdAt.toISOString(), duplicate: false };
 }
 
-async function loadOwnAttempt(attemptId: string, personId: string, bdId: string) {
+/** Answers the outcome bar. Returns the id of the `call` row when "Hablé" wrote one. */
+export async function resolveCallAttempt(
+  attemptId: string,
+  personId: string,
+  bdId: string,
+  outcome: string,
+  notes: string,
+): Promise<{ callId: string | null }> {
   const [personRow] = await db.select({ mergedIntoId: person.mergedIntoId }).from(person).where(eq(person.id, personId));
   if (!personRow) throw new ContactNotFoundError(personId);
   assertContactEditable(personRow);
+
   const [attempt] = await db
     .select({ createdAt: activity.createdAt, metadata: activity.metadata })
     .from(activity)
@@ -113,44 +116,6 @@ async function loadOwnAttempt(attemptId: string, personId: string, bdId: string)
       ),
     );
   if (!attempt) throw new CallAttemptNotFoundError();
-  return attempt;
-}
-
-/**
- * "Más detalles…": settles the attempt with the full call form. One `call` row
- * (carrying the dialled number) and the attempt folded into it, in ONE
- * transaction, so a call is never listed twice and a double submit loses.
- */
-export async function settleCallAttempt(
-  attemptId: string,
-  personId: string,
-  bdId: string,
-  input: AttemptCallInput,
-  now: Date = new Date(),
-): Promise<{ callId: string }> {
-  const attempt = await loadOwnAttempt(attemptId, personId, bdId);
-  const plan = planAttemptCall(attempt, input, now);
-  return db.transaction(async (tx) => {
-    const created = await createActivityInTx(tx, { type: "call", personId, actorBdId: bdId, metadata: { ...plan.call } });
-    const closed = await tx
-      .update(activity)
-      .set({ metadata: sql`${activity.metadata} || ${JSON.stringify({ ...plan.attemptPatch, callActivityId: created.id })}::jsonb`, updatedAt: new Date() })
-      .where(and(eq(activity.id, attemptId), sql`(${activity.metadata}->>'outcome') is null`))
-      .returning({ id: activity.id });
-    if (closed.length === 0) throw new CallAttemptResolvedError();
-    return { callId: created.id };
-  });
-}
-
-/** Answers the outcome bar. Returns the id of the `call` row when "Hablé" wrote one. */
-export async function resolveCallAttempt(
-  attemptId: string,
-  personId: string,
-  bdId: string,
-  outcome: string,
-  notes: string,
-): Promise<{ callId: string | null }> {
-  const attempt = await loadOwnAttempt(attemptId, personId, bdId);
   const plan = planAttemptResolution(attempt, outcome, notes);
 
   // Never overwrites an outcome that landed in between (two tabs, double click).
