@@ -138,6 +138,19 @@ test.describe('Estado de Gmail: the admin view', () => {
     await expect(bubble).toBeHidden();
   });
 
+  test('"Enviar recordatorio" is offered only to a BD who can get one; with no mail server the failure is told and nothing is audited', async ({ page }) => {
+    await gotoAuthed(page, '/admin/gmail');
+    const sendFor = (name: string) => page.getByRole('button', { name: `Enviar recordatorio a ${name}` });
+    await expect(sendFor(`ZZ E2E Fleet Never ${tag}`)).toBeVisible();
+    await expect(page.locator('table.data tbody tr', { hasText: okEmail }).getByRole('button')).toHaveCount(0);
+    await expect(page.locator('table.data tbody tr', { hasText: e2eAdminEmail() }).getByRole('button')).toHaveCount(0);
+
+    await sendFor(`ZZ E2E Fleet Never ${tag}`).click();
+    await expect(page.getByText(D.errorSend, { exact: true })).toBeVisible();
+    const audits = await sql`select count(*)::int as n from audit_log where target_bd_id = ${neverId} and action = 'gmail_reminder_manual'`;
+    expect(audits[0]!.n).toBe(0);
+  });
+
   test('the shell pages every user opens still render for an admin', async ({ page }) => {
     for (const url of ['/contacts', '/account']) {
       const seen = watchErrors(page);

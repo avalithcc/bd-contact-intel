@@ -2495,6 +2495,7 @@ export const es: typeof en = {
     failedLabel: "fallidos",
     lastErrorLabel: "último error:",
     send: "Enviar recordatorio",
+    sendAria: "Enviar recordatorio a {name}",
     sending: "Enviando…",
     toastSent: "Recordatorio enviado a {name} ({n} de 3)",
     errorSend: "No se pudo enviar el recordatorio. Inténtalo de nuevo.",

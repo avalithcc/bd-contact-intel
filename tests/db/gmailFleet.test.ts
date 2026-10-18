@@ -134,3 +134,78 @@ test("bounces are attributed to the BD that synced them, not to anyone else", as
   const rows = await getGmailFleetHealth(NOW);
   assert.deepEqual([rows.find((r) => r.bdId === a.id)!.bouncesHard, rows.find((r) => r.bdId === b.id)!.bouncesHard], [1, 0]);
 });
+
+test("a manual reminder claims the day, marks it sent and writes the audit row in one step; it counts in the fleet series and a second one the same day is refused", async () => {
+  const { sendManualReminder } = await import("@/lib/gmail/manualReminder");
+  const q = await import("@/lib/gmail/reminderQueries");
+  const { getGmailFleetHealth } = await import("@/lib/gmail/fleetQueries");
+  const { db } = await import("@/db");
+  const { auditLog } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+
+  const adm = await mkBd("ManualAdmin", { role: "admin" });
+  const target = await mkBd("ManualTarget");
+  const mails: { to: string }[] = [];
+  const deps = {
+    readRows: () => q.getReminderRows(),
+    send: async (m: { to: string }) => void mails.push(m),
+    claim: q.claimGmailReminder,
+    markSentAudited: (id: string, audit: Parameters<typeof q.markGmailReminderSentAudited>[1]) => q.markGmailReminderSentAudited(id, audit),
+    markFailed: q.markGmailReminderFailed,
+  };
+  const auditRows = () => db.select().from(auditLog).where(and(eq(auditLog.actorBdId, adm.id), eq(auditLog.targetBdId, target.id)));
+
+  const first = await sendManualReminder({ admin: adm, bdId: target.id, now: NOW, siteUrl: "https://crm.example.test" }, deps);
+  assert.deepEqual(first, { ok: true, number: 1 });
+  assert.deepEqual(mails.map((m) => m.to), [target.email]);
+
+  const audits = await auditRows();
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0]!.action, "gmail_reminder_manual");
+  assert.equal((audits[0]!.metadata as { reminderNumber: number }).reminderNumber, 1);
+
+  const row = (await getGmailFleetHealth(NOW)).find((r) => r.bdId === target.id)!;
+  assert.equal(row.sentReminders.length, 1, "the manual one is a `sent` reminder of the series");
+  assert.equal(row.reminder.kind === "series" && row.reminder.sent, 1);
+
+  const again = await sendManualReminder({ admin: adm, bdId: target.id, now: NOW, siteUrl: "https://crm.example.test" }, deps);
+  assert.deepEqual(again, { ok: false, reason: "already_sent_today" });
+  assert.equal(mails.length, 1);
+  assert.equal((await auditRows()).length, 1);
+});
+
+test("a manual reminder whose send failed can be retried the same day; a sent or in-flight claim still blocks", async () => {
+  const { sendManualReminder } = await import("@/lib/gmail/manualReminder");
+  const q = await import("@/lib/gmail/reminderQueries");
+  const { db } = await import("@/db");
+  const { auditLog, gmailReminderSend } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+
+  const adm = await mkBd("RetryAdmin", { role: "admin" });
+  const target = await mkBd("RetryTarget");
+  let smtpDown = true;
+  const mails: string[] = [];
+  const deps = {
+    readRows: () => q.getReminderRows(),
+    send: async (m: { to: string }) => {
+      if (smtpDown) throw new Error("smtp down");
+      mails.push(m.to);
+    },
+    claim: q.claimGmailReminderManual,
+    markSentAudited: (id: string, audit: Parameters<typeof q.markGmailReminderSentAudited>[1]) => q.markGmailReminderSentAudited(id, audit),
+    markFailed: q.markGmailReminderFailed,
+  };
+  const input = { admin: adm, bdId: target.id, now: NOW, siteUrl: "https://crm.example.test" };
+
+  assert.deepEqual(await sendManualReminder(input, deps), { ok: false, reason: "send_failed" });
+  const [failedRow] = await db.select().from(gmailReminderSend).where(eq(gmailReminderSend.bdId, target.id));
+  assert.equal(failedRow!.status, "failed");
+
+  smtpDown = false;
+  assert.deepEqual(await sendManualReminder(input, deps), { ok: true, number: 1 });
+  const rows = await db.select().from(gmailReminderSend).where(eq(gmailReminderSend.bdId, target.id));
+  assert.deepEqual(rows.map((r) => [r.status, r.error]), [["sent", null]], "the same day row was reclaimed, not duplicated");
+  assert.equal((await db.select().from(auditLog).where(and(eq(auditLog.actorBdId, adm.id), eq(auditLog.targetBdId, target.id)))).length, 1);
+  assert.deepEqual(await sendManualReminder(input, deps), { ok: false, reason: "already_sent_today" });
+  assert.equal(mails.length, 1);
+});

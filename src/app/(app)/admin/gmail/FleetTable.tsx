@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { formatInstant } from "@/lib/gmail/fleetFormat";
 import { bounceCell, failedCell, lastEmailCell, reminderCell, syncCell, type FleetDict } from "@/lib/gmail/fleetText";
 import { isNewFleetBd, type FleetRow } from "@/lib/gmail/fleetView";
+import { SendReminderButton } from "./SendReminderButton";
 
 type Tip = { title: string; body: string; action?: string };
 
@@ -181,7 +182,23 @@ function Row({ row, d, now, locale }: { row: FleetRow; d: FleetDict; now: Date; 
           </>
         )}
       </td>
-      <td className="right" />
+      <td className="right">
+        {row.canSendReminder && (
+          <SendReminderButton
+            bdId={row.bdId}
+            name={row.name}
+            labels={{
+              send: d.send,
+              sendAria: d.sendAria,
+              sending: d.sending,
+              toastSent: d.toastSent,
+              errorSend: d.errorSend,
+              errorAlreadySent: d.errorAlreadySent,
+              errorNotEligible: d.errorNotEligible,
+            }}
+          />
+        )}
+      </td>
     </tr>
   );
 }

@@ -4,7 +4,8 @@
  */
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { gmailReminderSend } from "@/db/schema";
+import { auditLog, gmailReminderSend } from "@/db/schema";
+import { MANUAL_REMINDER_AUDIT_ACTION, type ManualReminderAudit } from "./manualReminder";
 import type { ReminderRow } from "./reminderRows";
 
 /**
@@ -53,6 +54,23 @@ export async function claimGmailReminder(bdId: string, sentOn: string, reminderN
   return inserted?.id ?? null;
 }
 
+/**
+ * The manual send's claim: the cron's claim, except that today's row is taken over when its send FAILED (an admin retrying
+ * after an SMTP error must not be told "already sent"). A `sent` row or a `pending` one (a send in flight) still blocks.
+ */
+export async function claimGmailReminderManual(bdId: string, sentOn: string, reminderNumber: number): Promise<string | null> {
+  const [claimed] = await db
+    .insert(gmailReminderSend)
+    .values({ bdId, sentOn, reminderNumber, status: "pending" })
+    .onConflictDoUpdate({
+      target: [gmailReminderSend.bdId, gmailReminderSend.sentOn],
+      set: { status: "pending", error: null, reminderNumber },
+      setWhere: eq(gmailReminderSend.status, "failed"),
+    })
+    .returning({ id: gmailReminderSend.id });
+  return claimed?.id ?? null;
+}
+
 export async function markGmailReminderSent(id: string, at: Date = new Date()): Promise<void> {
   await db.update(gmailReminderSend).set({ status: "sent", sentAt: at }).where(eq(gmailReminderSend.id, id));
 }
@@ -60,4 +78,20 @@ export async function markGmailReminderSent(id: string, at: Date = new Date()): 
 /** `error` must already be sanitized — see src/lib/tasks/sendErrorSanitizer.ts. */
 export async function markGmailReminderFailed(id: string, error: string): Promise<void> {
   await db.update(gmailReminderSend).set({ status: "failed", error }).where(eq(gmailReminderSend.id, id));
+}
+
+/**
+ * The manual send's version of markGmailReminderSent: the row becomes `sent` and the audit row (actor = the admin, target =
+ * the BD) is written in ONE transaction, so a reminder that counts in the series is never unaudited.
+ */
+export async function markGmailReminderSentAudited(id: string, audit: ManualReminderAudit, at: Date = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.update(gmailReminderSend).set({ status: "sent", sentAt: at }).where(eq(gmailReminderSend.id, id));
+    await tx.insert(auditLog).values({
+      actorBdId: audit.actorBdId,
+      action: MANUAL_REMINDER_AUDIT_ACTION,
+      targetBdId: audit.bdId,
+      metadata: { reminderNumber: audit.number, sentOn: audit.sentOn },
+    });
+  });
 }

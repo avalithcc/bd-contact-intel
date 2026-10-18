@@ -1058,6 +1058,8 @@ export const auditLog = pgTable(
     // source 'signature_extract', the same provenance as the extractor)
     // 'bd_lusha_enable' | 'bd_lusha_disable' (an admin flipped a BD's Lusha switch on
     // /admin/lusha; target_bd_id is the BD, actor_bd_id the admin, metadata { enabled })
+    // 'gmail_reminder_manual' (an admin pressed "Enviar recordatorio" on /admin/gmail: the next "connect your Gmail"
+    // reminder went out now; target_bd_id is the BD, actor_bd_id the admin, metadata { reminderNumber, sentOn })
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",

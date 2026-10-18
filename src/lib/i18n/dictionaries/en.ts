@@ -2505,6 +2505,7 @@ export const en = {
     failedLabel: "failed",
     lastErrorLabel: "last error:",
     send: "Send reminder",
+    sendAria: "Send a reminder to {name}",
     sending: "Sending…",
     toastSent: "Reminder sent to {name} ({n} of 3)",
     errorSend: "The reminder could not be sent. Try again.",

@@ -7,7 +7,7 @@ import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { sanitizeSendError } from "@/lib/tasks/sendErrorSanitizer";
 import type { DigestSendInput } from "@/lib/mailer/smtpMailer";
 import { buildOwnerNoticeEmail, buildReminderEmail } from "./reminderEmail";
-import { planGmailReminders } from "./reminderPlan";
+import { planGmailReminders, planManualReminder } from "./reminderPlan";
 import { rowToCandidate, type ReminderRow } from "./reminderRows";
 
 export interface ReminderRunDeps {
@@ -33,14 +33,20 @@ export interface ReminderRunSummary {
 }
 
 export async function runGmailReminders(
-  input: { rows: readonly ReminderRow[]; now: Date; siteUrl: string; dryRun: boolean },
+  input: { rows: readonly ReminderRow[]; now: Date; siteUrl: string; dryRun: boolean; onlyBdId?: string },
   deps: ReminderRunDeps,
 ): Promise<{ date: string; dryRun: boolean; summary: ReminderRunSummary; results: ReminderRunResult[] }> {
-  const { rows, now, siteUrl, dryRun } = input;
+  const { rows, now, siteUrl, dryRun, onlyBdId } = input;
   const date = argentinaCalendarDate(now);
   const admins = rows.filter((r) => r.rm_role === "admin").map((r) => r.rm_email);
   const byId = new Map(rows.map((r) => [r.rm_bd_id, r]));
-  const decisions = planGmailReminders(rows.map((r) => rowToCandidate(r, now)), now);
+  // `onlyBdId`: an admin's "Enviar recordatorio" for one BD. Same claim, send and series as the cron, minus the schedule.
+  const only = onlyBdId ? byId.get(onlyBdId) : undefined;
+  const decisions = onlyBdId
+    ? only
+      ? [planManualReminder(rowToCandidate(only, now), now)]
+      : []
+    : planGmailReminders(rows.map((r) => rowToCandidate(r, now)), now);
 
   const results: ReminderRunResult[] = [];
   const summary: ReminderRunSummary = { sent: 0, skipped: 0, failed: 0 };
