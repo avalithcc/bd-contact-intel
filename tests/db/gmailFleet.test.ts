@@ -174,6 +174,24 @@ test("a manual reminder claims the day, marks it sent and writes the audit row i
   assert.equal((await auditRows()).length, 1);
 });
 
+test("the admin sidebar pill counts exactly the BDs the fleet screen lists under 'Necesitan atención', and a BD never pays for it", async () => {
+  const { getAppShellBadgeCounts } = await import("@/lib/shell/appShellBadgeCounts");
+  const { getGmailFleetHealth } = await import("@/lib/gmail/fleetQueries");
+  const { summarizeFleet } = await import("@/lib/gmail/fleetView");
+
+  const adm = await mkBd("PillAdmin", { role: "admin" });
+  const plain = await mkBd("PillBd");
+  const sick = await mkBd("PillSick");
+  await mkAccount(sick.id, { grantedScopes: "https://www.googleapis.com/auth/gmail.send" });
+
+  const asAdmin = await getAppShellBadgeCounts(adm.id, NOW, true);
+  const asBd = await getAppShellBadgeCounts(plain.id, NOW, false);
+  const summary = summarizeFleet(await getGmailFleetHealth(NOW));
+  assert.ok(summary.attention >= 2, "the admin without an account and the BD that must reconnect both need attention");
+  assert.equal(asAdmin.gmailAttentionCount, summary.attention);
+  assert.equal(asBd.gmailAttentionCount, 0);
+});
+
 test("a manual reminder whose send failed can be retried the same day; a sent or in-flight claim still blocks", async () => {
   const { sendManualReminder } = await import("@/lib/gmail/manualReminder");
   const q = await import("@/lib/gmail/reminderQueries");

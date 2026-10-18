@@ -43,7 +43,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
+import { activity, bd, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { CLOSED_STATES } from "@/lib/sequences/memberState";
 
@@ -201,6 +201,27 @@ export function buildAppShellBadgeCountsQuery({
         from ${scheduledEmail}
         where scheduled_email.bd_id = ${bdId}::uuid
           and scheduled_email.status in ('scheduled', 'on_hold', 'failed')
-      ) as scheduled_count
+      ) as scheduled_count,
+      ${
+        isAdmin
+          ? sql`(
+        -- Admin sidebar pill "Estado de Gmail": the Gmail account of every monitored BD, as light json (no message, bounce or
+        -- reminder tables: those belong to the fleet screen's own read). gmailAttentionCount() classifies it in JS with the
+        -- same rules as the screen. Same monitored set as fleetQueries.ts: admins, BDs with reminders on, or any account.
+        -- Literal column text, not interpolated column objects, per the Drizzle gotcha in PERFORMANCE.md. A handful of rows.
+        select json_agg(json_build_object(
+          'has', email_account.bd_id is not null,
+          'status', email_account.status,
+          'grantedScopes', email_account.granted_scopes,
+          'syncError', email_account.sync_error,
+          'lastSyncedAt', email_account.last_synced_at,
+          'connectedAt', email_account.connected_at
+        ))
+        from ${bd}
+        left join ${emailAccount} on email_account.bd_id = bd.id
+        where bd.role = 'admin' or bd.email_reminders_enabled or email_account.bd_id is not null
+      )`
+          : sql`null`
+      } as gmail_fleet_accounts
   `;
 }

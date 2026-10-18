@@ -91,6 +91,9 @@ test.describe('Estado de Gmail: the admin view', () => {
     await expect(page.locator('.stat')).toHaveCount(4);
     await expect(page.locator('.stat .label').first()).toHaveText(D.statHealthy);
     await expect(page.locator('nav.sidenav a[href="/admin/gmail"]')).toHaveText(new RegExp(D.title));
+    // The pill is the number of BDs the "Necesitan atención" filter lists (the stat cards add up to the same figure).
+    const needing = Number(await page.locator('.stat .value').nth(1).innerText()) + Number(await page.locator('.stat .value').nth(2).innerText()) + Number(await page.locator('.stat .value').nth(3).innerText());
+    await expect(page.locator('nav.sidenav a[href="/admin/gmail"] .pill-count')).toHaveText(String(needing));
 
     const ok = page.locator('table.data tbody tr', { hasText: okEmail });
     await expect(ok.locator('.badge-success')).toHaveText(D.chipConnected);
@@ -102,6 +105,9 @@ test.describe('Estado de Gmail: the admin view', () => {
     await expect(never.locator('.badge-neutral')).toHaveText(D.chipNever);
     await expect(never).toContainText(D.noEmails);
     await expect(page.locator('.alert-danger .title', { hasText: `ZZ E2E Fleet Reconnect ${tag}` })).toBeVisible();
+    // No horizontal scroll of the page at 1024 px: the wide table scrolls inside its own wrapper.
+    await page.setViewportSize({ width: 1024, height: 768 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.locator('th .tip-trigger', { hasText: new RegExp(`^${D.colConnection}$`) }).focus();
     await page.waitForTimeout(400);
@@ -165,5 +171,15 @@ test.describe('Estado de Gmail: a BD', () => {
   test('cannot open the admin screen', async ({ page }) => {
     const response = await page.goto('/admin/gmail');
     expect(response?.status()).toBe(404);
+  });
+
+  test('has no Estado de Gmail entry and the shell pages render for them too', async ({ page }) => {
+    for (const url of ['/contacts', '/account']) {
+      const seen = watchErrors(page);
+      await gotoAuthed(page, url);
+      await expect(page.locator('nav.sidenav')).toBeVisible();
+      await expect(page.locator('nav.sidenav a[href="/admin/gmail"]')).toHaveCount(0);
+      await expectNoCrash(page, seen);
+    }
   });
 });

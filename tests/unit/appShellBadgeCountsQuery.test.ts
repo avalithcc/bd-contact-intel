@@ -139,3 +139,20 @@ test("buildAppShellBadgeCountsQuery: scheduled_count is this BD's scheduled, on_
     /select count\(\*\)::int\s+from "scheduled_email"\s+where scheduled_email\.bd_id = \$\d+::uuid\s+and scheduled_email\.status in \('scheduled', 'on_hold', 'failed'\)\s*\) as scheduled_count/i,
   );
 });
+
+// Gmail fleet sidebar pill: admin-only, one bounded scan of bd + email_account riding the same statement.
+test("buildAppShellBadgeCountsQuery: admins get the monitored BDs' Gmail accounts as one json column, with no parameters of their own", () => {
+  const admin = render(true);
+  const match = admin.sql.match(/select json_agg\([\s\S]*?\)\s+as gmail_fleet_accounts/i);
+  assert.ok(match, "expected a gmail_fleet_accounts json_agg subquery");
+  assert.match(match[0], /from "bd"\s+left join "email_account"/i);
+  assert.match(match[0], /email_reminders_enabled/i);
+  assert.doesNotMatch(match[0], /\$\d+/);
+  assert.doesNotMatch(match[0], /email_message|activity|scheduled_email/i, "the pill must stay a light read, not the fleet aggregate");
+});
+
+test("buildAppShellBadgeCountsQuery: non-admins get a literal null and never scan every BD's account", () => {
+  const { sql } = render(false);
+  assert.match(sql, /null\s+as gmail_fleet_accounts/i);
+  assert.doesNotMatch(sql, /json_agg/i);
+});

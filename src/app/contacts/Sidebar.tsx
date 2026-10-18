@@ -134,6 +134,7 @@ export function Sidebar({
   scheduledCount,
   absorptionCount,
   duplicateCount,
+  gmailAttentionCount,
   isAdmin,
 }: {
   labels: NavLabels;
@@ -143,6 +144,7 @@ export function Sidebar({
   scheduledCount?: number;
   absorptionCount?: number;
   duplicateCount?: number;
+  gmailAttentionCount?: number;
   // Admin-only "Administración" section (admin-conversation-access mockup,
   // screen 1: admin-conversation.html:57-61) — "Registro de auditoría" and
   // "Reportes" (owner-reporting decision 1/5) are wired here; see
@@ -312,6 +314,7 @@ export function Sidebar({
           >
             <MailIcon className="icon" />
             {labels.gmailStatus}
+            {!!gmailAttentionCount && <span className="pill-count">{gmailAttentionCount}</span>}
           </Link>
         </div>
       )}

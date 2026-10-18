@@ -11,6 +11,7 @@ import { ensureTodayFollowUpQueue } from "@/lib/followUp/queueQueries";
 import { readBadgeRowEnsuringQueue } from "@/lib/shell/readBadgeRowEnsuringQueue";
 import { buildAppShellBadgeCountsQuery } from "@/lib/shell/appShellBadgeCountsQuery";
 import { decideConnectionBanner, type ConnectionBannerDecision } from "@/lib/gmail/connectionBanner";
+import { gmailAttentionCount, type GmailFleetAccountJson } from "@/lib/gmail/fleetAttention";
 
 export interface AppShellBadgeCounts {
   taskCount: number;
@@ -23,6 +24,8 @@ export interface AppShellBadgeCounts {
   sequenceCount: number;
   /** This BD's scheduled emails that are scheduled, on hold or failed. */
   scheduledCount: number;
+  /** BDs that need attention on /admin/gmail (the admin sidebar pill); always 0 for non-admins (the subquery is skipped). */
+  gmailAttentionCount: number;
   /** Which Gmail banner the shell shows, if any — see connectionBanner.ts. */
   connectionBanner: ConnectionBannerDecision | null;
 }
@@ -78,10 +81,11 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
       scheduled_count: number;
       queue_built: boolean;
       email_account_banner_state: EmailAccountBannerState | null;
+      gmail_fleet_accounts: GmailFleetAccountJson[] | null;
     }[];
     // An empty result cannot happen (scalar subqueries), but keep the old
     // `row?.` tolerance rather than throwing in the shell.
-    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, scheduled_count: 0, queue_built: true, email_account_banner_state: null };
+    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, scheduled_count: 0, queue_built: true, email_account_banner_state: null, gmail_fleet_accounts: null };
   };
   // F5: build today's queue on the first page of the day — see
   // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
@@ -110,6 +114,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
     duplicateCount: Number(row?.duplicate_count ?? 0),
     sequenceCount: Number(row?.sequence_count ?? 0),
     scheduledCount: Number(row?.scheduled_count ?? 0),
+    gmailAttentionCount: gmailAttentionCount(row?.gmail_fleet_accounts, now),
     connectionBanner,
   };
 }
