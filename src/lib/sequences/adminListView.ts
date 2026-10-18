@@ -7,4 +7,6 @@ export type AdminListView = {
   tabs: { mine: number; all: number };
   owners: readonly OwnerOption[];
   chipOwner: OwnerOption | null;
+  /** The read hit its cap: the counts and the owner menu cover only the newest `cap` Sequences (plus the viewer's own). */
+  capped?: { cap: number } | null;
 };

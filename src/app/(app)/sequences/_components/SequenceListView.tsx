@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { initialsFromName } from "@/components/initials";
-import { CloseIcon, FilterIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/icons";
+import { CloseIcon, FilterIcon, InfoIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/icons";
 import type { AdminListView } from "@/lib/sequences/adminListView";
 import { DAILY_SEND_CAP_WARN_ABOVE } from "@/lib/sequences/capValidation";
 import { companiesLine, createdAgo, createdOn, listView, type SequenceListRow } from "@/lib/sequences/listView";
@@ -97,6 +97,7 @@ export function SequenceListView({ rows, labels: l, now, admin = null }: { rows:
       {head}
       {admin && <Tabs admin={admin} l={l} />}
       {admin && all && <OwnerToolbar admin={admin} l={l} />}
+      {all && admin?.capped && <div className="alert alert-neutral mb-lg" role="status"><InfoIcon className="icon" /><div>{fill(l.listCappedNotice, { n: admin.capped.cap })}</div></div>}
       <div className="grid-4 mb-lg">
         {cards.map((c) => <div key={c.tone} className={`stat ${c.tone}`}><div className="label">{c.label}</div><div className="value">{c.value}</div><div className="foot">{c.foot}</div></div>)}
       </div>

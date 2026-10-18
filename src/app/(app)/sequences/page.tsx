@@ -2,7 +2,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { getCurrentBd } from "@/lib/queries";
 import { isAdminRole } from "@/lib/auth/adminRole";
 import { resolveScope, scopeView } from "@/lib/sequences/listScope";
-import { listAllSequences, listSequencesForBd } from "@/lib/sequences/pageQueries";
+import { ALL_SEQUENCES_LIMIT, listAllSequences, listSequencesForBd } from "@/lib/sequences/pageQueries";
 import { SequenceListView } from "./_components/SequenceListView";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +24,11 @@ export default async function SequencesPage({ searchParams }: { searchParams: Pr
       </main>
     );
   }
-  const view = scopeView(await listAllSequences(me.id), me.id, req);
+  const { rows: allRows, capped } = await listAllSequences(me.id);
+  const view = scopeView(allRows, me.id, req);
   return (
     <main className="page">
-      <SequenceListView rows={view.rows} labels={dict.sequences} now={new Date()} admin={{ scope: req.scope, meId: me.id, tabs: view.tabs, owners: view.owners, chipOwner: view.chipOwner }} />
+      <SequenceListView rows={view.rows} labels={dict.sequences} now={new Date()} admin={{ scope: req.scope, meId: me.id, tabs: view.tabs, owners: view.owners, chipOwner: view.chipOwner, capped: capped ? { cap: ALL_SEQUENCES_LIMIT } : null }} />
     </main>
   );
 }

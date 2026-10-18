@@ -125,6 +125,9 @@ export function normalizePhone(raw: string, ctx: PhoneContext): PhoneNormalizati
     return validE164(candidate) ? { value: candidate, rule: "intl_00_prefix" } : { flagged: true, reason: whyNotValid(candidate) };
   }
 
+  // The provider's country for THIS number outranks any guess from the source or the person's country: valid there or flagged.
+  if (ctx.countryIso2 && ctx.countryIso2 !== "AR") return providerCountryNumber(digits, ctx) ?? { flagged: true, reason: "no_country_code" };
+
   if (isArgentineContext(ctx.source, ctx.country, ctx.countryIso2) && digits.length === AR_LOCAL_LENGTH && !digits.startsWith("0")) {
     const mobile = ctx.column === "mobilePhone";
     const candidate = mobile ? `+549${digits}` : `+54${digits}`;

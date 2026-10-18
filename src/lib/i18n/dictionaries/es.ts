@@ -3120,6 +3120,7 @@ export const es: typeof en = {
     listFooterAllOne: "1 secuencia de 1 BD · las de otros BD se abren en solo lectura",
     listFooterOwner: "{n} secuencias de {name} · se abren en solo lectura",
     listFooterOwnerOne: "1 secuencia de {name} · se abre en solo lectura",
+    listCappedNotice: "Mostrando las {n} secuencias más recientes. Los conteos y el filtro por responsable cubren solo esas.",
     listEmptyMineTitle: "Todavía no hay secuencias propias",
     listEmptyMineBody: "Una secuencia es una tanda de correos 1:1 a contactos elegidos a mano, con vacantes IT abiertas en EE. UU. y correo alcanzable. Las de otros BD están en la pestaña Todas.",
     listSeeAll: "Ver todas",

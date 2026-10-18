@@ -45,13 +45,16 @@ export const ALL_SEQUENCES_LIMIT = 200;
  * Sequences so every shown roster stays complete. When `meId` is given, that BD's own Sequences are always included, so
  * the Mías tab never loses a row to the bound. The caller (the page) calls it for an admin only.
  */
-export async function listAllSequences(meId?: string, limit = ALL_SEQUENCES_LIMIT): Promise<SequenceListRow[]> {
+export async function listAllSequences(meId?: string, limit = ALL_SEQUENCES_LIMIT): Promise<{ rows: SequenceListRow[]; capped: boolean }> {
   const mine = meId ? sql` or s.owner_bd_id = ${meId}::uuid` : sql``;
-  return readListRows(
+  // limit + 1 newest: the extra one only proves more exist. Rows come newest first, so the viewer's older own rows sit
+  // after the newest limit + 1; `capped` is exactly "more than `limit` Sequences came back".
+  const rows = await readListRows(
     sql`, s.owner_bd_id::text as owner_id, ob.name as owner_name`,
     sql`join bd ob on ob.id = s.owner_bd_id`,
-    sql`where s.id in (select r.id from sequence r order by r.created_at desc, r.id limit ${limit})${mine}`,
+    sql`where s.id in (select r.id from sequence r order by r.created_at desc, r.id limit ${limit + 1})${mine}`,
   );
+  return { rows: rows.filter((r, i) => i < limit || (meId !== undefined && r.owner?.id === meId)), capped: rows.length > limit };
 }
 
 async function readListRows(ownerCols: SQL, ownerJoin: SQL, where: SQL): Promise<SequenceListRow[]> {

@@ -190,3 +190,23 @@ describe("provider country (Lusha countryIso2)", () => {
     assert.deepEqual(normalizePhone("(212) 555-0123", { column: "phone" }), { flagged: true, reason: "no_country_code" });
   });
 });
+
+describe("provider country outranks the source and the person's country", () => {
+  it("a US-reported 10-digit number for an Argentine person (or the DFF source) is +1, never +54", () => {
+    const want = { value: "+12125550123", rule: "provider_country" };
+    assert.deepEqual(normalizePhone("2125550123", { column: "mobilePhone", country: "Argentina", countryIso2: "US" }), want);
+    assert.deepEqual(normalizePhone("2125550123", { column: "mobilePhone", source: "dff-2026", countryIso2: "US" }), want);
+  });
+  it("is flagged, not guessed, when the number is not valid in the provider country", () => {
+    assert.deepEqual(normalizePhone("1155555555", { column: "phone", country: "Argentina", countryIso2: "US" }), { flagged: true, reason: "no_country_code" });
+  });
+  it("a Peruvian number with a PE provider and a dff-2026 source", () => {
+    assert.deepEqual(normalizePhone("987654321", { column: "mobilePhone", source: "dff-2026", countryIso2: "PE" }), { value: "+51987654321", rule: "provider_country" });
+  });
+  it("an explicit + country code still wins over the provider country", () => {
+    assert.deepEqual(normalizePhone("+54 9 11 5555 5555", { column: "mobilePhone", countryIso2: "US" }), { value: "+5491155555555", rule: "separators_stripped" });
+  });
+  it("an AR provider keeps the Argentine local rules", () => {
+    assert.deepEqual(normalizePhone("11 5555 5555", { column: "mobilePhone", countryIso2: "AR" }), { value: "+5491155555555", rule: "ar_mobile_local" });
+  });
+});

@@ -108,7 +108,7 @@ test("the list reads only the signed-in BD's Sequences, newest first, with membe
 
 test("the admin list reads EVERY BD's Sequences with the owner; a BD's own list carries no owner", async () => {
   const { listAllSequences, listSequencesForBd } = await import("@/lib/sequences/pageQueries");
-  const everyone = await listAllSequences();
+  const { rows: everyone } = await listAllSequences();
   const mine = everyone.find((r) => r.id === sequenceId)!;
   const theirs = everyone.find((r) => r.id === otherSequenceId)!;
   assert.deepEqual(mine.owner, { id: ownerId, name: "ZZ owner" });
@@ -118,12 +118,23 @@ test("the admin list reads EVERY BD's Sequences with the owner; a BD's own list 
   assert.equal((await listSequencesForBd(ownerId)).every((r) => r.owner === undefined), true);
 });
 
-test("the admin list is bounded on whole Sequences, and always keeps the viewer's own", async () => {
+test("the admin list is bounded on whole Sequences, reports the cap, and keeps the viewer's own even when older", async () => {
+  const { db } = await import("@/db");
+  const { sequence } = await import("@/db/schema");
   const { listAllSequences } = await import("@/lib/sequences/pageQueries");
-  assert.equal((await listAllSequences(undefined, 1)).length, 1);
-  const withMe = await listAllSequences(otherId, 1);
-  assert.ok(withMe.some((r) => r.id === otherSequenceId), "the viewer's own Sequence survives the bound");
-  assert.ok(withMe.filter((r) => r.owner?.id !== otherId).length <= 1, "at most the bound's worth of other rows");
+  // Newer than everything else, owned by another BD: with limit 1 it takes the only newest slot.
+  const [newest] = await db.insert(sequence).values({ name: key("newest"), ownerBdId: otherId, emailAccountId: accountId, schedule: {}, createdAt: new Date("2099-01-01T00:00:00Z") }).returning();
+  sequenceIds.push(newest.id);
+  const bare = await listAllSequences(undefined, 1);
+  assert.equal(bare.rows.length, 1);
+  assert.equal(bare.rows[0].id, newest.id);
+  assert.equal(bare.capped, true);
+  const withMe = await listAllSequences(ownerId, 1);
+  assert.equal(withMe.capped, true);
+  assert.ok(withMe.rows.some((r) => r.id === sequenceId), "the viewer's own Sequence is older than the newest 1 and still appears");
+  assert.ok(withMe.rows.some((r) => r.id === newest.id));
+  assert.equal(withMe.rows.filter((r) => r.owner?.id !== ownerId).length, 1, "at most the bound's worth of other rows");
+  assert.equal((await listAllSequences(ownerId, 100000)).capped, false, "under the cap: not capped");
 });
 
 test("the list does not truncate: 250 members are all there", async () => {

@@ -3117,6 +3117,7 @@ export const en = {
     listFooterAllOne: "1 Sequence from 1 BD · other BDs' Sequences open read-only",
     listFooterOwner: "{n} Sequences from {name} · they open read-only",
     listFooterOwnerOne: "1 Sequence from {name} · it opens read-only",
+    listCappedNotice: "Showing the {n} most recent Sequences. The counts and the owner filter cover only those.",
     listEmptyMineTitle: "You have no Sequences yet",
     listEmptyMineBody: "A Sequence is a batch of 1:1 emails to hand-picked contacts with open US IT roles and a reachable email. Other BDs' Sequences are in the All tab.",
     listSeeAll: "See all",
