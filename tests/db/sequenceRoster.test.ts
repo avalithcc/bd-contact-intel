@@ -57,13 +57,6 @@ async function mkSequence() {
   return s.id;
 }
 
-async function mkMember(sequenceId: string, personId: string, state: string) {
-  const { db } = await import("@/db");
-  const { sequenceMember } = await import("@/db/schema");
-  const [m] = await db.insert(sequenceMember).values({ sequenceId, personId, state }).returning();
-  return m.id;
-}
-
 const memberRow = async (id: string) => {
   const { db } = await import("@/db");
   const { sequenceMember } = await import("@/db/schema");

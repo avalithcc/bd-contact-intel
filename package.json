@@ -13,6 +13,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit --noUnusedLocals",
     "test:db": "npx tsx --test tests/db/**/*.test.ts",
     "test:unit": "npx tsx --test tests/unit/**/*.test.ts",
     "test:e2e": "playwright test",

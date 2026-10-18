@@ -36,7 +36,6 @@
  *   npx tsx --env-file=.env.local scripts/create-partner-account-contacts.ts
  *   npx tsx --env-file=.env.local scripts/create-partner-account-contacts.ts --execute --actor=<bd id>
  */
-import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import { auditLog, company, person } from "../src/db/schema";
@@ -93,7 +92,6 @@ async function main() {
   const { execute, actor } = parseArgs(process.argv.slice(2));
 
   const emails = PARTNER_ACCOUNT_CONTACT_ROWS.map((r) => r.email.trim().toLowerCase());
-  const companyKeysToCheck = [...new Set(PARTNER_ACCOUNT_CONTACT_ROWS.map((r) => r.companyDisplay))];
 
   const [existingByEmailRows, existingCompanyRows] = await Promise.all([
     db

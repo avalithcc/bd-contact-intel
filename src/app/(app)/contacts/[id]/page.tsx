@@ -54,7 +54,6 @@ import { ConversationHistoryCard } from "./ConversationHistoryCard";
 import { CompleteTaskCheckbox } from "./CompleteTaskCheckbox";
 import { TaskTitleLink } from "@/app/(app)/tasks/TaskTitleLink";
 import type { EditTaskLabels } from "@/app/(app)/tasks/EditTaskDialog";
-import styles from "./page.module.css";
 
 /** Maps this page's ContactRecordLabels into EditTaskDialog's shape — see
  * that component's doc comment for why each page builds its own copy. */

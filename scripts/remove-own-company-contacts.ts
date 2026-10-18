@@ -66,7 +66,7 @@
  * board_candidate, company_probe, and every cascading dependent table
  * listed above) before it is ever run against production.
  */
-import { eq, inArray, or, sql } from "drizzle-orm";
+import { inArray, or, sql } from "drizzle-orm";
 import { db } from "../src/db";
 import {
   activity,
@@ -139,26 +139,6 @@ async function main() {
     );
   }
 
-  // Dependent counts, keyed by contact_id (no DB-level FK to cascade).
-  const [scrapeJobCount] = ownContactIds.length
-    ? await db
-        .select({ count: sql<number>`count(*)` })
-        .from(linkedinScrapeJob)
-        .where(inArray(linkedinScrapeJob.contactId, ownContactIds))
-    : [{ count: 0 }];
-  const [signalCount] = ownContactIds.length
-    ? await db
-        .select({ count: sql<number>`count(*)` })
-        .from(signal)
-        .where(inArray(signal.contactId, ownContactIds))
-    : [{ count: 0 }];
-  const [activityCount] = ownContactIds.length
-    ? await db
-        .select({ count: sql<number>`count(*)` })
-        .from(activity)
-        .where(inArray(activity.contactId, ownContactIds))
-    : [{ count: 0 }];
-
   // Conversations belonging to those contacts, matched per-BD by
   // peer_profile_key (contact has no conversation_id FK either way — the
   // link is via profile key, same as the rest of the messaging feature).
@@ -171,17 +151,6 @@ async function main() {
         sql`${conversation.bdId} = ${pair.bdId} AND ${conversation.peerProfileKey} = ${pair.peerProfileKey}`,
       );
     conversationIds.push(...rows.map((r) => r.id));
-  }
-  const conversationCount = conversationIds.length;
-  let messageCount = 0;
-  if (conversationCount) {
-    const [msgCount] = await db.execute<{ count: number }>(
-      sql`SELECT count(*)::int AS count FROM message WHERE conversation_id IN (${sql.join(
-        conversationIds.map((id) => sql`${id}::uuid`),
-        sql`, `,
-      )})`,
-    );
-    messageCount = msgCount?.count ?? 0;
   }
 
   // --- 2. `person` rows (unified-contact model), across every BD/owner. ---

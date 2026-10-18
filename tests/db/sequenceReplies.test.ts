@@ -83,7 +83,7 @@ async function step2Draft(memberId: string) {
 async function auditCount(memberId: string) {
   const { db } = await import("@/db");
   const { auditLog } = await import("@/db/schema");
-  const { and, eq, sql } = await import("drizzle-orm");
+  const { and, sql } = await import("drizzle-orm");
   const rows = await db.select().from(auditLog).where(and(sql`${auditLog.metadata}->>'memberId' = ${memberId}`));
   return rows.length;
 }

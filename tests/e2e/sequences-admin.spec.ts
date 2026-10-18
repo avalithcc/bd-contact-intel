@@ -41,7 +41,6 @@ let sql: ScratchSql;
 let bdId: string;
 let adminId: string;
 let bdName: string;
-let adminName: string;
 let bdSeqId: string;
 let adminSeqId: string;
 const createdAccounts: string[] = [];
@@ -97,7 +96,6 @@ test.beforeAll(async ({ browser }) => {
     // A row that already existed keeps its own name; the assertions use whatever the database says.
     const names = await sql`select id, name from bd where id in (${bdId}, ${adminId})`;
     bdName = names.find((r) => r.id === bdId)!.name as string;
-    adminName = names.find((r) => r.id === adminId)!.name as string;
 
     for (const id of [bdId, adminId]) {
       const account = await ensureEmailAccount(sql, id, `seq-${tag}-${id.slice(0, 4)}@example.com`);

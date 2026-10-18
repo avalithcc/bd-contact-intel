@@ -20,9 +20,9 @@
  * person's result with one `UPDATE ... FROM (VALUES ...)` per chunk.
  * `recomputePersonStatus` (single id) is now a thin wrapper over it.
  */
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { asc, inArray, sql } from "drizzle-orm";
 import type { db } from "@/db";
-import { activity, person, personBdConnection } from "@/db/schema";
+import { activity, personBdConnection } from "@/db/schema";
 import { buildPersonStatusUpdates } from "@/lib/status/deriveStatus";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 

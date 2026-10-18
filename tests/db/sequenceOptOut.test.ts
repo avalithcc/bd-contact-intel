@@ -64,7 +64,7 @@ async function suppressionFor(value: string) {
 async function audits(memberIds: string[]) {
   const { db } = await import("@/db");
   const { auditLog } = await import("@/db/schema");
-  const { and, eq, sql } = await import("drizzle-orm");
+  const { and, eq } = await import("drizzle-orm");
   const all = await db.select().from(auditLog).where(and(eq(auditLog.action, "sequence_member_opt_out")));
   return all.filter((a) => memberIds.includes((a.metadata as { memberId: string }).memberId));
 }

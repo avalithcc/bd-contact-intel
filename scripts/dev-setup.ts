@@ -21,7 +21,6 @@ import {
 import { isLoopbackUrl } from "../src/lib/dev/localDevGuard";
 import { SERVER_IDENTITY_QUERY, serverLocalityRefusal, type ServerIdentity } from "../src/lib/dev/serverLocality";
 import {
-  SEED_TRUNCATED_TABLES,
   cascadeTablesQuery,
   missingSeedTables,
   occupiedTables,

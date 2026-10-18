@@ -22,7 +22,6 @@ import {
 import {
   buildIdentityWriteRows,
   buildPrefetchKeys,
-  planIdentityWrites,
   repointIdentityWriteRows,
   type ExistingPersonCandidate,
   type IdentityWritePlan,

@@ -15,7 +15,7 @@ import { verifyRepliedAddressesInTx } from "./inboundReplyVerificationDb";
 import { executeSyncedMessageWrite, type SyncWriteStore } from "./syncWriteCore";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
 import { buildAfterSyncSet, type AfterSyncPatch } from "./afterSyncPatch";
-import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "./classify";
+import type { ClassifiedMessage, KnownPersonEmail } from "./classify";
 import type { OutboundThreadRef, ThreadRefQuery } from "./threadAttribution";
 
 export { getNeverLogRules };

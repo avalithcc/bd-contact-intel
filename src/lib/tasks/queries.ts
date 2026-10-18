@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, company, person, task, type Task, type NewTask } from "@/db/schema";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
@@ -7,7 +7,6 @@ import type { TaskSubjectInput } from "@/lib/tasks/subject";
 // see that file's doc comment for why (src/app/(app)/contacts/actionErrors.ts
 // is unit-tested without a database and must not transitively import `db`).
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
-import { TaskNotFoundError } from "@/lib/tasks/errors";
 import { combineOpenAndDoneTasks } from "@/lib/contacts/timelineTasks";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 

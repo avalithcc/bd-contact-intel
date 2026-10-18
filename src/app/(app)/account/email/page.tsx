@@ -10,7 +10,7 @@ import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { deriveEmailConnectionScreenState } from "@/lib/gmail/connectionScreenState";
 import { needsReconnectForSync } from "@/lib/gmail/needsReconnectForSync";
 import { deriveSyncHealth } from "@/lib/gmail/syncHealth";
-import { InfoIcon, LinkIcon, MailIcon, WarningIcon } from "@/components/icons";
+import { LinkIcon, MailIcon, WarningIcon } from "@/components/icons";
 import { ConnectSuccessToast } from "./ConnectSuccessToast";
 import { DisconnectButton, SyncNowButton } from "./AccountEmailActions";
 

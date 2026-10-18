@@ -147,13 +147,6 @@ function bulkResultMessage(
   return null;
 }
 
-function emailBadge(row: ContactListRow, dict: Awaited<ReturnType<typeof getDictionary>>) {
-  if (row.emailStatus === "verified") return dict.contactList.emailVerified;
-  if (row.emailStatus === "probable") return dict.contactList.emailProbable;
-  if (row.emailStatus === "bounced") return dict.contactList.emailBounced;
-  return null;
-}
-
 function columnLabel(
   key: ContactColumnKey,
   l: Awaited<ReturnType<typeof getDictionary>>["contactList"],

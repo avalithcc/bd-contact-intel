@@ -26,7 +26,6 @@ function walk(dir: string): string[] {
 }
 
 const rel = (p: string) => relative(ROOT, p);
-const appFiles = walk(APP);
 
 const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8");
 

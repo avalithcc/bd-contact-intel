@@ -12,13 +12,12 @@ import { getOpenAbsorptionNotice } from "@/lib/companies/absorptionDb";
 import { relativeTime } from "@/lib/i18n/format";
 import { getLocale } from "@/lib/i18n/server";
 import { getHiringMatchIndex, getCompanyPostingsForKey } from "@/lib/hiring/queries";
-import { accountTypeLabel, industryLabel, stageBadgeClass, stageLabelOf, vacantesLabel } from "@/lib/companies/listMappers";
+import { accountTypeLabel, industryLabel, stageBadgeClass, stageLabelOf } from "@/lib/companies/listMappers";
 import {
   isCompanyActivityFilter,
   resolveCompanyTab,
   latestEditByProperty,
   startupLabel,
-  type CompanyActivityFilter,
 } from "@/lib/companies/recordMappers";
 import { buildCompanyTimelineViewRows } from "@/lib/companies/timelineView";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
@@ -70,9 +69,6 @@ function pickEditTaskLabels(l: Dictionary["companyRecord"]): EditTaskLabels {
 }
 
 export const dynamic = "force-dynamic";
-
-const STAGES = ["prospect", "qualified", "proposal_sent", "won", "lost"] as const;
-type Stage = (typeof STAGES)[number];
 
 interface CompanyDetailPageProps {
   params: Promise<{ key: string }>;
