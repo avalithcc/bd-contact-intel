@@ -24,7 +24,7 @@ export default async function SequencesPage({ searchParams }: { searchParams: Pr
       </main>
     );
   }
-  const view = scopeView(await listAllSequences(), me.id, req);
+  const view = scopeView(await listAllSequences(me.id), me.id, req);
   return (
     <main className="page">
       <SequenceListView rows={view.rows} labels={dict.sequences} now={new Date()} admin={{ scope: req.scope, meId: me.id, tabs: view.tabs, owners: view.owners, chipOwner: view.chipOwner }} />

@@ -1827,7 +1827,7 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   only declared, `src/db/schema.ts:1411`, and created/retyped by migrations
   0027 and 0033; nothing in `src/` reads or writes it, and 0 production rows
   have it set.)
-- `listAllSequences` has no limit.
+- ~~`listAllSequences` has no limit.~~ Fixed 2026-10-18: bounded to the newest 200 whole Sequences plus the viewer's own.
 - ~~The role-group backfill has not been run.~~ Wrong as written (checked
   2026-10-18): `scripts/backfill-person-role-groups.ts` has been executed 4
   times (4 `audit_log` rows `backfill_person_role_groups`, last 2026-10-02

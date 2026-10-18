@@ -118,6 +118,14 @@ test("the admin list reads EVERY BD's Sequences with the owner; a BD's own list 
   assert.equal((await listSequencesForBd(ownerId)).every((r) => r.owner === undefined), true);
 });
 
+test("the admin list is bounded on whole Sequences, and always keeps the viewer's own", async () => {
+  const { listAllSequences } = await import("@/lib/sequences/pageQueries");
+  assert.equal((await listAllSequences(undefined, 1)).length, 1);
+  const withMe = await listAllSequences(otherId, 1);
+  assert.ok(withMe.some((r) => r.id === otherSequenceId), "the viewer's own Sequence survives the bound");
+  assert.ok(withMe.filter((r) => r.owner?.id !== otherId).length <= 1, "at most the bound's worth of other rows");
+});
+
 test("the list does not truncate: 250 members are all there", async () => {
   const { db } = await import("@/db");
   const { person, sequence, sequenceMember } = await import("@/db/schema");

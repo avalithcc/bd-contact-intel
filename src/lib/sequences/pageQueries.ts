@@ -37,13 +37,21 @@ export async function listSequencesForBd(bdId: string): Promise<SequenceListRow[
   return readListRows(sql``, sql``, sql`where s.owner_bd_id = ${bdId}::uuid`);
 }
 
+/** Most Sequences the admin "Todas" read returns (newest first). Members are never cut: the bound is on whole Sequences. */
+export const ALL_SEQUENCES_LIMIT = 200;
+
 /**
- * Every BD's Sequences with their owner, for the admin list. The caller (the page) calls it for an admin only. Unbounded
- * for the same reason as above, and the tab counts and the owner menu need every row: about ten members per Sequence,
- * a few Sequences per BD. Revisit if the list passes ~50 rows (mockup note).
+ * Every BD's Sequences with their owner, for the admin list: the newest ALL_SEQUENCES_LIMIT Sequences, bounded on whole
+ * Sequences so every shown roster stays complete. When `meId` is given, that BD's own Sequences are always included, so
+ * the Mías tab never loses a row to the bound. The caller (the page) calls it for an admin only.
  */
-export async function listAllSequences(): Promise<SequenceListRow[]> {
-  return readListRows(sql`, s.owner_bd_id::text as owner_id, ob.name as owner_name`, sql`join bd ob on ob.id = s.owner_bd_id`, sql``);
+export async function listAllSequences(meId?: string, limit = ALL_SEQUENCES_LIMIT): Promise<SequenceListRow[]> {
+  const mine = meId ? sql` or s.owner_bd_id = ${meId}::uuid` : sql``;
+  return readListRows(
+    sql`, s.owner_bd_id::text as owner_id, ob.name as owner_name`,
+    sql`join bd ob on ob.id = s.owner_bd_id`,
+    sql`where s.id in (select r.id from sequence r order by r.created_at desc, r.id limit ${limit})${mine}`,
+  );
 }
 
 async function readListRows(ownerCols: SQL, ownerJoin: SQL, where: SQL): Promise<SequenceListRow[]> {
