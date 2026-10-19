@@ -524,9 +524,15 @@ Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
   to a synced thread from the contact record (`sendThreadReplyAction`, planned by
   `planThreadReply`, `contacts/actions.ts:409-427`). A NEW email still starts a
   new thread, as it should.
-- Single `to` only — no CC, no BCC, no attachments. **Owner 2026-10-19: build
-  attachments and multiple recipients, only when all recipients belong to the
-  same company** (change `email-attachments-recipients`). ~~A multi-recipient `To`
+- ~~Single `to` only — no CC, no BCC, no attachments.~~ **Shipped 2026-10-19**
+  (`email-attachments-recipients`, main `01060db0`): attachments (6 MB per
+  file, 10 MB total, 5 files; browser uploads to the private bucket
+  `email-attachments`, files deleted right after sending), several "Para"
+  contacts of the same company, "Cc" only @avalith.net, one activity per Para
+  contact. Migration 0053 and `scripts/sql/email-attachments-bucket.sql`
+  applied to production the same day. Scheduling WITH files needs
+  `SUPABASE_SERVICE_ROLE_KEY` in Vercel (owner to add). Unverified until the
+  first real send: Gmail's upload endpoint and Supabase direct upload. ~~A multi-recipient `To`
   string passes the guard~~ — fixed 2026-10-18: `buildRawMessage` and
   `assertSafeSendInput` call `assertRecipients`, so a new email, a scheduled
   send and sequences reject a list or a malformed address (`invalid_recipient`;
