@@ -5,7 +5,6 @@
  * the value back. No React, no clock of its own (callers pass `now`), so the server and the tests can use it.
  */
 import { MAX_LEAD_MS, MIN_LEAD_MS } from "@/lib/scheduledEmail/plan";
-import { miamiCalendarDate, miamiWallClockToUtc } from "@/lib/sequences/miamiTime";
 import { addDaysToDateString, argentinaCalendarDate, argentinaWallClockToUtc } from "@/lib/tasks/argentinaDate";
 
 /** A moment as the BD sees it: an Argentina calendar date and a 24-hour clock. */
@@ -14,7 +13,7 @@ export interface Slot {
   time: string;
 }
 
-export type SlotState = "ok" | "invalid_time" | "past" | "too_soon" | "too_far" | "before_floor";
+export type SlotState = "ok" | "invalid_time" | "past" | "too_soon" | "too_far";
 
 const ART_OFFSET_MS = 3 * 60 * 60 * 1000;
 const QUARTER_MS = 15 * 60_000;
@@ -65,17 +64,17 @@ export function schedulePresets(now: Date): { hour: Slot; tomorrow: Slot; monday
 }
 
 /**
- * Whether a slot can be picked. `floorHour` is the Miami hour before which nothing may go out (Sequences: 9); null for the
- * one-off composer. The same function disables options in the popover and re-checks on the server, so they cannot disagree.
+ * Whether a slot can be picked: not in the past, at least the minimum lead ahead and not beyond the maximum. The same
+ * function disables options in the popover and re-checks on the server, so they cannot disagree. Which hour it is
+ * (early, weekend, Miami floor) is deliberately NOT a rule here: explicit choices are respected.
  */
-export function slotState(slot: Slot, ctx: { now: Date; floorHour: number | null }): SlotState {
+export function slotState(slot: Slot, ctx: { now: Date }): SlotState {
   const instant = slotInstant(slot);
   if (!instant) return "invalid_time";
   const lead = instant.getTime() - ctx.now.getTime();
   if (lead <= 0) return "past";
   if (lead < MIN_LEAD_MS) return "too_soon";
   if (lead > MAX_LEAD_MS) return "too_far";
-  if (ctx.floorHour !== null && instant.getTime() < miamiWallClockToUtc(miamiCalendarDate(instant), ctx.floorHour).getTime()) return "before_floor";
   return "ok";
 }
 

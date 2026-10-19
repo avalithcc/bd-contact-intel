@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildGroupRows, buildZoneRows, resolveRecipientZone, suggestInHours, type RecipientZone } from "@/lib/sendSchedule/zones";
+import { buildGroupRows, buildZoneRows, localAdvisory, resolveRecipientZone, suggestBusinessDay, type RecipientZone } from "@/lib/sendSchedule/zones";
 
 const THU_10_ART = new Date("2026-10-22T13:00:00Z");
 const zone = (p: Parameters<typeof resolveRecipientZone>[0]) => resolveRecipientZone(p) as RecipientZone;
@@ -54,22 +54,31 @@ test("without a recipient: Argentina first (base) and the five fixed references"
   assert.deepEqual(rows.map((r) => [r.key, r.clocks[0]]), [["argentina", "10:00"], ["newYork", "9:00"], ["madrid", "15:00"], ["mexicoCity", "7:00"], ["bogota", "8:00"], ["saoPaulo", "10:00"]]);
 });
 
-test("the recipient row replaces the fixed one with the same zone and warns outside 8:00-19:00", () => {
+test("the recipient row replaces the fixed one with the same zone and warns when the local time is before 9:00 or on a weekend", () => {
   const rows = buildZoneRows(THU_10_ART, zone({ country: "Mexico", city: "Ciudad de México" }));
   assert.deepEqual(rows.map((r) => r.key), ["argentina", "recipient", "newYork", "madrid", "bogota", "saoPaulo"]);
   const lucia = rows[1]!;
-  assert.deepEqual([lucia.clocks, lucia.outside], [["7:00"], true]);
+  assert.deepEqual([lucia.clocks, lucia.warn], [["7:00"], true]);
   const tampa = buildZoneRows(THU_10_ART, zone({ country: "United States", region: "FL" }));
   assert.deepEqual(tampa.map((r) => r.key), ["argentina", "recipient", "madrid", "mexicoCity", "bogota", "saoPaulo"]);
-  assert.equal(tampa[1]!.outside, false);
+  assert.equal(tampa[1]!.warn, false);
 });
 
-test("the window edges 8:00 and 19:00 are inside", () => {
-  const edge = (iso: string) => buildZoneRows(new Date(iso), zone({ country: "Spain" }))[1]!.outside;
-  assert.equal(edge("2026-10-22T06:00:00Z"), false); // 8:00 Madrid (CEST)
-  assert.equal(edge("2026-10-22T05:59:00Z"), true);
-  assert.equal(edge("2026-10-22T17:00:00Z"), false); // 19:00 Madrid
-  assert.equal(edge("2026-10-22T17:01:00Z"), true);
+test("the advisory fires before 9:00 local (8:59 yes, 9:00 no) and on Saturday or Sunday in the RECIPIENT zone", () => {
+  const madrid = "Europe/Madrid";
+  assert.deepEqual(localAdvisory(new Date("2026-10-22T06:59:00Z"), madrid), { early: true, weekend: false, weekday: 4, clock: "8:59" });
+  assert.equal(localAdvisory(new Date("2026-10-22T07:00:00Z"), madrid), null);
+  assert.equal(localAdvisory(new Date("2026-10-22T21:00:00Z"), madrid), null); // 23:00 on a Thursday: late is not an advisory
+  assert.deepEqual(localAdvisory(new Date("2026-10-24T10:00:00Z"), madrid), { early: false, weekend: true, weekday: 6, clock: "12:00" });
+  assert.equal(localAdvisory(new Date("2026-10-25T10:00:00Z"), madrid)?.weekday, 0);
+});
+
+test("a day shift across zones decides the weekday: Friday evening in Argentina is already Saturday in Madrid", () => {
+  const fridayNight = new Date("2026-10-24T00:00:00Z"); // Fri 23 Oct 21:00 ART = Sat 24 Oct 02:00 Madrid
+  assert.equal(localAdvisory(fridayNight, "America/Argentina/Buenos_Aires"), null);
+  assert.deepEqual(localAdvisory(fridayNight, "Europe/Madrid"), { early: true, weekend: true, weekday: 6, clock: "2:00" });
+  const rows = buildZoneRows(fridayNight, zone({ country: "Spain" }));
+  assert.deepEqual([rows[1]!.warn, rows[1]!.dayShift], [true, 1]);
 });
 
 test("a local time on another calendar day than Argentina's carries the shift", () => {
@@ -89,23 +98,22 @@ test("daylight saving follows the chosen date, not today", () => {
   assert.equal(ny("2026-11-02T13:00:00Z"), "8:00");
 });
 
-test("suggestInHours moves an early recipient to 8:00 their time, a late one to 19:00, and leaves a good time alone", () => {
-  const mexico = zone({ country: "Mexico", city: "Ciudad de México" });
-  assert.deepEqual(suggestInHours(THU_10_ART, mexico), { slot: { date: "2026-10-22", time: "11:00" }, localClock: "8:00" });
-  const madrid = zone({ country: "Spain" });
-  // 18:30 ART = 23:30 Madrid -> 19:00 Madrid = 14:00 ART.
-  assert.deepEqual(suggestInHours(new Date("2026-10-22T21:30:00Z"), madrid), { slot: { date: "2026-10-22", time: "14:00" }, localClock: "19:00" });
-  assert.equal(suggestInHours(new Date("2026-10-22T15:00:00Z"), mexico), null);
+test("suggestBusinessDay offers 9:00 recipient time: the same day when it is early, the next Monday over a weekend", () => {
+  // Thu 10:00 ART = 7:00 in Mexico City: 9:00 there is 12:00 ART the same day.
+  assert.deepEqual(suggestBusinessDay(THU_10_ART, "America/Mexico_City"), { slot: { date: "2026-10-22", time: "12:00" }, weekday: 4, localClock: "9:00" });
+  // Sat 24 Oct 02:00 Madrid: Monday 26 Oct 9:00 Madrid (CET, UTC+1) = 08:00Z = 05:00 ART.
+  assert.deepEqual(suggestBusinessDay(new Date("2026-10-24T00:00:00Z"), "Europe/Madrid"), { slot: { date: "2026-10-26", time: "05:00" }, weekday: 1, localClock: "9:00" });
+  assert.equal(suggestBusinessDay(new Date("2026-10-22T15:00:00Z"), "America/Mexico_City"), null);
 });
 
-test("several recipients are grouped by country: distinct local times, the count, and the warning if any is outside", () => {
+test("several recipients are grouped by country: distinct local times, the count, and the warning if any is early or on a weekend", () => {
   const fl = zone({ country: "United States", region: "Florida" });
   const tx = zone({ country: "United States", region: "Texas" });
   const mx = zone({ country: "Mexico", city: "Guadalajara" });
   const rows = buildGroupRows(new Date("2026-10-21T13:30:00Z"), [fl, fl, tx, tx, tx, mx, mx]); // 10:30 ART
   const us = rows.find((r) => r.group === "us")!;
-  assert.deepEqual([us.count, us.clocks, us.outside, us.areas], [5, ["9:30", "8:30"], false, ["Florida", "Texas"]]);
+  assert.deepEqual([us.count, us.clocks, us.warn, us.areas], [5, ["9:30", "8:30"], true, ["Florida", "Texas"]]); // Texas is at 8:30
   const mexico = rows.find((r) => r.group === "mx")!;
-  assert.deepEqual([mexico.count, mexico.clocks, mexico.outside], [2, ["7:30"], true]);
+  assert.deepEqual([mexico.count, mexico.clocks, mexico.warn], [2, ["7:30"], true]);
   assert.deepEqual(rows.map((r) => r.key).slice(0, 3), ["argentina", "recipients", "recipients"]);
 });

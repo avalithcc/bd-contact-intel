@@ -9,9 +9,9 @@
  * members are `deferred`: they stay `approved` and NOTHING is written for them (the spec forbids dropping or
  * auto-cancelling them, and a hold would tell the BD something is wrong when nothing is).
  *
- * Nothing is released before 09:00 Miami on the run's own Miami day, whatever a step's stored due instant says: a
- * Sequence `hour` earlier than 9 (parseSchedule allows 0-23), or the 13:00 UTC cron firing at 08:00 under EST, must not
- * send early. Callers pass only members that already survived the pre-send checks, so a held member never uses budget.
+ * The 09:00 Miami floor holds REMINDERS (step 2) on the run's own Miami day, whatever the stored due instant says. It does
+ * not hold step 1: the cadence option stores an instant already clamped to the floor (sendMoment.ts), and "Enviar ahora"
+ * or a chosen time are explicit choices that go out exactly then (owner decision 2026-10-19). Callers pass only members that already survived the pre-send checks, so a held member never uses budget.
  */
 import { miamiCalendarDate, miamiWallClockToUtc } from "./miamiTime";
 
@@ -55,7 +55,7 @@ export function planSequenceRelease<T extends PlanCandidate>(input: ReleasePlanI
   const deferred: T[] = [];
   for (const c of due) {
     const left = budget.get(c.accountId) ?? 0;
-    if (beforeFloor || left <= 0) {
+    if ((beforeFloor && c.step === 2) || left <= 0) {
       deferred.push(c);
       continue;
     }

@@ -2,33 +2,32 @@
  * Which instant a Sequence approval stores in `sequence_draft.scheduled_for`, from the BD's choice in the split button.
  * Pure. The runner is still the only sender; this only decides WHEN a step becomes due.
  *
- * The 09:00 Miami floor applies to EVERY mode (owner decision 2026-10-19: Sequences never send before 9:00 Miami):
- *  - cadence: today's behavior, the next Miami day at the Sequence's hour.
- *  - now:     the instant itself, or the floor of today's Miami day when it is still earlier (`waitsForFloor`).
- *  - at:      a time the BD chose; before the floor of ITS Miami day it is refused, never silently moved.
- * `immediate` says the caller should try a release right away for these members (always through the runner's checks,
- * claim and cap); it is false for cadence, for a chosen time and for a "now" that has to wait for the floor.
+ * Explicit choices are respected (owner decision 2026-10-19, final): "now" is the instant itself and a chosen time is
+ * sent exactly then, even before 09:00 Miami. The 09:00 Miami floor belongs to the cadence option only (today's
+ * behavior): its instant is never earlier than the floor of its Miami day. The daily cap and every pre-send check still
+ * apply at release; whether the recipient's local time is a bad moment is a disclaimer in the UI, not a rule here.
+ * `immediate` says the caller should try a release right away for these members.
  */
-import { slotState, slotInstant, type Slot, type SlotState } from "@/lib/sendSchedule/time";
-import { releaseFloorFor, RELEASE_FLOOR_HOUR } from "./releasePlan";
+import { slotInstant, slotState, type Slot, type SlotState } from "@/lib/sendSchedule/time";
+import { releaseFloorFor } from "./releasePlan";
 import { DEFAULT_SCHEDULE, step1DueAt, type Schedule } from "./schedule";
 
 export type SendChoice = { kind: "cadence" } | { kind: "now" } | ({ kind: "at" } & Slot);
 export type SendMomentRefusal = Exclude<SlotState, "ok">;
-export type SendMoment = { ok: true; scheduledFor: Date; immediate: boolean; waitsForFloor: boolean } | { ok: false; reason: SendMomentRefusal };
+export type SendMoment = { ok: true; scheduledFor: Date; immediate: boolean } | { ok: false; reason: SendMomentRefusal };
 
 export function resolveSequenceSend(choice: SendChoice, ctx: { now: Date; schedule?: Schedule }): SendMoment {
   const { now } = ctx;
-  if (choice.kind === "cadence") return { ok: true, scheduledFor: step1DueAt(now, ctx.schedule ?? DEFAULT_SCHEDULE), immediate: false, waitsForFloor: false };
-  if (choice.kind === "now") {
-    const floor = releaseFloorFor(now);
-    const waits = now.getTime() < floor.getTime();
-    return { ok: true, scheduledFor: waits ? floor : now, immediate: !waits, waitsForFloor: waits };
+  if (choice.kind === "cadence") {
+    const due = step1DueAt(now, ctx.schedule ?? DEFAULT_SCHEDULE);
+    const floor = releaseFloorFor(due);
+    return { ok: true, scheduledFor: due.getTime() < floor.getTime() ? floor : due, immediate: false };
   }
-  const state = slotState(choice, { now, floorHour: RELEASE_FLOOR_HOUR });
+  if (choice.kind === "now") return { ok: true, scheduledFor: now, immediate: true };
+  const state = slotState(choice, { now });
   const instant = slotInstant(choice);
-  if (state !== "ok" || !instant) return { ok: false, reason: state === "ok" ? "invalid_time" : state };
-  return { ok: true, scheduledFor: instant, immediate: false, waitsForFloor: false };
+  if (state === "ok" && instant) return { ok: true, scheduledFor: instant, immediate: false };
+  return { ok: false, reason: state === "ok" ? "invalid_time" : state };
 }
 
 /** How many of `count` members leave now and how many wait, given the account's cap and what it already sent today. */

@@ -76,18 +76,32 @@ test("a failed attempt leaves the account with its whole budget (only recorded s
   assert.equal(plan.release.length, 5);
 });
 
-test("a run before 09:00 Miami releases nothing, even for a step overdue from yesterday", () => {
-  const overdue = cand({ dueAt: new Date("2026-10-14T13:00:00Z") });
+test("a run before 09:00 Miami releases no reminder, even one overdue from yesterday", () => {
+  const overdue = cand({ step: 2, dueAt: new Date("2026-10-14T13:00:00Z") });
   const early = new Date("2026-10-15T12:00:00Z"); // 08:00 Miami
   const plan = planSequenceRelease({ now: early, candidates: [overdue], sentToday: new Map() });
   assert.deepEqual(plan.release, []);
   assert.deepEqual(ids(plan.deferred), [overdue.id]);
 });
 
+test("a step 1 the BD sent explicitly (now, or a chosen time) is NOT held by the floor: owner decision 2026-10-19", () => {
+  const chosen = cand({ dueAt: new Date("2026-10-15T11:00:00Z") }); // 07:00 Miami
+  const early = new Date("2026-10-15T11:30:00Z"); // 07:30 Miami
+  const plan = planSequenceRelease({ now: early, candidates: [chosen], sentToday: new Map() });
+  assert.deepEqual(ids(plan.release), [chosen.id]);
+});
+
+test("the daily cap still applies to an early explicit send", () => {
+  const early = new Date("2026-10-15T11:30:00Z");
+  const plan = planSequenceRelease({ now: early, candidates: many(3, { dueAt: new Date("2026-10-15T11:00:00Z"), dailyCap: 2 }), sentToday: new Map() });
+  assert.equal(plan.release.length, 2);
+  assert.equal(plan.deferred.length, 1);
+});
+
 test("09:00 Miami sharp releases; the floor follows DST (EST: 09:00 is 14:00Z)", () => {
   assert.equal(planSequenceRelease({ now: NINE_AM, candidates: many(1), sentToday: new Map() }).release.length, 1);
   const est = new Date("2026-11-02T14:00:00Z");
-  const due = cand({ dueAt: est });
+  const due = cand({ step: 2, dueAt: est });
   assert.equal(planSequenceRelease({ now: new Date("2026-11-02T13:30:00Z"), candidates: [due], sentToday: new Map() }).release.length, 0);
   assert.equal(planSequenceRelease({ now: est, candidates: [due], sentToday: new Map() }).release.length, 1);
 });

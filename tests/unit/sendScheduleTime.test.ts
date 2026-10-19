@@ -47,21 +47,12 @@ test("the +1 h preset crosses midnight in Argentina, not in UTC", () => {
 const NOW = new Date("2026-10-19T14:42:00Z"); // Mon 11:42 ART, 10:42 Miami
 
 test("slotState without a floor: past and under the 5-minute lead are refused, the rest is ok", () => {
-  assert.equal(slotState({ date: "2026-10-19", time: "11:00" }, { now: NOW, floorHour: null }), "past");
-  assert.equal(slotState({ date: "2026-10-19", time: "11:45" }, { now: NOW, floorHour: null }), "too_soon");
-  assert.equal(slotState({ date: "2026-10-19", time: "11:46" }, { now: NOW, floorHour: null }), "too_soon");
-  assert.equal(slotState({ date: "2026-10-19", time: "11:47" }, { now: NOW, floorHour: null }), "ok");
-  assert.equal(slotState({ date: "2026-11-19", time: "09:00" }, { now: NOW, floorHour: null }), "too_far");
-  assert.equal(slotState({ date: "2026-10-20", time: "05:00" }, { now: NOW, floorHour: null }), "ok");
-});
-
-test("slotState with the Miami floor: before 9:00 Miami is refused on that Miami day", () => {
-  // 2026-10-20 10:00 ART = 09:00 Miami (EDT): exactly the floor, ok. 09:45 ART = 08:45 Miami: before it.
-  assert.equal(slotState({ date: "2026-10-20", time: "10:00" }, { now: NOW, floorHour: 9 }), "ok");
-  assert.equal(slotState({ date: "2026-10-20", time: "09:45" }, { now: NOW, floorHour: 9 }), "before_floor");
-  // After the US clock change (1 Nov) Miami is UTC-5: 9:00 Miami is 11:00 ART.
-  assert.equal(slotState({ date: "2026-11-02", time: "10:00" }, { now: NOW, floorHour: 9 }), "before_floor");
-  assert.equal(slotState({ date: "2026-11-02", time: "11:00" }, { now: NOW, floorHour: 9 }), "ok");
+  assert.equal(slotState({ date: "2026-10-19", time: "11:00" }, { now: NOW }), "past");
+  assert.equal(slotState({ date: "2026-10-19", time: "11:45" }, { now: NOW }), "too_soon");
+  assert.equal(slotState({ date: "2026-10-19", time: "11:46" }, { now: NOW }), "too_soon");
+  assert.equal(slotState({ date: "2026-10-19", time: "11:47" }, { now: NOW }), "ok");
+  assert.equal(slotState({ date: "2026-11-19", time: "09:00" }, { now: NOW }), "too_far");
+  assert.equal(slotState({ date: "2026-10-20", time: "05:00" }, { now: NOW }), "ok");
 });
 
 test("summaryLine words the moment in plain Spanish", () => {

@@ -140,8 +140,8 @@ export interface ZoneRow {
   clocks: string[];
   /** The local calendar day relative to Argentina's: -1, 0 or +1. */
   dayShift: -1 | 0 | 1;
-  /** Recipient rows only: the local time falls outside 8:00-19:00. */
-  outside: boolean;
+  /** Recipient rows only: the local time is before 9:00 or on a Saturday/Sunday (see localAdvisory). */
+  warn: boolean;
   approx: boolean;
   count: number;
   areas: string[];
@@ -156,8 +156,7 @@ const FIXED: { key: ZoneKey; zone: string }[] = [
   { key: "bogota", zone: "America/Bogota" },
   { key: "saoPaulo", zone: "America/Sao_Paulo" },
 ];
-const WINDOW_START = 8 * 60;
-const WINDOW_END = 19 * 60;
+const BUSINESS_START = 9 * 60;
 
 function local(instant: Date, zone: string): { date: string; minutes: number; clock: string } {
   const parts = Object.fromEntries(
@@ -175,11 +174,10 @@ const shiftOf = (instant: Date, zone: string): -1 | 0 | 1 => {
   const base = local(instant, ARGENTINA).date;
   return day === base ? 0 : day > base ? 1 : -1;
 };
-const isOutside = (minutes: number) => minutes < WINDOW_START || minutes > WINDOW_END;
 
 function row(instant: Date, key: ZoneKey, zone: string, extra: Partial<ZoneRow> = {}): ZoneRow {
   const l = local(instant, zone);
-  return { key, zone, clocks: [l.clock], dayShift: shiftOf(instant, zone), outside: false, approx: false, count: 1, areas: [], ...extra };
+  return { key, zone, clocks: [l.clock], dayShift: shiftOf(instant, zone), warn: false, approx: false, count: 1, areas: [], ...extra };
 }
 
 const fixedRows = (instant: Date, taken: ReadonlySet<string>) => FIXED.filter((f) => !taken.has(f.zone)).map((f) => row(instant, f.key, f.zone));
@@ -187,7 +185,7 @@ const fixedRows = (instant: Date, taken: ReadonlySet<string>) => FIXED.filter((f
 /** Argentina (the base), the recipient's own clock when known, then the fixed references minus any that repeat it. */
 export function buildZoneRows(instant: Date, recipient: RecipientZone | null): ZoneRow[] {
   const rows = [row(instant, "argentina", ARGENTINA)];
-  if (recipient) rows.push(row(instant, "recipient", recipient.zone, { outside: isOutside(local(instant, recipient.zone).minutes), approx: recipient.approx, areas: [recipient.area], group: recipient.group }));
+  if (recipient) rows.push(row(instant, "recipient", recipient.zone, { warn: localAdvisory(instant, recipient.zone) !== null, approx: recipient.approx, areas: [recipient.area], group: recipient.group }));
   return [...rows, ...fixedRows(instant, new Set(recipient ? [recipient.zone] : []))];
 }
 
@@ -200,7 +198,7 @@ export function buildGroupRows(instant: Date, recipients: readonly RecipientZone
     const clocks = zones.map((z) => local(instant, z));
     return row(instant, "recipients", zones[0]!, {
       clocks: clocks.map((c) => c.clock),
-      outside: clocks.some((c) => isOutside(c.minutes)),
+      warn: zones.some((z) => localAdvisory(instant, z) !== null),
       approx: members.some((m) => m.approx),
       count: members.length,
       areas: [...new Set(members.map((m) => m.area))],
@@ -211,11 +209,51 @@ export function buildGroupRows(instant: Date, recipients: readonly RecipientZone
   return [row(instant, "argentina", ARGENTINA), ...rows, ...fixedRows(instant, taken)];
 }
 
-/** For a recipient whose local time is outside 8:00-19:00: the nearest Argentina slot that lands on the window's edge. */
-export function suggestInHours(instant: Date, recipient: RecipientZone): { slot: Slot; localClock: string } | null {
-  const { minutes } = local(instant, recipient.zone);
-  if (!isOutside(minutes)) return null;
-  const target = minutes < WINDOW_START ? WINDOW_START : WINDOW_END;
-  const moved = new Date(instant.getTime() + (target - minutes) * 60_000);
-  return { slot: slotOf(moved), localClock: local(moved, recipient.zone).clock };
+export interface LocalAdvisory {
+  early: boolean;
+  weekend: boolean;
+  /** Local weekday, 0 = Sunday. */
+  weekday: number;
+  clock: string;
+}
+
+const weekdayOfDate = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay();
+
+/** The disclaimer, in the ZONE given (the recipient's, or Miami for an unknown Sequence recipient): before 9:00 and/or Saturday or Sunday. */
+export function localAdvisory(instant: Date, zone: string): LocalAdvisory | null {
+  const l = local(instant, zone);
+  const weekday = weekdayOfDate(l.date);
+  const early = l.minutes < BUSINESS_START;
+  const weekend = weekday === 0 || weekday === 6;
+  return early || weekend ? { early, weekend, weekday, clock: l.clock } : null;
+}
+
+/** Offset of `zone` from UTC at an instant, in ms. */
+function offsetMs(instant: Date, zone: string): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(instant)
+      .map((x) => [x.type, Number(x.value)]),
+  );
+  return Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!, p.second!) - Math.floor(instant.getTime() / 1000) * 1000;
+}
+
+/** 9:00 wall clock of a local calendar date in `zone`, as an instant (a second pass settles the daylight-saving edge). */
+function nineAmIn(zone: string, date: string): Date {
+  const guess = Date.parse(`${date}T09:00:00Z`);
+  const first = guess - offsetMs(new Date(guess), zone);
+  return new Date(guess - offsetMs(new Date(first), zone));
+}
+
+/**
+ * The "Usar <próximo día hábil> 9:00" button: 9:00 recipient time on the same local day when the problem is only the
+ * hour, on the next Monday when it is a weekend. Null when there is nothing to fix. The slot is in Argentina time.
+ */
+export function suggestBusinessDay(instant: Date, zone: string): { slot: Slot; weekday: number; localClock: string } | null {
+  const advisory = localAdvisory(instant, zone);
+  if (!advisory) return null;
+  const today = local(instant, zone).date;
+  const ahead = advisory.weekday === 6 ? 2 : advisory.weekday === 0 ? 1 : 0;
+  const day = new Date(Date.parse(`${today}T00:00:00Z`) + ahead * 86_400_000).toISOString().slice(0, 10);
+  return { slot: slotOf(nineAmIn(zone, day)), weekday: weekdayOfDate(day), localClock: "9:00" };
 }

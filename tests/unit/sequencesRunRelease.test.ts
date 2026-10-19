@@ -229,8 +229,8 @@ test("cap shared with what was already sent today", async () => {
   assert.deepEqual(await runSequenceRelease(f.ports), { released: 0, held: 0, deferred: 2, failed: 0 });
 });
 
-test("a run before 09:00 Miami releases nothing and writes nothing", async () => {
-  const f = fakes([candidate({ dueAt: new Date("2026-10-14T13:00:00Z") })], { now: new Date("2026-10-15T12:00:00Z") });
+test("a run before 09:00 Miami releases no reminder and writes nothing", async () => {
+  const f = fakes([candidate({ step: 2, memberState: "sent", step1RfcMessageId: "<a@b.test>", step1ThreadId: "t-1", dueAt: new Date("2026-10-14T13:00:00Z") })], { now: new Date("2026-10-15T12:00:00Z") });
   assert.deepEqual(await runSequenceRelease(f.ports), { released: 0, held: 0, deferred: 1, failed: 0 });
   assert.deepEqual(f.log, []);
 });
