@@ -40,6 +40,10 @@ export interface AboutPaneProps {
   ownerLabel: string | null;
   ownerBdId: string | null;
   pendingScheduled: QuickActionsProps["pendingScheduled"];
+  /** The Contact has a company key: the composer lets the BD add its other contacts to "Para". */
+  hasCompany: boolean;
+  /** The server can read attachments back for a scheduled email (service-role key set). */
+  scheduleAttachmentsEnabled: boolean;
   ownerOptions: OwnerOption[];
   // Manual owner reassignment is admin-only; false hides the edit control.
   canReassignOwner: boolean;
@@ -95,6 +99,8 @@ export function AboutPane({
   ownerLabel,
   ownerBdId,
   pendingScheduled,
+  hasCompany,
+  scheduleAttachmentsEnabled,
   ownerOptions,
   canReassignOwner,
   assigneeOptions,
@@ -154,6 +160,9 @@ export function AboutPane({
         meId={meId}
         ownerBdId={ownerBdId}
         pendingScheduled={pendingScheduled}
+        companyName={company}
+        hasCompany={hasCompany}
+        scheduleAttachmentsEnabled={scheduleAttachmentsEnabled}
       />
 
       <div className="section-title">

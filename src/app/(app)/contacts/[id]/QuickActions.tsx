@@ -28,6 +28,9 @@ import type { Locale } from "@/lib/i18n/locales";
 import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
+import { AttachmentsField } from "@/components/email/AttachmentsField";
+import { RecipientBlock, type ComposePrimary } from "@/components/email/ComposeFields";
+import { useComposeDraft, type ComposeDraft } from "@/components/email/useComposeDraft";
 import {
   CallIcon,
   ClipboardIcon,
@@ -70,6 +73,11 @@ export interface QuickActionsProps {
   ownerBdId: string | null;
   // This BD's next pending scheduled email to this Contact (envio-programado.html view 1a's "ya tenés uno" alert).
   pendingScheduled: { subject: string; sendsLabel: string } | null;
+  // Composer "Para" (redactar-email.html): the company the picker lists contacts of, and whether this Contact has one at all.
+  companyName: string | null;
+  hasCompany: boolean;
+  // False when the server has no service-role key: an email WITH files cannot be scheduled (the cron could not read them).
+  scheduleAttachmentsEnabled: boolean;
 }
 
 type QuickAction = "call" | "email" | "schedule" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
@@ -128,6 +136,9 @@ export function QuickActions({
   meId,
   ownerBdId,
   pendingScheduled,
+  companyName,
+  hasCompany,
+  scheduleAttachmentsEnabled,
 }: QuickActionsProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -142,6 +153,10 @@ export function QuickActions({
   // stale draft never pre-fills the NEXT "Correo".
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
+  // Para / Cc / files of the same composer: lifted here for the same reason (they must survive "Redactar con IA" and the
+  // trip to "Programar…" and back).
+  const draft = useComposeDraft();
+  const primary: ComposePrimary | null = email ? { personId, name, email, companyName, hasCompany } : null;
   // Where the "generate" panel's own close button (Esc/×) should go:
   // back to the email composer (opened via "Redactar con IA", draft above
   // kept intact) or fully closed (opened via the top-level "Generar
@@ -155,6 +170,9 @@ export function QuickActions({
     setEmailSubject("");
     setEmailBody("");
     setGenerateReturnTo(null);
+    // Closed without sending: whatever was uploaded for this composer is deleted. After a send the callers run
+    // `draft.sent()` first, which leaves nothing to delete.
+    draft.discard();
   }
 
   function closeGenerate() {
@@ -170,11 +188,12 @@ export function QuickActions({
     if (!email) return;
     setBusy(true);
     setError(null);
-    const result = await settleAction(() => sendContactEmailAction(personId, email, subject, body));
+    const result = await settleAction(() => sendContactEmailAction(personId, email, subject, body, draft.extras()));
     setBusy(false);
     // The write may have landed: show the timeline as it is now, so "revisar" points at the truth and not at a stale screen.
     if (!result.ok && result.reason === "unconfirmed") router.refresh();
     if (result.ok) {
+      draft.sent();
       closeQuickAction();
       showToast(l.toastEmailSent);
       router.refresh();
@@ -332,6 +351,8 @@ export function QuickActions({
         <EmailForm
           labels={l}
           to={email}
+          primary={primary}
+          draft={draft}
           name={name}
           busy={busy}
           error={error}
@@ -350,10 +371,11 @@ export function QuickActions({
         />
       )}
 
-      {openAction === "schedule" && email && (
+      {openAction === "schedule" && email && primary && (
         <ScheduleEmailDialog
           labels={l}
           name={name}
+          compose={{ draft, primary, attachmentsEnabled: scheduleAttachmentsEnabled }}
           subject={emailSubject}
           body={emailBody}
           busy={busy}
@@ -366,10 +388,11 @@ export function QuickActions({
           onSubmit={async (sendAt) => {
             setBusy(true);
             setError(null);
-            const result = await settleAction(() => scheduleContactEmailAction(personId, email, emailSubject, emailBody, sendAt.toISOString()));
+            const result = await settleAction(() => scheduleContactEmailAction(personId, email, emailSubject, emailBody, sendAt.toISOString(), draft.extras()));
             setBusy(false);
             if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
+              draft.sent(); // the scheduled email now holds the files
               closeQuickAction();
               showToast(l.toastEmailScheduled);
               router.refresh();
@@ -586,6 +609,8 @@ function TaskForm({
 function EmailForm({
   labels: l,
   to,
+  primary,
+  draft,
   name,
   busy,
   error,
@@ -600,6 +625,9 @@ function EmailForm({
   onSubmit,
 }: ComposerProps & {
   to: string | null;
+  // The record's contact and the Para / Cc / files draft (redactar-email.html). Both live in QuickActions.
+  primary: ComposePrimary | null;
+  draft: ComposeDraft;
   name: string;
   // Controlled by the caller (QuickActions), not local state (fresh-review
   // fix): "Redactar con IA" below unmounts this form while the "Generar
@@ -626,7 +654,7 @@ function EmailForm({
   const ids = useId();
   const showSubjectHint = shouldShowSubjectHint(subject, body);
 
-  if (!to) {
+  if (!to || !primary) {
     return (
       <Dialog open onClose={onCancel} title={l.quickActionEmail}>
         <p>{l.emailNoAddress}</p>
@@ -664,7 +692,7 @@ function EmailForm({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy || !subject.trim() || !body.trim()}
+            disabled={busy || draft.attachments.totals.uploading || !subject.trim() || !body.trim()}
             onClick={() => subject.trim() && body.trim() && onSubmit(subject.trim(), body.trim())}
           >
             {l.emailSend}
@@ -682,12 +710,7 @@ function EmailForm({
           </div>
         </div>
       )}
-      <div className="field">
-        <label className="label" htmlFor={`${ids}-to`}>
-          {l.emailToLabel}
-        </label>
-        <input id={`${ids}-to`} className="input" value={to} disabled />
-      </div>
+      <RecipientBlock labels={l} draft={draft} primary={primary} disabled={busy} />
       <div className="field">
         <label className="label" htmlFor={`${ids}-subject`}>
           {l.emailSubjectLabel}
@@ -720,6 +743,7 @@ function EmailForm({
           disabled={busy}
         />
       </div>
+      <AttachmentsField labels={l} attachments={draft.attachments} disabled={busy} />
     </Dialog>
   );
 }

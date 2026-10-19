@@ -62,7 +62,16 @@ export function ScheduledListView({ items, labels: l, gmailConnected, now: serve
               return (
                 <tr key={item.id}>
                   <td><div className="stack-sm"><Link className="strong" href={`/contacts/${item.personId}#scheduled-emails`}>{item.personName}</Link>{item.company && <div className="meta">{item.company}</div>}</div></td>
-                  <td>{item.subject}</td>
+                  <td>
+                    {item.subject}
+                    {(item.attachments.length > 0 || item.otherRecipients.length > 0) && (
+                      <div className="meta">
+                        {item.otherRecipients.length > 0 && <>{item.otherRecipients.length + 1} {l.emailRecipientsCount}</>}
+                        {item.otherRecipients.length > 0 && item.attachments.length > 0 && " · "}
+                        {item.attachments.length > 0 && <>{item.attachments.length} {item.attachments.length === 1 ? l.attachmentsFileOne : l.attachmentsFileMany}</>}
+                      </div>
+                    )}
+                  </td>
                   <td className="nowrap">
                     {failed ? (
                       <><span className="strong">{l.schedFailedTitle}</span><div className="meta">{l.schedWasPrefix} {wasLabel(item.sendAt, now, l.schedToday)}</div></>

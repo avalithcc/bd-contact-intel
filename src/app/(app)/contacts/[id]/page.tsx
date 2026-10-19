@@ -16,6 +16,7 @@ import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
 import { isGmailConnected, listScheduledForPerson } from "@/lib/scheduledEmail/queries";
+import { serviceRoleConfigured } from "@/lib/supabase/serviceRole";
 import { stateOf, whenLabel } from "@/lib/scheduledEmail/view";
 import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
@@ -458,6 +459,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           ownerLabel={record.ownerName}
           ownerBdId={record.person.ownerBdId}
           pendingScheduled={nextScheduled ? { subject: nextScheduled.subject, sendsLabel: whenLabel(nextScheduled.sendAt, "argentina") } : null}
+          hasCompany={Boolean(record.person.companyKey)}
+          scheduleAttachmentsEnabled={serviceRoleConfigured()}
           ownerOptions={ownerOptions}
           canReassignOwner={isAdminRole(me)}
           assigneeOptions={ownerOptions}

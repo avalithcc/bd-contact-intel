@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
+import { useComposeDraft } from "@/components/email/useComposeDraft";
 import { useToast } from "@/components/ToastProvider";
 import { settleAction } from "@/lib/contacts/actionOutcome";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
@@ -38,8 +39,15 @@ export function useScheduledActions(l: ContactRecordLabels) {
   const [cancelling, setCancelling] = useState<ScheduledItem | null>(null);
   const [confirming, setConfirming] = useState<ScheduledItem | null>(null);
   const [draft, setDraft] = useState({ subject: "", body: "" });
+  // Para / Cc / files of the row being edited (the same composer fields as "Programar…"), seeded when it opens.
+  const compose = useComposeDraft();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function closeEditing() {
+    setEditing(null);
+    compose.discard(); // files uploaded for this edit and never saved are deleted; the ones the email already holds stay
+  }
 
   async function settle(call: () => Promise<ContactActionResult>, success: string, close?: () => void) {
     setBusy(true);
@@ -66,6 +74,11 @@ export function useScheduledActions(l: ContactRecordLabels) {
     else if (action === "sendNow" || action === "sendAnyway") void settle(() => sendScheduledNowAction(item.id), l.toastScheduleSendNow);
     else {
       setDraft({ subject: item.subject, body: item.body });
+      compose.seed({
+        others: item.otherRecipients,
+        cc: item.ccAddresses.map((address) => ({ address })),
+        files: item.attachments.map((a) => ({ filename: a.filename, size: a.size, storagePath: a.storagePath, contentType: a.contentType })),
+      });
       setEditing(item);
     }
   }
@@ -83,10 +96,24 @@ export function useScheduledActions(l: ContactRecordLabels) {
           busy={busy}
           error={error}
           edit={{ initialSendAt: editing.sendAt, allowUnchanged: editing.status === "scheduled" }}
+          compose={{
+            draft: compose,
+            primary: { personId: editing.personId, name: editing.personName, email: editing.toAddress, companyName: editing.company, hasCompany: Boolean(editing.company) || editing.otherRecipients.length > 0 },
+            attachmentsEnabled: true, // the server refuses with a clear message when it cannot read files back
+          }}
           onSubjectChange={(subject) => setDraft((d) => ({ ...d, subject }))}
           onBodyChange={(body) => setDraft((d) => ({ ...d, body }))}
-          onCancel={() => setEditing(null)}
-          onSubmit={(sendAt) => void settle(() => editScheduledEmailAction(editing.id, draft.subject, draft.body, sendAt.toISOString()), l.toastScheduleSaved, () => setEditing(null))}
+          onCancel={closeEditing}
+          onSubmit={(sendAt) =>
+            void settle(
+              () => editScheduledEmailAction(editing.id, draft.subject, draft.body, sendAt.toISOString(), compose.extras()),
+              l.toastScheduleSaved,
+              () => {
+                compose.sent(); // saved: the email holds the files now
+                setEditing(null);
+              },
+            )
+          }
         />
       )}
       {confirming && (

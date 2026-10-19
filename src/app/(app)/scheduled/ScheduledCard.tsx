@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { AttachmentChips, RecipientsLine } from "@/components/email/AttachmentChips";
 import { ClockIcon, EditPencilIcon, WarningIcon } from "@/components/icons";
+import { summarizeRecipients } from "@/lib/email/recipients/summary";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { actionsFor, sendNowDisabled, stampLabel, stateOf, wasLabel, whenLabel, type ScheduledAction, type ScheduledItem } from "@/lib/scheduledEmail/view";
 import { ACTION_LABEL, type RunScheduled } from "./useScheduledActions";
@@ -38,6 +40,7 @@ export function ScheduledCard({ item, l, run, gmailConnected, now, busy }: { ite
           <div className="tl-body">
             {item.personName} {l.schedHoldReplied}{item.replyAt ? ` ${wasLabel(item.replyAt, now, l.schedToday)}` : ""}{item.replyText ? `: “${item.replyText}”` : ""}. {l.schedHoldBodyAfter}
           </div>
+          <AttachmentChips files={item.attachments} label={l.timelineAttachmentsLabel} />
           <div className="row mt-lg">{button("sendAnyway", "btn btn-secondary btn-sm")}{ghost("edit")}{cancel}</div>
         </div>
       </div>
@@ -57,6 +60,7 @@ export function ScheduledCard({ item, l, run, gmailConnected, now, busy }: { ite
           <div className="tl-body">
             {gmail ? l.schedFailedBodyGmail : state === "failed_unconfirmed" ? l.schedFailedBodyUnconfirmed : l.schedFailedBodyOther} <strong>{l.schedNoAutoSend}</strong>{l.schedFailedBodyAfter}
           </div>
+          <AttachmentChips files={item.attachments} label={l.timelineAttachmentsLabel} />
           <div className="row mt-lg">
             {gmail && <Link className="btn btn-primary btn-sm" href="/account/email">{l.schedReconnect}</Link>}
             {button("sendNow", "btn btn-secondary btn-sm", sendNowDisabled(state, gmailConnected) ? { disabled: true, title: l.schedSendNowDisabled } : {})}
@@ -77,9 +81,13 @@ export function ScheduledCard({ item, l, run, gmailConnected, now, busy }: { ite
           <span className="badge badge-brand no-dot">{l.schedCardSends} {whenLabel(item.sendAt, "argentina")}</span>
           <span className="when">{l.schedCardBy} {item.actorName} {l.schedCardOn} {stampLabel(item.createdAt)}</span>
         </div>
+        {item.otherRecipients.length > 0 || item.ccAddresses.length > 0 ? (
+          <RecipientsLine toPrefix={l.timelineToPrefix} ccPrefix={l.timelineCcPrefix} cc={item.ccAddresses} {...summarizeRecipients([{ name: item.personName, email: item.toAddress }, ...item.otherRecipients])} />
+        ) : null}
         <div className="tl-body">
-          {l.schedCardTo} {item.toAddress}. “{preview(item.body)}” <span className="meta">{l.schedCardInMiami} {whenLabel(item.sendAt, "miami")}.</span>
+          {item.otherRecipients.length > 0 || item.ccAddresses.length > 0 ? null : <>{l.schedCardTo} {item.toAddress}. </>}“{preview(item.body)}” <span className="meta">{l.schedCardInMiami} {whenLabel(item.sendAt, "miami")}.</span>
         </div>
+        <AttachmentChips files={item.attachments} label={l.timelineAttachmentsLabel} />
         {actions.length ? (
           <div className="row mt-lg">
             {button("edit", "btn btn-secondary btn-sm")}

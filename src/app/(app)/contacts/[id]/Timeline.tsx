@@ -29,7 +29,9 @@ import {
   threadContextSummary,
   type EmailThreadGroup,
 } from "@/lib/contacts/emailThreads";
-import { callWhatLabel, emailRecipientText, entryBody } from "@/lib/contacts/timelineEntryBody";
+import { callWhatLabel, emailRecipientText, entryBody, readSentEmailExtras } from "@/lib/contacts/timelineEntryBody";
+import { AttachmentChips, RecipientsLine } from "@/components/email/AttachmentChips";
+import { summarizeRecipients } from "@/lib/email/recipients/summary";
 import { readBounceMetadata } from "@/lib/gmail/bouncePlan";
 import { BounceTimelineCard } from "./BounceTimelineCard";
 import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
@@ -409,10 +411,10 @@ export function Timeline({
     setReplyError(null);
   }
 
-  async function submitReply(threadId: string, body: string) {
+  async function submitReply(threadId: string, body: string, attachments: unknown[]) {
     setReplyBusy(true);
     setReplyError(null);
-    const result = await sendThreadReplyAction(personId, threadId, body);
+    const result = await sendThreadReplyAction(personId, threadId, body, attachments);
     setReplyBusy(false);
     if (result.ok) {
       closeReply();
@@ -919,6 +921,22 @@ export function Timeline({
   }
 
   /**
+   * What a composed email adds under its card (redactar-email.html section 4): "Para: A, B, +1 · CC: x" when it had several
+   * recipients or a Cc, and a chip per file with name and size. No download: the CRM deletes the files right after the send.
+   */
+  function renderSentEmailExtras(metadata: Record<string, unknown> | null) {
+    const extras = readSentEmailExtras(metadata);
+    const showLine = extras.recipients.length > 1 || extras.cc.length > 0;
+    if (!showLine && extras.attachments.length === 0) return null;
+    return (
+      <>
+        {showLine && <RecipientsLine toPrefix={l.timelineToPrefix} ccPrefix={l.timelineCcPrefix} cc={extras.cc} {...summarizeRecipients(extras.recipients)} />}
+        <AttachmentChips files={extras.attachments} label={l.timelineAttachmentsLabel} />
+      </>
+    );
+  }
+
+  /**
    * One message inside an expanded synced thread (email-sync.html:158-174).
    * `body` is `undefined` while the thread's bodies are still loading —
    * renders a couple of skeleton lines instead of the (missing) real text.
@@ -982,6 +1000,7 @@ export function Timeline({
           ) : (
             <div className="snippet">{entryBody(m, l)}</div>
           )}
+          {isSent && renderSentEmailExtras(m.metadata)}
         </div>
       </div>
     );
@@ -1083,6 +1102,18 @@ export function Timeline({
                   )}{" "}
                   · {personName} · {direction === "inbound" ? l.timelineThreadInbound : l.timelineThreadOutbound}
                 </p>
+                {(() => {
+                  // Files and recipients of the emails the BD composed here (name and size only, never a download).
+                  const sent = group.messages.filter((m) => m.type === "email_sent").map((m) => readSentEmailExtras(m.metadata));
+                  const files = sent.flatMap((s) => s.attachments);
+                  const latest = [...sent].reverse().find((s) => s.recipients.length > 1 || s.cc.length > 0);
+                  return (
+                    <>
+                      {latest && <RecipientsLine toPrefix={l.timelineToPrefix} ccPrefix={l.timelineCcPrefix} cc={latest.cc} {...summarizeRecipients(latest.recipients)} />}
+                      <AttachmentChips files={files} label={l.timelineAttachmentsLabel} />
+                    </>
+                  );
+                })()}
                 {foreign ? (
                   <p className="meta mt-md">
                     {l.linkedinConversationOfPrefix} {threadOwner?.actorName ?? l.timelineSystemActor}
@@ -1434,6 +1465,7 @@ export function Timeline({
                             <>
                               {entryBody(timelineEntry, l)}
                               {renderForeignMailBody(timelineEntry)}
+                              {timelineEntry.type === "email_sent" && renderSentEmailExtras(timelineEntry.metadata)}
                             </>
                           )
                         ) : (
@@ -1477,7 +1509,7 @@ export function Timeline({
           busy={replyBusy}
           error={replyError}
           onCancel={closeReply}
-          onSubmit={(body) => submitReply(replyingThreadId, body)}
+          onSubmit={(body, attachments) => submitReply(replyingThreadId, body, attachments)}
         />
       )}
 

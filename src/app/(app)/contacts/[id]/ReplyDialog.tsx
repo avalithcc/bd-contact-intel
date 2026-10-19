@@ -3,6 +3,9 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 import { Dialog } from "@/components/Dialog";
+import { AttachmentsField } from "@/components/email/AttachmentsField";
+import { useEmailAttachments } from "@/components/email/useEmailAttachments";
+import type { AttachmentRef } from "@/lib/email/attachments/load";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 
 export interface ReplyDialogError {
@@ -32,27 +35,33 @@ export function ReplyDialog({
   busy: boolean;
   error: ReplyDialogError | null;
   onCancel: () => void;
-  onSubmit: (body: string) => void;
+  onSubmit: (body: string, attachments: AttachmentRef[]) => void;
 }) {
   const ids = useId();
   const [body, setBody] = useState("");
+  const attachments = useEmailAttachments();
+  // Closed without sending: whatever was uploaded for this reply is deleted from Storage.
+  const cancel = () => {
+    attachments.discardNew();
+    onCancel();
+  };
 
   return (
     <Dialog
       open
-      onClose={onCancel}
+      onClose={cancel}
       title={l.timelineReplyAction}
       wide
       footer={
         <>
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
+          <button type="button" className="btn btn-secondary" onClick={cancel} disabled={busy}>
             {l.cancel}
           </button>
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy || !body.trim()}
-            onClick={() => body.trim() && onSubmit(body.trim())}
+            disabled={busy || attachments.totals.uploading || !body.trim()}
+            onClick={() => body.trim() && onSubmit(body.trim(), attachments.refs)}
           >
             {l.emailSend}
           </button>
@@ -94,6 +103,7 @@ export function ReplyDialog({
           disabled={busy}
         />
       </div>
+      <AttachmentsField labels={l} attachments={attachments} disabled={busy} />
     </Dialog>
   );
 }

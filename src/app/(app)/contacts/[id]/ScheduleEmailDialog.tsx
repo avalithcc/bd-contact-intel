@@ -2,6 +2,9 @@
 
 import { useId, useState } from "react";
 import { Dialog } from "@/components/Dialog";
+import { AttachmentsField } from "@/components/email/AttachmentsField";
+import { RecipientBlock, type ComposePrimary } from "@/components/email/ComposeFields";
+import type { ComposeDraft } from "@/components/email/useComposeDraft";
 import { ClockIcon } from "@/components/icons";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { formatSendAt, planSchedule, wallTimeToInstant, type ZoneKey } from "@/lib/scheduledEmail/plan";
@@ -25,6 +28,9 @@ export function ScheduleEmailDialog(props: {
   busy: boolean;
   error: string | null;
   edit?: { initialSendAt: Date; allowUnchanged: boolean };
+  // Para / Cc / files of the email (redactar-email.html): the same draft the "Enviar correo" dialog holds, so it survives the
+  // trip here and back. `attachmentsEnabled` is false when the server cannot read files back for a scheduled email.
+  compose?: { draft: ComposeDraft; primary: ComposePrimary; attachmentsEnabled: boolean };
   onSubjectChange: (value: string) => void;
   onBodyChange: (value: string) => void;
   onBack?: () => void;
@@ -45,7 +51,10 @@ export function ScheduleEmailDialog(props: {
   const unchanged = !!edit?.allowUnchanged && !!sendAt && sendAt.getTime() === edit.initialSendAt.getTime();
   const plan = sendAt ? (unchanged ? { ok: true as const } : planSchedule({ sendAt, now: new Date(), pendingCount: 0 })) : null;
   const hint = !plan || (!plan.ok && plan.reason === "schedule_too_soon") ? l.scheduleTooSoonHint : !plan.ok && plan.reason === "schedule_too_far" ? l.errorScheduleTooFar : null;
-  const canSubmit = !busy && !!sendAt && !!plan?.ok && !!props.subject.trim() && !!props.body.trim();
+  const files = props.compose?.draft.attachments;
+  // An email with files cannot be scheduled when the server could not read them back at send time: refused here, up front.
+  const filesBlocked = !!files && files.refs.length > 0 && !props.compose!.attachmentsEnabled;
+  const canSubmit = !busy && !!sendAt && !!plan?.ok && !!props.subject.trim() && !!props.body.trim() && !files?.totals.uploading && !filesBlocked;
   const other: ZoneKey = zone === "argentina" ? "miami" : "argentina";
 
   const presets: { key: Chip; label: string; at: () => Date }[] = [
@@ -96,6 +105,7 @@ export function ScheduleEmailDialog(props: {
       }
     >
       {props.error && <div className="error-text" role="alert">{props.error}</div>}
+      {props.compose && <RecipientBlock labels={l} draft={props.compose.draft} primary={props.compose.primary} disabled={busy} />}
       <div className="field">
         <label className="label" htmlFor={`${ids}-subject`}>{l.emailSubjectLabel}</label>
         <input id={`${ids}-subject`} className="input" value={props.subject} onChange={(e) => props.onSubjectChange(e.target.value)} disabled={busy} />
@@ -104,6 +114,12 @@ export function ScheduleEmailDialog(props: {
         <label className="label" htmlFor={`${ids}-body`}>{l.emailBodyLabel}</label>
         <textarea id={`${ids}-body`} className="textarea" rows={3} value={props.body} onChange={(e) => props.onBodyChange(e.target.value)} disabled={busy} />
       </div>
+      {props.compose && <AttachmentsField labels={l} attachments={props.compose.draft.attachments} disabled={busy} />}
+      {filesBlocked && (
+        <div className="alert alert-warn" role="alert">
+          <div>{l.attachmentsScheduleUnavailable}</div>
+        </div>
+      )}
       <div className="fieldset">
         <div className="label" id={`${ids}-when`}>{l.scheduleWhen}</div>
         <div className="row wrap mt-md" role="group" aria-labelledby={`${ids}-when`}>

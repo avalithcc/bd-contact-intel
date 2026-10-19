@@ -1045,3 +1045,76 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
   background: var(--color-surface-2); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-dropdown);
 }
 .tip-bubble:not([hidden]) { display: block; }
+
+/* Composer recipients and attachments (email-attachments-recipients, mockups/redactar-email.html).
+   .rcpt is the Para / CC field: chips and a typed input inside one bordered box; .picker is its option list. */
+.rcpt {
+  display: flex; flex-wrap: wrap; gap: var(--space-2xs); align-items: center; min-height: var(--control-height);
+  padding: 3px var(--space-xs); background: var(--color-surface-2); border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm); position: relative;
+}
+.rcpt:focus-within, .rcpt.is-focus { border-color: var(--color-accent-strong); box-shadow: var(--focus-ring); }
+.rcpt.is-invalid { border-color: var(--color-danger); }
+.rcpt.is-disabled { background: var(--color-surface-sunken); }
+.rcpt .chip { height: var(--control-height-sm); padding-left: 3px; }
+.rcpt .chip.locked { padding-right: 0.6rem; }
+.rcpt .typed {
+  flex: 1; min-width: 140px; border: 0; outline: 0; background: transparent; font: var(--text-base) var(--font-body);
+  color: var(--color-ink); height: 26px;
+}
+.rcpt-add {
+  border: 0; background: transparent; color: var(--color-ink-soft); font: 600 var(--text-sm) var(--font-body); cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--space-2xs); padding: 0 var(--space-xs); height: 26px; border-radius: var(--radius-sm);
+}
+.rcpt-add:hover { background: var(--color-surface-sunken); color: var(--color-ink); }
+.rcpt-add:disabled { color: var(--color-ink-muted); cursor: not-allowed; background: transparent; }
+.rcpt .chip .chip-remove .icon, .file button .icon { width: 12px; height: 12px; }
+.cc-toggle { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink-soft); background: none; border: 0; cursor: pointer; padding: 0; }
+.cc-toggle:hover { color: var(--color-ink); text-decoration: underline; }
+.rel { position: relative; }
+.picker {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5; background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-dropdown);
+  padding: var(--space-2xs); max-height: 280px; overflow-y: auto;
+}
+.picker .opt { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); cursor: pointer; }
+.picker .opt:hover, .picker .opt.act { background: var(--color-row-hover); }
+.picker .opt.off { opacity: 0.6; cursor: not-allowed; }
+.picker .opt.off:hover { background: transparent; }
+.picker .opt .nm { font-weight: 600; }
+.picker .opt .sub { font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.picker .opt .tail { margin-left: auto; font-size: var(--text-xs); color: var(--color-ink-subtle); }
+.picker .picker-note { padding: var(--space-xs) var(--space-sm); font-size: var(--text-sm); color: var(--color-ink-subtle); }
+
+.attach-bar { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+.attach-bar .total { margin-left: auto; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.files { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.file {
+  display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 32px; padding: 3px 4px 3px var(--space-sm);
+  background: var(--color-surface-2); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md);
+  font-size: var(--text-sm); max-width: 100%;
+}
+.file:not(:has(button)) { padding-right: var(--space-sm); }
+.file .fn { font-weight: 600; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.file .sz { color: var(--color-ink-subtle); white-space: nowrap; }
+.file button {
+  border: 0; background: transparent; color: var(--color-ink-subtle); width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+  display: inline-grid; place-items: center; padding: 0;
+}
+.file button:hover { background: var(--color-surface-sunken); color: var(--color-ink); }
+.file.up { flex-direction: column; align-items: stretch; gap: 3px; min-width: 230px; padding: 5px 6px 6px var(--space-sm); }
+.file.up .top { display: flex; align-items: center; gap: var(--space-xs); }
+/* Scoped: .bar-track is also the 8px stacked bar of the reports (above). */
+.file.up .bar-track { height: 4px; display: block; }
+.file.up .bar-fill { display: block; height: 100%; background: var(--color-accent-strong); border-radius: var(--radius-pill); }
+.file.err { background: var(--color-danger-bg); border-color: var(--color-danger); }
+.file.err .fn { color: var(--color-danger-text); }
+.file.err .why { color: var(--color-danger-text); font-weight: 600; white-space: nowrap; }
+.dz-hint {
+  border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-1);
+  padding: var(--space-sm) var(--space-md); text-align: center; font-size: var(--text-sm); color: var(--color-ink-subtle);
+}
+.dz-hint.over { border-color: var(--color-accent-strong); background: var(--color-info-bg); color: var(--color-info-text); }
+.tl-card .files { margin-top: var(--space-sm); }
+.to-line { font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.to-line strong { color: var(--color-ink-soft); }
