@@ -126,6 +126,8 @@ export const STATUS_NEUTRAL_ACTIVITY_TYPES = [
   "lusha_reveal",
   "auto_reply_received",
   "email_bounced",
+  // Setting up a follow-up is bookkeeping, not contact with the person (also in NON_TOUCH_ACTIVITY_TYPES).
+  "task_created",
   // Only a held meeting (`meeting_logged`, "Se hizo") moves the stage: scheduled, no-show, cancelled and rescheduled never do.
   ...MEETING_ACTIVITY_TYPES,
 ] as const;

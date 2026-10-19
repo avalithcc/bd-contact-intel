@@ -17,14 +17,18 @@
  * observe different snapshots of `person.merged_into_id` (a person merged
  * away between the filter and the insert would otherwise still get a task).
  *
- * No `task_created` activity rows are written here, unlike a single-record
- * creation (`createTaskWithActivity`, src/lib/tasks/updateWithActivity.ts).
- * That is a known gap against the "every task change logs an activity" rule,
- * left for its own change so the bulk insert's shape is not altered here.
+ * One `task_created` activity per created task is written in the same
+ * transaction as ONE multi-row INSERT (so the whole call is: live-person
+ * filter, assignee name, task insert, activity insert, never a per-contact
+ * statement). `task_created` is status-neutral and a non-touch type, so no
+ * status recompute is needed (a recompute would read every selected contact's
+ * whole activity history).
  */
 import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { person, task } from "@/db/schema";
+import { activity, person, task } from "@/db/schema";
+import { loadBdNames } from "@/lib/tasks/assigneeNames";
+import { buildTaskActivityRow, buildTaskCreatedMetadata } from "@/lib/tasks/taskActivityBody";
 import {
   assertBulkTaskRowCountWithinCap,
   buildBulkTaskRows,
@@ -52,11 +56,12 @@ import {
 export async function bulkCreateTasks(
   personIds: readonly string[],
   fields: BulkTaskSharedFields,
+  database: typeof db = db,
 ): Promise<number> {
   assertBulkTaskRowCountWithinCap(personIds.length);
   if (!personIds.length) return 0;
 
-  return db.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     const liveRows = await tx
       .select({ id: person.id })
       .from(person)
@@ -67,7 +72,12 @@ export async function bulkCreateTasks(
       liveRows.map((r) => r.id),
       fields,
     );
-    await tx.insert(task).values(rows);
-    return rows.length;
+    const created = await tx.insert(task).values(rows).returning();
+    const names = await loadBdNames(tx, [fields.assignedToBdId]);
+    const assigneeName = names.get(fields.assignedToBdId) ?? null;
+    await tx
+      .insert(activity)
+      .values(created.map((t) => buildTaskActivityRow("task_created", t, fields.actorBdId, buildTaskCreatedMetadata(t, assigneeName))));
+    return created.length;
   });
 }

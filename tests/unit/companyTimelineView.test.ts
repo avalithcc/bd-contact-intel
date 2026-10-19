@@ -46,6 +46,8 @@ const labels = {
   taskChangeFieldAssignee: "Asignada a",
   taskChangeFieldDescription: "Descripción",
   taskChangeCreatedPrefix: "creó la tarea",
+  taskChangeCreatedDuePrefix: "vence",
+  taskChangeCreatedAssigneePrefix: "asignada a",
   taskChangeUpdatedPrefix: "editó la tarea",
   taskChangeCompletedPrefix: "completó la tarea",
   taskChangeReopenedPrefix: "reabrió la tarea",

@@ -28,7 +28,8 @@ import { TaskNotFoundError } from "@/lib/tasks/errors";
 import { isTaskStatusNoOp } from "@/lib/tasks/statusChange";
 import { diffTaskEdit, type TaskEditSnapshot } from "@/lib/tasks/taskEditDiff";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
-import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
+import { loadBdNames } from "@/lib/tasks/assigneeNames";
+import { buildTaskActivityRow, buildTaskCreatedMetadata } from "@/lib/tasks/taskActivityBody";
 
 /**
  * Reads the task row `FOR UPDATE`, inside the caller's transaction — review
@@ -74,12 +75,15 @@ async function buildNameLookup(): Promise<(bdId: string | null) => string | null
  * the activity is the inserted row's own, so it is right even when
  * `person_id` was resolved by the identity dual-write lookup.
  */
-export async function createTaskWithActivity(input: NewTask, me: TaskAuthActor): Promise<Task> {
-  return db.transaction(async (tx) => {
+export async function createTaskWithActivity(input: NewTask, me: TaskAuthActor, database: typeof db = db): Promise<Task> {
+  return database.transaction(async (tx) => {
     const created = await createTask(input, tx);
+    const names = await loadBdNames(tx, [created.assignedToBdId]);
     await tx
       .insert(activity)
-      .values(buildTaskActivityRow("task_created", created, me.id, { taskId: created.id, taskTitle: created.title }));
+      .values(
+        buildTaskActivityRow("task_created", created, me.id, buildTaskCreatedMetadata(created, names.get(created.assignedToBdId ?? "") ?? null)),
+      );
     // Same "every activity insert recomputes status in its own transaction"
     // contract as the other task writes (task_created is a non-touch type).
     if (created.personId) await recomputePersonStatus(tx, created.personId);

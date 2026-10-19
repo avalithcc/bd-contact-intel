@@ -11,7 +11,8 @@ import { createActivityInTx } from "@/lib/activity/queries";
 import { MeetingOccurredAtInFutureError } from "@/lib/contacts/meeting";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { createTask } from "@/lib/tasks/queries";
-import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
+import { loadBdNames } from "@/lib/tasks/assigneeNames";
+import { buildTaskActivityRow, buildTaskCreatedMetadata } from "@/lib/tasks/taskActivityBody";
 import {
   MeetingOutcomeError,
   canRemoveFollowUpTask,
@@ -147,9 +148,10 @@ export async function applyMeetingOutcome(
         tx,
       );
       followUpTaskId = created.id;
+      const names = await loadBdNames(tx, [created.assignedToBdId]);
       await tx
         .insert(activity)
-        .values(buildTaskActivityRow("task_created", created, actorBdId, { taskId: created.id, taskTitle: created.title }));
+        .values(buildTaskActivityRow("task_created", created, actorBdId, buildTaskCreatedMetadata(created, names.get(created.assignedToBdId ?? "") ?? null)));
     }
 
     await tx

@@ -181,6 +181,8 @@ test("a task_created entry reads '<actor> created task «X»' on the record's ti
   const l = {
     ...labels(),
     taskChangeCreatedPrefix: "created task",
+    taskChangeCreatedDuePrefix: "due",
+    taskChangeCreatedAssigneePrefix: "assigned to",
     taskChangeUnknownActor: "Someone",
   } as unknown as ContactRecordLabels;
   const body = entryBody(

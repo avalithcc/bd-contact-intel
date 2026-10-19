@@ -871,6 +871,8 @@ The bounced email shows on the contact record, in the list and in the timeline
 an Exchange/M365 `550 5.4.1` stays a soft bounce; NDRs from
 `MicrosoftExchange…@tenant` senders are ignored; there is no backfill of
 historical bounces.
+Owner decision 2026-10-19: the Exchange/M365 `550 5.4.1` stays a soft bounce and
+there is no historical bounce backfill, for now.
 
 ### Lusha phone reveal: measured 2026-10-15, three findings from the real shape
 
@@ -1856,6 +1858,22 @@ the actor (`updateTaskWithActivity`) — in production 2026-10-01: 4
 "every task change logs an activity naming the actor" currently applies to
 edit/complete/reopen but not to creation, and that asymmetry is easy to
 mistake for a bug later if no one writes down that it's intentional.
+
+**Done 2026-10-19 (owner approved logging creation).** Re-checked: by then the
+single create (`createTaskWithActivity`), the meeting follow-up task and the
+scheduled-email failure task already wrote `task_created`; the bulk create did
+not. Now every path writes it, with the actor, title, due date and assignee
+(`buildTaskCreatedMetadata`, `src/lib/tasks/taskActivityBody.ts`; rendered as
+"<actor> creó la tarea «X» · vence <fecha> · asignada a <BD>" on the contact and
+company timelines). The bulk create writes one activity per contact in a single
+multi-row INSERT inside the task transaction. `task_created` is in
+`STATUS_NEUTRAL_ACTIVITY_TYPES` and `NON_TOUCH_ACTIVITY_TYPES`. The meeting
+undo already deleted every activity naming the follow-up task, so it takes
+`task_created` with it. Every creation path has an actor (the triggering BD for
+the system tasks), so no "Sistema" actor was needed. `deleteTask` is unchanged
+and is not an undo path. Tests: `tests/db/taskCreatedActivity.test.ts`,
+`tests/unit/taskActivityBody.test.ts`. Tasks created before this change have no
+`task_created` row and none is backfilled.
 
 ### unit-test flake, unattributed
 One unreproducible unit-test failure was observed in 1 of 18 consecutive

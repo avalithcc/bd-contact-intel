@@ -27,6 +27,8 @@ function taskActivityBodyLabels(l: ContactRecordLabels): TaskActivityBodyLabels 
     fieldAssignee: l.taskChangeFieldAssignee,
     fieldDescription: l.taskChangeFieldDescription,
     createdPrefix: l.taskChangeCreatedPrefix,
+    createdDuePrefix: l.taskChangeCreatedDuePrefix,
+    createdAssigneePrefix: l.taskChangeCreatedAssigneePrefix,
     updatedPrefix: l.taskChangeUpdatedPrefix,
     completedPrefix: l.taskChangeCompletedPrefix,
     reopenedPrefix: l.taskChangeReopenedPrefix,

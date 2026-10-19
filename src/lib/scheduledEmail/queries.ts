@@ -8,7 +8,8 @@ import { activity, bd, emailAccount, person, scheduledEmail, task, type Schedule
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import type { ValidatedAttachment } from "@/lib/email/attachments/load";
 import { listScheduledAttachments, setScheduledAttachments, type AttachmentRow } from "@/lib/email/attachments/queries";
-import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
+import { loadBdNames } from "@/lib/tasks/assigneeNames";
+import { buildTaskActivityRow, buildTaskCreatedMetadata } from "@/lib/tasks/taskActivityBody";
 import { buildFailureTask, failureTaskRef } from "./failureTask";
 import {
   LOCK_MS,
@@ -255,7 +256,8 @@ async function insertFailureTasks(tx: Tx, ids: string[]): Promise<void> {
   const fields = rows.map((r) => buildFailureTask({ ...r, personName: [r.first, r.last].filter(Boolean).join(" ") }, now));
   if (!fields.length) return;
   const created = await tx.insert(task).values(fields).returning();
-  await tx.insert(activity).values(created.map((t) => buildTaskActivityRow("task_created", t, t.actorBdId!, { taskId: t.id, taskTitle: t.title })));
+  const names = await loadBdNames(tx, created.map((t) => t.assignedToBdId));
+  await tx.insert(activity).values(created.map((t) => buildTaskActivityRow("task_created", t, t.actorBdId!, buildTaskCreatedMetadata(t, names.get(t.assignedToBdId ?? "") ?? null))));
   for (const personId of new Set(created.map((t) => t.personId!))) await recomputePersonStatus(tx, personId); // task_created is a non-touch type
 }
 

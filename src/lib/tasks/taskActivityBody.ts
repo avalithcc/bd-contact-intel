@@ -10,6 +10,7 @@
  * `TaskFieldChange`) — already display-ready strings, never raw ids or
  * timestamps, so this never needs a database read to render.
  */
+import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 
 export interface TaskActivityChange {
   field: string;
@@ -21,6 +22,9 @@ export interface TaskActivityMetadata {
   taskId?: string;
   taskTitle?: string;
   changes?: TaskActivityChange[];
+  /** `task_created` only: the due date and assignee as display-ready strings (like `changes`), null/absent when unset. */
+  dueLabel?: string | null;
+  assigneeName?: string | null;
 }
 
 export interface TaskActivityBodyLabels {
@@ -42,6 +46,9 @@ export interface TaskActivityBodyLabels {
   unknownActor: string;
   /** Lowercase verb phrase for `task_created`, like the three above. */
   createdPrefix: string;
+  /** Lowercase lead-ins for the `task_created` suffix: "vence <fecha>" and "asignada a <BD>". */
+  createdDuePrefix: string;
+  createdAssigneePrefix: string;
 }
 
 const FIELD_LABEL_KEY: Record<string, keyof TaskActivityBodyLabels> = {
@@ -62,7 +69,13 @@ export function taskActivityBody(
   const title = metadata.taskTitle ?? "";
   const actor = actorName ?? l.unknownActor;
 
-  if (type === "task_created") return `${actor} ${l.createdPrefix} «${title}»`;
+  if (type === "task_created") {
+    const parts = [
+      metadata.dueLabel ? `${l.createdDuePrefix} ${metadata.dueLabel}` : null,
+      metadata.assigneeName ? `${l.createdAssigneePrefix} ${metadata.assigneeName}` : null,
+    ].filter((p): p is string => p !== null);
+    return [`${actor} ${l.createdPrefix} «${title}»`, ...parts].join(" · ");
+  }
   if (type === "task_completed") return `${actor} ${l.completedPrefix} «${title}»`;
   if (type === "task_reopened") return `${actor} ${l.reopenedPrefix} «${title}»`;
 
@@ -84,6 +97,24 @@ export function taskActivityBody(
 export const ALL_TASK_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;
 
 export type TaskActivityType = (typeof ALL_TASK_ACTIVITY_TYPES)[number];
+
+/**
+ * The metadata of a `task_created` row: ids for the report joins, plus the due
+ * date and assignee name already formatted, so the timeline renders it without
+ * a read. Shared by every creation path (single, bulk, meeting follow-up,
+ * scheduled-email failure) so they cannot drift.
+ */
+export function buildTaskCreatedMetadata(
+  created: { id: string; title: string; dueAt: Date | null },
+  assigneeName: string | null,
+): TaskActivityMetadata {
+  return {
+    taskId: created.id,
+    taskTitle: created.title,
+    dueLabel: created.dueAt ? formatTaskDueDate(created.dueAt) : null,
+    assigneeName,
+  };
+}
 
 export interface TaskActivitySubject {
   personId: string | null;

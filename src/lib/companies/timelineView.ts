@@ -45,6 +45,8 @@ export interface CompanyTimelineViewLabels {
   taskChangeFieldAssignee: string;
   taskChangeFieldDescription: string;
   taskChangeCreatedPrefix: string;
+  taskChangeCreatedDuePrefix: string;
+  taskChangeCreatedAssigneePrefix: string;
   taskChangeUpdatedPrefix: string;
   taskChangeCompletedPrefix: string;
   taskChangeReopenedPrefix: string;
@@ -147,6 +149,8 @@ function taskActivityViewBody(
     fieldAssignee: l.taskChangeFieldAssignee,
     fieldDescription: l.taskChangeFieldDescription,
     createdPrefix: l.taskChangeCreatedPrefix,
+    createdDuePrefix: l.taskChangeCreatedDuePrefix,
+    createdAssigneePrefix: l.taskChangeCreatedAssigneePrefix,
     updatedPrefix: l.taskChangeUpdatedPrefix,
     completedPrefix: l.taskChangeCompletedPrefix,
     reopenedPrefix: l.taskChangeReopenedPrefix,

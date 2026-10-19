@@ -16,6 +16,7 @@ import {
   taskActivityBody,
   buildTaskActivityRow,
   ALL_TASK_ACTIVITY_TYPES,
+  buildTaskCreatedMetadata,
   type TaskActivityBodyLabels,
 } from "@/lib/tasks/taskActivityBody";
 import { TASK_ACTIVITY_TYPES } from "@/lib/activity/timelinePills";
@@ -28,6 +29,8 @@ const LABELS: TaskActivityBodyLabels = {
   fieldAssignee: "Asignada a",
   fieldDescription: "Descripción",
   createdPrefix: "creó la tarea",
+  createdDuePrefix: "vence",
+  createdAssigneePrefix: "asignada a",
   updatedPrefix: "editó la tarea",
   completedPrefix: "completó la tarea",
   reopenedPrefix: "reabrió la tarea",
@@ -126,4 +129,36 @@ test("every task activity type is registered in each list that must know about i
   assert.deepEqual([...TASK_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES].sort());
   // Task writes and the meeting lifecycle records (meeting-outcomes) are the activity that is not a touch of the Contact.
   assert.deepEqual([...NON_TOUCH_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES, ...MEETING_ACTIVITY_TYPES].sort());
+});
+
+test("task_created shows the due date and assignee after the title", () => {
+  const body = taskActivityBody(
+    "task_created",
+    { taskTitle: "Enviar propuesta", dueLabel: "12 oct", assigneeName: "Cristian" },
+    "Macarena",
+    LABELS,
+  );
+  assert.equal(body, "Macarena creó la tarea «Enviar propuesta» · vence 12 oct · asignada a Cristian");
+});
+
+test("task_created omits an unset due date or assignee instead of printing a blank", () => {
+  assert.equal(
+    taskActivityBody("task_created", { taskTitle: "X", dueLabel: null, assigneeName: "Cristian" }, "Macarena", LABELS),
+    "Macarena creó la tarea «X» · asignada a Cristian",
+  );
+  assert.equal(taskActivityBody("task_created", { taskTitle: "X" }, "Macarena", LABELS), "Macarena creó la tarea «X»");
+});
+
+test("buildTaskCreatedMetadata keeps the ids and formats the due date once", () => {
+  const meta = buildTaskCreatedMetadata({ id: "t1", title: "Llamar", dueAt: null }, "Cristian");
+  assert.deepEqual(meta, { taskId: "t1", taskTitle: "Llamar", dueLabel: null, assigneeName: "Cristian" });
+  const due = buildTaskCreatedMetadata({ id: "t1", title: "Llamar", dueAt: new Date("2026-10-20T15:00:00.000Z") }, null);
+  assert.equal(typeof due.dueLabel, "string");
+  assert.equal(due.assigneeName, null);
+});
+
+test("task_created is status-neutral and not a touch", async () => {
+  const { STATUS_NEUTRAL_ACTIVITY_TYPES } = await import("@/lib/status/deriveStatus");
+  assert.ok((STATUS_NEUTRAL_ACTIVITY_TYPES as readonly string[]).includes("task_created"));
+  assert.ok((NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes("task_created"));
 });
