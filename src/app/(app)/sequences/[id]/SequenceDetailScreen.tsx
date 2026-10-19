@@ -171,7 +171,9 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       approve: () => approveMember(memberId, step),
     }), setError);
     if (!result) return;
-    if (result.persisted) router.refresh();
+    // Always refresh once the server was reached: approving an untouched draft persists nothing client-side but
+    // still changes the member's state, and the card must move without a manual reload.
+    router.refresh();
     if (result.ok) { showToast(intent === "save" ? l.toastSaved : l.toastApproved, "success"); closeDialogs(); } else setError(reasonText(result.error));
   }
 
