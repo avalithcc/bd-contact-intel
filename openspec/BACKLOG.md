@@ -1844,17 +1844,17 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
-- **Log meetings in the future** (owner, 2026-10-19). Today a meeting can only
+- ~~**Log meetings in the future**~~ **Shipped 2026-10-19** (`meeting-outcomes`, main `6bf96f14`; migration 0054 applied, pg_cron `meetings-digest-18-art` at 21:00 UTC scheduled): /reuniones with status tabs, outcome modal, admin read-only view with filters, 18:00 ART digest. Original note: Today a meeting can only
   be logged in the past. Needs a flow for meetings that don't happen or move:
   e.g. an end-of-day reminder to confirm held / no-show / rescheduled /
   cancelled (HubSpot "meeting outcome"). Options presented to the owner the
   same day; decision pending.
-- **Admin reports: reply rate must exclude current clients** (owner,
+- ~~**Admin reports: reply rate must exclude current clients**~~ **Shipped 2026-10-19** (main `9eb2d72a`): only the reply rate excludes won + client_status active. Original note: (owner,
   2026-10-19). The reply rate in Admin → Reportes counts conversations with
   active clients; it must count only prospects (contacts) and inactive
   clients. Define "current client" from the company relationship stage (e.g.
   `won`/active) and exclude those people from numerator and denominator.
-- **Admin reports: "Esta semana" does not filter "empresas ganadas"** (owner,
+- ~~**Admin reports: "Esta semana" does not filter "empresas ganadas"**~~ **Shipped 2026-10-19** (main `9eb2d72a`): every card follows the period; won dated by the company status_change to won; wins before 2026-10-07 are the initial load (no period); meetings dated by metadata.at; past and custom periods added. Original note: (owner,
   2026-10-19). Selecting the week period still shows the total/monthly won
   companies; every metric on the screen must follow the selected period
   (check each card's date filter, not only won companies).
@@ -1865,7 +1865,7 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   for the views it affects (revalidatePath / router.refresh / optimistic
   update with rollback on failure) and fix the stale ones, starting with
   Sequences approve/send.
-- **Edit a contact's first and last name** (owner, 2026-10-19). Some contacts
+- ~~**Edit a contact's first and last name**~~ **Shipped 2026-10-19** (main `3e1fb471`). Original note: (owner, 2026-10-19). Some contacts
   show a dash ("—") instead of a name, and the BD cannot fix it from the record:
   first name and last name must be editable (audited like other property edits,
   see person_property_history). Related: the 230 nameless contacts parked for
