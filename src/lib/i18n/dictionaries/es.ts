@@ -2413,7 +2413,7 @@ export const es: typeof en = {
     kpiMeetingsEmptyFoot: "Todavía no se registraron reuniones",
     kpiCompaniesWon: "Empresas ganadas",
     kpiCompaniesWonFoot: "pasaron a Ganada en el período",
-    kpiCompaniesWonUndatedFoot: (count: number) => `${count} ganada(s) sin fecha de cierre registrada, fuera de todo período`,
+    kpiCompaniesWonUndatedFoot: (count: number) => `${count} ganada(s) sin fecha de cierre real (carga inicial, antes del 7 oct)`,
     // Owner definition 2026-10-19: a current client is won + active.
     excludesActiveClients: "Excluye clientes activos",
     discardReasonsTitle: "Descartes por motivo",

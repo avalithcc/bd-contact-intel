@@ -2439,7 +2439,7 @@ export const en = {
     kpiMeetingsEmptyFoot: "No meetings recorded yet",
     kpiCompaniesWon: "Companies won",
     kpiCompaniesWonFoot: "moved to Won in the period",
-    kpiCompaniesWonUndatedFoot: (count: number) => `${count} won with no recorded close date, outside every period`,
+    kpiCompaniesWonUndatedFoot: (count: number) => `${count} won with no real close date (initial load, before Oct 7)`,
     excludesActiveClients: "Excludes active clients",
     discardReasonsTitle: "Discards by reason",
     discardReasonsEmpty: "No discards recorded for the selected period and BD.",

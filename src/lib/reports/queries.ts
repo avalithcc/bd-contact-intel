@@ -42,6 +42,7 @@ import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
 import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
+import { WON_TRACKING_STARTS_AT_ISO } from "@/lib/reports/wonTracking";
 import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
 import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
 
@@ -69,7 +70,8 @@ function companyBelongsToBdSql(bdId: string | null) {
  * `metadata.status` is 'won', by the shared effective activity time. `NULL` when the company is won but no such
  * transition was ever recorded (imports, scripts and pre-2026-09 edits wrote the stage without an activity): those
  * cannot be dated, and `company.updated_at` is NOT a substitute (any edit, e.g. setting client_status, bumps it and
- * would drag the company into the current period). Callers count them separately (`won_undated`). Correlated to the
+ * would drag the company into the current period). Moves before WON_TRACKING_STARTS_AT (wonTracking.ts: the initial
+ * data load) are not real wins either. Callers count both kinds separately (`won_undated`) and cut periods at that instant. Correlated to the
  * company row, so it runs once per WON company (~60), never over the whole activity table. Call sites FROM
  * `${company}` un-aliased.
  */
@@ -171,8 +173,8 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
     -- [from, to). Undated won companies (no recorded transition) are counted apart, never guessed into a period.
     rpt_won_period as (
       select
-        count(*) filter (where rpt_won_dated.pbc_won_at >= ${fromIso}::timestamptz and rpt_won_dated.pbc_won_at < ${toIso}::timestamptz)::int as pbc_in_period,
-        count(*) filter (where rpt_won_dated.pbc_won_at is null)::int as pbc_undated
+        count(*) filter (where rpt_won_dated.pbc_won_at >= ${WON_TRACKING_STARTS_AT_ISO}::timestamptz and rpt_won_dated.pbc_won_at >= ${fromIso}::timestamptz and rpt_won_dated.pbc_won_at < ${toIso}::timestamptz)::int as pbc_in_period,
+        count(*) filter (where rpt_won_dated.pbc_won_at is null or rpt_won_dated.pbc_won_at < ${WON_TRACKING_STARTS_AT_ISO}::timestamptz)::int as pbc_undated
       from (
         select ${wonAtSql()} as pbc_won_at
         from ${company}
@@ -312,7 +314,7 @@ export interface ReportAggregatesResult {
   pipeline: { stage: string | null; count: number }[];
   /** "Empresas ganadas" for the selected period: currently-won companies whose move to 'won' falls in it. */
   wonInPeriod: number;
-  /** Currently-won companies with no recorded move to 'won': not datable, so in no period. */
+  /** Currently-won companies with no real close date (no recorded move to 'won', or one before WON_TRACKING_STARTS_AT: the initial load): in no period. */
   wonUndated: number;
   /**
    * EVERY bd row (bug fix, reports-bd-filter-drilldown): the "Filtrar por
@@ -370,7 +372,8 @@ export function buildWonCompaniesDrilldownQuery({ fromIso, toIso, bdId }: WonCom
     rpt_won_companies as (
       select pbc_company_key, pbc_display_name, pbc_owner_bd_id, pbc_won_at
       from rpt_won_dated
-      where pbc_won_at >= ${fromIso}::timestamptz
+      where pbc_won_at >= ${WON_TRACKING_STARTS_AT_ISO}::timestamptz
+        and pbc_won_at >= ${fromIso}::timestamptz
         and pbc_won_at < ${toIso}::timestamptz
     ),
     rpt_won_company_person_owner as (

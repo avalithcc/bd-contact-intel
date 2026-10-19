@@ -22,7 +22,9 @@ const keys = {
   wonNoStatus: `zz-won-null-${run}`,
   qualifiedActive: `zz-qualified-active-${run}`,
   wonThisWeek: `zz-won-week-${run}`,
-  wonLastMonth: `zz-won-lastmonth-${run}`,
+  wonInitialLoad: `zz-won-initial-${run}`,
+  wonInitialLoadEdge: `zz-won-edge-${run}`,
+  wonOct08: `zz-won-oct08-${run}`,
   wonUndated: `zz-won-undated-${run}`,
   lostAfterWon: `zz-lost-${run}`,
 };
@@ -54,7 +56,9 @@ before(async () => {
     co(keys.wonNoStatus, "won", null),
     co(keys.qualifiedActive, "qualified", "active"),
     co(keys.wonThisWeek, "won", null),
-    co(keys.wonLastMonth, "won", null),
+    co(keys.wonInitialLoad, "won", null),
+    co(keys.wonInitialLoadEdge, "won", null),
+    co(keys.wonOct08, "won", null),
     co(keys.wonUndated, "won", null),
     co(keys.lostAfterWon, "lost", null),
   ]);
@@ -69,12 +73,15 @@ before(async () => {
   await insertPerson("qualifiedcontacted", "contacted", keys.qualifiedActive, created);
   await insertPerson("nocompany", "contacted", null, created);
 
-  // Won dates: the move to 'won' is a company-scoped status_change activity.
+  // Won dates: the move to 'won' is a company-scoped status_change activity, with the exact prod metadata shape
+  // ({"from":"prospect","status":"won"}: the key is `status`, not `to`). Won before 2026-10-07 ART is the initial data load.
   const won = (companyKey: string, createdAt: Date) =>
-    ({ companyKey, actorBdId: bdId, type: "status_change", metadata: { from: "qualified", status: "won" }, createdAt }) as const;
+    ({ companyKey, actorBdId: bdId, type: "status_change", metadata: { from: "prospect", status: "won" }, createdAt }) as const;
   await db.insert(activity).values([
     won(keys.wonThisWeek, new Date("2026-10-19T12:00:00Z")),
-    won(keys.wonLastMonth, new Date("2026-09-22T12:00:00Z")),
+    won(keys.wonInitialLoad, new Date("2026-10-03T15:00:00Z")),
+    won(keys.wonInitialLoadEdge, new Date("2026-10-07T02:59:59Z")), // 23:59:59 ART on the 6th: still the load
+    won(keys.wonOct08, new Date("2026-10-08T15:00:00Z")),
     won(keys.lostAfterWon, new Date("2026-10-19T12:00:00Z")),
   ]);
 
@@ -119,31 +126,29 @@ test("the cohort list behind the reply rate lists exactly the counted people", a
   assert.deepEqual(rows.map((r) => r.personId), [personIds.inactivereplied]);
 });
 
-test("'Empresas ganadas' follows the period: won this week is not counted last month, and vice versa", async () => {
-  const week = await aggregates("week");
-  assert.equal(week.result.wonInPeriod, 1, "only the company that moved to won on Monday");
-  const month = await aggregates("month");
-  assert.equal(month.result.wonInPeriod, 1);
-  const lastMonth = await aggregates("last_month");
-  assert.equal(lastMonth.result.wonInPeriod, 1, "the September move to won");
-  const lastWeek = await aggregates("last_week");
-  assert.equal(lastWeek.result.wonInPeriod, 0);
+test("'Empresas ganadas' follows the period", async () => {
+  assert.equal((await aggregates("week")).result.wonInPeriod, 1, "only the company that moved to won on Monday");
+  assert.equal((await aggregates("month")).result.wonInPeriod, 2, "Oct 8 and Oct 19");
+  assert.equal((await aggregates("quarter")).result.wonInPeriod, 2);
+  assert.equal((await aggregates("last_week")).result.wonInPeriod, 0, "nothing moved to won Oct 12-18");
 });
 
-test("a won company with no recorded move to won is reported as undated, never dragged into a period by updated_at", async () => {
-  const week = await aggregates("week");
-  assert.equal(week.result.wonUndated, 4, "the four won companies of this BD with no status_change: client active/inactive, won/no status, undated");
-  assert.equal(week.result.wonInPeriod, 1);
-});
-
-test("the won drill-down lists exactly the companies the period counted", async () => {
+test("won before the tracking start (initial data load, Oct 1-6) is in no period, even October; Oct 8 is in October", async () => {
+  const { WON_TRACKING_STARTS_AT_ISO } = await import("@/lib/reports/wonTracking");
+  assert.equal(WON_TRACKING_STARTS_AT_ISO, "2026-10-07T03:00:00.000Z");
+  const { reportPeriodRange } = await import("@/lib/reports/period");
   const { getWonCompaniesDrilldown } = await import("@/lib/reports/queriesDb");
+  const october = reportPeriodRange("month", NOW);
+  const rows = await getWonCompaniesDrilldown({ fromIso: october.fromIso, toIso: october.toIso, bdId });
+  assert.deepEqual(rows.map((r) => r.companyKey), [keys.wonThisWeek, keys.wonOct08]);
+  assert.equal((await aggregates("last_month")).result.wonInPeriod, 0);
+});
+
+test("won companies with no real close date (no recorded move, or the initial load) are counted apart", async () => {
   const week = await aggregates("week");
-  const rows = await getWonCompaniesDrilldown({ fromIso: week.range.fromIso, toIso: week.range.toIso, bdId });
-  assert.deepEqual(rows.map((r) => r.companyKey), [keys.wonThisWeek]);
-  const last = await aggregates("last_month");
-  const lastRows = await getWonCompaniesDrilldown({ fromIso: last.range.fromIso, toIso: last.range.toIso, bdId });
-  assert.deepEqual(lastRows.map((r) => r.companyKey), [keys.wonLastMonth]);
+  // no status_change: client active/inactive, won/no status, undated (4); initial load: Oct 3 and the Oct 6 23:59:59 edge (2)
+  assert.equal(week.result.wonUndated, 6);
+  assert.equal(week.result.wonInPeriod, 1);
 });
 
 async function meetingsIn(period: Parameters<typeof import("@/lib/reports/period").reportPeriodRange>[0]) {
