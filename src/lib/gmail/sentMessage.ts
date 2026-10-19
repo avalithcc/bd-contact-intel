@@ -17,6 +17,8 @@ export interface SentMessageInput {
   to: string;
   subject: string;
   content: MessageContent;
+  /** The Cc addresses the app sent (internal colleagues). Absent or empty for every send before Cc existed. */
+  cc?: readonly string[];
   gmailMessageId: string;
   gmailThreadId: string;
   /** Null when the Message-ID read-back failed. */
@@ -34,7 +36,7 @@ export function buildSentParsedMessage(input: SentMessageInput): ParsedGmailMess
     gmailThreadId: input.gmailThreadId,
     from: input.bdEmail,
     to: input.to,
-    cc: "",
+    cc: (input.cc ?? []).join(", "),
     subject: input.subject || null,
     bodyText: body.text,
     bodyTruncated: body.truncated,

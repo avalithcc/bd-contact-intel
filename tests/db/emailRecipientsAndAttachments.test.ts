@@ -212,3 +212,51 @@ test("setScheduledAttachments links the wanted files and unlinks the dropped one
   const [dropped] = await db.select().from(emailAttachment).where(eq(emailAttachment.storagePath, r1!.storagePath));
   assert.equal(dropped!.scheduledEmailId, null, "the dropped file is an orphan for the sweeper");
 });
+
+test("recordSentEmail writes ONE email_message and one email_sent per Para contact, and every one becomes Contactado", async () => {
+  const { db } = await import("@/db");
+  const { activity, emailMessage, emailMessagePerson, person } = await import("@/db/schema");
+  const { eq, inArray } = await import("drizzle-orm");
+  const { recordSentEmail } = await import("@/lib/gmail/sentEmailQueries");
+  const sender = await mkBd("Sender");
+  const key = await mkCompany("fanout");
+  const a = await mkPerson("a", { companyKey: key });
+  const b = await mkPerson("b", { companyKey: key });
+  const c = await mkPerson("c", { companyKey: key });
+  const gmailMessageId = `gm-${run}`;
+  const metadata = { to: [a.email, b.email, c.email], cc: ["ana@avalith.net"], subject: "Hola", gmailMessageId, gmailThreadId: `th-${run}`, attachments: [{ filename: "Propuesta.pdf", size: 10 }] };
+  await recordSentEmail({
+    bdId: sender.id,
+    message: { bdEmail: sender.email, to: `${a.email}, ${b.email}, ${c.email}`, subject: "Hola", content: { body: "Texto" }, cc: ["ana@avalith.net"], gmailMessageId, gmailThreadId: `th-${run}`, metadata: null },
+    activity: { type: "email_sent", personId: a.id, actorBdId: sender.id, metadata } as never,
+    alsoRecordFor: [b.id, c.id],
+  });
+  const messages = await db.select().from(emailMessage).where(eq(emailMessage.gmailMessageId, gmailMessageId));
+  assert.equal(messages.length, 1);
+  assert.deepEqual(messages[0]!.ccAddresses, ["ana@avalith.net"]);
+  const links = await db.select().from(emailMessagePerson).where(eq(emailMessagePerson.emailMessageId, messages[0]!.id));
+  assert.deepEqual(new Set(links.map((l) => l.personId)), new Set([a.id, b.id, c.id]), "the colleague in Cc is not linked as a contact");
+  const acts = await db.select().from(activity).where(inArray(activity.personId, [a.id, b.id, c.id]));
+  assert.equal(acts.length, 3);
+  assert.ok(acts.every((x) => x.type === "email_sent" && (x.metadata as Record<string, unknown>).emailMessageId === messages[0]!.id));
+  assert.deepEqual(new Set(acts.map((x) => x.personId)), new Set([a.id, b.id, c.id]));
+  const rows = await db.select({ id: person.id, status: person.status }).from(person).where(inArray(person.id, [a.id, b.id, c.id]));
+  assert.ok(rows.every((r) => r.status === "contacted"), JSON.stringify(rows));
+  await db.delete(emailMessage).where(eq(emailMessage.gmailMessageId, gmailMessageId));
+});
+
+test("recordSentEmail for a single contact still writes exactly one activity", async () => {
+  const { db } = await import("@/db");
+  const { activity } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { recordSentEmail } = await import("@/lib/gmail/sentEmailQueries");
+  const sender = await mkBd("Single");
+  const a = await mkPerson("solo", { companyKey: null });
+  const gmailMessageId = `gm-solo-${run}`;
+  await recordSentEmail({
+    bdId: sender.id,
+    message: { bdEmail: sender.email, to: a.email!, subject: "Hola", content: { body: "Texto" }, gmailMessageId, gmailThreadId: `th-${run}`, metadata: null },
+    activity: { type: "email_sent", personId: a.id, actorBdId: sender.id, metadata: { to: a.email, subject: "Hola", gmailMessageId, gmailThreadId: `th-${run}` } } as never,
+  });
+  assert.equal((await db.select().from(activity).where(eq(activity.personId, a.id))).length, 1);
+});

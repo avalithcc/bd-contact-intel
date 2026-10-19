@@ -121,7 +121,7 @@ test("upload request wraps the message as multipart/related with threadId metada
   const message = build({ attachments: [pdf()] });
   const { contentType, body } = buildUploadRequest(message, "thread-9");
   const boundary = /^multipart\/related; boundary="([^"]+)"$/.exec(contentType)![1]!;
-  const text = body.toString("utf8");
+  const text = body;
   const parts = text.split(`--${boundary}`);
   assert.equal(parts.length, 4);
   assert.match(parts[1]!, /Content-Type: application\/json; charset=UTF-8\r\n\r\n\{"threadId":"thread-9"\}\r\n$/);
@@ -132,5 +132,5 @@ test("upload request wraps the message as multipart/related with threadId metada
 
 test("upload request without a thread sends empty metadata", () => {
   const { body } = buildUploadRequest(build({ attachments: [pdf()] }));
-  assert.match(body.toString("utf8"), /Content-Type: application\/json; charset=UTF-8\r\n\r\n\{\}\r\n/);
+  assert.match(body, /Content-Type: application\/json; charset=UTF-8\r\n\r\n\{\}\r\n/);
 });

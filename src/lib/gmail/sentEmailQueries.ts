@@ -11,7 +11,8 @@
  */
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { emailMessage, emailMessagePerson, type NewActivity } from "@/db/schema";
+import { activity, emailMessage, emailMessagePerson, type NewActivity } from "@/db/schema";
+import { recomputePersonStatuses } from "@/lib/status/recompute";
 import { createActivityInTx } from "@/lib/activity/queries";
 import { extractEmailAddresses, shouldStoreClassifiedMessage, type ClassifiedMessage } from "./classify";
 import { getKnownPersonsForAddresses } from "./syncQueries";
@@ -56,6 +57,19 @@ export interface RecordSentEmailInput {
   bdId: string;
   message: Omit<SentMessageInput, "now">;
   activity: NewActivity;
+  /**
+   * Other contacts the SAME message went to ("Para" with several contacts): each gets its own copy of `activity` on its
+   * record, all pointing at the one `email_message`, so every one of them moves to "Contactado" like a single send.
+   */
+  alsoRecordFor?: readonly string[];
+}
+
+/** The primary activity first, then one copy per additional contact (no legacy lead/company link on the copies). */
+function activitiesOf(input: RecordSentEmailInput): NewActivity[] {
+  const copies = [...new Set(input.alsoRecordFor ?? [])]
+    .filter((personId) => personId !== input.activity.personId)
+    .map((personId) => ({ ...input.activity, personId, leadId: undefined, companyKey: undefined }) as NewActivity);
+  return [input.activity, ...copies];
 }
 
 /**
@@ -76,11 +90,10 @@ export async function recordSentEmail(input: RecordSentEmailInput): Promise<void
     try {
       await db.transaction(async (tx) => {
         const stored = await storeSentEmailMessage(txStore(tx), input.bdId, classified!);
-        if (!shouldWriteSentActivity(stored, classified!.matches, input.activity.personId)) return;
-        await createActivityInTx(tx, {
-          ...input.activity,
-          metadata: { ...(input.activity.metadata as Record<string, unknown>), emailMessageId: stored.emailMessageId },
-        });
+        const toWrite = activitiesOf(input)
+          .filter((act) => shouldWriteSentActivity(stored, classified!.matches, act.personId))
+          .map((act) => ({ ...act, metadata: { ...(act.metadata as Record<string, unknown>), emailMessageId: stored.emailMessageId } }) as NewActivity);
+        await insertActivities(tx, toWrite);
       });
       return;
     } catch (error) {
@@ -88,5 +101,18 @@ export async function recordSentEmail(input: RecordSentEmailInput): Promise<void
     }
   }
 
-  await db.transaction((tx) => createActivityInTx(tx, input.activity));
+  await db.transaction((tx) => insertActivities(tx, activitiesOf(input)));
+}
+
+/**
+ * ONE activity: exactly the write the app always did. Several (one per "Para" contact): one INSERT and one batched
+ * status recompute for all of them, so a 20-contact email costs the same round trips as a 2-contact one.
+ */
+async function insertActivities(tx: DbTransaction, acts: NewActivity[]): Promise<void> {
+  if (acts.length <= 1 || acts.some((a) => a.personId == null)) {
+    for (const act of acts) await createActivityInTx(tx, act);
+    return;
+  }
+  await tx.insert(activity).values(acts);
+  await recomputePersonStatuses(tx, acts.map((a) => a.personId!));
 }

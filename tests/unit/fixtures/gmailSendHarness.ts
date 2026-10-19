@@ -62,11 +62,21 @@ export async function installFakeWorld(opts: {
     mock.method(db, "transaction", (async (cb: (tx: unknown) => Promise<unknown>) =>
       cb({
         insert: () => ({
-          values: (v: Record<string, unknown>) => {
-            insertedActivities.push(v);
-            return { returning: async () => [{ ...v }] };
+          values: (v: Record<string, unknown> | Record<string, unknown>[]) => {
+            // A bulk insert (several "Para" contacts) arrives as an array: record one entry per row.
+            if (Array.isArray(v)) insertedActivities.push(...v);
+            else insertedActivities.push(v);
+            return { returning: async () => (Array.isArray(v) ? v : [{ ...v }]) };
           },
         }),
+        // recomputePersonStatuses reads two result sets and writes one UPDATE; the tests only care that it runs.
+        select: () => {
+          const chain: Record<string, unknown> = {};
+          for (const m of ["from", "where", "orderBy"]) chain[m] = () => chain;
+          chain.then = (resolve: (rows: unknown[]) => unknown) => resolve([]);
+          return chain;
+        },
+        execute: async () => [],
       })) as unknown as typeof db.transaction),
     mock.method(globalThis, "fetch", (async (url: string, init: RequestInit) => {
       fetchCalls.push({ url: String(url), init });

@@ -8,7 +8,8 @@ import { revalidatePath } from "next/cache";
 import { recordSentEmail } from "@/lib/gmail/sentEmailQueries";
 import { readSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
 import { assertRecipients } from "@/lib/gmail/recipient";
-import { assertSafeExtraHeader, assertSafeHeaderValue, buildSendPayload, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
+import { assertSafeExtraHeader, assertSafeHeaderValue, buildMimeMessage, buildSendPayload, buildUploadRequest, type MessageContent, type ReplyTarget } from "@/lib/gmail/rawMessage";
+import type { MimeAttachment } from "@/lib/gmail/mimeAttachments";
 
 // Callers give EITHER plain text (`body`, the unchanged legacy shape) OR
 // `bodyHtml` (the text/plain alternative is derived from it). The union makes
@@ -23,8 +24,16 @@ type SendGmailBody = {
   personId?: string;
   // Present only when continuing an existing thread (see replyThread.ts).
   reply?: ReplyTarget;
-  // True ONLY for a thread reply, whose recipients come from the stored thread and may be several.
+  // True for a thread reply (recipients come from the stored thread) and for a composed email with several "Para" contacts.
   allowRecipientList?: boolean;
+  // email-attachments-recipients (the composed email and its scheduled form only; Sequences never set these):
+  // validated internal Cc addresses (@avalith.net) ...
+  cc?: string[];
+  // ... files whose bytes were already loaded from Storage and checked (src/lib/email/attachments/load.ts) ...
+  attachments?: (MimeAttachment & { size: number })[];
+  // ... and ALL the "Para" contacts (the primary `personId` included) when there are several: the email is ONE message
+  // and one email_sent activity is written on each of their records.
+  recipients?: { personId: string; name: string; email: string }[];
   // Complete `Name: value` header lines (Sequence List-Unsubscribe pair).
   extraHeaders?: string[];
   // Extra keys for the `email_sent` activity (Sequence id + step). Merged
@@ -36,10 +45,38 @@ type SendGmailInput = { bdId: string } & SendGmailBody;
 
 type EmailAccountRow = typeof emailAccount.$inferSelect;
 
+const GMAIL_UPLOAD_SEND_URL = "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart";
+
+// Gmail's media-upload form of messages.send: the whole RFC 822 message as `message/rfc822`, `threadId` in the metadata part.
+function uploadSendInit(accessToken: string, message: string, threadId?: string): RequestInit {
+  const { contentType, body } = buildUploadRequest(message, threadId);
+  return { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": contentType }, body };
+}
+
+/**
+ * The recipient/attachment keys of the `email_sent` activity. A plain single-recipient send keeps writing `to` as the one
+ * address string, exactly as before; several Para contacts write the address array plus who they are, and files are
+ * recorded by name and size only (the CRM does not keep them).
+ */
+function composedMetadata(to: string, input: SendGmailBody): Record<string, unknown> {
+  const recipients = input.recipients ?? [];
+  const multi = recipients.length > 1;
+  return {
+    to: multi ? recipients.map((r) => r.email) : to,
+    ...(multi ? { recipients: recipients.map((r) => ({ personId: r.personId, name: r.name, email: r.email })) } : {}),
+    ...(input.cc?.length ? { cc: input.cc } : {}),
+    ...(input.attachments?.length ? { attachments: input.attachments.map((a) => ({ filename: a.filename, size: a.size })) } : {}),
+  };
+}
+
 // Fail fast on the untrusted recipient, before any DB read or token refresh.
-function assertSafeSendInput({ to, reply, extraHeaders, allowRecipientList }: SendGmailBody) {
+function assertSafeSendInput({ to, reply, extraHeaders, allowRecipientList, cc }: SendGmailBody) {
   assertSafeHeaderValue("To", to);
   assertRecipients(to, { allowList: allowRecipientList });
+  for (const address of cc ?? []) {
+    assertSafeHeaderValue("Cc", address);
+    assertRecipients(address); // each Cc is exactly one bare address
+  }
   for (const line of extraHeaders ?? []) assertSafeExtraHeader(line);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
@@ -75,6 +112,8 @@ export async function sendGmailMessageFromAccount(input: { accountId: string } &
 // row's own address, never a literal.
 async function sendFromAccountRow(account: EmailAccountRow | undefined, input: SendGmailBody) {
   const { subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata, allowRecipientList } = input;
+  const cc = input.cc ?? [];
+  const attachments = input.attachments ?? [];
   const to = input.to.trim(); // the guard ran on the raw value (assertSafeSendInput); the stored and sent address is the trimmed one
   const content: MessageContent =
     input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : { body: input.body };
@@ -147,15 +186,21 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
   const { access_token } = await tokenRes.json();
 
   const sendRes = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList),
-    },
+    attachments.length ? GMAIL_UPLOAD_SEND_URL : "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    attachments.length
+      ? uploadSendInit(
+          access_token,
+          buildMimeMessage({ from: account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList, cc, attachments }),
+          reply?.threadId,
+        )
+      : {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList, cc),
+        },
   );
 
   if (!sendRes.ok) {
@@ -189,6 +234,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
       to,
       subject,
       content,
+      cc,
       gmailMessageId: sent.id,
       gmailThreadId: sent.threadId,
       metadata,
@@ -199,8 +245,16 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
       companyKey,
       personId,
       actorBdId: account.bdId,
-      metadata: { ...activityMetadata, to, subject, gmailMessageId: sent.id, gmailThreadId: sent.threadId },
+      metadata: {
+        ...activityMetadata,
+        ...composedMetadata(to, input),
+        subject,
+        gmailMessageId: sent.id,
+        gmailThreadId: sent.threadId,
+      },
     } as NewActivity,
+    // One activity per OTHER "Para" contact, sharing the one email_message (the sync does the same for a message it reads).
+    alsoRecordFor: (input.recipients ?? []).filter((r) => r.personId !== personId).map((r) => r.personId),
   });
 
   if (leadId) revalidatePath(`/leads/${leadId}`);

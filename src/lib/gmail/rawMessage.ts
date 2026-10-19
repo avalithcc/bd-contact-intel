@@ -284,7 +284,7 @@ export function buildSendPayload(
  * `raw` field is limited to about 5 MB, the upload accepts the whole message (up to 35 MB) as `message/rfc822`.
  * The first part is the metadata, which is where `threadId` goes for a reply.
  */
-export function buildUploadRequest(message: string, threadId?: string): { contentType: string; body: Buffer } {
+export function buildUploadRequest(message: string, threadId?: string): { contentType: string; body: string } {
   const boundary = generateBoundary([message]);
   const body = [
     `--${boundary}`,
@@ -298,5 +298,5 @@ export function buildUploadRequest(message: string, threadId?: string): { conten
     `--${boundary}--`,
     "",
   ].join(CRLF);
-  return { contentType: `multipart/related; boundary="${boundary}"`, body: Buffer.from(body, "utf8") };
+  return { contentType: `multipart/related; boundary="${boundary}"`, body };
 }
