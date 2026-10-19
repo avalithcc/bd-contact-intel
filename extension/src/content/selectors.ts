@@ -36,6 +36,12 @@ export const SELECTORS = {
 /** New layout: the connection-degree line next to the name ("· 1er", "• 2º", "· 1st", "3rd+"). */
 export const NOT_A_HEADLINE = /^(?:[·•]\s*)?(?:(?:1st|2nd|3rd)\+?|[123]\s*(?:º|°|er|ro|do|ero)?\+?)$/i;
 
+/** A paragraph that is only a short parenthesised note, like a pronoun "(ella)": never the headline. */
+export const PAREN_NOTE = /^\(.{1,20}\)$/;
+
+/** Buttons that show the profile photo, not a company or school. */
+export const PHOTO_LABEL = /foto|photo|perfil de|profile picture|avatar/i;
+
 /** A prefix a control may put before the company name ("Ver empresa: X", "Current company: X"). */
 export const COMPANY_PREFIX = /^(?:Ver empresa|View company|Empresa actual|Current company|Empresa atual)\s*[:：]\s*/i;
 

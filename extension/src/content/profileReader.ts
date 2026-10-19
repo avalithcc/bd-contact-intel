@@ -6,7 +6,7 @@
  */
 import type { ProfileBasics } from "../shared/messages";
 import { cleanName, cleanText, companyFromLabel, stripCompanyPrefix } from "./profileText";
-import { NOT_A_HEADLINE, NOT_A_LOCATION, SELECTORS, TITLE_NAME } from "./selectors";
+import { NOT_A_HEADLINE, NOT_A_LOCATION, PAREN_NOTE, PHOTO_LABEL, SELECTORS, TITLE_NAME } from "./selectors";
 
 function firstText(root: ParentNode, selectors: readonly string[], accept: (text: string) => boolean = () => true): string {
   for (const selector of selectors) {
@@ -18,35 +18,69 @@ function firstText(root: ParentNode, selectors: readonly string[], accept: (text
   return "";
 }
 
+/** A candidate is the top card only when it is a single profile card: no aside, no other card, one contact link. */
+function isTopCardCandidate(candidate: Element, link: Element | null): boolean {
+  if (candidate.querySelector("aside, main") || candidate.matches("main, aside")) return false;
+  if (!link) return Boolean(candidate.querySelector(SELECTORS.heading));
+  if (candidate.querySelectorAll(SELECTORS.contactInfoLink).length !== 1) return false;
+  return Array.from(candidate.querySelectorAll(SELECTORS.heading)).some((h) => follows(h, link));
+}
+
 /** The top card, or null. New layout by `componentkey`, then by the contact-info link, then the old h1 section. */
 function findTopCard(doc: Document): Element | null {
   const byKey = doc.querySelector(SELECTORS.topCardByKey);
   if (byKey) return byKey;
-  let ancestor = doc.querySelector(SELECTORS.contactInfoLink)?.parentElement ?? null;
-  while (ancestor && ancestor !== doc.body && ancestor !== doc.documentElement) {
-    if (ancestor.querySelector(SELECTORS.heading)) return ancestor;
+  const link = doc.querySelector(SELECTORS.contactInfoLink);
+  let ancestor = link?.parentElement ?? null;
+  while (link && ancestor && !ancestor.matches("main, body, html")) {
+    const key = ancestor.getAttribute("componentkey");
+    if (key !== null && !key.endsWith("Topcard")) return null; // a different card
+    if (isTopCardCandidate(ancestor, link)) return ancestor;
+    if (ancestor.querySelector("aside")) return null;
     ancestor = ancestor.parentElement;
   }
-  return doc.querySelector("h1")?.closest(SELECTORS.topCardRoot) ?? null;
+  if (link) return null;
+  const section = doc.querySelector("h1")?.closest(SELECTORS.topCardRoot) ?? null;
+  return section && isTopCardCandidate(section, null) ? section : null;
 }
 
-const follows = (anchor: Element, node: Element) => Boolean(anchor.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING);
+function follows(anchor: Element, node: Element): boolean {
+  return Boolean(anchor.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
 
+const PAIR_ITEM = `${SELECTORS.pairButton}, figure`;
+
+/** Leaf paragraphs of the card. Text inside a company/school button is not a profile line. */
 function paragraphs(topCard: Element): Element[] {
-  return Array.from(topCard.querySelectorAll("p")).filter((p) => !p.querySelector("p"));
+  return Array.from(topCard.querySelectorAll("p")).filter((p) => !p.querySelector("p") && !p.closest(PAIR_ITEM));
+}
+
+/** The company/school pair candidates: buttons with a figure after the name, minus profile-photo buttons. */
+function pairButtons(topCard: Element, nameElement: Element | null): Element[] {
+  return Array.from(topCard.querySelectorAll(SELECTORS.pairButton)).filter(
+    (button) =>
+      button.querySelector("figure") &&
+      (!nameElement || follows(nameElement, button)) &&
+      cleanText(button.textContent) &&
+      !PHOTO_LABEL.test(`${cleanText(button.textContent)} ${button.getAttribute("aria-label") ?? ""}`),
+  );
 }
 
 function readHeadline(topCard: Element, nameElement: Element | null): string {
   if (nameElement) {
     for (const p of paragraphs(topCard)) {
       const text = cleanText(p.textContent);
-      if (follows(nameElement, p) && text && text !== "·" && !NOT_A_HEADLINE.test(text)) return text;
+      if (follows(nameElement, p) && text && text !== "·" && !NOT_A_HEADLINE.test(text) && !PAREN_NOTE.test(text)) return text;
     }
   }
   return firstText(topCard, SELECTORS.headline);
 }
 
-function readCompany(topCard: Element): string {
+function pairTexts(topCard: Element, nameElement: Element | null): string[] {
+  return pairButtons(topCard, nameElement).map((button) => cleanText(button.textContent));
+}
+
+function readCompany(topCard: Element, nameElement: Element | null): string {
   for (const selector of SELECTORS.companyLabelled) {
     for (const element of Array.from(topCard.querySelectorAll(selector))) {
       const company = companyFromLabel(element.getAttribute("aria-label"));
@@ -55,14 +89,11 @@ function readCompany(topCard: Element): string {
   }
   // Only a company AND a school together tell which is which (the first button is the current company); a lone
   // button can be either, so it is not guessed.
-  const pair = Array.from(topCard.querySelectorAll(SELECTORS.pairButton))
-    .filter((button) => button.querySelector("figure"))
-    .map((button) => cleanText(button.textContent))
-    .filter(Boolean);
+  const pair = pairTexts(topCard, nameElement);
   return pair.length === 2 ? stripCompanyPrefix(pair[0]).slice(0, 120) : "";
 }
 
-function readLocation(topCard: Element, headline: string): string {
+function readLocation(topCard: Element, headline: string, pair: string[]): string {
   const link = topCard.querySelector(SELECTORS.contactInfoLink);
   if (link) {
     const before = paragraphs(topCard).filter((p) => follows(p, link) && !p.contains(link));
@@ -70,7 +101,7 @@ function readLocation(topCard: Element, headline: string): string {
       const text = cleanText(p.textContent);
       if (!text || text === "·") continue;
       // The first real line before the contact info is the location; the company/school line is not one.
-      if (text !== headline && !text.includes(" · ") && !NOT_A_LOCATION.test(text)) return text;
+      if (text !== headline && !pair.includes(text) && !text.includes(" · ") && !NOT_A_LOCATION.test(text)) return text;
       break;
     }
   }
@@ -87,5 +118,5 @@ export function readProfileBasics(doc: Document): ProfileBasics {
   if (!topCard) return { name, title: "", company: "", location: "" };
 
   const title = readHeadline(topCard, nameElement);
-  return { name, title, company: readCompany(topCard), location: readLocation(topCard, title) };
+  return { name, title, company: readCompany(topCard, nameElement), location: readLocation(topCard, title, pairTexts(topCard, nameElement)) };
 }

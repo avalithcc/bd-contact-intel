@@ -51,9 +51,13 @@ after(async () => {
 });
 
 async function readFixture(name: string) {
+  return readHtml(fixture(name));
+}
+
+async function readHtml(html: string) {
   const page = await browser!.newPage();
   try {
-    await page.setContent(fixture(name));
+    await page.setContent(html);
     await page.addScriptTag({ content: readerBundle });
     return await page.evaluate(() => (window as unknown as { __read(): unknown }).__read());
   } finally {
@@ -116,6 +120,37 @@ test("without a top card only the name is read, from the title", async (t) => {
     company: "",
     location: "",
   });
+});
+
+const LINK = '<a href="https://www.linkedin.com/in/ana/overlay/contact-info/">Información de contacto</a>';
+const EMPTY = { name: "Ana", title: "", company: "", location: "" };
+
+test("a contact-info ancestor walk never lands on main or a container holding the aside", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = `<html><head><title>Ana | LinkedIn</title></head><body><main><div componentkey="x:nothing"><p>Ana</p>${LINK}</div><aside><h2>Ads</h2><p>Promo</p></aside></main></body></html>`;
+  assert.deepEqual(await readHtml(html), EMPTY);
+});
+
+const card = (inner: string) =>
+  `<html><head><title>Ana | LinkedIn</title></head><body><main><div componentkey="x:Topcard">${inner}</div></main></body></html>`;
+const button = (label: string) => `<div role="button"><figure aria-hidden="true"></figure><p><span>${label}</span></p></div>`;
+
+test("a school button is never read as the location when the profile shows none", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = card(`<h2>Ana</h2><p>Consultora</p><p>UBA</p><div>${LINK}</div>${button("UBA")}`);
+  assert.deepEqual(await readHtml(html), { ...EMPTY, title: "Consultora" });
+});
+
+test("a profile photo button does not count in the company/school pair", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = card(`${button("Foto de perfil de Ana")}<h2>Ana</h2><p>Consultora</p><div>${LINK}</div>${button("UBA")}`);
+  assert.deepEqual(await readHtml(html), { ...EMPTY, title: "Consultora" });
+});
+
+test("a parenthesised pronoun note is not the headline", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = card(`<h2>Ana</h2><p>(ella)</p><p>Consultora</p><div>${LINK}</div>`);
+  assert.deepEqual(await readHtml(html), { ...EMPTY, title: "Consultora" });
 });
 
 test("the card renders every state with the CRM's tokens and wires its buttons", async (t) => {
