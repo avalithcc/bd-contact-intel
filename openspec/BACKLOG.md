@@ -81,7 +81,7 @@ action taken in this app" is no longer true.) Why `contacted` fell by 42 and
 That was the state on 2026-09-28. By 2026-10-01 most of what stood between the
 team and a usable app has shipped — see **Shipped** below — and two of the
 three BDs are already working in it. What's left is a short list of
-in-progress items and manual owner actions (the 244 open duplicate pairs, plus
+in-progress items and manual owner actions (the duplicate pairs — all resolved by 2026-10-08, see **duplicates queue** — plus
 the owner decisions recorded below). Note what the activity above actually
 shows: the volume is small, it is two people, and the `call` rows are not
 obviously phone calls (the free-text notes on both read as a WhatsApp and an
@@ -1035,7 +1035,7 @@ what the owner would see).
   `maria.laura.fantoni@`, digits, initials), measured 2026-10-01. (Corrected
   2026-10-01: this said 233, "not re-verified this pass — no database access".)
   Needs another source (LinkedIn, enrichment) or a BD. Owner decision 2026-10-18: deferred, together
-  with the 244 duplicate pairs, for a joint human review later; stays TODO.
+  with the 244 duplicate pairs (those were all merged by 2026-10-08), for a joint human review later; stays TODO.
 - Duplicate pairs open in `/admin/duplicates` — see **duplicates queue**
   below; the "11 pairs" figure recorded here previously is stale (see that
   entry for why and for the current count).
@@ -1057,6 +1057,7 @@ Found by the launch-readiness audit (2026-09-30), fixed and merged the same
 day (#247) — see **Shipped** above for the three bugs and their fixes.
 
 ### duplicates queue — 244 open, 98 merged, 2 dismissed (re-measured 2026-10-01)
+**Superseded 2026-10-19 (re-measured in production):** 0 open, 333 merged, 2 dismissed. The 244 were merged on 2026-10-07 (11) and 2026-10-08 (224); `/admin/duplicates` now shows an empty queue and only the merge history (with undo). The 2026-10-18 "joint review" deferral applies only to the 230 nameless contacts. The rest of this section is history.
 Owner decision 2026-10-18: deferred for a joint human review later (with the 230 nameless
 contacts); stays TODO.
 Previously recorded as 353 open pairs with a recommendation to dismiss 9
