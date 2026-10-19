@@ -9,10 +9,11 @@
  * company_key). `count(*)::int` casts the aggregate — Postgres returns
  * bigint aggregates as strings over the wire otherwise.
  */
-import { and, asc, desc, eq, exists, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { phoneSearchCondition } from "@/lib/search/phoneCondition";
+import { E164_SHAPE_SQL_PATTERN } from "@/lib/phoneReview";
 import { activity, bd, company, person, personBdConnection } from "@/db/schema";
 import { getHiringCompanyKeys, getHiringMatchIndex } from "@/lib/hiring/queries";
 import type { ContactFilters } from "@/lib/contacts/viewFilters";
@@ -114,6 +115,11 @@ async function baseContactFilterConditions(
   // "Tiene teléfono" ad-hoc filter (migration 0016) — either phone column set.
   if (filters.hasPhone) {
     where.push(sql`(${person.phone} is not null or ${person.mobilePhone} is not null)`);
+  }
+  // "Teléfono a revisar": a non-blank phone or mobile_phone that is not E.164-shaped (phoneReview.ts, same pattern).
+  if (filters.phoneReview) {
+    const bad = (col: AnyColumn) => sql`(${col} is not null and btrim(${col}) <> '' and ${col} !~ ${E164_SHAPE_SQL_PATTERN})`;
+    where.push(sql`(${bad(person.phone)} or ${bad(person.mobilePhone)})`);
   }
   // "BD conectado" ad-hoc filter — EXISTS on person_bd_connection, never a
   // join that could fan out the outer person row.

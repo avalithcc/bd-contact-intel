@@ -14,6 +14,7 @@ test("FILTER_MENU_ORDER lists exactly the mockup's 12 'Agregar filtro' options (
     "status",
     "emailStatus",
     "hasPhone",
+    "phoneReview",
     "company",
     "hiring",
     "market",

@@ -20,6 +20,7 @@ export const AD_HOC_FILTER_PARAM_KEYS = [
   "bdConnected",
   "lastActivityDays",
   "hasPhone",
+  "phoneReview",
   "emailVerified",
 ] as const satisfies readonly (keyof AdHocContactFilterInput)[];
 
@@ -48,6 +49,7 @@ export const CHECKBOX_FILTER_PARAM_KEYS = [
   "hiring",
   "startupsOnly",
   "hasPhone",
+  "phoneReview",
   "emailVerified",
 ] as const satisfies readonly (typeof AD_HOC_FILTER_PARAM_KEYS)[number][];
 

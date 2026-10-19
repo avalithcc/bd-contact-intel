@@ -23,6 +23,7 @@ const SUBMITTED: Record<FilterChipField, string> = {
   status: "new",
   emailStatus: "verified",
   hasPhone: "on",
+  phoneReview: "on",
   company: "Acme",
   hiring: "1",
   market: "us",

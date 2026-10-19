@@ -91,6 +91,8 @@ export interface ContactFilters {
   /** "Tiene teléfono" ad-hoc filter (migration 0016) — `person.phone` or
    * `person.mobilePhone` is set. */
   hasPhone?: boolean;
+  /** "Teléfono a revisar": `phone` or `mobilePhone` is not in E.164 shape (phoneReview.ts). */
+  phoneReview?: boolean;
 }
 
 export function serializeContactFilters(filters: ContactFilters): URLSearchParams {
@@ -110,6 +112,7 @@ export function serializeContactFilters(filters: ContactFilters): URLSearchParam
   if (filters.bdConnected) params.set("bdConnected", filters.bdConnected);
   if (filters.lastActivityDays) params.set("lastActivityDays", String(filters.lastActivityDays));
   if (filters.hasPhone) params.set("hasPhone", "1");
+  if (filters.phoneReview) params.set("phoneReview", "1");
   return params;
 }
 
@@ -167,6 +170,7 @@ export function parseContactFilters(params: URLSearchParams): ContactFilters {
   }
 
   if (params.get("hasPhone") === "1") filters.hasPhone = true;
+  if (params.get("phoneReview") === "1") filters.phoneReview = true;
 
   return filters;
 }
@@ -203,6 +207,7 @@ export function sanitizeContactFilters(value: unknown): ContactFilters {
     filters.lastActivityDays = raw.lastActivityDays;
   }
   if (raw.hasPhone === true) filters.hasPhone = true;
+  if (raw.phoneReview === true) filters.phoneReview = true;
 
   return filters;
 }
@@ -231,6 +236,7 @@ export interface AdHocContactFilterInput {
   bdConnected?: string;
   lastActivityDays?: string;
   hasPhone?: string;
+  phoneReview?: string;
   emailVerified?: string;
 }
 
@@ -319,6 +325,11 @@ export function applyAdHocContactFilterOverrides(
   if (raw.hasPhone !== undefined) {
     if (raw.hasPhone === "" || raw.hasPhone === "0") delete result.hasPhone;
     else result.hasPhone = true;
+  }
+
+  if (raw.phoneReview !== undefined) {
+    if (raw.phoneReview === "" || raw.phoneReview === "0") delete result.phoneReview;
+    else result.phoneReview = true;
   }
 
   if (raw.emailVerified !== undefined) {

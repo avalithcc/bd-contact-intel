@@ -49,6 +49,7 @@ export const FILTER_FIELD_LABEL: Record<FilterChipField, string> = {
   seniority: "Seniority",
   emailVerified: "Correo verificado",
   hasPhone: "Tiene teléfono",
+  phoneReview: "Teléfono a revisar",
 };
 
 /**
@@ -86,6 +87,7 @@ export function buildActiveFilterChips(filters: ContactFilters, ctx: FilterChipC
   if (filters.seniority) chips.push({ field: "seniority", label: L.seniority, valueText: ctx.seniorityLabel?.(filters.seniority) ?? filters.seniority });
   if (filters.emailVerified) chips.push({ field: "emailVerified", label: L.emailVerified, valueText: null });
   if (filters.hasPhone) chips.push({ field: "hasPhone", label: L.hasPhone, valueText: null });
+  if (filters.phoneReview) chips.push({ field: "phoneReview", label: L.phoneReview, valueText: null });
 
   return chips;
 }

@@ -40,6 +40,7 @@ const CASES: ContactFilters[] = [
   { lastActivityDays: 30 },
   // "Tiene teléfono" ad-hoc filter (migration 0016; contacts.html "Agregar filtro").
   { hasPhone: true },
+  { phoneReview: true },
   {
     owner: SOME_BD_ID,
     status: ["new"],
@@ -209,4 +210,9 @@ test("applyAdHocContactFilterOverrides: hasPhone ('Tiene teléfono') is ad-hoc o
   const base: ContactFilters = {};
   assert.deepEqual(applyAdHocContactFilterOverrides(base, { hasPhone: "on" }), { hasPhone: true });
   assert.deepEqual(applyAdHocContactFilterOverrides(base, { hasPhone: "" }), {});
+});
+
+test("applyAdHocContactFilterOverrides: phoneReview ('Teléfono a revisar') is ad-hoc overridable", () => {
+  assert.deepEqual(applyAdHocContactFilterOverrides({}, { phoneReview: "on" }), { phoneReview: true });
+  assert.deepEqual(applyAdHocContactFilterOverrides({ phoneReview: true }, { phoneReview: "" }), {});
 });
