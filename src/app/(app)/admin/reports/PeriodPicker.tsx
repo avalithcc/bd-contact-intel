@@ -7,18 +7,19 @@ import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { CustomRange, ReportPeriod } from "@/lib/reports/period";
 import { buildReportsHref } from "@/lib/reports/reportsHref";
+import { CalendarMonth } from "@/components/calendar/CalendarMonth";
 import {
-  DOW_SHORT,
-  MONTH_NAMES,
-  dayLabel,
   dayState,
   describeRange,
   isDayDisabled,
   monthCells,
+  monthIndex,
+  monthOf,
   moveDay,
   pickDay,
   shiftMonth,
   type DaySelection,
+  type Ym,
 } from "@/lib/reports/rangeCalendar";
 
 export type PeriodPickerLabels = ClientStrings<
@@ -47,16 +48,6 @@ const PRESETS = [
 ] as const;
 
 const NAV_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "PageUp", "PageDown"]);
-
-type Ym = { y: number; m: number };
-
-function monthOf(day: string): Ym {
-  return { y: Number(day.slice(0, 4)), m: Number(day.slice(5, 7)) };
-}
-
-function monthIndex(ym: Ym): number {
-  return ym.y * 12 + ym.m;
-}
 
 /**
  * The period control of /admin/reports: three presets and "Personalizado", which opens a two-month range calendar (click the
@@ -155,69 +146,23 @@ export function PeriodPicker({
   };
 
   const renderMonth = (ym: Ym, nav: "prev" | "next") => (
-    <div className="cal" key={`${ym.y}-${ym.m}`}>
-      <div className="cal-head">
-        {nav === "prev" ? (
-          <button type="button" className="cal-nav" aria-label={l.calendarPrev} onClick={() => goToView(shiftMonth(view, -1))}>
-            ‹
-          </button>
-        ) : (
-          <span className="cal-nav" />
-        )}
-        <strong>
-          {MONTH_NAMES[ym.m - 1]!.charAt(0).toUpperCase() + MONTH_NAMES[ym.m - 1]!.slice(1)} {ym.y}
-        </strong>
-        {nav === "next" ? (
-          <button
-            type="button"
-            className="cal-nav"
-            aria-label={l.calendarNext}
-            disabled={monthIndex(right) >= monthIndex(monthOf(today))}
-            onClick={() => goToView(shiftMonth(view, 1))}
-          >
-            ›
-          </button>
-        ) : (
-          <span className="cal-nav" />
-        )}
-      </div>
-      <div className="cal-grid" role="group" aria-label={`${MONTH_NAMES[ym.m - 1]} ${ym.y}`} onMouseLeave={() => setHover(null)}>
-        {DOW_SHORT.map((d) => (
-          <span className="dow" key={d} aria-hidden="true">
-            {d}
-          </span>
-        ))}
-        {monthCells(ym.y, ym.m).map((day, i) => {
-          if (day === null) return <span key={`blank-${i}`} />;
-          const disabled = isDayDisabled(day, today, anchor);
-          const state = dayState(day, sel, hover);
-          const cls = ["day", disabled ? "off" : "", day === today ? "today" : "", state ? `st-${state}` : ""].filter(Boolean).join(" ");
-          return (
-            <button
-              key={day}
-              type="button"
-              className={cls}
-              data-day={day}
-              tabIndex={day === focusDay ? 0 : -1}
-              aria-label={dayLabel(day)}
-              aria-disabled={disabled || undefined}
-              aria-pressed={state === "start" || state === "end" || state === "single" || state === "in"}
-              aria-current={day === today ? "date" : undefined}
-              onMouseEnter={() => !disabled && setHover(day)}
-              onFocus={() => setFocusDay(day)}
-              onKeyDown={(e) => onDayKeyDown(e, day)}
-              onClick={() => {
-                if (disabled) return;
-                setSel(pickDay(sel, day));
-                setHover(null);
-              }}
-            >
-              {Number(day.slice(8))}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <CalendarMonth
+      key={`${ym.y}-${ym.m}`}
+      ym={ym}
+      today={today}
+      focusDay={focusDay}
+      prev={nav === "prev" ? { label: l.calendarPrev, onClick: () => goToView(shiftMonth(view, -1)) } : undefined}
+      next={nav === "next" ? { label: l.calendarNext, onClick: () => goToView(shiftMonth(view, 1)), disabled: monthIndex(right) >= monthIndex(monthOf(today)) } : undefined}
+      isDisabled={(day) => isDayDisabled(day, today, anchor)}
+      stateOf={(day) => dayState(day, sel, hover)}
+      onPick={(day) => {
+        setSel(pickDay(sel, day));
+        setHover(null);
+      }}
+      onHover={setHover}
+      onFocusDay={setFocusDay}
+      onDayKeyDown={onDayKeyDown}
+    />
   );
 
   const customActive = period === "custom" && custom !== null;

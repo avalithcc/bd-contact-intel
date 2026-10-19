@@ -66,31 +66,55 @@ export function pickDay(sel: DaySelection, day: string): DaySelection {
   return day < sel.start ? { start: day, end: sel.start } : { start: sel.start, end: day };
 }
 
-/** Keyboard movement on the grid; the result never passes today. */
-export function moveDay(day: string, key: string, today: string): string {
-  let next = day;
+/** Keyboard movement on the grid, unbounded. */
+function stepDay(day: string, key: string): string {
   switch (key) {
     case "ArrowLeft":
-      next = addDaysToDateString(day, -1);
-      break;
+      return addDaysToDateString(day, -1);
     case "ArrowRight":
-      next = addDaysToDateString(day, 1);
-      break;
+      return addDaysToDateString(day, 1);
     case "ArrowUp":
-      next = addDaysToDateString(day, -7);
-      break;
+      return addDaysToDateString(day, -7);
     case "ArrowDown":
-      next = addDaysToDateString(day, 7);
-      break;
+      return addDaysToDateString(day, 7);
     case "PageUp":
     case "PageDown": {
       const { y, m, d } = parts(day);
       const target = shiftMonth({ y, m }, key === "PageUp" ? -1 : 1);
-      next = toDay(target.y, target.m, Math.min(d, daysInMonth(target.y, target.m)));
-      break;
+      return toDay(target.y, target.m, Math.min(d, daysInMonth(target.y, target.m)));
     }
+    default:
+      return day;
   }
+}
+
+/** Keyboard movement on the grid; the result never passes today. */
+export function moveDay(day: string, key: string, today: string): string {
+  const next = stepDay(day, key);
   return next > today ? today : next;
+}
+
+/** Keyboard movement bounded on both sides (the schedule calendar: today .. 30 days ahead). */
+export function moveDayWithin(day: string, key: string, min: string, max: string): string {
+  const next = stepDay(day, key);
+  return next < min ? min : next > max ? max : next;
+}
+
+/** A day outside [min, max] cannot be picked. */
+export function isDayOutside(day: string, min: string, max: string): boolean {
+  return day < min || day > max;
+}
+
+export type Ym = { y: number; m: number };
+
+export function monthOf(day: string): Ym {
+  const { y, m } = parts(day);
+  return { y, m };
+}
+
+/** A sortable number for a month, to compare which of two is earlier. */
+export function monthIndex(ym: Ym): number {
+  return ym.y * 12 + ym.m;
 }
 
 export type DayState = "start" | "end" | "single" | "in" | "preview" | null;
