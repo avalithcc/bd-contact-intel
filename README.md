@@ -195,6 +195,35 @@ This requires a one-time manual setup in the Supabase dashboard — it is
    fails, the import still succeeds and the app reports the cleanup failure
    so it can be removed manually.
 
+### One-time Supabase setup (email attachments)
+
+Files attached to a composed email (Enviar correo, Programar…, Responder) follow
+the same pattern as `linkedin-imports`: the browser uploads straight to a
+private bucket with the signed-in user's session, inside `<auth uid>/`, and the
+server actions only receive `{storagePath, filename, contentType, size}`.
+
+1. Run `scripts/sql/email-attachments-bucket.sql` once per environment in the
+   Supabase SQL editor (idempotent: private bucket `email-attachments`, 6 MB per
+   file, the allowed MIME types, and the three own-folder RLS policies).
+2. Apply migration `drizzle/0053_email_attachments_recipients.sql` (table
+   `email_attachment` plus `scheduled_email.recipient_person_ids` / `cc_addresses`).
+3. Set `SUPABASE_SERVICE_ROLE_KEY` as a **server-only** env var (Vercel, never
+   `NEXT_PUBLIC_*`). It is read in exactly one module,
+   `src/lib/supabase/serviceRole.ts`, and used only where there is no user
+   session: the scheduled-send cron reading the files of a due email, and the
+   sweeper. Without it, scheduling an email WITH files is refused up front and a
+   due email that holds files fails closed (`attachments_unavailable`), never
+   sending without them. Emails sent immediately need no extra secret.
+
+Limits: at most 5 files, 6 MB each and 10 MB in total; PDF, Word, Excel,
+PowerPoint, PNG, JPG, TXT and CSV only. The server re-checks the real size and the
+file's first bytes at send time. **The CRM does not keep files**: each object is
+deleted right after a successful send (immediate or scheduled); the timeline shows
+only name and size, with no download. A sweeper in the scheduled-email cron route
+deletes uploads nobody claimed after 24 h, files of emails cancelled more than 30
+days ago, and leftovers of sent emails. Failed or waiting scheduled emails keep
+their files.
+
 ## Getting the input file
 LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data →
 select **Connections** only → Request archive. Import the resulting

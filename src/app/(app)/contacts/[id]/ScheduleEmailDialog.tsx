@@ -5,7 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { AttachmentsField } from "@/components/email/AttachmentsField";
 import { RecipientBlock, type ComposePrimary } from "@/components/email/ComposeFields";
 import type { ComposeDraft } from "@/components/email/useComposeDraft";
-import { ClockIcon } from "@/components/icons";
+import { ClipIcon, ClockIcon } from "@/components/icons";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { formatSendAt, planSchedule, wallTimeToInstant, type ZoneKey } from "@/lib/scheduledEmail/plan";
 import { nextMondayNineMiami, whenLabel } from "@/lib/scheduledEmail/view";
@@ -105,6 +105,12 @@ export function ScheduleEmailDialog(props: {
       }
     >
       {props.error && <div className="error-text" role="alert">{props.error}</div>}
+      {edit && props.compose && (
+        <div className="alert alert-neutral">
+          <ClipIcon className="icon" />
+          <div>{l.scheduleEditComposeNote}</div>
+        </div>
+      )}
       {props.compose && <RecipientBlock labels={l} draft={props.compose.draft} primary={props.compose.primary} disabled={busy} />}
       <div className="field">
         <label className="label" htmlFor={`${ids}-subject`}>{l.emailSubjectLabel}</label>

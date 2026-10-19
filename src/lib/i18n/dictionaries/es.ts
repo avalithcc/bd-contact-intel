@@ -804,6 +804,7 @@ export const es: typeof en = {
     attachmentsErrTotal: "Supera 10 MB en total",
     attachmentsErrUpload: "No se pudo subir",
     attachmentsErrEmpty: "El archivo está vacío",
+    scheduleEditComposeNote: "Al reprogramar se pueden quitar o añadir adjuntos y destinatarios, con las mismas reglas que al redactar.",
     attachmentsScheduleUnavailable: "Programar con adjuntos no está disponible por ahora: envía el correo ahora o quita los adjuntos.",
     scheduleRecipientsPrefix: "Para",
     // Timeline: recipients and files of a sent email

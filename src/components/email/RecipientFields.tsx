@@ -271,7 +271,7 @@ export function CcField(props: {
     if (!exists) props.onChange([...items, { address: checked.address, name }]);
     setErrorKey(null);
   }
-  /** Enter, comma, space, semicolon or leaving the field: each address typed or pasted becomes a chip (or an error). */
+  /** Enter, comma, semicolon or leaving the field: each address typed or pasted becomes a chip (or an error). */
   function commit() {
     const parts = text.split(/[\s,;]+/).filter(Boolean);
     if (parts.length === 0) return;
@@ -321,10 +321,14 @@ export function CcField(props: {
               setErrorKey(null);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "," || e.key === ";" || e.key === " ") {
+              if (e.key === "Enter" || e.key === "," || e.key === ";") {
                 if (text.trim()) {
                   e.preventDefault();
-                  commit();
+                  if (e.key === "Enter" && !text.includes("@") && suggestions[0]) {
+                    // A name was typed: Enter takes the first suggested colleague.
+                    add(suggestions[0].email, suggestions[0].name);
+                    setText("");
+                  } else commit();
                 }
               } else if (e.key === "Backspace" && text === "" && items.length > 0) {
                 props.onChange(items.slice(0, -1));

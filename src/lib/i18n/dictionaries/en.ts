@@ -879,6 +879,7 @@ export const en = {
     attachmentsErrTotal: "Over 10 MB in total",
     attachmentsErrUpload: "Upload failed",
     attachmentsErrEmpty: "The file is empty",
+    scheduleEditComposeNote: "When rescheduling you can remove or add attachments and recipients, with the same rules as when composing.",
     attachmentsScheduleUnavailable: "Scheduling with attachments is not available right now: send the email now or remove the attachments.",
     scheduleRecipientsPrefix: "To",
     // Timeline: recipients and files of a sent email
