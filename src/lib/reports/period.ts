@@ -43,12 +43,15 @@ function isRealDate(value: string | undefined): value is string {
 
 /**
  * Validates the `from`/`to` URL params: both real dates, ordered, at most MAX_CUSTOM_DAYS apart. With `now`, an end later than
- * tomorrow (ART) is refused too: the calendar never offers a future day, so such a URL was typed by hand. Null otherwise.
+ * tomorrow (ART) is refused too, and so is a start after today: the calendar never offers a future day, so such a URL was typed by hand. Null otherwise.
  */
 export function parseCustomRange(from: string | undefined, to: string | undefined, now?: Date): CustomRange | null {
   if (!isRealDate(from) || !isRealDate(to) || from > to) return null;
   if (addDaysToDateString(from, MAX_CUSTOM_DAYS) < to) return null;
-  if (now && to > addDaysToDateString(argentinaCalendarDate(now), 1)) return null;
+  if (now) {
+    const today = argentinaCalendarDate(now);
+    if (from > today || to > addDaysToDateString(today, 1)) return null; // the calendar offers no future day; a hand-typed one would give an empty report
+  }
   return { from, to };
 }
 

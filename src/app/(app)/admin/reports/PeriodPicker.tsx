@@ -121,6 +121,19 @@ export function PeriodPicker({
     rootRef.current?.querySelector<HTMLButtonElement>(`[data-day="${focusDay}"]`)?.focus();
   }, [open, focusDay, view]);
 
+  // Moves the visible months and keeps exactly one day cell tabbable: the focused day if still visible, else the first pickable one.
+  const goToView = (next: Ym) => {
+    const idx = monthIndex(monthOf(focusDay));
+    if (idx < monthIndex(next) || idx > monthIndex(next) + 1) {
+      const after = shiftMonth(next, 1);
+      const visible = [...monthCells(next.y, next.m), ...monthCells(after.y, after.m)];
+      const pending = sel.start !== null && sel.end === null ? sel.start : null;
+      const first = visible.find((d): d is string => d !== null && !isDayDisabled(d, today, pending));
+      if (first) setFocusDay(first);
+    }
+    setView(next);
+  };
+
   const anchor = sel.start !== null && sel.end === null ? sel.start : null;
   const right = shiftMonth(view, 1);
 
@@ -145,7 +158,7 @@ export function PeriodPicker({
     <div className="cal" key={`${ym.y}-${ym.m}`}>
       <div className="cal-head">
         {nav === "prev" ? (
-          <button type="button" className="cal-nav" aria-label={l.calendarPrev} onClick={() => setView(shiftMonth(view, -1))}>
+          <button type="button" className="cal-nav" aria-label={l.calendarPrev} onClick={() => goToView(shiftMonth(view, -1))}>
             ‹
           </button>
         ) : (
@@ -160,7 +173,7 @@ export function PeriodPicker({
             className="cal-nav"
             aria-label={l.calendarNext}
             disabled={monthIndex(right) >= monthIndex(monthOf(today))}
-            onClick={() => setView(shiftMonth(view, 1))}
+            onClick={() => goToView(shiftMonth(view, 1))}
           >
             ›
           </button>
@@ -238,6 +251,12 @@ export function PeriodPicker({
           className="pop"
           role="dialog"
           aria-label={l.periodCustomLabel}
+          onBlur={(e) => {
+            // Focus left the popover for somewhere outside it (the trigger handles itself on click); a null target is a click on a
+            // non-focusable spot, which the document pointerdown listener already tells apart.
+            const to = e.relatedTarget as Node | null;
+            if (to && !rootRef.current?.contains(to)) close(false);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();

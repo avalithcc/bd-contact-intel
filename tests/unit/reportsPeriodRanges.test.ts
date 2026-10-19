@@ -122,3 +122,10 @@ test("parseCustomRange with a clock refuses an end later than tomorrow (ART) and
 test("an old URL with a removed period falls back to the month, never an error", () => {
   for (const removed of ["quarter", "last_week", "last_quarter"]) assert.equal(resolveReportPeriod(removed), "month");
 });
+
+test("parseCustomRange with a clock also refuses a start after today, so from=to=tomorrow cannot be applied", () => {
+  const now = new Date("2026-10-19T14:00:00Z");
+  assert.equal(parseCustomRange("2026-10-20", "2026-10-20", now), null);
+  assert.equal(parseCustomRange("2026-10-20", "2026-10-21", now), null);
+  assert.deepEqual(parseCustomRange("2026-10-19", "2026-10-20", now), { from: "2026-10-19", to: "2026-10-20" });
+});
