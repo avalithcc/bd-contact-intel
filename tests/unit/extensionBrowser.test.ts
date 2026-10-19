@@ -176,6 +176,14 @@ test("a past first role falls back to the top card", async (t) => {
   assert.deepEqual(await readFixture("profile-experience-past-role.html"), LUCIA);
 });
 
+test("a description under a past role that mentions Present does not make it current", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = fixture("profile-experience-multi-role.html")
+    .replace("<p>Actualidad</p>", "<p>ene. de 2023 - actualidad (proyecto paralelo)</p>")
+    .replace("ene. de 2026 - actualidad · 10 meses", "ene. de 2024 - dic. de 2025 · 2 años");
+  assert.deepEqual(await readHtml(html), LUCIA);
+});
+
 async function readLoaded(html: string, insertAfterMs: number | null, waitMs: number) {
   const page = await browser!.newPage();
   try {
@@ -201,6 +209,15 @@ async function readLoaded(html: string, insertAfterMs: number | null, waitMs: nu
 test("a lazy Experience skeleton is waited for and then read", async (t) => {
   if (!browser) return t.skip(launchError ?? "no browser");
   assert.deepEqual(await readLoaded(fixture("profile-experience-skeleton.html"), 300, 3000), QUANTA);
+});
+
+test("a scrollIntoView that throws does not stop the wait for the section", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = fixture("profile-experience-skeleton.html").replace(
+    "</head>",
+    "<script>Element.prototype.scrollIntoView = function () { throw new Error('boom'); };</script></head>",
+  );
+  assert.deepEqual(await readLoaded(html, 300, 3000), QUANTA);
 });
 
 test("when the Experience section never loads, the top card answers after the timeout", async (t) => {

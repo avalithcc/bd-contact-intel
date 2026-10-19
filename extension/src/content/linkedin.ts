@@ -15,8 +15,8 @@ const COLLAPSED_KEY = "collapsed";
 let profileUrl: string | null = null;
 let state: CardState = { kind: "loading" };
 let collapsed = false;
-/** True while "Agregar al CRM" reads the profile (waits for the lazy Experience section). */
-let reading = false;
+/** Generation whose profile "Agregar al CRM" is reading (waits for the lazy Experience section), else null. */
+let readingGen: number | null = null;
 /** Bumped on every profile change so a slow answer for the previous profile is dropped. */
 let generation = 0;
 
@@ -30,15 +30,17 @@ async function ask(request: WorkerRequest): Promise<LookupResult> {
 }
 
 async function addToCrm(url: string): Promise<void> {
-  if (reading) return;
+  if (readingGen === generation) return;
   const mine = generation;
-  reading = true;
+  readingGen = mine;
   render();
   try {
     const basics = await readProfileBasicsWhenLoaded(document);
     if (mine === generation) await ask({ type: "open-add", profileUrl: url, basics });
+  } catch {
+    // Nothing to open; the button comes back so the BD can retry.
   } finally {
-    reading = false;
+    if (readingGen === mine) readingGen = null;
     render();
   }
 }
@@ -58,7 +60,7 @@ const card = new Card({
 
 function render(): void {
   if (!profileUrl) return;
-  card.render(buildCardView(state, reading), collapsed);
+  card.render(buildCardView(state, readingGen === generation), collapsed);
 }
 
 function setCollapsed(value: boolean): void {

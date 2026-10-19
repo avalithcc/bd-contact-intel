@@ -21,8 +21,10 @@ function textLinks(item: Element): Element[] {
   return Array.from(item.querySelectorAll("a")).filter((a) => a.querySelector("p"));
 }
 
+const CURRENT_MARKER = /^(?:actualidad|presente?)$/i;
+
 function isCurrent(lines: string[]): boolean {
-  return lines.some((line) => (DATE_RANGE.test(line) && CURRENT_POSITION.test(line)) || /^(?:actualidad|presente?)$/i.test(line));
+  return lines.some((line) => (DATE_RANGE.test(line) && CURRENT_POSITION.test(line)) || CURRENT_MARKER.test(line));
 }
 
 /** Several roles at one company: the header link names the company, the list holds the roles, newest first. */
@@ -32,7 +34,9 @@ function fromMultiRole(item: Element): CurrentRole | null {
   if (!role || !roleLink?.querySelector("p")) return null;
   const header = textLinks(item).find((a) => !a.closest("ul"));
   const title = cleanText(roleLink.querySelector("p")?.textContent);
-  if (!title || !isCurrent(texts(role))) return null;
+  // Only the role link's own lines, plus the exact marker next to it: a description below must not count.
+  const markers = Array.from(role.children).filter((c) => c.tagName === "P").map((c) => cleanText(c.textContent));
+  if (!title || !(isCurrent(texts(roleLink)) || markers.some((m) => CURRENT_MARKER.test(m)))) return null;
   return { title, company: cleanText(header?.querySelector("p")?.textContent) };
 }
 
@@ -69,20 +73,29 @@ export async function ensureExperienceLoaded(doc: Document, timeoutMs: number): 
     const view = doc.defaultView;
     if (!anchor || !view) return;
     const { scrollX, scrollY } = view;
-    await new Promise<void>((resolve) => {
-      const observer = new view.MutationObserver(() => {
-        if (doc.querySelector(ITEM)) finish();
+    const href = view.location.href;
+    try {
+      await new Promise<void>((resolve) => {
+        const observer = new view.MutationObserver(() => {
+          if (doc.querySelector(ITEM)) finish();
+        });
+        const timer = view.setTimeout(finish, timeoutMs);
+        function finish() {
+          observer.disconnect();
+          view!.clearTimeout(timer);
+          resolve();
+        }
+        observer.observe(doc.documentElement, { childList: true, subtree: true });
+        try {
+          anchor.scrollIntoView({ block: "center", behavior: "instant" });
+        } catch {
+          // Keep waiting: the section may still load.
+        }
       });
-      const timer = view.setTimeout(finish, timeoutMs);
-      function finish() {
-        observer.disconnect();
-        view!.clearTimeout(timer);
-        resolve();
-      }
-      observer.observe(doc.documentElement, { childList: true, subtree: true });
-      anchor.scrollIntoView({ block: "center" });
-    });
-    view.scrollTo(scrollX, scrollY);
+    } finally {
+      // Not when the BD navigated meanwhile: that scroll position belongs to another page.
+      if (view.location.href === href) view.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
+    }
   } catch {
     // Never break "Agregar al CRM": the top card answers instead.
   }

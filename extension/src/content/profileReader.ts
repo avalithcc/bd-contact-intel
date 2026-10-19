@@ -124,10 +124,20 @@ function readTopCard(doc: Document): ProfileBasics {
 
 /** Name and location from the top card; title and company from the current Experience role when there is one. */
 export function readProfileBasics(doc: Document): ProfileBasics {
-  const basics = readTopCard(doc);
-  const role = readCurrentRole(doc);
-  if (!role) return basics;
-  return { ...basics, title: role.title, company: role.company || basics.company };
+  try {
+    const basics = readTopCard(doc);
+    const role = readCurrentRole(doc);
+    return role ? { ...basics, title: role.title, company: role.company || basics.company } : basics;
+  } catch {
+    // Total: a markup surprise reads as empty (name from the title if possible), never as a throw.
+    let name = "";
+    try {
+      name = cleanName(TITLE_NAME.exec(doc.title)?.[1]);
+    } catch {
+      // keep it empty
+    }
+    return { name, title: "", company: "", location: "" };
+  }
 }
 
 /** Same, after waiting (up to `timeoutMs`) for the lazy Experience section. Never throws. */
