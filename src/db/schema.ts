@@ -1656,6 +1656,11 @@ export const scheduledEmail = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // Moves on every status change; a 'sending' row whose updated_at is old belongs to a dead run.
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // email-attachments-recipients: the OTHER "Para" contacts (person_id stays the primary one, to_address its address).
+    // Re-validated against the same-company rule at dispatch time. No FK: a merged-away id resolves to its survivor.
+    recipientPersonIds: uuid("recipient_person_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    // Internal colleagues (@avalith.net) in Cc; re-checked at dispatch.
+    ccAddresses: text("cc_addresses").array().notNull().default(sql`'{}'::text[]`),
   },
   (t) => ({
     // The dispatcher's due scan only ever looks at 'scheduled' rows.
@@ -1666,6 +1671,40 @@ export const scheduledEmail = pgTable(
 );
 
 export type ScheduledEmail = typeof scheduledEmail.$inferSelect;
+
+// email-attachments-recipients: one row per file a BD uploaded to the private `email-attachments` bucket. The CRM does
+// not keep files: the object is deleted right after the send (removed_at is then set), so a row is bookkeeping for the
+// sweeper and for the scheduled-email chips (filename + size), never a download. scheduled_email_id is set while a
+// scheduled email holds the file; ON DELETE SET NULL (not CASCADE) so a deleted scheduled row turns its files into
+// orphans the sweeper still finds, instead of losing track of objects that are still in Storage.
+export const emailAttachment = pgTable(
+  "email_attachment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    // The Supabase auth user that uploaded it (the first folder of storage_path). The scheduled-send cron has no session, so
+    // it checks this, together with bd_id, before it reads the object with the service role.
+    ownerAuthUid: text("owner_auth_uid").notNull(),
+    // `<auth uid>/<uuid>/<ascii file name>`; unique, so registering the same upload twice is a no-op.
+    storagePath: text("storage_path").notNull().unique(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    scheduledEmailId: uuid("scheduled_email_id").references(() => scheduledEmail.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Set once the object is gone from Storage.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => ({
+    byScheduled: index("email_attachment_scheduled_idx").on(t.scheduledEmailId),
+    // The sweeper only reads files still in Storage.
+    live: index("email_attachment_live_idx").on(t.createdAt).where(sql`${t.removedAt} is null`),
+  }),
+);
+
+export type EmailAttachment = typeof emailAttachment.$inferSelect;
 
 export type TaskDigestSend = typeof taskDigestSend.$inferSelect;
 export type NewTaskDigestSend = typeof taskDigestSend.$inferInsert;
