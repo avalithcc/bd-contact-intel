@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redactar correo: adjuntos y varios destinatarios · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+body{background:var(--color-canvas)}
+.wrap{max-width:1280px;margin:0 auto;padding:var(--space-2xl)}
+.wrap>header h1{margin:var(--space-2xs) 0}
+.toc{display:flex;gap:var(--space-sm);flex-wrap:wrap;margin:var(--space-lg) 0 var(--space-xl)}
+.sec{margin-top:var(--space-4xl)}
+.sec-head{display:flex;gap:var(--space-md);align-items:center;margin-bottom:var(--space-md)}
+.sec-n{display:grid;place-items:center;width:2rem;height:2rem;border-radius:50%;background:var(--color-accent);color:var(--color-ink);font-weight:800}
+.stage{background:var(--color-surface-sunken);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-xl)}
+
+/* Annotations in the margin: scaffolding of this mockup only */
+.note{font-size:var(--text-xs);color:var(--color-ink-subtle);border-left:2px solid var(--color-border-strong);padding-left:var(--space-sm);margin-top:var(--space-sm);max-width:36ch}
+.note.q{color:var(--color-danger-text);border-color:var(--color-danger);background:var(--color-danger-bg);padding:var(--space-xs) var(--space-sm);border-radius:var(--radius-sm)}
+.with-note{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:var(--space-xl);align-items:start}
+.notes-col>.note:first-child{margin-top:0}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-xl)}
+.cap{font-size:var(--text-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--color-ink-subtle);margin-bottom:var(--space-sm)}
+
+/* NEW (mockup-only, to be promoted to design-system.css when built): recipient field, picker, attachments */
+.rcpt{display:flex;flex-wrap:wrap;gap:var(--space-2xs);align-items:center;min-height:var(--control-height);padding:3px var(--space-xs);background:var(--color-surface-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);position:relative}
+.rcpt.is-focus{border-color:var(--color-accent-strong);box-shadow:var(--focus-ring)}
+.rcpt.is-invalid{border-color:var(--color-danger)}
+.rcpt .chip{height:var(--control-height-sm);padding-left:3px}
+.rcpt .chip.locked button{display:none}
+.rcpt .chip.locked{padding-right:.6rem}
+.rcpt .typed{flex:1;min-width:140px;border:0;outline:0;background:transparent;font:var(--text-base) var(--font-body);color:var(--color-ink);height:26px}
+.rcpt-add{border:0;background:transparent;color:var(--color-ink-soft);font:600 var(--text-sm) var(--font-body);cursor:pointer;display:inline-flex;align-items:center;gap:var(--space-2xs);padding:0 var(--space-xs);height:26px;border-radius:var(--radius-sm)}
+.rcpt-add:hover{background:var(--color-surface-sunken);color:var(--color-ink)}
+.rcpt-add:disabled{color:var(--color-ink-muted);cursor:not-allowed;background:transparent}
+.rcpt.is-disabled{background:var(--color-surface-sunken)}
+.field-row{display:grid;grid-template-columns:auto 1fr;gap:var(--space-sm);align-items:start}
+.field-row .label{padding-top:7px;min-width:44px}
+.cc-toggle{font-size:var(--text-sm);font-weight:600;color:var(--color-ink-soft);background:none;border:0;cursor:pointer;padding:0}
+.cc-toggle:hover{color:var(--color-ink);text-decoration:underline}
+.picker{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:5;background:var(--color-surface-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-dropdown);padding:var(--space-2xs)}
+.picker .opt{display:flex;align-items:center;gap:var(--space-sm);padding:var(--space-xs) var(--space-sm);border-radius:var(--radius-sm)}
+.picker .opt:hover,.picker .opt.act{background:var(--color-row-hover)}
+.picker .opt.off{opacity:.6;cursor:not-allowed}
+.picker .opt.off:hover{background:transparent}
+.picker .opt .nm{font-weight:600}
+.picker .opt .sub{font-size:var(--text-sm);color:var(--color-ink-subtle)}
+.picker .opt .tail{margin-left:auto;font-size:var(--text-xs);color:var(--color-ink-subtle)}
+.rel{position:relative}
+.attach-bar{display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap}
+.attach-bar .total{margin-left:auto;font-size:var(--text-sm);color:var(--color-ink-subtle)}
+.files{display:flex;flex-wrap:wrap;gap:var(--space-xs)}
+.file{display:inline-flex;align-items:center;gap:var(--space-xs);min-height:32px;padding:3px 4px 3px var(--space-sm);background:var(--color-surface-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-md);font-size:var(--text-sm);max-width:100%}
+.file .fn{font-weight:600;color:var(--color-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.file .sz{color:var(--color-ink-subtle);white-space:nowrap}
+a.file{text-decoration:none}
+a.file:hover{background:var(--color-row-hover);text-decoration:none}
+.file button{border:0;background:transparent;color:var(--color-ink-subtle);width:22px;height:22px;border-radius:50%;cursor:pointer;display:inline-grid;place-items:center;padding:0}
+.file button:hover{background:var(--color-surface-sunken);color:var(--color-ink)}
+.file.up{flex-direction:column;align-items:stretch;gap:3px;min-width:230px;padding:5px 6px 6px var(--space-sm)}
+.file.up .top{display:flex;align-items:center;gap:var(--space-xs)}
+.bar-track{height:4px;border-radius:var(--radius-pill);background:var(--color-surface-sunken);overflow:hidden}
+.bar-fill{height:100%;background:var(--color-accent-strong);border-radius:var(--radius-pill)}
+.file.err{background:var(--color-danger-bg);border-color:rgba(220,38,38,.3)}
+.file.err .fn{color:var(--color-danger-text)}
+.file.err .why{color:var(--color-danger-text);font-weight:600;white-space:nowrap}
+.dz-hint{border:1.5px dashed var(--color-border-strong);border-radius:var(--radius-md);background:var(--color-surface-1);padding:var(--space-sm) var(--space-md);text-align:center;font-size:var(--text-sm);color:var(--color-ink-subtle)}
+.dz-hint.over{border-color:var(--color-accent-strong);background:var(--color-info-bg);color:var(--color-info-text)}
+.tl-card .files{margin-top:var(--space-sm)}
+.to-line{font-size:var(--text-sm);color:var(--color-ink-subtle)}
+.to-line strong{color:var(--color-ink-soft)}
+table.rules{width:100%;border-collapse:collapse;font-size:var(--text-base)}
+table.rules th,table.rules td{text-align:left;vertical-align:top;padding:var(--space-sm) var(--space-md);border-top:1px solid var(--color-border)}
+table.rules th{width:22%;color:var(--color-ink-soft)}
+.dialog.static{margin:0 auto}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+<symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+<symbol id="i-reply" viewBox="0 0 24 24"><path d="M9 17 4 12l5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></symbol>
+</defs>
+</svg>
+
+<div class="wrap">
+<header>
+<span class="badge badge-brand no-dot">Mockup · email-attachments-recipients</span>
+<h1>Redactar correo: adjuntos y varios destinatarios</h1>
+<p class="meta">Evoluciona el diálogo «Enviar correo» de la ficha del contacto (hoy: Para fijo, Asunto, Mensaje; pie con Redactar con IA, Cancelar, Programar…, Enviar). Datos inventados. Solo escritorio.</p>
+<nav class="toc" aria-label="Secciones">
+<a class="btn btn-secondary btn-sm" href="#s1">1 · Redactar</a>
+<a class="btn btn-secondary btn-sm" href="#s2">2 · Sin empresa</a>
+<a class="btn btn-secondary btn-sm" href="#s3">3 · Responder hilo</a>
+<a class="btn btn-secondary btn-sm" href="#s4">4 · Línea de tiempo</a>
+<a class="btn btn-secondary btn-sm" href="#s5">5 · Programado</a>
+<a class="btn btn-secondary btn-sm" href="#s6">6 · Qué hace y qué no</a>
+</nav>
+</header>
+
+<!-- ============================ 1 ============================ -->
+<section class="sec" id="s1" aria-labelledby="h1s">
+<div class="sec-head"><span class="sec-n">1</span><h2 id="h1s">Redactar desde la ficha de Lucía Fernández (Andes Labs)</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="dialog wide static" role="dialog" aria-modal="true" aria-labelledby="c-title">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg><h2 id="c-title">Enviar correo</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body">
+
+<div class="field">
+<div class="row">
+<label class="label" for="c-to">Para</label>
+<span class="grow"></span>
+<button type="button" class="cc-toggle" aria-expanded="true" aria-controls="c-cc-row">Ocultar CC</button>
+</div>
+<div class="rcpt is-focus" role="group" aria-label="Destinatarios">
+<span class="chip locked" title="Contacto de esta ficha"><span class="avatar avatar-sm a1">LF</span>Lucía Fernández <span class="k">lucia@andeslabs.example</span></span>
+<span class="chip"><span class="avatar avatar-sm a3">MG</span>Martín Gómez <span class="k">martin@andeslabs.example</span><button type="button" aria-label="Quitar a Martín Gómez"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<span class="chip"><span class="avatar avatar-sm a5">SP</span>Sofía Paz <span class="k">sofia@andeslabs.example</span><button type="button" aria-label="Quitar a Sofía Paz"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<button type="button" class="rcpt-add" aria-haspopup="listbox"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><use href="#i-plus"/></svg>Añadir destinatario</button>
+</div>
+<p class="help">3 destinatarios · todos de Andes Labs. Cada uno recibe el mismo correo en la misma conversación y verá a los demás.</p>
+</div>
+
+<div class="field" id="c-cc-row">
+<label class="label" for="c-cc">CC</label>
+<div class="rcpt">
+<span class="chip"><span class="avatar avatar-sm a4">AS</span>Ana Soto <span class="k">ana@avalith.net</span><button type="button" aria-label="Quitar a ana@avalith.net"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<input id="c-cc" class="typed" placeholder="Añadir colega @avalith.net" aria-label="CC: añadir colega con correo @avalith.net">
+</div>
+<p class="help">Solo direcciones @avalith.net (colegas internos). No se registra el correo en su ficha.</p>
+</div>
+
+<div class="field"><label class="label" for="c-subj">Asunto</label><input id="c-subj" class="input" value="Propuesta de equipo dedicado para Andes Labs"></div>
+<div class="field"><label class="label" for="c-body">Mensaje</label><textarea id="c-body" class="textarea" rows="5">Hola Lucía, Martín y Sofía:
+
+Les comparto la propuesta con el equipo que armamos para el proyecto de datos y un caso de uso similar. Si les parece, lo repasamos el jueves.
+
+Saludos,
+Cristian</textarea></div>
+
+<div class="field">
+<span class="label" id="c-att-l">Adjuntos</span>
+<div class="attach-bar" role="group" aria-labelledby="c-att-l">
+<button type="button" class="btn btn-secondary btn-sm"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clip"/></svg>Adjuntar archivo</button>
+<span class="help">o arrástralos aquí</span>
+<span class="total" aria-live="polite">3 archivos · 4,2 MB de 10 MB</span>
+</div>
+<div class="files" role="list" aria-label="Archivos adjuntos">
+<span class="file" role="listitem"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Propuesta-Andes-Labs.pdf</span><span class="sz">2,6 MB</span><button type="button" aria-label="Quitar Propuesta-Andes-Labs.pdf"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<span class="file" role="listitem"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Casos-de-exito.pptx</span><span class="sz">1,5 MB</span><button type="button" aria-label="Quitar Casos-de-exito.pptx"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<span class="file up" role="listitem" aria-label="Subiendo Tarifas-2026.xlsx, 62 %">
+<span class="top"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Tarifas-2026.xlsx</span><span class="sz">0,1 MB · 62 %</span><button type="button" aria-label="Cancelar la subida de Tarifas-2026.xlsx"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<span class="bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="62"><span class="bar-fill" style="display:block;width:62%"></span></span>
+</span>
+<span class="file err" role="listitem"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--color-danger-text)"><use href="#i-alert"/></svg><span class="fn">Video-demo.mov</span><span class="why">Supera 6 MB</span><button type="button" aria-label="Descartar Video-demo.mov"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+<span class="file err" role="listitem"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--color-danger-text)"><use href="#i-alert"/></svg><span class="fn">instalador.exe</span><span class="why">Tipo de archivo no permitido</span><button type="button" aria-label="Descartar instalador.exe"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>
+</div>
+<div class="dz-hint over">Suelta los archivos para adjuntarlos <span class="meta">(estado al arrastrar sobre el diálogo)</span></div>
+<p class="help">Máximo 5 archivos, 6 MB cada uno y 10 MB en total (PDF, Word, Excel, PowerPoint, PNG, JPG, TXT, CSV). Los archivos con error no se envían; descártalos o reemplázalos. Mientras haya una subida en curso, Enviar queda deshabilitado.</p>
+</div>
+
+</div>
+<div class="dialog-footer">
+<button type="button" class="btn btn-ghost left"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-spark"/></svg>Redactar con IA</button>
+<button type="button" class="btn btn-secondary">Cancelar</button>
+<button type="button" class="btn btn-secondary"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg>Programar…</button>
+<button type="button" class="btn btn-primary">Enviar</button>
+</div>
+</div>
+</div>
+<div class="notes-col">
+<p class="note"><strong>Para.</strong> El contacto de la ficha va fijo (chip sin ×). Los demás se quitan con ×. Backspace sobre el campo vacío quita el último chip quitable.</p>
+<p class="note"><strong>Un solo mensaje.</strong> Es un único correo con varios destinatarios (como HubSpot), no un envío por persona. Todos ven a los demás.</p>
+<p class="note"><strong>CC (decidido).</strong> Solo direcciones @avalith.net (colegas internos), escritas como chips; se sugieren BDs. Una dirección de otro dominio o un subdominio se rechaza. Los colegas en CC no son contactos del CRM: no generan actividad. No hay CCO.</p>
+<p class="note"><strong>Adjuntos.</strong> Se suben al elegirlos (barra de progreso por archivo). Total acumulado en vivo. Un archivo con error no cuenta en el total ni se envía.</p>
+<p class="note"><strong>Pie.</strong> Sin cambios: Redactar con IA, Cancelar, Programar…, Enviar. Programar… conserva destinatarios y adjuntos al pasar a su diálogo y volver.</p>
+</div>
+</div>
+
+<h3 class="mt-2xl">1b · Selector «Añadir destinatario» y regla de la misma empresa</h3>
+<div class="pair mt-md">
+<div>
+<p class="cap">Selector abierto</p>
+<div class="stage" style="min-height:330px">
+<div class="field">
+<span class="label">Para</span>
+<div class="rel">
+<div class="rcpt is-focus">
+<span class="chip locked"><span class="avatar avatar-sm a1">LF</span>Lucía Fernández</span>
+<input class="typed" role="combobox" aria-expanded="true" aria-controls="pk-list" aria-label="Buscar contacto de Andes Labs" placeholder="Buscar en Andes Labs…">
+</div>
+<div class="picker" id="pk-list" role="listbox" aria-label="Contactos de Andes Labs">
+<div class="menu-label">Contactos de Andes Labs</div>
+<div class="opt act" role="option" aria-selected="true"><span class="avatar avatar-sm a3">MG</span><span><span class="nm">Martín Gómez</span><br><span class="sub">Head of Engineering · martin@andeslabs.example</span></span></div>
+<div class="opt" role="option"><span class="avatar avatar-sm a5">SP</span><span><span class="nm">Sofía Paz</span><br><span class="sub">Product Manager · sofia@andeslabs.example</span></span></div>
+<div class="opt" role="option"><span class="avatar avatar-sm a4">DR</span><span><span class="nm">Diego Ríos</span><br><span class="sub">CTO · diego@andeslabs.example</span></span></div>
+<div class="opt off" role="option" aria-disabled="true"><span class="avatar avatar-sm a2">VA</span><span><span class="nm">Valeria Acosta</span><br><span class="sub">People Lead · —</span></span><span class="tail badge badge-none no-dot">Sin email</span></div>
+</div>
+</div>
+</div>
+</div>
+<p class="note">Solo lista contactos con la misma empresa que la ficha y que aún no son destinatarios. Quien no tiene email aparece deshabilitado («Sin email»), para que el BD sepa que existe. Flechas y Enter para elegir; Esc cierra.</p>
+</div>
+<div>
+<p class="cap">Dirección de otra empresa</p>
+<div class="stage" style="min-height:330px">
+<div class="field">
+<span class="label">Para</span>
+<div class="rcpt is-invalid">
+<span class="chip locked"><span class="avatar avatar-sm a1">LF</span>Lucía Fernández</span>
+<input class="typed" value="pablo@otraempresa.example" aria-invalid="true" aria-describedby="e-rcpt" aria-label="Añadir destinatario">
+</div>
+<p class="error-text" id="e-rcpt" role="alert">Solo puedes añadir contactos de Andes Labs.</p>
+</div>
+</div>
+<p class="note">Escribir o pegar una dirección y pulsar Enter, coma o salir del campo: si no es un contacto de la misma empresa se rechaza con este error y no se crea el chip. No hay forma de añadir direcciones libres.</p>
+<p class="note">Un contacto de otra empresa tampoco aparece en el selector, así que el error solo sale al escribir/pegar una dirección.</p>
+</div>
+</div>
+</section>
+
+<!-- ============================ 2 ============================ -->
+<section class="sec" id="s2" aria-labelledby="h2s">
+<div class="sec-head"><span class="sec-n">2</span><h2 id="h2s">Contacto sin empresa</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="dialog wide static" role="dialog" aria-modal="true" aria-labelledby="n-title">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg><h2 id="n-title">Enviar correo</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body">
+<div class="field">
+<span class="label">Para</span>
+<div class="rcpt is-disabled">
+<span class="chip locked"><span class="avatar avatar-sm a2">RB</span>Rodrigo Bianchi <span class="k">rodrigo@ejemplo.example</span></span>
+<button type="button" class="rcpt-add" disabled aria-describedby="n-help"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><use href="#i-plus"/></svg>Añadir destinatario</button>
+</div>
+<p class="help" id="n-help">Este contacto no tiene empresa asignada: solo puedes enviarle a él.</p>
+</div>
+<div class="field"><label class="label" for="n-subj">Asunto</label><input id="n-subj" class="input" value=""></div>
+<div class="field"><label class="label" for="n-body">Mensaje</label><textarea id="n-body" class="textarea" rows="2"></textarea></div>
+<div class="field">
+<span class="label">Adjuntos</span>
+<div class="attach-bar"><button type="button" class="btn btn-secondary btn-sm"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clip"/></svg>Adjuntar archivo</button><span class="help">o arrástralos aquí</span><span class="total">Sin archivos · 0 MB de 10 MB</span></div>
+</div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-secondary"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg>Programar…</button><button type="button" class="btn btn-primary" disabled>Enviar</button></div>
+</div>
+</div>
+<div class="notes-col">
+<p class="note">El selector queda deshabilitado (con tooltip del mismo texto). Los adjuntos siguen disponibles: la restricción es solo de destinatarios.</p>
+<p class="note">Aplica igual si el contacto tiene empresa pero ningún otro contacto con email: el selector se abre y muestra «No hay otros contactos de Andes Labs con email».</p>
+</div>
+</div>
+</section>
+
+<!-- ============================ 3 ============================ -->
+<section class="sec" id="s3" aria-labelledby="h3s">
+<div class="sec-head"><span class="sec-n">3</span><h2 id="h3s">Responder a un hilo con adjuntos</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="dialog wide static" role="dialog" aria-modal="true" aria-labelledby="r-title">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reply"/></svg><h2 id="r-title">Responder</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body">
+<div class="field"><label class="label" for="r-to">Para</label><input id="r-to" class="input" value="lucia@andeslabs.example" disabled></div>
+<div class="field"><label class="label" for="r-subj">Asunto</label><input id="r-subj" class="input" value="Re: Propuesta de equipo dedicado para Andes Labs" disabled></div>
+<div class="field"><label class="label" for="r-body">Mensaje</label><textarea id="r-body" class="textarea" rows="3">Gracias, Lucía. Te adjunto la versión ajustada con las tarifas que hablamos.</textarea></div>
+<div class="field">
+<span class="label">Adjuntos</span>
+<div class="attach-bar"><button type="button" class="btn btn-secondary btn-sm"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clip"/></svg>Adjuntar archivo</button><span class="help">o arrástralos aquí</span><span class="total">1 archivo · 1,1 MB de 10 MB</span></div>
+<div class="files"><span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Propuesta-Andes-Labs-v2.pdf</span><span class="sz">1,1 MB</span><button type="button" aria-label="Quitar Propuesta-Andes-Labs-v2.pdf"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span></div>
+</div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Enviar</button></div>
+</div>
+</div>
+<div class="notes-col">
+<p class="note"><strong>Destinatarios de una respuesta: sin cambios.</strong> Para sigue siendo fijo y deshabilitado (quien escribió en el hilo), igual que hoy. Sin selector ni CC.</p>
+<p class="note">Solo se añade la fila de adjuntos, con el mismo comportamiento y límites que en el redactado nuevo. La respuesta conserva el hilo (Message-ID) como hoy.</p>
+</div>
+</div>
+</section>
+
+<!-- ============================ 4 ============================ -->
+<section class="sec" id="s4" aria-labelledby="h4s">
+<div class="sec-head"><span class="sec-n">4</span><h2 id="h4s">Línea de tiempo tras enviar</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="pair">
+<div>
+<p class="cap">Ficha de Lucía Fernández</p>
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Correo enviado · Propuesta de equipo dedicado para Andes Labs</span><span class="when">hoy, 10:42</span></div>
+<p class="to-line"><strong>Para:</strong> Lucía Fernández, Martín Gómez, +1 · <strong>CC:</strong> ana@avalith.net</p>
+<div class="tl-body"><blockquote>Hola Lucía, Martín y Sofía: Les comparto la propuesta con el equipo que armamos para el proyecto de datos…</blockquote></div>
+<div class="files" aria-label="Archivos adjuntos">
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Propuesta-Andes-Labs.pdf</span><span class="sz">2,6 MB</span></span>
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Casos-de-exito.pptx</span><span class="sz">1,5 MB</span></span>
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Tarifas-2026.xlsx</span><span class="sz">0,1 MB</span></span>
+</div>
+</div></div>
+</div>
+<div>
+<p class="cap">Ficha de Martín Gómez</p>
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Correo enviado · Propuesta de equipo dedicado para Andes Labs</span><span class="when">hoy, 10:42</span></div>
+<p class="to-line"><strong>Para:</strong> Lucía Fernández, Martín Gómez, +1 · <strong>CC:</strong> ana@avalith.net</p>
+<div class="tl-body"><blockquote>Hola Lucía, Martín y Sofía: Les comparto la propuesta con el equipo que armamos para el proyecto de datos…</blockquote></div>
+<div class="files" aria-label="Archivos adjuntos">
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Propuesta-Andes-Labs.pdf</span><span class="sz">2,6 MB</span></span>
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Casos-de-exito.pptx</span><span class="sz">1,5 MB</span></span>
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Tarifas-2026.xlsx</span><span class="sz">0,1 MB</span></span>
+</div>
+</div></div>
+</div>
+</div>
+</div>
+<div class="notes-col">
+<p class="note"><strong>Registrado en la ficha de cada destinatario de «Para»</strong> (una actividad por ficha, mismo correo). Los colegas en CC no tienen ficha: solo aparecen en la línea CC.</p>
+<p class="note">«Para: Lucía Fernández, Martín Gómez, +1»: muestra hasta 2 nombres y «+N» el resto; el detalle completo (con emails) va en el tooltip del «+1» y en la vista expandida.</p>
+<p class="note"><strong>Sin descargas.</strong> El CRM no conserva los archivos: tras el envío se borran y la línea de tiempo muestra solo nombre y tamaño. El original queda en Gmail (Enviados).</p>
+<p class="note"><strong>Contactado (decidido).</strong> Todos los destinatarios de «Para» pasan a Contactado, igual que con un envío individual.</p>
+</div>
+</div>
+</section>
+
+<!-- ============================ 5 ============================ -->
+<section class="sec" id="s5" aria-labelledby="h5s">
+<div class="sec-head"><span class="sec-n">5</span><h2 id="h5s">Correo programado con adjuntos</h2></div>
+<div class="with-note">
+<div class="stage">
+<p class="tl-group" style="margin-top:0">Próximas</p>
+<div class="tl-item"><div class="tl-icon email"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg></div><div class="tl-card">
+<div class="tl-head"><span class="what">Correo programado · Seguimiento de la propuesta</span><span class="badge badge-brand no-dot">Se envía mañana 09:00 (Argentina)</span></div>
+<p class="to-line"><strong>Para:</strong> Lucía Fernández, Martín Gómez, +1</p>
+<div class="tl-body"><blockquote>Hola Lucía, Martín y Sofía: ¿pudieron revisar la propuesta? Quedo atento a sus comentarios…</blockquote></div>
+<div class="files" aria-label="Archivos adjuntos">
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Propuesta-Andes-Labs.pdf</span><span class="sz">2,6 MB</span></span>
+<span class="file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg><span class="fn">Tarifas-2026.xlsx</span><span class="sz">0,1 MB</span></span>
+</div>
+<div class="row mt-md"><button class="btn btn-secondary btn-sm">Enviar ahora</button><button class="btn btn-ghost btn-sm">Reprogramar</button><button class="btn btn-ghost btn-sm">Cancelar envío</button></div>
+</div></div>
+<div class="alert alert-neutral mt-lg"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clip"/></svg><div>Al reprogramar se pueden quitar o añadir adjuntos y destinatarios, con las mismas reglas que al redactar.</div></div>
+</div>
+<div class="notes-col">
+<p class="note"><strong>Los archivos se guardan hasta el envío</strong> y se borran justo después de enviarse (sección 4: sin descargas).</p>
+<p class="note">Los chips son solo informativos (nombre y tamaño), sin descarga, antes y después del envío.</p>
+<p class="note">Si el programado se cancela, los archivos se conservan 30 días y se eliminan. Si falla el envío, quedan para el reintento («Enviar ahora») hasta que se resuelva o cancele. Las subidas huérfanas se borran a las 24 h.</p>
+<p class="note"><strong>Retención (decidido).</strong> Enviado: se borran de inmediato. Cancelado: 30 días.</p>
+</div>
+</div>
+</section>
+
+<!-- ============================ 6 ============================ -->
+<section class="sec" id="s6" aria-labelledby="h6s">
+<div class="sec-head"><span class="sec-n">6</span><h2 id="h6s">Qué hace y qué no</h2></div>
+<div class="card flat">
+<table class="rules">
+<tbody>
+<tr><th scope="row">Destinatarios</th><td>Varios destinatarios solo si todos son contactos de la misma empresa que el contacto desde cuya ficha se envía y tienen email. Sin direcciones libres. Sin empresa: solo el contacto de la ficha.</td></tr>
+<tr><th scope="row">Tamaño</th><td>Hasta <strong>5 archivos</strong>, <strong>6 MB</strong> por archivo y <strong>10 MB</strong> en total por correo (el límite de Gmail es 25 MB; base64 añade un tercio). El contador muestra «N archivos · X MB de 10 MB».</td></tr>
+<tr><th scope="row">Tipos bloqueados</th><td>Solo se aceptan PDF, Word, Excel, PowerPoint, PNG, JPG, TXT y CSV. Todo lo demás (ejecutables, comprimidos, HTML, SVG…) se rechaza con «Tipo de archivo no permitido». El servidor comprueba el tamaño real y el contenido del archivo al enviar.</td></tr>
+<tr><th scope="row">Dónde aplica</th><td>Redactar desde la ficha, Programar…, y Responder a un hilo (solo adjuntos en este último).</td></tr>
+<tr><th scope="row">Secuencias</th><td><strong>No</strong> admiten adjuntos ni varios destinatarios: cada paso se envía a un único contacto, sin archivos.</td></tr>
+<tr><th scope="row">Registro</th><td>El correo se registra en la ficha de cada destinatario de «Para»; muestra nombre y tamaño de los adjuntos, sin descarga. Los archivos se borran tras el envío.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3 class="mt-2xl">Decisiones para confirmar</h3>
+<ol class="stack-sm" style="padding-left:1.2rem;margin-top:var(--space-sm)">
+<li>CC solo para @avalith.net, sin CCO (decidido).</li>
+<li>Límites 6 MB / 10 MB / 5 archivos y lista de tipos permitidos (decidido).</li>
+<li>Estado «Contactado» para todos los destinatarios de Para (decidido).</li>
+<li>Sin descargas tras el envío; cancelados 30 días (decidido).</li>
+<li>Un solo correo con todos los destinatarios visibles (decidido).</li>
+</ol>
+</section>
+</div>
+</body>
+</html>
