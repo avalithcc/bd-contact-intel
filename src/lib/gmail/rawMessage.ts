@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { htmlToOutboundText } from "@/lib/gmail/outboundText";
-import { assertRecipients } from "@/lib/gmail/recipient";
+import { assertRecipients, checkRecipientShape } from "@/lib/gmail/recipient";
+import { attachmentHeaders, type MimeAttachment } from "@/lib/gmail/mimeAttachments";
 import { foldSubjectHeader } from "@/lib/gmail/subjectEncoding";
 
 /**
@@ -126,6 +127,117 @@ function foldIdList(name: string, value: string): string {
   return lines.join(CRLF);
 }
 
+export interface BuildMimeInput {
+  from: string;
+  /** One address, or (when `allowRecipientList`) a comma/semicolon list. Untrimmed: edge CR/LF is rejected, not dropped. */
+  to: string;
+  subject: string;
+  content: MessageContent;
+  boundaryRandom?: () => string;
+  reply?: ThreadingHeaders;
+  /** Complete `Name: value` lines (e.g. the Sequence List-Unsubscribe pair), appended after the threading headers. */
+  extraHeaders?: string[];
+  /** A list in `To` is allowed for a thread reply and for a multi-recipient send; every address still passes the single-address check. */
+  allowRecipientList?: boolean;
+  /** Visible copy recipients. The caller has already applied the product rule (internal domain only); each is still shape-checked. */
+  cc?: readonly string[];
+  /** When present the message becomes multipart/mixed: the body part(s) first, then one part per file. */
+  attachments?: readonly MimeAttachment[];
+}
+
+/** The text/plain part, or the multipart/alternative of text + html: the headers and body lines of ONE entity. */
+function bodyEntity(content: MessageContent, boundaryRandom?: () => string, taken: string[] = []): { headers: string[]; lines: string[] } {
+  if (content.bodyHtml === undefined) {
+    return { headers: partHeaders("text/plain"), lines: ["", encodeContent(plainTextPart(content))] };
+  }
+  const text = plainTextPart(content);
+  const boundary = generateBoundary([text, content.bodyHtml, ...taken], boundaryRandom);
+  return {
+    headers: [`Content-Type: multipart/alternative; boundary="${boundary}"`],
+    lines: [
+      "",
+      `--${boundary}`,
+      ...partHeaders("text/plain"),
+      "",
+      encodeContent(text),
+      `--${boundary}`,
+      ...partHeaders("text/html"),
+      "",
+      encodeContent(content.bodyHtml),
+      `--${boundary}--`,
+      "",
+    ],
+  };
+}
+
+function checkCc(cc: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const raw of cc) {
+    assertSafeHeaderValue("Cc", raw);
+    const address = raw.trim();
+    if (!checkRecipientShape(address).ok) {
+      throw new GmailSendError("invalid_recipient", "The Cc address is not a valid recipient (malformed)", "malformed");
+    }
+    out.push(address);
+  }
+  return out;
+}
+
+/**
+ * The RFC 5322 message as text (CRLF line endings, 7-bit: every body, header word and file is base64 or encoded).
+ * `buildRawMessage` is this, base64url-encoded for Gmail's JSON `raw` field; an attachment send uploads it as-is.
+ */
+export function buildMimeMessage(input: BuildMimeInput): string {
+  const { from, to: rawTo, subject, content, boundaryRandom, reply, extraHeaders = [], allowRecipientList = false, attachments = [] } = input;
+  assertSafeHeaderValue("From", from);
+  assertSafeHeaderValue("To", rawTo); // on the untrimmed value: edge CR/LF is rejected, not silently dropped
+  const to = rawTo.trim();
+  assertRecipients(to, { allowList: allowRecipientList });
+  const cc = checkCc(input.cc ?? []);
+  if (reply) {
+    assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
+    assertSafeHeaderValue("References", reply.references);
+  }
+  for (const line of extraHeaders) assertSafeExtraHeader(line);
+  const threading = reply
+    ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
+    : [];
+  const envelope = [
+    `From: ${from}`,
+    `To: ${to}`,
+    ...(cc.length ? [`Cc: ${cc.join(", ")}`] : []),
+    foldSubjectHeader(subject),
+    ...threading,
+    ...extraHeaders,
+    "MIME-Version: 1.0",
+  ];
+
+  if (attachments.length === 0) {
+    const entity = bodyEntity(content, boundaryRandom);
+    return [...envelope, ...entity.headers, ...entity.lines].join(CRLF);
+  }
+  // "=_bd_..." cannot occur in base64, so only the text parts can collide with a boundary.
+  const mixed = generateBoundary([plainTextPart(content), content.bodyHtml ?? ""], boundaryRandom);
+  const entity = bodyEntity(content, boundaryRandom, [mixed]);
+  const bodyLines = entity.lines[entity.lines.length - 1] === "" ? entity.lines.slice(0, -1) : entity.lines;
+  return [
+    ...envelope,
+    `Content-Type: multipart/mixed; boundary="${mixed}"`,
+    "",
+    `--${mixed}`,
+    ...entity.headers,
+    ...bodyLines,
+    ...attachments.flatMap((att) => [
+      `--${mixed}`,
+      ...attachmentHeaders(att),
+      "",
+      wrapBase64(Buffer.from(att.data).toString("base64")),
+    ]),
+    `--${mixed}--`,
+    "",
+  ].join(CRLF);
+}
+
 /**
  * `extraHeaders` are complete `Name: value` lines (e.g. the Sequence List-Unsubscribe pair), appended after the
  * threading headers. They are unencoded, so each goes through the same CR/LF/NUL guard as To/From.
@@ -138,45 +250,11 @@ export function buildRawMessage(
   boundaryRandom?: () => string,
   reply?: ThreadingHeaders,
   extraHeaders: string[] = [],
-  // Only a thread reply may carry several recipients (see assertRecipients); everything else is exactly one.
+  // Only a thread reply or a multi-recipient send may carry several recipients (see assertRecipients).
   allowRecipientList = false,
+  cc: readonly string[] = [],
 ): string {
-  assertSafeHeaderValue("From", from);
-  assertSafeHeaderValue("To", rawTo); // on the untrimmed value: edge CR/LF is rejected, not silently dropped
-  const to = rawTo.trim();
-  assertRecipients(to, { allowList: allowRecipientList });
-  if (reply) {
-    assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
-    assertSafeHeaderValue("References", reply.references);
-  }
-  for (const line of extraHeaders) assertSafeExtraHeader(line);
-  const threading = reply
-    ? [foldIdList("In-Reply-To", reply.inReplyTo), foldIdList("References", reply.references)]
-    : [];
-  const envelope = [`From: ${from}`, `To: ${to}`, foldSubjectHeader(subject), ...threading, ...extraHeaders, "MIME-Version: 1.0"];
-
-  let message: string;
-  if (content.bodyHtml === undefined) {
-    message = [...envelope, ...partHeaders("text/plain"), "", encodeContent(plainTextPart(content))].join(CRLF);
-  } else {
-    const text = plainTextPart(content);
-    const boundary = generateBoundary([text, content.bodyHtml], boundaryRandom);
-    message = [
-      ...envelope,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      "",
-      `--${boundary}`,
-      ...partHeaders("text/plain"),
-      "",
-      encodeContent(text),
-      `--${boundary}`,
-      ...partHeaders("text/html"),
-      "",
-      encodeContent(content.bodyHtml),
-      `--${boundary}--`,
-      "",
-    ].join(CRLF);
-  }
+  const message = buildMimeMessage({ from, to: rawTo, subject, content, boundaryRandom, reply, extraHeaders, allowRecipientList, cc });
   return Buffer.from(message, "utf8").toString("base64url");
 }
 
@@ -195,7 +273,30 @@ export function buildSendPayload(
   reply?: ReplyTarget,
   extraHeaders?: string[],
   allowRecipientList = false,
+  cc: readonly string[] = [],
 ): string {
-  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders, allowRecipientList);
+  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders, allowRecipientList, cc);
   return JSON.stringify(reply ? { raw, threadId: reply.threadId } : { raw });
+}
+
+/**
+ * Gmail's media-upload form of `messages.send` (`uploadType=multipart`), used when the message carries files: the JSON
+ * `raw` field is limited to about 5 MB, the upload accepts the whole message (up to 35 MB) as `message/rfc822`.
+ * The first part is the metadata, which is where `threadId` goes for a reply.
+ */
+export function buildUploadRequest(message: string, threadId?: string): { contentType: string; body: Buffer } {
+  const boundary = generateBoundary([message]);
+  const body = [
+    `--${boundary}`,
+    "Content-Type: application/json; charset=UTF-8",
+    "",
+    JSON.stringify(threadId ? { threadId } : {}),
+    `--${boundary}`,
+    "Content-Type: message/rfc822",
+    "",
+    message,
+    `--${boundary}--`,
+    "",
+  ].join(CRLF);
+  return { contentType: `multipart/related; boundary="${boundary}"`, body: Buffer.from(body, "utf8") };
 }
