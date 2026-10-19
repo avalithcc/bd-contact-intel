@@ -23,6 +23,9 @@ const notSent = (code: string) => new GmailSendError("send_failed", code, undefi
  * was meant to carry a file is never sent without it.
  */
 export async function loadRowAttachments(row: ClaimedEmail, storage: AttachmentStorage | null): Promise<LoadedAttachment[]> {
+  // The email was scheduled with `attachmentCount` files. Fewer held now (deleted after an earlier send, or lost) means it must
+  // not go out: never send text-only what was meant to carry files.
+  if (row.attachments.length < row.attachmentCount) throw notSent(ATTACHMENT_FAILED);
   if (row.attachments.length === 0) return [];
   if (!storage) throw notSent(ATTACHMENTS_UNAVAILABLE);
   const owners = new Set(row.attachments.map((a) => a.ownerAuthUid));

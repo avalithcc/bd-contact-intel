@@ -68,7 +68,7 @@ export async function scheduleEmail(input: {
     if (!plan.ok) return plan;
     const [inserted] = await tx
       .insert(scheduledEmail)
-      .values({ ...row, sendAt: plan.sendAt, recipientPersonIds: compose?.recipientPersonIds ?? [], ccAddresses: compose?.ccAddresses ?? [] })
+      .values({ ...row, sendAt: plan.sendAt, recipientPersonIds: compose?.recipientPersonIds ?? [], ccAddresses: compose?.ccAddresses ?? [], attachmentCount: compose?.attachments.length ?? 0 })
       .returning({ id: scheduledEmail.id });
     if (compose?.attachments.length) await setScheduledAttachments(tx, inserted!.id, input.bdId, compose.ownerAuthUid, compose.attachments);
     return { ok: true as const, id: inserted!.id };
@@ -104,7 +104,7 @@ export async function editScheduled(input: { id: string; bdId: string; subject: 
         error: null,
         updatedAt: sql`now()`,
         ...rebaseline,
-        ...(input.compose ? { recipientPersonIds: input.compose.recipientPersonIds, ccAddresses: input.compose.ccAddresses } : {}),
+        ...(input.compose ? { recipientPersonIds: input.compose.recipientPersonIds, ccAddresses: input.compose.ccAddresses, attachmentCount: input.compose.attachments.length } : {}),
       })
       .where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId), inArray(scheduledEmail.status, [...OPEN_STATUSES]), changeable))
       .returning({ id: scheduledEmail.id });
@@ -116,7 +116,15 @@ export async function editScheduled(input: { id: string; bdId: string; subject: 
 
 /** The caller's own row (person and stored recipient), for re-validating the recipient on edit. */
 export async function getOwnScheduled(id: string, bdId: string) {
-  const [row] = await db.select({ personId: scheduledEmail.personId, toAddress: scheduledEmail.toAddress }).from(scheduledEmail).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.bdId, bdId)));
+  const [row] = await db
+    .select({
+      personId: scheduledEmail.personId,
+      toAddress: scheduledEmail.toAddress,
+      attachmentCount: scheduledEmail.attachmentCount,
+      // Files still held (not yet deleted): fewer than `attachmentCount` means they were already sent and removed.
+      heldFiles: sql<number>`(select count(*)::int from email_attachment a where a.scheduled_email_id = ${scheduledEmail.id} and a.removed_at is null)`,
+    })
+    .from(scheduledEmail).where(and(eq(scheduledEmail.id, id), eq(scheduledEmail.bdId, bdId)));
   return row ?? null;
 }
 

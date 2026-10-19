@@ -20,7 +20,7 @@ const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 1, 2]);
 function attachment(name: string, over: Record<string, unknown> = {}) {
   return { id: `a-${name}`, bdId: "bd-1", ownerAuthUid: OWNER, storagePath: buildAttachmentPath(OWNER, UP, name), filename: name, contentType: "application/pdf", sizeBytes: 7, scheduledEmailId: "s-1", ...over };
 }
-const rowWith = (attachments: ReturnType<typeof attachment>[]) => ({ id: "s-1", bdId: "bd-1", attachments }) as never;
+const rowWith = (attachments: ReturnType<typeof attachment>[], attachmentCount = attachments.length) => ({ id: "s-1", bdId: "bd-1", attachments, attachmentCount }) as never;
 const storage = (objects: Record<string, Uint8Array>): AttachmentStorage => ({ download: async (p) => objects[p] ?? null, remove: async () => true, list: async () => null });
 
 async function load(row: never, st: AttachmentStorage | null) {
@@ -68,6 +68,13 @@ test("a missing object, or bytes that are not the declared type, fails closed", 
   assert.equal(await codeOf(load(rowWith([gone]), storage({}))), "attachment_failed");
   const fake = attachment("b.pdf");
   assert.equal(await codeOf(load(rowWith([fake]), storage({ [fake.storagePath]: new Uint8Array([0x4d, 0x5a, 0, 0]) }))), "attachment_failed");
+});
+
+test("fewer files held than the email was scheduled with fails closed, even with none left (a resend after the files were deleted)", async () => {
+  const a = attachment("a.pdf");
+  assert.equal(await codeOf(load(rowWith([a], 2), storage({ [a.storagePath]: pdf }))), "attachment_failed");
+  assert.equal(await codeOf(load(rowWith([], 1), storage({}))), "attachment_failed");
+  assert.deepEqual(await load(rowWith([], 0), null), [], "an email scheduled without files is untouched");
 });
 
 test("the attachment codes mean 'provably not sent' and show as a plain failure, not as unconfirmed", () => {

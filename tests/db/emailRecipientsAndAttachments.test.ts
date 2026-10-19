@@ -304,10 +304,17 @@ test("a file already held by another scheduled email is never taken over", async
   const input = { bdId: owner.id, personId: p.id, toAddress: p.email!, subject: "s", body: "b", sendAt: new Date(Date.now() + 60 * 60_000) };
   const compose = { recipientPersonIds: [], ccAddresses: [], attachments: checked.items, ownerAuthUid: uid };
   const first = await scheduleEmail({ ...input, compose });
-  const second = await scheduleEmail({ ...input, compose });
-  assert.ok(first.ok && second.ok);
-  assert.equal((await listScheduledAttachments([first.id])).length, 1);
-  assert.equal((await listScheduledAttachments([second.id])).length, 0, "the file stays with the first email");
+  assert.ok(first.ok);
+  // The second email cannot take the file: scheduling REFUSES (it would otherwise go out without the file the BD attached),
+  // and the transaction leaves no second row behind.
+  const { AttachmentLinkError } = await import("@/lib/email/attachments/errors");
+  await assert.rejects(scheduleEmail({ ...input, compose }), (e: unknown) => e instanceof AttachmentLinkError);
+  assert.equal((await listScheduledAttachments([first.id])).length, 1, "the file stays with the first email");
+  const { db } = await import("@/db");
+  const { scheduledEmail } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  assert.equal((await db.select().from(scheduledEmail).where(eq(scheduledEmail.personId, p.id))).length, 1);
+  assert.equal((await db.select().from(scheduledEmail).where(eq(scheduledEmail.personId, p.id)))[0]!.attachmentCount, 1);
 });
 
 test("recordSentEmail for a single contact still writes exactly one activity", async () => {

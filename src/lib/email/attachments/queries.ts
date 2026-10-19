@@ -6,6 +6,7 @@
 import { and, asc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { emailAttachment, scheduledEmail } from "@/db/schema";
+import { AttachmentLinkError } from "./errors";
 import type { ValidatedAttachment } from "./load";
 
 type Runner = Pick<typeof db, "insert" | "update" | "select">;
@@ -71,7 +72,7 @@ export async function setScheduledAttachments(tx: Runner, scheduledId: string, b
   if (keep.length) {
     // The order the BD attached them in (the uploads finish in any order).
     const order = sql`(case ${emailAttachment.storagePath} ${sql.join(items.map((i, index) => sql`when ${i.storagePath} then ${index}::smallint`), sql` `)} else 0::smallint end)`;
-    await tx
+    const linked = await tx
       .update(emailAttachment)
       .set({ scheduledEmailId: scheduledId, position: order })
       // Only a free file, or one this email already holds: a path that belongs to ANOTHER scheduled email is never taken over.
@@ -82,7 +83,11 @@ export async function setScheduledAttachments(tx: Runner, scheduledId: string, b
           isNull(emailAttachment.removedAt),
           or(isNull(emailAttachment.scheduledEmailId), eq(emailAttachment.scheduledEmailId, scheduledId)),
         ),
-      );
+      )
+      .returning({ id: emailAttachment.id });
+    // Fewer linked than attached (a file that is gone, or held elsewhere): refuse, so the email is never scheduled with
+    // fewer files than the BD attached. The caller's transaction rolls back.
+    if (linked.length !== keep.length) throw new AttachmentLinkError(keep.length, linked.length);
   }
 }
 

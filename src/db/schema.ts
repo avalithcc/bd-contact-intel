@@ -1661,6 +1661,9 @@ export const scheduledEmail = pgTable(
     recipientPersonIds: uuid("recipient_person_ids").array().notNull().default(sql`'{}'::uuid[]`),
     // Internal colleagues (@avalith.net) in Cc; re-checked at dispatch.
     ccAddresses: text("cc_addresses").array().notNull().default(sql`'{}'::text[]`),
+    // How many files this email was scheduled with. Dispatch refuses when fewer are still held, so an email meant to carry
+    // files is never sent without them (a resend of a failed row whose files were already deleted included).
+    attachmentCount: smallint("attachment_count").notNull().default(0),
   },
   (t) => ({
     // The dispatcher's due scan only ever looks at 'scheduled' rows.

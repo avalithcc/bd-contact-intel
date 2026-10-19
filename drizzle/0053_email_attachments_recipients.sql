@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS "email_attachment" (
 --> statement-breakpoint
 ALTER TABLE "scheduled_email" ADD COLUMN IF NOT EXISTS "recipient_person_ids" uuid[] DEFAULT '{}'::uuid[] NOT NULL;--> statement-breakpoint
 ALTER TABLE "scheduled_email" ADD COLUMN IF NOT EXISTS "cc_addresses" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "scheduled_email" ADD COLUMN IF NOT EXISTS "attachment_count" smallint DEFAULT 0 NOT NULL;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "email_attachment" ADD CONSTRAINT "email_attachment_bd_id_bd_id_fk" FOREIGN KEY ("bd_id") REFERENCES "public"."bd"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION

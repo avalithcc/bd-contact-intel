@@ -11,3 +11,5 @@ DROP TABLE IF EXISTS "email_attachment";
 ALTER TABLE "scheduled_email" DROP COLUMN IF EXISTS "recipient_person_ids";
 --> statement-breakpoint
 ALTER TABLE "scheduled_email" DROP COLUMN IF EXISTS "cc_addresses";
+--> statement-breakpoint
+ALTER TABLE "scheduled_email" DROP COLUMN IF EXISTS "attachment_count";

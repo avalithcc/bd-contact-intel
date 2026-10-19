@@ -30,6 +30,7 @@ import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
 import { NoteDeleteForbiddenError, NoteNotFoundError } from "@/lib/activity/noteDelete";
+import { AttachmentLinkError } from "@/lib/email/attachments/errors";
 
 export type ContactActionErrorReason =
   | "not_found"
@@ -188,6 +189,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof CallOutcomeRequiredError) return "call_outcome_required";
   if (err instanceof CallOccurredAtInFutureError) return "call_occurred_at_in_future";
   if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
+  if (err instanceof AttachmentLinkError) return "attachment_missing";
   if (err instanceof OwnerValueInvalidError) return "owner_invalid";
   // A task's assignee `<select>` reuses the same "owner_invalid" message
   // (l.errorOwnerInvalid) — both mean "pick a real, valid BD".
