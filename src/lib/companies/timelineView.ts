@@ -25,6 +25,11 @@ export interface CompanyTimelineViewLabels {
   atBounced: string;
   atStatusChange: string;
   atMeetingLogged: string;
+  // The rest of a contact meeting's life (meeting-outcomes).
+  atMeetingScheduled: string;
+  atMeetingNoShow: string;
+  atMeetingCancelled: string;
+  atMeetingRescheduled: string;
   atCall: string;
   atCallAttempt: string;
   atLushaReveal: string;
@@ -85,6 +90,14 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atStatusBackfill;
     case "meeting_logged":
       return l.atMeetingLogged;
+    case "meeting_scheduled":
+      return l.atMeetingScheduled;
+    case "meeting_no_show":
+      return l.atMeetingNoShow;
+    case "meeting_cancelled":
+      return l.atMeetingCancelled;
+    case "meeting_rescheduled":
+      return l.atMeetingRescheduled;
     case "call":
       return l.atCall;
     case "call_attempt":

@@ -74,12 +74,7 @@ export function UpcomingMeetingStrip(props: Shared) {
         <MeetingIcon className="icon" />
         <div className="grow">
           <strong>{fillTemplate(meeting.pending ? m.upNextPendingTitle : m.upNextTitle, { when: meeting.whenText })}</strong>
-          {meeting.notes && (
-            <>
-              <br />
-              <span className="meta">{meeting.notes}</span>
-            </>
-          )}
+          {meeting.notes && <span className="meta">{meeting.notes}</span>}
         </div>
         {buttons}
       </div>

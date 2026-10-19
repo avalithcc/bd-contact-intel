@@ -27,6 +27,10 @@ const labels = {
   atAutoReplyDefault: "Respuesta automática.",
   atStatusChange: "Cambio de etapa",
   atMeetingLogged: "Reunión",
+  atMeetingScheduled: "Reunión agendada",
+  atMeetingNoShow: "Reunión sin asistencia",
+  atMeetingCancelled: "Reunión cancelada",
+  atMeetingRescheduled: "Reunión reprogramada",
   atCall: "Llamada",
   atCallAttempt: "Intento de llamada",
   atLushaReveal: "Revelado con Lusha",
@@ -386,5 +390,19 @@ test("a non-admin still gets the locked row, with or without the explicit false 
     assert.equal(view.visible, false);
     assert.equal(view.metadata, null);
     assert.ok(!JSON.stringify(view).includes("jane@prospect.com"));
+  }
+});
+
+test("buildCompanyTimelineViewRows: every meeting lifecycle activity of a contact reads by name, never as its raw type", () => {
+  const cases: [string, string][] = [
+    ["meeting_scheduled", "Reunión agendada · Lucía"],
+    ["meeting_no_show", "Reunión sin asistencia · Lucía"],
+    ["meeting_cancelled", "Reunión cancelada · Lucía"],
+    ["meeting_rescheduled", "Reunión reprogramada · Lucía"],
+  ];
+  for (const [type, what] of cases) {
+    const rows = [{ ...baseRow, type, metadata: {}, personId: "p1", personName: "Lucía", scope: "contact" as const }];
+    const [view] = buildCompanyTimelineViewRows(rows, serverStrings, labels, stageLabelOf, VIEWER_BD_ID);
+    assert.equal(view.what, what, type);
   }
 });

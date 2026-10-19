@@ -1154,7 +1154,9 @@ table.data tr.clickable { cursor: pointer; }
   display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border: 1px dashed var(--status-meeting-text);
   background: var(--status-meeting-bg); border-radius: var(--radius-md); font-size: var(--text-sm); margin-top: var(--space-md);
 }
-.upnext .grow { min-width: 0; }
+.upnext { flex-wrap: wrap; }
+.upnext .grow { min-width: 0; flex: 1 1 12rem; }
+.upnext .meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl-card.upcoming { border-style: dashed; border-color: var(--status-meeting-text); background: var(--status-meeting-bg); }
 .tl-icon.upcoming { color: var(--status-meeting-text); background: var(--color-surface-2); border: 1px dashed var(--status-meeting-text); }
 .tl-card.moved { background: var(--color-surface-1); border-style: dashed; }
