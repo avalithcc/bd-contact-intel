@@ -1885,6 +1885,16 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- **Replace the 60 s background polling with push updates** (owner, 2026-10-19,
+  for 2026-10-20). The owner does not want pages re-rendering every 60 s (not
+  performant). Changes made elsewhere (cron sends, Gmail sync replies, other
+  BDs) must appear immediately and only where relevant. Direction to evaluate:
+  Supabase Realtime (postgres_changes on the few tables that matter —
+  activity, sequence member state, scheduled_email, meeting, task — filtered by
+  bd_id, behind RLS) or a server-sent-events channel, triggering a targeted
+  `router.refresh()` only when an event touches what the current screen shows.
+  Then remove the interval from `BackgroundRefresh` (keep or drop refresh-on-
+  focus). Shipped polling: `e1466e8c`, `src/lib/shell/refreshPolicy.ts`.
 - ~~**Log meetings in the future**~~ **Shipped 2026-10-19** (`meeting-outcomes`, main `6bf96f14`; migration 0054 applied, pg_cron `meetings-digest-18-art` at 21:00 UTC scheduled): /reuniones with status tabs, outcome modal, admin read-only view with filters, 18:00 ART digest. Original note: Today a meeting can only
   be logged in the past. Needs a flow for meetings that don't happen or move:
   e.g. an end-of-day reminder to confirm held / no-show / rescheduled /
