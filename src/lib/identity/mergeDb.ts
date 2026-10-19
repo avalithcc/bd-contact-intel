@@ -17,6 +17,7 @@ import {
   emailMessagePerson,
   followUpQueueItem,
   lushaReveal,
+  meeting,
   mergeEvent,
   person,
   personBdConnection,
@@ -90,17 +91,19 @@ export function toMergeConnection(row: typeof personBdConnection.$inferSelect): 
 }
 
 async function readReferencesOnPerson(tx: DbTransaction, personId: string): Promise<MergeReferenceRow[]> {
-  const [activityRows, taskRows, signalRows, lushaRows] = await Promise.all([
+  const [activityRows, taskRows, signalRows, lushaRows, meetingRows] = await Promise.all([
     tx.select({ id: activity.id }).from(activity).where(eq(activity.personId, personId)),
     tx.select({ id: task.id }).from(task).where(eq(task.personId, personId)),
     tx.select({ id: signal.id }).from(signal).where(eq(signal.personId, personId)),
     tx.select({ id: lushaReveal.id }).from(lushaReveal).where(eq(lushaReveal.personId, personId)),
+    tx.select({ id: meeting.id }).from(meeting).where(eq(meeting.personId, personId)),
   ]);
   return [
     ...activityRows.map((r) => ({ table: "activity" as const, id: r.id })),
     ...taskRows.map((r) => ({ table: "task" as const, id: r.id })),
     ...signalRows.map((r) => ({ table: "signal" as const, id: r.id })),
     ...lushaRows.map((r) => ({ table: "lusha_reveal" as const, id: r.id })),
+    ...meetingRows.map((r) => ({ table: "meeting" as const, id: r.id })),
   ];
 }
 
@@ -217,6 +220,9 @@ async function repointReferences(tx: DbTransaction, refs: readonly MergeReferenc
   // The Lusha ledger is a person's spend history: it follows the Contact, so a merge never re-charges a paid search.
   const lushaIds = refs.filter((r) => r.table === "lusha_reveal").map((r) => r.id);
   if (lushaIds.length) await tx.update(lushaReveal).set({ personId: toPersonId }).where(inArray(lushaReveal.id, lushaIds));
+  // Meetings follow the Contact so the survivor's record keeps its upcoming meetings and the Reuniones page its history.
+  const meetingIds = refs.filter((r) => r.table === "meeting").map((r) => r.id);
+  if (meetingIds.length) await tx.update(meeting).set({ personId: toPersonId }).where(inArray(meeting.id, meetingIds));
 }
 
 /**

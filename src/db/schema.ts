@@ -1597,6 +1597,83 @@ export const taskDigestSend = pgTable(
   }),
 );
 
+// A meeting with a contact and where it stands (meeting-outcomes). One row per meeting, owned by the BD who scheduled or
+// logged it (`bd_id`); a reschedule closes the row ('rescheduled') and opens a new one ('scheduled') linked both ways, so the
+// history stays. `status` is free text validated at the write boundary (src/lib/meetings/status.ts), the repo convention:
+// 'scheduled' | 'held' | 'no_show' | 'rescheduled' | 'cancelled'. "Por confirmar" is NOT a status: it is 'scheduled' whose
+// time has passed. Only 'held' is a held meeting for the contact's status and the reports: it owns a `meeting_logged`
+// activity (`held_activity_id`), the same row type every meeting logged before this table existed. Those older rows were
+// copied here as 'held' by drizzle/0054 and are left untouched in `activity`.
+export const meeting = pgTable(
+  "meeting",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("scheduled"),
+    // What the BD wrote when scheduling or logging.
+    notes: text("notes"),
+    // "¿Qué se habló?" when the meeting was confirmed as held.
+    outcomeNotes: text("outcome_notes"),
+    // Optional "Motivo" of a no-show or a cancellation.
+    reason: text("reason"),
+    outcomeAt: timestamp("outcome_at", { withTimezone: true }),
+    outcomeByBdId: uuid("outcome_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    rescheduledToId: uuid("rescheduled_to_id").references((): AnyPgColumn => meeting.id, { onDelete: "set null" }),
+    rescheduledFromId: uuid("rescheduled_from_id").references((): AnyPgColumn => meeting.id, { onDelete: "set null" }),
+    heldActivityId: uuid("held_activity_id").references(() => activity.id, { onDelete: "set null" }),
+    // The follow-up task the outcome save created, so an undo can take it back while it is still untouched.
+    followUpTaskId: uuid("follow_up_task_id").references(() => task.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // The queue: one BD's meetings by status, in time order.
+    byBdStatusAt: index("meeting_bd_status_at_idx").on(t.bdId, t.status, t.scheduledAt),
+    // The admin view across BDs and the digest's "today" window.
+    byStatusAt: index("meeting_status_at_idx").on(t.status, t.scheduledAt),
+    byPerson: index("meeting_person_idx").on(t.personId),
+    // A held activity belongs to at most one meeting (also makes the 0054 backfill rerunnable).
+    heldActivityUnique: uniqueIndex("meeting_held_activity_idx")
+      .on(t.heldActivityId)
+      .where(sql`${t.heldActivityId} is not null`),
+  }),
+);
+
+export type Meeting = typeof meeting.$inferSelect;
+export type NewMeeting = typeof meeting.$inferInsert;
+
+// One row per BD per Argentina day for the 18:00 "meetings still unconfirmed" email (meeting-outcomes). Same claim-before-send
+// idempotency as task_digest_send: the cron inserts a 'pending' row with `on conflict (bd_id, send_date) do nothing` BEFORE
+// sending and sends only when its own insert returned a row. A 'failed' row is left for a human, like the task digest.
+export const meetingDigestSend = pgTable(
+  "meeting_digest_send",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bdId: uuid("bd_id")
+      .notNull()
+      .references(() => bd.id, { onDelete: "cascade" }),
+    sendDate: date("send_date").notNull(),
+    // 'pending' (claimed, send in progress) | 'sent' | 'failed'
+    status: text("status").notNull().default("pending"),
+    subject: text("subject"),
+    todayCount: integer("today_count").notNull().default(0),
+    olderCount: integer("older_count").notNull().default(0),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    bdDateUnique: unique("meeting_digest_send_bd_date_unique").on(t.bdId, t.sendDate),
+    byBd: index("meeting_digest_send_bd_idx").on(t.bdId),
+  }),
+);
+
 // One row per "connect your Gmail" reminder email (gmail-reminder-email). Same claim-before-send idempotency as
 // task_digest_send: the cron inserts a 'pending' row with `on conflict (bd_id, sent_on) do nothing` BEFORE sending and sends
 // only when its own insert returned a row, so a duplicated run on the same Argentina day never mails a BD twice. A series is

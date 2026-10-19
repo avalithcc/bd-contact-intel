@@ -33,6 +33,7 @@ const MERGE_REPOINTED_TABLES = [
   "email_message_person", // this bugfix
   "follow_up_queue_item", // this bugfix
   "lusha_reveal", // lusha-reveal: rides MergeReferenceRow, in-flight collisions are failed first
+  "meeting", // meeting-outcomes: rides MergeReferenceRow
 ] as const;
 
 const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
@@ -70,6 +71,7 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
     excluded:
       "person_id is provenance only (nullable, ON DELETE SET NULL). A suppression is keyed by the normalized address or domain, never by person, so a merge neither strands nor needs to repoint it: the opt-out keeps applying to the address wherever the Contact ends up",
   },
+  meeting: "repointed", // upcoming meetings and the meetings history follow the Contact
   lusha_reveal: "repointed", // spend history of a PERSON: repointed so a merge never re-charges a paid search
   linkedin_scrape_job: {
     excluded: "one-off Apify scrape run bookkeeping, not read through personId for any live feature",

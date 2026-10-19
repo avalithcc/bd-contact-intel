@@ -20,6 +20,7 @@ import {
 } from "@/lib/tasks/taskActivityBody";
 import { TASK_ACTIVITY_TYPES } from "@/lib/activity/timelinePills";
 import { NON_TOUCH_ACTIVITY_TYPES } from "@/lib/contacts/effectiveActivityTime";
+import { MEETING_ACTIVITY_TYPES } from "@/lib/meetings/status";
 
 const LABELS: TaskActivityBodyLabels = {
   fieldTitle: "Título",
@@ -123,5 +124,6 @@ test("buildTaskActivityRow builds a task_created row that names the creator", ()
 test("every task activity type is registered in each list that must know about it", () => {
   assert.deepEqual([...ALL_TASK_ACTIVITY_TYPES].sort(), ["task_completed", "task_created", "task_reopened", "task_updated"]);
   assert.deepEqual([...TASK_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES].sort());
-  assert.deepEqual([...NON_TOUCH_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES].sort());
+  // Task writes and the meeting lifecycle records (meeting-outcomes) are the activity that is not a touch of the Contact.
+  assert.deepEqual([...NON_TOUCH_ACTIVITY_TYPES].sort(), [...ALL_TASK_ACTIVITY_TYPES, ...MEETING_ACTIVITY_TYPES].sort());
 });

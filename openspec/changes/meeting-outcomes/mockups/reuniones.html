@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reuniones futuras y resultado · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+body{background:var(--color-canvas)}
+.wrap{max-width:1280px;margin:0 auto;padding:var(--space-2xl)}
+.wrap>header h1{margin:var(--space-2xs) 0}
+.toc{display:flex;gap:var(--space-sm);flex-wrap:wrap;margin:var(--space-lg) 0 var(--space-xl)}
+.sec{margin-top:var(--space-4xl)}
+.sec-head{display:flex;gap:var(--space-md);align-items:center;margin-bottom:var(--space-md)}
+.sec-n{display:grid;place-items:center;width:2rem;height:2rem;border-radius:50%;background:var(--color-accent);color:var(--color-ink);font-weight:800}
+.stage{background:var(--color-surface-sunken);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-xl)}
+.note{font-size:var(--text-xs);color:var(--color-ink-subtle);border-left:2px solid var(--color-border-strong);padding-left:var(--space-sm);margin-top:var(--space-sm);max-width:36ch}
+.note.q{color:var(--color-danger-text);border-color:var(--color-danger);background:var(--color-danger-bg);padding:var(--space-xs) var(--space-sm);border-radius:var(--radius-sm)}
+.with-note{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:var(--space-xl);align-items:start}
+.notes-col>.note:first-child{margin-top:0}
+.cap{font-size:var(--text-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--color-ink-subtle);margin-bottom:var(--space-sm)}
+.dialog.static{margin:0 auto}
+
+/* NEW (mockup-only, to be promoted to design-system.css when built) */
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-sm)}
+.opt{display:grid;grid-template-columns:auto 1fr;column-gap:var(--space-sm);padding:var(--space-md);border:1px solid var(--color-border-strong);border-radius:var(--radius-md);background:var(--color-surface-2);cursor:pointer}
+.opt:hover{border-color:var(--color-ink-muted)}
+.opt.sel{border-color:var(--color-accent-strong);background:var(--color-accent-soft);box-shadow:0 0 0 1px var(--color-accent-strong)}
+.opt:focus-within{box-shadow:var(--focus-ring)}
+.opt input{grid-row:1 / span 2;align-self:center}
+.opt-t{font-weight:600}
+.opt-d{font-size:var(--text-sm);color:var(--color-ink-subtle)}
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-sm) var(--space-md);padding:var(--space-md);background:var(--color-surface-sunken);border:1px solid var(--color-border);border-radius:var(--radius-md);margin:0}
+.summary dt{font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-ink-subtle)}
+.summary dd{margin:0;font-size:var(--text-sm)}
+.summary .wide{grid-column:1 / -1}
+.reveal{padding-top:var(--space-xs)}
+tr.clickable{cursor:pointer}
+.cols2 .dialog.static{width:100%}
+
+.trunc{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-ink-soft)}
+.toolbar{display:flex;gap:var(--space-md);align-items:flex-end;flex-wrap:wrap}
+.mb-lg{margin-bottom:var(--space-lg)}
+.tl-card.upcoming{border-style:dashed;border-color:var(--status-meeting-text);background:var(--status-meeting-bg)}
+.tl-icon.upcoming{color:var(--status-meeting-text);background:var(--color-surface-2);border:1px dashed var(--status-meeting-text)}
+.tl-card.moved{background:var(--color-surface-1);border-style:dashed}
+.tl-card.moved .what{text-decoration:line-through;color:var(--color-ink-subtle)}
+.tl-actions{display:flex;gap:var(--space-xs);margin-top:var(--space-sm)}
+.upnext{display:flex;align-items:center;gap:var(--space-sm);padding:var(--space-sm) var(--space-md);border:1px dashed var(--status-meeting-text);background:var(--status-meeting-bg);border-radius:var(--radius-md);font-size:var(--text-sm);margin-top:var(--space-md)}
+.upnext .grow{min-width:0}
+.mini-nav{width:230px;background:var(--color-surface-1);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-sm)}
+.queue-layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:var(--space-xl);align-items:start}
+.outcomes{display:flex;gap:var(--space-xs);flex-wrap:wrap;justify-content:flex-end}
+.check-row{display:flex;gap:var(--space-xs);align-items:center;font-size:var(--text-sm)}
+.email-prev{max-width:620px;margin:0 auto;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-dialog);overflow:hidden}
+.email-prev .hdr{padding:var(--space-md) var(--space-xl);border-bottom:1px solid var(--color-border);font-size:var(--text-sm);color:var(--color-ink-soft)}
+.email-prev .hdr div+div{margin-top:2px}
+.email-prev .bodyx{padding:var(--space-xl)}
+.email-prev .mrow{display:flex;gap:var(--space-md);padding:var(--space-sm) 0;border-top:1px solid var(--color-border);align-items:center}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-xl)}
+table.cmp{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+table.cmp th,table.cmp td{text-align:left;padding:var(--space-xs) var(--space-sm);border-bottom:1px solid var(--color-border)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="i-tasks" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-fu" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+</svg>
+
+<div class="wrap">
+<header>
+<span class="badge badge-brand no-dot">Mockup · meeting-outcomes</span>
+<h1>Reuniones futuras y resultado de la reunión</h1>
+<p class="meta">Evoluciona «Registrar reunión» (hoy solo acepta fechas pasadas y rechaza las futuras con «No se puede registrar una reunión con fecha futura…»). Opción A elegida el 19 oct 2026: agendar hacia adelante y confirmar el resultado después, como el «resultado de la reunión» de HubSpot (Agendada, Realizada, Reprogramada, No se presentó, Cancelada). Datos inventados. Solo escritorio.</p>
+<nav class="toc" aria-label="Secciones">
+<a class="btn btn-secondary btn-sm" href="#s1">1 · Registrar</a>
+<a class="btn btn-secondary btn-sm" href="#s2">2 · Ficha y línea de tiempo</a>
+<a class="btn btn-secondary btn-sm" href="#s3">3 · Página Reuniones</a>
+<a class="btn btn-secondary btn-sm" href="#s4">4 · Correo de las 18:00</a>
+<a class="btn btn-secondary btn-sm" href="#s5">5 · Estado e informes</a>
+<a class="btn btn-secondary btn-sm" href="#s6">6 · Qué hace y qué no</a>
+</nav>
+</header>
+
+<!-- ============================ 1 ============================ -->
+<section class="sec" id="s1" aria-labelledby="h1s">
+<div class="sec-head"><span class="sec-n">1</span><h2 id="h1s">Registrar reunión: fecha futura o pasada</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="cols2">
+<div>
+<div class="cap">Fecha futura → se guarda como agendada</div>
+<div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="m1-title">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="m1-title">Registrar reunión</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<div class="form-grid">
+<div class="field"><label class="label" for="m1-date">Fecha</label><input class="input" id="m1-date" type="date" value="2026-10-22"></div>
+<div class="field"><label class="label" for="m1-time">Hora</label><input class="input" id="m1-time" type="time" value="15:00"></div>
+</div>
+<div class="alert alert-info" role="status"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info"/></svg><div>Se guardará como agendada. Te pediremos confirmar si se hizo.</div></div>
+<div class="field"><label class="label" for="m1-notes">Notas</label><textarea class="textarea" id="m1-notes" rows="3">Demo del módulo de reportes con el equipo de datos.</textarea></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Agendar reunión</button></div>
+</div>
+</div>
+<div>
+<div class="cap">Fecha pasada → igual que hoy</div>
+<div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="m2-title">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="m2-title">Registrar reunión</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<div class="form-grid">
+<div class="field"><label class="label" for="m2-date">Fecha</label><input class="input" id="m2-date" type="date" value="2026-10-16"></div>
+<div class="field"><label class="label" for="m2-time">Hora</label><input class="input" id="m2-time" type="time" value="11:00"></div>
+</div>
+<p class="help">Al guardar, el estado derivado pasa a Reunión.</p>
+<div class="field"><label class="label" for="m2-notes">Notas</label><textarea class="textarea" id="m2-notes" rows="3">Primera llamada de descubrimiento.</textarea></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Registrar reunión</button></div>
+</div>
+</div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">Mismos campos de hoy: Fecha, Hora, Notas. No se agrega nada más. La hora se interpreta en la zona horaria de Argentina, como hoy.</p>
+<p class="note">La regla es solo la fecha y hora: pasada = «Realizada» (comportamiento actual, el contacto pasa a Reunión al instante); futura = «Agendada». Mientras escribe, el aviso azul aparece y el botón cambia a «Agendar reunión».</p>
+<p class="note">Se retira el error «No se puede registrar una reunión con fecha futura».</p>
+<p class="note q">PREGUNTA ABIERTA: ¿una reunión de hoy a una hora que aún no llegó cuenta como agendada? Propuesta: sí, se compara fecha y hora exactas.</p>
+</aside>
+</div>
+</section>
+
+<!-- ============================ 2 ============================ -->
+<section class="sec" id="s2" aria-labelledby="h2s">
+<div class="sec-head"><span class="sec-n">2</span><h2 id="h2s">Ficha del contacto: reunión agendada</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="cols2">
+<div>
+<div class="cap">Cabecera de la ficha</div>
+<div class="record-identity">
+<span class="avatar avatar-lg a1">LF</span>
+<div><h1>Lucía Fernández</h1><p class="headline">Head of Data en <a href="#">Andes Labs</a></p></div>
+<div class="row wrap"><span class="badge badge-replied">Respondió</span><span class="badge badge-verified">Verificado</span></div>
+</div>
+<div class="upnext" role="status">
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg>
+<div class="grow"><strong>Reunión agendada · jue 22 oct, 15:00</strong><br><span class="meta">Demo del módulo de reportes</span></div>
+<button class="btn btn-secondary btn-sm" type="button">Reprogramar</button>
+<button class="btn btn-ghost btn-sm" type="button">Cancelar</button>
+</div>
+<div class="quick-actions mt-md" role="toolbar" aria-label="Acciones rápidas">
+<button class="qa" type="button"><span class="qa-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-note"/></svg></span>Nota</button>
+<button class="qa" type="button"><span class="qa-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg></span>Correo</button>
+<button class="qa" type="button"><span class="qa-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tasks"/></svg></span>Tarea</button>
+<button class="qa" type="button"><span class="qa-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg></span>Reunión</button>
+<button class="qa" type="button"><span class="qa-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ban"/></svg></span>Descartar</button>
+</div>
+</div>
+<div>
+<div class="cap">Línea de tiempo</div>
+<div class="tl-group">Próximas</div>
+<div class="tl-item"><div class="tl-icon upcoming"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg></div>
+<div class="tl-card upcoming"><div class="tl-head"><span class="what">Reunión agendada · jue 22 oct, 15:00</span><span class="badge badge-meeting no-dot">Agendada</span><span class="when">Agendada por Cristian Civita</span></div>
+<div class="tl-body">Demo del módulo de reportes con el equipo de datos.</div>
+<div class="tl-actions"><button class="btn btn-secondary btn-sm" type="button">Reprogramar</button><button class="btn btn-ghost btn-sm" type="button">Cancelar</button></div></div></div>
+<div class="tl-group">Octubre 2026</div>
+<div class="tl-item"><div class="tl-icon meeting"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></div>
+<div class="tl-card"><div class="tl-head"><span class="what">Reunión registrada</span><span class="badge badge-success no-dot">Realizada</span><span class="when">16 oct, 11:00</span></div>
+<div class="tl-body">Primera llamada de descubrimiento.</div></div></div>
+<div class="tl-item"><div class="tl-icon system"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg></div>
+<div class="tl-card moved"><div class="tl-head"><span class="what">Reunión agendada · mié 14 oct, 10:00</span><span class="badge badge-neutral no-dot">Reprogramada</span><span class="when">12 oct, 09:12</span></div>
+<div class="tl-body">Reprogramada → jue 22 oct, 15:00</div></div></div>
+</div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">Estilo propio para lo que aún no pasó: borde punteado y fondo del color «Reunión», con la insignia «Agendada». Una reunión realizada mantiene el estilo actual (ícono lleno, «Reunión registrada»).</p>
+<p class="note">La franja «Reunión agendada» bajo la identidad se muestra solo si hay una próxima. «Reprogramar» y «Cancelar» abren el diálogo «¿Cómo fue la reunión?» (3f) con la opción ya elegida. Ambas acciones también están en la tarjeta de «Próximas» de la línea de tiempo.</p>
+<p class="note">Reprogramar no borra: la fecha anterior queda tachada con «Reprogramada → nueva fecha».</p>
+<p class="note q">PREGUNTA ABIERTA: el mockup usa «jue 22 oct» (el 23 oct de 2026 cae viernes).</p>
+</aside>
+</div>
+</section>
+
+<!-- ============================ 3 ============================ -->
+<section class="sec" id="s3" aria-labelledby="h3s">
+<div class="sec-head"><span class="sec-n">3</span><h2 id="h3s">Página «Reuniones»: todas las reuniones por estado</h2></div>
+
+<div class="cap">3a · Vista de un BD (solo sus reuniones) · pestaña «Por confirmar» (por defecto cuando hay alguna)</div>
+<div class="with-note">
+<div class="stage">
+<div class="queue-layout">
+<nav class="mini-nav" aria-label="Principal (fragmento)">
+<div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tasks"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-fu"/></svg>Seguimientos<span class="pill-count">10</span></a>
+<a class="nav-item active" aria-current="page" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg>Reuniones<span class="pill-count">3</span></a>
+<a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-send"/></svg>Secuencias<span class="pill-count">2</span></a>
+</nav>
+<div>
+<div class="page-header"><div class="titles"><div class="eyebrow">Espacio de trabajo</div><h1>reuniones<span class="dot">.</span></h1>
+<p class="meta">Tus reuniones agendadas y su resultado.</p></div></div>
+<nav class="view-tabs" aria-label="Estado de la reunión">
+<a class="view-tab active" aria-current="page" href="#">Por confirmar<span class="count">3</span></a>
+<a class="view-tab" href="#">Agendadas<span class="count">4</span></a>
+<a class="view-tab" href="#">Realizadas<span class="count">12</span></a>
+<a class="view-tab" href="#">No se presentó<span class="count">2</span></a>
+<a class="view-tab" href="#">Reprogramadas<span class="count">1</span></a>
+<a class="view-tab" href="#">Canceladas<span class="count">1</span></a>
+</nav>
+<div class="table-wrap">
+<table class="data">
+<thead><tr><th scope="col">Contacto</th><th scope="col">Empresa</th><th scope="col">Fecha y hora</th><th scope="col">Estado</th><th scope="col">Notas</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead>
+<tbody>
+<tr class="clickable "><td><div class="cell-person"><span class="avatar avatar-sm a1">LF</span><a href="#"><strong>Lucía Fernández</strong></a></div></td><td>Andes Labs</td><td class="nowrap">hoy 11:00 <span class='meta'>· hace 7 h</span></td><td><span class="badge badge-warn no-dot">Por confirmar</span></td><td class="trunc">Demo del módulo de reportes con el equipo de datos y el área de producto…</td><td class="right"><button class="btn btn-primary btn-sm" type="button" aria-haspopup="dialog">Confirmar</button></td></tr>
+<tr class="clickable "><td><div class="cell-person"><span class="avatar avatar-sm a3">MG</span><a href="#"><strong>Martín Gómez</strong></a></div></td><td>Nube Sur</td><td class="nowrap">hoy 16:30 <span class='meta'>· hace 1 h</span></td><td><span class="badge badge-warn no-dot">Por confirmar</span></td><td class="trunc">Revisión de la propuesta de squad.</td><td class="right"><button class="btn btn-primary btn-sm" type="button" aria-haspopup="dialog">Confirmar</button></td></tr>
+<tr class="clickable "><td><div class="cell-person"><span class="avatar avatar-sm a5">SP</span><a href="#"><strong>Sofía Paz</strong></a></div></td><td>Pampa Pay</td><td class="nowrap">ayer 10:00</td><td><span class="badge badge-warn no-dot">Por confirmar</span></td><td class="trunc">Presentación con el delivery lead.</td><td class="right"><button class="btn btn-primary btn-sm" type="button" aria-haspopup="dialog">Confirmar</button></td></tr>
+</tbody></table>
+</div>
+<p class="meta mt-md">Las filas son de solo lectura. Pulsa «Confirmar» o cualquier parte de la fila para abrir el diálogo (3d).</p>
+</div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">Ítem «Reuniones» en «Espacio de trabajo». Su contador cuenta solo las «Por confirmar» (hora pasada, sin resultado).</p>
+<p class="note">Filtro por estado: pestañas con conteo (<span class="mono">view-tabs</span>), el mismo patrón de «Tareas». Vista por defecto: «Por confirmar» si hay alguna; si no, «Agendadas». Una pestaña vacía muestra «No tienes reuniones en este estado.»</p>
+<p class="note">Una sola acción por fila: «Confirmar». Toda la fila es clicable y el enlace al contacto sigue siendo un enlace aparte. Notas se corta a una línea; el texto completo está en la línea de tiempo del contacto.</p>
+</aside>
+</div>
+
+<div class="cap mt-2xl">3b · Vista de un BD · pestaña «Agendadas» (acciones Reprogramar y Cancelar)</div>
+<div class="with-note">
+<div class="stage">
+<nav class="view-tabs" aria-label="Estado de la reunión">
+<a class="view-tab" href="#">Por confirmar<span class="count">3</span></a>
+<a class="view-tab active" aria-current="page" href="#">Agendadas<span class="count">4</span></a>
+<a class="view-tab" href="#">Realizadas<span class="count">12</span></a>
+<a class="view-tab" href="#">No se presentó<span class="count">2</span></a>
+<a class="view-tab" href="#">Reprogramadas<span class="count">1</span></a>
+<a class="view-tab" href="#">Canceladas<span class="count">1</span></a>
+</nav>
+<div class="table-wrap"><table class="data">
+<thead><tr><th scope="col">Contacto</th><th scope="col">Empresa</th><th scope="col">Fecha y hora</th><th scope="col">Estado</th><th scope="col">Notas</th><th scope="col">Acciones</th></tr></thead>
+<tbody>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a1">LF</span><a href="#"><strong>Lucía Fernández</strong></a></div></td><td>Andes Labs</td><td class="nowrap">jue 22 oct, 15:00</td><td><span class="badge badge-meeting no-dot">Agendada</span></td><td class="trunc">Demo del módulo de reportes con el equipo de datos.</td>
+<td><div class="outcomes"><button class="btn btn-secondary btn-sm" type="button">Reprogramar</button><button class="btn btn-ghost btn-sm" type="button">Cancelar</button></div></td></tr>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a4">TR</span><a href="#"><strong>Tomás Ríos</strong></a></div></td><td>Costa Digital</td><td class="nowrap">vie 23 oct, 10:30</td><td><span class="badge badge-meeting no-dot">Agendada</span></td><td class="trunc">Llamada de presentación.</td>
+<td><div class="outcomes"><button class="btn btn-secondary btn-sm" type="button">Reprogramar</button><button class="btn btn-ghost btn-sm" type="button">Cancelar</button></div></td></tr>
+</tbody></table></div>
+</div>
+<aside class="notes-col">
+<p class="note">Las «Agendadas» solo ofrecen Reprogramar y Cancelar (abren el diálogo 3f). Los 4 resultados se dan en «Por confirmar» con «Confirmar» (diálogo 3d).</p>
+<p class="note">En «Realizadas», «No se presentó», «Reprogramadas» y «Canceladas» la columna Acciones queda vacía (solo lectura); «Deshacer» sigue disponible unos segundos tras confirmar.</p>
+</aside>
+</div>
+
+<div class="cap mt-2xl">3c · Vista de administrador (todas las reuniones) · pestaña «Realizadas»</div>
+<div class="with-note">
+<div class="stage">
+<div class="toolbar mb-lg">
+<div class="field"><label class="label" for="a-bd">BD</label><select class="select input-sm" id="a-bd"><option>BD: Todos</option><option>Cristian Civita</option><option>Mariel</option><option>Macarena</option></select></div>
+<div class="field"><label class="label" for="a-from">Desde</label><input class="input input-sm" id="a-from" type="date" value="2026-10-01"></div>
+<div class="field"><label class="label" for="a-to">Hasta</label><input class="input input-sm" id="a-to" type="date" value="2026-10-31"></div>
+<span class="badge badge-neutral no-dot">Solo administradores ven a todos los BD</span>
+</div>
+<nav class="view-tabs" aria-label="Estado de la reunión">
+<a class="view-tab" href="#">Por confirmar<span class="count">9</span></a>
+<a class="view-tab" href="#">Agendadas<span class="count">11</span></a>
+<a class="view-tab active" aria-current="page" href="#">Realizadas<span class="count">31</span></a>
+<a class="view-tab" href="#">No se presentó<span class="count">5</span></a>
+<a class="view-tab" href="#">Reprogramadas<span class="count">3</span></a>
+<a class="view-tab" href="#">Canceladas<span class="count">4</span></a>
+</nav>
+<div class="table-wrap"><table class="data">
+<thead><tr><th scope="col">Contacto</th><th scope="col">Empresa</th><th scope="col">BD</th><th scope="col">Fecha y hora</th><th scope="col">Estado</th><th scope="col">Notas</th><th scope="col">Acciones</th></tr></thead>
+<tbody>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a5">SP</span><a href="#"><strong>Sofía Paz</strong></a></div></td><td>Pampa Pay</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a3">CC</span>Cristian Civita</span></td><td class="nowrap">18 oct, 10:00</td><td><span class="badge badge-success no-dot">Realizada</span></td><td class="trunc">Presentación con el delivery lead.</td><td></td></tr>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a2">JO</span><a href="#"><strong>Julián Oviedo</strong></a></div></td><td>Kavak</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a1">MA</span>Mariel</span></td><td class="nowrap">16 oct, 15:30</td><td><span class="badge badge-success no-dot">Realizada</span></td><td class="trunc">Revisión de precios y alcance del primer squad.</td><td></td></tr>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a1">LF</span><a href="#"><strong>Lucía Fernández</strong></a></div></td><td>Andes Labs</td><td><span class="owner-chip"><span class="avatar avatar-sm avatar-bd a4">MC</span>Macarena</span></td><td class="nowrap">16 oct, 11:00</td><td><span class="badge badge-success no-dot">Realizada</span></td><td class="trunc">Primera llamada de descubrimiento.</td><td></td></tr>
+</tbody></table></div>
+</div>
+<aside class="notes-col">
+<p class="note">Cada BD ve solo sus reuniones y no ve la columna BD ni los filtros de BD y fechas. El administrador ve las de todos, con la columna «BD», el filtro «BD: Todos / Mariel / Macarena / …» y el rango de fechas (por defecto el mes en curso).</p>
+<p class="note">El contador del menú del administrador cuenta solo sus propias «Por confirmar», no las del equipo.</p>
+<p class="note">Las pestañas muestran los conteos según los filtros activos.</p>
+<p class="note q">PREGUNTA ABIERTA: ¿el administrador puede dar resultado o reprogramar reuniones de otros BD? Propuesta: solo lectura en las ajenas (sin botones); cada resultado queda a nombre de quien lo confirma.</p>
+</aside>
+</div>
+<div class="cap mt-2xl">3d · Diálogo «¿Cómo fue la reunión?» (se abre desde «Confirmar»)</div>
+<div class="with-note">
+<div class="stage">
+<div class="cols2">
+<div><div class="cap">Sin elegir: «Guardar» deshabilitado</div><div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="d0-t">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="d0-t">¿Cómo fue la reunión con Lucía Fernández?</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<dl class="summary"><div><dt>Contacto</dt><dd>Lucía Fernández</dd></div><div><dt>Empresa</dt><dd>Andes Labs</dd></div><div><dt>Agendada para</dt><dd>hoy 11:00</dd></div><div class="wide"><dt>Notas</dt><dd>Demo del módulo de reportes con el equipo de datos.</dd></div></dl>
+<fieldset class="fieldset"><legend class="label">Resultado</legend><div class="opts" role="radiogroup" aria-label="Resultado de la reunión"><label class="opt"><input type="radio" name="d0-o" value="done"><span class="opt-t">Se hizo</span><span class="opt-d">La reunión se realizó.</span></label><label class="opt"><input type="radio" name="d0-o" value="noshow"><span class="opt-t">No se presentó</span><span class="opt-d">El contacto no asistió.</span></label><label class="opt"><input type="radio" name="d0-o" value="resched"><span class="opt-t">Reprogramada</span><span class="opt-d">Se acordó otra fecha.</span></label><label class="opt"><input type="radio" name="d0-o" value="cancel"><span class="opt-t">Cancelada</span><span class="opt-d">La reunión no se hará.</span></label></div></fieldset>
+<p class="help">Elige un resultado para continuar.</p>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary" disabled>Guardar</button></div>
+</div></div>
+<div><div class="cap">«Se hizo»</div><div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="d1-t">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="d1-t">¿Cómo fue la reunión con Lucía Fernández?</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<dl class="summary"><div><dt>Contacto</dt><dd>Lucía Fernández</dd></div><div><dt>Empresa</dt><dd>Andes Labs</dd></div><div><dt>Agendada para</dt><dd>hoy 11:00</dd></div><div class="wide"><dt>Notas</dt><dd>Demo del módulo de reportes con el equipo de datos.</dd></div></dl>
+<fieldset class="fieldset"><legend class="label">Resultado</legend><div class="opts" role="radiogroup" aria-label="Resultado de la reunión"><label class="opt sel"><input type="radio" name="d1-o" value="done" checked><span class="opt-t">Se hizo</span><span class="opt-d">La reunión se realizó.</span></label><label class="opt"><input type="radio" name="d1-o" value="noshow"><span class="opt-t">No se presentó</span><span class="opt-d">El contacto no asistió.</span></label><label class="opt"><input type="radio" name="d1-o" value="resched"><span class="opt-t">Reprogramada</span><span class="opt-d">Se acordó otra fecha.</span></label><label class="opt"><input type="radio" name="d1-o" value="cancel"><span class="opt-t">Cancelada</span><span class="opt-d">La reunión no se hará.</span></label></div></fieldset>
+<div class="reveal"><div class="field"><label class="label" for="a-n">¿Qué se habló? (opcional)</label><textarea class="textarea" id="a-n" rows="3">Quedaron en enviar la propuesta el viernes.</textarea></div></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Guardar</button></div>
+</div></div>
+<div><div class="cap">«Reprogramada»: pide la nueva fecha</div><div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="d2-t">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="d2-t">¿Cómo fue la reunión con Lucía Fernández?</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<dl class="summary"><div><dt>Contacto</dt><dd>Lucía Fernández</dd></div><div><dt>Empresa</dt><dd>Andes Labs</dd></div><div><dt>Agendada para</dt><dd>hoy 11:00</dd></div><div class="wide"><dt>Notas</dt><dd>Demo del módulo de reportes con el equipo de datos.</dd></div></dl>
+<fieldset class="fieldset"><legend class="label">Resultado</legend><div class="opts" role="radiogroup" aria-label="Resultado de la reunión"><label class="opt"><input type="radio" name="d2-o" value="done"><span class="opt-t">Se hizo</span><span class="opt-d">La reunión se realizó.</span></label><label class="opt"><input type="radio" name="d2-o" value="noshow"><span class="opt-t">No se presentó</span><span class="opt-d">El contacto no asistió.</span></label><label class="opt sel"><input type="radio" name="d2-o" value="resched" checked><span class="opt-t">Reprogramada</span><span class="opt-d">Se acordó otra fecha.</span></label><label class="opt"><input type="radio" name="d2-o" value="cancel"><span class="opt-t">Cancelada</span><span class="opt-d">La reunión no se hará.</span></label></div></fieldset>
+<div class="reveal stack"><div class="form-grid"><div class="field"><label class="label" for="b-d">Nueva fecha</label><input class="input" id="b-d" type="date" value="2026-10-26"></div><div class="field"><label class="label" for="b-t">Hora</label><input class="input" id="b-t" type="time" value="15:00"></div></div><p class="help">Se conserva la fecha anterior en la línea de tiempo y la reunión vuelve a quedar agendada.</p></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Reprogramar</button></div>
+</div></div>
+<div><div class="cap">«No se presentó» (igual para «Cancelada»)</div><div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="d3-t">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="d3-t">¿Cómo fue la reunión con Lucía Fernández?</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<dl class="summary"><div><dt>Contacto</dt><dd>Lucía Fernández</dd></div><div><dt>Empresa</dt><dd>Andes Labs</dd></div><div><dt>Agendada para</dt><dd>hoy 11:00</dd></div><div class="wide"><dt>Notas</dt><dd>Demo del módulo de reportes con el equipo de datos.</dd></div></dl>
+<fieldset class="fieldset"><legend class="label">Resultado</legend><div class="opts" role="radiogroup" aria-label="Resultado de la reunión"><label class="opt"><input type="radio" name="d3-o" value="done"><span class="opt-t">Se hizo</span><span class="opt-d">La reunión se realizó.</span></label><label class="opt sel"><input type="radio" name="d3-o" value="noshow" checked><span class="opt-t">No se presentó</span><span class="opt-d">El contacto no asistió.</span></label><label class="opt"><input type="radio" name="d3-o" value="resched"><span class="opt-t">Reprogramada</span><span class="opt-d">Se acordó otra fecha.</span></label><label class="opt"><input type="radio" name="d3-o" value="cancel"><span class="opt-t">Cancelada</span><span class="opt-d">La reunión no se hará.</span></label></div></fieldset>
+<div class="reveal stack"><div class="field"><label class="label" for="d3-r">Motivo (opcional)</label><input class="input" id="d3-r" type="text" placeholder="Por ejemplo: tuvo un imprevisto"></div><div class="row"><label class="check-row"><input type="checkbox" checked> <span>Crear tarea de seguimiento</span></label><span class="grow"></span><label class="label" for="d3-d">Vence</label><input class="input input-sm" id="d3-d" type="date" value="2026-10-21" style="width:auto"></div></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Guardar</button></div>
+</div></div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">Arriba del diálogo, el resumen de la reunión (contacto, empresa, fecha y hora agendada, notas). Debajo, 4 opciones grandes de selección única; al elegir una aparece solo lo que necesita.</p>
+<p class="note">«Se hizo»: notas opcionales «¿Qué se habló?». «Reprogramada»: nueva fecha y hora; «Guardar» sigue deshabilitado hasta tener la fecha. «No se presentó» y «Cancelada»: motivo opcional y «Crear tarea de seguimiento» marcada por defecto, con vencimiento en 2 días editable.</p>
+<p class="note">Cerrar con la X, Escape o «Cancelar» no guarda nada. Si falla el guardado, el diálogo sigue abierto con el error; al guardar, se cierra y el foco vuelve a la fila.</p>
+<p class="note q">PREGUNTA ABIERTA: ¿la tarea de seguimiento viene marcada por defecto? Aquí sí, con vencimiento en 2 días.</p>
+</aside>
+</div>
+
+<div class="cap mt-2xl">3e · Después de guardar «Se hizo» en Lucía Fernández</div>
+<div class="with-note">
+<div class="stage">
+<div class="table-wrap">
+<table class="data">
+<thead><tr><th scope="col">Contacto</th><th scope="col">Empresa</th><th scope="col">Fecha y hora</th><th scope="col">Estado</th><th scope="col">Notas</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead>
+<tbody>
+<tr class="clickable "><td><div class="cell-person"><span class="avatar avatar-sm a3">MG</span><a href="#"><strong>Martín Gómez</strong></a></div></td><td>Nube Sur</td><td class="nowrap">hoy 16:30 <span class='meta'>· hace 1 h</span></td><td><span class="badge badge-warn no-dot">Por confirmar</span></td><td class="trunc">Revisión de la propuesta de squad.</td><td class="right"><button class="btn btn-primary btn-sm" type="button" aria-haspopup="dialog">Confirmar</button></td></tr>
+<tr class="clickable "><td><div class="cell-person"><span class="avatar avatar-sm a5">SP</span><a href="#"><strong>Sofía Paz</strong></a></div></td><td>Pampa Pay</td><td class="nowrap">ayer 10:00</td><td><span class="badge badge-warn no-dot">Por confirmar</span></td><td class="trunc">Presentación con el delivery lead.</td><td class="right"><button class="btn btn-primary btn-sm" type="button" aria-haspopup="dialog">Confirmar</button></td></tr>
+</tbody></table>
+</div>
+<p class="meta mt-md">La fila de Lucía salió de «Por confirmar» (contador 3 → 2, pestaña «Realizadas» 12 → 13).</p>
+<div class="toast inline mt-lg" role="status"><svg class="icon ok" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg>Reunión confirmada<a href="#">Deshacer</a></div>
+</div>
+<aside class="notes-col">
+<p class="note">Al guardar, el diálogo se cierra, la fila desaparece de la pestaña y aparece el aviso «Reunión confirmada» con «Deshacer», que restituye la reunión a «Por confirmar».</p>
+</aside>
+</div>
+
+<div class="cap mt-2xl">3f · El mismo diálogo desde «Reprogramar» y «Cancelar» (pestaña «Agendadas» y ficha del contacto)</div>
+<div class="with-note">
+<div class="stage">
+<div class="cols2">
+<div><div class="cap">«Reprogramar» → opción «Reprogramada» preseleccionada</div><div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="f1-t">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="f1-t">Reprogramar la reunión con Lucía Fernández</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<dl class="summary"><div><dt>Contacto</dt><dd>Lucía Fernández</dd></div><div><dt>Empresa</dt><dd>Andes Labs</dd></div><div><dt>Agendada para</dt><dd>jue 22 oct, 15:00</dd></div><div class="wide"><dt>Notas</dt><dd>Demo del módulo de reportes con el equipo de datos.</dd></div></dl>
+<fieldset class="fieldset"><legend class="label">Resultado</legend><div class="opts" role="radiogroup" aria-label="Resultado de la reunión"><label class="opt"><input type="radio" name="f1-o" value="done"><span class="opt-t">Se hizo</span><span class="opt-d">La reunión se realizó.</span></label><label class="opt"><input type="radio" name="f1-o" value="noshow"><span class="opt-t">No se presentó</span><span class="opt-d">El contacto no asistió.</span></label><label class="opt sel"><input type="radio" name="f1-o" value="resched" checked><span class="opt-t">Reprogramada</span><span class="opt-d">Se acordó otra fecha.</span></label><label class="opt"><input type="radio" name="f1-o" value="cancel"><span class="opt-t">Cancelada</span><span class="opt-d">La reunión no se hará.</span></label></div></fieldset>
+<div class="reveal stack"><div class="form-grid"><div class="field"><label class="label" for="f1-d">Nueva fecha</label><input class="input" id="f1-d" type="date" value="2026-10-26"></div><div class="field"><label class="label" for="f1-t">Hora</label><input class="input" id="f1-t" type="time" value="15:00"></div></div><p class="help">Se conserva la fecha anterior en la línea de tiempo y la reunión vuelve a quedar agendada.</p></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Reprogramar</button></div>
+</div></div>
+<div><div class="cap">«Cancelar» → opción «Cancelada» preseleccionada</div><div class="dialog static" role="dialog" aria-modal="true" aria-labelledby="f2-t">
+<div class="dialog-header"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cal"/></svg><h2 id="f2-t">Cancelar la reunión con Lucía Fernández</h2><button class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+<div class="dialog-body stack">
+<dl class="summary"><div><dt>Contacto</dt><dd>Lucía Fernández</dd></div><div><dt>Empresa</dt><dd>Andes Labs</dd></div><div><dt>Agendada para</dt><dd>jue 22 oct, 15:00</dd></div><div class="wide"><dt>Notas</dt><dd>Demo del módulo de reportes con el equipo de datos.</dd></div></dl>
+<fieldset class="fieldset"><legend class="label">Resultado</legend><div class="opts" role="radiogroup" aria-label="Resultado de la reunión"><label class="opt"><input type="radio" name="f2-o" value="done"><span class="opt-t">Se hizo</span><span class="opt-d">La reunión se realizó.</span></label><label class="opt"><input type="radio" name="f2-o" value="noshow"><span class="opt-t">No se presentó</span><span class="opt-d">El contacto no asistió.</span></label><label class="opt"><input type="radio" name="f2-o" value="resched"><span class="opt-t">Reprogramada</span><span class="opt-d">Se acordó otra fecha.</span></label><label class="opt sel"><input type="radio" name="f2-o" value="cancel" checked><span class="opt-t">Cancelada</span><span class="opt-d">La reunión no se hará.</span></label></div></fieldset>
+<div class="reveal stack"><div class="field"><label class="label" for="f2-r">Motivo (opcional)</label><input class="input" id="f2-r" type="text" placeholder="Por ejemplo: tuvo un imprevisto"></div><div class="row"><label class="check-row"><input type="checkbox" checked> <span>Crear tarea de seguimiento</span></label><span class="grow"></span><label class="label" for="f2-d">Vence</label><input class="input input-sm" id="f2-d" type="date" value="2026-10-21" style="width:auto"></div></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Cancelar reunión</button></div>
+</div></div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">Es el mismo componente. Desde «Agendadas» y desde la ficha, el botón elige la opción de partida («Reprogramar» o «Cancelar»). Las 4 opciones siguen visibles, así que también se puede cambiar de idea.</p>
+<p class="note">En una reunión que todavía no pasó, «Se hizo» y «No se presentó» quedan deshabilitadas con la ayuda «Disponible cuando pase la hora de la reunión».</p>
+</aside>
+</div>
+</section>
+
+<!-- ============================ 4 ============================ -->
+<section class="sec" id="s4" aria-labelledby="h4s">
+<div class="sec-head"><span class="sec-n">4</span><h2 id="h4s">Correo de recordatorio a las 18:00</h2></div>
+<div class="with-note">
+<div class="stage">
+<div class="email-prev" role="img" aria-label="Vista previa del correo de recordatorio">
+<div class="hdr">
+<div><strong>De:</strong> avalith. CRM &lt;notificaciones@crm.avalith.net&gt;</div>
+<div><strong>Para:</strong> cristian@avalith.net</div>
+<div><strong>Asunto:</strong> Tienes 2 reuniones de hoy sin confirmar</div>
+</div>
+<div class="bodyx stack">
+<h3>Tienes 2 reuniones de hoy sin confirmar</h3>
+<p class="soft">Hola Cristian, indica cómo salieron para mantener al día tus contactos y los informes.</p>
+<div>
+<div class="mrow"><span class="avatar avatar-sm a1">LF</span><div class="grow"><strong>Lucía Fernández</strong> · Andes Labs<br><span class="meta">hoy 11:00</span></div></div>
+<div class="mrow"><span class="avatar avatar-sm a3">MG</span><div class="grow"><strong>Martín Gómez</strong> · Nube Sur<br><span class="meta">hoy 16:30</span></div></div>
+</div>
+<div><a class="btn btn-primary" href="#s3">Confirmar reuniones</a></div>
+<p class="meta">También tienes 1 reunión de días anteriores en la cola.</p>
+<p class="meta">Recibes este aviso porque agendaste reuniones en el CRM. Se envía a las 18:00 (hora de Argentina), solo si hay reuniones sin confirmar.</p>
+</div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">Remitente notificaciones@crm.avalith.net, por Resend como el resto del correo del CRM. El botón lleva a la página «Reuniones», pestaña «Por confirmar».</p>
+<p class="note">Solo se envía si hay al menos una reunión sin confirmar. Un correo por BD por día. Sin reuniones sin confirmar, no se envía nada.</p>
+<p class="note">Lista únicamente las de hoy; las de días anteriores se resumen en una línea. Los administradores lo reciben solo por sus propias reuniones.</p>
+<p class="note q">PREGUNTA ABIERTA: ¿se reenvía algo si la reunión sigue sin confirmar al día siguiente? Propuesta: no; ya queda en la cola y en el contador.</p>
+</aside>
+</div>
+</section>
+
+<!-- ============================ 5 ============================ -->
+<section class="sec" id="s5" aria-labelledby="h5s">
+<div class="sec-head"><span class="sec-n">5</span><h2 id="h5s">Dónde se ve el estado del contacto y los informes</h2></div>
+
+<div class="cap">5a · Estado del contacto antes y después de confirmar «Se hizo» (Lucía Fernández)</div>
+<div class="with-note">
+<div class="stage">
+<div class="cols2">
+<div>
+<div class="cap">Antes · reunión por confirmar</div>
+<div class="record-identity">
+<span class="avatar avatar-lg a1">LF</span>
+<div><h1>Lucía Fernández</h1><p class="headline">Head of Data en <a href="#">Andes Labs</a></p></div>
+<div class="row wrap"><span class="badge badge-replied">Respondió</span><span class="badge badge-verified">Verificado</span></div>
+</div>
+</div>
+<div>
+<div class="cap">Después · «Se hizo»</div>
+<div class="record-identity">
+<span class="avatar avatar-lg a1">LF</span>
+<div><h1>Lucía Fernández</h1><p class="headline">Head of Data en <a href="#">Andes Labs</a></p></div>
+<div class="row wrap"><span class="badge badge-meeting">Reunión</span><span class="badge badge-verified">Verificado</span></div>
+</div>
+</div>
+</div>
+<div class="cols2 mt-xl">
+<div class="table-wrap"><table class="data">
+<thead><tr><th scope="col">Nombre</th><th scope="col">Empresa</th><th scope="col">Estado</th></tr></thead>
+<tbody>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a1">LF</span><strong>Lucía Fernández</strong></div></td><td>Andes Labs</td><td><span class="badge badge-replied">Respondió</span></td></tr>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a3">MG</span>Martín Gómez</div></td><td>Nube Sur</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
+</tbody></table></div>
+<div class="table-wrap"><table class="data">
+<thead><tr><th scope="col">Nombre</th><th scope="col">Empresa</th><th scope="col">Estado</th></tr></thead>
+<tbody>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a1">LF</span><strong>Lucía Fernández</strong></div></td><td>Andes Labs</td><td><span class="badge badge-meeting">Reunión</span></td></tr>
+<tr><td><div class="cell-person"><span class="avatar avatar-sm a3">MG</span>Martín Gómez</div></td><td>Nube Sur</td><td><span class="badge badge-contacted">Contactado</span></td></tr>
+</tbody></table></div>
+</div>
+<p class="meta mt-md">Lista de contactos, columna «Estado». «No se presentó», «Cancelada» y «Reprogramada» dejan el estado igual que en «Antes».</p>
+</div>
+<aside class="notes-col">
+<p class="note">Etiquetas reales del estado derivado: Nuevo, Contactado, Respondió, Reunión, Descartado. Mientras la reunión está agendada o por confirmar, el contacto conserva su estado actual (aquí «Respondió»).</p>
+<p class="note">Al confirmar «Se hizo» el estado pasa a «Reunión» en la cabecera de la ficha y en la lista de contactos, igual que hoy al registrar una reunión pasada.</p>
+</aside>
+</div>
+
+<div class="cap mt-2xl">5b · Admin → Reportes: tarjetas de reuniones (período 1–31 oct 2026 · Todos los BDs)</div>
+<div class="with-note">
+<div class="stage">
+<div class="cols2">
+<div>
+<div class="cap">Antes de confirmar</div>
+<div class="grid-2">
+<button type="button" class="stat success stat-clickable"><div class="label">Reuniones realizadas</div><div class="value">5</div><div class="foot">en el período</div></button>
+<button type="button" class="stat info stat-clickable"><div class="label">Reuniones agendadas</div><div class="value">4</div><div class="foot">por venir o por confirmar</div></button>
+</div>
+</div>
+<div>
+<div class="cap">Después de «Se hizo»</div>
+<div class="grid-2">
+<button type="button" class="stat success stat-clickable"><div class="label">Reuniones realizadas</div><div class="value">6</div><div class="foot">en el período</div></button>
+<button type="button" class="stat info stat-clickable"><div class="label">Reuniones agendadas</div><div class="value">3</div><div class="foot">por venir o por confirmar</div></button>
+</div>
+</div>
+</div>
+</div>
+<aside class="notes-col">
+<p class="note">«Reuniones realizadas» es la tarjeta actual (hoy llamada «Reuniones agendadas», con el mismo diálogo de detalle por contacto, empresa, BD y fecha) renombrada. «Reuniones agendadas» es nueva y también abre un detalle.</p>
+<p class="note">Los números del embudo («Reunión») solo cuentan «Se hizo».</p>
+<p class="note q">PREGUNTA ABIERTA: definición de «Reuniones agendadas»: propuesta, agendadas con fecha en el período que aún están por venir o por confirmar. Al confirmarse pasan a «realizadas».</p>
+</aside>
+</div>
+
+<div class="cap mt-2xl">5c · Resumen</div>
+<div class="with-note">
+<div class="stage">
+<table class="cmp">
+<thead><tr><th scope="col">Resultado</th><th scope="col">Estado del contacto</th><th scope="col">Admin → Reportes</th><th scope="col">Línea de tiempo</th></tr></thead>
+<tbody>
+<tr><td><span class="badge badge-meeting no-dot">Agendada</span></td><td>No cambia</td><td>Cuenta en «Reuniones agendadas»</td><td>«Reunión agendada · fecha»</td></tr>
+<tr><td><span class="badge badge-success no-dot">Se hizo</span></td><td>Pasa a Reunión</td><td>Cuenta en «Reuniones realizadas» y en el embudo</td><td>«Reunión registrada»</td></tr>
+<tr><td><span class="badge badge-neutral no-dot">Reprogramada</span></td><td>No cambia</td><td>Cuenta una sola vez, con la nueva fecha</td><td>Fecha anterior tachada + «Reprogramada → nueva fecha»</td></tr>
+<tr><td><span class="badge badge-warn no-dot">No se presentó</span></td><td>No cambia</td><td>No cuenta</td><td>«Reunión: no se presentó» (+ tarea opcional)</td></tr>
+<tr><td><span class="badge badge-danger no-dot">Cancelada</span></td><td>No cambia</td><td>No cuenta</td><td>«Reunión cancelada» (+ tarea opcional)</td></tr>
+</tbody></table>
+</div>
+<aside class="notes-col">
+<p class="note">Solo «Se hizo» cuenta como reunión realizada para el estado del contacto y para Admin → Reportes. Reprogramar mantiene el historial en la línea de tiempo.</p>
+</aside>
+</div>
+</section>
+
+<!-- ============================ 6 ============================ -->
+<section class="sec" id="s6" aria-labelledby="h6s">
+<div class="sec-head"><span class="sec-n">6</span><h2 id="h6s">Qué hace y qué no</h2></div>
+<div class="cols2">
+<div class="card"><div class="card-header"><h3>Qué hace</h3></div><div class="card-body">
+<ul>
+<li>Acepta fecha y hora futuras en «Registrar reunión» y las guarda como agendadas.</li>
+<li>Muestra la reunión agendada en la cabecera y en «Próximas» de la línea de tiempo, con Reprogramar y Cancelar.</li>
+<li>Agrega la página «Reuniones» con todas las reuniones por estado (Por confirmar, Agendadas, Realizadas, No se presentó, Reprogramadas, Canceladas); en «Por confirmar» el botón «Confirmar» abre un diálogo con los 4 resultados y la tarea de seguimiento opcional. Cada BD ve las suyas; el administrador ve todas con filtros de BD y fechas.</li>
+<li>Envía a las 18:00 (Argentina) un correo con las reuniones de hoy sin confirmar.</li>
+<li>Solo «Se hizo» cambia el estado del contacto y cuenta como realizada.</li>
+</ul></div></div>
+<div class="card"><div class="card-header"><h3>Qué no hace</h3></div><div class="card-body">
+<ul>
+<li>No se conecta con Google Calendar ni envía invitaciones.</li>
+<li>No confirma resultados por su cuenta: una reunión vencida espera a que el BD la confirme.</li>
+<li>No avisa al administrador ni a otras personas.</li>
+<li>No reenvía el correo en días siguientes.</li>
+<li>No agrega campos nuevos al diálogo: solo Fecha, Hora y Notas.</li>
+<li>No reescribe las reuniones ya registradas: siguen siendo «Realizada».</li>
+</ul></div></div>
+</div>
+</section>
+</div>
+</body>
+</html>

@@ -36,6 +36,8 @@ import * as schema from "@/db/schema";
  * follow_up_queue_item) have been converted — the migration is complete.
  */
 const CONVERTED_TABLES: readonly string[] = [
+  "meeting",
+  "meeting_digest_send",
   "bd",
   "gmail_reminder_send",
   "scheduled_email",

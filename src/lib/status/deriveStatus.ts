@@ -21,6 +21,8 @@
  * is fully unit-testable.
  */
 
+import { MEETING_ACTIVITY_TYPES } from "@/lib/meetings/status";
+
 export type StatusStage = "new" | "contacted" | "replied" | "meeting";
 export type PersonStatus = StatusStage | "discarded";
 
@@ -119,7 +121,14 @@ export interface DiscardCandidate {
  * its place in the follow-up cadence). It is a separate type rather than a branch inside
  * `reply_received` so that neutrality is structural, not a special case.
  */
-export const STATUS_NEUTRAL_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"] as const;
+export const STATUS_NEUTRAL_ACTIVITY_TYPES = [
+  "call_attempt",
+  "lusha_reveal",
+  "auto_reply_received",
+  "email_bounced",
+  // Only a held meeting (`meeting_logged`, "Se hizo") moves the stage: scheduled, no-show, cancelled and rescheduled never do.
+  ...MEETING_ACTIVITY_TYPES,
+] as const;
 
 export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {
   if ((STATUS_NEUTRAL_ACTIVITY_TYPES as readonly string[]).includes(event.type)) return null;

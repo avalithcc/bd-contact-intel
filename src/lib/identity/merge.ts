@@ -74,7 +74,7 @@ export interface MergeConnection {
 }
 
 export interface MergeReferenceRow {
-  table: "activity" | "task" | "signal" | "lusha_reveal";
+  table: "activity" | "task" | "signal" | "lusha_reveal" | "meeting";
   id: string;
 }
 

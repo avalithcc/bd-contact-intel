@@ -38,6 +38,7 @@
  */
 import { sql } from "drizzle-orm";
 import { activity } from "@/db/schema";
+import { MEETING_ACTIVITY_TYPES } from "@/lib/meetings/status";
 import {
   activityRowToStatusEvent,
   OCCURRED_AT_ACTIVITY_TYPES,
@@ -61,7 +62,15 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * timelineGrouping.ts), so this list is defined ONCE here and both twins
  * reference it — no second definition to drift.
  */
-export const NON_TOUCH_ACTIVITY_TYPES = ["task_created", "task_updated", "task_completed", "task_reopened"] as const;
+export const NON_TOUCH_ACTIVITY_TYPES = [
+  "task_created",
+  "task_updated",
+  "task_completed",
+  "task_reopened",
+  // Scheduling, rescheduling, cancelling or a no-show records what happened to a meeting, not a conversation with the
+  // Contact (meeting-outcomes). Only "Se hizo" (`meeting_logged`) is a touch.
+  ...MEETING_ACTIVITY_TYPES,
+] as const;
 
 function isNonTouchActivityType(type: string): boolean {
   return (NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes(type);
