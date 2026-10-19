@@ -90,7 +90,7 @@ export interface ParaCandidate {
 
 // The canonical key of the record's company: its own key, or the company an alias key points at. NULL when the contact has no company.
 const canonicalOf = (personId: string) =>
-  sql`(select coalesce((select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = p0.company_key and ${aliasKeyIsNotLiveCompany()}), p0.company_key) from person p0 where p0.id = ${personId}::uuid)`;
+  sql`(select nullif(btrim(coalesce((select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = p0.company_key and ${aliasKeyIsNotLiveCompany()}), p0.company_key)), '') from person p0 where p0.id = ${personId}::uuid)`;
 
 const CANDIDATE_LIMIT = 200;
 

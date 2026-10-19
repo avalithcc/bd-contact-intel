@@ -21,7 +21,7 @@ function attachment(name: string, over: Record<string, unknown> = {}) {
   return { id: `a-${name}`, bdId: "bd-1", ownerAuthUid: OWNER, storagePath: buildAttachmentPath(OWNER, UP, name), filename: name, contentType: "application/pdf", sizeBytes: 7, scheduledEmailId: "s-1", ...over };
 }
 const rowWith = (attachments: ReturnType<typeof attachment>[]) => ({ id: "s-1", bdId: "bd-1", attachments }) as never;
-const storage = (objects: Record<string, Uint8Array>): AttachmentStorage => ({ download: async (p) => objects[p] ?? null, remove: async () => true });
+const storage = (objects: Record<string, Uint8Array>): AttachmentStorage => ({ download: async (p) => objects[p] ?? null, remove: async () => true, list: async () => null });
 
 async function load(row: never, st: AttachmentStorage | null) {
   const { loadRowAttachments } = await import("@/lib/scheduledEmail/send");

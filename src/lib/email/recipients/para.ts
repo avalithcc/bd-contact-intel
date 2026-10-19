@@ -37,12 +37,15 @@ const displayName = (p: ParaPerson) => [p.firstName, p.lastName].filter(Boolean)
 /** `others` keeps the order the BD picked them in; `undefined` stands for an id that did not resolve to a live contact. */
 export function evaluatePara(primary: ParaPerson | undefined, others: readonly (ParaPerson | undefined)[]): ParaResult {
   if (!primary) return { ok: false, reason: "recipient_unavailable" };
+  // An empty or blank key is "no company" (imports have left '' behind), never a company shared by everyone who has one.
+  const companyOf = (p: ParaPerson) => p.canonicalCompanyKey?.trim() || null;
+  const primaryCompany = companyOf(primary);
   const recipients: ParaRecipient[] = [];
   const seenPeople = new Set<string>();
   const seenEmails = new Set<string>();
   for (const person of [primary, ...others]) {
     if (!person) return { ok: false, reason: "recipient_unavailable" };
-    if (person !== primary && (primary.canonicalCompanyKey === null || person.canonicalCompanyKey !== primary.canonicalCompanyKey)) {
+    if (person !== primary && (primaryCompany === null || companyOf(person) !== primaryCompany)) {
       return { ok: false, reason: "recipient_other_company" };
     }
     const email = person.email?.trim() ?? "";

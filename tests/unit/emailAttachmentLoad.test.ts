@@ -24,6 +24,9 @@ function fakeStorage(objects: Record<string, Uint8Array | null>): AttachmentStor
     async download(path) {
       return objects[path] ?? null;
     },
+    async list() {
+      return null;
+    },
     async remove(paths) {
       removed.push(...paths);
       return true;

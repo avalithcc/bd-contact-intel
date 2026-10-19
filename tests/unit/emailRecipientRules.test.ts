@@ -93,6 +93,13 @@ test("Para: at most 20 recipients after dedupe", () => {
   assert.deepEqual(evaluatePara(p("a"), tooMany), { ok: false, reason: "too_many_recipients" });
 });
 
+test("Para: an empty or blank company key counts as no company", () => {
+  const blank = (id: string) => p(id, { canonicalCompanyKey: "" });
+  assert.deepEqual(evaluatePara(blank("a"), [blank("b")]), { ok: false, reason: "recipient_other_company" });
+  assert.deepEqual(evaluatePara(p("a"), [p("b", { canonicalCompanyKey: "  " })]), { ok: false, reason: "recipient_other_company" });
+  assert.equal(evaluatePara(blank("a"), []).ok, true);
+});
+
 test("Para: the To header text lists the addresses joined by comma", () => {
   const r = evaluatePara(p("a"), [p("b")]);
   assert.equal(r.ok && r.to, "a@acme.test, b@acme.test");

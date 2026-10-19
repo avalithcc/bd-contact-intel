@@ -15,7 +15,7 @@ const resolvePara = (people: Record<string, ParaPerson>) => async (primary: stri
 
 const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 1, 2, 3]);
 const refFor = (name: string) => ({ storagePath: buildAttachmentPath(UID, UP, name), filename: name, contentType: "application/pdf", size: 8 });
-const storageWith = (objects: Record<string, Uint8Array>): AttachmentStorage => ({ download: async (p) => objects[p] ?? null, remove: async () => true });
+const storageWith = (objects: Record<string, Uint8Array>): AttachmentStorage => ({ download: async (p) => objects[p] ?? null, remove: async () => true, list: async () => null });
 
 test("plain compose: nothing beyond one recipient and text", () => {
   assert.equal(isPlainCompose(undefined), true);
@@ -51,7 +51,7 @@ test("with load off the descriptors are checked but Storage is never touched", a
     extras: { attachments: [r] },
     ownerAuthUid: UID,
     resolvePara: resolvePara({ [A]: person(A) }),
-    storage: { download: async () => ((touched = true), null), remove: async () => true },
+    storage: { download: async () => ((touched = true), null), remove: async () => true, list: async () => null },
     load: false,
   });
   assert.ok(out.ok);

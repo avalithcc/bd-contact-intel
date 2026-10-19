@@ -4,8 +4,8 @@ import { dispatchScheduledEmails } from "@/lib/scheduledEmail/dispatch";
 import { claimDue, countDue, holdReplied, markCancelled, markFailed, markSent, releaseClaimed, sweepStale } from "@/lib/scheduledEmail/queries";
 import { sendScheduledEmail } from "@/lib/scheduledEmail/send";
 import { listSuppressionRules } from "@/lib/sequences/suppressionQueries";
-import { markAttachmentsRemoved, selectSweepable } from "@/lib/email/attachments/queries";
-import { sweepAttachments } from "@/lib/email/attachments/sweep";
+import { markAttachmentsRemoved, selectSweepable, trackedPaths } from "@/lib/email/attachments/queries";
+import { sweepAttachments, sweepUnregisteredObjects } from "@/lib/email/attachments/sweep";
 import { serviceRoleAttachmentStorage } from "@/lib/supabase/serviceRole";
 
 /**
@@ -37,6 +37,14 @@ export async function GET(request: Request) {
     console.error("[scheduled-email] attachment sweep failed", err);
     return null;
   });
-  console.log("[scheduled-email]", JSON.stringify({ ...summary, attachments }));
-  return NextResponse.json({ ...summary, attachments });
+  // Uploads nobody registered have no row, so the database sweep cannot see them: walk the bucket, about once an hour.
+  const walkBucket = !dryRun && storage !== null && new Date().getUTCMinutes() < 2;
+  const unregistered = !walkBucket
+    ? null
+    : await sweepUnregisteredObjects({ storage, tracked: trackedPaths }, new Date()).catch((err) => {
+        console.error("[scheduled-email] unregistered-object sweep failed", err);
+        return null;
+      });
+  console.log("[scheduled-email]", JSON.stringify({ ...summary, attachments, unregistered }));
+  return NextResponse.json({ ...summary, attachments, unregistered });
 }

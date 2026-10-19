@@ -2,6 +2,7 @@ import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { CompanyTimelineRow } from "@/lib/companies/recordQueries";
 import { taskActivityBody, ALL_TASK_ACTIVITY_TYPES, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
 import { isTimelineEntryVisible } from "@/lib/activity/timelineVisibility";
+import { emailRecipientText } from "@/lib/contacts/timelineEntryBody";
 
 /**
  * Plain-string labels this module needs to build a row's "what" headline —
@@ -186,7 +187,7 @@ export function buildCompanyTimelineViewRows(
       if (row.type === "note") what = serverStrings.noteBy(row.actorName ?? "");
       else if (row.type === "email_sent")
         what = visible
-          ? serverStrings.emailSentTo(typeof metadata.to === "string" ? metadata.to : "")
+          ? serverStrings.emailSentTo(emailRecipientText(metadata) ?? "")
           // Locked company-scoped conversation row (consistency fix,
           // 2026-10-01): name the OWNING BD, same identity a locked row
           // already carries on the contact timeline (single-entry head) and

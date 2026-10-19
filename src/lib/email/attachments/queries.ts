@@ -32,6 +32,16 @@ export async function registerAttachments(bdId: string, ownerAuthUid: string, it
   return inserted.length;
 }
 
+/** Of these paths, the ones a live (not removed) row still tracks. */
+export async function trackedPaths(paths: readonly string[]): Promise<Set<string>> {
+  if (paths.length === 0) return new Set();
+  const rows = await db
+    .select({ storagePath: emailAttachment.storagePath })
+    .from(emailAttachment)
+    .where(and(inArray(emailAttachment.storagePath, [...paths]), isNull(emailAttachment.removedAt)));
+  return new Set(rows.map((r) => r.storagePath));
+}
+
 /** Whether a tracked, still-stored file is held by a scheduled email (a held file must not be deleted by the composer). */
 export async function isHeldByScheduledEmail(storagePath: string): Promise<boolean> {
   const [row] = await db
