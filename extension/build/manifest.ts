@@ -8,7 +8,7 @@
  * THE extension version, and the only thing to change to release a new one: the build packs a zip with it, the CRM
  * serves that zip and compares the installed version against this very value (src/lib/extension/release.ts).
  */
-export const EXTENSION_VERSION = "1.0.0";
+export const EXTENSION_VERSION = "1.0.1";
 
 /** Name of the downloadable archive for a version; one definition for the packer, the route and the UI. */
 export function extensionZipName(version: string): string {

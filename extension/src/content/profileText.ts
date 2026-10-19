@@ -2,6 +2,8 @@
  * Cleaning of text read from the profile. Pure (no DOM) so it is unit-tested; the DOM side lives in
  * profileReader.ts. It only normalizes what LinkedIn rendered; it never fills in or guesses a value.
  */
+import { COMPANY_PREFIX } from "./selectors";
+
 const ZERO_WIDTH = /[​-‏‪-‮⁠﻿]/g;
 
 /** Whitespace-collapsed text, `""` for nothing. Undoes text doubled by a visually hidden accessible copy. */
@@ -34,4 +36,9 @@ const COMPANY_LABEL = /^(?:Current company|Empresa actual|Empresa atual)\s*[:：
 export function companyFromLabel(label: string | null | undefined): string | null {
   const match = COMPANY_LABEL.exec(cleanText(label));
   return match?.[1] ? cleanText(match[1]) || null : null;
+}
+
+/** Drops a "Ver empresa:" / "Current company:" style prefix a control may put before the company name. */
+export function stripCompanyPrefix(raw: string | null | undefined): string {
+  return cleanText(raw).replace(COMPANY_PREFIX, "").trim();
 }

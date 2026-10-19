@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { cleanName, cleanText, companyFromLabel } from "../../extension/src/content/profileText";
+import { cleanName, cleanText, companyFromLabel, stripCompanyPrefix } from "../../extension/src/content/profileText";
 import { buildCardView, formatActivity, type CardState } from "../../extension/src/content/viewModel";
 import { extractCardCss } from "../../extension/build/extractCardCss";
 
@@ -33,6 +33,9 @@ test("the current company comes from the top-card label in Spanish, English or P
   assert.equal(companyFromLabel("Current company: Mercado Libre. Click to skip to experience card"), "Mercado Libre");
   assert.equal(companyFromLabel("Empresa atual: Nubank. Clique para ir para a seção de experiência"), "Nubank");
   assert.equal(companyFromLabel("Educación: Universidad de Buenos Aires"), null);
+  assert.equal(stripCompanyPrefix("Ver empresa: ZURE-Embryotech"), "ZURE-Embryotech");
+  assert.equal(stripCompanyPrefix("View company: Acme"), "Acme");
+  assert.equal(stripCompanyPrefix("Andes Labs"), "Andes Labs");
   assert.equal(companyFromLabel(""), null);
 });
 

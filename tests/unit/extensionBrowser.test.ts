@@ -86,6 +86,38 @@ test("markup the selectors do not know reads as empty, never guessed", async (t)
   assert.deepEqual(await readFixture("profile-unreadable.html"), { name: "", title: "", company: "", location: "" });
 });
 
+const LUCIA = {
+  name: "Lucía Fernández",
+  title: "Head of Growth at Andes Labs",
+  company: "Andes Labs",
+  location: "Córdoba, Argentina",
+};
+
+test("the new layout reads the top card by componentkey and never the sponsored ad in the aside", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-new-layout.html"), LUCIA);
+});
+
+test("the new layout with English markers reads the same", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-new-layout-english.html"), LUCIA);
+});
+
+test("a single company/school button leaves the company empty", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-new-layout-one-button.html"), { ...LUCIA, company: "" });
+});
+
+test("without a top card only the name is read, from the title", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-new-layout-no-topcard.html"), {
+    name: "Lucía Fernández",
+    title: "",
+    company: "",
+    location: "",
+  });
+});
+
 test("the card renders every state with the CRM's tokens and wires its buttons", async (t) => {
   if (!browser) return t.skip(launchError ?? "no browser");
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
