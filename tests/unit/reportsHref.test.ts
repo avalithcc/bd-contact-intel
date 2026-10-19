@@ -20,5 +20,5 @@ test("buildReportsHref includes a selected bd id", () => {
 });
 
 test("buildReportsHref includes both period and bd together", () => {
-  assert.equal(buildReportsHref("quarter", "bd-1"), "/admin/reports?period=quarter&bd=bd-1");
+  assert.equal(buildReportsHref("last_month", "bd-1"), "/admin/reports?period=last_month&bd=bd-1");
 });

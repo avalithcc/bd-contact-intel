@@ -135,7 +135,6 @@ const FUNNEL = { newTotal: 118, contactedOrMore: 43, repliedOrMore: 12, meeting:
 
 test("cohortPeriodPhrase names the period the way the mockup does", () => {
   assert.equal(cohortPeriodPhrase("month", "2026-10-01", "2026-11-01", w), "en octubre 2026");
-  assert.equal(cohortPeriodPhrase("quarter", "2026-10-01", "2027-01-01", w), "en el 4.º trimestre 2026");
   assert.equal(cohortPeriodPhrase("week", "2026-10-12", "2026-10-19", w), "del 12 al 18 oct 2026");
   assert.equal(cohortPeriodPhrase("week", "2026-09-28", "2026-10-05", w), "del 28 sep al 4 oct 2026");
   assert.equal(cohortPeriodPhrase("week", "2025-12-29", "2026-01-05", w), "del 29 dic 2025 al 4 ene 2026");

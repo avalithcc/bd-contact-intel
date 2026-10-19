@@ -1,6 +1,6 @@
 /**
  * Unit tests for src/lib/reports/period.ts — owner-reporting's period filter
- * (semana/mes/trimestre), Argentina calendar boundaries built on
+ * (semana/mes/mes pasado/personalizado), Argentina calendar boundaries built on
  * argentinaInstantBoundary (src/lib/tasks/argentinaDate.ts).
  */
 import assert from "node:assert/strict";
@@ -11,23 +11,25 @@ test("resolveReportPeriod defaults to 'month' for anything unrecognized, includi
   assert.equal(resolveReportPeriod(undefined), "month");
   assert.equal(resolveReportPeriod("bogus"), "month");
   assert.equal(resolveReportPeriod("week"), "week");
-  assert.equal(resolveReportPeriod("quarter"), "quarter");
+  for (const removed of ["quarter", "last_week", "last_quarter"]) assert.equal(resolveReportPeriod(removed), "month", `${removed} is gone: an old URL falls back to the month`);
+  for (const kept of ["last_month", "custom"]) assert.equal(resolveReportPeriod(kept), kept);
 });
 
-test("reportPeriodRange 'month' spans the whole ART calendar month, clamped to now", () => {
+test("reportPeriodRange 'month' runs from the 1st to now", () => {
   const now = new Date("2026-09-30T14:00:00Z"); // 11:00 ART, 30th
   const range = reportPeriodRange("month", now);
   assert.equal(range.fromIso, "2026-09-01T03:00:00.000Z");
   assert.equal(range.toIso, now.toISOString());
   assert.equal(range.fromDate, "2026-09-01");
   assert.equal(range.toDateExclusive, "2026-10-01");
-  assert.equal(range.label, "1–30 sep 2026");
+  assert.equal(range.label, "1 – 30 sep");
+  assert.equal(range.lastDate, "2026-09-30");
 });
 
-test("reportPeriodRange 'month' mid-month: the label still shows the full calendar month", () => {
+test("reportPeriodRange 'month' mid-month: the label ends today, not at the end of the month", () => {
   const now = new Date("2026-09-15T14:00:00Z");
   const range = reportPeriodRange("month", now);
-  assert.equal(range.label, "1–30 sep 2026");
+  assert.equal(range.label, "1 – 15 sep");
   assert.equal(range.toIso, now.toISOString(), "the query cutoff never includes not-yet-happened days");
 });
 
@@ -43,20 +45,6 @@ test("reportPeriodRange 'week' when today itself is Monday starts on today, not 
   const now = new Date("2026-09-28T14:00:00Z"); // Monday
   const range = reportPeriodRange("week", now);
   assert.equal(range.fromDate, "2026-09-28");
-});
-
-test("reportPeriodRange 'quarter' spans the current ART calendar quarter (Jan/Apr/Jul/Oct start)", () => {
-  const now = new Date("2026-09-30T14:00:00Z"); // Q3 (Jul-Sep)
-  const range = reportPeriodRange("quarter", now);
-  assert.equal(range.fromDate, "2026-07-01");
-  assert.equal(range.toDateExclusive, "2026-10-01");
-});
-
-test("reportPeriodRange 'quarter' crossing a year boundary (Q4 starts October)", () => {
-  const now = new Date("2026-12-15T14:00:00Z");
-  const range = reportPeriodRange("quarter", now);
-  assert.equal(range.fromDate, "2026-10-01");
-  assert.equal(range.toDateExclusive, "2027-01-01");
 });
 
 test("reportPeriodRange never mutates across repeated calls with the same 'now' (pure)", () => {

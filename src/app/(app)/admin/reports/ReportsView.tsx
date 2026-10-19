@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { es } from "@/lib/i18n/dictionaries/es";
 import type { CustomRange, ReportPeriod, ReportPeriodRange } from "@/lib/reports/period";
-import { buildReportsHref } from "@/lib/reports/reportsHref";
+import { addDaysToDateString } from "@/lib/tasks/argentinaDate";
 import { buildFunnelBreakdown } from "@/lib/reports/funnel";
 import { buildSourceConversionRows, type SourceBucket } from "@/lib/reports/sourceBucket";
 import { buildDiscardReasonRows, discardReasonLabel, totalDiscardCount } from "@/lib/reports/discardReasons";
@@ -14,6 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { BdFilterSelect } from "./BdFilterSelect";
 import { WonCompaniesKpiCard, type WonCompaniesKpiCardLabels } from "./WonCompaniesKpiCard";
+import { PeriodPicker, type PeriodPickerLabels } from "./PeriodPicker";
 import { MeetingsKpiCard, type MeetingsKpiCardLabels } from "./MeetingsKpiCard";
 import { CohortFunnelRow, CohortTile, type CohortDrilldownLabels } from "./CohortDrilldown";
 import { cohortCount, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
@@ -55,6 +55,21 @@ const meetingsKpiLabels: MeetingsKpiCardLabels = {
   dialogTruncated: dict.dialogTruncated,
   numberLocale: dict.numberLocale,
 };
+const periodPickerLabels: PeriodPickerLabels = {
+  periodFilterLabel: dict.periodFilterLabel,
+  periodWeek: dict.periodWeek,
+  periodMonth: dict.periodMonth,
+  periodLastMonth: dict.periodLastMonth,
+  periodCustom: dict.periodCustom,
+  periodCustomLabel: dict.periodCustomLabel,
+  periodCustomClear: dict.periodCustomClear,
+  calendarPrev: dict.calendarPrev,
+  calendarNext: dict.calendarNext,
+  calendarCancel: dict.calendarCancel,
+  calendarApply: dict.calendarApply,
+  calendarPickEnd: dict.calendarPickEnd,
+  calendarMaxDays: dict.calendarMaxDays,
+};
 const cohortLabels: CohortDrilldownLabels = {
   kpiNewContacts: dict.kpiNewContacts,
   funnelContacted: dict.funnelContacted,
@@ -81,15 +96,6 @@ const cohortLabels: CohortDrilldownLabels = {
   leadStatuses: es.leadStatuses,
   roleGroups: es.roleGroups,
 };
-
-const PERIOD_PRESETS: readonly (readonly [ReportPeriod, string])[] = [
-  ["week", dict.periodWeek],
-  ["month", dict.periodMonth],
-  ["quarter", dict.periodQuarter],
-  ["last_week", dict.periodLastWeek],
-  ["last_month", dict.periodLastMonth],
-  ["last_quarter", dict.periodLastQuarter],
-];
 
 const SOURCE_LABEL: Record<SourceBucket, string> = {
   hubspot: dict.sourceHubspot,
@@ -132,6 +138,7 @@ export function ReportsView({
   bdId,
   custom,
   range,
+  today,
   aggregates,
   perBd,
 }: {
@@ -140,6 +147,8 @@ export function ReportsView({
   /** Validated Desde–Hasta range, present only for the "custom" period. */
   custom: CustomRange | null;
   range: ReportPeriodRange;
+  /** Today as an ART calendar date, for the range calendar. */
+  today: string;
   aggregates: ReportAggregatesResult;
   perBd: ReportPerBdRow[];
 }) {
@@ -147,7 +156,7 @@ export function ReportsView({
   // Same period + BD as the page's own query, so each dialog lists exactly the
   // persons its number counted (cohortDrilldown.ts). The header words are
   // built here because they use dictionary formatters (server-only).
-  const periodPhrase = cohortPeriodPhrase(period, range.fromDate, range.toDateExclusive, dict);
+  const periodPhrase = cohortPeriodPhrase(period, range.fromDate, addDaysToDateString(range.lastDate, 1), dict);
   // `rate` = the reply-rate tile: its counts (and its list) leave out current clients, so the header quotes those counts.
   const cohortQuery = (population: CohortPopulation, rate = false) => {
     const lines = cohortHeaderLines(
@@ -227,28 +236,7 @@ export function ReportsView({
 
       <div className="row wrap between mb-lg" aria-label="Filtros del reporte">
         <div className="row wrap" style={{ gap: "var(--space-lg)" }}>
-          <div className="segmented" role="group" aria-label={dict.periodFilterLabel}>
-            {PERIOD_PRESETS.map(([key, label]) => (
-              <Link key={key} href={buildReportsHref(key, bdId)} className={period === key ? "on" : ""} aria-current={period === key ? "page" : undefined}>
-                {label}
-              </Link>
-            ))}
-          </div>
-          <form className="row wrap" style={{ gap: "var(--space-sm)" }} aria-label={dict.periodCustomLabel}>
-            <input type="hidden" name="period" value="custom" />
-            {bdId && <input type="hidden" name="bd" value={bdId} />}
-            <label className="label sr-only" htmlFor="range-from">
-              {dict.periodCustomFrom}
-            </label>
-            <input id="range-from" name="from" type="date" className="input input-sm" required defaultValue={custom?.from} />
-            <label className="label sr-only" htmlFor="range-to">
-              {dict.periodCustomTo}
-            </label>
-            <input id="range-to" name="to" type="date" className="input input-sm" required defaultValue={custom?.to} />
-            <button type="submit" className={`btn btn-sm ${period === "custom" ? "btn-primary" : "btn-ghost"}`}>
-              {dict.applyFilter}
-            </button>
-          </form>
+          <PeriodPicker period={period} bdId={bdId} custom={custom} customLabel={range.label} today={today} labels={periodPickerLabels} />
           <form className="row wrap" style={{ gap: "var(--space-sm)" }}>
             <input type="hidden" name="period" value={period} />
             {period === "custom" && custom && (

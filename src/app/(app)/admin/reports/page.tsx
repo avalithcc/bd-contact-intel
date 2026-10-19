@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { isUuid } from "@/lib/uuid";
 import { parseCustomRange, reportPeriodRange, resolveReportPeriod } from "@/lib/reports/period";
 import { getReportAggregates, getReportPerBd } from "@/lib/reports/queriesDb";
@@ -24,10 +25,11 @@ export default async function ReportsPage({
 
   const sp = await searchParams;
   // A "custom" period without a valid from/to pair falls back to the month, like an unknown period.
-  const custom = parseCustomRange(sp.from, sp.to);
+  const now = new Date();
+  const custom = parseCustomRange(sp.from, sp.to, now);
   const period = sp.period === "custom" && !custom ? "month" : resolveReportPeriod(sp.period);
   const bdId = sp.bd && sp.bd !== "all" && isUuid(sp.bd) ? sp.bd : null;
-  const range = reportPeriodRange(period, new Date(), custom);
+  const range = reportPeriodRange(period, now, custom);
 
   // Exactly 2 round trips for the whole page (PERFORMANCE.md) — these two
   // statements have unrelated result shapes (one JSON row vs. N per-BD
@@ -45,5 +47,5 @@ export default async function ReportsPage({
     bdId,
   });
 
-  return <ReportsView period={period} bdId={bdId} custom={custom} range={range} aggregates={aggregates} perBd={perBd} />;
+  return <ReportsView period={period} bdId={bdId} custom={custom} range={range} today={argentinaCalendarDate(now)} aggregates={aggregates} perBd={perBd} />;
 }

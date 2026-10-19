@@ -103,10 +103,10 @@ after(async () => {
   await db.delete(bd).where(eq(bd.id, bdId));
 });
 
-async function aggregates(period: Parameters<typeof import("@/lib/reports/period").reportPeriodRange>[0]) {
+async function aggregates(period: Parameters<typeof import("@/lib/reports/period").reportPeriodRange>[0], custom?: { from: string; to: string }) {
   const { reportPeriodRange } = await import("@/lib/reports/period");
   const { getReportAggregates } = await import("@/lib/reports/queriesDb");
-  const range = reportPeriodRange(period, NOW);
+  const range = reportPeriodRange(period, NOW, custom);
   return { range, result: await getReportAggregates({ fromIso: range.fromIso, toIso: range.toIso, bdId }) };
 }
 
@@ -142,8 +142,8 @@ test("the cohort lists include clients, except the reply-rate tile's list which 
 test("'Empresas ganadas' follows the period", async () => {
   assert.equal((await aggregates("week")).result.wonInPeriod, 1, "only the company that moved to won on Monday");
   assert.equal((await aggregates("month")).result.wonInPeriod, 2, "Oct 8 and Oct 19");
-  assert.equal((await aggregates("quarter")).result.wonInPeriod, 2);
-  assert.equal((await aggregates("last_week")).result.wonInPeriod, 0, "nothing moved to won Oct 12-18");
+  assert.equal((await aggregates("custom", { from: "2026-07-01", to: "2026-12-31" })).result.wonInPeriod, 2, "a custom range over the quarter");
+  assert.equal((await aggregates("custom", { from: "2026-10-12", to: "2026-10-18" })).result.wonInPeriod, 0, "nothing moved to won Oct 12-18");
 });
 
 test("won before the tracking start (initial data load, Oct 1-6) is in no period, even October; Oct 8 is in October", async () => {
@@ -174,9 +174,9 @@ async function meetingsIn(period: Parameters<typeof import("@/lib/reports/period
 }
 
 test("a meeting logged Sep 30 and held Oct 2 counts in Q4, not Q3 (metadata.at); one without metadata.at falls back to created_at", async () => {
-  const q4 = await meetingsIn("quarter");
+  const q4 = await meetingsIn("month");
   assert.deepEqual(q4, { count: 2, listed: 2 }, "held Oct 2 + the undated one logged Oct 5");
-  const q3 = await meetingsIn("last_quarter");
+  const q3 = await meetingsIn("last_month");
   assert.deepEqual(q3, { count: 0, listed: 0 }, "logged in Q3 but held in Q4");
   const october = await meetingsIn("month");
   assert.equal(october.count, 2);
