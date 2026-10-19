@@ -103,7 +103,7 @@ started.
   2026-10-19 (v1.0.2): download, lookup with the CRM session, and prefill on
   LinkedIn's new profile layout. Job title and company come from the current
   Experience role (the section is lazy-loaded; the reader scrolls to it and
-  falls back to the headline). Still unverified: the Edge labels in Spanish.
+  falls back to the headline). Edge labels in Spanish confirmed by the owner\n  the same day.
 - Shipped 2026-10-18: (1) task legacy columns dropped (migration 0050 applied
   to production). (2) Phone E.164 normalization, normalize on write
   (`d6152619`..`f1b65eee`); the production backfill ran 2026-10-18 and changed
