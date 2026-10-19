@@ -284,9 +284,9 @@ async function getPreviousCountsAndSync(
  * (vacancies, per-market, offshore, startup), how many Contacts (company-wide, not per-BD) work there, and the
  * 7-day delta (today's counted total minus the total counted 7 days ago, see hiringDelta).
  *
- * `contactCount` is the signed-in BD's own contacts at the company (alias-aware, same `contact` rows and key set as
- * the `/?companyKey=` list the count links to via listContacts/companyKeyFilter), so the number and the page it
- * opens always agree.
+ * `contactCount` is the signed-in BD's own contacts at the company (alias-aware). The number links to the company
+ * record (companyContactsHref), which lists every contact there, so the record can show more than the count since
+ * the old `/?companyKey=` list was retired.
  *
  * Four fixed queries regardless of how many companies/postings/contacts exist: the two behind
  * resolveHiringCompanies() (called without the per-posting detail columns, which this table never renders), the

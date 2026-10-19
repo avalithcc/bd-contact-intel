@@ -38,9 +38,9 @@ export function hiringDelta(i: { total: number; previous: number; filtered?: boo
   return { kind: "none" };
 }
 
-/** Contacts of a company, by key (a name match would mix "Meta" with "Metalab"). */
+/** Contacts of a company, by key (a name match would mix "Meta" with "Metalab"): the company record lists them. */
 export function companyContactsHref(companyKey: string): string {
-  return `/?companyKey=${encodeURIComponent(companyKey)}`;
+  return `/companies/${encodeURIComponent(companyKey)}`;
 }
 
 /** The company record opened on its hiring tab (the list behind the vacancy number), by key, under the same filter. */

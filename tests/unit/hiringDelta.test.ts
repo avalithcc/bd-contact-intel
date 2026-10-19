@@ -39,8 +39,8 @@ test("under a market filter new-on-radar is suppressed: the view cannot speak fo
 });
 
 test("the contacts link carries the company key, never the display name", () => {
-  assert.equal(companyContactsHref("meta"), "/?companyKey=meta");
-  assert.equal(companyContactsHref("a&b c"), "/?companyKey=a%26b%20c");
+  assert.equal(companyContactsHref("meta"), "/companies/meta");
+  assert.equal(companyContactsHref("a&b c"), "/companies/a%26b%20c");
 });
 
 test("the vacancy number links to the company's hiring tab by key, URL-encoded, and the tab resolves back", () => {
