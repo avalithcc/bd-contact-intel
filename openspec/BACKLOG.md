@@ -1826,6 +1826,11 @@ rewrite or deletion; (3) the guard has not been exercised at runtime by a
 Playwright run (none was possible: no `.env.e2e.local`), only by unit tests,
 typecheck and `playwright test --list`: unverified; (4) whether the rows
 created by the 2026-10-01 runs were ever cleaned up is still unverified.
+**Re-checked 2026-10-19:** gap (1) is closed (`c5a51a30`: `getCurrentBd` consults
+`mayProvisionBd` and throws instead of inserting or stamping for a read-only e2e
+request; production is unaffected); gap (2) is closed (`phase11.spec.ts` was
+rewritten, then deleted with the route it covered in `4f0ca389`; no spec of that
+name remains).
 
 Update 2026-10-13. Gap (4) is **answered: the e2e account has no footprint in
 production.** Measured read-only against production for
@@ -1895,7 +1900,10 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `regexp_replace` digit indexes. Searching should match a local form like
   `11 5555 5555` against stored E.164 `+5491155555555`. (Noted 2026-10-18, after
   the E.164 backfill made stored phones uniform.)
-- The e2e login setup times out on a cold dev server (flaky).
+- ~~The e2e login setup times out on a cold dev server (flaky).~~ Already fixed
+  (`eda9e552`, re-checked 2026-10-19): `tests/e2e/auth.setup.ts` warms `/login`
+  with a 120 s request, gives the navigation 120 s and the landing 90 s, inside a
+  240 s budget for that one setup test only; nothing is retried or masked.
 - `email_account.reconnect_banner_dismissed_at` is unused. (Checked 2026-10-18:
   only declared, `src/db/schema.ts:1411`, and created/retyped by migrations
   0027 and 0033; nothing in `src/` reads or writes it, and 0 production rows
