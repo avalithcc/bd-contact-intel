@@ -112,18 +112,31 @@ async function aggregates(period: Parameters<typeof import("@/lib/reports/period
 
 test("reply rate leaves out people of current clients (won + active), including through an alias, and keeps everyone else", async () => {
   const { result } = await aggregates("month");
-  // Included: won+inactive (replied), won+null, qualified+active, no company. Excluded: won+active and its alias.
-  assert.equal(result.funnel.newTotal, 4);
-  assert.equal(result.funnel.contactedOrMore, 4);
-  assert.equal(result.funnel.repliedOrMore, 1);
+  // Rate: included = won+inactive (replied), won+null, qualified+active, no company. Excluded = won+active and its alias.
+  assert.equal(result.funnel.rateContacted, 4);
+  assert.equal(result.funnel.rateReplied, 1);
 });
 
-test("the cohort list behind the reply rate lists exactly the counted people", async () => {
+test("a contact at a current client still counts in 'Contactos nuevos', the funnel and the source table; only the rate leaves them out", async () => {
+  const { result } = await aggregates("month");
+  assert.equal(result.funnel.newTotal, 6, "all six cohort people, clients included");
+  assert.equal(result.funnel.contactedOrMore, 6);
+  assert.equal(result.funnel.repliedOrMore, 3, "the two client contacts replied and still show in Respondió");
+  const sourceTotal = result.sourceStatus.reduce((n, r) => n + r.count, 0);
+  assert.equal(sourceTotal, 6);
+});
+
+test("the cohort lists include clients, except the reply-rate tile's list which matches its number", async () => {
   const { reportPeriodRange } = await import("@/lib/reports/period");
   const { getCohortDrilldown } = await import("@/lib/reports/queriesDb");
   const range = reportPeriodRange("month", NOW);
-  const rows = await getCohortDrilldown({ population: "replied", fromIso: range.fromIso, toIso: range.toIso, bdId });
-  assert.deepEqual(rows.map((r) => r.personId), [personIds.inactivereplied]);
+  const base = { fromIso: range.fromIso, toIso: range.toIso, bdId };
+  const everyone = await getCohortDrilldown({ ...base, population: "replied" });
+  assert.equal(everyone.length, 3);
+  const nuevos = await getCohortDrilldown({ ...base, population: "new" });
+  assert.equal(nuevos.length, 6);
+  const rate = await getCohortDrilldown({ ...base, population: "replied", excludeClients: true });
+  assert.deepEqual(rate.map((r) => r.personId), [personIds.inactivereplied]);
 });
 
 test("'Empresas ganadas' follows the period", async () => {

@@ -19,7 +19,23 @@ export interface FunnelCounts {
   discarded: number;
 }
 
+/**
+ * The reply-rate tile's own counts: same statuses as `contactedOrMore`/`repliedOrMore`, but current clients (won +
+ * active) are left out of numerator and denominator (owner decision 2026-10-19). Optional so callers that only have
+ * the everyone-counts fall back to them.
+ */
+export interface ReplyRateCounts {
+  rateContacted: number;
+  rateReplied: number;
+}
+
 export interface FunnelBreakdown extends FunnelCounts {
+  /** The "Tasa de respuesta" tile (clients excluded): percentage, whether it is a rate, and the "replied / contacted" fraction. */
+  rateReplyPct: number;
+  rateReplyIsRate: boolean;
+  rateReplyFraction: string;
+  rateContacted: number;
+  rateReplied: number;
   contactedPct: number;
   repliedPct: number;
   meetingPct: number;
@@ -46,10 +62,17 @@ function pct(numerator: number, denominator: number): number {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
 }
 
-export function buildFunnelBreakdown(counts: FunnelCounts): FunnelBreakdown {
+export function buildFunnelBreakdown(counts: FunnelCounts & Partial<ReplyRateCounts>): FunnelBreakdown {
   const replyRatePct = pct(counts.repliedOrMore, counts.contactedOrMore);
+  const rateContacted = counts.rateContacted ?? counts.contactedOrMore;
+  const rateReplied = counts.rateReplied ?? counts.repliedOrMore;
   return {
     ...counts,
+    rateContacted,
+    rateReplied,
+    rateReplyPct: pct(rateReplied, rateContacted),
+    rateReplyIsRate: rateContacted >= MIN_RATE_SAMPLE,
+    rateReplyFraction: `${rateReplied} / ${rateContacted}`,
     contactedPct: pct(counts.contactedOrMore, counts.newTotal),
     repliedPct: pct(counts.repliedOrMore, counts.newTotal),
     meetingPct: pct(counts.meeting, counts.newTotal),

@@ -110,22 +110,21 @@ export interface ReportAggregatesParams {
  * The period's cohort: non-merged persons created in the period, owner-scoped
  * when a BD is selected. Shared by `rpt_person_scope` (the funnel counts) and
  * the cohort drill-down list, so a tile and the list behind it can never
- * disagree about WHO is in scope. Current clients (won + active, notCurrentClientPersonSql) are out of the cohort, so
- * the reply rate, the funnel rows and the source table all exclude them from numerator AND denominator.
+ * disagree about WHO is in scope. Everyone is in the cohort, current clients included: only the reply rate leaves them
+ * out (owner decision 2026-10-19), via `rpt_person_scope.pbc_in_rate` and the drill-down's `excludeClients`.
  * Call sites FROM `${person}` un-aliased.
  */
 function cohortScopeSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
   return sql`person.merged_into_id is null
         and person.created_at >= ${fromIso}::timestamptz
         and person.created_at < ${toIso}::timestamptz
-        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)
-        and ${notCurrentClientPersonSql()}`;
+        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)`;
 }
 
 export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggregatesParams) {
   return sql`
     with rpt_person_scope as (
-      select person.id, person.status, person.source_key
+      select person.id, person.status, person.source_key, ${notCurrentClientPersonSql()} as pbc_in_rate
       from ${person}
       where ${cohortScopeSql({ fromIso, toIso, bdId })}
     ),
@@ -134,6 +133,8 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
         count(*)::int as pbc_new_total,
         count(*) filter (where rpt_person_scope.status in ('contacted','replied','meeting'))::int as pbc_contacted_or_more,
         count(*) filter (where rpt_person_scope.status in ('replied','meeting'))::int as pbc_replied_or_more,
+        count(*) filter (where rpt_person_scope.pbc_in_rate and rpt_person_scope.status in ('contacted','replied','meeting'))::int as pbc_rate_contacted,
+        count(*) filter (where rpt_person_scope.pbc_in_rate and rpt_person_scope.status in ('replied','meeting'))::int as pbc_rate_replied,
         count(*) filter (where rpt_person_scope.status = 'meeting')::int as pbc_meeting,
         count(*) filter (where rpt_person_scope.status = 'discarded')::int as pbc_discarded
       from rpt_person_scope
@@ -191,6 +192,8 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
         'newTotal', pbc_new_total,
         'contactedOrMore', pbc_contacted_or_more,
         'repliedOrMore', pbc_replied_or_more,
+        'rateContacted', pbc_rate_contacted,
+        'rateReplied', pbc_rate_replied,
         'meeting', pbc_meeting,
         'discarded', pbc_discarded
       ) from rpt_funnel) as funnel,
@@ -308,7 +311,7 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
 }
 
 export interface ReportAggregatesResult {
-  funnel: { newTotal: number; contactedOrMore: number; repliedOrMore: number; meeting: number; discarded: number };
+  funnel: { newTotal: number; contactedOrMore: number; repliedOrMore: number; rateContacted: number; rateReplied: number; meeting: number; discarded: number };
   sourceStatus: { sourceKey: string | null; status: string; count: number }[];
   discardReasons: { reason: string; count: number }[];
   pipeline: { stage: string | null; count: number }[];
@@ -462,6 +465,8 @@ export type MeetingDrilldownRawResultRow = {
 
 export interface CohortDrilldownParams extends ReportAggregatesParams {
   population: CohortPopulation;
+  /** The reply-rate tile's list: leaves out current clients (won + active), exactly like its number. */
+  excludeClients?: boolean;
 }
 
 /**
@@ -532,7 +537,8 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
         person.job_title as pbc_job_title,
         person.created_at as pbc_created_at
       from ${person}
-      where ${cohortScopeSql(params)}${statusFilter}
+      where ${cohortScopeSql(params)}${statusFilter}${params.excludeClients ? sql`
+        and ${notCurrentClientPersonSql()}` : sql``}
     )${replyCtes}
     select
       rpt_cohort.pbc_id as person_id,

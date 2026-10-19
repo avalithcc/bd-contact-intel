@@ -48,6 +48,8 @@ interface CohortQuery {
   fromIso: string;
   toIso: string;
   bdId: string | null;
+  /** The reply-rate tile only: leave current clients out of the list, like its number. */
+  excludeClients?: boolean;
   /** Header text, built server-side by cohortHeaderLines. */
   summary: string;
   note: string;
@@ -207,8 +209,8 @@ export function CohortTile({
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}
-      cacheKey={drilldownCacheKey({ kind: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
-      fetchRows={() => getCohortDrilldownAction({ population: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
+      cacheKey={drilldownCacheKey({ kind: query.excludeClients ? `${query.population}_rate` : query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
+      fetchRows={() => getCohortDrilldownAction({ population: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId, excludeClients: query.excludeClients })}
       renderList={(rows) => <CohortRowsTable population={query.population} rows={rows} labels={l} />}
     />
   );

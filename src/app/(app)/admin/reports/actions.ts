@@ -66,6 +66,7 @@ export async function getCohortDrilldownAction(params: {
   fromIso: string;
   toIso: string;
   bdId: string | null;
+  excludeClients?: boolean;
 }): Promise<DrilldownResult<CohortRow>> {
   try {
     await requireAdmin();
@@ -77,6 +78,7 @@ export async function getCohortDrilldownAction(params: {
       fromIso: params.fromIso,
       toIso: params.toIso,
       bdId: normalizedBdId(params.bdId),
+      excludeClients: params.excludeClients === true,
     });
     return { ok: true, rows };
   } catch (err) {

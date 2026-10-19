@@ -148,14 +148,23 @@ export function ReportsView({
   // persons its number counted (cohortDrilldown.ts). The header words are
   // built here because they use dictionary formatters (server-only).
   const periodPhrase = cohortPeriodPhrase(period, range.fromDate, range.toDateExclusive, dict);
-  const cohortQuery = (population: CohortPopulation) => ({
-    population,
-    fromIso: range.fromIso,
-    toIso: range.toIso,
-    bdId,
-    ...cohortHeaderLines(population, aggregates.funnel, periodPhrase, dict),
-    labels: cohortLabels,
-  });
+  // `rate` = the reply-rate tile: its counts (and its list) leave out current clients, so the header quotes those counts.
+  const cohortQuery = (population: CohortPopulation, rate = false) => {
+    const lines = cohortHeaderLines(
+      population,
+      rate ? { ...aggregates.funnel, repliedOrMore: funnel.rateReplied, contactedOrMore: funnel.rateContacted } : aggregates.funnel,
+      periodPhrase,
+      dict,
+    );
+    return {
+      population,
+      fromIso: range.fromIso,
+      toIso: range.toIso,
+      bdId,
+      ...(rate ? { excludeClients: true, summary: lines.summary, note: `${lines.note} ${dict.excludesActiveClients}.` } : lines),
+      labels: cohortLabels,
+    };
+  };
   const sourceRows = buildSourceConversionRows(aggregates.sourceStatus);
   const sourceTotal = sourceRows.reduce(
     (acc, r) => ({
@@ -273,16 +282,16 @@ export function ReportsView({
           foot={dict.kpiNewContactsFoot}
         />
         <CohortTile
-          {...cohortQuery("replied")}
-          toneClass={funnel.replyRateIsRate ? "info" : "neutral"}
+          {...cohortQuery("replied", true)}
+          toneClass={funnel.rateReplyIsRate ? "info" : "neutral"}
           label={dict.kpiReplyRate}
-          count={cohortCount(aggregates.funnel, "replied")}
-          displayValue={funnel.replyRateIsRate ? `${funnel.replyRatePct}%` : funnel.replyRateFraction}
+          count={funnel.rateReplied}
+          displayValue={funnel.rateReplyIsRate ? `${funnel.rateReplyPct}%` : funnel.rateReplyFraction}
           foot={
             <>
-              {funnel.replyRateIsRate
-                ? dict.kpiReplyRateFoot(funnel.repliedOrMore, funnel.contactedOrMore)
-                : dict.kpiReplyRateSmallFoot(funnel.replyRatePct)}
+              {funnel.rateReplyIsRate
+                ? dict.kpiReplyRateFoot(funnel.rateReplied, funnel.rateContacted)
+                : dict.kpiReplyRateSmallFoot(funnel.rateReplyPct)}
               <br />
               {dict.excludesActiveClients}
             </>
@@ -442,9 +451,7 @@ export function ReportsView({
                 <span className="bar-success" style={{ width: `${funnel.meetingPct}%` }} />
               </div>
             </div>
-            <div className="card-footer meta">
-              {dict.funnelDiscardedFoot(funnel.discarded, funnel.discardedPct)} {dict.excludesActiveClients}.
-            </div>
+            <div className="card-footer meta">{dict.funnelDiscardedFoot(funnel.discarded, funnel.discardedPct)}</div>
           </div>
         </div>
 
