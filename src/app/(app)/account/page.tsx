@@ -141,6 +141,14 @@ export default async function AccountPage() {
 
       <div className={styles.card}>
         <h3 className={styles.cardHeader}>{l.importTitle}</h3>
+        <Link className={styles.listLink} href="/contacts/import">
+          <LinkedInIcon className={`icon ${styles.listLinkIcon}`} />
+          <span className={styles.listLinkGrow}>
+            <span className={styles.listLinkTitle}>{l.linkedinConnectionsRowTitle}</span>
+            <span className={styles.listLinkMeta}>{l.linkedinConnectionsRowMeta}</span>
+          </span>
+          <ChevronRightIcon className={`icon ${styles.listLinkChevron}`} />
+        </Link>
         <Link className={styles.listLink} href="/account/linkedin-messages">
           <LinkedInIcon className={`icon ${styles.listLinkIcon}`} />
           <span className={styles.listLinkGrow}>

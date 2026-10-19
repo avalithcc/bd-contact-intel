@@ -1540,6 +1540,8 @@ export const es: typeof en = {
     linkedinMessagesRowMeta: (messages: string, conversations: string, lastImport: string) =>
       `${messages} mensajes en ${conversations} conversaciones · última importación: ${lastImport}`,
     linkedinMessagesRowEmptyMeta: "Todavía no importaste mensajes",
+    linkedinConnectionsRowTitle: "Contactos de LinkedIn",
+    linkedinConnectionsRowMeta: "Sube el archivo Connections.csv que exportas desde LinkedIn",
     signatureTitle: "Firma de correo",
     signatureHelp:
       "Pega el HTML completo de tu firma. Se añade al final de cada correo que envías desde el CRM; sin firma, tus correos se envían como texto plano.",
