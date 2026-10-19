@@ -23,6 +23,7 @@
  */
 import { sql } from "drizzle-orm";
 import { activity } from "@/db/schema";
+import { safeTimestamptzSql } from "@/lib/contacts/effectiveActivityTime";
 import { activityRowToStatusEvent, type ActivityRowForStatus } from "@/lib/status/deriveStatus";
 
 export const FOLLOW_UP_DAILY_CAP = 10;
@@ -75,6 +76,6 @@ export function workedTodayAtSql() {
     when ${activity.type} in (${sql.join(
       WORKED_TODAY_OCCURRED_AT_TYPES.map((t) => sql`${t}`),
       sql`, `,
-    )}) and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
+    )}) then coalesce(${safeTimestamptzSql(sql`(${activity.metadata}->>'occurredAt')`)}, ${activity.createdAt})
     else ${activity.createdAt} end)`;
 }

@@ -121,10 +121,21 @@ const ISO_DATETIME_SHAPE =
  * Postgres guarantees a CASE branch is only evaluated when its WHEN holds, which `a AND b` does not guarantee. Year is
  * limited to 19xx/20xx so `make_date` cannot see year 0.
  */
-function safeTimestamptzSql(value: SQL) {
+export function safeTimestamptzSql(value: SQL) {
   return sql`(case when ${value} ~ ${sql.raw(`'${ISO_DATETIME_SHAPE}'`)} then (case
       when substr(${value}, 9, 2)::int <= extract(day from (make_date(substr(${value}, 1, 4)::int, substr(${value}, 6, 2)::int, 1) + interval '1 month' - interval '1 day'))::int
       then (${value})::timestamptz end) end)`;
+}
+
+/**
+ * Literal-text twin of `safeTimestamptzSql` for the raw-text SQL fragments that cannot interpolate drizzle columns
+ * (`sql.raw` sites such as the reports and app-shell worked pivots). `valueText` is a trusted constant expression
+ * (e.g. `(activity.metadata->>'occurredAt')`), never user input; it is repeated, so it must be side-effect free.
+ */
+export function safeTimestamptzText(valueText: string): string {
+  return `(case when ${valueText} ~ '${ISO_DATETIME_SHAPE}' then (case
+      when substr(${valueText}, 9, 2)::int <= extract(day from (make_date(substr(${valueText}, 1, 4)::int, substr(${valueText}, 6, 2)::int, 1) + interval '1 month' - interval '1 day'))::int
+      then (${valueText})::timestamptz end) end)`;
 }
 
 function activityTimeCase(hideDeleted: boolean, meetingHeldAt = false) {

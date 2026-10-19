@@ -44,13 +44,14 @@
  */
 import { sql } from "drizzle-orm";
 import { activity, bd, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, meeting, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
+import { safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { CLOSED_STATES } from "@/lib/sequences/memberState";
 
 /** Raw-SQL-text twin of queueSelection.ts#workedTodayAtSql() — see this file's doc comment for why it can't reuse that helper via interpolation here. */
-const WORKED_TODAY_AT_SQL_TEXT = `(case
+export const WORKED_TODAY_AT_SQL_TEXT = `(case
             when activity.type = 'call' then activity.created_at
-            when activity.type in ('email_sent', 'reply_received') and (activity.metadata->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (activity.metadata->>'occurredAt')::timestamptz
+            when activity.type in ('email_sent', 'reply_received') then coalesce(${safeTimestamptzText("(activity.metadata->>'occurredAt')")}, activity.created_at)
             else activity.created_at end)`;
 
 export interface AppShellBadgeCountsQueryParams {

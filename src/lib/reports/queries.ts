@@ -40,7 +40,7 @@
  */
 import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, meeting, person, sequence, sequenceMember, task } from "@/db/schema";
-import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql, safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
 import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
 import { WON_TRACKING_STARTS_AT_ISO } from "@/lib/reports/wonTracking";
 import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
@@ -94,9 +94,9 @@ const ACTIVITY_BY_BD_TYPES = ["note", "call", "meeting_logged", "email_sent", "r
 const QUEUE_DAY_START_UTC_SQL_TEXT = `(follow_up_queue_item.queue_date::timestamp at time zone 'UTC')`;
 
 /** Literal-text twin of queueSelection.ts#workedTodayAtSql(), generalized from "today" to an arbitrary ART calendar date — see this file's doc comment for why it can't reuse that helper via interpolation here. */
-const WORKED_AT_SQL_TEXT = `(case
+export const WORKED_AT_SQL_TEXT = `(case
             when activity.type = 'call' then activity.created_at
-            when activity.type in ('email_sent', 'reply_received') and (activity.metadata->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (activity.metadata->>'occurredAt')::timestamptz
+            when activity.type in ('email_sent', 'reply_received') then coalesce(${safeTimestamptzText("(activity.metadata->>'occurredAt')")}, activity.created_at)
             else activity.created_at end)`;
 const WORKED_ACTIVITY_TYPE_LIST = ["note", "call", "meeting_logged", "email_sent", "discarded"] as const;
 

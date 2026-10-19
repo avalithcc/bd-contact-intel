@@ -87,7 +87,7 @@ test("buildAppShellBadgeCountsQuery: worked-today redirects email_sent/reply_rec
   const { sql } = render();
   assert.match(
     sql,
-    /when activity\.type in \('email_sent', 'reply_received'\) and \(activity\.metadata->>'occurredAt'\) ~ '[^']+' then \(activity\.metadata->>'occurredAt'\)::timestamptz/i,
+    /when activity\.type in \('email_sent', 'reply_received'\) then coalesce\(\(case when \(activity\.metadata->>'occurredAt'\) ~ '[^']+'/i,
   );
 });
 
