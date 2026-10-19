@@ -34,6 +34,8 @@ import { AttachmentChips, RecipientsLine } from "@/components/email/AttachmentCh
 import { summarizeRecipients } from "@/lib/email/recipients/summary";
 import { readBounceMetadata } from "@/lib/gmail/bouncePlan";
 import { BounceTimelineCard } from "./BounceTimelineCard";
+import { MeetingTimelineCard, isMeetingCardType } from "./MeetingTimelineCard";
+import { UpcomingMeetingCard, type RecordMeeting } from "./UpcomingMeetings";
 import { splitQuotedText } from "@/lib/gmail/splitQuotedText";
 import {
   buildConnectionTimelineEntries,
@@ -113,6 +115,8 @@ export interface TimelineProps {
   // counterpart's identity for a "Recibido" message is simply this record's
   // own contact.
   personName: string;
+  // The Contact's company, for the outcome dialog's summary of an upcoming meeting.
+  personCompany: string | null;
   labels: ContactRecordLabels;
   // Server-fetched initial page for `activePill` (or the unfiltered "Todo"
   // page when `activePill` is undefined) — see the "Instant pill filtering"
@@ -135,6 +139,8 @@ export interface TimelineProps {
   tasks: TimelineTask[];
   // This BD's scheduled emails for the Contact (open ones plus recent cancellations), see listScheduledForPerson.
   scheduled: ScheduledItem[];
+  // Scheduled meetings of this Contact the viewer may see (meeting-outcomes): the dashed "Próximas" cards.
+  meetings: RecordMeeting[];
   gmailConnected: boolean;
   // The server's clock, so the scheduled cards render the same on both sides; it ticks from there (useNow).
   now: Date;
@@ -218,6 +224,9 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   hunter_lookup: "timelineFilterHunter",
   status_change: "timelineFilterStatusChange",
   meeting_logged: "timelineFilterMeeting",
+  meeting_no_show: "timelineFilterMeeting",
+  meeting_cancelled: "timelineFilterMeeting",
+  meeting_rescheduled: "timelineFilterMeeting",
   call: "timelineFilterCall",
   call_attempt: "timelineFilterCallAttempt",
   lusha_reveal: "timelineFilterLushaReveal",
@@ -242,6 +251,10 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   hunter_lookup: SearchIcon,
   status_change: HistoryIcon,
   meeting_logged: MeetingIcon,
+  // Drawn by MeetingTimelineCard, which picks its own icon.
+  meeting_no_show: MeetingIcon,
+  meeting_cancelled: MeetingIcon,
+  meeting_rescheduled: MeetingIcon,
   call: CallIcon,
   // Rendered by the dashed attempt row below, which draws its own icon.
   call_attempt: CallIcon,
@@ -358,12 +371,14 @@ function lockedConversationText(l: ContactRecordLabels, ownerName: string): stri
 export function Timeline({
   personId,
   personName,
+  personCompany,
   labels: l,
   entries,
   countsByType,
   activePill,
   tasks,
   scheduled,
+  meetings,
   gmailConnected,
   now: serverNow,
   taskTotalCount,
@@ -1291,10 +1306,13 @@ export function Timeline({
         </>
       ) : (
         <>
-          {(upcoming.length > 0 || openScheduled.length > 0) && (
+          {(upcoming.length > 0 || openScheduled.length > 0 || meetings.length > 0) && (
             <>
               <div className="tl-group">{l.timelineGroupUpcoming}</div>
               <div className="tl">
+                {meetings.map((meeting) => (
+                  <UpcomingMeetingCard key={meeting.id} meeting={meeting} personName={personName} company={personCompany} labels={l} />
+                ))}
                 {openScheduled.map((s) => (
                   <ScheduledCard key={s.id} item={s} l={l} run={sched.run} gmailConnected={gmailConnected} now={now} busy={sched.busy} />
                 ))}
@@ -1310,7 +1328,7 @@ export function Timeline({
           )}
           {sched.dialogs}
 
-          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length + openScheduled.length + cancelledScheduled.length, unlisted: unlistedEntries.length }) ? (
+          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length + openScheduled.length + cancelledScheduled.length + meetings.length, unlisted: unlistedEntries.length }) ? (
             <div className={styles.placeholder}>{l.timelineEmpty}</div>
           ) : (
             groups.map((group, i) => (
@@ -1433,6 +1451,9 @@ export function Timeline({
                 // A visible bounce has its own layout (hard: danger card with effect chips; soft: neutral dotted card).
                 const bounceMeta = timelineEntry.type === "email_bounced" && timelineEntry.visible ? readBounceMetadata(timelineEntry.metadata) : null;
                 if (bounceMeta) return <BounceTimelineCard key={timelineEntry.id} meta={bounceMeta} when={formatWhen(at)} labels={l} />;
+                if (isMeetingCardType(timelineEntry.type)) {
+                  return <MeetingTimelineCard key={timelineEntry.id} entry={timelineEntry} at={at} labels={l} />;
+                }
                 const Icon = TYPE_ICON[timelineEntry.type as TimelineActivityType] ?? NoteIcon;
                 const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
                 return (

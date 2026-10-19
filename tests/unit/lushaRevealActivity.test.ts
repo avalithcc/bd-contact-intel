@@ -118,7 +118,7 @@ test("a reveal still counts as the last activity and has its own label in es and
 test("the reveal has a timeline body per field, in both locales", () => {
   for (const locale of ["es", "en"] as const) {
     const d = t(locale);
-    const l = { ...d.contactRecord, leadStatuses: d.leadStatuses };
+    const l = { ...d.contactRecord, leadStatuses: d.leadStatuses, meetings: d.meetings };
     assert.equal(entryBody({ type: REVEAL, visible: true, actorName: null, metadata: { field: "emails" } }, l), l.timelineLushaRevealEmail);
     assert.equal(entryBody({ type: REVEAL, visible: true, actorName: null, metadata: { field: "phones" } }, l), l.timelineLushaRevealPhone);
   }

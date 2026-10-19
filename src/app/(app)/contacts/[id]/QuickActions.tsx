@@ -1,6 +1,6 @@
 "use client";
 
-import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
+import { argentinaCalendarDate, argentinaWallClockToUtc } from "@/lib/tasks/argentinaDate";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -37,6 +37,7 @@ import {
   ClockIcon,
   DiscardIcon,
   GenerateIcon,
+  InfoIcon,
   MailIcon,
   MeetingIcon,
   NoteIcon,
@@ -421,7 +422,7 @@ export function QuickActions({
             if (!result.ok && result.reason === "unconfirmed") router.refresh();
             if (result.ok) {
               closeQuickAction();
-              showToast(l.toastMeetingLogged);
+              showToast(result.kind === "scheduled" ? l.meetings.toastScheduled : l.toastMeetingLogged);
               router.refresh();
             } else {
               const message = contactActionErrorMessage(l, result.reason);
@@ -754,11 +755,18 @@ export function MeetingForm({
   error,
   onCancel,
   onSubmit,
-}: ComposerProps & { onSubmit: (date: string, time: string, notes: string) => void }) {
+  allowScheduling = true,
+}: ComposerProps & {
+  onSubmit: (date: string, time: string, notes: string) => void;
+  /** A date and time still ahead is saved as Agendada (meeting-outcomes). The board's "Reunión" column only logs held meetings. */
+  allowScheduling?: boolean;
+}) {
   const ids = useId();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
+  // Exact date + time, Argentina wall clock: the same comparison the server makes (planMeetingEntry).
+  const scheduling = allowScheduling && date !== "" && argentinaWallClockToUtc(date, time || "00:00").getTime() > Date.now();
 
   return (
     <Dialog
@@ -766,6 +774,7 @@ export function MeetingForm({
       onClose={onCancel}
       closeDisabled={busy}
       title={l.meetingSubmit}
+      icon={<MeetingIcon className="icon" />}
       footer={
         <>
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
@@ -777,7 +786,7 @@ export function MeetingForm({
             disabled={busy || !date}
             onClick={() => date && onSubmit(date, time, notes)}
           >
-            {l.meetingSubmit}
+            {scheduling ? l.meetings.scheduleSubmit : l.meetingSubmit}
           </button>
         </>
       }
@@ -794,8 +803,8 @@ export function MeetingForm({
             id={`${ids}-date`}
             className="input"
             type="date"
-            // Courtesy only (the server guard is the real check): same ART day as futureGuard.ts.
-            max={argentinaCalendarDate(new Date())}
+            // Without scheduling, a courtesy limit only (the server decides): the same ART day as futureGuard.ts.
+            max={allowScheduling ? undefined : argentinaCalendarDate(new Date())}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             disabled={busy}
@@ -815,6 +824,14 @@ export function MeetingForm({
           />
         </div>
       </div>
+      {scheduling ? (
+        <div className="alert alert-info" role="status">
+          <InfoIcon className="icon" />
+          <div>{l.meetings.scheduleInfo}</div>
+        </div>
+      ) : (
+        <p className="help">{l.meetingHelp}</p>
+      )}
       <div className="field">
         <label className="label" htmlFor={`${ids}-notes`}>
           {l.meetingNotesLabel}
@@ -827,7 +844,6 @@ export function MeetingForm({
           disabled={busy}
         />
       </div>
-      <p className="help">{l.meetingHelp}</p>
     </Dialog>
   );
 }

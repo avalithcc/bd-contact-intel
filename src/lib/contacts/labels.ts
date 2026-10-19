@@ -10,10 +10,12 @@ import type { StatusReasonEvidence } from "@/lib/status/deriveStatus";
 // the same vocabulary (design D4).
 export type ContactRecordLabels = ClientStrings<Dictionary["contactRecord"]> & {
   leadStatuses: Dictionary["leadStatuses"];
+  // Meeting copy shared with the Reuniones page (meeting-outcomes): the register dialog, the strip and the timeline cards.
+  meetings: Dictionary["meetings"];
 };
 
 export function pickContactRecordLabels(dict: Dictionary): ContactRecordLabels {
-  return { ...dict.contactRecord, leadStatuses: dict.leadStatuses };
+  return { ...dict.contactRecord, leadStatuses: dict.leadStatuses, meetings: dict.meetings };
 }
 
 /**

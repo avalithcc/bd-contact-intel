@@ -157,7 +157,7 @@ test("it renders under the Correos pill with the replies and joins a thread as a
 test("the card reads as an automatic reply, not 'respondio', in both locales", () => {
   for (const locale of ["es", "en"] as const) {
     const d = t(locale);
-    const l = { ...d.contactRecord, leadStatuses: d.leadStatuses };
+    const l = { ...d.contactRecord, leadStatuses: d.leadStatuses, meetings: d.meetings };
     assert.equal(entryBody({ type: AUTO, visible: true, actorName: null, metadata: {} }, l), l.timelineAutoReplyDefault);
     assert.equal(entryBody({ type: AUTO, visible: true, actorName: null, metadata: { subject: "Out of office", from: "jane@prospect.com" } }, l), "Out of office · jane@prospect.com");
     assert.notEqual(l.timelineFilterAutoReply, l.timelineFilterReplyReceived);

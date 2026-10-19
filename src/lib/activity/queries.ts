@@ -34,6 +34,11 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "hunter_lookup",
   "status_change",
   "meeting_logged",
+  // The rest of a meeting's life (meeting-outcomes). `meeting_scheduled` is deliberately absent: the "Próximas" card and the
+  // outcome cards already tell it, and the activity itself stays as the audit record of who scheduled what.
+  "meeting_no_show",
+  "meeting_cancelled",
+  "meeting_rescheduled",
   "call",
   "call_attempt",
   "lusha_reveal",

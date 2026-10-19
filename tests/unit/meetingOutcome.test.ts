@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MeetingDateRequiredError } from "@/lib/contacts/meeting";
+import { TIMELINE_PILL_GROUPS } from "@/lib/activity/timelinePills";
 import { activityStageCandidate } from "@/lib/status/deriveStatus";
 import { NON_TOUCH_ACTIVITY_TYPES } from "@/lib/contacts/effectiveActivityTime";
 import { argentinaWallClockToUtc } from "@/lib/tasks/argentinaDate";
@@ -226,4 +227,9 @@ test("only meeting_logged moves the contact stage; every other meeting activity 
     assert.ok((NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes(type), `${type} is not a touch`);
   }
   assert.ok(!(NON_TOUCH_ACTIVITY_TYPES as readonly string[]).includes("meeting_logged"));
+});
+
+test("the timeline shows every outcome of a meeting under the Reuniones pill, and no pill carries the bare scheduling record", () => {
+  assert.deepEqual([...TIMELINE_PILL_GROUPS.meeting_logged].sort(), ["meeting_cancelled", "meeting_logged", "meeting_no_show", "meeting_rescheduled"]);
+  assert.ok(!Object.values(TIMELINE_PILL_GROUPS).flat().includes("meeting_scheduled"));
 });

@@ -180,6 +180,8 @@ export function BoardDnD({
           labels={recordLabels}
           busy={busy}
           error={error}
+          // The "Reunión" column holds meetings that happened; scheduling one is the record page's job.
+          allowScheduling={false}
           onCancel={closeForm}
           onSubmit={async (date, time, notes) => {
             setBusy(true);

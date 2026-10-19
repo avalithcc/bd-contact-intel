@@ -8,6 +8,9 @@ import { emailBounceHint } from "@/lib/contacts/bounceView";
 import { getContactRecord } from "@/lib/contacts/queries";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
+import { getScheduledMeetingsForPerson } from "@/lib/meetings/queries";
+import { formatMeetingWhen } from "@/lib/meetings/when";
+import type { RecordMeeting } from "./UpcomingMeetings";
 import { getLockedConversationSummaries } from "@/lib/activity/lockedConversationSummaries";
 import { resolveLockedConnectionCardRows } from "@/lib/contacts/conversationHistoryAccess";
 import { getAdminInlineConversations } from "@/lib/activity/adminInlineConversations";
@@ -137,7 +140,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   const timelineTab = rawActivityType === "task" ? ("task" as const) : activePill;
   const me = await getCurrentBd();
   const isAdmin = me.role === "admin";
-  const [timeline, ownerOptions, tasksForPerson, sequenceMemberships, scheduled] = await Promise.all([
+  const [timeline, ownerOptions, tasksForPerson, sequenceMemberships, scheduled, meetingsForPerson] = await Promise.all([
     getPersonTimeline(record.person.id, me.id, { pill: activePill, viewerIsAdmin: isAdmin }),
     listOwnerOptions(),
     getTasksForPerson(record.person.id),
@@ -145,8 +148,26 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     listContactMemberships(me.id, record.person.email),
     // This BD's own scheduled emails for the Contact: the "Próximas" cards, the cancellation lines and the composer's notice.
     listScheduledForPerson(record.person.id, me.id),
+    // Scheduled meetings of this Contact the viewer may see: their own, or everyone's for an admin (read-only for the others').
+    getScheduledMeetingsForPerson(record.person.id, me),
   ]);
   const nowForScheduled = new Date();
+  const meetingWhenLabels = {
+    today: dict.meetings.whenToday,
+    yesterday: dict.meetings.whenYesterday,
+    tomorrow: dict.meetings.whenTomorrow,
+    agoMinutes: dict.meetings.whenAgoMinutes,
+    agoHours: dict.meetings.whenAgoHours,
+  };
+  const recordMeetings: RecordMeeting[] = meetingsForPerson.map((m) => ({
+    id: m.id,
+    bdName: m.bdName,
+    scheduledAtIso: m.scheduledAt.toISOString(),
+    whenText: formatMeetingWhen(m.scheduledAt, nowForScheduled, meetingWhenLabels).text,
+    notes: m.notes,
+    canMutate: m.canMutate,
+    pending: m.scheduledAt.getTime() <= nowForScheduled.getTime(),
+  }));
   const needsGmail = scheduled.some((s) => stateOf(s, nowForScheduled) === "failed_gmail");
   const gmailConnected = needsGmail ? await isGmailConnected(me.id) : true;
   const nextScheduled = scheduled.find((s) => s.status === "scheduled" || s.status === "on_hold");
@@ -476,6 +497,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           messageLabels={messageLabels}
           locale={locale}
           initialAction={openAction}
+          upcomingMeeting={recordMeetings[0] ?? null}
         />
 
         <div className="record-main">
@@ -504,6 +526,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   <Timeline
                     personId={record.person.id}
                     personName={name}
+                    personCompany={companyDisplayName}
                     labels={l}
                     entries={timeline.entries}
                     countsByType={timeline.countsByType}
@@ -521,6 +544,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       associationLabel: companyDisplayName ? `${name} · ${companyDisplayName}` : name,
                     }))}
                     scheduled={scheduled}
+                    meetings={recordMeetings}
                     gmailConnected={gmailConnected}
                     now={nowForScheduled}
                     taskTotalCount={tasksForPerson.openCount + tasksForPerson.doneCount}

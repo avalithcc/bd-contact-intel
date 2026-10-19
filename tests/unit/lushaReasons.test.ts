@@ -17,7 +17,7 @@ test("ContactActionErrorReason declares exactly the library's Lusha reasons", ()
 test("every Lusha reason has its own copy in both locales, none falling back to the generic error", () => {
   for (const locale of ["es", "en"] as const) {
     const d = t(locale);
-    const l = { ...d.contactRecord, leadStatuses: d.leadStatuses };
+    const l = { ...d.contactRecord, leadStatuses: d.leadStatuses, meetings: d.meetings };
     const messages = LUSHA_REASONS.map((r) => contactActionErrorMessage(l, r));
     assert.ok(messages.every((m) => typeof m === "string" && m.length > 0 && m !== l.genericError), locale);
     assert.equal(new Set(messages).size, LUSHA_REASONS.length, `${locale}: copy must be distinct per reason`);
@@ -25,7 +25,7 @@ test("every Lusha reason has its own copy in both locales, none falling back to 
 });
 
 test("the account being out of credits reads differently from the daily cap and from a protected person", () => {
-  const l = { ...t("es").contactRecord, leadStatuses: t("es").leadStatuses };
+  const l = { ...t("es").contactRecord, leadStatuses: t("es").leadStatuses, meetings: t("es").meetings };
   const [credits, cap, protectedCopy] = ["lusha_no_credits", "lusha_cap_reached", "lusha_protected"].map((r) => contactActionErrorMessage(l, r as never));
   assert.equal(new Set([credits, cap, protectedCopy]).size, 3);
 });

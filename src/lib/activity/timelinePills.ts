@@ -54,7 +54,7 @@ export const TIMELINE_PILL_GROUPS: Record<TimelinePillKey, readonly string[]> = 
   // here with `email_sent` (not its own pill key) since both are "Correos"
   // to a BD reading the timeline.
   email_sent: ["email_sent", "reply_received", "auto_reply_received", "email_bounced"],
-  meeting_logged: ["meeting_logged"],
+  meeting_logged: ["meeting_logged", "meeting_no_show", "meeting_cancelled", "meeting_rescheduled"],
   system: ["hunter_lookup", "status_change", "discarded", "status_backfill", "lusha_reveal"],
 };
 

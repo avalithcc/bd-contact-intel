@@ -11,6 +11,7 @@ import { HistoryIcon, LinkedInIcon } from "@/components/icons";
 import type { LushaView } from "@/lib/lusha/revealView";
 import { PropertyList, type AboutPaneProperty, type JobTitleRoleGroupHint, type OwnerOption } from "./PropertyList";
 import { QuickActions, type QuickActionsProps, type TaskAssigneeOption } from "./QuickActions";
+import { UpcomingMeetingStrip, type RecordMeeting } from "./UpcomingMeetings";
 
 export type { AboutPaneProperty, JobTitleRoleGroupHint, OwnerOption };
 
@@ -71,6 +72,8 @@ export interface AboutPaneProps {
   // queue's deep-link quick actions: opens the matching quick-action
   // composer on load, e.g. `?openAction=meeting`.
   initialAction?: "email" | "meeting" | "discard" | "call" | "task" | null;
+  // The nearest scheduled meeting the viewer may see (meeting-outcomes): the "Reunión agendada" strip under the identity header.
+  upcomingMeeting: RecordMeeting | null;
 }
 
 /**
@@ -116,6 +119,7 @@ export function AboutPane({
   messageLabels,
   locale,
   initialAction,
+  upcomingMeeting,
 }: AboutPaneProps) {
   return (
     <aside className="record-left" aria-label={l.aboutSectionTitle}>
@@ -147,6 +151,8 @@ export function AboutPane({
           )}
         </div>
       </div>
+
+      {upcomingMeeting && <UpcomingMeetingStrip meeting={upcomingMeeting} personName={name} company={company} labels={l} />}
 
       <QuickActions
         personId={personId}
