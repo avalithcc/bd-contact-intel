@@ -2834,7 +2834,7 @@ export const en = {
     newContactEmail: "Email",
     newContactCompany: "Company",
     newContactCancel: "Cancel",
-    newContactCreate: "Create",
+    newContactCreate: "Create contact",
     newContactCreateAnyway: "Create anyway",
     newContactOpenExisting: "Open existing",
     newContactDuplicateWarningPrefix: "Possible duplicate",

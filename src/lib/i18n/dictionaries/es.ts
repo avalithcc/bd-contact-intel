@@ -2820,7 +2820,7 @@ export const es: typeof en = {
     newContactEmail: "Correo electrónico",
     newContactCompany: "Empresa",
     newContactCancel: "Cancelar",
-    newContactCreate: "Crear",
+    newContactCreate: "Crear contacto",
     newContactCreateAnyway: "Crear de todas formas",
     newContactOpenExisting: "Abrir el existente",
     newContactDuplicateWarningPrefix: "Posible duplicado",
