@@ -1835,7 +1835,7 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-17
-- **Phone search — built 2026-10-18 (migration 0051 not yet applied to production).** Before this the CRM had no phone search:
+- ~~**Phone search**~~ **Shipped 2026-10-18; migration 0051 applied to production the same day (re-checked 2026-10-19: both suffix indexes exist).** Before this the CRM had no phone search:
   `searchCondition` covers only names, company and email, and nothing uses the
   `regexp_replace` digit indexes. Searching should match a local form like
   `11 5555 5555` against stored E.164 `+5491155555555`. (Noted 2026-10-18, after
