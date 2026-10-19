@@ -696,7 +696,10 @@ Implementation pending that OK.
 production backfill changed 3,092 values (audit_log
 `2db6e75c-b2ed-4a71-9bf1-23f724da0caa`; revert SQL in the
 `scripts/normalize-phones.ts` header). About 580 flagged values were left
-untouched; the by-reason counts are in **Shipped**.
+untouched; the by-reason counts are in **Shipped**. Owner decision 2026-10-19
+(option A, shipped `ca206c85`): a "Revisar formato" badge on the record and the
+list plus a "Teléfono a revisar" filter (488 contacts that day); each BD fixes
+them as they work the contact.
 Owner decision 2026-10-18: option (b) — keep the one-tap bar and add "Más
 detalles…" with the full form; no paid dialer. Shipped 2026-10-18.
 
@@ -1858,7 +1861,7 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   2026-10-19). Selecting the week period still shows the total/monthly won
   companies; every metric on the screen must follow the selected period
   (check each card's date filter, not only won companies).
-- **Actions must update the screen immediately** (owner, 2026-10-19). Example:
+- ~~**Actions must update the screen immediately**~~ **Shipped 2026-10-19** (main `e1466e8c`): Sequences approve refresh fix, cross-route revalidation (follow-ups, scheduled, contacts, tasks, reuniones, sequences), and an app-wide background refresh (every 60 s while visible and idle, on tab focus; paused by dialogs, focused inputs and `data-dirty`; /contacts every 180 s; e2e `tests/e2e/background-refresh.spec.ts`). Original note: (owner, 2026-10-19). Example:
   approving/sending a Sequence email left the contact in the pending list
   until a full page refresh; it should move to "sent" the moment the button
   is pressed. Applies to every action in the app: audit each server action
