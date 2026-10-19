@@ -16,6 +16,7 @@ import { CompanyNotFoundError } from "@/lib/companies/errors";
 import {
   InvalidContactTypeError,
   InvalidEmailError,
+  InvalidNameError,
   InvalidPhoneError,
   InvalidProfileKeyError,
   PropertyBatchEditError,
@@ -39,6 +40,7 @@ export type ContactActionErrorReason =
   // `To` holds several addresses (comma, semicolon or space separated); the product sends to exactly one.
   | "multiple_recipients"
   | "invalid_phone"
+  | "invalid_name"
   | "invalid_profile_key"
   // The LinkedIn profile already belongs to another contact; the failure also
   // carries that contact (see ContactActionResult.conflict).
@@ -166,6 +168,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof NoteDeleteForbiddenError) return "note_delete_forbidden";
   if (err instanceof InvalidEmailError) return "invalid_email";
   if (err instanceof InvalidPhoneError) return "invalid_phone";
+  if (err instanceof InvalidNameError) return "invalid_name";
   if (err instanceof InvalidProfileKeyError) return "invalid_profile_key";
   if (err instanceof ProfileKeyTakenError) return "profile_key_taken";
   if (err instanceof InvalidContactTypeError) return "invalid_contact_type";

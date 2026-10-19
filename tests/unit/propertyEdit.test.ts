@@ -14,6 +14,7 @@ import {
   EDITABLE_PERSON_PROPERTIES,
   InvalidContactTypeError,
   InvalidEmailError,
+  InvalidNameError,
   InvalidPhoneError,
   InvalidProfileKeyError,
   isEditablePersonProperty,
@@ -25,6 +26,8 @@ import {
 
 const BASE_PERSON = {
   id: "11111111-1111-1111-1111-111111111111",
+  firstName: "Eva" as string | null,
+  lastName: "Editor" as string | null,
   email: "old@example.com",
   emailNormalized: "old@example.com",
   emailStatus: "verified",
@@ -539,4 +542,45 @@ test("the DB layer wires the phone normalizer, and the pure module never imports
   assert.match(readFileSync("src/lib/contacts/propertyEditDb.ts", "utf8"), /planPropertyEdit\(row, property, rawNewValue, changedByBdId, normalizePhoneForWrite\)/);
   assert.doesNotMatch(readFileSync("src/lib/contacts/propertyEdit.ts", "utf8"), /import \{[^}]*\} from "@\/lib\/phoneNormalize"/);
   assert.equal(planPropertyEdit(BASE_PERSON, "mobilePhone", "+54 9 11 4123-4567", "bd-1").personUpdate?.mobilePhone, "+54 9 11 4123-4567", "without a normalizer the value is stored as typed");
+});
+
+// ---- firstName / lastName ---------------------------------------------------
+
+test("firstName and lastName are allow-listed, listed before every other property", () => {
+  assert.equal(isEditablePersonProperty("firstName"), true);
+  assert.equal(isEditablePersonProperty("lastName"), true);
+  assert.deepEqual(EDITABLE_PERSON_PROPERTIES.slice(0, 2), ["firstName", "lastName"]);
+});
+
+test("a name edit trims, collapses inner whitespace and writes one history row", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "firstName", "  María   José ", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.firstName, "María José");
+  assert.deepEqual(plan.historyRows, [
+    { personId: BASE_PERSON.id, property: "firstName", oldValue: "Eva", newValue: "María José", changedByBdId: "bd-1", source: "edit" },
+  ]);
+});
+
+test("a name that only differs in whitespace from the stored one is a no-op", () => {
+  assert.equal(planPropertyEdit(BASE_PERSON, "lastName", "  Editor ", "bd-1").changed, false);
+});
+
+test("clearing the first name is rejected, clearing the last name is allowed", () => {
+  assert.throws(() => planPropertyEdit(BASE_PERSON, "firstName", "   ", "bd-1"), InvalidNameError);
+  const plan = planPropertyEdit(BASE_PERSON, "lastName", "  ", "bd-1");
+  assert.equal(plan.personUpdate?.lastName, null);
+  assert.equal(plan.historyRows[0]?.newValue, null);
+});
+
+test("a contact with no first name can be given one, and an untouched blank stays a no-op", () => {
+  const nameless = { ...BASE_PERSON, firstName: null };
+  assert.equal(planPropertyEdit(nameless, "firstName", "", "bd-1").changed, false);
+  assert.equal(planPropertyEdit(nameless, "firstName", "Ana", "bd-1").personUpdate?.firstName, "Ana");
+});
+
+test("names with control characters or beyond 200 characters are rejected", () => {
+  assert.throws(() => planPropertyEdit(BASE_PERSON, "firstName", "Ev\u0000a", "bd-1"), InvalidNameError);
+  assert.throws(() => planPropertyEdit(BASE_PERSON, "lastName", "Ed\u0007itor", "bd-1"), InvalidNameError);
+  assert.throws(() => planPropertyEdit(BASE_PERSON, "lastName", "x".repeat(201), "bd-1"), InvalidNameError);
+  assert.equal(planPropertyEdit(BASE_PERSON, "lastName", "x".repeat(200), "bd-1").changed, true);
 });

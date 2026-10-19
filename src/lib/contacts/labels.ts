@@ -90,6 +90,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorMultipleRecipients;
     case "invalid_phone":
       return l.errorInvalidPhone;
+    case "invalid_name":
+      return l.errorInvalidName;
     case "invalid_profile_key":
       return l.errorInvalidProfileKey;
     case "profile_key_taken":

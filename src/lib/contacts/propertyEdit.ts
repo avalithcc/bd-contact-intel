@@ -77,6 +77,26 @@ export class InvalidContactTypeError extends Error {
   }
 }
 
+export type InvalidNameReason = "required" | "too_long" | "control_chars";
+
+/**
+ * Thrown by planPropertyEdit for `firstName`/`lastName`: a cleared first name
+ * (it is the only thing the record header shows), a name over NAME_MAX, or one
+ * carrying control characters. Clearing the last name is always allowed.
+ */
+export class InvalidNameError extends Error {
+  constructor(public readonly reason: InvalidNameReason) {
+    super(`Invalid name: ${reason}`);
+    this.name = "InvalidNameError";
+  }
+}
+
+/** Same ceiling as the quick-add form's free text (createContact.ts FREE_TEXT_MAX). */
+const NAME_MAX = 200;
+const NAME_PROPERTIES = new Set(["firstName", "lastName"]);
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
+
 /** Same "local@domain-with-a-dot" bar as splitEmail, plus a literal dot in the domain. */
 function isValidEmailFormat(value: string): boolean {
   const split = splitEmail(value);
@@ -89,6 +109,8 @@ function derivedRoleGroup(jobTitle: string | null): RoleGroupKey | null {
 }
 
 export const EDITABLE_PERSON_PROPERTIES = [
+  "firstName",
+  "lastName",
   "email",
   "phone",
   "mobilePhone",
@@ -168,7 +190,8 @@ export function planPropertyEdit(
   changedByBdId: string,
   normalizePhone?: PhoneWriteNormalizer,
 ): PropertyEditPlan {
-  const trimmed = rawNewValue.trim();
+  // Names collapse inner whitespace too (a pasted "María   José\n" is one name).
+  const trimmed = NAME_PROPERTIES.has(property) ? rawNewValue.replace(/\s+/g, " ").trim() : rawNewValue.trim();
   let newValue = trimmed === "" ? null : trimmed;
   if (property === "profileKey" && newValue !== null) {
     // Normalized BEFORE the no-op check: the same profile pasted in another
@@ -201,6 +224,12 @@ export function planPropertyEdit(
         { personId: person.id, property: "roleGroup", oldValue: person.roleGroup ?? null, newValue: group, changedByBdId, source: "edit" },
       ],
     };
+  }
+
+  if (NAME_PROPERTIES.has(property)) {
+    if (newValue === null && property === "firstName") throw new InvalidNameError("required");
+    if (newValue !== null && newValue.length > NAME_MAX) throw new InvalidNameError("too_long");
+    if (newValue !== null && CONTROL_CHARS.test(newValue)) throw new InvalidNameError("control_chars");
   }
 
   if (property === "email" && newValue !== null && !isValidEmailFormat(newValue)) {

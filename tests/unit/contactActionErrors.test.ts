@@ -10,7 +10,7 @@ import { test } from "node:test";
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
-import { InvalidContactTypeError, InvalidEmailError } from "@/lib/contacts/propertyEdit";
+import { InvalidContactTypeError, InvalidEmailError, InvalidNameError } from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import {
@@ -98,4 +98,8 @@ test("contactActionErrorHref returns undefined for other reasons", () => {
 
 test("contactActionErrorReason maps AdminRequiredError to a visible reason, not 'unexpected'", () => {
   assert.equal(contactActionErrorReason(new AdminRequiredError()), "admin_required");
+});
+
+test("maps InvalidNameError to 'invalid_name'", () => {
+  assert.equal(contactActionErrorReason(new InvalidNameError("required")), "invalid_name");
 });
