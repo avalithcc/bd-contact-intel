@@ -1837,6 +1837,13 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- **Actions must update the screen immediately** (owner, 2026-10-19). Example:
+  approving/sending a Sequence email left the contact in the pending list
+  until a full page refresh; it should move to "sent" the moment the button
+  is pressed. Applies to every action in the app: audit each server action
+  for the views it affects (revalidatePath / router.refresh / optimistic
+  update with rollback on failure) and fix the stale ones, starting with
+  Sequences approve/send.
 - **Edit a contact's first and last name** (owner, 2026-10-19). Some contacts
   show a dash ("—") instead of a name, and the BD cannot fix it from the record:
   first name and last name must be editable (audited like other property edits,
