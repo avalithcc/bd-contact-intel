@@ -45,7 +45,9 @@ export function ExtensionTool({
   updateHref: string;
 }) {
   const installed = useInstalledExtensionVersion();
-  const state = extensionInstallState(installed, release.version);
+  const state = extensionInstallState(installed ?? null, release.version);
+  // Until detection settles, render neither state so an installed BD never sees the download button flash.
+  const checking = installed === undefined;
   const downloadIcon = <DownloadIcon className="icon" />;
 
   return (
@@ -58,14 +60,14 @@ export function ExtensionTool({
           <strong>{l.title}</strong>
           <p className="meta">{state.kind === "not-installed" ? l.body : l.installedBody}</p>
         </div>
-        {state.kind !== "not-installed" && (
+        {!checking && state.kind !== "not-installed" && (
           <span className={`badge ${state.kind === "outdated" ? "badge-warn" : "badge-success"}`}>
             {fill(l.installedBadge, { version: state.version })}
           </span>
         )}
       </div>
 
-      {state.kind === "not-installed" && (
+      {!checking && state.kind === "not-installed" && (
         <div className="stack-sm">
           <a className="btn btn-primary btn-block" href={release.downloadHref} download={release.fileName}>
             {downloadIcon}
@@ -76,7 +78,7 @@ export function ExtensionTool({
         </div>
       )}
 
-      {state.kind === "current" && (
+      {!checking && state.kind === "current" && (
         <div>
           <Link className="btn btn-secondary btn-sm" href={guideHref}>
             {l.guideLink}
@@ -84,7 +86,7 @@ export function ExtensionTool({
         </div>
       )}
 
-      {state.kind === "outdated" && (
+      {!checking && state.kind === "outdated" && (
         <>
           <div className="alert alert-warn">
             <WarningIcon className="icon" />

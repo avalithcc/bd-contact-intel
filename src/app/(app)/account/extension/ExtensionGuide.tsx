@@ -34,7 +34,8 @@ export function ExtensionGuide({
 }) {
   const [browser, setBrowser] = useState<Browser>(initialBrowser);
   const tabRefs = useRef<Record<Browser, HTMLButtonElement | null>>({ chrome: null, edge: null });
-  const state = extensionInstallState(useInstalledExtensionVersion(), release.version);
+  const installed = useInstalledExtensionVersion();
+  const state = extensionInstallState(installed ?? null, release.version);
 
   function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const index = BROWSERS.indexOf(browser);
@@ -52,7 +53,7 @@ export function ExtensionGuide({
 
   return (
     <>
-      {state.kind === "not-installed" ? (
+      {installed === undefined ? null : state.kind === "not-installed" ? (
         <div className="alert alert-neutral" role="status">
           <InfoIcon className="icon" />
           <div>
