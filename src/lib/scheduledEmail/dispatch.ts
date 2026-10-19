@@ -10,6 +10,7 @@
  */
 import { GmailSendError } from "@/lib/gmail/errors";
 import { isSuppressed, type SuppressionRule } from "@/lib/sequences/suppression";
+import { ATTACHMENT_FAILURE_CODES } from "./codes";
 import { BATCH_SIZE } from "./plan";
 import type { ClaimedEmail } from "./queries";
 
@@ -47,6 +48,8 @@ export interface RunSummary {
 /** Fixed, UI-mappable codes. Never the raw error: Gmail's response body can carry addresses and tokens. */
 export function failureCode(err: unknown): string {
   if (err instanceof GmailSendError) {
+    // A row that held files and could not read them: provably not sent, with its own code so the BD is told why.
+    if (err.kind === "send_failed" && err.status === 400 && ATTACHMENT_FAILURE_CODES.includes(err.message)) return err.message;
     if (err.kind === "not_connected" || err.kind === "reauth_required") return "gmail_not_connected";
     if (err.kind === "invalid_recipient") return "invalid_recipient"; // rejected before Gmail: provably not sent
     if (err.kind !== "send_failed" || (err.status !== undefined && err.status < 500)) return "gmail_unavailable"; // provably not sent

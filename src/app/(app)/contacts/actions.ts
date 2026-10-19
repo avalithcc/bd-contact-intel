@@ -31,6 +31,8 @@ import { softDeleteContactNote } from "@/lib/activity/noteDeleteDb";
 import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
 import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
+import { isPlainCompose, type ComposeExtras } from "@/lib/email/compose/prepare";
+import { prepareComposeForCurrentUser, prepareReplyAttachmentsForCurrentUser, removeSentAttachments } from "@/lib/email/compose/server";
 import {
   actionFailure,
   contactLocationActionErrorReason,
@@ -397,6 +399,7 @@ export async function sendContactEmailAction(
   to: string,
   subject: string,
   body: string,
+  extras?: ComposeExtras,
 ): Promise<SendContactEmailResult> {
   try {
     // A NEW email needs its own subject and body; a reply is exempt (its
@@ -409,14 +412,27 @@ export async function sendContactEmailAction(
     const me = await getCurrentBd();
     // BD with a signature sends HTML (body + signature); without one the
     // message is the same single-part plain text as before (composeEmailBody).
-    await sendGmailMessage({
-      bdId: me.id,
-      to,
-      subject: input.subject,
-      ...composeEmailBody(input.body, me.signatureHtml),
-      personId,
-    });
+    const message = { bdId: me.id, subject: input.subject, ...composeEmailBody(input.body, me.signatureHtml), personId };
+    if (isPlainCompose(extras)) {
+      await sendGmailMessage({ ...message, to });
+    } else {
+      // Several "Para" contacts, "Cc" and/or files. The server is the authority on all three (same-company rule, internal
+      // Cc, file policy and the real bytes read back from Storage): the client's `to` is not used.
+      const prepared = await prepareComposeForCurrentUser(personId, extras!, true);
+      if (!prepared.ok) return { ok: false, reason: prepared.reason };
+      const several = prepared.recipients.length > 1;
+      await sendGmailMessage({
+        ...message,
+        to: prepared.to,
+        allowRecipientList: several,
+        recipients: several ? prepared.recipients : undefined,
+        cc: prepared.cc,
+        attachments: prepared.files,
+      });
+      await removeSentAttachments(prepared.files.map((f) => f.storagePath));
+    }
     revalidatePath(`/contacts/${personId}`);
+    for (const other of extras?.recipientPersonIds ?? []) if (isUuid(other)) revalidatePath(`/contacts/${other}`);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -434,6 +450,7 @@ export async function sendThreadReplyAction(
   personId: string,
   gmailThreadId: string,
   body: string,
+  attachments?: unknown[],
 ): Promise<SendContactEmailResult> {
   try {
     if (!isUuid(personId) || !gmailThreadId || !body.trim()) return { ok: false, reason: "not_found" };
@@ -444,6 +461,9 @@ export async function sendThreadReplyAction(
       if (plan.reason === "unsafe_header") logUnsafeReplyHeader(me.id, personId, gmailThreadId);
       return { ok: false, reason: plan.reason === "unsafe_header" ? "reply_unsafe_header" : "reply_unavailable" };
     }
+    // Recipients stay exactly what the thread dictates; a reply only gains files.
+    const files = await prepareReplyAttachmentsForCurrentUser(attachments ?? []);
+    if (!files.ok) return { ok: false, reason: files.reason };
     await sendGmailMessage({
       bdId: me.id,
       to: plan.to,
@@ -452,7 +472,9 @@ export async function sendThreadReplyAction(
       personId,
       allowRecipientList: true,
       reply: { threadId: plan.threadId, inReplyTo: plan.inReplyTo, references: plan.references },
+      attachments: files.files,
     });
+    await removeSentAttachments(files.files.map((f) => f.storagePath));
     revalidatePath(`/contacts/${personId}`);
     return { ok: true };
   } catch (err) {

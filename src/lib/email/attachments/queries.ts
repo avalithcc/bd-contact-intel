@@ -3,7 +3,7 @@
  * records that an object exists (so the sweeper can find it) and, for a scheduled email, which files it holds.
  * Dates reach SQL only through DB-side `now()`, never as JS values.
  */
-import { and, asc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { emailAttachment, scheduledEmail } from "@/db/schema";
 import type { ValidatedAttachment } from "./load";
@@ -32,6 +32,15 @@ export async function registerAttachments(bdId: string, ownerAuthUid: string, it
   return inserted.length;
 }
 
+/** Whether a tracked, still-stored file is held by a scheduled email (a held file must not be deleted by the composer). */
+export async function isHeldByScheduledEmail(storagePath: string): Promise<boolean> {
+  const [row] = await db
+    .select({ scheduledEmailId: emailAttachment.scheduledEmailId })
+    .from(emailAttachment)
+    .where(and(eq(emailAttachment.storagePath, storagePath), isNull(emailAttachment.removedAt)));
+  return Boolean(row?.scheduledEmailId);
+}
+
 /** The object is gone from Storage (or was never there): stop tracking it. */
 export async function markAttachmentsRemoved(paths: readonly string[]): Promise<void> {
   if (paths.length === 0) return;
@@ -53,7 +62,15 @@ export async function setScheduledAttachments(tx: Runner, scheduledId: string, b
     await tx
       .update(emailAttachment)
       .set({ scheduledEmailId: scheduledId })
-      .where(and(inArray(emailAttachment.storagePath, keep), eq(emailAttachment.bdId, bdId), isNull(emailAttachment.removedAt)));
+      // Only a free file, or one this email already holds: a path that belongs to ANOTHER scheduled email is never taken over.
+      .where(
+        and(
+          inArray(emailAttachment.storagePath, keep),
+          eq(emailAttachment.bdId, bdId),
+          isNull(emailAttachment.removedAt),
+          or(isNull(emailAttachment.scheduledEmailId), eq(emailAttachment.scheduledEmailId, scheduledId)),
+        ),
+      );
   }
 }
 

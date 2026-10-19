@@ -71,6 +71,23 @@ export type ContactActionErrorReason =
   | "schedule_cap_reached"
   | "schedule_locked"
   | "schedule_recipient_invalid"
+  // email-attachments-recipients: "Para" (same-company contacts), "Cc" (@avalith.net only) and files. The reasons are the
+  // same strings the pure rules return (src/lib/email/**), so a refusal travels from the rule to the label untouched.
+  | "recipient_unavailable"
+  | "recipient_no_email"
+  | "recipient_other_company"
+  | "too_many_recipients"
+  | "cc_invalid"
+  | "cc_not_internal"
+  | "cc_too_many"
+  | "attachment_invalid"
+  | "attachment_type_not_allowed"
+  | "attachment_too_large"
+  | "attachment_too_many"
+  | "attachment_total_too_large"
+  | "attachment_missing"
+  // Scheduling WITH files needs the service-role key (no user session in the cron); without it the schedule is refused.
+  | "attachments_unavailable"
   | "owner_invalid"
   | "admin_required"
   // Deleting a note that is not yours (and you are not an admin): see lib/activity/noteDelete.ts.

@@ -136,6 +136,34 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorScheduleLocked;
     case "schedule_recipient_invalid":
       return l.errorScheduleRecipientInvalid;
+    case "recipient_unavailable":
+      return l.errorRecipientUnavailable;
+    case "recipient_no_email":
+      return l.errorRecipientNoEmail;
+    case "recipient_other_company":
+      return l.errorRecipientOtherCompany;
+    case "too_many_recipients":
+      return l.errorTooManyRecipients;
+    case "cc_invalid":
+      return l.errorCcInvalid;
+    case "cc_not_internal":
+      return l.errorCcNotInternal;
+    case "cc_too_many":
+      return l.errorCcTooMany;
+    case "attachment_invalid":
+      return l.errorAttachmentInvalid;
+    case "attachment_type_not_allowed":
+      return l.errorAttachmentTypeNotAllowed;
+    case "attachment_too_large":
+      return l.errorAttachmentTooLarge;
+    case "attachment_too_many":
+      return l.errorAttachmentTooMany;
+    case "attachment_total_too_large":
+      return l.errorAttachmentTotalTooLarge;
+    case "attachment_missing":
+      return l.errorAttachmentMissing;
+    case "attachments_unavailable":
+      return l.errorAttachmentsUnavailable;
     case "owner_invalid":
       return l.errorOwnerInvalid;
     case "admin_required":

@@ -39,6 +39,7 @@ const CONVERTED_TABLES: readonly string[] = [
   "bd",
   "gmail_reminder_send",
   "scheduled_email",
+  "email_attachment",
   "company_category",
   "target_company",
   "company_alias",

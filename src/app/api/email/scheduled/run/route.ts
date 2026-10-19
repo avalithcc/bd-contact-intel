@@ -4,6 +4,9 @@ import { dispatchScheduledEmails } from "@/lib/scheduledEmail/dispatch";
 import { claimDue, countDue, holdReplied, markCancelled, markFailed, markSent, releaseClaimed, sweepStale } from "@/lib/scheduledEmail/queries";
 import { sendScheduledEmail } from "@/lib/scheduledEmail/send";
 import { listSuppressionRules } from "@/lib/sequences/suppressionQueries";
+import { markAttachmentsRemoved, selectSweepable } from "@/lib/email/attachments/queries";
+import { sweepAttachments } from "@/lib/email/attachments/sweep";
+import { serviceRoleAttachmentStorage } from "@/lib/supabase/serviceRole";
 
 /**
  * Scheduled-send dispatcher. Called every minute by Supabase pg_cron (see openspec/changes/scheduled-send/pg_cron.sql);
@@ -27,6 +30,13 @@ export async function GET(request: Request) {
     { holdReplied, claimDue, countDue, sweepStale, markSent, markFailed, markCancelled, releaseClaimed, loadSuppression: listSuppressionRules, send: sendScheduledEmail },
     { dryRun },
   );
-  console.log("[scheduled-email]", JSON.stringify(summary));
-  return NextResponse.json(summary);
+  // The CRM does not keep files: after the dispatch, delete uploads nothing claimed (24 h), cancelled leftovers (30 days)
+  // and sent leftovers. Needs the service role (no user session here); without the key there is nothing to sweep WITH.
+  const storage = serviceRoleAttachmentStorage();
+  const attachments = dryRun || !storage ? null : await sweepAttachments({ selectSweepable, markRemoved: markAttachmentsRemoved, storage }).catch((err) => {
+    console.error("[scheduled-email] attachment sweep failed", err);
+    return null;
+  });
+  console.log("[scheduled-email]", JSON.stringify({ ...summary, attachments }));
+  return NextResponse.json({ ...summary, attachments });
 }

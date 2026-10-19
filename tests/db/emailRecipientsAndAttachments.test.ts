@@ -245,6 +245,71 @@ test("recordSentEmail writes ONE email_message and one email_sent per Para conta
   await db.delete(emailMessage).where(eq(emailMessage.gmailMessageId, gmailMessageId));
 });
 
+test("a scheduled email keeps its other recipients, Cc and files; the card reads them, the claim hands them to the sender", async () => {
+  const { scheduleEmail, editScheduled, listScheduledForPerson, claimDue, cancelScheduled } = await import("@/lib/scheduledEmail/queries");
+  const { validateAttachmentRefs } = await import("@/lib/email/attachments/load");
+  const { buildAttachmentPath } = await import("@/lib/email/attachments/storagePath");
+  const { db } = await import("@/db");
+  const { sql } = await import("drizzle-orm");
+  const owner = await mkBd("Compose");
+  const key = await mkCompany("sched");
+  const a = await mkPerson("a", { companyKey: key });
+  const b = await mkPerson("b", { companyKey: key, firstName: "Beatriz", lastName: "Paz" });
+  const uid = randomUUID();
+  const ref = (name: string, size: number) => ({ storagePath: buildAttachmentPath(uid, randomUUID(), name), filename: name, contentType: "application/pdf", size });
+  const checked = validateAttachmentRefs([ref("Propuesta.pdf", 2_000_000), ref("Tarifas.pdf", 100)], uid);
+  assert.ok(checked.ok);
+  const scheduled = await scheduleEmail({
+    bdId: owner.id, personId: a.id, toAddress: a.email!, subject: "Seguimiento", body: "Texto", sendAt: new Date(Date.now() + 60 * 60_000),
+    compose: { recipientPersonIds: [b.id], ccAddresses: ["ana@avalith.net"], attachments: checked.items, ownerAuthUid: uid },
+  });
+  assert.ok(scheduled.ok);
+  const [item] = await listScheduledForPerson(a.id, owner.id);
+  assert.deepEqual(item!.attachments, [{ filename: "Propuesta.pdf", size: 2_000_000 }, { filename: "Tarifas.pdf", size: 100 }]);
+  assert.deepEqual(item!.otherRecipients, ["Beatriz Paz"]);
+  assert.deepEqual(item!.ccAddresses, ["ana@avalith.net"]);
+
+  // Editing replaces the files and Cc, and drops the other recipients when none are sent.
+  const only = validateAttachmentRefs([checked.items[1]!], uid);
+  assert.ok(only.ok);
+  assert.deepEqual(await editScheduled({ id: scheduled.id, bdId: owner.id, subject: "Seguimiento", body: "Texto", sendAt: new Date(Date.now() + 90 * 60_000), compose: { recipientPersonIds: [], ccAddresses: [], attachments: only.items, ownerAuthUid: uid } }), { ok: true });
+  const [edited] = await listScheduledForPerson(a.id, owner.id);
+  assert.deepEqual(edited!.attachments, [{ filename: "Tarifas.pdf", size: 100 }]);
+  assert.deepEqual(edited!.otherRecipients, []);
+  assert.deepEqual(edited!.ccAddresses, []);
+
+  // Editing WITHOUT compose leaves all of it as it was.
+  assert.deepEqual(await editScheduled({ id: scheduled.id, bdId: owner.id, subject: "Otro asunto", body: "Texto", sendAt: new Date(Date.now() + 90 * 60_000) }), { ok: true });
+  assert.deepEqual((await listScheduledForPerson(a.id, owner.id))[0]!.attachments, [{ filename: "Tarifas.pdf", size: 100 }]);
+
+  // Due: the claim carries the files (with the owner uid the cron checks).
+  await db.execute(sql.raw(`update scheduled_email set send_at = now() - interval '1 minute' where id = '${scheduled.id}'`));
+  const claimed = (await claimDue(50)).filter((c) => c.id === scheduled.id);
+  assert.equal(claimed.length, 1);
+  assert.deepEqual(claimed[0]!.attachments.map((x) => [x.filename, x.ownerAuthUid, x.bdId]), [["Tarifas.pdf", uid, owner.id]]);
+  assert.deepEqual(claimed[0]!.recipientPersonIds, []);
+  void cancelScheduled;
+});
+
+test("a file already held by another scheduled email is never taken over", async () => {
+  const { scheduleEmail } = await import("@/lib/scheduledEmail/queries");
+  const { listScheduledAttachments } = await import("@/lib/email/attachments/queries");
+  const { validateAttachmentRefs } = await import("@/lib/email/attachments/load");
+  const { buildAttachmentPath } = await import("@/lib/email/attachments/storagePath");
+  const owner = await mkBd("Steal");
+  const p = await mkPerson("steal");
+  const uid = randomUUID();
+  const checked = validateAttachmentRefs([{ storagePath: buildAttachmentPath(uid, randomUUID(), "x.pdf"), filename: "x.pdf", contentType: "application/pdf", size: 10 }], uid);
+  assert.ok(checked.ok);
+  const input = { bdId: owner.id, personId: p.id, toAddress: p.email!, subject: "s", body: "b", sendAt: new Date(Date.now() + 60 * 60_000) };
+  const compose = { recipientPersonIds: [], ccAddresses: [], attachments: checked.items, ownerAuthUid: uid };
+  const first = await scheduleEmail({ ...input, compose });
+  const second = await scheduleEmail({ ...input, compose });
+  assert.ok(first.ok && second.ok);
+  assert.equal((await listScheduledAttachments([first.id])).length, 1);
+  assert.equal((await listScheduledAttachments([second.id])).length, 0, "the file stays with the first email");
+});
+
 test("recordSentEmail for a single contact still writes exactly one activity", async () => {
   const { db } = await import("@/db");
   const { activity } = await import("@/db/schema");

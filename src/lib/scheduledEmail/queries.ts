@@ -6,6 +6,8 @@ import { and, asc, count, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, emailAccount, person, scheduledEmail, task, type ScheduledEmail } from "@/db/schema";
 import { recomputePersonStatus } from "@/lib/status/recompute";
+import type { ValidatedAttachment } from "@/lib/email/attachments/load";
+import { listScheduledAttachments, setScheduledAttachments, type AttachmentRow } from "@/lib/email/attachments/queries";
 import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
 import { buildFailureTask, failureTaskRef } from "./failureTask";
 import {
@@ -40,6 +42,15 @@ async function countPending(bdId: string, run: Runner = db): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+/** What an email-attachments-recipients compose adds to a scheduled row: the other "Para" contacts, Cc and the files it holds. */
+export interface ScheduledCompose {
+  recipientPersonIds: string[];
+  ccAddresses: string[];
+  attachments: ValidatedAttachment[];
+  /** The uploader's auth user id (first folder of every path); the cron re-checks it before reading a file. */
+  ownerAuthUid: string;
+}
+
 export async function scheduleEmail(input: {
   bdId: string;
   personId: string;
@@ -48,13 +59,19 @@ export async function scheduleEmail(input: {
   body: string;
   sendAt: Date;
   replyThreadId?: string;
+  compose?: ScheduledCompose;
 }): Promise<ScheduleResult> {
+  const { compose, ...row } = input;
   return db.transaction(async (tx) => {
     await lockBd(tx, input.bdId);
     const plan = planSchedule({ sendAt: input.sendAt, now: new Date(), pendingCount: await countPending(input.bdId, tx) });
     if (!plan.ok) return plan;
-    const [row] = await tx.insert(scheduledEmail).values({ ...input, sendAt: plan.sendAt }).returning({ id: scheduledEmail.id });
-    return { ok: true as const, id: row!.id };
+    const [inserted] = await tx
+      .insert(scheduledEmail)
+      .values({ ...row, sendAt: plan.sendAt, recipientPersonIds: compose?.recipientPersonIds ?? [], ccAddresses: compose?.ccAddresses ?? [] })
+      .returning({ id: scheduledEmail.id });
+    if (compose?.attachments.length) await setScheduledAttachments(tx, inserted!.id, input.bdId, compose.ownerAuthUid, compose.attachments);
+    return { ok: true as const, id: inserted!.id };
   });
 }
 
@@ -63,7 +80,8 @@ async function refusalFor(id: string, bdId: string): Promise<EditResult> {
   return { ok: false, reason: row ? "schedule_locked" : "not_found" }; // someone else's row is indistinguishable from none
 }
 
-export async function editScheduled(input: { id: string; bdId: string; subject: string; body: string; sendAt: Date }): Promise<EditResult> {
+/** `compose` replaces the row's other recipients, Cc and files; left out, they are untouched. */
+export async function editScheduled(input: { id: string; bdId: string; subject: string; body: string; sendAt: Date; compose?: ScheduledCompose }): Promise<EditResult> {
   const [row] = await db.select().from(scheduledEmail).where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId)));
   if (!row) return { ok: false, reason: "not_found" };
   // Only an untouched time on a still-scheduled row skips the 5-minute rule (so text can be fixed up to the lock).
@@ -78,9 +96,19 @@ export async function editScheduled(input: { id: string; bdId: string; subject: 
     }
     const updated = await tx
       .update(scheduledEmail)
-      .set({ subject: input.subject, body: input.body, sendAt: input.sendAt, status: "scheduled", error: null, updatedAt: sql`now()`, ...rebaseline })
+      .set({
+        subject: input.subject,
+        body: input.body,
+        sendAt: input.sendAt,
+        status: "scheduled",
+        error: null,
+        updatedAt: sql`now()`,
+        ...rebaseline,
+        ...(input.compose ? { recipientPersonIds: input.compose.recipientPersonIds, ccAddresses: input.compose.ccAddresses } : {}),
+      })
       .where(and(eq(scheduledEmail.id, input.id), eq(scheduledEmail.bdId, input.bdId), inArray(scheduledEmail.status, [...OPEN_STATUSES]), changeable))
       .returning({ id: scheduledEmail.id });
+    if (updated.length && input.compose) await setScheduledAttachments(tx, input.id, input.bdId, input.compose.ownerAuthUid, input.compose.attachments);
     return updated.length ? { ok: true as const } : null;
   });
   return outcome ?? refusalFor(input.id, input.bdId);
@@ -132,7 +160,8 @@ export async function holdReplied(): Promise<number> {
   return held.length;
 }
 
-export type ClaimedEmail = ScheduledEmail & { signatureHtml: string | null };
+/** A claimed row with what the sender needs besides the row itself: the BD's signature and the files it holds. */
+export type ClaimedEmail = ScheduledEmail & { signatureHtml: string | null; attachments: AttachmentRow[] };
 
 /** Atomically moves up to `limit` due rows to 'sending' (skip locked: a concurrent run takes different rows). */
 export async function claimDue(limit: number): Promise<ClaimedEmail[]> {
@@ -146,7 +175,8 @@ export async function claimDue(limit: number): Promise<ClaimedEmail[]> {
   if (!claimed.length) return [];
   const signatures = await db.select({ id: bd.id, signatureHtml: bd.signatureHtml }).from(bd).where(inArray(bd.id, [...new Set(claimed.map((c) => c.bdId))]));
   const byBd = new Map(signatures.map((s) => [s.id, s.signatureHtml]));
-  return claimed.map((c) => ({ ...c, signatureHtml: byBd.get(c.bdId) ?? null }));
+  const files = await listScheduledAttachments(claimed.map((c) => c.id)); // one read for the whole batch
+  return claimed.map((c) => ({ ...c, signatureHtml: byBd.get(c.bdId) ?? null, attachments: files.filter((f) => f.scheduledEmailId === c.id) }));
 }
 
 /**
@@ -285,6 +315,12 @@ async function listItems(where: ReturnType<typeof and>): Promise<ScheduledItem[]
       actorName: bd.name,
       replyAt: latestReply("em.sent_at").mapWith((v: unknown) => (v ? new Date(v as string) : null)),
       replyText: latestReply("left(em.body_text, 600)").mapWith((v: unknown) => (v == null ? null : String(v))),
+      // Name and size of the files a row holds (never a link: the chips are informational), in the same round trip.
+      files: sql`coalesce((select json_agg(json_build_object('filename', a.filename, 'size', a.size_bytes) order by a.created_at, a.id)
+        from email_attachment a where a.scheduled_email_id = ${scheduledEmail.id} and a.removed_at is null), '[]'::json)`.mapWith(jsonArray),
+      // Names of the OTHER "Para" contacts, in the order they were picked.
+      otherRecipients: sql`coalesce((select json_agg(trim(concat_ws(' ', rp.first_name, rp.last_name)) order by array_position(${scheduledEmail.recipientPersonIds}, rp.id))
+        from person rp where rp.id = any(${scheduledEmail.recipientPersonIds})), '[]'::json)`.mapWith(jsonArray),
     })
     .from(scheduledEmail)
     .innerJoin(person, eq(person.id, scheduledEmail.personId))
@@ -292,7 +328,7 @@ async function listItems(where: ReturnType<typeof and>): Promise<ScheduledItem[]
     .where(where)
     .orderBy(asc(scheduledEmail.sendAt))
     .limit(100);
-  return rows.map(({ row, first, last, company, actorName, replyAt, replyText }) => ({
+  return rows.map(({ row, first, last, company, actorName, replyAt, replyText, files, otherRecipients }) => ({
     id: row.id,
     personId: row.personId,
     personName: [first, last].filter(Boolean).join(" "),
@@ -308,7 +344,16 @@ async function listItems(where: ReturnType<typeof and>): Promise<ScheduledItem[]
     replyAt,
     replyText: replySnippet(replyText),
     cancelledAt: row.status === "cancelled" ? row.updatedAt : null,
+    attachments: (files as { filename: string; size: number }[]).map((f) => ({ filename: String(f.filename), size: Number(f.size) })),
+    otherRecipients: (otherRecipients as unknown[]).map(String).filter(Boolean),
+    ccAddresses: row.ccAddresses,
   }));
+}
+
+// The driver hands back a json column parsed; a raw string is parsed here so either shape works.
+function jsonArray(value: unknown): unknown[] {
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 /** The "Programados" screen: this BD's rows that are, or may still be, going out. */

@@ -3,6 +3,7 @@
  * Argentina/Miami labels. No DB, no clock of its own. The rules of the engine itself live in plan.ts.
  */
 import { addDaysToDateString, argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
+import { ATTACHMENT_FAILURE_CODES } from "./codes";
 import { ZONES, isLocked, wallTimeToInstant, type ScheduledStatus, type ZoneKey } from "./plan";
 
 export interface ScheduledItem {
@@ -23,6 +24,11 @@ export interface ScheduledItem {
   replyText: string | null;
   /** When a 'cancelled' row was cancelled. */
   cancelledAt: Date | null;
+  /** Files the row holds: name and size only, informational (no download anywhere). */
+  attachments: { filename: string; size: number }[];
+  /** Names of the other "Para" contacts (the row's own contact is `personName`). */
+  otherRecipients: string[];
+  ccAddresses: string[];
 }
 
 /** failed_unconfirmed: the outcome is unknown (the mail may have gone out); failed_other: Gmail provably did not send it. */
@@ -33,7 +39,8 @@ export function stateOf(row: { status: ScheduledStatus; sendAt: Date; error: str
   if (row.status === "on_hold") return "on_hold";
   if (row.status === "failed") {
     if (row.error === "gmail_not_connected") return "failed_gmail";
-    return row.error === "gmail_unavailable" || row.error === "invalid_recipient" ? "failed_other" : "failed_unconfirmed"; // unknown or legacy codes are treated as unconfirmed
+    // Unknown or legacy codes are treated as unconfirmed. The attachment codes are provably-not-sent, like the others.
+    return row.error === "gmail_unavailable" || row.error === "invalid_recipient" || (row.error !== null && ATTACHMENT_FAILURE_CODES.includes(row.error)) ? "failed_other" : "failed_unconfirmed";
   }
   return isLocked(row, now) ? "locked" : "scheduled";
 }

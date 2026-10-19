@@ -32,6 +32,8 @@ export const failureTaskRef = (scheduledId: string): string => `Ref: ${scheduled
 function reasonText(error: string | null): string {
   if (error === "gmail_not_connected") return "Gmail no está conectado: reconectá la cuenta y volvé a enviarlo desde Programados.";
   if (error === "invalid_recipient") return "La dirección del destinatario no es válida, así que el correo no salió. Corrígela y vuelve a programarlo.";
+  if (error === "attachments_unavailable") return "El correo tiene adjuntos y el servidor no puede leerlos todavía, así que no salió. Edítalo desde Programados, quita los adjuntos y vuelve a programarlo.";
+  if (error === "attachment_failed") return "No se pudo leer alguno de los adjuntos, así que el correo no salió (nunca se envía sin sus archivos). Edítalo, vuelve a adjuntar los archivos y reprográmalo.";
   if (error === "gmail_unavailable") return "Gmail no aceptó el envío, así que el correo no salió. Podés reenviarlo desde Programados.";
   return "No se pudo confirmar si salió: revisá la carpeta Enviados antes de reenviarlo desde Programados.";
 }
