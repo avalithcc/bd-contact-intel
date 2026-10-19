@@ -4,6 +4,8 @@ const nextConfig = {
   // stylesheets by reading them at runtime. Vercel only ships files it can trace to an import: name them here.
   outputFileTracingIncludes: {
     "/api/unsubscribe": ["./src/app/design-system.css", "./src/app/globals.css"],
+    // The extension zip is built by `npm run build` into extension/zip (gitignored) and read at request time.
+    "/api/extension/download": ["./extension/zip/**"],
   },
   experimental: {
     serverActions: {

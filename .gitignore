@@ -43,3 +43,4 @@ bugs_ss/
 # LinkedIn extension build output (npm run extension:build)
 /extension/dist/
 /extension/dist-dev/
+/extension/zip/

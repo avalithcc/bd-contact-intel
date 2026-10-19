@@ -10,7 +10,7 @@
     "dev:stack": "bash scripts/dev-stack.sh",
     "dev:setup": "tsx scripts/dev-setup.ts",
     "dev:reset": "tsx scripts/dev-setup.ts --reset",
-    "build": "next build",
+    "build": "npm run extension:zip && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit && tsc --noEmit -p extension",
     "lint": "tsc --noEmit --noUnusedLocals && tsc --noEmit --noUnusedLocals -p extension",
@@ -23,7 +23,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "extension:build": "tsx extension/build/build.ts",
-    "extension:build:dev": "tsx extension/build/build.ts --dev"
+    "extension:build:dev": "tsx extension/build/build.ts --dev",
+    "extension:pack": "tsx extension/build/pack.ts",
+    "extension:zip": "npm run extension:build && npm run extension:pack"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.87",
