@@ -99,4 +99,36 @@ test.describe('render smoke', () => {
     expect(page.url()).toMatch(/\/contacts\//);
     await expectRendered(page, consoleErrors, 'call dialog');
   });
+  test('connections import: first upload creates, the same file again reports no changes', async ({ page }) => {
+    // Writes contacts, so scratch database only. Also proves csv-parse works in the real browser bundle.
+    skipUnlessWritesAllowed();
+    test.setTimeout(120_000);
+    const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const csv = [
+      'Notes:',
+      '"When exporting your connections, you may notice that some of the email addresses are missing."',
+      '',
+      'First Name,Last Name,URL,Email Address,Company,Position,Connected On',
+      `Ana,Smoke${run},https://www.linkedin.com/in/zz-smoke-${run}-a,,Smoke Co ${run},Engineer,01 Jan 2025`,
+      `Ben,Smoke${run},https://www.linkedin.com/in/zz-smoke-${run}-b,,Smoke Co ${run},Designer,02 Jan 2025`,
+      '',
+    ].join('\n');
+    const file = { name: 'Connections.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) };
+    const t = es.contactsImport;
+    const form = page.locator('form', { has: page.locator('#connections-file') });
+
+    await gotoAuthed(page, '/contacts/import');
+    await form.locator('#connections-file').setInputFiles(file);
+    await form.getByRole('button', { name: t.connectionsSubmit }).click();
+    await expect(form.getByText(new RegExp(`${t.outcomeContactsCreated} 2\\b`))).toBeVisible({ timeout: 60_000 });
+    await expect(form.getByText(t.connectionsErrorGenericFailed)).toHaveCount(0);
+    await expect(form.getByText(t.connectionsErrorUnreadable)).toHaveCount(0);
+
+    await form.locator('#connections-file').setInputFiles(file);
+    await form.getByRole('button', { name: t.connectionsSubmit }).click();
+    await expect(form.getByText(new RegExp(`${t.outcomeContactsUnchanged} 2\\b`))).toBeVisible({ timeout: 60_000 });
+    await expect(form.getByText(new RegExp(`${t.outcomeContactsCreated} 0\\b`))).toBeVisible();
+    await expect(form.getByText(t.connectionsErrorGenericFailed)).toHaveCount(0);
+    await expectRendered(page, consoleErrors, 'connections import');
+  });
 });

@@ -3073,6 +3073,7 @@ export const en = {
     connectionsErrorMissingFile: "Choose a CSV file.",
     connectionsErrorNoConnectionsFound: "No connections were found in that file.",
     connectionsErrorGenericFailed: "Could not import the file.",
+    connectionsErrorUnreadable: "We could not read the file. Make sure you upload LinkedIn's Connections.csv.",
     connectionsProgress: "Importing… {done} of {total}",
     connectionsErrorBatchFailed:
       "Batch {batch} of {total} failed. Earlier batches were imported; upload the file again to continue.",

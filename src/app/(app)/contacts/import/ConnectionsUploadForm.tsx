@@ -40,8 +40,9 @@ export function ConnectionsUploadForm({ labels: l }: { labels: ContactsImportLab
     let rows;
     try {
       rows = parseConnectionsCsv(await file.text());
-    } catch {
-      setState({ phase: "failed", message: l.connectionsErrorGenericFailed, totals: null });
+    } catch (err) {
+      console.error("Could not parse the connections CSV", err);
+      setState({ phase: "failed", message: l.connectionsErrorUnreadable, totals: null });
       return;
     }
     if (!rows.length) {
@@ -52,7 +53,7 @@ export function ConnectionsUploadForm({ labels: l }: { labels: ContactsImportLab
     const result = await runBatchedImport(rows, {
       send: async (batch) => {
         const res = await importConnectionsBatch(batch);
-        return res.ok ? { ok: true, outcome: res.outcome } : { ok: false, detail: res.errorDetail };
+        return res.ok ? { ok: true, outcome: res.outcome } : { ok: false };
       },
       onProgress: (done, total) => setState({ phase: "importing", done, total }),
     });

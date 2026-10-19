@@ -3064,6 +3064,7 @@ export const es: typeof en = {
     connectionsErrorMissingFile: "Elige un archivo CSV.",
     connectionsErrorNoConnectionsFound: "No se encontraron conexiones en ese archivo.",
     connectionsErrorGenericFailed: "No se pudo importar el archivo.",
+    connectionsErrorUnreadable: "No pudimos leer el archivo. Asegúrate de subir el Connections.csv de LinkedIn.",
     connectionsProgress: "Importando… {done} de {total}",
     connectionsErrorBatchFailed:
       "Falló el lote {batch} de {total}. Los lotes anteriores quedaron importados; sube el archivo de nuevo para continuar.",

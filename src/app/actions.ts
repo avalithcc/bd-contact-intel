@@ -103,7 +103,7 @@ export async function uploadCsv(
 
 export type ImportBatchResult =
   | { ok: true; outcome: ImportBatchOutcome }
-  | { ok: false; errorKey: UploadErrorKey; errorDetail?: string };
+  | { ok: false; errorKey: UploadErrorKey };
 
 /**
  * One batch of the browser-driven connections import (the browser parses the
@@ -114,16 +114,18 @@ export type ImportBatchResult =
  */
 export async function importConnectionsBatch(rows: unknown): Promise<ImportBatchResult> {
   try {
-    const batch = sanitizeConnectionsBatch(rows);
-    if (!batch) return { ok: false, errorKey: "genericFailed", errorDetail: "Invalid batch" };
-    if (!batch.length) return { ok: true, outcome: emptyImportTotals() };
+    // Auth first: an unauthenticated caller learns nothing about batch validity.
     const me = await getCurrentBd();
+    const batch = sanitizeConnectionsBatch(rows);
+    if (!batch) return { ok: false, errorKey: "genericFailed" };
+    if (!batch.length) return { ok: true, outcome: emptyImportTotals() };
     const { created, updated, unchanged, skippedOwnCompany, identityReport } = await upsertContacts(me.id, batch);
     revalidatePath("/contacts");
     return { ok: true, outcome: { created, updated, unchanged, skippedOwnCompany, identityReport } };
   } catch (err) {
     unstable_rethrow(err);
-    return { ok: false, errorKey: "genericFailed", errorDetail: err instanceof Error ? err.message : undefined };
+    console.error("importConnectionsBatch failed", err);
+    return { ok: false, errorKey: "genericFailed" };
   }
 }
 
@@ -133,7 +135,7 @@ export async function importConnectionsBatch(rows: unknown): Promise<ImportBatch
  * computed from the messages side), so fill in just those. Safe to call after
  * a partial run too: it only touches contacts still at zero.
  */
-export async function finalizeConnectionsImport(): Promise<{ ok: boolean; errorDetail?: string }> {
+export async function finalizeConnectionsImport(): Promise<{ ok: boolean }> {
   try {
     const me = await getCurrentBd();
     await recomputeMessageSignals(me.id, "unsignalled");
@@ -143,7 +145,8 @@ export async function finalizeConnectionsImport(): Promise<{ ok: boolean; errorD
     return { ok: true };
   } catch (err) {
     unstable_rethrow(err);
-    return { ok: false, errorDetail: err instanceof Error ? err.message : undefined };
+    console.error("finalizeConnectionsImport failed", err);
+    return { ok: false };
   }
 }
 
