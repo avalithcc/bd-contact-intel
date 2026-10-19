@@ -90,6 +90,18 @@ started.
 
 ## Shipped
 
+- Shipped 2026-10-18/19: LinkedIn browser extension for Chrome and Edge
+  (`extension/`, replaces the bookmarklet). On `linkedin.com/in/*` an in-page
+  card says whether the person is already in the CRM
+  (`GET /api/extension/linkedin-lookup`). "Agregar al CRM" prefills Nuevo
+  contacto with name, job title, company and location read from that profile,
+  only on click. The owner accepted LinkedIn's policy risk (manual use only).
+  Distribution is "Load unpacked": the CRM serves the zip at
+  `/api/extension/download` and a guide at `/account/extension`; releasing a
+  new version means bumping `EXTENSION_VERSION` in
+  `extension/build/manifest.ts`. Unverified until the owner's first real test:
+  the LinkedIn DOM selectors (`extension/src/content/selectors.ts`), the
+  session cookie sent from the service worker, and the Edge labels in Spanish.
 - Shipped 2026-10-18: (1) task legacy columns dropped (migration 0050 applied
   to production). (2) Phone E.164 normalization, normalize on write
   (`d6152619`..`f1b65eee`); the production backfill ran 2026-10-18 and changed
