@@ -14,14 +14,38 @@ export function readInstalledVersion(attribute: string | null | undefined): stri
   return VERSION.test(value) ? value : null;
 }
 
-/** `NEXT_PUBLIC_EXTENSION_STORE_URL` when it is a real https URL; otherwise null and the button stays disabled. */
-export function resolveExtensionStoreUrl(raw: string | null | undefined): string | null {
-  const value = raw?.trim();
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" ? url.toString() : null;
-  } catch {
-    return null;
+function parseParts(version: string): number[] | null {
+  return VERSION.test(version) ? version.split(".").map(Number) : null;
+}
+
+/** Numeric, segment-by-segment comparison (1.10.0 > 1.9.0; missing segments are 0). `null` when either side is not a plain dotted version. */
+export function compareVersions(a: string, b: string): -1 | 0 | 1 | null {
+  const left = parseParts(a);
+  const right = parseParts(b);
+  if (!left || !right) return null;
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
   }
+  return 0;
+}
+
+export type ExtensionInstallState =
+  | { kind: "not-installed" }
+  | { kind: "current"; version: string }
+  | { kind: "outdated"; version: string };
+
+/**
+ * Not installed / installed / installed but older than what the CRM serves. "Outdated" needs a proven older
+ * version: anything that cannot be compared counts as installed, so the BD is never nagged on a guess.
+ */
+export function extensionInstallState(installed: string | null, served: string): ExtensionInstallState {
+  const version = readInstalledVersion(installed);
+  if (!version) return { kind: "not-installed" };
+  return compareVersions(version, served) === -1 ? { kind: "outdated", version } : { kind: "current", version };
+}
+
+/** The install guide opens on the tab matching the visitor's browser: Edge when the user agent says so, Chrome otherwise. */
+export function defaultBrowserTab(userAgent: string | null | undefined): "chrome" | "edge" {
+  return /\bEdg(?:e|A|iOS)?\//.test(userAgent ?? "") ? "edge" : "chrome";
 }
