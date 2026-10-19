@@ -1169,7 +1169,13 @@ Two pieces of work, and they were independent — both are done:
   together with the E.164 work. Checked 2026-10-18 after the backfill: dotted
   `+54.9.11…` values were stripped by the backfill, but this one sits on a
   merged-away row and was NOT touched, because only live rows are processed; the
-  survivor still has no phone); the merge happened 2026-09-30
+  survivor still has no phone. **Script written 2026-10-19:**
+  `scripts/restore-normalized-merged-phones.ts` (dry run by default, counts and
+  ids only; `--execute --actor=<bd id>`), planner
+  `src/lib/identity/restoreNormalizedMergedPhones.ts`, never guesses a country,
+  same audit row and revert as `restore-merged-phones.ts`. **Not yet run on
+  production:** the orchestrator runs the dry run, then executes after
+  approval); the merge happened 2026-09-30
    22:11 UTC, before the fix. (Corrected 2026-10-01: this said "recover the 35";
    the real figure is 34 recovered plus 1 invalid.)
 2. **Stop it recurring — done (#272).** Both phone columns are in

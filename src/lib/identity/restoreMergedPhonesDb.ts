@@ -27,7 +27,7 @@ export interface RestoreFillRecord {
   value: string;
 }
 
-export async function readPhoneRestoreRows(): Promise<{ rows: PhoneRestoreRow[]; ownerNameById: Map<string, string> }> {
+export async function readPhoneRestoreRows(): Promise<{ rows: (PhoneRestoreRow & { sourceKey: string | null; country: string | null })[]; ownerNameById: Map<string, string> }> {
   const found = await db
     .select({
       id: person.id,
@@ -37,6 +37,8 @@ export async function readPhoneRestoreRows(): Promise<{ rows: PhoneRestoreRow[];
       phone: person.phone,
       mobilePhone: person.mobilePhone,
       mergedIntoId: person.mergedIntoId,
+      sourceKey: person.sourceKey,
+      country: person.country,
     })
     .from(person)
     .where(
@@ -56,6 +58,8 @@ export async function readPhoneRestoreRows(): Promise<{ rows: PhoneRestoreRow[];
       phone: r.phone,
       mobilePhone: r.mobilePhone,
       mergedIntoId: r.mergedIntoId,
+      sourceKey: r.sourceKey,
+      country: r.country,
     })),
     ownerNameById: new Map(owners.map((o) => [o.id, o.name])),
   };
