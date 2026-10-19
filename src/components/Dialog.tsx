@@ -25,6 +25,7 @@ export function Dialog({
   wide = false,
   xwide = false,
   closeDisabled = false,
+  icon,
 }: {
   open: boolean;
   onClose: () => void;
@@ -42,6 +43,8 @@ export function Dialog({
   // shows the close button disabled) — every other caller omits this and
   // keeps today's always-closable behavior.
   closeDisabled?: boolean;
+  // Optional leading icon of the header (`.dialog-header .icon`), as in the meetings mockup. Decorative: aria-hidden.
+  icon?: React.ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -135,6 +138,7 @@ export function Dialog({
         tabIndex={-1}
       >
         <div className="dialog-header">
+          {icon}
           <h2 id={titleId}>{title}</h2>
           <button
             type="button"

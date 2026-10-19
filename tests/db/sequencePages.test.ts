@@ -307,7 +307,7 @@ test("sequence_count: this BD's Sequences with at least one member still in prog
   const { sequence } = await import("@/db/schema");
   const { buildAppShellBadgeCountsQuery } = await import("@/lib/shell/appShellBadgeCountsQuery");
   const count = async (bdId: string) => {
-    const [r] = (await db.execute(buildAppShellBadgeCountsQuery({ bdId, queueDate: "2026-10-15", tomorrowStartUtcIso: "2026-10-16T00:00:00Z", workedTodayFromIso: "2026-10-15T03:00:00Z", workedTodayToIso: "2026-10-16T03:00:00Z" }))) as unknown as { sequence_count: number }[];
+    const [r] = (await db.execute(buildAppShellBadgeCountsQuery({ bdId, queueDate: "2026-10-15", tomorrowStartUtcIso: "2026-10-16T00:00:00Z", workedTodayFromIso: "2026-10-15T03:00:00Z", workedTodayToIso: "2026-10-16T03:00:00Z", nowIso: "2026-10-15T15:00:00Z" }))) as unknown as { sequence_count: number }[];
     return r.sequence_count;
   };
   const ck = await mkCompany("badge");

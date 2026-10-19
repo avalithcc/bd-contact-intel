@@ -43,7 +43,7 @@ async function badgeFollowUpCount() {
   const { buildAppShellBadgeCountsQuery } = await import("@/lib/shell/appShellBadgeCountsQuery");
   const rows = Array.from(
     await db.execute(
-      buildAppShellBadgeCountsQuery({ bdId, queueDate: QUEUE_DATE, tomorrowStartUtcIso: "2026-09-11T00:00:00Z", workedTodayFromIso: "2026-09-10T03:00:00Z", workedTodayToIso: "2026-09-11T03:00:00Z" }),
+      buildAppShellBadgeCountsQuery({ bdId, queueDate: QUEUE_DATE, tomorrowStartUtcIso: "2026-09-11T00:00:00Z", workedTodayFromIso: "2026-09-10T03:00:00Z", workedTodayToIso: "2026-09-11T03:00:00Z", nowIso: "2026-09-10T15:00:00Z" }),
     ),
   ) as { follow_up_count: number }[];
   return Number(rows[0]!.follow_up_count);

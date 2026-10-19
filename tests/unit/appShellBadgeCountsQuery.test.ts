@@ -27,6 +27,7 @@ function render(isAdmin = false) {
       tomorrowStartUtcIso: "2026-09-30T00:00:00.000Z",
       workedTodayFromIso: "2026-09-29T03:00:00.000Z",
       workedTodayToIso: "2026-09-30T03:00:00.000Z",
+      nowIso: "2026-09-29T21:00:00.000Z",
       isAdmin,
     }),
   );
@@ -155,4 +156,13 @@ test("buildAppShellBadgeCountsQuery: non-admins get a literal null and never sca
   const { sql } = render(false);
   assert.match(sql, /null\s+as gmail_fleet_accounts/i);
   assert.doesNotMatch(sql, /json_agg/i);
+});
+
+test("buildAppShellBadgeCountsQuery: meeting_pending_count is this BD's scheduled meetings whose time has passed (Por confirmar), in the same statement", () => {
+  const { sql, params } = render();
+  assert.match(
+    sql,
+    /select count\(\*\)::int\s+from "meeting"\s+where meeting\.bd_id = \$\d+::uuid\s+and meeting\.status = 'scheduled'\s+and meeting\.scheduled_at <= \$\d+::timestamptz\s*\)\s+as meeting_pending_count/i,
+  );
+  assert.ok(params.includes("2026-09-29T21:00:00.000Z"), "the clock is bound as an ISO string, never a Date");
 });

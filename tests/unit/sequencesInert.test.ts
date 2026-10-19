@@ -70,12 +70,14 @@ test("the unsubscribe route serves GET and POST through the Drizzle client, neve
   assert.match(route, /unsubscribeQueries/);
 });
 
-test("the sidebar has a Secuencias entry directly below Seguimientos", () => {
+test("the sidebar has a Secuencias entry below Seguimientos (Reuniones sits between them, per the meeting-outcomes mockup)", () => {
   const items = NAVIGATION.flatMap((section) => section.items);
   const at = items.findIndex((item) => item.labelKey === "followUps");
   assert.ok(at >= 0);
-  assert.equal(items[at + 1]?.labelKey, "sequences");
-  assert.equal(items[at + 1]?.href, "/sequences");
+  assert.equal(items[at + 1]?.labelKey, "meetings");
+  assert.equal(items[at + 1]?.href, "/reuniones");
+  assert.equal(items[at + 2]?.labelKey, "sequences");
+  assert.equal(items[at + 2]?.href, "/sequences");
   assert.equal(t("es").nav.sequences, "Secuencias");
 });
 

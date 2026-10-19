@@ -1118,3 +1118,45 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .tl-card .files { margin-top: var(--space-sm); }
 .to-line { font-size: var(--text-sm); color: var(--color-ink-subtle); }
 .to-line strong { color: var(--color-ink-soft); }
+
+/* ---------------------------------------------------------------- meetings (meeting-outcomes)
+   Promoted from the approved mockup openspec/changes/meeting-outcomes/mockups/reuniones.html:
+   the outcome dialog's choice cards and summary, the clickable table row, the upcoming-meeting
+   strip and the timeline cards for a meeting that has not happened or was moved. */
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.opts .opt {
+  display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-sm); padding: var(--space-md);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-2); cursor: pointer;
+}
+.opts .opt:hover { border-color: var(--color-ink-muted); }
+.opts .opt.sel { border-color: var(--color-accent-strong); background: var(--color-accent-soft); box-shadow: 0 0 0 1px var(--color-accent-strong); }
+.opts .opt:focus-within { box-shadow: var(--focus-ring); }
+.opts .opt.off { opacity: 0.6; cursor: not-allowed; }
+.opts .opt.off:hover { border-color: var(--color-border-strong); }
+.opts .opt input { grid-row: 1 / span 2; align-self: center; }
+.opts .opt label { display: contents; cursor: inherit; }
+.opt-t { font-weight: 600; }
+.opt-d { font-size: var(--text-sm); color: var(--color-ink-subtle); }
+.summary {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-sm) var(--space-md); padding: var(--space-md);
+  background: var(--color-surface-sunken); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin: 0;
+}
+.summary dt { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink-subtle); }
+.summary dd { margin: 0; font-size: var(--text-sm); }
+.summary .wide { grid-column: 1 / -1; }
+.reveal { padding-top: var(--space-xs); }
+.check-row { display: flex; gap: var(--space-xs); align-items: center; font-size: var(--text-sm); }
+table.data tr.clickable { cursor: pointer; }
+.trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-soft); }
+.outcomes { display: flex; gap: var(--space-xs); flex-wrap: wrap; justify-content: flex-end; }
+.toolbar.filters { align-items: flex-end; gap: var(--space-md); }
+.upnext {
+  display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border: 1px dashed var(--status-meeting-text);
+  background: var(--status-meeting-bg); border-radius: var(--radius-md); font-size: var(--text-sm); margin-top: var(--space-md);
+}
+.upnext .grow { min-width: 0; }
+.tl-card.upcoming { border-style: dashed; border-color: var(--status-meeting-text); background: var(--status-meeting-bg); }
+.tl-icon.upcoming { color: var(--status-meeting-text); background: var(--color-surface-2); border: 1px dashed var(--status-meeting-text); }
+.tl-card.moved { background: var(--color-surface-1); border-style: dashed; }
+.tl-card.moved .what { text-decoration: line-through; color: var(--color-ink-subtle); }
+.tl-actions { display: flex; gap: var(--space-xs); margin-top: var(--space-sm); }

@@ -43,7 +43,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
-import { activity, bd, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
+import { activity, bd, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, meeting, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { CLOSED_STATES } from "@/lib/sequences/memberState";
 
@@ -76,6 +76,8 @@ export interface AppShellBadgeCountsQueryParams {
    */
   workedTodayFromIso: string;
   workedTodayToIso: string;
+  /** The clock for "Por confirmar" (meeting_pending_count): a scheduled meeting whose time is at or before it. */
+  nowIso: string;
   /**
    * Only admins see (and can open) /admin/duplicates, so only they pay for
    * the `duplicate_count` subquery; everyone else gets a literal 0.
@@ -89,6 +91,7 @@ export function buildAppShellBadgeCountsQuery({
   tomorrowStartUtcIso,
   workedTodayFromIso,
   workedTodayToIso,
+  nowIso,
   isAdmin = false,
 }: AppShellBadgeCountsQueryParams) {
   const workedTypes = sql.join(
@@ -202,6 +205,15 @@ export function buildAppShellBadgeCountsQuery({
         where scheduled_email.bd_id = ${bdId}::uuid
           and scheduled_email.status in ('scheduled', 'on_hold', 'failed')
       ) as scheduled_count,
+      (
+        -- Sidebar "Reuniones" pill (meeting-outcomes): THIS BD's meetings waiting for an outcome ("Por confirmar") -- scheduled,
+        -- and their time has passed. Only their own, an admin's included. Backed by meeting_bd_status_at_idx.
+        select count(*)::int
+        from ${meeting}
+        where meeting.bd_id = ${bdId}::uuid
+          and meeting.status = 'scheduled'
+          and meeting.scheduled_at <= ${nowIso}::timestamptz
+      ) as meeting_pending_count,
       ${
         isAdmin
           ? sql`(

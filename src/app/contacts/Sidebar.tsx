@@ -31,6 +31,7 @@ import {
   BoltIcon,
   ClockIcon,
   MailIcon,
+  MeetingIcon,
 } from "@/components/icons";
 
 /** Longest a clicked item stays highlighted without the route committing. */
@@ -76,6 +77,7 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "companies", href: "/companies", icon: CompaniesIcon },
       { labelKey: "tasks", href: "/tasks", icon: TasksIcon },
       { labelKey: "followUps", href: "/follow-ups", icon: FollowUpIcon },
+      { labelKey: "meetings", href: "/reuniones", icon: MeetingIcon },
       { labelKey: "sequences", href: "/sequences", icon: SendIcon },
       { labelKey: "scheduled", href: "/scheduled", icon: ClockIcon },
       { labelKey: "outreach", href: "/contacts?view=outreach", icon: OutreachIcon },
@@ -132,6 +134,7 @@ export function Sidebar({
   followUpCount,
   sequenceCount,
   scheduledCount,
+  meetingCount,
   absorptionCount,
   duplicateCount,
   gmailAttentionCount,
@@ -142,6 +145,8 @@ export function Sidebar({
   followUpCount?: number;
   sequenceCount?: number;
   scheduledCount?: number;
+  /** Own meetings waiting for an outcome ("Por confirmar"). */
+  meetingCount?: number;
   absorptionCount?: number;
   duplicateCount?: number;
   gmailAttentionCount?: number;
@@ -195,6 +200,7 @@ export function Sidebar({
     followUps: followUpCount,
     sequences: sequenceCount,
     scheduled: scheduledCount,
+    meetings: meetingCount,
   };
 
   return (
