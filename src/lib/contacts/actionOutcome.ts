@@ -12,7 +12,9 @@ import type { ContactActionResult, ContactActionErrorReason } from "@/app/(app)/
  * transport fails mid-request the write may or may not have landed, and the
  * copy has to say so rather than invite a blind retry (a duplicate).
  */
-export async function settleAction(run: () => Promise<ContactActionResult>): Promise<ContactActionResult> {
+export async function settleAction<T extends ContactActionResult>(
+  run: () => Promise<T>,
+): Promise<T | Extract<ContactActionResult, { ok: false }>> {
   try {
     return await run();
   } catch {

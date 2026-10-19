@@ -17,7 +17,7 @@ import { sendGmailMessage } from "@/lib/gmail/send";
 import { composeEmailBody } from "@/lib/signature/compose";
 import { logUnsafeReplyHeader, planThreadReply } from "@/lib/gmail/replyThread";
 import { getThreadReplySource } from "@/lib/gmail/threadMessages";
-import { planMeeting } from "@/lib/contacts/meeting";
+import { registerContactMeeting } from "@/lib/meetings/db";
 import { planCall } from "@/lib/contacts/call";
 import { recordCallAttempt, resolveCallAttempt, settleCallAttempt } from "@/lib/contacts/callAttemptDb";
 import type { DialledField } from "@/lib/contacts/callAttempt";
@@ -250,19 +250,26 @@ export async function reopenContactTaskAction(taskId: string, personId: string):
   }
 }
 
-/** "Reunión" quick action (task 10.2) — writes a `meeting_logged` activity; status recomputes to `meeting` in the same transaction (recompute.ts, via createActivity). */
+export type RegisterMeetingResult = { ok: true; kind: "scheduled" | "held" } | Extract<ContactActionResult, { ok: false }>;
+
+/**
+ * "Registrar reunión" (task 10.2, meeting-outcomes): a date and time still ahead is saved as Agendada (no change to the
+ * contact's status); one at or before now is saved as Realizada, exactly as before, and the status recomputes to `meeting`
+ * in the same transaction. The meeting is owned by the BD who registers it.
+ */
 export async function logContactMeetingAction(
   personId: string,
   date: string,
   time: string,
   notes: string,
-): Promise<ContactActionResult> {
+): Promise<RegisterMeetingResult> {
   try {
+    const me = await getCurrentBd();
     await assertContactEditableById(personId);
-    const metadata = planMeeting(date, time, notes);
-    await createActivityAction({ type: "meeting_logged", personId, metadata: { ...metadata } });
+    const { kind } = await registerContactMeeting(personId, me.id, date, time, notes);
     revalidatePath(`/contacts/${personId}`);
-    return { ok: true };
+    revalidatePath("/reuniones");
+    return { ok: true, kind };
   } catch (err) {
     return actionFailure(err);
   }
