@@ -853,6 +853,7 @@ export const es: typeof en = {
     errorScheduleRecipientInvalid: "Sólo se puede programar un correo a una dirección de este contacto.",
     errorRecipientUnavailable: "Alguno de los destinatarios ya no está disponible. Cierra el diálogo y vuelve a elegir.",
     errorRecipientNoEmail: "Alguno de los destinatarios no tiene correo registrado.",
+    errorRecipientSuppressed: "Uno de los destinatarios se dio de baja y no quiere recibir correos. Quítalo de «Para» para enviar.",
     errorRecipientOtherCompany: "Solo puedes añadir contactos de la misma empresa que esta ficha.",
     errorTooManyRecipients: "Máximo 20 destinatarios por correo.",
     errorCcInvalid: "Una de las direcciones de CC no es válida.",

@@ -3,7 +3,7 @@
  * Argentina/Miami labels. No DB, no clock of its own. The rules of the engine itself live in plan.ts.
  */
 import { addDaysToDateString, argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
-import { ATTACHMENT_FAILURE_CODES } from "./codes";
+import { NOT_SENT_CODES } from "./codes";
 import { ZONES, isLocked, wallTimeToInstant, type ScheduledStatus, type ZoneKey } from "./plan";
 
 export interface ScheduledItem {
@@ -40,7 +40,7 @@ export function stateOf(row: { status: ScheduledStatus; sendAt: Date; error: str
   if (row.status === "failed") {
     if (row.error === "gmail_not_connected") return "failed_gmail";
     // Unknown or legacy codes are treated as unconfirmed. The attachment codes are provably-not-sent, like the others.
-    return row.error === "gmail_unavailable" || row.error === "invalid_recipient" || (row.error !== null && ATTACHMENT_FAILURE_CODES.includes(row.error)) ? "failed_other" : "failed_unconfirmed";
+    return row.error === "gmail_unavailable" || row.error === "invalid_recipient" || (row.error !== null && NOT_SENT_CODES.includes(row.error)) ? "failed_other" : "failed_unconfirmed";
   }
   return isLocked(row, now) ? "locked" : "scheduled";
 }

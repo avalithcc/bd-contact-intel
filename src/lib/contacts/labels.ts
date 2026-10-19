@@ -140,6 +140,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorRecipientUnavailable;
     case "recipient_no_email":
       return l.errorRecipientNoEmail;
+    case "recipient_suppressed":
+      return l.errorRecipientSuppressed;
     case "recipient_other_company":
       return l.errorRecipientOtherCompany;
     case "too_many_recipients":

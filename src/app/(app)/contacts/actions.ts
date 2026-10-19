@@ -32,7 +32,7 @@ import { getPersonTimeline, type TimelineEntry } from "@/lib/activity/queries";
 import { isTimelinePillKey } from "@/lib/activity/timelinePills";
 import { isUuid } from "@/lib/uuid";
 import { isPlainCompose, type ComposeExtras } from "@/lib/email/compose/prepare";
-import { prepareComposeForCurrentUser, prepareReplyAttachmentsForCurrentUser, removeSentAttachments } from "@/lib/email/compose/server";
+import { hasSuppressedOthers, prepareComposeForCurrentUser, prepareReplyAttachmentsForCurrentUser, removeSentAttachments } from "@/lib/email/compose/server";
 import {
   actionFailure,
   contactLocationActionErrorReason,
@@ -420,6 +420,8 @@ export async function sendContactEmailAction(
       // Cc, file policy and the real bytes read back from Storage): the client's `to` is not used.
       const prepared = await prepareComposeForCurrentUser(personId, extras!, true);
       if (!prepared.ok) return { ok: false, reason: prepared.reason };
+      // An opted-out extra recipient stops the send: never emailed by adding them, never dropped silently.
+      if (await hasSuppressedOthers(prepared)) return { ok: false, reason: "recipient_suppressed" };
       const several = prepared.recipients.length > 1;
       await sendGmailMessage({
         ...message,

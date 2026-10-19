@@ -76,6 +76,8 @@ export type ContactActionErrorReason =
   // same strings the pure rules return (src/lib/email/**), so a refusal travels from the rule to the label untouched.
   | "recipient_unavailable"
   | "recipient_no_email"
+  // A "Para" contact other than the record's own opted out (email_suppression): the email is refused, never sent to the rest.
+  | "recipient_suppressed"
   | "recipient_other_company"
   | "too_many_recipients"
   | "cc_invalid"

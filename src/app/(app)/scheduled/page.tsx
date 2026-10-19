@@ -5,6 +5,9 @@ import { isGmailConnected, listOwnScheduled } from "@/lib/scheduledEmail/queries
 import { ScheduledListView } from "./ScheduledListView";
 
 export const dynamic = "force-dynamic";
+// Hosts editScheduledEmailAction, which re-reads attachments from Storage. 60 s matches the contact page (which hosts the
+// send actions) and the other routes of this repo; more than the 10 s default of a Vercel function.
+export const maxDuration = 60;
 
 /**
  * "Programados" (mockups/envio-programado.html section 3). Every BD, admins included, sees only their own scheduled

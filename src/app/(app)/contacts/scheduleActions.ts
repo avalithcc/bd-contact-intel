@@ -4,9 +4,9 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
-import { getCurrentAuthUserId, getCurrentBd } from "@/lib/queries";
-import { isPlainCompose, type ComposeExtras } from "@/lib/email/compose/prepare";
-import { prepareComposeForCurrentUser } from "@/lib/email/compose/server";
+import { getCurrentBd } from "@/lib/queries";
+import type { ComposeExtras } from "@/lib/email/compose/prepare";
+import { scheduledComposeForCurrentUser } from "@/lib/email/compose/server";
 import { serviceRoleConfigured } from "@/lib/supabase/serviceRole";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { validateNewEmailInput } from "@/lib/contacts/newEmailInput";
@@ -56,17 +56,10 @@ const hasAttachments = (extras: ComposeExtras | undefined) => (extras?.attachmen
 
 /**
  * "Para", "Cc" and files of a scheduled email, validated like an immediate send (same-company rule, internal Cc, file
- * policy and the real bytes) so a bad file is refused now instead of at the send time. `undefined` for a plain email.
+ * policy and the real bytes, no opted-out recipient) so a problem is refused now instead of at the send time. `undefined`
+ * for a plain email.
  */
-async function scheduledCompose(personId: string, extras: ComposeExtras | undefined) {
-  if (isPlainCompose(extras)) return { ok: true as const, compose: undefined };
-  const prepared = await prepareComposeForCurrentUser(personId, extras!, true);
-  if (!prepared.ok) return prepared;
-  return {
-    ok: true as const,
-    compose: { recipientPersonIds: prepared.otherPersonIds, ccAddresses: prepared.cc, attachments: prepared.validated, ownerAuthUid: await getCurrentAuthUserId() },
-  };
-}
+const scheduledCompose = (personId: string, extras: ComposeExtras | undefined) => scheduledComposeForCurrentUser(personId, extras, "nothing");
 
 export async function editScheduledEmailAction(id: string, subject: string, body: string, sendAtIso: string, extras?: ComposeExtras): Promise<ContactActionResult> {
   try {
@@ -84,9 +77,9 @@ export async function editScheduledEmailAction(id: string, subject: string, body
     // left out, they stay as scheduled.
     let compose;
     if (extras) {
-      const prepared = await prepareComposeForCurrentUser(own.personId, extras, true);
+      const prepared = await scheduledComposeForCurrentUser(own.personId, extras, "clear");
       if (!prepared.ok) return { ok: false, reason: prepared.reason };
-      compose = { recipientPersonIds: prepared.otherPersonIds, ccAddresses: prepared.cc, attachments: prepared.validated, ownerAuthUid: await getCurrentAuthUserId() };
+      compose = prepared.compose;
     }
     return await editScheduled({ id, bdId: me.id, subject: input.subject, body: input.body, sendAt: new Date(sendAtIso), compose });
   } catch (err) {

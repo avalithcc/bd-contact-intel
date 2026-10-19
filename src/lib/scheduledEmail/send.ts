@@ -12,10 +12,17 @@ import { checkCcList } from "@/lib/email/recipients/cc";
 import type { ParaRecipient } from "@/lib/email/recipients/para";
 import { resolveParaRecipients } from "@/lib/email/recipients/queries";
 import { serviceRoleAttachmentStorage } from "@/lib/supabase/serviceRole";
-import { ATTACHMENT_FAILED, ATTACHMENTS_UNAVAILABLE } from "./codes";
+import { isSuppressed, type SuppressionRule } from "@/lib/sequences/suppression";
+import { listSuppressionRules } from "@/lib/sequences/suppressionQueries";
+import { ATTACHMENT_FAILED, ATTACHMENTS_UNAVAILABLE, RECIPIENT_SUPPRESSED } from "./codes";
 import type { ClaimedEmail } from "./queries";
 
-const notSent = (code: string) => new GmailSendError("send_failed", code, undefined, 400); // status 400 keeps failureCode off "outcome_unknown"
+/** Throws (provably not sent) when any of the addresses has opted out; an unparseable address fails closed, like isSuppressed. */
+export function assertNoSuppressedRecipients(addresses: readonly string[], rules: readonly SuppressionRule[]): void {
+  if (addresses.some((address) => isSuppressed(address, rules))) throw new GmailSendError("send_failed", RECIPIENT_SUPPRESSED, undefined, 400);
+}
+
+const notSent =(code: string) => new GmailSendError("send_failed", code, undefined, 400); // status 400 keeps failureCode off "outcome_unknown"
 
 /**
  * The files of a due row, read back with the service role (the cron has no user session). Fail closed: no key, a row that
@@ -66,6 +73,9 @@ async function sendRow(row: ClaimedEmail, survivorId: string, base: { bdId: stri
     if (row.recipientPersonIds.length > 0) {
       const para = await resolveParaRecipients(survivorId, row.recipientPersonIds);
       if (!para.ok) throw new GmailSendError("invalid_recipient", `A recipient is no longer valid (${para.reason})`, "malformed");
+      // The dispatcher already checked the row's own address; the others are only known now. One opted-out recipient stops the
+      // whole email (it is never sent to the rest without the BD knowing), with a task that says why.
+      assertNoSuppressedRecipients(para.recipients.map((r) => r.email), await listSuppressionRules());
       to = para.to;
       recipients = para.recipients.length > 1 ? para.recipients : undefined;
     }

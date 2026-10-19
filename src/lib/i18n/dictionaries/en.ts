@@ -928,6 +928,7 @@ export const en = {
     errorScheduleRecipientInvalid: "An email can only be scheduled to one of this contact's own addresses.",
     errorRecipientUnavailable: "One of the recipients is no longer available. Close the dialog and pick again.",
     errorRecipientNoEmail: "One of the recipients has no email on file.",
+    errorRecipientSuppressed: "One of the recipients opted out of emails. Remove them from To to send.",
     errorRecipientOtherCompany: "You can only add contacts from the same company as this record.",
     errorTooManyRecipients: "At most 20 recipients per email.",
     errorCcInvalid: "One of the CC addresses is not valid.",

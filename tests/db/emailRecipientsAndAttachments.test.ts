@@ -291,6 +291,37 @@ test("a scheduled email keeps its other recipients, Cc and files; the card reads
   void cancelScheduled;
 });
 
+test("an opt-out also cancels pending emails that carry the address as an EXTRA Para recipient", async () => {
+  const { scheduleEmail, cancelPendingForAddress } = await import("@/lib/scheduledEmail/queries");
+  const { db } = await import("@/db");
+  const { scheduledEmail } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const owner = await mkBd("Optout");
+  const key = await mkCompany("optout");
+  const a = await mkPerson("a", { companyKey: key });
+  const b = await mkPerson("b", { companyKey: key });
+  const c = await mkPerson("c", { companyKey: key });
+  const input = { bdId: owner.id, personId: a.id, toAddress: a.email!, subject: "s", body: "b", sendAt: new Date(Date.now() + 60 * 60_000) };
+  const withB = await scheduleEmail({ ...input, compose: { recipientPersonIds: [b.id], ccAddresses: [], attachments: [], ownerAuthUid: "" } });
+  const withC = await scheduleEmail({ ...input, compose: { recipientPersonIds: [c.id], ccAddresses: [], attachments: [], ownerAuthUid: "" } });
+  const plain = await scheduleEmail(input);
+  assert.ok(withB.ok && withC.ok && plain.ok);
+  const cancelled = await db.transaction((tx) => cancelPendingForAddress(tx, b.email!.toLowerCase()));
+  assert.equal(cancelled, 1);
+  const status = async (id: string) => (await db.select().from(scheduledEmail).where(eq(scheduledEmail.id, id)))[0]!;
+  assert.equal((await status(withB.id)).status, "cancelled");
+  assert.equal((await status(withB.id)).error, "recipient_suppressed");
+  assert.equal((await status(withC.id)).status, "scheduled");
+  assert.equal((await status(plain.id)).status, "scheduled");
+});
+
+test("an empty company key is no company: the picker lists nobody for it", async () => {
+  const { listParaCandidates } = await import("@/lib/email/recipients/queries");
+  const a = await mkPerson("blank", { companyKey: "" });
+  await mkPerson("blank2", { companyKey: "" });
+  assert.deepEqual(await listParaCandidates(a.id), []);
+});
+
 test("a file already held by another scheduled email is never taken over", async () => {
   const { scheduleEmail } = await import("@/lib/scheduledEmail/queries");
   const { listScheduledAttachments } = await import("@/lib/email/attachments/queries");

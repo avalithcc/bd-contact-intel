@@ -292,7 +292,14 @@ export async function cancelPendingForAddress(tx: Tx, normalizedAddress: string)
   const cancelled = await tx
     .update(scheduledEmail)
     .set({ status: "cancelled", error: "recipient_suppressed", updatedAt: sql`now()` })
-    .where(and(inArray(scheduledEmail.status, ["scheduled", "on_hold"]), sql`lower(trim(${scheduledEmail.toAddress})) = ${normalizedAddress}`))
+    .where(
+      and(
+        inArray(scheduledEmail.status, ["scheduled", "on_hold"]),
+        // The row's own address, or an EXTRA "Para" recipient of a multi-recipient email (their ids are stored, not their address).
+        sql`(lower(trim(${scheduledEmail.toAddress})) = ${normalizedAddress}
+          or exists (select 1 from person rp where rp.id = any(${scheduledEmail.recipientPersonIds}) and lower(trim(rp.email)) = ${normalizedAddress}))`,
+      ),
+    )
     .returning({ id: scheduledEmail.id });
   return cancelled.length;
 }

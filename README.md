@@ -222,7 +222,19 @@ deleted right after a successful send (immediate or scheduled); the timeline sho
 only name and size, with no download. A sweeper in the scheduled-email cron route
 deletes uploads nobody claimed after 24 h, files of emails cancelled more than 30
 days ago, and leftovers of sent emails. Failed or waiting scheduled emails keep
-their files.
+their files. About once an hour the same route also walks the bucket
+(`<owner>/<upload>/<file>`, capped at 100 upload folders per run) and deletes
+objects older than 24 h that no live `email_attachment` row tracks (an upload whose
+registration never happened). A delete only counts when Storage confirms every
+object; an object that is already gone stops being tracked.
+
+A scheduled email stores how many files it was scheduled with; at dispatch (and on
+"Enviar ahora") it refuses to go out with fewer, e.g. a failed row whose files were
+already deleted after an earlier send. An opted-out (`email_suppression`) "Para"
+recipient stops the whole email: refused when composing or scheduling, and failed at
+dispatch with a task explaining why (the opt-out also cancels pending emails that
+carry the address as an extra recipient). The server actions that read and upload
+files run on pages with `maxDuration = 60` (the contact page and `/scheduled`).
 
 ## Getting the input file
 LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data →
