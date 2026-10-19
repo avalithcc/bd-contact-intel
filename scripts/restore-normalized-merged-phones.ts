@@ -3,8 +3,13 @@
  * phone on a merged-away row that failed `isValidPhoneFormat` (dot-separated
  * `+54.9.11...`). The E.164 backfill never touched it either (it processes
  * live rows only). The value is normalized with `normalizePhone`
- * (src/lib/phoneNormalize.ts, never guessing a country) and written to the
+ * (src/lib/phoneNormalize.ts) and written to the
  * survivor, only where the survivor has no phone and no mobile.
+ *
+ * A country is never guessed: only a value with an explicit `+` country code is
+ * read (separators stripped first), and normalizePhone gets no source or person
+ * country, so no Argentine or country-prefix inference applies. Any other
+ * stranded invalid value is counted as skipped and left for a human.
  *
  * Same write path as scripts/restore-merged-phones.ts (executeRestore): ONE
  * transaction, history rows with the actor, ONE audit_log row
@@ -33,10 +38,13 @@ function parseArgs(argv: readonly string[]) {
 async function main(): Promise<void> {
   const { execute, actor } = parseArgs(process.argv.slice(2));
   const { rows } = await readPhoneRestoreRows();
-  const { plan, normalized, unresolved } = planNormalizedMergedPhones(rows);
+  const { plan, normalized, unresolved, skipped } = planNormalizedMergedPhones(rows);
 
   console.log(`Merged-away rows read: ${plan.counts.mergedRows}`);
   console.log(`Stranded values normalized to E.164: ${normalized.length}`);
+  for (const n of normalized) console.log(`  merged row ${n.mergedId} ${n.field}: rule ${n.rule}`);
+  console.log(`Skipped, no explicit + country code (a country is never guessed): ${skipped.length}`);
+  for (const k of skipped) console.log(`  merged row ${k.mergedId} ${k.field}`);
   const byReason: Record<string, number> = {};
   for (const u of unresolved) byReason[u.reason] = (byReason[u.reason] ?? 0) + 1;
   console.log(`Stranded invalid values still unresolved (left as is): ${unresolved.length} ${JSON.stringify(byReason)}`);

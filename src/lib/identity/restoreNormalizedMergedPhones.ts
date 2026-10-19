@@ -3,7 +3,7 @@
  * restore (restoreMergedPhones.ts) skipped stranded values that fail
  * `isValidPhoneFormat` (a dot-separated `+54.9.11...`), and the E.164 backfill
  * only processes live rows, so the number stayed on the merged-away row. This
- * runs those values through `normalizePhone` (never guessing a country) and
+ * runs those values through `normalizePhone` (explicit + only, no country inferred) and
  * hands the normalized rows to the original planner, then keeps only the
  * survivors that exist because of a normalization. Values already valid are
  * left to the original script. Pure: the input is never mutated.
@@ -31,24 +31,39 @@ export interface UnresolvedValue {
   reason: PhoneFlagReason;
 }
 
+/** A stranded invalid value without an explicit `+` country code: never guessed, left for a human. */
+export interface SkippedValue {
+  mergedId: string;
+  field: PhoneField;
+}
+
 export interface NormalizedRestorePlan {
   plan: RestorePlan;
+  skipped: readonly SkippedValue[];
   normalized: readonly NormalizedValue[];
   unresolved: readonly UnresolvedValue[];
 }
 
+const SEPARATORS = /[\s().-]/g;
 const FIELDS: readonly PhoneField[] = ["phone", "mobilePhone"];
 
 export function planNormalizedMergedPhones(rows: readonly NormalizableRestoreRow[]): NormalizedRestorePlan {
   const normalized: NormalizedValue[] = [];
   const unresolved: UnresolvedValue[] = [];
+  const skipped: SkippedValue[] = [];
   const prepared: PhoneRestoreRow[] = rows.map((r) => {
     const copy: PhoneRestoreRow = { id: r.id, name: r.name, ownerBdId: r.ownerBdId, phone: r.phone, mobilePhone: r.mobilePhone, mergedIntoId: r.mergedIntoId };
     if (r.mergedIntoId == null) return copy;
     for (const field of FIELDS) {
       const raw = r[field];
       if (raw == null || raw.trim() === "" || isValidPhoneFormat(raw)) continue;
-      const result = normalizePhone(raw, { column: field, source: r.sourceKey, country: r.country });
+      // Never guess a country: only an explicit `+` country code is read, and normalizePhone gets no source, person
+      // country or provider country, so none of its Argentine or country-prefix inference can apply.
+      if (!raw.replace(SEPARATORS, "").startsWith("+")) {
+        skipped.push({ mergedId: r.id, field });
+        continue;
+      }
+      const result = normalizePhone(raw, { column: field, source: null, country: null });
       if ("flagged" in result) {
         unresolved.push({ mergedId: r.id, field, reason: result.reason });
         continue;
@@ -76,5 +91,5 @@ export function planNormalizedMergedPhones(rows: readonly NormalizableRestoreRow
     conflicts: full.conflicts.filter((c) => c.candidates.some((x) => touched.has(x.mergedId))),
     counts: { ...full.counts, restorableSurvivors: restorable.length },
   };
-  return { plan, normalized, unresolved };
+  return { plan, skipped, normalized, unresolved };
 }

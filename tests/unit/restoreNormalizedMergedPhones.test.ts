@@ -33,15 +33,28 @@ test("a dotted +54.9.11 stranded value is normalized to E.164 and fills the surv
   assert.deepEqual(result.normalized, [{ mergedId: "m1", field: "mobilePhone", from: "+54.9.11.5555.5555", to: "+5491155555555", rule: "separators_stripped" }]);
 });
 
-test("a country is never guessed: a digits-only local number stays unrestored", () => {
+test("a country is never guessed: only values with an explicit + are considered, the rest are skipped", () => {
+  for (const raw of ["5555.5555", "011.5555.5555", "00.54.9.11.5555.5555", "54.9.11.5555.5555"]) {
+    const result = planNormalizedMergedPhones([row("s1"), row("m1", { mergedIntoId: "s1", phone: raw })]);
+    assert.equal(result.plan.restorable.length, 0, raw);
+    assert.equal(result.normalized.length, 0, raw);
+    assert.deepEqual(result.skipped, [{ mergedId: "m1", field: "phone" }], raw);
+  }
+});
+
+test("the survivor's Argentine context does not turn a plus-less number into an Argentine one", () => {
   const result = planNormalizedMergedPhones([
     row("s1"),
-    row("m1", { mergedIntoId: "s1", phone: "5555.5555" }),
+    row("m1", { mergedIntoId: "s1", mobilePhone: "11.5555.5555", sourceKey: "dff-2026", country: "Argentina" }),
   ]);
   assert.equal(result.plan.restorable.length, 0);
-  assert.equal(result.normalized.length, 0);
+  assert.equal(result.skipped.length, 1);
+});
+
+test("a plus value that is not a valid number is unresolved, not skipped", () => {
+  const result = planNormalizedMergedPhones([row("s1"), row("m1", { mergedIntoId: "s1", phone: "+54.9.11.1" })]);
+  assert.equal(result.skipped.length, 0);
   assert.equal(result.unresolved.length, 1);
-  assert.equal(result.unresolved[0]!.reason, "no_country_code");
 });
 
 test("survivors whose merged values were already valid are left to the original script", () => {
