@@ -316,10 +316,10 @@ async function listItems(where: ReturnType<typeof and>): Promise<ScheduledItem[]
       replyAt: latestReply("em.sent_at").mapWith((v: unknown) => (v ? new Date(v as string) : null)),
       replyText: latestReply("left(em.body_text, 600)").mapWith((v: unknown) => (v == null ? null : String(v))),
       // Name and size of the files a row holds (never a link: the chips are informational), in the same round trip.
-      files: sql`coalesce((select json_agg(json_build_object('filename', a.filename, 'size', a.size_bytes) order by a.created_at, a.id)
+      files: sql`coalesce((select json_agg(json_build_object('filename', a.filename, 'size', a.size_bytes, 'storagePath', a.storage_path, 'contentType', a.content_type) order by a.position, a.created_at, a.id)
         from email_attachment a where a.scheduled_email_id = ${scheduledEmail.id} and a.removed_at is null), '[]'::json)`.mapWith(jsonArray),
       // Names of the OTHER "Para" contacts, in the order they were picked.
-      otherRecipients: sql`coalesce((select json_agg(trim(concat_ws(' ', rp.first_name, rp.last_name)) order by array_position(${scheduledEmail.recipientPersonIds}, rp.id))
+      otherRecipients: sql`coalesce((select json_agg(json_build_object('id', rp.id, 'name', trim(concat_ws(' ', rp.first_name, rp.last_name)), 'email', coalesce(rp.email, '')) order by array_position(${scheduledEmail.recipientPersonIds}, rp.id))
         from person rp where rp.id = any(${scheduledEmail.recipientPersonIds})), '[]'::json)`.mapWith(jsonArray),
     })
     .from(scheduledEmail)
@@ -344,8 +344,8 @@ async function listItems(where: ReturnType<typeof and>): Promise<ScheduledItem[]
     replyAt,
     replyText: replySnippet(replyText),
     cancelledAt: row.status === "cancelled" ? row.updatedAt : null,
-    attachments: (files as { filename: string; size: number }[]).map((f) => ({ filename: String(f.filename), size: Number(f.size) })),
-    otherRecipients: (otherRecipients as unknown[]).map(String).filter(Boolean),
+    attachments: (files as ScheduledItem["attachments"]).map((f) => ({ filename: String(f.filename), size: Number(f.size), storagePath: String(f.storagePath), contentType: String(f.contentType) })),
+    otherRecipients: (otherRecipients as ScheduledItem["otherRecipients"]).map((r) => ({ id: String(r.id), name: String(r.name), email: String(r.email) })),
     ccAddresses: row.ccAddresses,
   }));
 }

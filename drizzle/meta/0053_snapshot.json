@@ -1,5 +1,5 @@
 {
-  "id": "7db5ca0e-faa2-4a39-8813-8fda2bc9e6bb",
+  "id": "39f6ba78-727b-45ea-b5e7-8043e66de9f2",
   "prevId": "e2da0b56-db53-4a10-ac06-fafca5d3e42e",
   "version": "7",
   "dialect": "postgresql",
@@ -2090,6 +2090,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",

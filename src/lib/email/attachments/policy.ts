@@ -109,3 +109,8 @@ export function formatAttachmentSize(bytes: number): string {
   if (bytes <= 0) return "0 MB";
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
 }
+
+/** A whole-megabyte limit as the mockup writes it: "10 MB". */
+export function formatAttachmentLimit(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}

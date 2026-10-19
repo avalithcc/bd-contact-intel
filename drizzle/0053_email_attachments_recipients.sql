@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS "email_attachment" (
 	"content_type" text NOT NULL,
 	"size_bytes" integer NOT NULL,
 	"scheduled_email_id" uuid,
+	"position" smallint DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"removed_at" timestamp with time zone,
 	CONSTRAINT "email_attachment_storage_path_unique" UNIQUE("storage_path")

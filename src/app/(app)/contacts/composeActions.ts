@@ -6,7 +6,7 @@ import { validateAttachmentRefs } from "@/lib/email/attachments/load";
 import { isHeldByScheduledEmail, markAttachmentsRemoved, registerAttachments } from "@/lib/email/attachments/queries";
 import { supabaseAttachmentStorage } from "@/lib/email/attachments/storage";
 import { pathBelongsTo } from "@/lib/email/attachments/storagePath";
-import { listParaCandidates, type ParaCandidate } from "@/lib/email/recipients/queries";
+import { listColleagueSuggestions, listParaCandidates, type ColleagueSuggestion, type ParaCandidate } from "@/lib/email/recipients/queries";
 import { isUuid } from "@/lib/uuid";
 import { actionFailure, type ContactActionResult } from "./actionErrors";
 
@@ -47,6 +47,19 @@ export async function discardEmailAttachmentAction(storagePath: string): Promise
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
+  }
+}
+
+export type ColleagueSuggestionsResult = { ok: true; colleagues: ColleagueSuggestion[] } | { ok: false };
+
+/** CC suggestions: the BDs with an @avalith.net address. Suggestions only; the server still validates every Cc address. */
+export async function listColleagueSuggestionsAction(): Promise<ColleagueSuggestionsResult> {
+  try {
+    await getCurrentBd();
+    return { ok: true, colleagues: await listColleagueSuggestions() };
+  } catch (err) {
+    actionFailure(err);
+    return { ok: false };
   }
 }
 

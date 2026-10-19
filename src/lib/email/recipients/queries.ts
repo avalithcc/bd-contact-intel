@@ -7,8 +7,9 @@
  */
 import { and, asc, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { companyAlias, person } from "@/db/schema";
+import { bd, companyAlias, person } from "@/db/schema";
 import { aliasKeyIsNotLiveCompany } from "@/lib/companies/aliasRule";
+import { INTERNAL_CC_DOMAIN } from "./cc";
 import { evaluatePara, type ParaPerson, type ParaResult } from "./para";
 
 const MAX_MERGE_HOPS = 5;
@@ -63,6 +64,21 @@ export async function resolveParaRecipients(primaryId: string, otherIds: readonl
   const ids = [primaryId, ...otherIds];
   const people = await loadParaPeople(ids);
   return evaluatePara(people.get(primaryId), otherIds.map((id) => people.get(id)));
+}
+
+export interface ColleagueSuggestion {
+  name: string;
+  email: string;
+}
+
+/** CC suggestions: the BDs, whose address is on the internal domain. One small statement (the table has a handful of rows). */
+export async function listColleagueSuggestions(): Promise<ColleagueSuggestion[]> {
+  const rows = await db
+    .select({ name: bd.name, email: bd.email })
+    .from(bd)
+    .where(sql`lower(${bd.email}) like ${"%@" + INTERNAL_CC_DOMAIN}`)
+    .orderBy(asc(bd.name));
+  return rows.map((r) => ({ name: r.name, email: r.email.trim().toLowerCase() }));
 }
 
 export interface ParaCandidate {

@@ -63,6 +63,32 @@ export function emailRecipientText(metadata: Record<string, unknown> | null | un
   return null;
 }
 
+/**
+ * What a composed email adds to its `email_sent` activity (send.ts `composedMetadata`): who it went to when there were
+ * several "Para" contacts, the Cc colleagues, and the files by name and size. Older activities have none of these keys.
+ */
+export interface SentEmailExtras {
+  recipients: { name: string; email: string }[];
+  cc: string[];
+  attachments: { filename: string; size: number }[];
+}
+
+export function readSentEmailExtras(metadata: Record<string, unknown> | null | undefined): SentEmailExtras {
+  const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+  const obj = (v: unknown): Record<string, unknown> | null => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : null);
+  return {
+    recipients: list(metadata?.recipients).flatMap((r) => {
+      const o = obj(r);
+      return o && typeof o.email === "string" ? [{ name: typeof o.name === "string" ? o.name : "", email: o.email }] : [];
+    }),
+    cc: list(metadata?.cc).filter((a): a is string => typeof a === "string" && a !== ""),
+    attachments: list(metadata?.attachments).flatMap((a) => {
+      const o = obj(a);
+      return o && typeof o.filename === "string" ? [{ filename: o.filename, size: typeof o.size === "number" ? o.size : 0 }] : [];
+    }),
+  };
+}
+
 function discardBody(metadata: Record<string, unknown>, l: ContactRecordLabels): string {
   const reason = typeof metadata.reason === "string" ? metadata.reason : null;
   const note = typeof metadata.note === "string" ? metadata.note : null;

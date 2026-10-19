@@ -265,8 +265,8 @@ test("a scheduled email keeps its other recipients, Cc and files; the card reads
   });
   assert.ok(scheduled.ok);
   const [item] = await listScheduledForPerson(a.id, owner.id);
-  assert.deepEqual(item!.attachments, [{ filename: "Propuesta.pdf", size: 2_000_000 }, { filename: "Tarifas.pdf", size: 100 }]);
-  assert.deepEqual(item!.otherRecipients, ["Beatriz Paz"]);
+  assert.deepEqual(item!.attachments.map((f) => [f.filename, f.size, f.contentType, f.storagePath.startsWith(`${uid}/`)]), [["Propuesta.pdf", 2_000_000, "application/pdf", true], ["Tarifas.pdf", 100, "application/pdf", true]], "files come back in the order they were attached");
+  assert.deepEqual(item!.otherRecipients, [{ id: b.id, name: "Beatriz Paz", email: b.email }]);
   assert.deepEqual(item!.ccAddresses, ["ana@avalith.net"]);
 
   // Editing replaces the files and Cc, and drops the other recipients when none are sent.
@@ -274,13 +274,13 @@ test("a scheduled email keeps its other recipients, Cc and files; the card reads
   assert.ok(only.ok);
   assert.deepEqual(await editScheduled({ id: scheduled.id, bdId: owner.id, subject: "Seguimiento", body: "Texto", sendAt: new Date(Date.now() + 90 * 60_000), compose: { recipientPersonIds: [], ccAddresses: [], attachments: only.items, ownerAuthUid: uid } }), { ok: true });
   const [edited] = await listScheduledForPerson(a.id, owner.id);
-  assert.deepEqual(edited!.attachments, [{ filename: "Tarifas.pdf", size: 100 }]);
+  assert.deepEqual(edited!.attachments.map((f) => f.filename), ["Tarifas.pdf"]);
   assert.deepEqual(edited!.otherRecipients, []);
   assert.deepEqual(edited!.ccAddresses, []);
 
   // Editing WITHOUT compose leaves all of it as it was.
   assert.deepEqual(await editScheduled({ id: scheduled.id, bdId: owner.id, subject: "Otro asunto", body: "Texto", sendAt: new Date(Date.now() + 90 * 60_000) }), { ok: true });
-  assert.deepEqual((await listScheduledForPerson(a.id, owner.id))[0]!.attachments, [{ filename: "Tarifas.pdf", size: 100 }]);
+  assert.deepEqual((await listScheduledForPerson(a.id, owner.id))[0]!.attachments.map((f) => f.filename), ["Tarifas.pdf"]);
 
   // Due: the claim carries the files (with the owner uid the cron checks).
   await db.execute(sql.raw(`update scheduled_email set send_at = now() - interval '1 minute' where id = '${scheduled.id}'`));

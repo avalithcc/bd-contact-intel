@@ -59,9 +59,11 @@ export async function setScheduledAttachments(tx: Runner, scheduledId: string, b
     .set({ scheduledEmailId: null })
     .where(and(eq(emailAttachment.scheduledEmailId, scheduledId), keep.length ? notInArray(emailAttachment.storagePath, keep) : sql`true`));
   if (keep.length) {
+    // The order the BD attached them in (the uploads finish in any order).
+    const order = sql`(case ${emailAttachment.storagePath} ${sql.join(items.map((i, index) => sql`when ${i.storagePath} then ${index}::smallint`), sql` `)} else 0::smallint end)`;
     await tx
       .update(emailAttachment)
-      .set({ scheduledEmailId: scheduledId })
+      .set({ scheduledEmailId: scheduledId, position: order })
       // Only a free file, or one this email already holds: a path that belongs to ANOTHER scheduled email is never taken over.
       .where(
         and(
@@ -90,7 +92,7 @@ export async function listScheduledAttachments(scheduledIds: readonly string[]):
     })
     .from(emailAttachment)
     .where(and(inArray(emailAttachment.scheduledEmailId, [...scheduledIds]), isNull(emailAttachment.removedAt)))
-    .orderBy(asc(emailAttachment.createdAt), asc(emailAttachment.id));
+    .orderBy(asc(emailAttachment.position), asc(emailAttachment.createdAt), asc(emailAttachment.id));
 }
 
 export interface SweepCandidate {

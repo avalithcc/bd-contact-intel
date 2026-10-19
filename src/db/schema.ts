@@ -1693,6 +1693,8 @@ export const emailAttachment = pgTable(
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     scheduledEmailId: uuid("scheduled_email_id").references(() => scheduledEmail.id, { onDelete: "set null" }),
+    // Position of the file in the scheduled email's list (the order the BD attached them); files upload in any order.
+    position: smallint("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // Set once the object is gone from Storage.
     removedAt: timestamp("removed_at", { withTimezone: true }),

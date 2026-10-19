@@ -24,10 +24,10 @@ export interface ScheduledItem {
   replyText: string | null;
   /** When a 'cancelled' row was cancelled. */
   cancelledAt: Date | null;
-  /** Files the row holds: name and size only, informational (no download anywhere). */
-  attachments: { filename: string; size: number }[];
-  /** Names of the other "Para" contacts (the row's own contact is `personName`). */
-  otherRecipients: string[];
+  /** Files the row holds. The chips show name and size only (no download anywhere); the path lets the reschedule dialog keep a file. */
+  attachments: { filename: string; size: number; storagePath: string; contentType: string }[];
+  /** The other "Para" contacts (the row's own contact is `personName`). */
+  otherRecipients: { id: string; name: string; email: string }[];
   ccAddresses: string[];
 }
 
