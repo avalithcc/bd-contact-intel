@@ -1844,6 +1844,15 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- **Admin reports: reply rate must exclude current clients** (owner,
+  2026-10-19). The reply rate in Admin → Reportes counts conversations with
+  active clients; it must count only prospects (contacts) and inactive
+  clients. Define "current client" from the company relationship stage (e.g.
+  `won`/active) and exclude those people from numerator and denominator.
+- **Admin reports: "Esta semana" does not filter "empresas ganadas"** (owner,
+  2026-10-19). Selecting the week period still shows the total/monthly won
+  companies; every metric on the screen must follow the selected period
+  (check each card's date filter, not only won companies).
 - **Actions must update the screen immediately** (owner, 2026-10-19). Example:
   approving/sending a Sequence email left the contact in the pending list
   until a full page refresh; it should move to "sent" the moment the button
