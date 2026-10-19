@@ -13,6 +13,13 @@
  * the current distribution, the distribution after the change, and every
  * `from -> to` transition with its count.
  *
+ * `--title-regex=<postgres regex>` narrows the run (dry or execute) to persons whose
+ * `job_title` matches a case-insensitive Postgres regex (`job_title ~* regex`), so a
+ * vocabulary change can be applied on its own and stay within EXACT_REVERT_MAX rows.
+ * For the German general-management terms added 2026-10-19:
+ *   --title-regex='gesch(ä|ae)ftsf(ü|ue)hrer|hoteldirektor|hotelmanager|generaldirektor|^direktor(in)?$'
+ * Run the dry run first: it prints "Exact revert: yes/no (N changes, limit 500)".
+ *
  * `--execute --actor=<bd id>`: pages through the scope by keyset on `id`
  * (batches of BATCH_SIZE, never the whole table in memory) and, inside ONE
  * transaction, updates only rows whose computed group differs from the stored
@@ -48,8 +55,8 @@
  * `no_position`/`other` rather than NULL (the classifier never yields NULL).
  *
  * Usage (dry run is the default):
- *   npx tsx --env-file=.env.local scripts/backfill-person-role-groups.ts [--source-key=<key>]
- *   npx tsx --env-file=.env.local scripts/backfill-person-role-groups.ts --execute --actor=<bd id> [--source-key=<key>]
+ *   npx tsx --env-file=.env.local scripts/backfill-person-role-groups.ts [--source-key=<key>] [--title-regex=<regex>]
+ *   npx tsx --env-file=.env.local scripts/backfill-person-role-groups.ts --execute --actor=<bd id> [--source-key=<key>] [--title-regex=<regex>]
  */
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../src/db";
@@ -72,15 +79,18 @@ function parseArgs(argv: string[]) {
   let execute = false;
   let actor: string | null = null;
   let sourceKey: string | null = null;
+  let titleRegex: string | null = null;
   for (const arg of argv) {
     if (arg === "--execute") execute = true;
     else if (arg.startsWith("--actor=")) actor = arg.slice("--actor=".length);
     else if (arg.startsWith("--source-key=")) sourceKey = arg.slice("--source-key=".length);
-    else throw new Error(`Unknown argument: ${arg}. Valid: --execute, --actor=<bd id>, --source-key=<key>`);
+    else if (arg.startsWith("--title-regex=")) titleRegex = arg.slice("--title-regex=".length);
+    else throw new Error(`Unknown argument: ${arg}. Valid: --execute, --actor=<bd id>, --source-key=<key>, --title-regex=<postgres regex>`);
   }
   if (sourceKey !== null && sourceKey === "") throw new Error("--source-key must not be empty");
+  if (titleRegex !== null && titleRegex === "") throw new Error("--title-regex must not be empty");
   if (execute && !actor) throw new Error("--execute requires --actor=<bd id> for the audit log");
-  return { execute, actor, sourceKey };
+  return { execute, actor, sourceKey, titleRegex };
 }
 
 type Executor = Pick<typeof db, "execute">;
@@ -112,10 +122,11 @@ async function newlyHiddenOwners(ex: Executor, changes: RoleGroupChange[]): Prom
   return out;
 }
 
-async function fetchPage(ex: Executor, lastId: string | null, sourceKey: string | null): Promise<PersonRoleGroupRow[]> {
+async function fetchPage(ex: Executor, lastId: string | null, sourceKey: string | null, titleRegex: string | null): Promise<PersonRoleGroupRow[]> {
   const conditions: SQL[] = [sql`merged_into_id is null`];
   if (lastId !== null) conditions.push(sql`id > ${lastId}::uuid`);
   if (sourceKey !== null) conditions.push(sql`source_key = ${sourceKey}`);
+  if (titleRegex !== null) conditions.push(sql`job_title ~* ${titleRegex}`);
   const rows = await ex.execute<{
     id: string;
     job_title: string | null;
@@ -148,6 +159,7 @@ async function fetchPage(ex: Executor, lastId: string | null, sourceKey: string 
 async function scan(
   ex: Executor,
   sourceKey: string | null,
+  titleRegex: string | null,
   onChanges: (changes: RoleGroupChange[]) => Promise<void>,
 ): Promise<ScanResult> {
   const tally: RoleGroupTally = { before: {}, after: {}, transitions: {}, skippedHumanEdits: 0 };
@@ -157,7 +169,7 @@ async function scan(
   let total = 0;
   let changed = 0;
   for (;;) {
-    const page = await fetchPage(ex, lastId, sourceKey);
+    const page = await fetchPage(ex, lastId, sourceKey, titleRegex);
     if (page.length === 0) break;
     const changes = planRoleGroupPage(page, tally);
     if (changes.length > 0) {
@@ -194,6 +206,7 @@ async function print(ex: Executor, label: string, scope: string, result: ScanRes
   const s = summarizeTally(result.tally);
   const changedWording = label === "EXECUTED" ? "changed" : "would change";
   console.log(`\n=== ${label} (${scope}): ${result.total} persons, ${result.changed} ${changedWording} ===`);
+  console.log(`Exact revert: ${result.exact ? "yes" : "no"} (${result.changed} changes, limit ${EXACT_REVERT_MAX})`);
   console.log("Current distribution:");
   for (const r of s.before) console.log(`  ${String(r.count).padStart(6)}  ${r.group}`);
   console.log("Distribution after the change:");
@@ -216,18 +229,21 @@ async function print(ex: Executor, label: string, scope: string, result: ScanRes
 }
 
 async function main() {
-  const { execute, actor, sourceKey } = parseArgs(process.argv.slice(2));
-  const scope = sourceKey === null ? "all non-merged persons" : `source_key=${sourceKey}`;
+  const { execute, actor, sourceKey, titleRegex } = parseArgs(process.argv.slice(2));
+  const scope = [
+    sourceKey === null ? "all non-merged persons" : `source_key=${sourceKey}`,
+    ...(titleRegex === null ? [] : [`job_title ~* ${titleRegex}`]),
+  ].join(", ");
 
   if (!execute) {
-    const result = await scan(db, sourceKey, async () => {});
+    const result = await scan(db, sourceKey, titleRegex, async () => {});
     await print(db, "DRY RUN", scope, result);
     console.log("\nDry run: nothing written. Re-run with --execute --actor=<bd id> to apply.");
     return;
   }
 
   const result = await db.transaction(async (tx) => {
-    const r = await scan(tx, sourceKey, async (changes) => {
+    const r = await scan(tx, sourceKey, titleRegex, async (changes) => {
       const tuples = sql.join(changes.map((c) => sql`(${c.id}::uuid, ${c.roleGroup}::text)`), sql`, `);
       await tx.execute(sql`
         update person p
@@ -241,7 +257,7 @@ async function main() {
         actorBdId: actor!,
         action: AUDIT_ACTION,
         metadata: {
-          filter: { sourceKey },
+          filter: { sourceKey, titleRegex },
           scanned: r.total,
           updated: r.changed,
           skippedHumanEdits: r.tally.skippedHumanEdits,
