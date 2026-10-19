@@ -1836,6 +1836,13 @@ investigated further in this pass — **unverified**; for what it is worth,
 `npm run test:unit` passed 2317 of 2317 in each of 4 runs on 2026-10-01 (default
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
+### Open, noted 2026-10-19
+- **Edit a contact's first and last name** (owner, 2026-10-19). Some contacts
+  show a dash ("—") instead of a name, and the BD cannot fix it from the record:
+  first name and last name must be editable (audited like other property edits,
+  see person_property_history). Related: the 230 nameless contacts parked for
+  joint review (Known defects).
+
 ### Open, noted 2026-10-17
 - ~~**Phone search**~~ **Shipped 2026-10-18; migration 0051 applied to production the same day (re-checked 2026-10-19: both suffix indexes exist).** Before this the CRM had no phone search:
   `searchCondition` covers only names, company and email, and nothing uses the
