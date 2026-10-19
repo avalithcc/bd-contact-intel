@@ -75,8 +75,9 @@ export function isFromLinkedin(value: string | undefined): boolean {
 }
 
 /** Pre-fill for `/contacts?linkedin=`: re-validated, never trusted from the query string. */
-export function linkedinPrefill(value: string | undefined): string | undefined {
-  const parsed = parseCaptureUrl(value);
+export function linkedinPrefill(value: string | string[] | undefined): string | undefined {
+  // Next hands a repeated query param over as an array; the first value wins.
+  const parsed = parseCaptureUrl(Array.isArray(value) ? value[0] : value);
   return parsed.ok ? parsed.linkedinUrl : undefined;
 }
 

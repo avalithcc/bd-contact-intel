@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { splitLocation } from "@/lib/contacts/locationSplit";
 import { PREFILL_MAX_LENGTH, parseProfilePrefill } from "@/lib/contacts/linkedinProfilePrefill";
 import { buildNewContactFields } from "@/lib/contacts/createContact";
+import { linkedinPrefill } from "@/lib/contacts/linkedinCapture";
 import { isKnownCountryName } from "@/lib/hiring/markets";
 
 test("a trailing known country becomes the country and the rest the city", () => {
@@ -104,4 +105,15 @@ test("the create fields carry jobTitle, city and country with blank-to-null sema
   assert.equal(fields.country, "Argentina");
   const blank = buildNewContactFields({ firstName: "A", lastName: "", linkedinUrl: "", email: "", company: "" });
   assert.deepEqual([blank.jobTitle, blank.city, blank.country], [null, null, null]);
+});
+
+test("a repeated query param does not crash the page; the first value wins", () => {
+  const prefill = parseProfilePrefill({ name: ["Ana Pérez", "x"], company: ["Acme"], title: [], location: undefined });
+  assert.equal(prefill?.firstName, "Ana");
+  assert.equal(prefill?.company, "Acme");
+  assert.equal(prefill?.jobTitle, "");
+  assert.equal(
+    linkedinPrefill(["https://www.linkedin.com/in/ana-perez", "https://example.com"]),
+    linkedinPrefill("https://www.linkedin.com/in/ana-perez"),
+  );
 });

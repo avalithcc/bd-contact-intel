@@ -20,15 +20,19 @@ export interface ProfilePrefill {
   location: string;
 }
 
+/** Next hands a repeated query param over as an array; the first value wins. */
+type QueryValue = string | string[] | undefined;
+
 export interface ProfilePrefillParams {
-  name?: string;
-  title?: string;
-  company?: string;
-  location?: string;
+  name?: QueryValue;
+  title?: QueryValue;
+  company?: QueryValue;
+  location?: QueryValue;
 }
 
-function clean(value: string | undefined): string {
-  if (!value) return "";
+function clean(raw: QueryValue): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string" || !value) return "";
   return value
     .replace(/[\u0000-\u001f\u007f]+/g, " ")
     .replace(/\s+/g, " ")
