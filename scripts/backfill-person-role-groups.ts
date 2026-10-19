@@ -37,7 +37,12 @@
  * Idempotent: a second run finds no differing row and reports zero
  * transitions (and writes nothing, no audit row).
  *
- * Revert: the audit row is not row-exact by design. To undo, `git revert` the
+ * Revert: for a run of at most EXACT_REVERT_MAX rows the audit metadata holds
+ * `changes` ([{id, from, to}]); restore with
+ *   update person p set role_group = c."from"
+ *   from audit_log a, jsonb_to_recordset(a.metadata->'changes') as c(id uuid, "from" text, "to" text)
+ *   where a.id = '<audit id>' and p.id = c.id and p.role_group = c."to";
+ * Larger runs are not row-exact by design. To undo, `git revert` the
  * classifier change and re-run this script with the same filter; the old rules
  * recompute the old groups. Persons whose stored group was NULL come back as
  * `no_position`/`other` rather than NULL (the classifier never yields NULL).
@@ -60,6 +65,8 @@ import {
 
 const BATCH_SIZE = 1000;
 const AUDIT_ACTION = "backfill_person_role_groups";
+/** A run touching at most this many rows also records each `{id, from, to}` in the audit row, so it can be reverted exactly. */
+const EXACT_REVERT_MAX = 500;
 
 function parseArgs(argv: string[]) {
   let execute = false;
@@ -145,6 +152,7 @@ async function scan(
 ): Promise<ScanResult> {
   const tally: RoleGroupTally = { before: {}, after: {}, transitions: {}, skippedHumanEdits: 0 };
   const newlyHidden: Record<string, number> = {};
+  const exact: { id: string; from: string | null; to: string }[] = [];
   let lastId: string | null = null;
   let total = 0;
   let changed = 0;
@@ -154,13 +162,14 @@ async function scan(
     const changes = planRoleGroupPage(page, tally);
     if (changes.length > 0) {
       for (const [owner, n] of Object.entries(await newlyHiddenOwners(ex, changes))) newlyHidden[owner] = (newlyHidden[owner] ?? 0) + n;
+      if (exact.length <= EXACT_REVERT_MAX) for (const c of changes) exact.push({ id: c.id, from: c.from, to: c.roleGroup });
       await onChanges(changes);
     }
     total += page.length;
     changed += changes.length;
     lastId = page[page.length - 1].id;
   }
-  return { tally, total, changed, newlyHidden };
+  return { tally, total, changed, newlyHidden, exact: changed <= EXACT_REVERT_MAX ? exact : null };
 }
 
 interface ScanResult {
@@ -168,6 +177,8 @@ interface ScanResult {
   total: number;
   changed: number;
   newlyHidden: Record<string, number>;
+  /** Every change, only when the run is small enough to revert row by row; null otherwise. */
+  exact: { id: string; from: string | null; to: string }[] | null;
 }
 
 async function ownerNames(ex: Executor, ids: string[]): Promise<Record<string, string>> {
@@ -237,6 +248,7 @@ async function main() {
           nullClassified: summarizeTally(r.tally).nullClassified,
           newlyHiddenByOwner: r.newlyHidden,
           transitions: summarizeTally(r.tally).transitions,
+          ...(r.exact ? { changes: r.exact } : {}),
         },
       });
     }

@@ -123,6 +123,13 @@ const RULES: Rule[] = [
       "direttore generale",
       "direttrice generale",
       "proprietari[oa]",
+      "gesch(?:ä|ae)ftsf(?:ü|ue)hrer\\w*",
+      "hoteldirektor\\w*",
+      "hotelmanager\\w*",
+      "generaldirektor\\w*",
+      // Bare "Direktor" is whole-title only, like "direttore": "Direktor
+      // Vertrieb" names a different job.
+      "^direktor$",
       "unternehmensinhaber\\w*",
       "inhaber\\w*",
       "^amministratore$",

@@ -1298,6 +1298,15 @@ README recommends not creating a dedicated hotel group yet. Not implemented;
 `classifyPosition` and the hide rule are unchanged.
 Owner decision 2026-10-18: leave the Revenue, Finance and guest-operations hotel
 roles as they are (no change).
+**Update 2026-10-19:** the Spanish/Italian general-management vocabulary was
+already in `classifyPosition` (Director General, Consejero delegado, Direttore,
+Proprietario, ...); this change adds the German gap (Geschäftsführer,
+Hoteldirektor, Hotelmanager, Generaldirektor, whole-title `Direktor`), tested in
+`tests/unit/roleGroupsGermanManagement.test.ts`. The recompute is the existing
+`scripts/backfill-person-role-groups.ts` (dry run by default; `--execute
+--actor=<bd id>`); for runs of up to 500 rows its audit row now also stores
+`changes` (`{id, from, to}`) so the run reverts exactly. **Remaining for the
+orchestrator:** run the dry run on production, then `--execute` after approval.
 
 **Correction to the README's headline finding** (2026-10-01, after #284): the
 README says 51 of 147 hotel contacts do not appear in Mariel's default view,
