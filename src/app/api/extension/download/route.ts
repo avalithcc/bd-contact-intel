@@ -15,10 +15,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!(await hasUsableSession())) return new NextResponse(null, { status: 401 });
   const { fileName } = currentExtensionRelease();
-  let body: Buffer;
-  try {
-    body = await readFile(path.join(process.cwd(), "extension", "zip", fileName));
-  } catch {
+  const body = await readFile(path.join(process.cwd(), "extension", "zip", fileName)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!body) {
     return new NextResponse("Extension archive not found. Run `npm run extension:zip` and redeploy.", { status: 404 });
   }
   return new NextResponse(new Uint8Array(body), {

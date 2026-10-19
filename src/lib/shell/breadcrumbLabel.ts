@@ -38,6 +38,7 @@ const ROUTE_LABELS: ReadonlyArray<readonly [string, BreadcrumbKey]> = [
   ["/admin/migration", "migration"],
   ["/admin/rfc-backfill", "rfcBackfill"],
   ["/admin/reports", "reports"],
+  ["/account/extension", "extensionGuide"],
   ["/account", "account"],
   ["/contact-status", "contactStatusGuide"],
   ["/playbook", "playbook"],

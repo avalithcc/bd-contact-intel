@@ -499,3 +499,54 @@ export function BoltIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+// Install-guide glyphs (openspec/changes/linkedin-extension/mockups/instalar-extension.html).
+export function CopyIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </Svg>
+  );
+}
+
+export function FolderIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </Svg>
+  );
+}
+
+export function ArchiveTrayIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    </Svg>
+  );
+}
+
+export function PuzzleIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4z" />
+    </Svg>
+  );
+}
+
+export function PinIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3z" />
+    </Svg>
+  );
+}
+
+export function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+    </Svg>
+  );
+}

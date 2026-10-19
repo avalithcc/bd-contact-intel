@@ -1,0 +1,236 @@
+/* Install guide for the LinkedIn extension (openspec/changes/linkedin-extension/mockups/instalar-extension.html).
+   Only what the design system has no class for: numbered steps and the grey-block browser schematics. Tokens only. */
+.guide {
+  max-width: 880px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: var(--space-xl) 0;
+  border-top: 1px solid var(--color-border);
+}
+.step:first-of-type {
+  border-top: 0;
+}
+.step h3 {
+  margin: 0 0 var(--space-2xs);
+}
+.stepN {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+.body {
+  display: grid;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.addr {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) var(--space-md);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  width: max-content;
+  max-width: 100%;
+}
+
+/* Schematic browser: grey blocks only, no brand marks, no screenshots */
+.sch {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface-2);
+  max-width: 620px;
+  font-size: var(--text-sm);
+}
+.schBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border);
+}
+.dots {
+  display: flex;
+  gap: 6px;
+}
+.dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+.schUrl {
+  flex: 1;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-md);
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.schIco {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-ink-soft);
+}
+.schIco svg {
+  width: 14px;
+  height: 14px;
+}
+.schBody {
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+  position: relative;
+  min-height: 120px;
+}
+.schBodyTall {
+  min-height: 150px;
+}
+.schHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  justify-content: space-between;
+}
+.schHead strong {
+  font-size: var(--text-base);
+}
+.schRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.schLine {
+  height: 12px;
+  background: var(--color-border);
+  border-radius: 4px;
+}
+.schCard {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--color-surface-2);
+}
+.schCardEnd {
+  justify-self: end;
+  width: 260px;
+}
+.schCardFloat {
+  position: absolute;
+  right: var(--space-md);
+  top: var(--space-md);
+  width: 210px;
+  display: grid;
+}
+.schSide {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+.schSide aside {
+  background: var(--color-surface-1);
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+  align-content: start;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-weight: 600;
+}
+.toggle i {
+  width: 2rem;
+  height: 1.1rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+  position: relative;
+  display: inline-block;
+}
+.toggle i::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: calc(100% - 0.8rem - 2px);
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--color-surface-2);
+}
+.hl {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+  position: relative;
+}
+.folder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+.folderSel {
+  background: var(--color-accent-soft);
+}
+
+/* Problemas frecuentes: native <details>, only the first open */
+.faq details {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-md) 0;
+}
+.faq details:last-child {
+  border-bottom: 1px solid var(--color-border);
+}
+.faq summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: "+";
+  color: var(--color-ink-subtle);
+}
+.faq details[open] summary::after {
+  content: "\2212";
+}
+.faq summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.faq details > div {
+  margin-top: var(--space-sm);
+}

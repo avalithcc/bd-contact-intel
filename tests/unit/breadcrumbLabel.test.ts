@@ -31,6 +31,7 @@ test("keeps the sections that already worked", () => {
   assert.equal(resolveBreadcrumbKey("/discovery"), "discovery");
   assert.equal(resolveBreadcrumbKey("/account"), "account");
   assert.equal(resolveBreadcrumbKey("/account/linkedin-messages"), "account");
+  assert.equal(resolveBreadcrumbKey("/account/extension"), "extensionGuide");
   // "/" is the legacy contacts home (title: "base de contactos"), so Contactos
   // is its real name here, not the old catch-all fallback.
   assert.equal(resolveBreadcrumbKey("/"), "leads");

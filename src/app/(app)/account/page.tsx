@@ -10,7 +10,7 @@ import { MailIcon, LockIcon, LinkedInIcon, ChevronRightIcon } from "@/components
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { gmailConnectionState } from "@/lib/gmail/connectionState";
 import { formatArgentinaDayMonth } from "@/lib/i18n/format";
-import { resolveExtensionStoreUrl } from "@/lib/extension/install";
+import { currentExtensionRelease } from "@/lib/extension/release";
 import { ExtensionTool } from "./ExtensionTool";
 import { SignOutButton } from "../../SignOutButton";
 import { SignatureEditor } from "./SignatureEditor";
@@ -45,8 +45,8 @@ export default async function AccountPage() {
   const numberFormat = new Intl.NumberFormat("es-AR");
   // Same state function as /account/email, so the two pages always agree.
   const gmailState = gmailConnectionState(getGmailOAuthConfig().ok, account?.status);
-  // Read at request time on the server; undefined until the owner publishes the store listing (extension/README.md).
-  const extensionStoreUrl = resolveExtensionStoreUrl(process.env.NEXT_PUBLIC_EXTENSION_STORE_URL);
+  // Version and file name come from the extension manifest source at build time (single source of truth).
+  const extensionRelease = currentExtensionRelease();
 
   return (
     <main className={styles.page}>
@@ -118,18 +118,21 @@ export default async function AccountPage() {
       <div className={styles.card} id="herramientas">
         <h3 className={styles.cardHeader}>{l.toolsTitle}</h3>
         <ExtensionTool
-          storeUrl={extensionStoreUrl}
+          release={extensionRelease}
+          guideHref="/account/extension"
+          updateHref="/account/extension#actualizar"
           labels={{
             title: l.extensionTitle,
             body: l.extensionBody,
             install: l.extensionInstall,
-            storeSoon: l.extensionStoreSoon,
-            step1Title: l.extensionStep1Title,
-            step1Body: l.extensionStep1Body,
-            step2Title: l.extensionStep2Title,
-            step2Body: l.extensionStep2Body,
+            fileMeta: l.extensionFileMeta,
+            guideLink: l.extensionGuideLink,
+            installedBody: l.extensionInstalledBody,
             installedBadge: l.extensionInstalledBadge,
-            installedMeta: l.extensionInstalledMeta,
+            outdatedTitle: l.extensionOutdatedTitle,
+            outdatedBody: l.extensionOutdatedBody,
+            downloadVersion: l.extensionDownloadVersion,
+            howToUpdate: l.extensionHowToUpdate,
             privacyTitle: l.toolPrivacyTitle,
             privacyBody: l.toolPrivacyBody,
           }}

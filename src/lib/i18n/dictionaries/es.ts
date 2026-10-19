@@ -243,6 +243,7 @@ export const es: typeof en = {
     whatsNew: "Novedades",
     discovery: "Descubrimiento",
     account: "Cuenta",
+    extensionGuide: "Extensión de LinkedIn",
     playbook: "Guía de roles",
     // "Guías" sidenav section (openspec/changes/contact-status-guide) —
     // reference/manual pages for every BD, no live counts, not admin-gated.
@@ -1407,6 +1408,104 @@ export const es: typeof en = {
     genericError: "Ocurrió un error. Intentá de nuevo.",
   },
 
+  // Install guide for the LinkedIn extension (/account/extension; openspec/changes/linkedin-extension/mockups/instalar-extension.html).
+  // `**x**` renders bold and `` `x` `` renders mono (see ExtensionGuide's Rich); {version}/{latest} are replaced client-side.
+  extensionGuide: {
+    breadcrumbAria: "Ruta de navegación",
+    breadcrumbAccount: "Cuenta",
+    breadcrumbCurrent: "Extensión de LinkedIn",
+    title: "Instalar la extensión de LinkedIn",
+    subtitle: "Al abrir un perfil de LinkedIn, una tarjeta te dice si la persona ya está en el CRM.",
+    subtitleStrong: "Tarda unos 2 minutos. Solo se hace una vez por navegador.",
+    detectedTitle: "Extensión detectada · v{version}",
+    detectedBody: "Ya está lista. Abre un perfil de LinkedIn para ver la tarjeta.",
+    outdatedTitle: "Hay una versión nueva (v{latest})",
+    outdatedBody: "Tienes la v{version}. Mira «Cómo actualizar» más abajo.",
+    outdatedLink: "Cómo actualizar",
+    notDetectedTitle: "Todavía no la detectamos",
+    notDetectedBody: "Sigue los pasos de abajo. Esta indicación cambia sola cuando la extensión queda activa.",
+    tabsLabel: "Navegador",
+    tabChrome: "Chrome",
+    tabEdge: "Edge",
+    download: "Descargar extensión",
+    optional: "Opcional",
+    extensionName: "CRM avalith",
+    extensionsHeading: "Extensiones",
+    devMode: "Modo de desarrollador",
+    folderName: "crm-linkedin",
+    step1Title: "Descarga el archivo .zip",
+    step1Meta: "Se guarda en tu carpeta de Descargas.",
+    step2Title: "Descomprímelo y deja la carpeta en un lugar fijo",
+    step2MetaChrome:
+      "Haz doble clic en el .zip y mueve la carpeta resultante a Documentos (o a otro lugar que no vayas a tocar).",
+    step2MetaEdge: "Igual que en Chrome: mueve la carpeta a Documentos.",
+    schemaDoubleClick: "→ doble clic →",
+    schemaMoveTo: "Muévela a",
+    schemaDocuments: "Documentos",
+    folderWarning: "Si borras o mueves la carpeta, la extensión deja de funcionar.",
+    step3Title: "Abre la página de extensiones",
+    step3MetaChrome:
+      "Los navegadores no permiten abrir esta dirección desde un enlace. Cópiala, abre una pestaña nueva, pégala en la barra de direcciones y pulsa Enter.",
+    step3MetaEdge: "Cópiala, abre una pestaña nueva, pégala en la barra de direcciones y pulsa Enter.",
+    copy: "Copiar",
+    copied: "Copiado",
+    copyHelp: "Tras pulsar Copiar, el botón dice “Copiado” unos segundos.",
+    copyToast: "Dirección copiada",
+    copyFailed: "No se pudo copiar. Selecciona la dirección y cópiala a mano.",
+    step4Title: "Activa el “Modo de desarrollador”",
+    step4MetaChrome: "Es el interruptor de la esquina superior derecha. Debe quedar activado (verde).",
+    step4MetaEdge: "En Edge el interruptor está en el **menú de la izquierda**, abajo. Debe quedar activado.",
+    step5TitleChrome: "Pulsa “Cargar descomprimida” y elige la carpeta",
+    step5MetaChrome:
+      "Aparece una barra con botones. Elige la carpeta **crm-linkedin** que dejaste en Documentos (la que tiene el archivo `manifest.json` dentro) y pulsa Seleccionar.",
+    step5TitleEdge: "Pulsa “Cargar desempaquetada” y elige la carpeta",
+    step5MetaEdge:
+      "Elige la carpeta **crm-linkedin** (la que tiene `manifest.json` dentro) y pulsa Seleccionar carpeta.",
+    loadUnpackedChrome: "Cargar descomprimida",
+    loadUnpackedEdge: "Cargar desempaquetada",
+    packExtension: "Empaquetar extensión",
+    refresh: "Actualizar",
+    containsManifest: "contiene manifest.json",
+    step6TitleChrome: "Fija la extensión en la barra",
+    step6MetaChrome:
+      "Pulsa el icono de pieza de puzle, busca “CRM avalith” y pulsa la chincheta. Así tienes el icono siempre a la vista; la tarjeta funciona igual sin fijarla.",
+    step6TitleEdge: "Muestra la extensión en la barra",
+    step6MetaEdge:
+      "Pulsa el icono de puzle (Extensiones), busca “CRM avalith” y pulsa el ojo para mostrarla en la barra.",
+    step7Title: "Comprueba que funciona",
+    step7MetaChrome:
+      "Abre cualquier perfil de LinkedIn. A la derecha aparece una tarjeta con el logo del CRM. Si inicias sesión en el CRM en este mismo navegador, verás al instante si la persona ya existe. Arriba de esta página también verás “Extensión detectada”.",
+    step7MetaEdge: "Igual que en Chrome: abre un perfil de LinkedIn y busca la tarjeta a la derecha.",
+    schemaCardMeta: "Ana Pérez ya está en el CRM",
+    updateTitle: "Cómo actualizar a una versión nueva",
+    updateIntro:
+      "Cuando haya una versión nueva, Cuenta lo avisa. No hace falta quitar la extensión ni volver a hacer los siete pasos.",
+    update1Title: "Descarga el .zip nuevo y descomprímelo",
+    downloadVersion: "Descargar v{version}",
+    update2Title: "Reemplaza el contenido de la carpeta de siempre",
+    update2Meta:
+      "Copia los archivos nuevos dentro de la misma carpeta, en el mismo lugar, y acepta reemplazar los existentes. No crees otra carpeta.",
+    update3Title: "Recarga la extensión",
+    update3Meta:
+      "Abre `chrome://extensions` (en Edge, `edge://extensions`) y pulsa el icono de flecha circular en la tarjeta de “CRM avalith”. Después recarga la pestaña de LinkedIn.",
+    faqTitle: "Problemas frecuentes",
+    faq1Q: "No aparece la tarjeta en LinkedIn",
+    faq1A:
+      "Recarga la pestaña de LinkedIn. Verifica que estás en un perfil (la dirección empieza por `linkedin.com/in/`) y que la extensión está activada en la página de extensiones.",
+    faq2Q: "La tarjeta dice “Inicia sesión” aunque ya entré al CRM",
+    faq2A:
+      "Las sesiones no se comparten entre navegadores. Abre `crm.avalith.net` en este mismo navegador, inicia sesión y vuelve a LinkedIn.",
+    faq3Q: "El navegador avisa de extensiones en modo de desarrollador",
+    faq3A:
+      "Es normal con este método de instalación; no significa que algo esté mal. Si aparece el aviso al abrir el navegador, elige conservarla (no desactivarla).",
+    faq4Q: "La extensión dejó de funcionar o aparece con un error",
+    faq4A:
+      "Probablemente se movió o borró la carpeta. Vuelve a descargar el .zip, déjalo en un lugar fijo y repite desde el paso 5; antes, elimina la tarjeta antigua con el botón Quitar.",
+    faq5Q: "Esta página sigue diciendo “Todavía no la detectamos”",
+    faq5A:
+      "Recarga esta página después de cargar la extensión. Si usas otro navegador o perfil distinto del que instalaste, la extensión no está ahí: repite la instalación en ese navegador.",
+  },
+
   accountSettings: {
     eyebrow: "Cuenta",
     title: "cuenta",
@@ -1422,19 +1521,18 @@ export const es: typeof en = {
     passwordRowTitle: "Contraseña",
     passwordRowMeta: "Actualizá tu contraseña de acceso",
     toolsTitle: "Herramientas",
-    extensionTitle: "Extensión para Chrome, Edge y Brave",
+    extensionTitle: "Extensión para Chrome y Edge",
     extensionBody:
       "Al abrir un perfil de LinkedIn, una tarjeta te dice si la persona ya está en el CRM y te lleva a su ficha o a crearla, sin salir de la página.",
-    extensionInstall: "Instalar extensión",
-    extensionStoreSoon: "Disponible pronto en la Chrome Web Store",
-    extensionStep1Title: "Instálala una sola vez",
-    extensionStep1Body:
-      "Se abre la tienda de tu navegador. Pulsa “Agregar” y listo; no hay que arrastrar nada ni mostrar la barra de marcadores.",
-    extensionStep2Title: "Abre cualquier perfil de LinkedIn",
-    extensionStep2Body:
-      "La tarjeta aparece sola a la derecha. Si ya iniciaste sesión en el CRM, verás el resultado al instante.",
-    extensionInstalledBadge: "Instalada",
-    extensionInstalledMeta: "Versión {version} · abre cualquier perfil de LinkedIn para ver la tarjeta.",
+    extensionInstall: "Descargar extensión",
+    extensionFileMeta: "{file} · versión {version}",
+    extensionGuideLink: "Ver guía de instalación",
+    extensionInstalledBody: "Abre cualquier perfil de LinkedIn para ver la tarjeta.",
+    extensionInstalledBadge: "Instalada · v{version}",
+    extensionOutdatedTitle: "Hay una versión nueva (v{latest})",
+    extensionOutdatedBody: "Tienes la v{version}.",
+    extensionDownloadVersion: "Descargar v{latest}",
+    extensionHowToUpdate: "Cómo actualizar",
     toolPrivacyTitle: "Privacidad",
     toolPrivacyBody: "Solo lee los datos básicos del perfil que agregas, cuando pulsas Agregar.",
     importTitle: "Importación",

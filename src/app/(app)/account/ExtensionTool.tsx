@@ -1,43 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { DownloadIcon, LinkedInIcon, LockIcon } from "@/components/icons";
-import { readInstalledVersion } from "@/lib/extension/install";
+import Link from "next/link";
+import { DownloadIcon, LinkedInIcon, LockIcon, WarningIcon } from "@/components/icons";
+import { extensionInstallState } from "@/lib/extension/install";
+import { fillTemplate as fill } from "@/lib/i18n/template";
+import type { ExtensionRelease } from "@/lib/extension/release";
+import { useInstalledExtensionVersion } from "./useInstalledExtension";
 import styles from "./page.module.css";
 
 export interface ExtensionToolLabels {
   title: string;
   body: string;
   install: string;
-  storeSoon: string;
-  step1Title: string;
-  step1Body: string;
-  step2Title: string;
-  step2Body: string;
+  /** Contains `{file}` and `{version}`; plain strings because a function cannot cross the server/client boundary. */
+  fileMeta: string;
+  guideLink: string;
+  installedBody: string;
+  /** Contains `{version}`. */
   installedBadge: string;
-  /** Contains `{version}`; a plain string because a function cannot cross the server/client boundary. */
-  installedMeta: string;
+  /** Contain `{latest}` / `{version}`. */
+  outdatedTitle: string;
+  outdatedBody: string;
+  downloadVersion: string;
+  howToUpdate: string;
   privacyTitle: string;
   privacyBody: string;
 }
 
 /**
- * Cuenta > Herramientas: the LinkedIn extension card (linkedin-extension mockup, section 3). The extension's own
- * script on this origin writes `data-crm-extension="<version>"` on <html>; this reads it after mount and
- * follows later changes, switching between "Instalar extensión" and the "Instalada" badge. When nothing is
- * detected the not-installed variant shows, as the mockup specifies.
+ * Cuenta > Herramientas: the LinkedIn extension card (instalar-extension mockup, section 1). Three states from what
+ * the extension announces on <html> versus the version this deploy serves: not installed (download + guide),
+ * installed and current (badge), installed but older (warning + download of the new version + how to update).
+ * "Older" needs a proven numeric comparison; an installed version that cannot be compared never nags.
  */
-export function ExtensionTool({ labels: l, storeUrl }: { labels: ExtensionToolLabels; storeUrl: string | null }) {
-  const [version, setVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const read = () => setVersion(readInstalledVersion(root.getAttribute("data-crm-extension")));
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(root, { attributes: true, attributeFilter: ["data-crm-extension"] });
-    return () => observer.disconnect();
-  }, []);
+export function ExtensionTool({
+  labels: l,
+  release,
+  guideHref,
+  updateHref,
+}: {
+  labels: ExtensionToolLabels;
+  release: ExtensionRelease;
+  guideHref: string;
+  updateHref: string;
+}) {
+  const installed = useInstalledExtensionVersion();
+  const state = extensionInstallState(installed, release.version);
+  const downloadIcon = <DownloadIcon className="icon" />;
 
   return (
     <div className="stack">
@@ -47,46 +56,56 @@ export function ExtensionTool({ labels: l, storeUrl }: { labels: ExtensionToolLa
         </span>
         <div className="grow">
           <strong>{l.title}</strong>
-          <p className="meta">{version ? l.installedMeta.replace("{version}", version) : l.body}</p>
+          <p className="meta">{state.kind === "not-installed" ? l.body : l.installedBody}</p>
         </div>
-        {version && <span className="badge badge-success">{l.installedBadge}</span>}
+        {state.kind !== "not-installed" && (
+          <span className={`badge ${state.kind === "outdated" ? "badge-warn" : "badge-success"}`}>
+            {fill(l.installedBadge, { version: state.version })}
+          </span>
+        )}
       </div>
-      {!version && (
+
+      {state.kind === "not-installed" && (
+        <div className="stack-sm">
+          <a className="btn btn-primary btn-block" href={release.downloadHref} download={release.fileName}>
+            {downloadIcon}
+            {l.install}
+          </a>
+          <p className="help">{fill(l.fileMeta, { file: release.fileName, version: release.version })}</p>
+          <Link href={guideHref}>{l.guideLink}</Link>
+        </div>
+      )}
+
+      {state.kind === "current" && (
+        <div>
+          <Link className="btn btn-secondary btn-sm" href={guideHref}>
+            {l.guideLink}
+          </Link>
+        </div>
+      )}
+
+      {state.kind === "outdated" && (
         <>
-          <div>
-            {storeUrl ? (
-              <a className="btn btn-primary" href={storeUrl} target="_blank" rel="noopener noreferrer">
-                <DownloadIcon className="icon" />
-                {l.install}
-              </a>
-            ) : (
-              <>
-                <button type="button" className="btn btn-primary" disabled aria-describedby="ext-store-soon">
-                  <DownloadIcon className="icon" />
-                  {l.install}
-                </button>
-                <p className="help mt-md" id="ext-store-soon">
-                  {l.storeSoon}
-                </p>
-              </>
-            )}
-          </div>
-          <div className={styles.step}>
-            <span className={styles.stepN}>1</span>
-            <div className="grow">
-              <strong>{l.step1Title}</strong>
-              <p className="meta">{l.step1Body}</p>
+          <div className="alert alert-warn">
+            <WarningIcon className="icon" />
+            <div>
+              <div className="title">{fill(l.outdatedTitle, { latest: release.version })}</div>
+              {fill(l.outdatedBody, { version: state.version })}
             </div>
           </div>
-          <div className={styles.step}>
-            <span className={styles.stepN}>2</span>
-            <div className="grow">
-              <strong>{l.step2Title}</strong>
-              <p className="meta">{l.step2Body}</p>
-            </div>
+          <div className="row">
+            <a className="btn btn-primary" href={release.downloadHref} download={release.fileName}>
+              {downloadIcon}
+              {fill(l.downloadVersion, { latest: release.version })}
+            </a>
+            <Link className="btn btn-ghost" href={updateHref}>
+              {l.howToUpdate}
+            </Link>
           </div>
+          <p className="help">{release.fileName}</p>
         </>
       )}
+
       <div className="alert alert-neutral">
         <LockIcon className="icon" />
         <div>

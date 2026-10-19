@@ -270,6 +270,7 @@ export const en = {
     whatsNew: "What's New",
     discovery: "Discovery",
     account: "Account",
+    extensionGuide: "LinkedIn extension",
     playbook: "Role guide",
     // "Guides" sidenav section (openspec/changes/contact-status-guide) —
     // reference pages for every BD, not admin-gated.
@@ -1454,6 +1455,103 @@ export const en = {
     genericError: "Something went wrong. Please try again.",
   },
 
+  // Install guide for the LinkedIn extension (/account/extension; openspec/changes/linkedin-extension/mockups/instalar-extension.html).
+  // `**x**` renders bold and `` `x` `` renders mono (see ExtensionGuide's Rich); {version}/{latest} are replaced client-side.
+  extensionGuide: {
+    breadcrumbAria: "Breadcrumb",
+    breadcrumbAccount: "Account",
+    breadcrumbCurrent: "LinkedIn extension",
+    title: "Install the LinkedIn extension",
+    subtitle: "When you open a LinkedIn profile, a card tells you whether the person is already in the CRM.",
+    subtitleStrong: "It takes about 2 minutes. You only do it once per browser.",
+    detectedTitle: "Extension detected · v{version}",
+    detectedBody: "It is ready. Open a LinkedIn profile to see the card.",
+    outdatedTitle: "A new version is available (v{latest})",
+    outdatedBody: "You have v{version}. See \"How to update\" below.",
+    outdatedLink: "How to update",
+    notDetectedTitle: "We can't detect it yet",
+    notDetectedBody: "Follow the steps below. This notice changes by itself once the extension is active.",
+    tabsLabel: "Browser",
+    tabChrome: "Chrome",
+    tabEdge: "Edge",
+    download: "Download extension",
+    optional: "Optional",
+    extensionName: "CRM avalith",
+    extensionsHeading: "Extensions",
+    devMode: "Developer mode",
+    folderName: "crm-linkedin",
+    step1Title: "Download the .zip file",
+    step1Meta: "It is saved in your Downloads folder.",
+    step2Title: "Unzip it and keep the folder somewhere permanent",
+    step2MetaChrome:
+      "Double-click the .zip and move the resulting folder to Documents (or any other place you won't touch).",
+    step2MetaEdge: "Same as in Chrome: move the folder to Documents.",
+    schemaDoubleClick: "→ double-click →",
+    schemaMoveTo: "Move it to",
+    schemaDocuments: "Documents",
+    folderWarning: "If you delete or move the folder, the extension stops working.",
+    step3Title: "Open the extensions page",
+    step3MetaChrome:
+      "Browsers do not allow opening this address from a link. Copy it, open a new tab, paste it in the address bar and press Enter.",
+    step3MetaEdge: "Copy it, open a new tab, paste it in the address bar and press Enter.",
+    copy: "Copy",
+    copied: "Copied",
+    copyHelp: "After you press Copy, the button says \"Copied\" for a few seconds.",
+    copyToast: "Address copied",
+    copyFailed: "Could not copy. Select the address and copy it by hand.",
+    step4Title: "Turn on \"Developer mode\"",
+    step4MetaChrome: "It is the switch in the top right corner. It must be on (green).",
+    step4MetaEdge: "In Edge the switch is in the **left menu**, at the bottom. It must be on.",
+    step5TitleChrome: "Press \"Load unpacked\" and choose the folder",
+    step5MetaChrome:
+      "A bar with buttons appears. Choose the **crm-linkedin** folder you left in Documents (the one with the `manifest.json` file inside) and press Select.",
+    step5TitleEdge: "Press \"Load unpacked\" and choose the folder",
+    step5MetaEdge:
+      "Choose the **crm-linkedin** folder (the one with `manifest.json` inside) and press Select folder.",
+    loadUnpackedChrome: "Load unpacked",
+    loadUnpackedEdge: "Load unpacked",
+    packExtension: "Pack extension",
+    refresh: "Update",
+    containsManifest: "contains manifest.json",
+    step6TitleChrome: "Pin the extension to the toolbar",
+    step6MetaChrome:
+      "Press the puzzle piece icon, find \"CRM avalith\" and press the pin. That keeps the icon in sight; the card works the same without pinning.",
+    step6TitleEdge: "Show the extension in the toolbar",
+    step6MetaEdge: "Press the puzzle icon (Extensions), find \"CRM avalith\" and press the eye to show it in the toolbar.",
+    step7Title: "Check that it works",
+    step7MetaChrome:
+      "Open any LinkedIn profile. A card with the CRM logo appears on the right. If you are signed in to the CRM in this same browser, you see right away whether the person already exists. At the top of this page you will also see \"Extension detected\".",
+    step7MetaEdge: "Same as in Chrome: open a LinkedIn profile and look for the card on the right.",
+    schemaCardMeta: "Ana Pérez is already in the CRM",
+    updateTitle: "How to update to a new version",
+    updateIntro:
+      "When a new version is available, Account tells you. You do not need to remove the extension or repeat the seven steps.",
+    update1Title: "Download the new .zip and unzip it",
+    downloadVersion: "Download v{version}",
+    update2Title: "Replace the contents of the usual folder",
+    update2Meta:
+      "Copy the new files into the same folder, in the same place, and accept replacing the existing ones. Do not create another folder.",
+    update3Title: "Reload the extension",
+    update3Meta:
+      "Open `chrome://extensions` (in Edge, `edge://extensions`) and press the circular arrow icon on the \"CRM avalith\" card. Then reload the LinkedIn tab.",
+    faqTitle: "Common problems",
+    faq1Q: "The card does not appear on LinkedIn",
+    faq1A:
+      "Reload the LinkedIn tab. Check that you are on a profile (the address starts with `linkedin.com/in/`) and that the extension is enabled on the extensions page.",
+    faq2Q: "The card says \"Sign in\" even though I already signed in to the CRM",
+    faq2A:
+      "Sessions are not shared between browsers. Open `crm.avalith.net` in this same browser, sign in and go back to LinkedIn.",
+    faq3Q: "The browser warns about developer mode extensions",
+    faq3A:
+      "That is normal with this installation method; it does not mean anything is wrong. If the warning appears when you open the browser, choose to keep it (do not disable it).",
+    faq4Q: "The extension stopped working or shows an error",
+    faq4A:
+      "The folder was probably moved or deleted. Download the .zip again, leave it somewhere permanent and repeat from step 5; first, remove the old card with the Remove button.",
+    faq5Q: "This page keeps saying \"We can't detect it yet\"",
+    faq5A:
+      "Reload this page after loading the extension. If you use a different browser or profile from the one you installed in, the extension is not there: repeat the installation in that browser.",
+  },
+
   accountSettings: {
     eyebrow: "Account",
     title: "account",
@@ -1469,19 +1567,18 @@ export const en = {
     passwordRowTitle: "Password",
     passwordRowMeta: "Update your sign-in password",
     toolsTitle: "Tools",
-    extensionTitle: "Extension for Chrome, Edge and Brave",
+    extensionTitle: "Extension for Chrome and Edge",
     extensionBody:
       "When you open a LinkedIn profile, a card tells you whether the person is already in the CRM and takes you to their record or to create it, without leaving the page.",
-    extensionInstall: "Install extension",
-    extensionStoreSoon: "Coming soon to the Chrome Web Store",
-    extensionStep1Title: "Install it once",
-    extensionStep1Body:
-      "Your browser's store opens. Press \"Add\" and you are done; there is nothing to drag and no bookmarks bar to show.",
-    extensionStep2Title: "Open any LinkedIn profile",
-    extensionStep2Body:
-      "The card appears on its own on the right. If you are already signed in to the CRM, you see the result right away.",
-    extensionInstalledBadge: "Installed",
-    extensionInstalledMeta: "Version {version} · open any LinkedIn profile to see the card.",
+    extensionInstall: "Download extension",
+    extensionFileMeta: "{file} · version {version}",
+    extensionGuideLink: "View installation guide",
+    extensionInstalledBody: "Open any LinkedIn profile to see the card.",
+    extensionInstalledBadge: "Installed · v{version}",
+    extensionOutdatedTitle: "A new version is available (v{latest})",
+    extensionOutdatedBody: "You have v{version}.",
+    extensionDownloadVersion: "Download v{latest}",
+    extensionHowToUpdate: "How to update",
     toolPrivacyTitle: "Privacy",
     toolPrivacyBody: "It only reads the basic details of the profile you add, when you press Add.",
     importTitle: "Import",
