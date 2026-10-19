@@ -4,16 +4,21 @@
  * the task digest's (src/lib/tasks/digestQueries.ts): the row is inserted BEFORE sending, so a repeated run on the same Argentina
  * day never mails a BD twice, and a run that died mid-send is reclaimed only after the abandonment threshold.
  */
-import { and, asc, eq, lt, lte } from "drizzle-orm";
+import { and, asc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, meeting, meetingDigestSend, person } from "@/db/schema";
 import { abandonedClaimCutoff } from "@/lib/tasks/digestClaim";
+import { argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import type { DigestMeetingRow } from "@/lib/meetings/digest";
 
 type Executor = Pick<typeof db, "select" | "insert" | "update">;
 
-/** Every BD's meetings that are scheduled and whose time has passed, in one bounded read (rule: every read has a LIMIT). */
-export function getUnconfirmedMeetingsForDigest(now: Date, limit = 5000, executor: Executor = db): Promise<DigestMeetingRow[]> {
+/**
+ * The meetings to LIST: every BD's scheduled meetings of today's Argentina day whose time has passed (bounded by the day, so a
+ * backlog of older pending meetings can never crowd them out of the LIMIT; rule: every read has a LIMIT).
+ */
+export function getTodayUnconfirmedMeetingsForDigest(now: Date, limit = 5000, executor: Executor = db): Promise<DigestMeetingRow[]> {
+  const { fromUtc } = argentinaInstantDayWindow(now);
   return executor
     .select({
       meetingId: meeting.id,
@@ -28,9 +33,20 @@ export function getUnconfirmedMeetingsForDigest(now: Date, limit = 5000, executo
     .from(meeting)
     .innerJoin(bd, eq(bd.id, meeting.bdId))
     .innerJoin(person, eq(person.id, meeting.personId))
-    .where(and(eq(meeting.status, "scheduled"), lte(meeting.scheduledAt, now)))
+    .where(and(eq(meeting.status, "scheduled"), gte(meeting.scheduledAt, fromUtc), lte(meeting.scheduledAt, now)))
     .orderBy(asc(bd.id), asc(meeting.scheduledAt))
     .limit(limit);
+}
+
+/** Pending meetings of earlier Argentina days, counted per BD (one row per BD, so no LIMIT is needed): the email only needs the number. */
+export async function getOlderUnconfirmedCounts(now: Date, executor: Executor = db): Promise<Map<string, number>> {
+  const { fromUtc } = argentinaInstantDayWindow(now);
+  const rows = await executor
+    .select({ bdId: meeting.bdId, n: sql<number>`count(*)::int` })
+    .from(meeting)
+    .where(and(eq(meeting.status, "scheduled"), lt(meeting.scheduledAt, fromUtc)))
+    .groupBy(meeting.bdId);
+  return new Map(rows.map((r) => [r.bdId, Number(r.n)]));
 }
 
 /**

@@ -59,6 +59,13 @@ test("a meeting whose time has not come is not unconfirmed yet, whatever the cal
   assert.deepEqual(selectMeetingDigests([row({ scheduledAt: art("2026-10-22", "18:30") })], NOW), []);
 });
 
+test("earlier-day pending meetings can arrive as a per-BD count, without their rows", () => {
+  const older = new Map([["bd-1", 4], ["bd-2", 9]]);
+  const digests = selectMeetingDigests([row()], NOW, older);
+  assert.equal(digests.length, 1, "bd-2 has only older ones: no email");
+  assert.equal(digests[0]!.olderCount, 4);
+});
+
 test("the input is not mutated and the result is repeatable", () => {
   const rows = [row({ meetingId: "b", scheduledAt: art("2026-10-22", "16:30") }), row({ meetingId: "a", scheduledAt: art("2026-10-22", "11:00") })];
   const before = rows.map((r) => r.meetingId);

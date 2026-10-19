@@ -9,7 +9,8 @@ import { sendDigestEmail } from "@/lib/mailer/smtpMailer";
 import { buildMeetingDigestEmail, selectMeetingDigests } from "@/lib/meetings/digest";
 import {
   claimMeetingDigest,
-  getUnconfirmedMeetingsForDigest,
+  getOlderUnconfirmedCounts,
+  getTodayUnconfirmedMeetingsForDigest,
   markMeetingDigestFailed,
   markMeetingDigestSent,
 } from "@/lib/meetings/digestQueries";
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
   const sendDate = argentinaCalendarDate(now);
   const l = (await getDictionary()).meetings;
   const siteBaseUrl = getSiteUrl();
-  const plans = selectMeetingDigests(await getUnconfirmedMeetingsForDigest(now), now);
+  const plans = selectMeetingDigests(await getTodayUnconfirmedMeetingsForDigest(now), now, await getOlderUnconfirmedCounts(now));
 
   const results: DigestResult[] = [];
   for (const plan of plans) {

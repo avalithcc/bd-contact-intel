@@ -59,10 +59,10 @@ test("selection from real rows: today's unconfirmed meetings per BD, the Argenti
     await addMeeting(tx, contact.id, c.id, art("2026-10-22", "18:30"));
     await addMeeting(tx, contact.id, c.id, art("2026-10-22", "10:00"), "cancelled");
 
-    const { getUnconfirmedMeetingsForDigest } = await import("@/lib/meetings/digestQueries");
+    const { getTodayUnconfirmedMeetingsForDigest, getOlderUnconfirmedCounts } = await import("@/lib/meetings/digestQueries");
     const { selectMeetingDigests } = await import("@/lib/meetings/digest");
-    const rows = (await getUnconfirmedMeetingsForDigest(NOW, 5000, tx)).filter((r) => [a.id, b.id, c.id].includes(r.bdId));
-    const plans = selectMeetingDigests(rows, NOW);
+    const rows = (await getTodayUnconfirmedMeetingsForDigest(NOW, 5000, tx)).filter((r) => [a.id, b.id, c.id].includes(r.bdId));
+    const plans = selectMeetingDigests(rows, NOW, await getOlderUnconfirmedCounts(NOW, tx));
     const byBd = new Map(plans.map((p) => [p.bdId, p]));
     assert.deepEqual([...byBd.keys()].sort(), [a.id, c.id].sort(), "B has nothing from today");
     assert.equal(byBd.get(a.id)!.today.length, 1);
@@ -70,6 +70,24 @@ test("selection from real rows: today's unconfirmed meetings per BD, the Argenti
     assert.equal(byBd.get(c.id)!.today.length, 1);
     assert.equal(byBd.get(c.id)!.olderCount, 0);
     assert.equal(byBd.get(a.id)!.today[0]!.company, "Andes Labs");
+  });
+});
+
+test("a backlog of older pending meetings never crowds today's out of the read; older ones are counted per BD", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { a, contact } = await seed(tx);
+    for (let i = 0; i < 12; i++) await addMeeting(tx, contact.id, a.id, art("2026-10-10", `${String(8 + (i % 10)).padStart(2, "0")}:00`));
+    await addMeeting(tx, contact.id, a.id, art("2026-10-22", "17:00"));
+    const { getTodayUnconfirmedMeetingsForDigest, getOlderUnconfirmedCounts } = await import("@/lib/meetings/digestQueries");
+    const { selectMeetingDigests } = await import("@/lib/meetings/digest");
+    // A limit smaller than the backlog: an ASC read of everything would have returned only older rows.
+    const today = (await getTodayUnconfirmedMeetingsForDigest(NOW, 5, tx)).filter((r) => r.bdId === a.id);
+    assert.equal(today.length, 1);
+    const older = await getOlderUnconfirmedCounts(NOW, tx);
+    assert.equal(older.get(a.id), 12);
+    const [plan] = selectMeetingDigests(today, NOW, older).filter((p) => p.bdId === a.id);
+    assert.equal(plan?.today.length, 1);
+    assert.equal(plan?.olderCount, 12);
   });
 });
 

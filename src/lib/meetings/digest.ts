@@ -42,9 +42,16 @@ export interface MeetingDigestPlan {
 
 /**
  * One plan per BD that has at least one unconfirmed meeting today. A meeting whose time has not come yet is not unconfirmed,
- * whatever the caller passed in. Never mutates `rows`.
+ * whatever the caller passed in. Never mutates its inputs.
+ *
+ * `rows` are the meetings to list (today's). Earlier days only need a number, so the caller may pass them as `olderByBd`
+ * (pending meetings of earlier days, per BD) instead of as rows; any earlier-day row in `rows` is counted too.
  */
-export function selectMeetingDigests(rows: readonly DigestMeetingRow[], now: Date): MeetingDigestPlan[] {
+export function selectMeetingDigests(
+  rows: readonly DigestMeetingRow[],
+  now: Date,
+  olderByBd: ReadonlyMap<string, number> = new Map(),
+): MeetingDigestPlan[] {
   const today = argentinaCalendarDate(now);
   const byBd = new Map<string, MeetingDigestPlan>();
   for (const row of rows) {
@@ -59,7 +66,7 @@ export function selectMeetingDigests(rows: readonly DigestMeetingRow[], now: Dat
   }
   return [...byBd.values()]
     .filter((plan) => plan.today.length > 0)
-    .map((plan) => ({ ...plan, today: [...plan.today].sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime()) }));
+    .map((plan) => ({ ...plan, olderCount: plan.olderCount + (olderByBd.get(plan.bdId) ?? 0), today: [...plan.today].sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime()) }));
 }
 
 export interface MeetingDigestEmail {
