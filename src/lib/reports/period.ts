@@ -7,16 +7,37 @@
  * never by the naive 00:00-UTC scheme `argentinaDayBoundaries` uses for
  * `due_at` (a different column kind entirely).
  *
- * The upper bound is always `now`, not the calendar period's own end — a
- * report must never claim data exists for days that have not happened yet.
+ * The upper bound is the period's own end or `now`, whichever is earlier — a
+ * report must never claim data exists for days that have not happened yet
+ * (current periods end at `now`; look-back periods and custom ranges end at their own end).
  * The display `label`, by contrast, names the full calendar period (owner
  * decision: "Período: 1–30 sep 2026" reads naturally even on day 30 itself).
  */
 import { addDaysToDateString, argentinaCalendarDate, argentinaInstantBoundary } from "@/lib/tasks/argentinaDate";
 
-export type ReportPeriod = "week" | "month" | "quarter";
+export type ReportPeriod = "week" | "month" | "quarter" | "last_week" | "last_month" | "last_quarter" | "custom";
 
-const REPORT_PERIODS: readonly ReportPeriod[] = ["week", "month", "quarter"];
+const REPORT_PERIODS: readonly ReportPeriod[] = ["week", "month", "quarter", "last_week", "last_month", "last_quarter", "custom"];
+
+/** A custom "Desde–Hasta" range as ART calendar dates, both inclusive. */
+export interface CustomRange {
+  from: string;
+  to: string;
+}
+
+/** Longest custom range accepted; keeps every report read bounded. */
+const MAX_CUSTOM_DAYS = 400;
+
+function isRealDate(value: string | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return addDaysToDateString(value, 0) === value;
+}
+
+/** Validates the `from`/`to` URL params: both real dates, ordered, at most MAX_CUSTOM_DAYS apart. Null otherwise. */
+export function parseCustomRange(from: string | undefined, to: string | undefined): CustomRange | null {
+  if (!isRealDate(from) || !isRealDate(to) || from > to) return null;
+  return addDaysToDateString(from, MAX_CUSTOM_DAYS) < to ? null : { from, to };
+}
 
 export function resolveReportPeriod(value: string | undefined): ReportPeriod {
   return (REPORT_PERIODS as readonly string[]).includes(value ?? "") ? (value as ReportPeriod) : "month";
@@ -25,7 +46,7 @@ export function resolveReportPeriod(value: string | undefined): ReportPeriod {
 export interface ReportPeriodRange {
   /** Inclusive lower bound, ISO instant. */
   fromIso: string;
-  /** Exclusive upper bound, ISO instant — always `now`, never in the future. */
+  /** Exclusive upper bound, ISO instant — the period end or `now`, whichever is earlier; never in the future. */
   toIso: string;
   /** Same lower bound as an ART calendar date, for `date`-typed columns (e.g. `follow_up_queue_item.queue_date`). */
   fromDate: string;
@@ -74,18 +95,49 @@ function labelOf(fromDate: string, toDateExclusive: string): string {
     : `${from.d} ${ES_MONTH_ABBR[from.m - 1]} – ${to.d} ${month} ${to.y}`;
 }
 
-export function reportPeriodRange(period: ReportPeriod, now: Date): ReportPeriodRange {
+function previousOf(fromDate: string, rangeOf: (y: number, m: number) => { fromDate: string; toDateExclusive: string }) {
+  const { y, m } = ymd(addDaysToDateString(fromDate, -1));
+  return rangeOf(y, m);
+}
+
+export function reportPeriodRange(period: ReportPeriod, now: Date, custom?: CustomRange | null): ReportPeriodRange {
   const today = argentinaCalendarDate(now);
   const { y, m } = ymd(today);
 
-  const { fromDate, toDateExclusive } =
-    period === "week" ? weekRangeOf(today) : period === "quarter" ? quarterRangeOf(y, m) : monthRangeOf(y, m);
+  const current = {
+    week: weekRangeOf(today),
+    month: monthRangeOf(y, m),
+    quarter: quarterRangeOf(y, m),
+  };
+  let bounds: { fromDate: string; toDateExclusive: string };
+  switch (period) {
+    case "week":
+    case "month":
+    case "quarter":
+      bounds = current[period];
+      break;
+    case "last_week":
+      bounds = weekRangeOf(addDaysToDateString(current.week.fromDate, -1));
+      break;
+    case "last_month":
+      bounds = previousOf(current.month.fromDate, monthRangeOf);
+      break;
+    case "last_quarter":
+      bounds = previousOf(current.quarter.fromDate, quarterRangeOf);
+      break;
+    case "custom":
+      // An invalid/missing range falls back to the month, same as an unknown period.
+      bounds = custom ? { fromDate: custom.from, toDateExclusive: addDaysToDateString(custom.to, 1) } : current.month;
+      break;
+  }
 
+  // The upper bound is the period's own end, but never later than now (a report must not claim days that have not happened).
+  const endInstant = argentinaInstantBoundary(bounds.toDateExclusive);
   return {
-    fromIso: argentinaInstantBoundary(fromDate).toISOString(),
-    toIso: now.toISOString(),
-    fromDate,
-    toDateExclusive,
-    label: labelOf(fromDate, toDateExclusive),
+    fromIso: argentinaInstantBoundary(bounds.fromDate).toISOString(),
+    toIso: (endInstant < now ? endInstant : now).toISOString(),
+    fromDate: bounds.fromDate,
+    toDateExclusive: bounds.toDateExclusive,
+    label: labelOf(bounds.fromDate, bounds.toDateExclusive),
   };
 }

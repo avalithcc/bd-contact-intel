@@ -5,11 +5,15 @@
  * ReportsView's own server-only imports (next/link, the full es dictionary)
  * into the client bundle.
  */
-import type { ReportPeriod } from "@/lib/reports/period";
+import type { CustomRange, ReportPeriod } from "@/lib/reports/period";
 
-export function buildReportsHref(period: ReportPeriod, bdId: string | null): string {
+export function buildReportsHref(period: ReportPeriod, bdId: string | null, custom?: CustomRange | null): string {
   const params = new URLSearchParams();
   if (period !== "month") params.set("period", period);
+  if (period === "custom" && custom) {
+    params.set("from", custom.from);
+    params.set("to", custom.to);
+  }
   if (bdId) params.set("bd", bdId);
   const qs = params.toString();
   return qs ? `/admin/reports?${qs}` : "/admin/reports";

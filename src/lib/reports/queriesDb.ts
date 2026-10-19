@@ -32,6 +32,8 @@ export async function getReportAggregates(params: ReportAggregatesParams): Promi
     source_status: { sourceKey: string; status: string; count: number }[];
     discard_reasons: { reason: string; count: number }[];
     pipeline: { stage: string | null; count: number }[];
+    won_in_period: number | string;
+    won_undated: number | string;
     bd_options: { id: string; name: string }[];
   }>(buildReportAggregatesQuery(params));
   return {
@@ -39,6 +41,8 @@ export async function getReportAggregates(params: ReportAggregatesParams): Promi
     sourceStatus: row!.source_status,
     discardReasons: row!.discard_reasons,
     pipeline: row!.pipeline,
+    wonInPeriod: Number(row!.won_in_period),
+    wonUndated: Number(row!.won_undated),
     bdOptions: row!.bd_options,
   };
 }

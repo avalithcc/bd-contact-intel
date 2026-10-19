@@ -46,18 +46,21 @@ function wonAtText(row: WonCompanyDrilldownRow, l: WonCompaniesKpiCardLabels): s
 /**
  * "Empresas ganadas" KPI (reports-bd-filter-drilldown, owner request): the
  * card becomes a clickable trigger once its value is >= 1, opening a Dialog
- * with the current won-companies list. BD-filtered only, deliberately
- * ignoring the page's period filter — see
- * src/lib/reports/wonCompaniesDrilldown.ts's doc comment.
+ * with the companies that moved to Ganada in the selected period (same
+ * period and BD filter as the number, queries.ts#buildWonCompaniesDrilldownQuery).
  */
 export function WonCompaniesKpiCard({
   value,
   foot,
+  fromIso,
+  toIso,
   bdId,
   labels: l,
 }: {
   value: number;
   foot: React.ReactNode;
+  fromIso: string;
+  toIso: string;
   bdId: string | null;
   labels: WonCompaniesKpiCardLabels;
 }) {
@@ -73,8 +76,8 @@ export function WonCompaniesKpiCard({
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}
-      cacheKey={drilldownCacheKey({ kind: "won", bdId })}
-      fetchRows={() => getWonCompaniesDrilldownAction(bdId)}
+      cacheKey={drilldownCacheKey({ kind: "won", fromIso, toIso, bdId })}
+      fetchRows={() => getWonCompaniesDrilldownAction({ fromIso, toIso, bdId })}
       renderList={(rows) =>
         rows.length === 0 ? (
           <p className="meta">{l.wonCompaniesDialogEmpty}</p>

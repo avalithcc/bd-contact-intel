@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { isUuid } from "@/lib/uuid";
-import { reportPeriodRange, resolveReportPeriod } from "@/lib/reports/period";
+import { parseCustomRange, reportPeriodRange, resolveReportPeriod } from "@/lib/reports/period";
 import { getReportAggregates, getReportPerBd } from "@/lib/reports/queriesDb";
 import { ReportsView } from "./ReportsView";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; bd?: string }>;
+  searchParams: Promise<{ period?: string; bd?: string; from?: string; to?: string }>;
 }) {
   try {
     await requireAdmin();
@@ -23,9 +23,11 @@ export default async function ReportsPage({
   }
 
   const sp = await searchParams;
-  const period = resolveReportPeriod(sp.period);
+  // A "custom" period without a valid from/to pair falls back to the month, like an unknown period.
+  const custom = parseCustomRange(sp.from, sp.to);
+  const period = sp.period === "custom" && !custom ? "month" : resolveReportPeriod(sp.period);
   const bdId = sp.bd && sp.bd !== "all" && isUuid(sp.bd) ? sp.bd : null;
-  const range = reportPeriodRange(period, new Date());
+  const range = reportPeriodRange(period, new Date(), custom);
 
   // Exactly 2 round trips for the whole page (PERFORMANCE.md) — these two
   // statements have unrelated result shapes (one JSON row vs. N per-BD
@@ -43,5 +45,5 @@ export default async function ReportsPage({
     bdId,
   });
 
-  return <ReportsView period={period} bdId={bdId} range={range} aggregates={aggregates} perBd={perBd} />;
+  return <ReportsView period={period} bdId={bdId} custom={custom} range={range} aggregates={aggregates} perBd={perBd} />;
 }

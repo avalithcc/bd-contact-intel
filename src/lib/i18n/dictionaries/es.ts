@@ -2384,6 +2384,12 @@ export const es: typeof en = {
     periodWeek: "Esta semana",
     periodMonth: "Este mes",
     periodQuarter: "Este trimestre",
+    periodLastWeek: "Semana pasada",
+    periodLastMonth: "Mes pasado",
+    periodLastQuarter: "Trimestre pasado",
+    periodCustomLabel: "Rango personalizado",
+    periodCustomFrom: "Desde",
+    periodCustomTo: "Hasta",
     bdFilterLabel: "Filtrar por BD",
     allBds: "Todos los BDs",
     applyFilter: "Aplicar",
@@ -2406,7 +2412,10 @@ export const es: typeof en = {
     // there for THIS period).
     kpiMeetingsEmptyFoot: "Todavía no se registraron reuniones",
     kpiCompaniesWon: "Empresas ganadas",
-    kpiCompaniesWonFoot: (qualified: number) => `de ${qualified} en Calificada`,
+    kpiCompaniesWonFoot: "pasaron a Ganada en el período",
+    kpiCompaniesWonUndatedFoot: (count: number) => `${count} ganada(s) sin fecha de cierre registrada, fuera de todo período`,
+    // Owner definition 2026-10-19: a current client is won + active.
+    excludesActiveClients: "Excluye clientes activos",
     discardReasonsTitle: "Descartes por motivo",
     discardReasonsEmpty: "Sin descartes registrados con el período y el BD seleccionados.",
     // Collapsed illustrative reference (mockup reports.html:89-93), restored
@@ -2462,10 +2471,7 @@ export const es: typeof en = {
     dialogLoading: "Cargando…",
     dialogError: "No se pudo cargar la lista.",
     wonCompaniesDialogTitle: "Empresas ganadas",
-    // Prod bug fix (2026-09-30): this is decision 7's CURRENT snapshot
-    // (same as "Pipeline de empresas" above it), never the period filter —
-    // spelled out here so nobody reads this list as "ganadas EN el período".
-    wonCompaniesDialogSubtitle: "Instantánea actual, no cambia con el período — igual que el Pipeline de arriba.",
+    wonCompaniesDialogSubtitle: "Empresas que pasaron a Ganada en el período seleccionado.",
     wonCompaniesDialogColCompany: "Empresa",
     wonCompaniesDialogColOwner: "BD dueño",
     wonCompaniesDialogColWonAt: "Ganada",

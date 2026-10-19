@@ -40,7 +40,8 @@
  */
 import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
-import { effectiveActivityAtSql, workDoneAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
 import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
 import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
 
@@ -61,6 +62,23 @@ function companyBelongsToBdSql(bdId: string | null) {
       and person.merged_into_id is null
       and person.owner_bd_id = ${bdId}::uuid
   ))`;
+}
+
+/**
+ * The date a company moved to 'won': the latest `status_change` activity (company-scoped, `person_id` null) whose
+ * `metadata.status` is 'won', by the shared effective activity time. `NULL` when the company is won but no such
+ * transition was ever recorded (imports, scripts and pre-2026-09 edits wrote the stage without an activity): those
+ * cannot be dated, and `company.updated_at` is NOT a substitute (any edit, e.g. setting client_status, bumps it and
+ * would drag the company into the current period). Callers count them separately (`won_undated`). Correlated to the
+ * company row, so it runs once per WON company (~60), never over the whole activity table. Call sites FROM
+ * `${company}` un-aliased.
+ */
+function wonAtSql() {
+  return sql`(select max(${effectiveActivityAtSql()}) from ${activity}
+    where activity.type = 'status_change'
+      and activity.person_id is null
+      and activity.company_key = company.company_key
+      and activity.metadata->>'status' = 'won')`;
 }
 
 const ACTIVITY_BY_BD_TYPES = ["note", "call", "meeting_logged", "email_sent", "reply_received"] as const;
@@ -90,13 +108,16 @@ export interface ReportAggregatesParams {
  * The period's cohort: non-merged persons created in the period, owner-scoped
  * when a BD is selected. Shared by `rpt_person_scope` (the funnel counts) and
  * the cohort drill-down list, so a tile and the list behind it can never
- * disagree about WHO is in scope. Call sites FROM `${person}` un-aliased.
+ * disagree about WHO is in scope. Current clients (won + active, notCurrentClientPersonSql) are out of the cohort, so
+ * the reply rate, the funnel rows and the source table all exclude them from numerator AND denominator.
+ * Call sites FROM `${person}` un-aliased.
  */
 function cohortScopeSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
   return sql`person.merged_into_id is null
         and person.created_at >= ${fromIso}::timestamptz
         and person.created_at < ${toIso}::timestamptz
-        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)`;
+        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)
+        and ${notCurrentClientPersonSql()}`;
 }
 
 export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggregatesParams) {
@@ -146,6 +167,19 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
       where ${companyBelongsToBdSql(bdId)}
       group by company.relationship_stage
     ),
+    -- "Empresas ganadas" follows the period: currently-won companies whose move to 'won' (wonAtSql) falls in
+    -- [from, to). Undated won companies (no recorded transition) are counted apart, never guessed into a period.
+    rpt_won_period as (
+      select
+        count(*) filter (where rpt_won_dated.pbc_won_at >= ${fromIso}::timestamptz and rpt_won_dated.pbc_won_at < ${toIso}::timestamptz)::int as pbc_in_period,
+        count(*) filter (where rpt_won_dated.pbc_won_at is null)::int as pbc_undated
+      from (
+        select ${wonAtSql()} as pbc_won_at
+        from ${company}
+        where company.relationship_stage = 'won'
+          and ${companyBelongsToBdSql(bdId)}
+      ) as rpt_won_dated
+    ),
     rpt_bd_options as (
       select bd.id as pbc_id, bd.name as pbc_name
       from ${bd}
@@ -161,6 +195,8 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
       coalesce((select json_agg(json_build_object('sourceKey', pbc_source_key, 'status', pbc_status, 'count', pbc_count)) from rpt_source_status), '[]'::json) as source_status,
       coalesce((select json_agg(json_build_object('reason', pbc_reason, 'count', pbc_count)) from rpt_discard_reasons), '[]'::json) as discard_reasons,
       coalesce((select json_agg(json_build_object('stage', pbc_stage, 'count', pbc_count)) from rpt_pipeline), '[]'::json) as pipeline,
+      (select pbc_in_period from rpt_won_period) as won_in_period,
+      (select pbc_undated from rpt_won_period) as won_undated,
       coalesce((select json_agg(json_build_object('id', pbc_id, 'name', pbc_name) order by pbc_name) from rpt_bd_options), '[]'::json) as bd_options
   `;
 }
@@ -196,12 +232,12 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       where activity.actor_bd_id is not null
         and activity.type in (${activityTypes})
         and (${bdId}::uuid is null or activity.actor_bd_id = ${bdId}::uuid)
-        -- workDoneAtSql, NOT effectiveActivityAtSql, on purpose: this asks "how much did this BD do?", so a note the BD wrote
+        -- happenedAtSql (workDoneAtSql + a meeting's own metadata.at), NOT effectiveActivityAtSql, on purpose: this asks "how much did this BD do?", so a note the BD wrote
         -- and later deleted still counts (as queue_worked below already does). The follow-up queue asks a different question,
         -- "is this contact stale?", and deliberately keeps the display rule (a deleted note is often one filed on the WRONG
         -- contact, which is no evidence the contact is warm). Do not "fix" either back into agreement with the other.
-        and ${workDoneAtSql()} >= ${fromIso}::timestamptz
-        and ${workDoneAtSql()} < ${toIso}::timestamptz
+        and ${happenedAtSql()} >= ${fromIso}::timestamptz
+        and ${happenedAtSql()} < ${toIso}::timestamptz
       group by activity.actor_bd_id
     ),
     rpt_task_completions as (
@@ -274,6 +310,10 @@ export interface ReportAggregatesResult {
   sourceStatus: { sourceKey: string | null; status: string; count: number }[];
   discardReasons: { reason: string; count: number }[];
   pipeline: { stage: string | null; count: number }[];
+  /** "Empresas ganadas" for the selected period: currently-won companies whose move to 'won' falls in it. */
+  wonInPeriod: number;
+  /** Currently-won companies with no recorded move to 'won': not datable, so in no period. */
+  wonUndated: number;
   /**
    * EVERY bd row (bug fix, reports-bd-filter-drilldown): the "Filtrar por
    * BD" `<select>`'s options must never come from `perBd` (buildReportPerBdQuery's
@@ -301,37 +341,37 @@ export interface ReportPerBdRow {
 }
 
 export interface WonCompaniesDrilldownParams {
+  fromIso: string;
+  toIso: string;
   bdId: string | null;
 }
 
 /**
- * "Empresas ganadas" KPI drilldown (reports-bd-filter-drilldown). BD-filtered
- * only, deliberately NOT period-filtered — see wonCompaniesDrilldown.ts's
- * doc comment for why (must stay consistent with the KPI's own decision-7
- * snapshot count, and the same rpt_pipeline count via companyBelongsToBdSql).
- * `rpt_won_at`/`rpt_won_company_person_owner` both scan their own table
- * scoped down to only the companies already selected by `rpt_won_companies`
- * (a correlated EXISTS, rule 7), reusing the existing
- * `activity_company_idx`/`activity_type_idx`/`contact_bd_company_idx`-style
- * indexes rather than a full-table scan.
+ * "Empresas ganadas" KPI drilldown: the exact companies `rpt_won_period` counted (same `wonAtSql`, same
+ * `companyBelongsToBdSql`, same [from, to)), so the number and its list cannot disagree. Undated won companies are
+ * not listed (see wonAtSql). `rpt_won_company_person_owner` scans only the already-selected companies (correlated
+ * EXISTS, rule 7).
  *
- * `owner_bd_id`/`owner_bd_name` prefer the company's own owner, falling
- * back to its MOST RECENTLY updated owned, non-merged person (prod: Datapar
- * S.A. has no company owner but one owned contact — `distinct on` picks
- * that single row deterministically even if a future company somehow has
- * more than one owned contact under different BDs).
+ * `owner_bd_id`/`owner_bd_name` prefer the company's own owner, falling back to its MOST RECENTLY updated owned,
+ * non-merged person (prod: Datapar S.A. has no company owner but one owned contact).
  */
-export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownParams) {
+export function buildWonCompaniesDrilldownQuery({ fromIso, toIso, bdId }: WonCompaniesDrilldownParams) {
   return sql`
-    with rpt_won_companies as (
+    with rpt_won_dated as (
       select
         company.company_key as pbc_company_key,
         company.display_name as pbc_display_name,
         company.owner_bd_id as pbc_owner_bd_id,
-        company.updated_at as pbc_updated_at
+        ${wonAtSql()} as pbc_won_at
       from ${company}
       where company.relationship_stage = 'won'
         and ${companyBelongsToBdSql(bdId)}
+    ),
+    rpt_won_companies as (
+      select pbc_company_key, pbc_display_name, pbc_owner_bd_id, pbc_won_at
+      from rpt_won_dated
+      where pbc_won_at >= ${fromIso}::timestamptz
+        and pbc_won_at < ${toIso}::timestamptz
     ),
     rpt_won_company_person_owner as (
       select distinct on (person.company_key)
@@ -342,34 +382,16 @@ export function buildWonCompaniesDrilldownQuery({ bdId }: WonCompaniesDrilldownP
         and person.owner_bd_id is not null
         and exists (select 1 from rpt_won_companies where rpt_won_companies.pbc_company_key = person.company_key)
       order by person.company_key, person.updated_at desc, person.id
-    ),
-    -- ", activity.id" (end of the ORDER BY below) breaks a tie between two
-    -- 'won' status_change rows with the identical created_at (review fix: a
-    -- bulk import writes exactly that) -- without it, DISTINCT ON's pick
-    -- among tied rows is unspecified and the displayed "Ganada" date could
-    -- flip between requests. Same tie-break rpt_won_company_person_owner
-    -- already uses.
-    rpt_won_at as (
-      select distinct on (activity.company_key)
-        activity.company_key as pbc_company_key,
-        activity.created_at as pbc_won_at
-      from ${activity}
-      where activity.type = 'status_change'
-        and activity.person_id is null
-        and activity.metadata->>'status' = 'won'
-        and exists (select 1 from rpt_won_companies where rpt_won_companies.pbc_company_key = activity.company_key)
-      order by activity.company_key, activity.created_at desc, activity.id
     )
     select
       rpt_won_companies.pbc_company_key as company_key,
       rpt_won_companies.pbc_display_name as display_name,
       coalesce(rpt_won_companies.pbc_owner_bd_id, rpt_won_company_person_owner.pbc_owner_bd_id) as owner_bd_id,
       bd.name as owner_bd_name,
-      coalesce(rpt_won_at.pbc_won_at, rpt_won_companies.pbc_updated_at) as won_at,
-      (rpt_won_at.pbc_won_at is not null) as won_at_exact
+      rpt_won_companies.pbc_won_at as won_at,
+      true as won_at_exact
     from rpt_won_companies
     left join rpt_won_company_person_owner on rpt_won_company_person_owner.pbc_company_key = rpt_won_companies.pbc_company_key
-    left join rpt_won_at on rpt_won_at.pbc_company_key = rpt_won_companies.pbc_company_key
     left join ${bd} on bd.id = coalesce(rpt_won_companies.pbc_owner_bd_id, rpt_won_company_person_owner.pbc_owner_bd_id)
     order by won_at desc
     limit ${DRILLDOWN_ROW_LIMIT}
@@ -394,7 +416,7 @@ export interface MeetingsDrilldownParams {
 /**
  * "Reuniones agendadas" KPI drilldown (reports-bd-filter-drilldown).
  * Actor-scoped (`activity.actor_bd_id`) and period-scoped
- * (`effectiveActivityAtSql()`), matching this KPI's own definition exactly —
+ * by when the meeting HAPPENED (`happenedAtDisplaySql()`: metadata.at, created_at as fallback), matching this KPI's own definition exactly —
  * see meetingsDrilldown.ts's doc comment for why this is actor-, not
  * owner-, scoped.
  */
@@ -409,15 +431,15 @@ export function buildMeetingsDrilldownQuery({ fromIso, toIso, bdId }: MeetingsDr
       company.display_name as company_name,
       activity.actor_bd_id as bd_id,
       bd.name as bd_name,
-      ${effectiveActivityAtSql()} as meeting_at
+      ${happenedAtDisplaySql()} as meeting_at
     from ${activity}
     join ${person} on person.id = activity.person_id and person.merged_into_id is null
     left join ${company} on company.company_key = person.company_key
     left join ${bd} on bd.id = activity.actor_bd_id
     where activity.type = 'meeting_logged'
       and (${bdId}::uuid is null or activity.actor_bd_id = ${bdId}::uuid)
-      and ${effectiveActivityAtSql()} >= ${fromIso}::timestamptz
-      and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
+      and ${happenedAtDisplaySql()} >= ${fromIso}::timestamptz
+      and ${happenedAtDisplaySql()} < ${toIso}::timestamptz
     order by meeting_at desc
     limit ${DRILLDOWN_ROW_LIMIT}
   `;

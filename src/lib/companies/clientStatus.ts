@@ -22,6 +22,15 @@ export function isClientStatus(value: string | undefined): value is ClientStatus
   return !!value && (CLIENT_STATUSES as readonly string[]).includes(value);
 }
 
+/**
+ * Owner definition (2026-10-19): a "current client" is a company that is `won` AND whose client_status is
+ * `active`. Won + inactive, won with no client_status and any other stage are NOT current clients. SQL twin:
+ * src/lib/reports/currentClient.ts.
+ */
+export function isCurrentClient(c: { relationshipStage: string | null; clientStatus: string | null }): boolean {
+  return c.relationshipStage === "won" && c.clientStatus === "active";
+}
+
 export type ClientStatusLabels = Pick<Dictionary["companyRecord"], "clientStatusActive" | "clientStatusInactive">;
 
 /** Null renders as an em dash ("not stated"); an unrecognized value is shown

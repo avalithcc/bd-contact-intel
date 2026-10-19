@@ -163,52 +163,60 @@ test("buildReportAggregatesQuery: bd_options is an UNFILTERED json_agg of every 
   assert.match(sql, /as bd_options/i);
 });
 
+const WON_PERIOD = { fromIso: "2026-09-01T03:00:00.000Z", toIso: "2026-09-30T14:00:00.000Z" };
 function renderWon(params: WonCompaniesDrilldownParams) {
   return dialect.sqlToQuery(buildWonCompaniesDrilldownQuery(params));
 }
 
 test("buildWonCompaniesDrilldownQuery: filters relationship_stage='won' and the nullable bd filter applies to company.owner_bd_id", () => {
-  const { sql } = renderWon({ bdId: null });
+  const { sql } = renderWon({ ...WON_PERIOD, bdId: null });
   assert.match(sql, /company\.relationship_stage = 'won'/i);
   assert.match(sql, /\$\d+::uuid is null or company\.owner_bd_id = \$\d+::uuid/i);
 });
 
-test("buildWonCompaniesDrilldownQuery: never filters by period (decision 7 consistency — see wonCompaniesDrilldown.ts)", () => {
-  const { sql } = renderWon({ bdId: null });
-  assert.doesNotMatch(sql, /created_at >= /i);
+test("buildWonCompaniesDrilldownQuery: follows the selected period via the date the company moved to 'won'", () => {
+  const { sql, params } = renderWon({ fromIso: "2026-10-19T03:00:00.000Z", toIso: "2026-10-19T14:00:00.000Z", bdId: null });
+  assert.match(sql, /activity\.type = 'status_change'/i);
+  assert.match(sql, /activity\.person_id is null/i);
+  assert.match(sql, /activity\.metadata->>'status' = 'won'/i);
+  assert.match(sql, /pbc_won_at >= \$\d+::timestamptz/i);
+  assert.match(sql, /pbc_won_at < \$\d+::timestamptz/i);
+  assert.ok(params.includes("2026-10-19T03:00:00.000Z"));
 });
 
-test("buildWonCompaniesDrilldownQuery: the won_at activity scan is a correlated EXISTS against rpt_won_companies, not an unbounded activity scan", () => {
-  const { sql } = renderWon({ bdId: null });
-  assert.match(sql, /exists \(select 1 from rpt_won_companies where rpt_won_companies\.pbc_company_key = activity\.company_key\)/i);
-  assert.match(sql, /activity\.type = 'status_change'/i);
-  assert.match(sql, /activity\.metadata->>'status' = 'won'/i);
+test("buildWonCompaniesDrilldownQuery: the won-at lookup is correlated to the company, never an unbounded activity scan", () => {
+  const { sql } = renderWon({ ...WON_PERIOD, bdId: null });
+  assert.match(sql, /activity\.company_key = company\.company_key/i);
+});
+
+test("buildReportAggregatesQuery: 'Empresas ganadas' counts won companies by their won date inside the period (won_in_period), plus the undated ones", () => {
+  const { sql } = renderAgg();
+  assert.match(sql, /as won_in_period/i);
+  assert.match(sql, /as won_undated/i);
+  const section = sql.slice(sql.indexOf("rpt_won_period"), sql.indexOf("rpt_won_period") + 1500);
+  assert.match(section, /company\.relationship_stage = 'won'/i);
+  assert.match(section, /activity\.metadata->>'status' = 'won'/i);
+  assert.match(section, />= \$\d+::timestamptz/i);
 });
 
 test("buildWonCompaniesDrilldownQuery: bounded with a LIMIT", () => {
-  const { sql } = renderWon({ bdId: null });
+  const { sql } = renderWon({ ...WON_PERIOD, bdId: null });
   assert.match(sql, /limit \$\d+/i);
 });
 
 test("buildWonCompaniesDrilldownQuery: the BD filter rolls up through owned people too (prod bug: Almería Sports Destination / Datapar S.A. have no company.owner_bd_id)", () => {
-  const { sql } = renderWon({ bdId: "00000000-0000-0000-0000-000000000001" });
+  const { sql } = renderWon({ ...WON_PERIOD, bdId: "00000000-0000-0000-0000-000000000001" });
   assert.match(sql, /\$\d+::uuid is null or company\.owner_bd_id = \$\d+::uuid or exists \(/i);
   assert.match(sql, /person\.company_key = company\.company_key/i);
   assert.match(sql, /person\.merged_into_id is null/i);
 });
 
 test("buildWonCompaniesDrilldownQuery: owner_bd_id/owner_bd_name fall back to the company's most-recently-updated owned person (Datapar case)", () => {
-  const { sql } = renderWon({ bdId: null });
+  const { sql } = renderWon({ ...WON_PERIOD, bdId: null });
   assert.match(sql, /distinct on \(person\.company_key\)/i);
   assert.match(sql, /person\.owner_bd_id is not null/i);
   assert.match(sql, /order by person\.company_key, person\.updated_at desc, person\.id/i);
   assert.match(sql, /coalesce\(rpt_won_companies\.pbc_owner_bd_id, rpt_won_company_person_owner\.pbc_owner_bd_id\) as owner_bd_id/i);
-});
-
-test("buildWonCompaniesDrilldownQuery: rpt_won_at's DISTINCT ON breaks a created_at tie with activity.id (review fix — a bulk import can write two 'won' rows with the identical timestamp)", () => {
-  const { sql } = renderWon({ bdId: null });
-  assert.match(sql, /distinct on \(activity\.company_key\)/i);
-  assert.match(sql, /order by activity\.company_key, activity\.created_at desc, activity\.id/i);
 });
 
 function renderMeetings(params: MeetingsDrilldownParams) {

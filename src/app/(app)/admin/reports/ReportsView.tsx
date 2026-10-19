@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { es } from "@/lib/i18n/dictionaries/es";
-import type { ReportPeriod, ReportPeriodRange } from "@/lib/reports/period";
+import type { CustomRange, ReportPeriod, ReportPeriodRange } from "@/lib/reports/period";
 import { buildReportsHref } from "@/lib/reports/reportsHref";
 import { buildFunnelBreakdown } from "@/lib/reports/funnel";
 import { buildSourceConversionRows, type SourceBucket } from "@/lib/reports/sourceBucket";
@@ -82,6 +82,15 @@ const cohortLabels: CohortDrilldownLabels = {
   roleGroups: es.roleGroups,
 };
 
+const PERIOD_PRESETS: readonly (readonly [ReportPeriod, string])[] = [
+  ["week", dict.periodWeek],
+  ["month", dict.periodMonth],
+  ["quarter", dict.periodQuarter],
+  ["last_week", dict.periodLastWeek],
+  ["last_month", dict.periodLastMonth],
+  ["last_quarter", dict.periodLastQuarter],
+];
+
 const SOURCE_LABEL: Record<SourceBucket, string> = {
   hubspot: dict.sourceHubspot,
   linkedin: dict.sourceLinkedin,
@@ -121,12 +130,15 @@ const DISCARD_REFERENCE_REMAINING = [
 export function ReportsView({
   period,
   bdId,
+  custom,
   range,
   aggregates,
   perBd,
 }: {
   period: ReportPeriod;
   bdId: string | null;
+  /** Validated Desde–Hasta range, present only for the "custom" period. */
+  custom: CustomRange | null;
   range: ReportPeriodRange;
   aggregates: ReportAggregatesResult;
   perBd: ReportPerBdRow[];
@@ -159,7 +171,6 @@ export function ReportsView({
   const discardTotal = totalDiscardCount(discardRows);
 
   const pipelineRows = buildPipelineRows(aggregates.pipeline);
-  const qualifiedCount = pipelineRows.find((r) => r.stage === "qualified")?.count ?? 0;
 
   const perBdRows = perBd.map((row) => ({
     ...row,
@@ -208,22 +219,39 @@ export function ReportsView({
       <div className="row wrap between mb-lg" aria-label="Filtros del reporte">
         <div className="row wrap" style={{ gap: "var(--space-lg)" }}>
           <div className="segmented" role="group" aria-label={dict.periodFilterLabel}>
-            <Link href={buildReportsHref("week", bdId)} className={period === "week" ? "on" : ""} aria-current={period === "week" ? "page" : undefined}>
-              {dict.periodWeek}
-            </Link>
-            <Link href={buildReportsHref("month", bdId)} className={period === "month" ? "on" : ""} aria-current={period === "month" ? "page" : undefined}>
-              {dict.periodMonth}
-            </Link>
-            <Link href={buildReportsHref("quarter", bdId)} className={period === "quarter" ? "on" : ""} aria-current={period === "quarter" ? "page" : undefined}>
-              {dict.periodQuarter}
-            </Link>
+            {PERIOD_PRESETS.map(([key, label]) => (
+              <Link key={key} href={buildReportsHref(key, bdId)} className={period === key ? "on" : ""} aria-current={period === key ? "page" : undefined}>
+                {label}
+              </Link>
+            ))}
           </div>
+          <form className="row wrap" style={{ gap: "var(--space-sm)" }} aria-label={dict.periodCustomLabel}>
+            <input type="hidden" name="period" value="custom" />
+            {bdId && <input type="hidden" name="bd" value={bdId} />}
+            <label className="label sr-only" htmlFor="range-from">
+              {dict.periodCustomFrom}
+            </label>
+            <input id="range-from" name="from" type="date" className="input input-sm" required defaultValue={custom?.from} />
+            <label className="label sr-only" htmlFor="range-to">
+              {dict.periodCustomTo}
+            </label>
+            <input id="range-to" name="to" type="date" className="input input-sm" required defaultValue={custom?.to} />
+            <button type="submit" className={`btn btn-sm ${period === "custom" ? "btn-primary" : "btn-ghost"}`}>
+              {dict.applyFilter}
+            </button>
+          </form>
           <form className="row wrap" style={{ gap: "var(--space-sm)" }}>
             <input type="hidden" name="period" value={period} />
+            {period === "custom" && custom && (
+              <>
+                <input type="hidden" name="from" value={custom.from} />
+                <input type="hidden" name="to" value={custom.to} />
+              </>
+            )}
             <label className="label sr-only" htmlFor="bd-filter">
               {dict.bdFilterLabel}
             </label>
-            <BdFilterSelect period={period} bdId={bdId} options={aggregates.bdOptions} allLabel={dict.allBds} />
+            <BdFilterSelect period={period} custom={custom} bdId={bdId} options={aggregates.bdOptions} allLabel={dict.allBds} />
             {/* No-JS fallback only (bug fix: BdFilterSelect now applies on
                 change for everyone else) — invisible whenever JS runs. */}
             <noscript>
@@ -251,9 +279,13 @@ export function ReportsView({
           count={cohortCount(aggregates.funnel, "replied")}
           displayValue={funnel.replyRateIsRate ? `${funnel.replyRatePct}%` : funnel.replyRateFraction}
           foot={
-            funnel.replyRateIsRate
-              ? dict.kpiReplyRateFoot(funnel.repliedOrMore, funnel.contactedOrMore)
-              : dict.kpiReplyRateSmallFoot(funnel.replyRatePct)
+            <>
+              {funnel.replyRateIsRate
+                ? dict.kpiReplyRateFoot(funnel.repliedOrMore, funnel.contactedOrMore)
+                : dict.kpiReplyRateSmallFoot(funnel.replyRatePct)}
+              <br />
+              {dict.excludesActiveClients}
+            </>
           }
         />
         {/* Bug fix: this KPI used to reuse `funnel.meeting` (persons whose
@@ -276,8 +308,20 @@ export function ReportsView({
           labels={meetingsKpiLabels}
         />
         <WonCompaniesKpiCard
-          value={pipelineRows.find((r) => r.stage === "won")?.count ?? 0}
-          foot={dict.kpiCompaniesWonFoot(qualifiedCount)}
+          value={aggregates.wonInPeriod}
+          foot={
+            <>
+              {dict.kpiCompaniesWonFoot}
+              {aggregates.wonUndated > 0 && (
+                <>
+                  <br />
+                  {dict.kpiCompaniesWonUndatedFoot(aggregates.wonUndated)}
+                </>
+              )}
+            </>
+          }
+          fromIso={range.fromIso}
+          toIso={range.toIso}
           bdId={bdId}
           labels={wonCompaniesKpiLabels}
         />
@@ -398,7 +442,9 @@ export function ReportsView({
                 <span className="bar-success" style={{ width: `${funnel.meetingPct}%` }} />
               </div>
             </div>
-            <div className="card-footer meta">{dict.funnelDiscardedFoot(funnel.discarded, funnel.discardedPct)}</div>
+            <div className="card-footer meta">
+              {dict.funnelDiscardedFoot(funnel.discarded, funnel.discardedPct)} {dict.excludesActiveClients}.
+            </div>
           </div>
         </div>
 

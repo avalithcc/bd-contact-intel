@@ -107,14 +107,18 @@ export function resolveEffectiveActivityAt(row: ActivityRowForStatus & { deleted
  * looks like an ISO datetime), so a query can `ORDER BY`/aggregate on a row's effective time without pulling every row into
  * JS first. `@/db/schema`-only import (no `@/db` client), so this stays importable without a live DATABASE_URL.
  */
-function activityTimeCase(hideDeleted: boolean) {
+function activityTimeCase(hideDeleted: boolean, meetingHeldAt = false) {
+  const meetingBranch = meetingHeldAt
+    ? sql`when ${activity.type} = 'meeting_logged' and (${activity.metadata}->>'at') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'at')::timestamptz
+    `
+    : sql``;
   const deletedBranch = hideDeleted ? sql`when ${activity.deletedAt} is not null then null ` : sql``;
   return sql`(case
     ${deletedBranch}when ${activity.type} in (${sql.join(
       NON_TOUCH_ACTIVITY_TYPES.map((t) => sql`${t}`),
       sql`, `,
     )}) then null
-    when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz
+    ${meetingBranch}when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz
     when ${activity.type} in (${sql.join(
       OCCURRED_AT_ACTIVITY_TYPES.map((t) => sql`${t}`),
       sql`, `,
@@ -130,6 +134,34 @@ export function effectiveActivityAtSql() {
 /** What WORK happened: identical to `effectiveActivityAtSql()` except a soft-deleted note keeps its time. See above. */
 export function workDoneAtSql() {
   return activityTimeCase(false);
+}
+
+/**
+ * When the thing HAPPENED, for reports that bucket by period (prod 2026-10-19: a meeting logged 2026-09-30 and held
+ * 2026-10-02 was counted in Q3). Identical to `workDoneAtSql()` except a `meeting_logged` row uses `metadata.at` (the
+ * meeting's own date, entered by the BD, never in the future) and falls back to `created_at` when it is absent or not an
+ * ISO datetime. `deriveStatus` deliberately keeps ignoring `metadata.at`, so status derivation is unchanged: this is a
+ * reporting rule, not a status rule. Calls/emails/replies already use `metadata.occurredAt` in the shared case.
+ */
+export function happenedAtSql() {
+  return activityTimeCase(false, true);
+}
+
+/** Same as `happenedAtSql()` but a soft-deleted note is NULL (display rule), for lists a BD reads. */
+export function happenedAtDisplaySql() {
+  return activityTimeCase(true, true);
+}
+
+/** JS twin of `happenedAtSql()` (pins the rule in a unit test; the report runs it in SQL). `null` for non-touch types. */
+export function resolveHappenedAt(row: ActivityRowForStatus & { deletedAt?: Date | null }): Date | null {
+  if (row.type === "meeting_logged" && !isNonTouchActivityType(row.type)) {
+    const raw = row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>).at : undefined;
+    if (typeof raw === "string" && /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/.test(raw)) {
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+  }
+  return resolveEffectiveActivityAt({ ...row, deletedAt: null });
 }
 
 /** Same semantics as the SQL EXISTS filter's `effectiveAt >= since` check —

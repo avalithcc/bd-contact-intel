@@ -33,8 +33,8 @@ function ymd(date: string): { y: number; m: number; d: number } {
 /** "en octubre 2026" / "en el 4.º trimestre 2026" / "del 12 al 18 oct 2026" — the period the cohort was created in. */
 export function cohortPeriodPhrase(period: ReportPeriod, fromDate: string, toDateExclusive: string, w: CohortHeaderWords): string {
   const from = ymd(fromDate);
-  if (period === "month") return w.cohortPeriodMonth(w.cohortMonthNames[from.m - 1]!, from.y);
-  if (period === "quarter") return w.cohortPeriodQuarter(Math.floor((from.m - 1) / 3) + 1, from.y);
+  if (period === "month" || period === "last_month") return w.cohortPeriodMonth(w.cohortMonthNames[from.m - 1]!, from.y);
+  if (period === "quarter" || period === "last_quarter") return w.cohortPeriodQuarter(Math.floor((from.m - 1) / 3) + 1, from.y);
   const to = ymd(addDaysToDateString(toDateExclusive, -1));
   const sameMonth = from.m === to.m && from.y === to.y;
   const fromText = sameMonth ? `${from.d}` : `${from.d} ${w.cohortMonthAbbr[from.m - 1]}${from.y === to.y ? "" : ` ${from.y}`}`;

@@ -22,10 +22,15 @@ function normalizedBdId(bdId: string | null): string | null {
   return bdId && isUuid(bdId) ? bdId : null;
 }
 
-export async function getWonCompaniesDrilldownAction(bdId: string | null): Promise<DrilldownResult<WonCompanyDrilldownRow>> {
+export async function getWonCompaniesDrilldownAction(params: {
+  fromIso: string;
+  toIso: string;
+  bdId: string | null;
+}): Promise<DrilldownResult<WonCompanyDrilldownRow>> {
   try {
     await requireAdmin();
-    const rows = await getWonCompaniesDrilldown({ bdId: normalizedBdId(bdId) });
+    if (Number.isNaN(Date.parse(params.fromIso)) || Number.isNaN(Date.parse(params.toIso))) return { ok: false };
+    const rows = await getWonCompaniesDrilldown({ fromIso: params.fromIso, toIso: params.toIso, bdId: normalizedBdId(params.bdId) });
     return { ok: true, rows };
   } catch (err) {
     unstable_rethrow(err);

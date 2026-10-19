@@ -25,7 +25,7 @@ async function main() {
   if (process.env.TZ !== "UTC") {
     throw new Error("Refusing to run: set TZ=UTC so both dumps share the same process timezone.");
   }
-  const rows = await getWonCompaniesDrilldown({ bdId: null });
+  const rows = await getWonCompaniesDrilldown({ fromIso: "1970-01-01T00:00:00.000Z", toIso: new Date().toISOString(), bdId: null });
   const sorted = [...rows]
     .sort((a, b) => (a.companyKey < b.companyKey ? -1 : a.companyKey > b.companyKey ? 1 : 0))
     .map((r) => ({ ...r, wonAt: r.wonAt.toISOString() }));

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { buildReportsHref } from "@/lib/reports/reportsHref";
-import type { ReportPeriod } from "@/lib/reports/period";
+import type { CustomRange, ReportPeriod } from "@/lib/reports/period";
 
 /**
  * Bug fix (owner report 2026-09-30: "when I select a BD, the report
@@ -20,11 +20,13 @@ import type { ReportPeriod } from "@/lib/reports/period";
  */
 export function BdFilterSelect({
   period,
+  custom,
   bdId,
   options,
   allLabel,
 }: {
   period: ReportPeriod;
+  custom: CustomRange | null;
   bdId: string | null;
   options: { id: string; name: string }[];
   allLabel: string;
@@ -37,7 +39,7 @@ export function BdFilterSelect({
       name="bd"
       className="select input-sm"
       defaultValue={bdId ?? "all"}
-      onChange={(e) => router.push(buildReportsHref(period, e.target.value === "all" ? null : e.target.value))}
+      onChange={(e) => router.push(buildReportsHref(period, e.target.value === "all" ? null : e.target.value, custom))}
     >
       <option value="all">{allLabel}</option>
       {options.map((o) => (
