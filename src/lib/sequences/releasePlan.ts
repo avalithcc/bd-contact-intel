@@ -17,6 +17,9 @@ import { miamiCalendarDate, miamiWallClockToUtc } from "./miamiTime";
 
 export const RELEASE_FLOOR_HOUR = 9;
 
+/** 09:00 Miami on the Miami day `instant` falls on: nothing is released, and nothing is scheduled, earlier than this. */
+export const releaseFloorFor = (instant: Date): Date => miamiWallClockToUtc(miamiCalendarDate(instant), RELEASE_FLOOR_HOUR);
+
 export interface PlanCandidate {
   /** The member id: unique per run (a member is at step 1 or at step 2, never both). Final tie-break of the order. */
   id: string;
@@ -42,7 +45,7 @@ export const byOrder = (a: OrderKey, b: OrderKey) =>
 export function planSequenceRelease<T extends PlanCandidate>(input: ReleasePlanInput<T>): { release: T[]; deferred: T[] } {
   const { now, sentToday } = input;
   const due = input.candidates.filter((c) => c.dueAt.getTime() <= now.getTime()).sort(byOrder);
-  const beforeFloor = now.getTime() < miamiWallClockToUtc(miamiCalendarDate(now), RELEASE_FLOOR_HOUR).getTime();
+  const beforeFloor = now.getTime() < releaseFloorFor(now).getTime();
 
   const lowestCap = new Map<string, number>();
   for (const c of due) lowestCap.set(c.accountId, Math.min(lowestCap.get(c.accountId) ?? Infinity, c.dailyCap));
