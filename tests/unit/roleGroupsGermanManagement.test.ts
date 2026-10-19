@@ -39,3 +39,32 @@ test("already-covered Spanish and Italian terms and existing groups are unchange
   assert.equal(classifyPosition("Revenue Manager"), "hospitality_revenue");
   assert.equal(classifyPosition("Direttore commerciale"), "other");
 });
+
+test("assistants and secretaries to a Geschäftsführer or Hoteldirektor are not general management", () => {
+  for (const t of [
+    "Assistent des Geschäftsführers",
+    "Assistentin der Geschäftsführung",
+    "Assistant to the Geschäftsführer",
+    "Assistenz der Geschäftsführer",
+    "Sekretärin des Hoteldirektors",
+    "Sekretaer Geschäftsführer",
+    "Office Manager Geschäftsführer",
+    "Assistent des Generaldirektors",
+  ]) {
+    assert.notEqual(classifyPosition(t), "c_level_business", t);
+  }
+});
+
+test("the German suffix is gender endings only, with a word boundary", () => {
+  for (const t of ["Geschäftsführerin", "Geschäftsführerinnen", "Hoteldirektorin", "Geschäftsführer/in", "Geschäftsführer, Hotel Alpenblick"]) {
+    assert.equal(classifyPosition(t), "c_level_business", t);
+  }
+  for (const t of ["Geschäftsführers", "Geschäftsführerassistent", "Hoteldirektoren Assistent"]) {
+    assert.notEqual(classifyPosition(t), "c_level_business", t);
+  }
+});
+
+test("bare Direktorin is whole-title only, like Direktor", () => {
+  assert.equal(classifyPosition("Direktorin"), "c_level_business");
+  assert.equal(classifyPosition("Direktorin Einkauf"), "other");
+});

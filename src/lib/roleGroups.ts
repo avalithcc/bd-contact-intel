@@ -123,13 +123,14 @@ const RULES: Rule[] = [
       "direttore generale",
       "direttrice generale",
       "proprietari[oa]",
-      "gesch(?:ä|ae)ftsf(?:ü|ue)hrer\\w*",
-      "hoteldirektor\\w*",
-      "hotelmanager\\w*",
-      "generaldirektor\\w*",
+      // Endings are the gender forms only (-in, -innen), with the word boundary
+      // doing the rest, so "des Geschäftsführers" does not match. Anyone
+      // supporting the manager (assistant, secretary, office manager) is not
+      // the manager: the lookahead rejects the whole title.
+      "(?<!(?:assistent|assistant|assistenz|sekret[äa]e?r|office manager)[^]*)(?!.*(?:assistent|assistant|assistenz|sekret[äa]e?r|office manager))(?:gesch(?:ä|ae)ftsf(?:ü|ue)hrer|hoteldirektor|hotelmanager|generaldirektor)(?:in|innen)?",
       // Bare "Direktor" is whole-title only, like "direttore": "Direktor
       // Vertrieb" names a different job.
-      "^direktor$",
+      "^direktor(?:in)?$",
       "unternehmensinhaber\\w*",
       "inhaber\\w*",
       "^amministratore$",
