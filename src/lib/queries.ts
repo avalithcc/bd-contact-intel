@@ -2,6 +2,11 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import {
+  classifyContactRows,
+  indexExistingContacts,
+  type ContactWriteRow,
+} from "@/lib/contacts/connectionsDiff";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import {
@@ -475,7 +480,12 @@ async function resolveCompanyCategories(
 }
 
 export interface UpsertContactsResult {
+  // Rows processed (created + updated + unchanged), own-company skips excluded.
   imported: number;
+  created: number;
+  updated: number;
+  // Already stored with identical values: not written at all.
+  unchanged: number;
   // Rows dropped because they belong to Avalith itself (a BD's own
   // coworker, pulled in incidentally by whatever source produced `rows` —
   // LinkedIn connections today, potentially a scrape or a third-party CSV
@@ -499,25 +509,35 @@ export async function upsertContacts(
   bdId: string,
   rows: Omit<NewContact, "bdId">[],
 ): Promise<UpsertContactsResult> {
-  if (!rows.length) return { imported: 0, skippedOwnCompany: 0, identityReport: null };
+  const empty = { imported: 0, created: 0, updated: 0, unchanged: 0 };
+  if (!rows.length) return { ...empty, skippedOwnCompany: 0, identityReport: null };
   const { kept: filteredRows, skipped: ownRows } = partitionOwnCompanyRows(rows);
   const skippedOwnCompany = ownRows.length;
-  if (!filteredRows.length) return { imported: 0, skippedOwnCompany, identityReport: null };
+  if (!filteredRows.length) return { ...empty, skippedOwnCompany, identityReport: null };
 
-  let count = 0;
+  let created = 0;
+  let updated = 0;
+  let unchanged = 0;
   const chunkReports: (IdentityIngestReport | null)[] = [];
   // chunk to keep parameter counts sane
   const chunkSize = 500;
+  const dualWriteEnabled = isIdentityDualWriteEnabled();
   for (let i = 0; i < filteredRows.length; i += chunkSize) {
     const rowsChunk = filteredRows.slice(i, i + chunkSize);
     const categories = await resolveCompanyCategories(
       rowsChunk.map((r) => r.company),
     );
-    const chunk = rowsChunk.map((r) => {
+    const prepared: ContactWriteRow[] = rowsChunk.map((r) => {
       const trimmedCompany = r.company?.trim();
       return {
-        ...r,
         bdId,
+        profileKey: r.profileKey,
+        firstName: r.firstName ?? null,
+        lastName: r.lastName ?? null,
+        company: r.company ?? null,
+        position: r.position ?? null,
+        email: r.email ?? null,
+        connectedOn: r.connectedOn ?? null,
         roleGroup: classifyPosition(r.position),
         companyCategory: categories.get(r.company) ?? "unclassified",
         companyKey: trimmedCompany ? normalizeCompanyKey(trimmedCompany) : null,
@@ -525,18 +545,47 @@ export async function upsertContacts(
     });
     // One transaction per chunk (design D14): the legacy upsert plus the
     // identity resolver's lock/prefetch/match/write, or — when
-    // IDENTITY_DUAL_WRITE is off — the legacy upsert alone, byte-identical
-    // to pre-cutover behavior. See src/lib/identity/ingestWrite.ts.
-    const dualWriteEnabled = isIdentityDualWriteEnabled();
+    // IDENTITY_DUAL_WRITE is off — the legacy upsert alone. See
+    // src/lib/identity/ingestWrite.ts.
     await db.transaction(async (tx) => {
-      // Same insert either way; `.returning()` is only appended when the
-      // identity resolver actually needs the inserted/updated rows, so the
-      // kill-switch-off path stays the exact original statement (D11:
-      // byte-identical to pre-cutover behavior, including query text).
+      // ONE read of what is already stored for this chunk's keys (bd-scoped
+      // unique key), so unchanged contacts are never rewritten (2026-10-19:
+      // a re-import rewrote every contact and person one by one and timed
+      // out). `mapped` tells whether the identity side already knows the row.
+      const storedRows = await tx
+        .select({
+          id: contact.id,
+          profileKey: contact.profileKey,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          company: contact.company,
+          position: contact.position,
+          roleGroup: contact.roleGroup,
+          companyCategory: contact.companyCategory,
+          companyKey: contact.companyKey,
+          email: contact.email,
+          connectedOn: contact.connectedOn,
+          industry: contact.industry,
+          emailStatus: contact.emailStatus,
+          emailConfidence: contact.emailConfidence,
+          emailSource: contact.emailSource,
+          mapped: sql<boolean>`exists (select 1 from person_id_map pim where pim.legacy_table = 'contact' and pim.legacy_id = ${contact.id})`,
+        })
+        .from(contact)
+        .where(and(eq(contact.bdId, bdId), inArray(contact.profileKey, prepared.map((r) => r.profileKey))));
+      const diff = classifyContactRows(prepared, indexExistingContacts(storedRows));
+      const toWrite = [...diff.fresh, ...diff.changed];
+      // Unchanged contacts skip the contact write; one the identity side has
+      // never seen (pre-cutover import) still goes through the resolver.
+      const unmapped = dualWriteEnabled ? diff.unchanged.filter((u) => !u.existing.mapped) : [];
+      created += diff.fresh.length;
+      updated += diff.changed.length;
+      unchanged += diff.unchanged.length;
+
       const upsertContactRows = () =>
         tx
           .insert(contact)
-          .values(chunk)
+          .values(toWrite)
           .onConflictDoUpdate({
             target: [contact.bdId, contact.profileKey],
             set: {
@@ -553,9 +602,9 @@ export async function upsertContacts(
           });
       const { report } = await runIdentityCutoverChunk(dualWriteEnabled, {
         withLock: (fn) => withIdentityLock(tx, fn),
-        legacyWrite: dualWriteEnabled
-          ? () =>
-              upsertContactRows().returning({
+        legacyWrite: async () => {
+          const written: InsertedContactRow[] = toWrite.length
+            ? await upsertContactRows().returning({
                 id: contact.id,
                 bdId: contact.bdId,
                 profileKey: contact.profileKey,
@@ -571,20 +620,29 @@ export async function upsertContacts(
                 emailConfidence: contact.emailConfidence,
                 emailSource: contact.emailSource,
               })
-          : () => upsertContactRows().then(() => [] as InsertedContactRow[]),
+            : [];
+          return [
+            ...written,
+            ...unmapped.map(({ row, existing }) => ({ ...existing, bdId: row.bdId })),
+          ];
+        },
         toIdentityRows: contactRowsToIdentityRows,
         prefetch: (rows) => prefetchIdentityIndex(tx, rows),
-        // applyIdentityWrites now returns the resolved legacyId->personId
-        // map (hubspot_import fresh-review fix); this ingest harness's
-        // `apply` contract is Promise<void>, and live ingestion has no
-        // caller-side use for the map, so it's discarded here.
+        // applyIdentityWrites returns the resolved legacyId->personId map;
+        // live ingestion has no caller-side use for it, so it's discarded.
         apply: (plan) => applyIdentityWrites(tx, plan).then(() => undefined),
       });
       chunkReports.push(report);
     });
-    count += chunk.length;
   }
-  return { imported: count, skippedOwnCompany, identityReport: sumIdentityReports(chunkReports) };
+  return {
+    imported: created + updated + unchanged,
+    created,
+    updated,
+    unchanged,
+    skippedOwnCompany,
+    identityReport: sumIdentityReports(chunkReports),
+  };
 }
 
 export interface PositionTitleCount {
@@ -815,14 +873,30 @@ export async function importMessages(
  * `person_bd_connection` per chunk, `deriveStatus` run in memory per person,
  * and one `UPDATE ... FROM (VALUES ...)` per chunk — not a per-person loop.
  */
-export async function recomputeMessageSignals(bdId: string): Promise<void> {
-  return db.transaction((tx) => recomputeMessageSignalsInTx(tx, bdId));
+export async function recomputeMessageSignals(
+  bdId: string,
+  scope: MessageSignalScope = "all",
+): Promise<void> {
+  return db.transaction((tx) => recomputeMessageSignalsInTx(tx, bdId, scope));
 }
+
+/**
+ * "unsignalled" only writes contacts / connections still at message_count 0
+ * (people imported after their messages) and skips the conversation-level
+ * aggregate, which a contact import cannot change. Used by the connections
+ * import finalize step so it stays cheap on a 13k-contact base.
+ */
+export type MessageSignalScope = "all" | "unsignalled";
 
 type RecomputeTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function recomputeMessageSignalsInTx(tx: RecomputeTx, bdId: string): Promise<void> {
-  await tx.execute(sql`
+async function recomputeMessageSignalsInTx(
+  tx: RecomputeTx,
+  bdId: string,
+  scope: MessageSignalScope,
+): Promise<void> {
+  const onlyUnsignalled = scope === "unsignalled";
+  if (!onlyUnsignalled) await tx.execute(sql`
     UPDATE conversation c
     SET
       message_count = agg.message_count,
@@ -882,6 +956,7 @@ async function recomputeMessageSignalsInTx(tx: RecomputeTx, bdId: string): Promi
     FROM peer_agg pa
     LEFT JOIN first_msg fm ON fm.peer_profile_key = pa.peer_profile_key
     WHERE ct.bd_id = ${bdId} AND ct.profile_key = pa.peer_profile_key
+      ${onlyUnsignalled ? sql`AND ct.message_count = 0` : sql``}
   `);
 
   if (!isIdentityDualWriteEnabled()) return;
@@ -927,6 +1002,7 @@ async function recomputeMessageSignalsInTx(tx: RecomputeTx, bdId: string): Promi
     JOIN person_id_map pim ON pim.legacy_table = 'contact' AND pim.legacy_id = ct2.id
     LEFT JOIN first_msg fm ON fm.peer_profile_key = pa.peer_profile_key
     WHERE pbc.person_id = pim.person_id AND pbc.bd_id = ${bdId}
+      ${onlyUnsignalled ? sql`AND pbc.message_count = 0` : sql``}
     RETURNING pbc.person_id AS "personId"
   `);
 

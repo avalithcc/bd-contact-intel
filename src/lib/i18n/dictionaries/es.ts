@@ -3064,6 +3064,11 @@ export const es: typeof en = {
     connectionsErrorMissingFile: "Elige un archivo CSV.",
     connectionsErrorNoConnectionsFound: "No se encontraron conexiones en ese archivo.",
     connectionsErrorGenericFailed: "No se pudo importar el archivo.",
+    connectionsProgress: "Importando… {done} de {total}",
+    connectionsErrorBatchFailed:
+      "Falló el lote {batch} de {total}. Los lotes anteriores quedaron importados; sube el archivo de nuevo para continuar.",
+    connectionsFinalizeFailed:
+      "Los contactos se importaron, pero no se pudieron actualizar los mensajes asociados. Sube el archivo de nuevo para completarlo.",
     leadsCardTitle: "Lista de leads",
     sharedVisibilityNote:
       "Los contactos que subas acá quedan visibles para todo el equipo, a diferencia de los mensajes.",
@@ -3072,6 +3077,9 @@ export const es: typeof en = {
     outcomeFlaggedForReview: "Enviados a revisión",
     outcomeNew: "Contactos nuevos",
     outcomeSkippedOwnCompany: "Omitidos · empresa propia",
+    outcomeContactsCreated: "Contactos creados",
+    outcomeContactsUpdated: "Actualizados",
+    outcomeContactsUnchanged: "Sin cambios",
     outcomeReviewQueueLink: "Ver cola de revisión",
     outcomeUnavailable:
       "El resumen de deduplicación no está disponible para esta importación.",

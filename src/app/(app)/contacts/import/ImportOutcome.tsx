@@ -16,19 +16,36 @@ export function ImportOutcome({
   report,
   labels: l,
   ownCompanySkippedBeforeMatching = 0,
+  counts,
 }: {
+  // Contact-level counts (connections import only): unchanged rows were not
+  // written at all. Leads imports omit it.
+  counts?: { created: number; updated: number; unchanged: number };
   report: IdentityIngestReport | null;
   labels: ContactsImportLabels;
   // Rows dropped by the own-company pre-filter before they reach the
   // resolver (src/lib/ownCompany.ts); the resolver only counts the rest.
   ownCompanySkippedBeforeMatching?: number;
 }) {
+  const countsLine = counts && (
+    <p className="muted mb-0">
+      {l.outcomeContactsCreated} {counts.created} · {l.outcomeContactsUpdated} {counts.updated} ·{" "}
+      {l.outcomeContactsUnchanged} {counts.unchanged}
+    </p>
+  );
+
   if (!report) {
-    return <p className="muted mb-0">{l.outcomeUnavailable}</p>;
+    return (
+      <div>
+        {countsLine}
+        <p className="muted mb-0">{l.outcomeUnavailable}</p>
+      </div>
+    );
   }
 
   return (
     <div>
+      {countsLine}
       <p className="muted mb-0">
         <strong>{l.outcomeTitle}:</strong> {l.outcomeAutoMerged} {report.autoMerged} ·{" "}
         {l.outcomeFlaggedForReview} {report.flaggedForReview} · {l.outcomeNew} {report.new} ·{" "}

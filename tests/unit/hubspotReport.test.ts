@@ -123,6 +123,7 @@ test("buildHubSpotRunReport's reviewSample never exceeds 20 entries and is deter
       rowOutcomes: [],
       newPersons: [],
       existingUpdates: [],
+      unchangedExisting: 0,
       reviewPairs: outcomes.map((o, i) => ({
         refA: o.personId!,
         refB: `existing-${i}`,
@@ -187,6 +188,7 @@ test("redactReportForLog never leaks a name or email — only counts and company
       rowOutcomes: [],
       newPersons: [],
       existingUpdates: [],
+      unchangedExisting: 0,
       reviewPairs: [{ refA: "np1", refB: "existing-0", reason: "name_company", matchKey: "jane doe::acme" }],
       report: { rowsRead: 1, ownCompanySkipped: 0, autoMerged: 0, flaggedForReview: 1, new: 0 },
     },

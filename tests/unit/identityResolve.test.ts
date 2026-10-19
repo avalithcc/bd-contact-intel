@@ -336,7 +336,8 @@ test("planIdentityWrites: default mergePolicy stays 'r7' (specificity-based) whe
 // specificity/recency merge, unchanged. ------------------------------------
 
 test("planIdentityWrites with default mergePolicy 'r7': an existing person's non-empty company is NEVER overwritten, even by a longer/different incoming value", () => {
-  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International" })];
+  // jobTitle is new so the person is genuinely updated and the merge is observable.
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International", jobTitle: "Sales" })];
   const index = [existing({ id: "person-1", profileKey: "li/jane", company: "Acme" })];
   const plan = planIdentityWrites(rows, index);
   assert.equal(plan.existingUpdates[0].merged.company, "Acme");
@@ -359,12 +360,13 @@ test("planIdentityWrites with default mergePolicy 'r7': every other field keeps 
   const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "Sales", company: "Different Co" })];
   const index = [existing({ id: "person-1", profileKey: "li/jane", jobTitle: "Head of Sales, EMEA", company: "Acme" })];
   const plan = planIdentityWrites(rows, index);
-  assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales, EMEA");
-  assert.equal(plan.existingUpdates[0].merged.company, "Acme");
+  // Both stored values win, so nothing differs from what is stored: no update at all.
+  assert.equal(plan.existingUpdates.length, 0);
+  assert.equal(plan.unchangedExisting, 1);
 });
 
 test("planIdentityWrites with default mergePolicy 'r7': an existing person's non-empty companyKey is NEVER overwritten, even by a differently-derived incoming key", () => {
-  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International" })];
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", company: "Acme Corporation International", jobTitle: "Sales" })];
   const index = [existing({ id: "person-1", profileKey: "li/jane", company: "Acme", companyKey: "acme" })];
   const plan = planIdentityWrites(rows, index);
   assert.equal(plan.existingUpdates[0].merged.companyKey, "acme");
@@ -558,4 +560,38 @@ test("isIdentityDualWriteEnabled: disabled only by the literal string 'false'", 
   assert.equal(isIdentityDualWriteEnabled({ IDENTITY_DUAL_WRITE: "false" }), false);
   assert.equal(isIdentityDualWriteEnabled({ IDENTITY_DUAL_WRITE: "0" }), true);
   assert.equal(isIdentityDualWriteEnabled({ IDENTITY_DUAL_WRITE: "" }), true);
+});
+
+// --- No-op detection (LinkedIn re-import timeout, 2026-10-19) -----------------
+
+test("planIdentityWrites: a matched person whose merged fields equal what is stored produces no update", () => {
+  const stored = existing({ id: "p1", profileKey: "li/jane", jobTitle: "Head of Sales", company: "Acme" });
+  const plan = planIdentityWrites(
+    [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "Head of Sales", company: "Acme" })],
+    [stored],
+  );
+  assert.equal(plan.existingUpdates.length, 0);
+  assert.equal(plan.unchangedExisting, 1);
+  assert.equal(plan.report.autoMerged, 1, "the row is still matched and reported");
+});
+
+test("planIdentityWrites: a matched person with a changed field still produces exactly one update", () => {
+  const stored = existing({ id: "p1", profileKey: "li/jane", jobTitle: null, company: "Acme" });
+  const plan = planIdentityWrites(
+    [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "Head of Sales", company: "Acme" })],
+    [stored],
+  );
+  assert.equal(plan.existingUpdates.length, 1);
+  assert.equal(plan.existingUpdates[0].merged.jobTitle, "Head of Sales");
+  assert.equal(plan.unchangedExisting, 0);
+});
+
+test("planIdentityWrites: planning twice with the same input gives the same plan and leaves the input untouched", () => {
+  const stored = [existing({ id: "p1", profileKey: "li/jane", jobTitle: null })];
+  const rows = [row({ legacyId: "c1", profileKey: "li/jane", jobTitle: "VP" })];
+  const snapshot = JSON.stringify({ stored, rows });
+  const first = planIdentityWrites(rows, stored);
+  const second = planIdentityWrites(rows, stored);
+  assert.deepEqual(second, first);
+  assert.equal(JSON.stringify({ stored, rows }), snapshot);
 });

@@ -8,8 +8,14 @@ import {
   getCurrentAuthUserId,
   getCurrentBd,
   importMessages,
+  recomputeMessageSignals,
   upsertContacts,
 } from "@/lib/queries";
+import {
+  emptyImportTotals,
+  sanitizeConnectionsBatch,
+  type ImportBatchOutcome,
+} from "@/lib/contacts/importBatches";
 import type { IdentityIngestReport } from "@/lib/identity/ingestWrite";
 import { createClient } from "@/lib/supabase/server";
 import { MESSAGES_IMPORT_BUCKET } from "@/lib/storage";
@@ -92,6 +98,52 @@ export async function uploadCsv(
       errorKey: "genericFailed",
       errorDetail: err instanceof Error ? err.message : undefined,
     };
+  }
+}
+
+export type ImportBatchResult =
+  | { ok: true; outcome: ImportBatchOutcome }
+  | { ok: false; errorKey: UploadErrorKey; errorDetail?: string };
+
+/**
+ * One batch of the browser-driven connections import (the browser parses the
+ * CSV and sends ~1,000 rows per call; a single 13k-row action exceeded
+ * Vercel's 300 s limit). Same write path as `uploadCsv`: bd scoping comes from
+ * the session, never from the payload, and the own-company skip lives in
+ * `upsertContacts`. Idempotent: a retried batch reports its rows as unchanged.
+ */
+export async function importConnectionsBatch(rows: unknown): Promise<ImportBatchResult> {
+  try {
+    const batch = sanitizeConnectionsBatch(rows);
+    if (!batch) return { ok: false, errorKey: "genericFailed", errorDetail: "Invalid batch" };
+    if (!batch.length) return { ok: true, outcome: emptyImportTotals() };
+    const me = await getCurrentBd();
+    const { created, updated, unchanged, skippedOwnCompany, identityReport } = await upsertContacts(me.id, batch);
+    revalidatePath("/contacts");
+    return { ok: true, outcome: { created, updated, unchanged, skippedOwnCompany, identityReport } };
+  } catch (err) {
+    unstable_rethrow(err);
+    return { ok: false, errorKey: "genericFailed", errorDetail: err instanceof Error ? err.message : undefined };
+  }
+}
+
+/**
+ * Last call of a connections import: people imported after their LinkedIn
+ * messages have no sent/received counts or status yet (the signals are only
+ * computed from the messages side), so fill in just those. Safe to call after
+ * a partial run too: it only touches contacts still at zero.
+ */
+export async function finalizeConnectionsImport(): Promise<{ ok: boolean; errorDetail?: string }> {
+  try {
+    const me = await getCurrentBd();
+    await recomputeMessageSignals(me.id, "unsignalled");
+    revalidatePath("/");
+    revalidatePath("/contacts");
+    revalidatePath("/contacts/import");
+    return { ok: true };
+  } catch (err) {
+    unstable_rethrow(err);
+    return { ok: false, errorDetail: err instanceof Error ? err.message : undefined };
   }
 }
 

@@ -188,6 +188,7 @@ test("the real producer -> real consumer contract resolves new, review and exist
       { planRef: "np2", profileKey: null, sourceKey: "hubspot_import", merged: emptyMerged, migrationRunId: null },
     ],
     existingUpdates: [],
+    unchangedExisting: 0,
     reviewPairs: [],
     report: { rowsRead: 3, ownCompanySkipped: 0, autoMerged: 1, flaggedForReview: 1, new: 1 },
   };

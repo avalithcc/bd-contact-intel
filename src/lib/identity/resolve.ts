@@ -195,6 +195,10 @@ export interface IdentityWritePlan {
   rowOutcomes: IdentityRowOutcome[];
   newPersons: IdentityNewPerson[];
   existingUpdates: IdentityExistingUpdate[];
+  // Matched existing persons whose merged fields equal what is already
+  // stored: they get no `existingUpdates` entry (no write, no updated_at
+  // bump), but are still counted in `report.autoMerged`.
+  unchangedExisting: number;
   reviewPairs: IdentityReviewPair[];
   report: {
     rowsRead: number;
@@ -244,6 +248,10 @@ function candidateAsMerged(p: ExistingPersonCandidate): IdentityMergedFields {
     country: p.country ?? null,
     ownerBdId: p.ownerBdId ?? null,
   };
+}
+
+function mergedFieldsEqual(a: IdentityMergedFields, b: IdentityMergedFields): boolean {
+  return (Object.keys(a) as (keyof IdentityMergedFields)[]).every((k) => a[k] === b[k]);
 }
 
 function nameCompanyKeyFromCandidate(p: ExistingPersonCandidate): string | null {
@@ -374,11 +382,16 @@ export function planIdentityWrites(
   const mergedByRef = new Map<string, IdentityMergedFields>();
   const rowByRef = new Map<string, IdentityIngestRow>();
   const existingIds = new Set<string>();
+  // Snapshot of each stored person as the planner first saw it, to tell a
+  // real change from a no-op re-import (mergeFields returns fresh objects,
+  // so this never aliases the working copy).
+  const storedMergedById = new Map<string, IdentityMergedFields>();
   const updatedExisting = new Set<string>();
 
   for (const p of index) {
     existingIds.add(p.id);
     mergedByRef.set(p.id, candidateAsMerged(p));
+    storedMergedById.set(p.id, candidateAsMerged(p));
     if (p.profileKey) byProfileKey.set(p.profileKey, p.id);
     if (p.emailStatus === "verified" && p.emailNormalized) byVerifiedEmail.set(p.emailNormalized, p.id);
     if (p.emailNormalized) byEmailAny.set(p.emailNormalized, [...(byEmailAny.get(p.emailNormalized) ?? []), p.id]);
@@ -481,10 +494,13 @@ export function planIdentityWrites(
     }
   }
 
-  const existingUpdates: IdentityExistingUpdate[] = [...updatedExisting].map((id) => ({
-    personId: id,
-    merged: mergedByRef.get(id)!,
-  }));
+  const existingUpdates: IdentityExistingUpdate[] = [];
+  let unchangedExisting = 0;
+  for (const id of updatedExisting) {
+    const merged = mergedByRef.get(id)!;
+    if (mergedFieldsEqual(storedMergedById.get(id)!, merged)) unchangedExisting++;
+    else existingUpdates.push({ personId: id, merged });
+  }
 
   const newPersons: IdentityNewPerson[] = [];
   const seenPlanRefs = new Set<string>();
@@ -507,6 +523,7 @@ export function planIdentityWrites(
     rowOutcomes,
     newPersons,
     existingUpdates,
+    unchangedExisting,
     reviewPairs,
     report: {
       rowsRead: rows.length,

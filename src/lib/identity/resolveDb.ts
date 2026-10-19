@@ -213,28 +213,50 @@ export async function applyIdentityWrites(
     rows.existingUpdates.map((u) => u.personId),
   );
 
-  for (const update of rows.existingUpdates) {
-    await tx
-      .update(person)
-      .set({
-        firstName: update.merged.firstName,
-        lastName: update.merged.lastName,
-        company: update.merged.company,
-        companyKey: update.merged.companyKey,
-        jobTitle: update.merged.jobTitle,
-        roleGroup: update.merged.roleGroup,
-        industry: update.merged.industry,
-        city: update.merged.city,
-        country: update.merged.country,
-        ...(manualOwnerIds.has(update.personId) ? {} : { ownerBdId: update.merged.ownerBdId }),
-        email: update.merged.email,
-        emailNormalized: update.merged.emailNormalized,
-        emailStatus: update.merged.emailStatus,
-        emailConfidence: update.merged.emailConfidence,
-        emailSource: update.merged.emailSource,
-        updatedAt: new Date(),
-      })
-      .where(eq(person.id, update.personId));
+  // One set-based UPDATE per batch instead of one statement per person (the
+  // 2026-10-19 LinkedIn import timeout: ~65 ms per row made 1,000 rows blow
+  // any request budget). The planner only emits real changes, see
+  // IdentityWritePlan.unchangedExisting.
+  for (const batch of chunk(rows.existingUpdates, WRITE_BATCH_SIZE)) {
+    if (!batch.length) continue;
+    const payload = JSON.stringify(
+      batch.map((u) => ({
+        id: u.personId,
+        first_name: u.merged.firstName,
+        last_name: u.merged.lastName,
+        company: u.merged.company,
+        company_key: u.merged.companyKey,
+        job_title: u.merged.jobTitle,
+        role_group: u.merged.roleGroup,
+        industry: u.merged.industry,
+        city: u.merged.city,
+        country: u.merged.country,
+        owner_bd_id: u.merged.ownerBdId,
+        keep_owner: manualOwnerIds.has(u.personId),
+        email: u.merged.email,
+        email_normalized: u.merged.emailNormalized,
+        email_status: u.merged.emailStatus,
+        email_confidence: u.merged.emailConfidence,
+        email_source: u.merged.emailSource,
+      })),
+    );
+    await tx.execute(sql`
+      update person p set
+        first_name = v.first_name, last_name = v.last_name, company = v.company,
+        company_key = v.company_key, job_title = v.job_title, role_group = v.role_group,
+        industry = v.industry, city = v.city, country = v.country,
+        owner_bd_id = case when v.keep_owner then p.owner_bd_id else v.owner_bd_id end,
+        email = v.email, email_normalized = v.email_normalized, email_status = v.email_status,
+        email_confidence = v.email_confidence, email_source = v.email_source,
+        updated_at = now()
+      from jsonb_to_recordset(${payload}::jsonb) as v(
+        id uuid, first_name text, last_name text, company text, company_key text,
+        job_title text, role_group text, industry text, city text, country text,
+        owner_bd_id uuid, keep_owner boolean, email text, email_normalized text,
+        email_status text, email_confidence integer, email_source text
+      )
+      where p.id = v.id
+    `);
   }
 
   const legacyIdToPersonId = new Map<string, string>();

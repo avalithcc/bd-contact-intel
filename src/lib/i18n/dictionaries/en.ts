@@ -3073,6 +3073,11 @@ export const en = {
     connectionsErrorMissingFile: "Choose a CSV file.",
     connectionsErrorNoConnectionsFound: "No connections were found in that file.",
     connectionsErrorGenericFailed: "Could not import the file.",
+    connectionsProgress: "Importing… {done} of {total}",
+    connectionsErrorBatchFailed:
+      "Batch {batch} of {total} failed. Earlier batches were imported; upload the file again to continue.",
+    connectionsFinalizeFailed:
+      "The contacts were imported, but their linked messages could not be updated. Upload the file again to finish.",
     leadsCardTitle: "Leads list",
     sharedVisibilityNote:
       "Contacts you upload here are visible to the whole team, unlike messages.",
@@ -3081,6 +3086,9 @@ export const en = {
     outcomeFlaggedForReview: "Sent to review",
     outcomeNew: "New contacts",
     outcomeSkippedOwnCompany: "Skipped · own company",
+    outcomeContactsCreated: "Contacts created",
+    outcomeContactsUpdated: "Updated",
+    outcomeContactsUnchanged: "Unchanged",
     outcomeReviewQueueLink: "View review queue",
     outcomeUnavailable: "The dedup outcome isn't available for this import.",
   },
