@@ -526,7 +526,7 @@ Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
   new thread, as it should.
 - Single `to` only — no CC, no BCC, no attachments. **Owner 2026-10-19: build
   attachments and multiple recipients, only when all recipients belong to the
-  same company** (change `linkedin-extension`'s sibling: `email-multi-recipient`). ~~A multi-recipient `To`
+  same company** (change `email-attachments-recipients`). ~~A multi-recipient `To`
   string passes the guard~~ — fixed 2026-10-18: `buildRawMessage` and
   `assertSafeSendInput` call `assertRecipients`, so a new email, a scheduled
   send and sequences reject a list or a malformed address (`invalid_recipient`;
