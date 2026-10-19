@@ -27,7 +27,7 @@ export async function createActivityAction(input: {
   // Revalidate all affected paths
   if (input.leadId) revalidatePath(`/leads/${input.leadId}`);
   if (input.companyKey) revalidatePath(`/companies/${input.companyKey}`);
-  if (input.contactId) revalidatePath(`/contacts/${input.contactId}`);
+  if (input.contactId) revalidatePath(`/contact/${input.contactId}`); // legacy contact route, keyed by contact id (not person id)
   if (input.personId) {
     revalidatePath(`/contacts/${input.personId}`);
     // A note/call/discard on a Contact moves last contact and the follow-up queue.
