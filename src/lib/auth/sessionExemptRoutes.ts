@@ -11,6 +11,7 @@ export const SESSION_EXEMPT_ROUTES: readonly string[] = [
   "/api/hiring/discover",
   "/api/leads/ingest",
   "/api/tasks/digest",
+  "/api/meetings/digest",
   "/api/gmail/sync",
   "/api/gmail/reminders",
   "/api/email/scheduled/run",

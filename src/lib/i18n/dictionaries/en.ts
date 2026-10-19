@@ -2001,6 +2001,7 @@ export const en = {
     emailEyebrow: "Reminder",
     emailGreeting: "Hi {name}, tell us how they went to keep your contacts and reports up to date.",
     emailButton: "Confirm meetings",
+    emailMore: "and {n} more in the CRM",
     emailOlderOne: "You also have 1 meeting from earlier days in the queue.",
     emailOlderMany: "You also have {n} meetings from earlier days in the queue.",
     emailReason: "You receive this because you scheduled meetings in the CRM. It is sent at 18:00 (Argentina time), only when there are unconfirmed meetings.",

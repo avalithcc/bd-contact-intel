@@ -1977,6 +1977,7 @@ export const es: typeof en = {
     emailEyebrow: "Recordatorio",
     emailGreeting: "Hola {name}, indica cómo salieron para mantener al día tus contactos y los informes.",
     emailButton: "Confirmar reuniones",
+    emailMore: "y {n} más en el CRM",
     emailOlderOne: "También tienes 1 reunión de días anteriores en la cola.",
     emailOlderMany: "También tienes {n} reuniones de días anteriores en la cola.",
     emailReason: "Recibes este aviso porque agendaste reuniones en el CRM. Se envía a las 18:00 (hora de Argentina), solo si hay reuniones sin confirmar.",
