@@ -99,9 +99,11 @@ started.
   Distribution is "Load unpacked": the CRM serves the zip at
   `/api/extension/download` and a guide at `/account/extension`; releasing a
   new version means bumping `EXTENSION_VERSION` in
-  `extension/build/manifest.ts`. Unverified until the owner's first real test:
-  the LinkedIn DOM selectors (`extension/src/content/selectors.ts`), the
-  session cookie sent from the service worker, and the Edge labels in Spanish.
+  `extension/build/manifest.ts`. Verified by the owner in Chrome on
+  2026-10-19 (v1.0.2): download, lookup with the CRM session, and prefill on
+  LinkedIn's new profile layout. Job title and company come from the current
+  Experience role (the section is lazy-loaded; the reader scrolls to it and
+  falls back to the headline). Still unverified: the Edge labels in Spanish.
 - Shipped 2026-10-18: (1) task legacy columns dropped (migration 0050 applied
   to production). (2) Phone E.164 normalization, normalize on write
   (`d6152619`..`f1b65eee`); the production backfill ran 2026-10-18 and changed
