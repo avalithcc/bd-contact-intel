@@ -1904,7 +1904,12 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   (`eda9e552`, re-checked 2026-10-19): `tests/e2e/auth.setup.ts` warms `/login`
   with a 120 s request, gives the navigation 120 s and the landing 90 s, inside a
   240 s budget for that one setup test only; nothing is retried or masked.
-- `email_account.reconnect_banner_dismissed_at` is unused. (Checked 2026-10-18:
+- `email_account.reconnect_banner_dismissed_at` is unused. **Done in code
+  2026-10-19:** removed from `src/db/schema.ts`; migration
+  `0055_email_account_drop_reconnect_banner.sql` (DROP COLUMN IF EXISTS) with
+  `0055_email_account_drop_reconnect_banner_rollback.sql` (not journaled).
+  **Not yet applied to production:** deploy the code first, then apply 0055.
+  (Checked 2026-10-18:
   only declared, `src/db/schema.ts:1411`, and created/retyped by migrations
   0027 and 0033; nothing in `src/` reads or writes it, and 0 production rows
   have it set.)

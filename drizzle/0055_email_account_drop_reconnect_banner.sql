@@ -1,0 +1,1 @@
+ALTER TABLE "email_account" DROP COLUMN IF EXISTS "reconnect_banner_dismissed_at";

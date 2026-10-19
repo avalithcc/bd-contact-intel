@@ -1409,12 +1409,6 @@ export const emailAccount = pgTable(
     // backfill completes (historyId then takes over for incremental sync)
     // or before it has started.
     backfillPageToken: text("backfill_page_token"),
-    // UNUSED (gmail-reconnect-banner): the reconnect banner is no longer
-    // dismissible, so nothing reads or writes this column any more
-    // (decideConnectionBanner in src/lib/gmail/connectionBanner.ts ignores it).
-    // Kept, nullable, to avoid a destructive migration; drop it in a later,
-    // separate change if wanted.
-    reconnectBannerDismissedAt: timestamp("reconnect_banner_dismissed_at", { withTimezone: true }),
     connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
     disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
