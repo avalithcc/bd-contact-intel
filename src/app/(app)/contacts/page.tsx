@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { pickListPhone, toTelHref } from "@/lib/phone";
+import { anyPhoneNeedsReview } from "@/lib/phoneReview";
 import { whatsappLinkFor } from "@/lib/whatsapp";
 import { PhoneValue } from "@/components/PhoneValue";
 import { doNotCallWarning } from "@/lib/contacts/doNotCallWarning";
@@ -118,6 +119,7 @@ interface ContactsPageProps {
     bdConnected?: string;
     lastActivityDays?: string;
     hasPhone?: string;
+    phoneReview?: string;
     contactType?: string;
     emailVerified?: string;
     // "Outreach" system view filters (task 15a-2; owner decision
@@ -259,10 +261,21 @@ function columnCell(
       const value = pickListPhone(row.phone, row.mobilePhone);
       if (!value) return <span className="badge badge-none">{l.phoneNone}</span>;
       // Malformed: bare plain text, as drawn (no cell wrapper, no min-width).
-      if (!toTelHref(value)) return <PhoneValue value={value} labels={l} />;
+      // Either column counts, like the "Teléfono a revisar" filter (phone-review-marker mockup).
+      const review = anyPhoneNeedsReview(row.phone, row.mobilePhone) ? <span className="badge badge-warn no-dot">{l.phoneReviewBadge}</span> : null;
+      if (!toTelHref(value))
+        return review ? (
+          <div className="phone-cell">
+            <PhoneValue value={value} labels={l} />
+            {review}
+          </div>
+        ) : (
+          <PhoneValue value={value} labels={l} />
+        );
       return (
         <div className="phone-cell">
           <PhoneValue
+            afterNumber={review}
             value={value}
             whatsappUrl={whatsappLinkFor(value)}
             labels={l}

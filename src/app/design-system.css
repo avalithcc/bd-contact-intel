@@ -1062,6 +1062,7 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
    .table-wrap overflow cannot clip it; top/left come from the component. */
 .tip { position: relative; display: inline-block; }
 .tip-trigger { cursor: help; border-radius: var(--radius-sm); }
+.tip-trigger[role="button"] { cursor: pointer; }
 .tip-hdr .tip-trigger { display: inline-flex; align-items: center; gap: var(--space-3xs); }
 .tip-q { width: 13px; height: 13px; color: var(--color-ink-muted); }
 .tip-trigger:hover .tip-q, .tip-trigger:focus-visible .tip-q { color: var(--color-ink-soft); }

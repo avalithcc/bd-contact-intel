@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { safeWhatsappHref, toTelHref } from "@/lib/phone";
 import { WhatsAppIcon } from "@/components/icons";
 import { PhoneCallLink, type DoNotCallWarning } from "@/components/PhoneCallLink";
@@ -36,6 +37,7 @@ export function PhoneValue({
   labels,
   call,
   doNotCall,
+  afterNumber,
 }: {
   value: string;
   whatsappUrl?: string | null;
@@ -43,6 +45,8 @@ export function PhoneValue({
   call?: { personId: string; personName: string };
   /** Present only for a number Lusha flagged; the contacts list passes none (it does not load the Lusha ledger). */
   doNotCall?: DoNotCallWarning;
+  /** Rendered right after the number and before the WhatsApp shortcut (the list's "Revisar formato" mark). */
+  afterNumber?: ReactNode;
 }) {
   const telHref = toTelHref(value);
   if (!telHref) {
@@ -56,6 +60,7 @@ export function PhoneValue({
   return (
     <>
       <PhoneCallLink href={telHref} value={value} personId={call?.personId} personName={call?.personName} warn={doNotCall} />
+      {afterNumber}
       {waHref && (
         <a
           className="wa-btn"

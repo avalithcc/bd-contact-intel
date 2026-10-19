@@ -1099,6 +1099,12 @@ export const es: typeof en = {
     whatsappNoCountryCodeHint: "Sin código de país no se puede armar el enlace de WhatsApp.",
     whatsappUnavailableHint: "No se puede armar un enlace de WhatsApp con este número.",
     phoneUnrecognizedTitle: "Formato no reconocido: se muestra como texto",
+    // "Teléfono a revisar" (phone-review-marker mockup): the badge and its two tooltip variants.
+    phoneReviewBadge: "Revisar formato",
+    phoneReviewNoCountryTitle: "Teléfono sin código de país",
+    phoneReviewNoCountryBody: "No pudimos saber el país de este número. Edítalo con el código de país, por ejemplo +54 9 11 5555 5555.",
+    phoneReviewUnrecognizedTitle: "Número no reconocido",
+    phoneReviewUnrecognizedBody: "Este número tiene código de país, pero no pudimos validarlo. Revisa que esté completo, por ejemplo +54 9 11 5555 5555.",
     // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — never
     // shown alongside verifiedBadge, since email_status can only be one of
     // 'verified'/'probable'/'none' at a time.
@@ -3077,6 +3083,7 @@ export const es: typeof en = {
     whatsappTitle: "Abrir WhatsApp con este número",
     whatsappLabelPrefix: "Abrir WhatsApp con",
     phoneUnrecognizedTitle: "Formato no reconocido: se muestra como texto",
+    phoneReviewBadge: "Revisar formato",
     ownerNone: "—",
     noResults: "Ningún contacto coincide con esta vista.",
     showingRange: (from, to, total) => `Mostrando ${from}–${to} de ${total}`,

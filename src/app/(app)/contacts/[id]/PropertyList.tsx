@@ -18,6 +18,8 @@ import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { InfoIcon, EditPencilIcon, WarningIcon } from "@/components/icons";
 import { toTelHref, type WhatsappLink } from "@/lib/phone";
 import { PhoneValue } from "@/components/PhoneValue";
+import { PhoneReviewBadge } from "@/components/PhoneReviewBadge";
+import { phoneNeedsReview } from "@/lib/phoneReview";
 import { CONTACT_TYPES, CONTACT_TYPE_LABELS } from "@/lib/contacts/contactType";
 import type { LushaView } from "@/lib/lusha/revealView";
 import { doNotCallWarning } from "@/lib/contacts/doNotCallWarning";
@@ -486,6 +488,7 @@ function PropertyRow({
         {emailInferred && !emailVerified && !emailBounced && prop.value && <span className="badge badge-probable">{l.inferredBadge}</span>}
         {prop.value && lushaBadgeFor(lusha, prop.key) && <LushaBadge l={l} />}
         {prop.value && doNotCallFor(lusha, prop.key) && <DoNotCallBadge l={l} />}
+        {isPhoneProp && prop.value && phoneNeedsReview(prop.value) && <PhoneReviewBadge value={prop.value} labels={l} onEdit={onStartEdit} />}
         {roleGroupHint && (
           <details className="dropdown">
             <summary className="btn btn-ghost btn-sm btn-icon" aria-label={l.jobTitleHintLabel} title={l.jobTitleHintLabel}>

@@ -25,6 +25,7 @@ export function Tooltip({
   actionLabel,
   variant = "inline",
   align = "start",
+  onActivate,
   children,
 }: {
   title: string;
@@ -34,6 +35,8 @@ export function Tooltip({
   actionLabel: string;
   variant?: "inline" | "header";
   align?: "start" | "end";
+  /** Makes the trigger itself a button (click, Enter or Space) while keeping the single tab stop. */
+  onActivate?: () => void;
   children: ReactNode;
 }) {
   const id = useId();
@@ -96,6 +99,18 @@ export function Tooltip({
         ref={triggerRef}
         className="tip-trigger"
         tabIndex={0}
+        role={onActivate ? "button" : undefined}
+        onClick={onActivate}
+        onKeyDown={
+          onActivate
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onActivate();
+                }
+              }
+            : undefined
+        }
         aria-describedby={id}
         onFocus={() => {
           setFocus(true);
