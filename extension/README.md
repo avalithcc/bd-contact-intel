@@ -94,12 +94,8 @@ opens the dialog with empty fields, update `src/content/selectors.ts`, add the n
 - It does not save anything without you: the contact is created only when you press "Crear contacto" in the CRM.
 - It does not send messages or connection requests, does not use a data provider and does not store your browsing.
 
-## Publishing to the Chrome Web Store later
+## Chrome Web Store
 
-Not planned today. If the team ever needs it (for example a company policy that blocks developer mode): create a developer account
-with the **avalith.net** Google account (one-time USD 5), upload `extension/zip/crm-linkedin-v<version>.zip` re-zipped without the
-`crm-linkedin/` wrapper folder (the store wants `manifest.json` at the root), choose **Unlisted** visibility, fill the privacy
-practices tab (single purpose; host access to the CRM and `www.linkedin.com`; `storage` for the collapsed card; the data goes only to
-the company CRM) with a privacy policy URL, and wait for review. Then the guide and the Cuenta card would need a store path again.
+Not planned, ever (owner decision 2026-10-19): the extension is distributed only as the zip the CRM serves, loaded unpacked.
 LinkedIn's help article on prohibited software says extensions that scrape, modify the appearance of, or automate the site are not
 allowed; the owner accepted this risk: usage is manual, one person at a time, only to check the CRM and add a person.
