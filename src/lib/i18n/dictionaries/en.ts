@@ -2434,7 +2434,9 @@ export const en = {
     // explanatory "sample too small" copy was dropped once the hierarchy
     // itself carries the message.
     kpiReplyRateSmallFoot: (pct: number) => `${pct}%`,
-    kpiMeetings: "Meetings scheduled",
+    kpiMeetings: "Meetings held",
+    kpiMeetingsScheduled: "Meetings scheduled",
+    kpiMeetingsScheduledFoot: "upcoming or to confirm",
     kpiMeetingsFoot: "in the period",
     kpiMeetingsEmptyFoot: "No meetings recorded yet",
     kpiCompaniesWon: "Companies won",
@@ -2473,7 +2475,7 @@ export const en = {
     activityTitle: "Activity by BD",
     activityNotes: "Notes",
     activityCalls: "Calls",
-    activityMeetings: "Meetings",
+    activityMeetings: "Meetings held",
     activityEmailsSent: "Emails sent",
     activityRepliesReceived: "Replies received",
     activityTasksCompleted: "Tasks completed",
@@ -2501,7 +2503,7 @@ export const en = {
     wonCompaniesDialogNoOwner: "No owner assigned",
     wonCompaniesDialogFootnote: "Counted by the company's own owner or any of its contacts' owner.",
     wonCompaniesDialogEmpty: "No companies won for this filter.",
-    meetingsDialogTitle: "Meetings scheduled",
+    meetingsDialogTitle: "Meetings held",
     meetingsDialogColContact: "Contact",
     meetingsDialogColCompany: "Company",
     meetingsDialogColBd: "BD",

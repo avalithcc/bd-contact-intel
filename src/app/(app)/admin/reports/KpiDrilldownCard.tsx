@@ -109,7 +109,7 @@ export function DrilldownDialog<T>({
 
 /**
  * Shared "clickable KPI stat → Dialog with an on-demand list" shell for
- * "Empresas ganadas"/"Reuniones agendadas" (reports-bd-filter-drilldown) and
+ * "Empresas ganadas"/"Reuniones realizadas" (reports-bd-filter-drilldown) and
  * "Tasa de respuesta" (reports-kpi-drilldown).
  *
  * `value` is the count of rows behind the tile; `displayValue` overrides what

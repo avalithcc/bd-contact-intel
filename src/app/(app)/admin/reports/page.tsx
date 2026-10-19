@@ -36,7 +36,7 @@ export default async function ReportsPage({
   // would (PERFORMANCE.md: "does this remove round trips, or just reorder
   // them?"), so this stays sequential rather than implying a speedup that
   // isn't real.
-  const aggregates = await getReportAggregates({ fromIso: range.fromIso, toIso: range.toIso, bdId });
+  const aggregates = await getReportAggregates({ fromIso: range.fromIso, toIso: range.toIso, scheduledToIso: range.endIso, bdId });
   const perBd = await getReportPerBd({
     fromIso: range.fromIso,
     toIso: range.toIso,

@@ -2403,7 +2403,9 @@ export const es: typeof en = {
     // explanatory "sample too small" copy was dropped once the hierarchy
     // itself carries the message.
     kpiReplyRateSmallFoot: (pct: number) => `${pct}%`,
-    kpiMeetings: "Reuniones agendadas",
+    kpiMeetings: "Reuniones realizadas",
+    kpiMeetingsScheduled: "Reuniones agendadas",
+    kpiMeetingsScheduledFoot: "por venir o por confirmar",
     kpiMeetingsFoot: "en el período",
     // Prod (2026-09-30): 0 meeting_logged rows exist in the whole DB today
     // — the KPI is genuinely 0, not broken. Shown instead of kpiMeetingsFoot
@@ -2451,7 +2453,7 @@ export const es: typeof en = {
     activityTitle: "Actividad por BD",
     activityNotes: "Notas",
     activityCalls: "Llamadas",
-    activityMeetings: "Reuniones",
+    activityMeetings: "Reuniones realizadas",
     activityEmailsSent: "Correos enviados",
     activityRepliesReceived: "Respuestas recibidas",
     activityTasksCompleted: "Tareas completadas",
@@ -2484,7 +2486,7 @@ export const es: typeof en = {
     // alone.
     wonCompaniesDialogFootnote: "Se cuenta por dueño de la empresa o de alguno de sus contactos.",
     wonCompaniesDialogEmpty: "No hay empresas ganadas para este filtro.",
-    meetingsDialogTitle: "Reuniones agendadas",
+    meetingsDialogTitle: "Reuniones realizadas",
     meetingsDialogColContact: "Contacto",
     meetingsDialogColCompany: "Empresa",
     meetingsDialogColBd: "BD",

@@ -79,3 +79,11 @@ test("isValidReportWindow: ordered, parseable and at most the longest custom ran
   const custom = reportPeriodRange("custom", new Date("2026-10-19T14:00:00Z"), parseCustomRange("2025-09-14", "2026-10-18"));
   assert.equal(isValidReportWindow(custom.fromIso, custom.toIso), true, "the widest accepted custom range passes");
 });
+
+test("endIso is the end of the FULL period (still ahead for a current one) while toIso stops at now", () => {
+  const range = reportPeriodRange("week", new Date("2026-10-22T15:00:00Z"));
+  assert.equal(range.toIso, "2026-10-22T15:00:00.000Z");
+  assert.equal(range.endIso, "2026-10-26T03:00:00.000Z");
+  const past = reportPeriodRange("last_week", new Date("2026-10-22T15:00:00Z"));
+  assert.equal(past.endIso, past.toIso);
+});

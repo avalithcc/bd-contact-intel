@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * On-demand drilldown reads for the "Empresas ganadas"/"Reuniones agendadas"
+ * On-demand drilldown reads for the "Empresas ganadas"/"Reuniones realizadas"
  * KPI dialogs (reports-bd-filter-drilldown) and the cohort lists behind
  * "Tasa de respuesta"/the funnel rows (reports-kpi-drilldown). Admin-gated like every other
  * /admin/reports read; never invoked on page load (KpiDrilldownCard.tsx

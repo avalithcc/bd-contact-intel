@@ -34,6 +34,7 @@ export async function getReportAggregates(params: ReportAggregatesParams): Promi
     pipeline: { stage: string | null; count: number }[];
     won_in_period: number | string;
     won_undated: number | string;
+    meetings_scheduled: number | string;
     bd_options: { id: string; name: string }[];
   }>(buildReportAggregatesQuery(params));
   return {
@@ -43,6 +44,7 @@ export async function getReportAggregates(params: ReportAggregatesParams): Promi
     pipeline: row!.pipeline,
     wonInPeriod: Number(row!.won_in_period),
     wonUndated: Number(row!.won_undated),
+    meetingsScheduled: Number(row!.meetings_scheduled),
     bdOptions: row!.bd_options,
   };
 }
@@ -62,7 +64,7 @@ export async function getWonCompaniesDrilldown(params: WonCompaniesDrilldownPara
   );
 }
 
-/** "Reuniones agendadas" KPI drilldown — see queries.ts#buildMeetingsDrilldownQuery. */
+/** "Reuniones realizadas" KPI drilldown — see queries.ts#buildMeetingsDrilldownQuery. */
 export async function getMeetingsDrilldown(params: MeetingsDrilldownParams): Promise<MeetingDrilldownRow[]> {
   const rows = await db.execute<MeetingDrilldownRawResultRow>(buildMeetingsDrilldownQuery(params));
   return buildMeetingDrilldownRows(

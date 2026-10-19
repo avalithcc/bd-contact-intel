@@ -39,7 +39,7 @@
  * fast unit test with plain fixtures.
  */
 import { sql } from "drizzle-orm";
-import { activity, bd, company, followUpQueueItem, person, sequence, sequenceMember, task } from "@/db/schema";
+import { activity, bd, company, followUpQueueItem, meeting, person, sequence, sequenceMember, task } from "@/db/schema";
 import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
 import { WON_TRACKING_STARTS_AT_ISO } from "@/lib/reports/wonTracking";
@@ -103,6 +103,8 @@ const WORKED_ACTIVITY_TYPE_LIST = ["note", "call", "meeting_logged", "email_sent
 export interface ReportAggregatesParams {
   fromIso: string;
   toIso: string;
+  /** Exclusive end of the FULL period for "Reuniones agendadas" (upcoming meetings are after `toIso`, which stops at now). Defaults to `toIso`. */
+  scheduledToIso?: string;
   bdId: string | null;
 }
 
@@ -121,7 +123,7 @@ function cohortScopeSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
         and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)`;
 }
 
-export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggregatesParams) {
+export function buildReportAggregatesQuery({ fromIso, toIso, scheduledToIso = toIso, bdId }: ReportAggregatesParams) {
   return sql`
     with rpt_person_scope as (
       select person.id, person.status, person.source_key, ${notCurrentClientPersonSql()} as pbc_in_rate
@@ -183,6 +185,16 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
           and ${companyBelongsToBdSql(bdId)}
       ) as rpt_won_dated
     ),
+    -- "Reuniones agendadas": meetings still 'scheduled' with their time in the FULL period, not capped at now (upcoming and "por confirmar"). A reschedule
+    -- closes the old row as 'rescheduled', so it counts once, with the new date. Scoped by the BD who owns the meeting.
+    rpt_meetings_scheduled as (
+      select count(*)::int as pbc_count
+      from ${meeting}
+      where meeting.status = 'scheduled'
+        and meeting.scheduled_at >= ${fromIso}::timestamptz
+        and meeting.scheduled_at < ${scheduledToIso}::timestamptz
+        and (${bdId}::uuid is null or meeting.bd_id = ${bdId}::uuid)
+    ),
     rpt_bd_options as (
       select bd.id as pbc_id, bd.name as pbc_name
       from ${bd}
@@ -202,6 +214,7 @@ export function buildReportAggregatesQuery({ fromIso, toIso, bdId }: ReportAggre
       coalesce((select json_agg(json_build_object('stage', pbc_stage, 'count', pbc_count)) from rpt_pipeline), '[]'::json) as pipeline,
       (select pbc_in_period from rpt_won_period) as won_in_period,
       (select pbc_undated from rpt_won_period) as won_undated,
+      (select pbc_count from rpt_meetings_scheduled) as meetings_scheduled,
       coalesce((select json_agg(json_build_object('id', pbc_id, 'name', pbc_name) order by pbc_name) from rpt_bd_options), '[]'::json) as bd_options
   `;
 }
@@ -319,6 +332,8 @@ export interface ReportAggregatesResult {
   wonInPeriod: number;
   /** Currently-won companies with no real close date (no recorded move to 'won', or one before WON_TRACKING_STARTS_AT: the initial load): in no period. */
   wonUndated: number;
+  /** "Reuniones agendadas": meetings with status 'scheduled' whose scheduled_at falls in the period. */
+  meetingsScheduled: number;
   /**
    * EVERY bd row (bug fix, reports-bd-filter-drilldown): the "Filtrar por
    * BD" `<select>`'s options must never come from `perBd` (buildReportPerBdQuery's
@@ -420,7 +435,7 @@ export interface MeetingsDrilldownParams {
 }
 
 /**
- * "Reuniones agendadas" KPI drilldown (reports-bd-filter-drilldown).
+ * "Reuniones realizadas" KPI drilldown (reports-bd-filter-drilldown).
  * Actor-scoped (`activity.actor_bd_id`) and period-scoped
  * by when the meeting HAPPENED (`happenedAtDisplaySql()`: metadata.at, created_at as fallback), matching this KPI's own definition exactly —
  * see meetingsDrilldown.ts's doc comment for why this is actor-, not

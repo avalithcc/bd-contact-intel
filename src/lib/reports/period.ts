@@ -55,6 +55,8 @@ export interface ReportPeriodRange {
   fromIso: string;
   /** Exclusive upper bound, ISO instant — the period end or `now`, whichever is earlier; never in the future. */
   toIso: string;
+  /** Exclusive upper bound of the FULL period, ISO instant: unlike `toIso` it can be in the future (meetings still ahead). */
+  endIso: string;
   /** Same lower bound as an ART calendar date, for `date`-typed columns (e.g. `follow_up_queue_item.queue_date`). */
   fromDate: string;
   /** Exclusive upper bound as an ART calendar date — the full period's own end, unlike `toIso`. */
@@ -143,6 +145,7 @@ export function reportPeriodRange(period: ReportPeriod, now: Date, custom?: Cust
   return {
     fromIso: argentinaInstantBoundary(bounds.fromDate).toISOString(),
     toIso: (endInstant < now ? endInstant : now).toISOString(),
+    endIso: endInstant.toISOString(),
     fromDate: bounds.fromDate,
     toDateExclusive: bounds.toDateExclusive,
     label: labelOf(bounds.fromDate, bounds.toDateExclusive),

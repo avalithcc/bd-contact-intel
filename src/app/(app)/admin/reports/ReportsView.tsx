@@ -273,7 +273,7 @@ export function ReportsView({
         <span className="meta">{dict.periodLabel(range.label)}</span>
       </div>
 
-      <div className="grid-4 mb-lg">
+      <div className="grid-5 mb-lg">
         <CohortTile
           {...cohortQuery("new")}
           toneClass="neutral"
@@ -316,6 +316,12 @@ export function ReportsView({
           bdId={bdId}
           labels={meetingsKpiLabels}
         />
+        {/* No drilldown: the list lives in /reuniones. Dated by scheduled_at, status 'scheduled' (upcoming and "por confirmar"). */}
+        <div className="stat info">
+          <div className="label">{dict.kpiMeetingsScheduled}</div>
+          <div className="value">{aggregates.meetingsScheduled}</div>
+          <div className="foot">{dict.kpiMeetingsScheduledFoot}</div>
+        </div>
         <WonCompaniesKpiCard
           value={aggregates.wonInPeriod}
           foot={

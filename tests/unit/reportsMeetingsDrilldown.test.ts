@@ -1,6 +1,6 @@
 /**
  * Unit tests for src/lib/reports/meetingsDrilldown.ts — the "Reuniones
- * agendadas" KPI drilldown's pure row normalizer.
+ * realizadas" KPI drilldown's pure row normalizer.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

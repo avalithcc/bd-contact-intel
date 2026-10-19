@@ -32,7 +32,7 @@ export type MeetingsKpiCardLabels = ClientStrings<
 >;
 
 /**
- * "Reuniones agendadas" KPI (reports-bd-filter-drilldown, owner request):
+ * "Reuniones realizadas" KPI (reports-bd-filter-drilldown, owner request):
  * clickable once its value is >= 1, opening a Dialog with the meetings
  * logged in the selected period — actor-scoped (`activity.actor_bd_id`),
  * matching "Actividad por BD"'s own "Reuniones" column, NOT the "Embudo de

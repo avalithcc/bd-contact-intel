@@ -247,3 +247,30 @@ test("buildMeetingsDrilldownQuery: bounded with a LIMIT", () => {
   const { sql } = renderMeetings(MEETINGS_PARAMS);
   assert.match(sql, /limit \$\d+/i);
 });
+
+test("buildReportAggregatesQuery: 'Reuniones agendadas' is folded into the same statement, status scheduled, dated up to the full period end and BD-scoped", () => {
+  const { sql, params } = renderAgg({ ...AGG_PARAMS, scheduledToIso: "2026-10-01T03:00:00.000Z", bdId: "00000000-0000-0000-0000-000000000001" });
+  assert.match(sql, /meeting\.status = 'scheduled'/);
+  assert.match(sql, /meeting\.scheduled_at >= \$\d+::timestamptz/);
+  assert.match(sql, /meeting\.scheduled_at < \$\d+::timestamptz/);
+  assert.match(sql, /meeting\.bd_id = \$\d+::uuid/);
+  assert.match(sql, /as meetings_scheduled/);
+  assert.ok(params.includes("2026-10-01T03:00:00.000Z"));
+});
+
+test("buildReportAggregatesQuery: without scheduledToIso the agendadas window ends at toIso", () => {
+  const { params } = renderAgg(AGG_PARAMS);
+  assert.ok(params.includes(AGG_PARAMS.toIso));
+});
+
+test("the held-meetings KPI and its per-BD column are labelled 'realizadas'; the new KPI is 'agendadas'", async () => {
+  const { es } = await import("@/lib/i18n/dictionaries/es");
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  assert.equal(es.reports.kpiMeetings, "Reuniones realizadas");
+  assert.equal(es.reports.meetingsDialogTitle, "Reuniones realizadas");
+  assert.equal(es.reports.activityMeetings, "Reuniones realizadas");
+  assert.equal(es.reports.kpiMeetingsScheduled, "Reuniones agendadas");
+  assert.equal(en.reports.kpiMeetings, "Meetings held");
+  assert.equal(en.reports.meetingsDialogTitle, "Meetings held");
+  assert.equal(en.reports.kpiMeetingsScheduled, "Meetings scheduled");
+});

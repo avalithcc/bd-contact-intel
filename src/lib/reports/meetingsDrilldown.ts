@@ -1,5 +1,5 @@
 /**
- * "Reuniones agendadas" KPI drilldown (reports-bd-filter-drilldown fix).
+ * "Reuniones realizadas" KPI drilldown (reports-bd-filter-drilldown fix).
  * Pure row normalizer for buildMeetingsDrilldownQuery's raw result — same
  * "normalize raw-SQL results" rule every other reports pure module follows.
  *
