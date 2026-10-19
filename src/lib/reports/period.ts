@@ -28,6 +28,13 @@ export interface CustomRange {
 /** Longest custom range accepted; keeps every report read bounded. */
 const MAX_CUSTOM_DAYS = 400;
 
+/** Server-side guard for the drill-down actions: both instants parse, `from` < `to`, and the window is no longer than the longest custom range. */
+export function isValidReportWindow(fromIso: string, toIso: string): boolean {
+  const from = Date.parse(fromIso);
+  const to = Date.parse(toIso);
+  return Number.isFinite(from) && Number.isFinite(to) && from < to && to - from <= (MAX_CUSTOM_DAYS + 1) * 24 * 60 * 60 * 1000;
+}
+
 function isRealDate(value: string | undefined): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   return addDaysToDateString(value, 0) === value;

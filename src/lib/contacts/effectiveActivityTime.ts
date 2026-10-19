@@ -36,7 +36,7 @@
  * so a future type added to it never needs updating in two places. This
  * module's tests pin the JS-side rule every SQL site must match.
  */
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { activity } from "@/db/schema";
 import { MEETING_ACTIVITY_TYPES } from "@/lib/meetings/status";
 import {
@@ -107,9 +107,29 @@ export function resolveEffectiveActivityAt(row: ActivityRowForStatus & { deleted
  * looks like an ISO datetime), so a query can `ORDER BY`/aggregate on a row's effective time without pulling every row into
  * JS first. `@/db/schema`-only import (no `@/db` client), so this stays importable without a live DATABASE_URL.
  */
+/**
+ * Full ISO-8601 datetime shape with real ranges (month 01-12, day 01-31, hour 00-23, minute/second 00-59, optional
+ * fraction and offset). A prefix-only check let '2026-10-02T25:00:00' through to the cast, which throws.
+ */
+const ISO_DATETIME_SHAPE =
+  "^(19|20)[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?(Z|[+-]([01][0-9]|2[0-3]):?[0-5][0-9])?$";
+
+/**
+ * TOTAL timestamptz cast of a text expression: NULL (so the caller falls back to `created_at`) for anything that is not a
+ * real datetime, and never an error. The shape regex rules out bad months/hours/minutes; the day-of-month check
+ * (day <= days in that month, so '2026-02-30' and '2026-02-29' are rejected, '2028-02-29' is not) needs the nested CASE:
+ * Postgres guarantees a CASE branch is only evaluated when its WHEN holds, which `a AND b` does not guarantee. Year is
+ * limited to 19xx/20xx so `make_date` cannot see year 0.
+ */
+function safeTimestamptzSql(value: SQL) {
+  return sql`(case when ${value} ~ ${sql.raw(`'${ISO_DATETIME_SHAPE}'`)} then (case
+      when substr(${value}, 9, 2)::int <= extract(day from (make_date(substr(${value}, 1, 4)::int, substr(${value}, 6, 2)::int, 1) + interval '1 month' - interval '1 day'))::int
+      then (${value})::timestamptz end) end)`;
+}
+
 function activityTimeCase(hideDeleted: boolean, meetingHeldAt = false) {
   const meetingBranch = meetingHeldAt
-    ? sql`when ${activity.type} = 'meeting_logged' and (${activity.metadata}->>'at') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'at')::timestamptz
+    ? sql`when ${activity.type} = 'meeting_logged' then coalesce(${safeTimestamptzSql(sql`(${activity.metadata}->>'at')`)}, ${activity.createdAt})
     `
     : sql``;
   const deletedBranch = hideDeleted ? sql`when ${activity.deletedAt} is not null then null ` : sql``;
@@ -118,11 +138,11 @@ function activityTimeCase(hideDeleted: boolean, meetingHeldAt = false) {
       NON_TOUCH_ACTIVITY_TYPES.map((t) => sql`${t}`),
       sql`, `,
     )}) then null
-    ${meetingBranch}when ${activity.type} = 'status_backfill' and (${activity.metadata}->>'originalAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'originalAt')::timestamptz
+    ${meetingBranch}when ${activity.type} = 'status_backfill' then coalesce(${safeTimestamptzSql(sql`(${activity.metadata}->>'originalAt')`)}, ${activity.createdAt})
     when ${activity.type} in (${sql.join(
       OCCURRED_AT_ACTIVITY_TYPES.map((t) => sql`${t}`),
       sql`, `,
-    )}) and (${activity.metadata}->>'occurredAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' then (${activity.metadata}->>'occurredAt')::timestamptz
+    )}) then coalesce(${safeTimestamptzSql(sql`(${activity.metadata}->>'occurredAt')`)}, ${activity.createdAt})
     else ${activity.createdAt} end)`;
 }
 

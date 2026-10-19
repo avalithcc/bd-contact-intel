@@ -43,7 +43,7 @@ test("aggregates are CTEs grouped before the join to company, one row per key", 
 
 test("effective time uses the shared helper (status_backfill originalAt) in both aggregates", () => {
   const { sql } = renderPage();
-  assert.equal(sql.match(/originalAt/g)?.length, 4); // 2 per helper expansion
+  assert.equal(sql.match(/= .status_backfill./g)?.length, 2); // one per helper expansion
 });
 
 test("lastActivityAt is the latest of the two aggregates", () => {

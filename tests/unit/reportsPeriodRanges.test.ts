@@ -68,3 +68,14 @@ test("buildReportsHref carries the custom range, and only for the custom period"
   assert.equal(buildReportsHref("last_month", null, { from: "2026-10-05", to: "2026-10-07" }), "/admin/reports?period=last_month");
   assert.equal(buildReportsHref("month", null), "/admin/reports");
 });
+
+test("isValidReportWindow: ordered, parseable and at most the longest custom range", async () => {
+  const { isValidReportWindow } = await import("@/lib/reports/period");
+  assert.equal(isValidReportWindow("2026-10-01T03:00:00.000Z", "2026-10-19T14:00:00.000Z"), true);
+  assert.equal(isValidReportWindow("2026-10-19T14:00:00.000Z", "2026-10-19T14:00:00.000Z"), false, "from must be < to");
+  assert.equal(isValidReportWindow("2026-10-19T14:00:00.000Z", "2026-10-01T03:00:00.000Z"), false);
+  assert.equal(isValidReportWindow("nope", "2026-10-01T03:00:00.000Z"), false);
+  assert.equal(isValidReportWindow("2020-01-01T00:00:00.000Z", "2026-10-01T00:00:00.000Z"), false, "over 400 days");
+  const custom = reportPeriodRange("custom", new Date("2026-10-19T14:00:00Z"), parseCustomRange("2025-09-14", "2026-10-18"));
+  assert.equal(isValidReportWindow(custom.fromIso, custom.toIso), true, "the widest accepted custom range passes");
+});

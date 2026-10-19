@@ -12,6 +12,7 @@ import { unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { isUuid } from "@/lib/uuid";
 import { getCohortDrilldown, getMeetingsDrilldown, getWonCompaniesDrilldown } from "@/lib/reports/queriesDb";
+import { isValidReportWindow } from "@/lib/reports/period";
 import { isCohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import type { MeetingDrilldownRow } from "@/lib/reports/meetingsDrilldown";
 import type { WonCompanyDrilldownRow } from "@/lib/reports/wonCompaniesDrilldown";
@@ -29,7 +30,7 @@ export async function getWonCompaniesDrilldownAction(params: {
 }): Promise<DrilldownResult<WonCompanyDrilldownRow>> {
   try {
     await requireAdmin();
-    if (Number.isNaN(Date.parse(params.fromIso)) || Number.isNaN(Date.parse(params.toIso))) return { ok: false };
+    if (!isValidReportWindow(params.fromIso, params.toIso)) return { ok: false };
     const rows = await getWonCompaniesDrilldown({ fromIso: params.fromIso, toIso: params.toIso, bdId: normalizedBdId(params.bdId) });
     return { ok: true, rows };
   } catch (err) {
@@ -46,6 +47,7 @@ export async function getMeetingsDrilldownAction(params: {
 }): Promise<DrilldownResult<MeetingDrilldownRow>> {
   try {
     await requireAdmin();
+    if (!isValidReportWindow(params.fromIso, params.toIso)) return { ok: false };
     const rows = await getMeetingsDrilldown({
       fromIso: params.fromIso,
       toIso: params.toIso,
@@ -67,7 +69,7 @@ export async function getCohortDrilldownAction(params: {
 }): Promise<DrilldownResult<CohortRow>> {
   try {
     await requireAdmin();
-    if (!isCohortPopulation(params.population) || Number.isNaN(Date.parse(params.fromIso)) || Number.isNaN(Date.parse(params.toIso))) {
+    if (!isCohortPopulation(params.population) || !isValidReportWindow(params.fromIso, params.toIso)) {
       return { ok: false };
     }
     const rows = await getCohortDrilldown({

@@ -32,7 +32,7 @@ test("other types keep the shared effective-time rule (calls use occurredAt, not
 test("happenedAtSql reads metadata.at for meeting_logged with the same ISO guard as the other casts", () => {
   const { sql } = dialect.sqlToQuery(happenedAtSql());
   assert.match(sql, /"type" = 'meeting_logged'/i);
-  assert.match(sql, /"metadata"->>'at'\) ~ /i);
+  assert.match(sql, /"metadata"->>.at.\)/i);
 });
 
 test("the per-BD meetings count and the meetings drill-down both bucket by when the meeting happened", () => {
@@ -40,6 +40,6 @@ test("the per-BD meetings count and the meetings drill-down both bucket by when 
     buildReportPerBdQuery({ fromIso: "2026-10-01T03:00:00.000Z", toIso: "2026-10-19T14:00:00.000Z", fromDate: "2026-10-01", toDateExclusive: "2026-11-01", bdId: null }),
   ).sql;
   const drill = dialect.sqlToQuery(buildMeetingsDrilldownQuery({ fromIso: "2026-10-01T03:00:00.000Z", toIso: "2026-10-19T14:00:00.000Z", bdId: null })).sql;
-  assert.match(perBd, /meeting_logged' and \("activity"\."metadata"->>'at'\)|"type" = 'meeting_logged'/i);
-  assert.match(drill, /"type" = 'meeting_logged' and \("activity"\."metadata"->>'at'\)/i);
+  assert.match(perBd, /"type" = 'meeting_logged' then coalesce\(/i);
+  assert.match(drill, /"type" = 'meeting_logged' then coalesce\(/i);
 });

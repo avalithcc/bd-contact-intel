@@ -193,7 +193,7 @@ test("buildReportAggregatesQuery: 'Empresas ganadas' counts won companies by the
   const { sql } = renderAgg();
   assert.match(sql, /as won_in_period/i);
   assert.match(sql, /as won_undated/i);
-  const section = sql.slice(sql.indexOf("rpt_won_period"), sql.indexOf("rpt_won_period") + 1500);
+  const section = sql.slice(sql.indexOf("rpt_won_period"), sql.indexOf("rpt_won_period") + 5000);
   assert.match(section, /company\.relationship_stage = 'won'/i);
   assert.match(section, /activity\.metadata->>'status' = 'won'/i);
   assert.match(section, />= \$\d+::timestamptz/i);
