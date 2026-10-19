@@ -596,7 +596,7 @@ export async function upsertContacts(
               roleGroup: sql`excluded.role_group`,
               companyCategory: sql`excluded.company_category`,
               companyKey: sql`excluded.company_key`,
-              email: sql`excluded.email`,
+              email: sql`coalesce(nullif(excluded.email, ''), ${contact.email})`,
               connectedOn: sql`excluded.connected_on`,
             },
           });

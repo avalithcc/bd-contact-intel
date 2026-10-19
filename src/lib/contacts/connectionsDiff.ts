@@ -62,7 +62,13 @@ const COMPARED_FIELDS = [
 ] as const satisfies readonly (keyof ContactWriteRow & keyof ExistingContactSnapshot)[];
 
 function sameStored(row: ContactWriteRow, existing: ExistingContactSnapshot): boolean {
-  return COMPARED_FIELDS.every((f) => norm(row[f]) === norm(existing[f]));
+  return COMPARED_FIELDS.every((f) => {
+    const incomingValue = norm(row[f]);
+    // The writer keeps a stored email when the CSV one is blank (upsertContacts: coalesce(nullif(excluded.email, ''), ...)),
+    // so a blank incoming email is "no change" for that field and an unchanged re-import stays zero-write.
+    if (f === "email" && incomingValue === null) return true;
+    return incomingValue === norm(existing[f]);
+  });
 }
 
 export interface ContactDiff {

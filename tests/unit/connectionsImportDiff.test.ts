@@ -50,6 +50,20 @@ test("classifyContactRows: whitespace-only and blank-vs-null differences are not
   assert.equal(out.unchanged.length, 1);
 });
 
+test("classifyContactRows: a blank incoming email over a stored email is no change (the writer keeps the stored one)", () => {
+  const out = classifyContactRows(
+    [incoming({ email: null }), incoming({ profileKey: "linkedin.com/in/b", email: "  " })],
+    index([stored({ email: "jane@acme.test" }), stored({ id: "c-2", profileKey: "linkedin.com/in/b", email: "b@acme.test" })]),
+  );
+  assert.equal(out.unchanged.length, 2);
+  assert.equal(out.changed.length, 0);
+});
+
+test("classifyContactRows: a different non-blank incoming email is still a change", () => {
+  const out = classifyContactRows([incoming({ email: "new@acme.test" })], index([stored({ email: "jane@acme.test" })]));
+  assert.equal(out.changed.length, 1);
+});
+
 test("classifyContactRows: one differing field makes the row changed", () => {
   const out = classifyContactRows([incoming({ position: "CEO", roleGroup: "c_level" })], index([stored()]));
   assert.equal(out.changed.length, 1);

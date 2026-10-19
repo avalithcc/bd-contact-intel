@@ -85,6 +85,28 @@ test("import, unchanged re-import and a single changed row", async () => {
   assert.deepEqual(changedKeys(v2.persons, v3.persons), [rows[58].profileKey]);
 });
 
+test("a blank CSV email never wipes a stored contact.email, and stays zero-write", async () => {
+  const { db } = await import("@/db");
+  const { sql } = await import("drizzle-orm");
+  const { upsertContacts } = await import("@/lib/queries");
+  const rows = mkRows(5, 900);
+  await upsertContacts(bdId, rows);
+  const key = rows[2].profileKey;
+  await db.execute(sql`update contact set email = 'kept@acme.test' where bd_id = ${bdId} and profile_key = ${key}`);
+  const before = await versions();
+
+  const again = await upsertContacts(bdId, rows); // CSV email is blank for every row
+  assert.deepEqual([again.created, again.updated, again.unchanged], [0, 0, 5]);
+  assert.deepEqual(changedKeys(before.contacts, (await versions()).contacts), [], "no contact rewritten");
+
+  // A genuine change on the same row writes it but still keeps the stored email.
+  const edited = rows.map((r, i) => (i === 2 ? { ...r, position: "CTO" } : r));
+  const third = await upsertContacts(bdId, edited);
+  assert.deepEqual([third.updated, third.unchanged], [1, 4]);
+  const [stored] = Array.from(await db.execute<{ email: string | null }>(sql`select email from contact where bd_id = ${bdId} and profile_key = ${key}`));
+  assert.equal(stored.email, "kept@acme.test");
+});
+
 test("5,000 rows: first import and unchanged re-import timings", async () => {
   const { upsertContacts } = await import("@/lib/queries");
   const rows = mkRows(5000, 1000);
