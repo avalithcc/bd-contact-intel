@@ -1,5 +1,5 @@
 /**
- * Builds the extension into extension/dist (Chrome Web Store variant) or extension/dist-dev (`--dev`: also
+ * Builds the extension into extension/dist (production "store" variant, no localhost) or extension/dist-dev (`--dev`: also
  * allows http://localhost:3000). Bundles with esbuild, copies the icons, writes the manifest and generates the
  * card stylesheet from the CRM's own CSS. Run with `npm run extension:build` / `npm run extension:build:dev`.
  */

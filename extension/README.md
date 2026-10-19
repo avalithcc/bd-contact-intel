@@ -1,6 +1,6 @@
 # CRM avalith · LinkedIn extension
 
-A Manifest V3 extension for Chrome, Edge and Brave (Chromium). On a LinkedIn profile (`linkedin.com/in/<slug>/`) it shows a small card
+A Manifest V3 extension for Chrome and Edge (Chromium). On a LinkedIn profile (`linkedin.com/in/<slug>/`) it shows a small card
 that says whether the person is already in the CRM, links to the record, or opens "Nuevo contacto" prefilled. Approved mockup:
 `openspec/changes/linkedin-extension/mockups/extension-linkedin.html`.
 
@@ -28,44 +28,57 @@ that says whether the person is already in the CRM, links to the record, or open
 Pure logic is unit-tested in `tests/unit/extension*.test.ts`; the reader and the card also run in headless Chromium against synthetic
 fixtures in `tests/fixtures/linkedin/`.
 
-## Build and load it unpacked (Chrome and Edge)
+## How a BD installs it (load unpacked)
+
+The extension is not on the Chrome Web Store. The CRM serves it as a zip and explains the steps at **Cuenta > Herramientas >
+Ver guía de instalación** (`/account/extension`, Chrome and Edge, approved mockup
+`openspec/changes/linkedin-extension/mockups/instalar-extension.html`).
+
+1. Download `crm-linkedin-v<version>.zip` from Cuenta (served by `GET /api/extension/download`, signed-in users only).
+2. Unzip it. The zip has a single top-level folder, `crm-linkedin/`, with `manifest.json` inside. Keep that folder somewhere permanent.
+3. `chrome://extensions` (or `edge://extensions`), turn on **Developer mode**, **Load unpacked**, choose the `crm-linkedin` folder.
+4. Sign in to the CRM in the same browser profile, then open any `linkedin.com/in/…` profile.
+
+Cuenta and the guide show "Instalada · vX" because the extension's CRM-origin script sets `data-crm-extension="<version>"` on `<html>`.
+
+## Releasing a new version
+
+Bumping the version is the **only** release step:
+
+1. Change `EXTENSION_VERSION` in `build/manifest.ts` (e.g. `1.0.0` to `1.1.0`; numeric, dotted, up to four segments).
+2. Merge and deploy. `npm run build` (what Vercel runs) first runs `npm run extension:zip`, which builds the store variant into
+   `extension/dist` and packs `extension/zip/crm-linkedin-v<version>.zip` (`build/pack.ts`, `build/zip.ts`, no dependency).
+   The CRM reads the version from the same file at build time, so the served zip, its file name and the "Hay una versión nueva"
+   comparison all follow. Versions compare numerically (`1.10.0` is newer than `1.9.0`); an installed version that cannot be parsed
+   is shown as installed, never as outdated.
+3. BDs see the warning in Cuenta and follow "Cómo actualizar": download, replace the contents of the same folder, reload the
+   extension in `chrome://extensions`, reload the LinkedIn tab.
+
+A missing or incomplete extension build, a manifest version that does not match, or a development manifest (with the localhost
+host permission) makes the build fail on purpose instead of shipping a broken download.
+
+Local commands:
 
 ```bash
 npm run extension:build        # store variant  -> extension/dist      (talks to https://crm.avalith.net)
 npm run extension:build:dev    # dev variant    -> extension/dist-dev  (talks to http://localhost:3000)
+npm run extension:zip          # build + pack   -> extension/zip/crm-linkedin-v<version>.zip
 ```
 
-1. Chrome: open `chrome://extensions`, turn on **Developer mode**, **Load unpacked**, choose `extension/dist` (or `dist-dev`).
-2. Edge: open `edge://extensions`, turn on **Developer mode**, **Load unpacked**, same folder. (Installing from the Chrome Web Store
-   in Edge additionally needs **Allow extensions from other stores** enabled, once, in `edge://extensions`.)
-3. Sign in to the CRM in the same browser profile, then open any `linkedin.com/in/…` profile.
+Without `extension/zip/…` (plain `next build` or `next dev` before the first `extension:zip`) the download route answers 404; run
+`npm run extension:zip` once locally to test the download.
 
 ### Pointing it at localhost
 
 Use the dev build. It adds `http://localhost:3000/*` to the host permissions and the CRM marker, and the service worker calls
-`http://localhost:3000`. Run `npm run dev`, sign in at `http://localhost:3000`, load `extension/dist-dev`. After rebuilding, press the
-reload icon of the extension in `chrome://extensions` and reload the LinkedIn tab. Never publish the dev build.
+`http://localhost:3000`. Run `npm run dev`, sign in at `http://localhost:3000`, load `extension/dist-dev` unpacked. After rebuilding,
+press the reload icon of the extension in `chrome://extensions` and reload the LinkedIn tab. Never publish or zip the dev build.
 
 ## When LinkedIn changes its page
 
 LinkedIn changes its markup without notice and these selectors have only been exercised against synthetic fixtures. If "Agregar al CRM"
 opens the dialog with empty fields, update `src/content/selectors.ts`, add the new shape to `tests/fixtures/linkedin/`, and run
 `npx tsx --test tests/unit/extensionBrowser.test.ts`. A field that cannot be read is left empty on purpose; the extension never guesses.
-
-## Chrome Web Store publishing checklist (owner)
-
-1. Create a Chrome Web Store developer account with the **avalith.net** Google account (one-time **USD 5** registration fee).
-2. `npm run extension:build`, then `cd extension/dist && zip -r ../crm-avalith-linkedin.zip .` and upload the zip.
-3. **Visibility: Unlisted** (only people with the link can install). "Private" needs a Google Workspace admin to enable domain publishing.
-4. Store listing: description, a screenshot of the card on a profile, and the "what it does / does not do" text below.
-5. **Privacy practices tab**: single purpose ("show whether a LinkedIn profile is already in the company CRM and add it"); permission
-   justifications (host access to the CRM and to `www.linkedin.com`, `storage` for the collapsed card); data disclosure: handles the
-   profile address and, on click, the name, headline, company and location of the profile being added; data goes only to the company CRM,
-   is not sold or shared, not used for unrelated purposes. Publish a **privacy policy** URL and link it.
-6. Review takes days to weeks. After approval, set `NEXT_PUBLIC_EXTENSION_STORE_URL` to the listing URL in the Vercel project
-   (Production) and redeploy: Cuenta > Herramientas then enables "Instalar extensión".
-7. LinkedIn's help article on prohibited software says extensions that scrape, modify the appearance of, or automate the site are not
-   allowed. The owner accepted this risk: usage is manual, one person at a time, only to check the CRM and add a person.
 
 ## Store listing text (mockup section 4)
 
@@ -80,3 +93,13 @@ opens the dialog with empty fields, update `src/content/selectors.ts`, add the n
 - It does not read your contacts, your messages or other profiles.
 - It does not save anything without you: the contact is created only when you press "Crear contacto" in the CRM.
 - It does not send messages or connection requests, does not use a data provider and does not store your browsing.
+
+## Publishing to the Chrome Web Store later
+
+Not planned today. If the team ever needs it (for example a company policy that blocks developer mode): create a developer account
+with the **avalith.net** Google account (one-time USD 5), upload `extension/zip/crm-linkedin-v<version>.zip` re-zipped without the
+`crm-linkedin/` wrapper folder (the store wants `manifest.json` at the root), choose **Unlisted** visibility, fill the privacy
+practices tab (single purpose; host access to the CRM and `www.linkedin.com`; `storage` for the collapsed card; the data goes only to
+the company CRM) with a privacy policy URL, and wait for review. Then the guide and the Cuenta card would need a store path again.
+LinkedIn's help article on prohibited software says extensions that scrape, modify the appearance of, or automate the site are not
+allowed; the owner accepted this risk: usage is manual, one person at a time, only to check the CRM and add a person.
