@@ -1844,6 +1844,11 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- **Log meetings in the future** (owner, 2026-10-19). Today a meeting can only
+  be logged in the past. Needs a flow for meetings that don't happen or move:
+  e.g. an end-of-day reminder to confirm held / no-show / rescheduled /
+  cancelled (HubSpot "meeting outcome"). Options presented to the owner the
+  same day; decision pending.
 - **Admin reports: reply rate must exclude current clients** (owner,
   2026-10-19). The reply rate in Admin → Reportes counts conversations with
   active clients; it must count only prospects (contacts) and inactive
