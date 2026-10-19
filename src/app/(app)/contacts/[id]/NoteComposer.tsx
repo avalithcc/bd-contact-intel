@@ -106,7 +106,7 @@ export function NoteComposer({ personId, labels: l }: { personId: string; labels
   }
 
   return (
-    <div className="composer" id="log-note">
+    <div className="composer" id="log-note" data-dirty={note.trim() !== "" || followUpTitle.trim() !== "" || noteSaved ? "true" : undefined}>
       <label className="sr-only" htmlFor="note-in">
         {l.notePlaceholder}
       </label>

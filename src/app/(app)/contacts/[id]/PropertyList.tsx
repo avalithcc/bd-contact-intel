@@ -392,7 +392,7 @@ function PropertyRow({
 
   if (editing) {
     return (
-      <div className="prop">
+      <div className="prop" data-dirty="true">
         <dt id={`${inputId}-label`}>{prop.label}</dt>
         <dd>
           {prop.key === "contactType" ? (
@@ -613,7 +613,7 @@ function LocationPropertyRow({
     };
 
     return (
-      <div className="prop">
+      <div className="prop" data-dirty="true">
         <dt id="contact-prop-location-label">{l.propLocation}</dt>
         <dd>
           <input
