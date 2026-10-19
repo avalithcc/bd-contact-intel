@@ -3,6 +3,7 @@
 // Roster, drafting and approval actions, mounted by the Sequence pages (go-live, PR 13). Every
 // guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
 import { getCurrentBd } from "@/lib/queries";
+import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { advanceReminder as advanceReminderRow, approveBulk as approveBulkRows, approveMember as approveMemberRow, cancelApproval as cancelApprovalRow, markDraftReviewed as markDraftReviewedRow } from "@/lib/sequences/approvalQueries";
 import { formatOutreachSignalLabel } from "@/lib/outreach/messageSignalLabels";
 import { pickGenerateMessageLabels, signalLabelsFromDict } from "@/lib/outreach/messageLabels";
@@ -46,7 +47,9 @@ export async function createSequence(input: { name: string; emailAccountId: stri
 
 export async function addMembers(sequenceId: string, personIds: string[]): Promise<AddMembersResult> {
   const me = await getCurrentBd();
-  return addMembersToSequence(me.id, sequenceId, personIds);
+  const result = await addMembersToSequence(me.id, sequenceId, personIds);
+  revalidateLists("sequences");
+  return result;
 }
 
 export async function removeMembers(sequenceId: string, memberIds: string[], reason: string): Promise<RemoveMembersResult> {
@@ -122,7 +125,9 @@ export async function advanceReminder(memberId: string) {
 /** "No contactar": suppresses the member's address and discards every live membership of it (reason opt_out). */
 export async function recordOptOut(memberId: string): Promise<OptOutResult> {
   const me = await getCurrentBd();
-  return recordOptOutForMember(me.id, memberId);
+  const result = await recordOptOutForMember(me.id, memberId);
+  revalidateLists("sequences", "contactList");
+  return result;
 }
 
 /**

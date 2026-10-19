@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
@@ -61,6 +62,7 @@ export async function updateContactPropertyAction(
     const me = await getCurrentBd();
     await updateContactProperty(personId, property, value, me.id);
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -86,6 +88,7 @@ export async function updateContactLocationAction(
     const me = await getCurrentBd();
     await updateContactProperties(personId, fields, me.id);
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("contactList");
     return { ok: true };
   } catch (err) {
     const located = contactLocationActionErrorReason(err);
@@ -123,6 +126,7 @@ export async function updateContactOwnerAction(
     // so (see bulkOwnerAudit.ts's "owner_change" vs "bulk_owner_change").
     await bulkAssignOwner([personId], ownerBdId, me.id, { mode: "single" });
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -157,6 +161,7 @@ export async function changeContactCompanyAction(
     const me = await getCurrentBd();
     await changeContactCompany(personId, companyKey, me.id);
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("contactList");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -185,6 +190,7 @@ export async function deleteContactNoteAction(noteId: string): Promise<ContactAc
     const me = await getCurrentBd();
     const { personId } = await softDeleteContactNote(me, noteId);
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("contactList");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -228,6 +234,7 @@ export async function completeContactTaskAction(taskId: string, personId: string
     const me = await getCurrentBd();
     await setTaskStatusChecked(taskId, "done", me);
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("tasks");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -244,6 +251,7 @@ export async function reopenContactTaskAction(taskId: string, personId: string):
     const me = await getCurrentBd();
     await setTaskStatusChecked(taskId, "open", me);
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("tasks");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -269,7 +277,7 @@ export async function logContactMeetingAction(
     await assertContactEditableById(personId);
     const { kind } = await registerContactMeeting(personId, me.id, date, time, notes, new Date(), { allowScheduling });
     revalidatePath(`/contacts/${personId}`);
-    revalidatePath("/reuniones");
+    revalidateLists("touch", "meetings", "tasks");
     return { ok: true, kind };
   } catch (err) {
     return actionFailure(err);
@@ -293,6 +301,7 @@ export async function logCallAction(
     const metadata = planCall(outcome, direction, date, time, notes);
     await createActivityAction({ type: "call", personId, metadata: { ...metadata } });
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -332,7 +341,7 @@ export async function resolveCallAttemptAction(
     const me = await getCurrentBd();
     await resolveCallAttempt(attemptId, personId, me.id, outcome, notes);
     revalidatePath(`/contacts/${personId}`);
-    revalidatePath("/contacts");
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -357,7 +366,7 @@ export async function settleCallAttemptAction(
     const me = await getCurrentBd();
     await settleCallAttempt(attemptId, personId, me.id, { outcome, date, time, notes });
     revalidatePath(`/contacts/${personId}`);
-    revalidatePath("/contacts");
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -375,6 +384,7 @@ export async function discardContactAction(
     const metadata = planDiscard(reason, note);
     await createActivityAction({ type: "discarded", personId, metadata: { ...metadata } });
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -442,6 +452,7 @@ export async function sendContactEmailAction(
       await removeSentAttachments(prepared.files.map((f) => f.storagePath));
     }
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     for (const other of extras?.recipientPersonIds ?? []) if (isUuid(other)) revalidatePath(`/contacts/${other}`);
     return { ok: true };
   } catch (err) {
@@ -486,6 +497,7 @@ export async function sendThreadReplyAction(
     });
     await removeSentAttachments(files.files.map((f) => f.storagePath));
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

@@ -2,6 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { getCurrentBd } from "@/lib/queries";
@@ -46,6 +47,7 @@ export async function scheduleContactEmailAction(
     const result = await scheduleEmail({ bdId: me.id, personId, toAddress: to, subject: input.subject, body: input.body, sendAt: new Date(sendAtIso), compose: compose.compose });
     if (!result.ok) return result;
     revalidatePath(`/contacts/${personId}`);
+    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -81,7 +83,9 @@ export async function editScheduledEmailAction(id: string, subject: string, body
       if (!prepared.ok) return { ok: false, reason: prepared.reason };
       compose = prepared.compose;
     }
-    return await editScheduled({ id, bdId: me.id, subject: input.subject, body: input.body, sendAt: new Date(sendAtIso), compose });
+    const edited = await editScheduled({ id, bdId: me.id, subject: input.subject, body: input.body, sendAt: new Date(sendAtIso), compose });
+    if (edited.ok) revalidateLists("scheduled");
+    return edited;
   } catch (err) {
     return actionFailure(err);
   }
@@ -91,7 +95,9 @@ export async function cancelScheduledEmailAction(id: string): Promise<ContactAct
   try {
     if (!isUuid(id)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
-    return await cancelScheduled({ id, bdId: me.id });
+    const cancelled = await cancelScheduled({ id, bdId: me.id });
+    if (cancelled.ok) revalidateLists("touch");
+    return cancelled;
   } catch (err) {
     return actionFailure(err);
   }
@@ -102,7 +108,9 @@ export async function sendScheduledNowAction(id: string): Promise<ContactActionR
   try {
     if (!isUuid(id)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
-    return await sendScheduledNowChecked({ id, bdId: me.id });
+    const sent = await sendScheduledNowChecked({ id, bdId: me.id });
+    if (sent.ok) revalidateLists("touch");
+    return sent;
   } catch (err) {
     return actionFailure(err);
   }

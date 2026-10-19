@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { createActivity } from "@/lib/activity/queries";
 import { getCurrentBd } from "@/lib/queries";
 import type { NewActivity } from "@/db/schema";
@@ -26,8 +27,12 @@ export async function createActivityAction(input: {
   // Revalidate all affected paths
   if (input.leadId) revalidatePath(`/leads/${input.leadId}`);
   if (input.companyKey) revalidatePath(`/companies/${input.companyKey}`);
-  if (input.contactId) revalidatePath(`/contact/${input.contactId}`);
-  if (input.personId) revalidatePath(`/contacts/${input.personId}`);
+  if (input.contactId) revalidatePath(`/contacts/${input.contactId}`);
+  if (input.personId) {
+    revalidatePath(`/contacts/${input.personId}`);
+    // A note/call/discard on a Contact moves last contact and the follow-up queue.
+    revalidateLists("touch");
+  }
 
   return activity;
 }

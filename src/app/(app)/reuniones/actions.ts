@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
@@ -25,10 +26,8 @@ function failure(err: unknown): { ok: false; reason: MeetingActionReason } {
 }
 
 function revalidateMeetingPaths(personId: string): void {
-  revalidatePath("/reuniones");
-  revalidatePath("/tasks");
   revalidatePath(`/contacts/${personId}`);
-  revalidatePath("/contacts");
+  revalidateLists("touch", "meetings", "tasks");
 }
 
 /**
