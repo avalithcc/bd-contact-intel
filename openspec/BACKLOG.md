@@ -524,7 +524,9 @@ Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
   to a synced thread from the contact record (`sendThreadReplyAction`, planned by
   `planThreadReply`, `contacts/actions.ts:409-427`). A NEW email still starts a
   new thread, as it should.
-- Single `to` only — no CC, no BCC, no attachments. ~~A multi-recipient `To`
+- Single `to` only — no CC, no BCC, no attachments. **Owner 2026-10-19: build
+  attachments and multiple recipients, only when all recipients belong to the
+  same company** (change `linkedin-extension`'s sibling: `email-multi-recipient`). ~~A multi-recipient `To`
   string passes the guard~~ — fixed 2026-10-18: `buildRawMessage` and
   `assertSafeSendInput` call `assertRecipients`, so a new email, a scheduled
   send and sequences reject a list or a malformed address (`invalid_recipient`;
@@ -1858,13 +1860,14 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 ## Deferred from crm-hubspot-ux
 
 Status re-checked 2026-10-01 against `main`:
-- Global cross-object search — **still not built.** #242 added company search
-  and made the header search context-aware, which is per-object, not global.
+- ~~Global cross-object search~~ — **dropped by the owner 2026-10-19:** search
+  stays per view (the header search follows the section you are in), on
+  purpose. #242 made it context-aware.
 - Company pipeline board (`relationshipStage`) — **still not built**
   (`src/app/(app)/companies/page.tsx:47`: "Board/pipeline redesign stays out of
   scope"). The stage itself is now in use: 10 `won` and 3 `proposal_sent`
   companies on 2026-10-01.
-- Task queue filters and bulk actions — **partly.** `/tasks` has three view
+- Task queue filters and bulk actions — **owner 2026-10-19: leave as is.** **Partly.** `/tasks` has three view
   tabs, `mine` / `all` / `done` (`src/lib/tasks/viewTabs.ts:12`), and bulk task
   *creation* from the contacts list shipped (#220); there are no bulk actions on
   the task list itself (`tasks/page.tsx` has no bulk control). Whether other
