@@ -262,11 +262,12 @@ export async function logContactMeetingAction(
   date: string,
   time: string,
   notes: string,
+  allowScheduling = true,
 ): Promise<RegisterMeetingResult> {
   try {
     const me = await getCurrentBd();
     await assertContactEditableById(personId);
-    const { kind } = await registerContactMeeting(personId, me.id, date, time, notes);
+    const { kind } = await registerContactMeeting(personId, me.id, date, time, notes, new Date(), { allowScheduling });
     revalidatePath(`/contacts/${personId}`);
     revalidatePath("/reuniones");
     return { ok: true, kind };

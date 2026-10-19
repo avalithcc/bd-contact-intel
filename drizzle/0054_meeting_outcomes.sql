@@ -94,11 +94,24 @@ CREATE INDEX IF NOT EXISTS "meeting_digest_send_bd_idx" ON "meeting_digest_send"
 INSERT INTO "meeting" ("person_id", "bd_id", "scheduled_at", "status", "notes", "outcome_at", "outcome_by_bd_id", "held_activity_id", "created_at", "updated_at")
 SELECT a."person_id",
        coalesce(a."actor_bd_id", p."owner_bd_id"),
-       CASE WHEN a."metadata"->>'at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(Z|[+-][0-9]{2}:?[0-9]{2})$' THEN (a."metadata"->>'at')::timestamptz ELSE a."created_at" END,
+       -- TOTAL cast: a value that is not a real instant must fall back to created_at, never raise (one bad row would abort the
+       -- whole migration). The regex pins every range (month 01-12, day 01-31, hour 00-23, minute/second 00-59, year 1-9999,
+       -- offset up to +-15:59); the nested CASE then rejects the days a month does not have (30/31 Feb, 31 Apr/Jun/Sep/Nov,
+       -- 29 Feb in a non-leap year).
+       CASE WHEN a."metadata"->>'at' ~ '^[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9](\.[0-9]{1,6})?)?(Z|[+-](0[0-9]|1[0-5]):?[0-5][0-9])$'
+            THEN CASE WHEN a."metadata"->>'at' ~ '^[0-9]{4}-(04|06|09|11)-31T'
+                        OR a."metadata"->>'at' ~ '^[0-9]{4}-02-(30|31)T'
+                        OR (a."metadata"->>'at' ~ '^[0-9]{4}-02-29T'
+                            AND NOT (substr(a."metadata"->>'at', 1, 4)::int % 4 = 0
+                                     AND (substr(a."metadata"->>'at', 1, 4)::int % 100 <> 0 OR substr(a."metadata"->>'at', 1, 4)::int % 400 = 0)))
+                      THEN a."created_at"
+                      ELSE (a."metadata"->>'at')::timestamptz END
+            ELSE a."created_at" END,
        'held',
        nullif(a."metadata"->>'notes', ''),
-       a."created_at",
-       a."actor_bd_id",
+       -- No outcome step happened for these: outcome_at/outcome_by stay NULL, which is also what keeps them from being undone.
+       NULL,
+       NULL,
        a."id",
        a."created_at",
        a."created_at"

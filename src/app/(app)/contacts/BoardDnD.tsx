@@ -186,7 +186,7 @@ export function BoardDnD({
           onSubmit={async (date, time, notes) => {
             setBusy(true);
             setError(null);
-            const result = await logContactMeetingAction(activeForm.personId, date, time, notes);
+            const result = await logContactMeetingAction(activeForm.personId, date, time, notes, false);
             setBusy(false);
             if (result.ok) {
               closeForm();

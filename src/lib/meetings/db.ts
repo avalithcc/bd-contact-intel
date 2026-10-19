@@ -8,6 +8,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, meeting, task, type Meeting } from "@/db/schema";
 import { createActivityInTx } from "@/lib/activity/queries";
+import { MeetingOccurredAtInFutureError } from "@/lib/contacts/meeting";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { createTask } from "@/lib/tasks/queries";
 import { buildTaskActivityRow } from "@/lib/tasks/taskActivityBody";
@@ -35,6 +36,14 @@ export interface MeetingDbDeps {
   database?: Pick<typeof db, "transaction">;
 }
 
+export interface RegisterMeetingOptions extends MeetingDbDeps {
+  /**
+   * False for a caller that cannot schedule (the board's "Reunión" column): a time still ahead is then refused with the same
+   * error the contact dialog gave before scheduling existed, instead of being saved as Agendada behind its back.
+   */
+  allowScheduling?: boolean;
+}
+
 export interface RegisterMeetingResult {
   kind: "scheduled" | "held";
   meetingId: string;
@@ -51,9 +60,10 @@ export async function registerContactMeeting(
   rawTime: string,
   rawNotes: string,
   now: Date = new Date(),
-  { database = db }: MeetingDbDeps = {},
+  { database = db, allowScheduling = true }: RegisterMeetingOptions = {},
 ): Promise<RegisterMeetingResult> {
   const plan = planMeetingEntry(rawDate, rawTime, rawNotes, now);
+  if (plan.kind === "scheduled" && !allowScheduling) throw new MeetingOccurredAtInFutureError();
   return database.transaction(async (tx) => {
     const [created] = await tx
       .insert(meeting)
@@ -63,7 +73,7 @@ export async function registerContactMeeting(
         scheduledAt: plan.at,
         status: plan.kind,
         notes: plan.notes,
-        ...(plan.kind === "held" ? { outcomeAt: now, outcomeByBdId: bdId } : {}),
+        // A meeting logged already held has no outcome step: outcome_at stays NULL, which is also what makes it not undoable.
       })
       .returning({ id: meeting.id });
     const meetingId = created!.id;
