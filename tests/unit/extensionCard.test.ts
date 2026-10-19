@@ -89,6 +89,7 @@ test("not found offers to add and says what will be read", () => {
     badge: "No está en el CRM",
     message: "Esta persona aún no existe en el CRM.",
     actionLabel: "Agregar al CRM",
+    actionBusy: false,
     help: "Lee nombre, cargo y empresa de este perfil y abre “Nuevo contacto” precargado, en una pestaña nueva. No se guarda nada hasta que lo revises.",
   });
 });
@@ -139,4 +140,11 @@ test("the card stylesheet carries the CRM tokens and the design-system component
   assert.doesNotMatch(css, /:root/);
   assert.doesNotMatch(css, /\.sidebar|\.topbar|\.overlay/, "app chrome rules are not copied");
   assert.doesNotMatch(css, /@media/, "media-query blocks are skipped, the card is desktop-only");
+});
+
+test("while the profile is being read, \"Agregar al CRM\" shows the busy label", () => {
+  const idle = buildCardView({ kind: "not_found" });
+  const busy = buildCardView({ kind: "not_found" }, true);
+  assert.equal(idle.body.kind === "not_found" && idle.body.actionBusy, false);
+  assert.ok(busy.body.kind === "not_found" && busy.body.actionBusy && busy.body.actionLabel === "Leyendo el perfil…");
 });

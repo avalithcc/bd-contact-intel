@@ -5,6 +5,7 @@
  * A field it cannot read is `""`: nothing is guessed.
  */
 import type { ProfileBasics } from "../shared/messages";
+import { ensureExperienceLoaded, readCurrentRole } from "./experience";
 import { cleanName, cleanText, companyFromLabel, stripCompanyPrefix } from "./profileText";
 import { NOT_A_HEADLINE, NOT_A_LOCATION, PAREN_NOTE, PHOTO_LABEL, SELECTORS, TITLE_NAME } from "./selectors";
 
@@ -108,7 +109,7 @@ function readLocation(topCard: Element, headline: string, pair: string[]): strin
   return firstText(topCard, SELECTORS.location, (text) => !NOT_A_LOCATION.test(text));
 }
 
-export function readProfileBasics(doc: Document): ProfileBasics {
+function readTopCard(doc: Document): ProfileBasics {
   const topCard = findTopCard(doc);
   const nameElement = topCard
     ? (SELECTORS.name.flatMap((s) => Array.from(topCard.querySelectorAll(s))).find((el) => cleanText(el.textContent)) ?? null)
@@ -119,4 +120,18 @@ export function readProfileBasics(doc: Document): ProfileBasics {
 
   const title = readHeadline(topCard, nameElement);
   return { name, title, company: readCompany(topCard, nameElement), location: readLocation(topCard, title, pairTexts(topCard, nameElement)) };
+}
+
+/** Name and location from the top card; title and company from the current Experience role when there is one. */
+export function readProfileBasics(doc: Document): ProfileBasics {
+  const basics = readTopCard(doc);
+  const role = readCurrentRole(doc);
+  if (!role) return basics;
+  return { ...basics, title: role.title, company: role.company || basics.company };
+}
+
+/** Same, after waiting (up to `timeoutMs`) for the lazy Experience section. Never throws. */
+export async function readProfileBasicsWhenLoaded(doc: Document, timeoutMs = 3000): Promise<ProfileBasics> {
+  await ensureExperienceLoaded(doc, timeoutMs);
+  return readProfileBasics(doc);
 }

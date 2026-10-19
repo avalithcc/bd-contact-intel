@@ -120,11 +120,15 @@ export class Card {
     return aside;
   }
 
-  private action(kind: BodyView["kind"], label: string, className: string, iconName?: keyof typeof ICONS): HTMLElement {
+  private action(kind: BodyView["kind"], label: string, className: string, iconName?: keyof typeof ICONS, busy = false): HTMLElement {
     const button = el("button", { className: `btn ${className} btn-block`, attrs: { type: "button" } }, [
       iconName ? icon(iconName) : null,
       document.createTextNode(label),
     ]);
+    if (busy) {
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+    }
     button.addEventListener("click", () => this.handlers.onAction(kind));
     return button;
   }
@@ -173,7 +177,7 @@ export class Card {
             el("span", { className: "badge badge-neutral", text: body.badge }),
             el("p", { text: body.message }),
           ]),
-          this.action("not_found", body.actionLabel, "btn-primary", "plus"),
+          this.action("not_found", body.actionLabel, "btn-primary", "plus", body.actionBusy),
           el("p", { className: "help", text: body.help }),
         ];
       case "signed_out":

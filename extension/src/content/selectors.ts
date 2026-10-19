@@ -29,6 +29,10 @@ export const SELECTORS = {
   ],
   /** Top-card controls whose accessible label names the current company ("Empresa actual: X. …"). */
   companyLabelled: ["button[aria-label]", "a[aria-label]", "[role=button][aria-label]"],
+  /** The Experience section (lazy-loaded) and the placeholders that trigger its loading when scrolled into view. */
+  experienceSection: '[componentkey$="ExperienceTopLevelSection"]',
+  experienceItem: '[componentkey^="entity-collection-item"]',
+  experienceLazyAnchors: ['[componentkey^="profile_top_card_experience_lazy_anchor"]', '[componentkey^="profileCardsExperienceOnly"]'],
   /** New layout: the company/school pair are `role=button` items holding a figure and a text. */
   pairButton: '[role="button"]',
 } as const;
@@ -51,3 +55,12 @@ export const NOT_A_LOCATION =
 
 /** `document.title` is "(3) Name | LinkedIn": used for the name only when the top card has no heading. */
 export const TITLE_NAME = /^(?:\(\d+\)\s*)?(.+?)(?:\s+[-–|]\s+.*)?\s*\|\s*LinkedIn\s*$/;
+
+/** A position's date line: "ene. de 2026 - actualidad · 10 meses", "Jan 2026 - Present · 10 mos", "2020 - 2022". */
+export const DATE_RANGE = /\d{4}\s*[-–]\s*[\p{L}\d]/u;
+
+/** A date line or a standalone label that says the position has no end. */
+export const CURRENT_POSITION = /\b(?:actualidad|presente?)\b/i;
+
+/** Single-role items: "Company · Full-time" (the suffix is the employment type, not part of the company). */
+export const COMPANY_SEPARATOR = " · ";

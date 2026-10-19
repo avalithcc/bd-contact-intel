@@ -29,7 +29,7 @@ export type BodyView =
       actionLabel: string;
       help: string;
     }
-  | { kind: "not_found"; badge: string; message: string; actionLabel: string; help: string }
+  | { kind: "not_found"; badge: string; message: string; actionLabel: string; actionBusy: boolean; help: string }
   | { kind: "signed_out"; message: string; actionLabel: string; help: string }
   | { kind: "error"; message: string; actionLabel: string };
 
@@ -55,7 +55,8 @@ export function formatActivity(activity: { label: string; date: string }): strin
   return `${part("day")} ${part("month")} ${part("year")} · ${activity.label}`;
 }
 
-export function buildCardView(state: CardState): CardView {
+/** `reading`: the profile is being read for "Agregar al CRM" (the lazy Experience section may take a moment). */
+export function buildCardView(state: CardState, reading = false): CardView {
   switch (state.kind) {
     case "loading":
       return {
@@ -88,7 +89,14 @@ export function buildCardView(state: CardState): CardView {
         badge: null,
         pill: { label: S.notInCrm, ariaLabel: S.pillNotFound, dot: "neutral" },
         busy: false,
-        body: { kind: "not_found", badge: S.notInCrm, message: S.notFoundMessage, actionLabel: S.addToCrm, help: S.addHelp },
+        body: {
+          kind: "not_found",
+          badge: S.notInCrm,
+          message: S.notFoundMessage,
+          actionLabel: reading ? S.reading : S.addToCrm,
+          actionBusy: reading,
+          help: S.addHelp,
+        },
       };
     case "signed_out":
       return {

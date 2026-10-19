@@ -33,7 +33,7 @@ before(async () => {
   const bundle = async (contents: string, define: Record<string, string> = {}) =>
     (await build({ stdin: { contents, resolveDir: root }, bundle: true, write: false, format: "iife", define })).outputFiles[0]!.text;
   readerBundle = await bundle(
-    `import { readProfileBasics } from "./extension/src/content/profileReader"; window.__read = () => readProfileBasics(document);`,
+    `import { readProfileBasics, readProfileBasicsWhenLoaded } from "./extension/src/content/profileReader"; window.__read = () => readProfileBasics(document); window.__readLoaded = (ms) => readProfileBasicsWhenLoaded(document, ms);`,
   );
   cardBundle = await bundle(
     `import { Card } from "./extension/src/content/card";
@@ -151,6 +151,61 @@ test("a parenthesised pronoun note is not the headline", async (t) => {
   if (!browser) return t.skip(launchError ?? "no browser");
   const html = card(`<h2>Ana</h2><p>(ella)</p><p>Consultora</p><div>${LINK}</div>`);
   assert.deepEqual(await readHtml(html), { ...EMPTY, title: "Consultora" });
+});
+
+const NIMBUS = { ...LUCIA, title: "Co-Founder & CEO", company: "Nimbus Labs" };
+const QUANTA = { ...LUCIA, title: "Head of Data", company: "Quanta Works" };
+
+test("the current role of a multi-role company is read from the first Experience item", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-experience-multi-role.html"), NIMBUS);
+});
+
+test("a current single-role item gives title and company without the employment type", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-experience-single-role.html"), QUANTA);
+});
+
+test("English Experience markers (Present, Full-time) read the same", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-experience-english.html"), QUANTA);
+});
+
+test("a past first role falls back to the top card", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readFixture("profile-experience-past-role.html"), LUCIA);
+});
+
+async function readLoaded(html: string, insertAfterMs: number | null, waitMs: number) {
+  const page = await browser!.newPage();
+  try {
+    await page.setContent(html);
+    await page.addScriptTag({ content: readerBundle });
+    if (insertAfterMs !== null) {
+      const section = /<section[\s\S]*<\/section>/.exec(fixture("profile-experience-single-role.html"))![0];
+      await page.evaluate(
+        ([markup, delay]) => {
+          setTimeout(() => {
+            document.querySelector('[componentkey^="profileCardsExperienceOnly"]')!.insertAdjacentHTML("beforeend", markup);
+          }, delay);
+        },
+        [section, insertAfterMs] as const,
+      );
+    }
+    return await page.evaluate((ms) => (window as unknown as { __readLoaded(ms: number): Promise<unknown> }).__readLoaded(ms), waitMs);
+  } finally {
+    await page.close();
+  }
+}
+
+test("a lazy Experience skeleton is waited for and then read", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readLoaded(fixture("profile-experience-skeleton.html"), 300, 3000), QUANTA);
+});
+
+test("when the Experience section never loads, the top card answers after the timeout", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readLoaded(fixture("profile-experience-skeleton.html"), null, 400), LUCIA);
 });
 
 test("the card renders every state with the CRM's tokens and wires its buttons", async (t) => {

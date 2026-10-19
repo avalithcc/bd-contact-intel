@@ -2,12 +2,12 @@
  * Content script on www.linkedin.com. Shows the CRM card on a profile page (`/in/<slug>/` only), keeps it in
  * step with LinkedIn's single-page navigation and refreshes it when the tab regains focus. It makes no network
  * request itself: every CRM call is a message to the service worker. It reads the profile page's text exactly
- * once per "Agregar al CRM" click (readProfileBasics) and never on load, navigation or in the background.
+ * once per "Agregar al CRM" click (readProfileBasicsWhenLoaded) and never on load, navigation or in the background.
  */
 import { profileUrlFromLocation } from "../shared/profileUrl";
 import type { LookupResult, WorkerRequest } from "../shared/messages";
 import { Card } from "./card";
-import { readProfileBasics } from "./profileReader";
+import { readProfileBasicsWhenLoaded } from "./profileReader";
 import { buildCardView, type CardState } from "./viewModel";
 
 const COLLAPSED_KEY = "collapsed";
@@ -15,6 +15,8 @@ const COLLAPSED_KEY = "collapsed";
 let profileUrl: string | null = null;
 let state: CardState = { kind: "loading" };
 let collapsed = false;
+/** True while "Agregar al CRM" reads the profile (waits for the lazy Experience section). */
+let reading = false;
 /** Bumped on every profile change so a slow answer for the previous profile is dropped. */
 let generation = 0;
 
@@ -27,12 +29,26 @@ async function ask(request: WorkerRequest): Promise<LookupResult> {
   }
 }
 
+async function addToCrm(url: string): Promise<void> {
+  if (reading) return;
+  const mine = generation;
+  reading = true;
+  render();
+  try {
+    const basics = await readProfileBasicsWhenLoaded(document);
+    if (mine === generation) await ask({ type: "open-add", profileUrl: url, basics });
+  } finally {
+    reading = false;
+    render();
+  }
+}
+
 const card = new Card({
   onAction(kind) {
     if (!profileUrl) return;
     if (kind === "found" && state.kind === "found") void ask({ type: "open-view", personId: state.personId });
     // The one and only read of the page: the BD pressed "Agregar al CRM" on THIS profile.
-    else if (kind === "not_found") void ask({ type: "open-add", profileUrl, basics: readProfileBasics(document) });
+    else if (kind === "not_found") void addToCrm(profileUrl);
     else if (kind === "signed_out") void ask({ type: "open-login" });
     else if (kind === "error") void refresh(false);
   },
@@ -42,7 +58,7 @@ const card = new Card({
 
 function render(): void {
   if (!profileUrl) return;
-  card.render(buildCardView(state), collapsed);
+  card.render(buildCardView(state, reading), collapsed);
 }
 
 function setCollapsed(value: boolean): void {

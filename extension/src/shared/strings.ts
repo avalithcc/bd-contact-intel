@@ -21,6 +21,7 @@ export const STRINGS = {
   viewHelp: "Se abre la ficha en una pestaña nueva.",
   notFoundMessage: "Esta persona aún no existe en el CRM.",
   addToCrm: "Agregar al CRM",
+  reading: "Leyendo el perfil…",
   addHelp:
     "Lee nombre, cargo y empresa de este perfil y abre “Nuevo contacto” precargado, en una pestaña nueva. No se guarda nada hasta que lo revises.",
   signedOutMessage: "Inicia sesión en el CRM para ver si esta persona ya existe.",
