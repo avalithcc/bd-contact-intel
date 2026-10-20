@@ -3,6 +3,7 @@
 -- NOT part of the drizzle journal on purpose: inert until run by hand. Removes the policy, the triggers and both
 -- functions; no data was written by the migration. Also remove the journal entry (idx 56), drizzle/meta/0056_snapshot.json
 -- and the drizzle.__drizzle_migrations row. The app keeps working without live updates (the client falls back silently).
+SET LOCAL lock_timeout = '3s';
 DO $do$
 DECLARE t text;
 BEGIN

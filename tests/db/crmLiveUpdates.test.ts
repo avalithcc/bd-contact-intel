@@ -84,6 +84,43 @@ test("the migration applies without a realtime schema and writes keep working", 
   });
 });
 
+/** Who may EXECUTE the function, by role name ("public" for PUBLIC). */
+async function executors(tx: Tx, fn: string): Promise<string[]> {
+  const rows = [...(await run(tx, `select case when a.grantee = 0 then 'public' else a.grantee::regrole::text end as who
+    from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+    where p.oid = 'public.${fn}()'::regprocedure and a.privilege_type = 'EXECUTE' order by 1`))] as unknown as { who: string }[];
+  return rows.map((r) => r.who);
+}
+
+async function createApiRoles(tx: Tx, roles: string[]) {
+  for (const role of roles) {
+    await run(tx, `do $$ begin if not exists (select 1 from pg_roles where rolname = '${role}') then create role ${role} nologin; end if; end $$`);
+  }
+  await run(tx, "alter default privileges in schema public grant execute on functions to anon, authenticated, service_role");
+}
+
+test("the notify function is executable by its owner only, even where the API roles get EXECUTE by default", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await run(tx, "set local client_min_messages = warning");
+    await createApiRoles(tx, ["anon", "authenticated", "service_role"]);
+    await applyMigration(tx);
+    const who = await executors(tx, "crm_notify_change");
+    const owner = ([...(await run(tx, "select proowner::regrole::text as owner from pg_proc where oid = 'public.crm_notify_change()'::regprocedure"))] as unknown as { owner: string }[])[0]!.owner;
+    assert.deepEqual(who, [owner]);
+  });
+});
+
+test("a second apply leaves the existing triggers alone (no drop, so no ACCESS EXCLUSIVE) and creates all 33", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    const ids = async () => [...(await run(tx, "select oid::text as oid from pg_trigger where tgname like 'crm_notify_%' order by oid"))].map((r) => (r as unknown as { oid: string }).oid);
+    const first = await ids();
+    assert.equal(first.length, 33);
+    await applyMigration(tx);
+    assert.deepEqual(await ids(), first);
+  });
+});
+
 test("the migration is re-runnable", async () => {
   await inRolledBackTransaction(async (tx) => {
     await applyMigration(tx);
@@ -215,6 +252,7 @@ test("the receive policy admits a confirmed, allowed-domain BD on topic 'crm' an
     await run(tx, "create function realtime.topic() returns text language sql stable as $$ select current_setting('realtime.topic', true) $$");
     await run(tx, "create table realtime.messages (id serial primary key, topic text, extension text)");
     await run(tx, "alter table realtime.messages enable row level security");
+    await createApiRoles(tx, ["anon", "authenticated", "service_role"]);
     await run(tx, "grant usage on schema realtime, auth to authenticated");
     await run(tx, "grant select on realtime.messages to authenticated");
     await run(tx, "grant execute on function realtime.topic() to authenticated");
@@ -251,5 +289,8 @@ test("the receive policy admits a confirmed, allowed-domain BD on topic 'crm' an
     assert.equal(await seen(null, "crm"), 0);
     const policies = [...(await run(tx, "select cmd from pg_policies where schemaname = 'realtime' and tablename = 'messages'"))] as unknown as { cmd: string }[];
     assert.deepEqual(policies.map((p) => p.cmd), ["SELECT"]);
+    const who = await executors(tx, "crm_live_allowed");
+    assert.ok(who.includes("authenticated"), "the policy runs with the querying role's privileges");
+    for (const denied of ["public", "anon", "service_role"]) assert.ok(!who.includes(denied), `${denied} must not execute crm_live_allowed`);
   });
 });

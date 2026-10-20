@@ -9,6 +9,12 @@
 -- Deliberately NOT notified: email_message / email_message_person (raw Gmail sync rows; the sync's activities and
 -- email_account.last_synced_at already cover every screen), *_property_history and audit_log (history of rows that are
 -- notified themselves), sequence_send_claim and the cron digest tables (internal bookkeeping), sync_run.
+-- Fail fast instead of queueing a lock behind a long sync or import transaction (a queued lock request blocks every later
+-- reader and writer of the table). CREATE TRIGGER takes SHARE ROW EXCLUSIVE; triggers that already exist are not touched.
+SET LOCAL lock_timeout = '3s';
+--> statement-breakpoint
+SET LOCAL statement_timeout = '60s';
+--> statement-breakpoint
 CREATE OR REPLACE FUNCTION public.crm_notify_change() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
 DECLARE
@@ -27,7 +33,7 @@ BEGIN
     WHEN 'sequence' THEN 'NULL, NULL, r.id::text, NULL, NULL, NULL, r.owner_bd_id::text'
     WHEN 'sequence_member' THEN 'r.person_id::text, NULL, r.sequence_id::text, NULL, NULL, NULL, NULL'
     WHEN 'sequence_draft' THEN 'm.person_id::text, NULL, m.sequence_id::text, NULL, NULL, NULL, NULL'
-    WHEN 'follow_up_queue_item' THEN 'r.person_id::text, NULL, NULL, NULL, NULL, NULL, NULL'
+    WHEN 'follow_up_queue_item' THEN 'r.person_id::text, NULL, NULL, NULL, NULL, NULL, r.bd_id::text'
     WHEN 'person' THEN 'r.id::text, r.company_key, NULL, NULL, NULL, NULL, r.owner_bd_id::text'
     WHEN 'company' THEN 'NULL, r.company_key, NULL, NULL, NULL, NULL, r.owner_bd_id::text'
     WHEN 'email_account' THEN 'NULL, NULL, NULL, NULL, NULL, NULL, r.bd_id::text'
@@ -60,17 +66,33 @@ BEGIN
 END
 $fn$;
 --> statement-breakpoint
+-- Only the owner (and the trigger machinery) may run it: Supabase grants EXECUTE on new public functions to the API roles.
 DO $do$
-DECLARE t text;
+DECLARE r text;
+BEGIN
+  EXECUTE 'REVOKE ALL ON FUNCTION public.crm_notify_change() FROM PUBLIC';
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      EXECUTE format('REVOKE ALL ON FUNCTION public.crm_notify_change() FROM %I', r);
+    END IF;
+  END LOOP;
+END
+$do$;
+--> statement-breakpoint
+DO $do$
+DECLARE t text; op record;
 BEGIN
   FOREACH t IN ARRAY ARRAY['activity','task','meeting','scheduled_email','sequence','sequence_member','sequence_draft',
                            'follow_up_queue_item','person','company','email_account'] LOOP
-    EXECUTE format('DROP TRIGGER IF EXISTS crm_notify_ins ON public.%I', t);
-    EXECUTE format('DROP TRIGGER IF EXISTS crm_notify_upd ON public.%I', t);
-    EXECUTE format('DROP TRIGGER IF EXISTS crm_notify_del ON public.%I', t);
-    EXECUTE format('CREATE TRIGGER crm_notify_ins AFTER INSERT ON public.%I REFERENCING NEW TABLE AS crm_new FOR EACH STATEMENT EXECUTE FUNCTION public.crm_notify_change()', t);
-    EXECUTE format('CREATE TRIGGER crm_notify_upd AFTER UPDATE ON public.%I REFERENCING OLD TABLE AS crm_old NEW TABLE AS crm_new FOR EACH STATEMENT EXECUTE FUNCTION public.crm_notify_change()', t);
-    EXECUTE format('CREATE TRIGGER crm_notify_del AFTER DELETE ON public.%I REFERENCING OLD TABLE AS crm_old FOR EACH STATEMENT EXECUTE FUNCTION public.crm_notify_change()', t);
+    FOR op IN SELECT * FROM (VALUES
+      ('crm_notify_ins', 'AFTER INSERT', 'REFERENCING NEW TABLE AS crm_new'),
+      ('crm_notify_upd', 'AFTER UPDATE', 'REFERENCING OLD TABLE AS crm_old NEW TABLE AS crm_new'),
+      ('crm_notify_del', 'AFTER DELETE', 'REFERENCING OLD TABLE AS crm_old')) AS v(name, event, refs) LOOP
+      -- Created only when missing: a re-run never drops (ACCESS EXCLUSIVE) a live trigger.
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = format('public.%I', t)::regclass AND tgname = op.name AND NOT tgisinternal) THEN
+        EXECUTE format('CREATE TRIGGER %I %s ON public.%I %s FOR EACH STATEMENT EXECUTE FUNCTION public.crm_notify_change()', op.name, op.event, t, op.refs);
+      END IF;
+    END LOOP;
   END LOOP;
 END
 $do$;
@@ -79,6 +101,7 @@ $do$;
 -- getCurrentBd and the middleware) may RECEIVE on the 'crm' topic. No INSERT policy, so the browser cannot broadcast.
 -- Skipped where Supabase's realtime/auth schemas do not exist (local scratch databases).
 DO $do$
+DECLARE r text;
 BEGIN
   IF to_regclass('realtime.messages') IS NULL OR to_regclass('auth.users') IS NULL THEN RETURN; END IF;
   EXECUTE $f$
@@ -91,7 +114,13 @@ BEGIN
           AND lower(btrim(u.email)) ~ '^[^@]+@avalith\.net$')
     $body$
   $f$;
+  -- Policy expressions run with the querying role's privileges, so only `authenticated` keeps EXECUTE.
   EXECUTE 'REVOKE ALL ON FUNCTION public.crm_live_allowed() FROM PUBLIC';
+  FOREACH r IN ARRAY ARRAY['anon', 'service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      EXECUTE format('REVOKE ALL ON FUNCTION public.crm_live_allowed() FROM %I', r);
+    END IF;
+  END LOOP;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     EXECUTE 'GRANT EXECUTE ON FUNCTION public.crm_live_allowed() TO authenticated';
   END IF;
@@ -102,3 +131,7 @@ BEGIN
   $p$;
 END
 $do$;
+--> statement-breakpoint
+SET LOCAL lock_timeout = DEFAULT;
+--> statement-breakpoint
+SET LOCAL statement_timeout = DEFAULT;
