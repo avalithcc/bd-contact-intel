@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { COMPLIANCE_CONFIG, type ComplianceConfig } from "../../src/lib/sequences/config";
 import { appendFooter, bodyHasFooter, buildFooter } from "../../src/lib/sequences/complianceFooter";
+import { classifyMarket, isKnownCountryName } from "../../src/lib/hiring/markets";
 import { recipientMarket } from "../../src/lib/sequences/recipientMarket";
 
 const URL = "https://example.test/unsubscribe/abc123";
@@ -144,4 +145,23 @@ test("the Canada rule lives in the sequences layer: classifyMarket still calls C
 test("all three links absent resolves to other (hold, never send)", () => {
   assert.equal(recipientMarket({}), "other");
   assert.equal(recipientMarket({ personCountry: null, companyCountry: null, postingMarkets: null }), "other");
+});
+
+test("Spanish-speaking Central America resolves latam and Puerto Rico resolves us", () => {
+  for (const country of ["El Salvador", "Honduras", "Nicaragua", "el salvador"]) {
+    assert.equal(recipientMarket({ personCountry: country }), "latam", country);
+    assert.equal(classifyMarket(country), "latam", country);
+  }
+  assert.equal(recipientMarket({ personCountry: "Puerto Rico" }), "us");
+  assert.equal(classifyMarket("San Juan, Puerto Rico"), "us");
+});
+
+test("Cuba stays unmapped on purpose: a US-entity footer to Cuba is an OFAC question for the owner", () => {
+  assert.equal(recipientMarket({ personCountry: "Cuba" }), "other");
+  assert.equal(isKnownCountryName("Cuba"), false);
+});
+
+test("the new country names do not reclassify the Brazilian city of Salvador", () => {
+  assert.equal(classifyMarket("Salvador, Bahia, Brazil"), "latam");
+  assert.equal(classifyMarket("Salvador, Bahia"), "other");
 });

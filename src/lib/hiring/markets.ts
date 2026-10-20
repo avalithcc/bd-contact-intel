@@ -65,6 +65,11 @@ export const LATAM_COUNTRY_NAMES: readonly string[] = [
   "guatemala",
   "dominican republic",
   "republica dominicana",
+  "el salvador",
+  "honduras",
+  "nicaragua",
+  // Cuba is left out on purpose, not by oversight: a US-entity footer on mail to Cuba raises an OFAC sanctions
+  // question that is the owner's to answer. Do not add it without that decision.
 ];
 
 // LATAM: the 15 countries this business currently tracks contacts/companies
@@ -150,6 +155,8 @@ const US_RULES: MarketRules = {
   phrases: [
     "united states",
     "usa",
+    // A US territory: the US footer and an English draft are the correct posture for a Puerto Rican recipient.
+    "puerto rico",
     "alabama",
     "alaska",
     "arizona",
