@@ -1885,13 +1885,15 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
-- ~~**Replace the 60 s background polling with push updates**~~ **Built 2026-10-20, pending prod apply** (migration 0056,
+- ~~**Replace the 60 s background polling with push updates**~~ **Shipped 2026-10-20** (main `cdf818e4`, migration 0056, owner verified with two tabs;
   `src/components/LiveUpdates.tsx`). Statement-level triggers broadcast an id-only message on the private Realtime topic
   'crm' (`realtime.send`, no postgres_changes, publication stays empty); the browser refreshes only the screens the
   message feeds (`src/lib/shell/liveRelevance.ts`), debounced and held while the screen is busy
   (`src/lib/shell/liveController.ts`). No interval, no refresh-on-focus. Known gap: the sidebar badge counts refresh with
   the next relevant refresh or navigation, not on every message. Replaced `BackgroundRefresh` / `refreshPolicy.ts`
-  (`e1466e8c`).
+  (`e1466e8c`). Keepalive: Supabase only creates the daily `realtime.messages` partitions when a client joins a channel, so
+  `GET /api/realtime/keepalive` joins a public channel daily (pg_cron `realtime-keepalive-daily`, 06:00 UTC,
+  `scripts/realtime-keepalive-cron.sql`, applied by the orchestrator after approval).
 - ~~**Log meetings in the future**~~ **Shipped 2026-10-19** (`meeting-outcomes`, main `6bf96f14`; migration 0054 applied, pg_cron `meetings-digest-18-art` at 21:00 UTC scheduled): /reuniones with status tabs, outcome modal, admin read-only view with filters, 18:00 ART digest. Original note: Today a meeting can only
   be logged in the past. Needs a flow for meetings that don't happen or move:
   e.g. an end-of-day reminder to confirm held / no-show / rescheduled /
