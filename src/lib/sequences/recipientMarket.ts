@@ -50,7 +50,7 @@ export function marketOfCountry(country: string): MarketKey {
   return market === "other" && CANADA.test(country) ? "us" : market;
 }
 
-function fromPostings(markets: readonly (string | null)[] | null | undefined): MarketKey {
+export function fromPostings(markets: readonly (string | null)[] | null | undefined): MarketKey {
   const known = new Set<MarketKey>();
   for (const m of markets ?? []) {
     if (isMarketKey(m) && m !== "other") known.add(m);

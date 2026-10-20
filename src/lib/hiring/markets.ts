@@ -29,7 +29,7 @@ interface MarketRules {
 
 /** Strips diacritics and lowercases, so "São Paulo"/"Bogotá"/"México" match
  * their unaccented spellings too without listing both forms everywhere. */
-function normalizeText(text: string): string {
+export function normalizeText(text: string): string {
   return text
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
