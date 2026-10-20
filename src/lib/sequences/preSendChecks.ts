@@ -14,7 +14,7 @@
  * source of truth, so a hook that failed costs nothing here: the last line of defence never depends on an optional step.
  */
 import type { ComplianceAddress } from "./complianceAudience";
-import { bodyHasFooter } from "./complianceFooter";
+import { complianceRefusal, extractUnsubscribeUrl } from "./complianceGate";
 import { COMPLIANCE_CONFIG, SEQUENCE_SYNC_STALE_MS, type ComplianceConfig } from "./config";
 import { isSyncFreshEnough } from "./syncFreshness";
 import { isSuppressed, type SuppressionRule } from "./suppression";
@@ -69,12 +69,8 @@ export const IN_FLIGHT_CLAIM_MS = 5 * 60_000;
 
 export type CheckResult = { ok: true } | { ok: false; reason: HoldReason } | { ok: false; skip: "in_flight" };
 
-const UNSUBSCRIBE_LINK = /https:\/\/[^\s<>,"]+\/api\/unsubscribe\?t=[A-Za-z0-9_-]{43}/;
-
-/** The per-recipient link the footer producer wrote into the body; null when the BD edited it away. */
-export function extractUnsubscribeUrl(body: string): string | null {
-  return body.match(UNSUBSCRIBE_LINK)?.[0] ?? null;
-}
+// Kept here so existing importers (releaseMessage) are untouched; the implementation lives in complianceGate.
+export { extractUnsubscribeUrl };
 
 export function evaluatePreSendChecks(
   f: PreSendFacts,
@@ -92,8 +88,8 @@ export function evaluatePreSendChecks(
   if (isSuppressed(email, ctx.suppression)) return hold("suppressed");
   if (f.hasClientStatus) return hold("client_company");
   const config = ctx.config ?? COMPLIANCE_CONFIG;
-  if (!f.address || !Object.hasOwn(config, f.address)) return hold("unmapped_market");
-  if (!bodyHasFooter(f.body, config, f.address) || !extractUnsubscribeUrl(f.body)) return hold("missing_footer");
+  const refusal = complianceRefusal(f.address, f.body, config);
+  if (refusal) return hold(refusal);
   if (f.accountStatus !== "connected") return hold("account_not_connected");
   if (f.step === 2) {
     if (f.repliedAt || f.inboundReplyAt) return hold("replied");

@@ -3530,6 +3530,8 @@ export const es: typeof en = {
       not_approvable: "Este contacto ya no está en un estado que se pueda aprobar.",
       no_draft: "Este contacto no tiene un borrador para aprobar.",
       unreviewed: "Abrí cada borrador antes de aprobarlo en bloque.",
+      unmapped_market: "No podemos ubicar al contacto en un país, o su país está bajo embargo, así que ningún correo puede llevar su pie legal. Corregí la ubicación del contacto antes de aprobar.",
+      missing_footer: "Al borrador le falta el pie de baja que corresponde a la región de este contacto. Regeneralo para recuperarlo antes de aprobar.",
       reply_prefix_subject: "Un primer correo no puede empezar con «Re:» ni «Fwd:», porque simula una conversación que no existió. Reescribí el asunto.",
       invalid_time: "Esa fecha u hora no es válida.",
       past: "Esa hora ya pasó.",

@@ -3531,6 +3531,8 @@ export const en = {
       not_approvable: "This contact is no longer in a state that can be approved.",
       no_draft: "This contact has no draft to approve.",
       unreviewed: "Open every draft before approving them in bulk.",
+      unmapped_market: "We cannot place this contact in a country, or its country is under an embargo, so no email can carry a legal footer for it. Fix the contact's location before approving.",
+      missing_footer: "The draft is missing the unsubscribe footer for this contact's region. Regenerate the draft to restore it before approving.",
       reply_prefix_subject: "A first email cannot start with \"Re:\" or \"Fwd:\" because it pretends to continue a conversation that never happened. Rewrite the subject.",
       invalid_time: "That date or time is not valid.",
       past: "That time has already passed.",
