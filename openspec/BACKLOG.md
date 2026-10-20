@@ -1913,6 +1913,32 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
     is intact in all 3, so none is refused for a missing link. Approved-and-unsent: still
     **0**. The 1,736 contacts that changed address were a POPULATION count, never a
     regeneration queue.
+- ~~**The unsubscribe page was English for every recipient**~~ **Fixed on branch
+  `feat/unsubscribe-language`** (commits `fe854854`, `8a927cb4`; not yet merged). We mail a
+  Spanish-speaking contact in Spanish and the CAN-SPAM opt-out page they land on was in
+  English. `unsubscribeQueries.ts:130` already resolved the recipient's FULL audience —
+  postal address AND language — and threw the language away.
+  - The locale is now derived in exactly ONE place: `renderUnsubscribePage(view, page, css)`
+    calls `pageLocale` once and feeds that single value to both the copy and
+    `<html lang>`, so they cannot disagree. The route no longer computes a locale, which
+    means there is nowhere left to pass a second one. The `<html lang>` mattered on its
+    own: a screen reader was pronouncing Spanish with English phonetics.
+  - `MessageLanguage` -> `Locale` is narrowed by a TOTAL mapped type
+    (`messageLanguage.ts:29-32`), no cast and no `??`. Adding a language without an entry,
+    adding `pt` to `LOCALES`, or a wrong entry each BREAK THE BUILD. A silently-English
+    Portuguese page cannot exist. (`pt` is in `MESSAGE_LANGUAGES` and deliberately unused:
+    the owner chose English for Brazil.)
+  - The `invalid` view stays English with `lang="en"`, no postal address and its 404, and
+    never calls the audience lookup: no token means no contact and no language signal, and
+    the page is generic on purpose (it does not reveal whether a token was unknown or
+    malformed). Documented in place so the next reader does not "fix" it.
+  - **The Spanish copy had no diacritics at all** — "Darte de baja?", "ingenieria",
+    "valido", "todavia" — while the rest of `es.ts` has 1242 accented lines. It was the one
+    dictionary block nobody had ever rendered. Rewritten as correct neutral Spanish, no
+    voseo, since the readers are prospects across LATAM and Spain. Owner read the strings.
+  - The GET path still writes nothing (it is handed `{ findToken }` alone, because mail
+    scanners open every link in an inbound message), and the SQL is byte-identical to the
+    old `postalAddressForToken` — only the name and the mapped result changed.
 - **Three follow-ups found by the fresh-context review of that branch. None is fixed,
   none was introduced by it:**
   1. Three byte-identical copies of the posting alias clause (`draftQueries.ts:47`,
@@ -2025,13 +2051,12 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   readers onto the picker's company-country rule, replacing an arbitrary
   `... or company_key in (alias) limit 1` pick, so contacts whose own and
   canonical company countries differ can get a different footer than before.
-- **Pre-existing gaps found while mapping the market (2026-10-20), NOT fixed:**
-  the seed path never sets `marketMapped` (`src/lib/sequences/seedQueries.ts:111-121`),
-  so `staticRosterRejection` cannot return `unmapped_market` there and the only
-  gate is draft time; `approvalQueries.ts` has no market or footer check at all;
-  and the unsubscribe page is hard-wired to English
-  (`src/lib/sequences/unsubscribeHtml.ts:13`), so a Spanish email links to an
-  English page. Also: `person.country` can only ever hold "United States" or one
+- ~~**Pre-existing gaps found while mapping the market (2026-10-20)**~~ **all three
+  fixed 2026-10-20.** The seed path not setting `marketMapped` and `approvalQueries.ts`
+  having no footer check shipped as #375 (main `8a095603`). The unsubscribe page being
+  hard-wired to English (`unsubscribeHtml.ts:13` was `t("en")` at module level, and
+  `unsubscribeRequest.ts:33` hard-coded `<html lang="en">`) is fixed on
+  `feat/unsubscribe-language` — see **Open, noted 2026-10-20**. Also: `person.country` can only ever hold "United States" or one
   of the 15 LATAM country names, because `splitLocation`
   (`src/lib/contacts/locationSplit.ts:21`) writes a country only when the last
   token passes `isKnownCountryName` (`src/lib/hiring/markets.ts:437-441`) — so a
