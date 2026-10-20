@@ -12,6 +12,8 @@ export interface LiveChange {
   kind: string;
   op: string;
   ids: Partial<Record<IdKey, string[]>>;
+  /** The BD the row belongs to (assignee, owner, actor), when the statement touched exactly one. */
+  bdId: string | null;
   /** True when the statement touched too many ids to list: nothing can be narrowed. */
   bulk: boolean;
 }
@@ -32,7 +34,7 @@ export function parseChange(raw: unknown): LiveChange | null {
       ids[key] = value as string[];
     }
   }
-  return { kind: r.kind, op: r.op, ids, bulk: r.bulk === true };
+  return { kind: r.kind, op: r.op, ids, bdId: typeof r.bdId === "string" ? r.bdId : null, bulk: r.bulk === true };
 }
 
 interface Feed {
@@ -85,7 +87,16 @@ function feedFor(pathname: string): Feed | null {
   return null;
 }
 
-export function isRelevant(change: LiveChange, pathname: string): boolean {
+/** Kinds behind the sidebar counts that every screen renders (see getAppShellBadgeCounts); the count is per BD. */
+const BADGE_KINDS: ReadonlySet<string> = set("task", "follow_up_queue_item", "meeting", "scheduled_email", "sequence", "email_account");
+
+/**
+ * The screen's own feed, or the sidebar badges: a badge-kind message about the current BD refreshes whatever screen is open.
+ * Screens with no feed (/, /whats-new, /account/*, /playbook, /admin/audit-log, the import/export/new pages) still react to
+ * the badge rule, nothing else.
+ */
+export function isRelevant(change: LiveChange, pathname: string, meId: string | null = null): boolean {
+  if (BADGE_KINDS.has(change.kind) && (change.bulk || (meId !== null && change.bdId === meId))) return true;
   const feed = feedFor(pathname);
   if (!feed || !feed.kinds.has(change.kind)) return false;
   if (!feed.scope || change.bulk) return true;

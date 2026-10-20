@@ -6,7 +6,7 @@
  */
 import type { LiveChange } from "@/lib/shell/liveRelevance";
 
-/** A message this soon after a refresh is the echo of the tab's own action, which that refresh already shows. */
+/** A message this soon after a refresh is probably the echo of the tab's own action: it is not dropped, its refresh trails the window. */
 export const ECHO_MS = 1_500;
 /** While a refresh is held back by a dialog, a focused field or unsaved input, how often that is re-checked locally. */
 export const BUSY_RECHECK_MS = 2_000;
@@ -52,10 +52,9 @@ export function createLiveController(d: LiveDeps) {
     },
     onChange(change: LiveChange) {
       if (!d.relevant(change)) return;
-      if (d.now() - lastRefreshAt < ECHO_MS) return;
       pending = true;
-      // Trailing debounce: each message in a burst pushes the single refresh back.
-      schedule(d.debounceMs());
+      // Trailing debounce: each message in a burst pushes the single refresh back, and never into the echo window.
+      schedule(Math.max(d.debounceMs(), lastRefreshAt + ECHO_MS - d.now()));
     },
     /** Blur, dialog closed, tab visible again: run what was held back. */
     onIdle() {

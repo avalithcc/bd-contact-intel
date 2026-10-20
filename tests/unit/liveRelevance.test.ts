@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { debounceMsFor, isRelevant, parseChange, type LiveChange } from "@/lib/shell/liveRelevance";
 
-const change = (kind: string, ids: LiveChange["ids"] = {}, extra: Partial<LiveChange> = {}): LiveChange => ({ kind, op: "INSERT", ids, bulk: false, ...extra });
+const change = (kind: string, ids: LiveChange["ids"] = {}, extra: Partial<LiveChange> = {}): LiveChange => ({ kind, op: "INSERT", ids, bdId: null, bulk: false, ...extra });
+const ME = "bd-me";
 
 test("parseChange reads the trigger payload and rejects anything else", () => {
-  assert.deepEqual(parseChange({ kind: "activity", op: "INSERT", ids: { personId: ["p1"] }, bdId: "b1" }), { kind: "activity", op: "INSERT", ids: { personId: ["p1"] }, bulk: false });
-  assert.deepEqual(parseChange({ kind: "task", op: "UPDATE", bulk: true, count: 900 }), { kind: "task", op: "UPDATE", ids: {}, bulk: true });
+  assert.deepEqual(parseChange({ kind: "activity", op: "INSERT", ids: { personId: ["p1"] }, bdId: "b1" }), { kind: "activity", op: "INSERT", ids: { personId: ["p1"] }, bdId: "b1", bulk: false });
+  assert.deepEqual(parseChange({ kind: "task", op: "UPDATE", bulk: true, count: 900 }), { kind: "task", op: "UPDATE", ids: {}, bdId: null, bulk: true });
   for (const bad of [null, undefined, 3, "x", {}, { kind: 4 }, { kind: "task", op: "INSERT", ids: { personId: "not-an-array" } }]) assert.equal(parseChange(bad), null, JSON.stringify(bad));
 });
 
@@ -64,6 +65,24 @@ test("screens that nothing feeds ignore every message", () => {
 test("the heavy reports screen waits longer than the rest", () => {
   assert.ok(debounceMsFor("/admin/reports") > debounceMsFor("/tasks"));
   assert.equal(debounceMsFor("/tasks"), 400);
+});
+
+test("the sidebar badges stay fresh on every route: a badge kind about the current BD refreshes any screen", () => {
+  for (const path of ["/", "/whats-new", "/account/email", "/playbook", "/contacts/p1", "/companies/acme.com", "/admin/audit-log"]) {
+    for (const kind of ["task", "follow_up_queue_item", "meeting", "scheduled_email", "sequence", "email_account"]) {
+      assert.equal(isRelevant(change(kind, {}, { bdId: ME }), path, ME), true, `${path} <- ${kind} of me`);
+      assert.equal(isRelevant(change(kind, {}, { bdId: "bd-other" }), path, ME), false, `${path} <- ${kind} of someone else`);
+    }
+  }
+  assert.equal(isRelevant(change("activity", {}, { bdId: ME }), "/whats-new", ME), false, "activity is not a badge kind");
+  assert.equal(isRelevant(change("task", {}, { bdId: ME }), "/whats-new", null), false, "no current BD, no badge match");
+  assert.equal(isRelevant(change("task", {}, { bulk: true }), "/whats-new", ME), true, "a bulk badge message cannot be narrowed to me");
+});
+
+test("a badge match is added to the feed, not instead of it", () => {
+  assert.equal(isRelevant(change("task", { personId: ["p2"] }, { bdId: ME }), "/contacts/p1", ME), true, "my task on another contact still moves my badge");
+  assert.equal(isRelevant(change("task", { personId: ["p2"] }, { bdId: "bd-other" }), "/contacts/p1", ME), false);
+  assert.equal(isRelevant(change("activity", { personId: ["p1"] }, { bdId: "bd-other" }), "/contacts/p1", ME), true, "the feed still matches");
 });
 
 test("isRelevant does not mutate the change", () => {

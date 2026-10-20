@@ -16,7 +16,7 @@ import { debounceMsFor, isRelevant, parseChange } from "@/lib/shell/liveRelevanc
  * Fails soft: without Supabase config, a session, or a channel the receive policy lets in, it does nothing and the app
  * works exactly as before minus live updates. Renders nothing.
  */
-export function LiveUpdates() {
+export function LiveUpdates({ meId }: { meId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const pathRef = useRef(pathname);
@@ -37,33 +37,45 @@ export function LiveUpdates() {
       refresh: () => router.refresh(),
       isBusy: () => detectBusy(domProbe(document)),
       isHidden: () => document.hidden,
-      relevant: (change) => isRelevant(change, pathRef.current),
+      relevant: (change) => isRelevant(change, pathRef.current, meId),
       debounceMs: () => debounceMsFor(pathRef.current),
     });
     resetRef.current = controller.reset;
 
     let stopped = false;
+    let gaveUp = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let connection = initialConnection;
+    const removeOnce = () => {
+      const c = channel;
+      channel = null;
+      if (c) void supabase.removeChannel(c);
+    };
 
     void (async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (stopped || !data.session) return;
         await supabase.realtime.setAuth(data.session.access_token);
+        // The effect may have been cleaned up while we awaited: never create a channel nobody will remove.
+        if (stopped) return;
         channel = supabase
           .channel("crm", { config: { private: true } })
           .on("broadcast", { event: "change" }, (message) => {
+            if (stopped || gaveUp) return;
             const change = parseChange(message.payload);
             if (change) controller.onChange(change);
           })
           .subscribe((status) => {
             const known = toChannelStatus(status);
-            if (stopped || !known) return;
+            if (stopped || gaveUp || !known) return;
             const step = stepConnection(connection, known);
             connection = step.next;
             if (step.catchUp) controller.catchUp();
-            if (step.giveUp && channel) void supabase.removeChannel(channel);
+            if (step.giveUp) {
+              gaveUp = true;
+              removeOnce();
+            }
           });
       } catch {
         // No live updates; the page keeps working.
@@ -79,9 +91,9 @@ export function LiveUpdates() {
       document.removeEventListener("visibilitychange", onIdle);
       document.removeEventListener("focusout", onIdle);
       controller.dispose();
-      if (channel) void supabase.removeChannel(channel);
+      removeOnce();
     };
-  }, [router]);
+  }, [router, meId]);
 
   return null;
 }

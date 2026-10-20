@@ -664,7 +664,6 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     );
   }
 
-  // The list is the heaviest screen to re-render (PERFORMANCE.md): background refresh every 3 min instead of 1.
   return (
     <main className="page">
       <div className="page-header">

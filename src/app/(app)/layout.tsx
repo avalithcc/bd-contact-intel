@@ -57,7 +57,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
-      <LiveUpdates />
+      <LiveUpdates meId={me.id} />
       <CallAttemptProvider labels={dict.callAttempt} details={callDetails}>
         <div className="app">
           <Sidebar

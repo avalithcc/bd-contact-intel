@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { BUSY_RECHECK_MS, createLiveController, ECHO_MS, initialConnection, stepConnection } from "@/lib/shell/liveController";
 import type { LiveChange } from "@/lib/shell/liveRelevance";
 
-const change: LiveChange = { kind: "task", op: "INSERT", ids: {}, bulk: false };
+const change: LiveChange = { kind: "task", op: "INSERT", ids: {}, bdId: null, bulk: false };
 
 /** A manual clock: timers fire only when `advance` passes their time, in order. */
 function harness(over: { busy?: boolean; hidden?: boolean; relevant?: boolean } = {}) {
@@ -97,19 +97,19 @@ test("a hidden tab holds the refresh until it becomes visible", () => {
   assert.equal(h.state.refreshes.length, 1);
 });
 
-test("a message right after a refresh is the echo of the tab's own action and is dropped", () => {
+test("a message right after a refresh is not lost: it refreshes once, trailing, after the echo window", () => {
   const h = harness();
   h.controller.onChange(change);
   h.advance(400);
   assert.equal(h.state.refreshes.length, 1);
-  h.advance(ECHO_MS - 401);
+  h.advance(300);
   h.controller.onChange(change);
-  h.advance(5_000);
-  assert.equal(h.state.refreshes.length, 1, "inside the echo window");
-  h.advance(ECHO_MS);
-  h.controller.onChange(change);
-  h.advance(400);
-  assert.equal(h.state.refreshes.length, 2, "outside the echo window");
+  h.advance(ECHO_MS - 301);
+  assert.equal(h.state.refreshes.length, 1, "still inside the echo window");
+  h.advance(2);
+  assert.equal(h.state.refreshes.length, 2, "the trailing refresh runs right after the window");
+  h.advance(60_000);
+  assert.equal(h.state.refreshes.length, 2);
 });
 
 test("catching up after a reconnect refreshes exactly once, even without a message and inside the echo window", () => {
