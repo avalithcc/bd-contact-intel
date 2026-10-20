@@ -1885,6 +1885,19 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- ~~**Sequences picker limited to US-hiring companies**~~ **Shipped 2026-10-20**
+  (main `52c950ba`): picker lists every non-merged contact with an email
+  (server search + paging), optional chips Florida / Miami, Contratando IT en
+  EE. UU., Mis contactos; contacts whose market has no compliance footer show
+  as blocked "Sin pie legal para su región" (hidden behind "Mostrar
+  bloqueados") and are rejected server-side.
+- **OWNER DECISION PENDING (for 2026-10-21): ~2,400 contacts have no legal
+  footer.** Prod count 2026-10-20 of ~7,500 contacts with email: ~5,100
+  addable; ~2,040 with NO country (person nor company; 2,035 have no single
+  us/latam posting market) and ~390 in other regions (Spain 133, Ireland 61,
+  Italy 45, UK 30, Germany 29, France 14, Israel 9…). Options to present:
+  default footer for unknown country, infer country from phone dial code
+  (E.164 now stored), add an EU/other postal address, or keep blocked.
 - **Flaky e2e (noted 2026-10-20):** `tests/e2e/scheduled-send.spec.ts` "a reply
   puts the row on hold… Enviar igual" (:429) and "a dead-token row… Enviar ahora
   waits for the reconnection" (:452) fail intermittently on the first
