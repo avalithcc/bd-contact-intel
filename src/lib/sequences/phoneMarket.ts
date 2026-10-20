@@ -30,15 +30,25 @@ export function countryNameOf(iso: string): string {
   return NAME_COLLIDES_WITH_US_STATE.has(iso) ? iso : (regionNames.of(iso) ?? iso);
 }
 
-/** The name of the country the first usable number (mobile, then phone) belongs to, or null when none places one. */
-export function phoneCountryName(mobilePhone: string | null | undefined, phone: string | null | undefined): string | null {
+/**
+ * The ISO code of the country the first usable number (mobile, then phone) belongs to, or null when none places one.
+ * The compliance resolver reads this directly: going through a display name and back would add an ICU dependency to a
+ * jurisdiction check for no gain.
+ */
+export function phoneCountryIso(mobilePhone: string | null | undefined, phone: string | null | undefined): string | null {
   for (const raw of [mobilePhone, phone]) {
     const value = raw?.trim();
     if (!value) continue;
     const parsed = parsePhoneNumberFromString(value);
-    if (parsed?.isValid() && parsed.country) return countryNameOf(parsed.country);
+    if (parsed?.isValid() && parsed.country) return parsed.country;
   }
   return null;
+}
+
+/** The name of the country the first usable number (mobile, then phone) belongs to, or null when none places one. */
+export function phoneCountryName(mobilePhone: string | null | undefined, phone: string | null | undefined): string | null {
+  const iso = phoneCountryIso(mobilePhone, phone);
+  return iso ? countryNameOf(iso) : null;
 }
 
 /**
