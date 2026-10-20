@@ -129,7 +129,10 @@ async function openSchedulePopover(page: Page, subject = `Asunto ${tag}`, body =
 async function setPopoverWhen(pop: ReturnType<Page['getByRole']>, ms: number) {
   const { date, time } = artInputs(ms);
   const day = pop.locator(`[data-day="${date}"]`);
-  for (let i = 0; i < 2 && (await day.count()) === 0; i++) await pop.getByRole('button', { name: S.calNext, exact: true }).click();
+  const next = pop.getByRole('button', { name: S.calNext, exact: true });
+  const prev = pop.getByRole('button', { name: S.calPrev, exact: true });
+  // The arrows are disabled at the ends of the allowed range, and clicking a disabled one waits until the test times out.
+  for (let i = 0; i < 4 && (await day.count()) === 0; i++) await ((await next.isEnabled()) ? next : prev).click();
   await day.click();
   await pop.getByLabel(S.timeLabel, { exact: true }).fill(time);
 }
@@ -205,11 +208,11 @@ test.describe('Scheduled send: the composer split button and the schedule popove
 
   test('days beyond 30 are disabled on the calendar; 29 days ahead is fine', async ({ page }) => {
     const pop = await openSchedulePopover(page);
-    const far = artInputs(Date.now() + 33 * DAY).date;
-    await pop.getByRole('button', { name: S.calNext, exact: true }).click();
-    await pop.getByRole('button', { name: S.calNext, exact: true }).click().catch(() => undefined);
-    const farDay = pop.locator(`[data-day="${far}"]`);
-    if (await farDay.count()) await expect(farDay).toHaveAttribute('aria-disabled', 'true');
+    const next = pop.getByRole('button', { name: S.calNext, exact: true });
+    for (let i = 0; i < 2 && (await next.isEnabled()); i++) await next.click();
+    await expect(next, 'the last month of the 30-day range has no next month').toBeDisabled();
+    const beyond = pop.locator(`[data-day="${artInputs(Date.now() + 31 * DAY).date}"]`);
+    if (await beyond.count()) await expect(beyond).toHaveAttribute('aria-disabled', 'true'); // visible only when it falls in the last month
     await setPopoverWhen(pop, Date.now() + 29 * DAY);
     await expect(popSubmit(pop)).toBeEnabled();
   });

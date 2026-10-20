@@ -80,7 +80,9 @@ export function SendSplitButton({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape" && (menuOpen || popOpen)) {
       // Not the dialog's Escape: the first one only closes what this control opened.
+      // React's root is `document`, the same node as the Dialog's Escape listener: only stopImmediatePropagation keeps the dialog open.
       e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
       closeAll();
       return;
     }

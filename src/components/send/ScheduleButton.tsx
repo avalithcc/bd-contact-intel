@@ -58,6 +58,7 @@ export function ScheduleButton({
       onKeyDown={(e) => {
         if (e.key === "Escape" && open) {
           e.stopPropagation();
+          e.nativeEvent.stopImmediatePropagation(); // see SendSplitButton: React's root and the Dialog listener share `document`
           close();
         }
       }}
