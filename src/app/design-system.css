@@ -242,6 +242,37 @@ button.cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
 .day.st-end { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .day.st-single { border-radius: var(--radius-sm); }
 .pop-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-xl); border-top: 1px solid var(--color-border); margin-top: var(--space-md); padding-top: var(--space-md); }
+/* Send control (send-now-or-schedule): split button, its menu, and the shared schedule popover. Promoted from the mockup
+   enviar-o-programar.html. The calendar pieces (.cal, .day, ...) above are shared with the report period picker. */
+.anchor-split { position: relative; display: inline-block; }
+.split-btn .split-chev { width: var(--control-height); padding: 0; border-left: 1px solid color-mix(in srgb, var(--color-accent-fg) 35%, transparent); }
+.split-btn .btn-sm.split-chev { width: var(--control-height-sm); }
+.foot-anchor { position: relative; display: inline-flex; gap: var(--space-sm); }
+.menu.up { top: auto; bottom: calc(100% + 6px); right: 0; min-width: 19rem; }
+.mi { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; align-items: flex-start; }
+.mi .icon { margin-top: 3px; }
+.mi-t { display: block; font-weight: 600; }
+.mi-s { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); font-weight: 400; }
+.pop-sched { width: 33.5rem; right: 0; left: auto; text-align: left; font-weight: 400; display: flex; flex-direction: column; gap: var(--space-md); }
+.pop-sched.up { top: auto; bottom: calc(100% + 8px); }
+.pop-sched.down { top: calc(100% + 8px); }
+.pop-sched .pop-foot { margin-top: 0; }
+.pop-title { display: flex; align-items: center; gap: var(--space-xs); font-weight: 700; }
+.sched-cols { display: grid; grid-template-columns: 15.5rem minmax(0, 1fr); gap: var(--space-xl); }
+.sched-side { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; }
+.tlist { border: 1px solid var(--color-border); border-radius: var(--radius-md); max-height: 8.2rem; overflow: auto; padding: var(--space-2xs); background: var(--color-surface-2); }
+.topt { display: block; width: 100%; text-align: left; border: 0; background: transparent; font: inherit; font-size: var(--text-sm); color: var(--color-ink); padding: 0.2rem var(--space-sm); border-radius: var(--radius-sm); cursor: pointer; font-variant-numeric: tabular-nums; height: auto; min-height: 0; }
+.topt:hover:not(.off) { background: var(--color-row-hover); }
+.topt.sel { background: var(--color-accent-soft); color: var(--color-accent-strong); font-weight: 700; }
+.tz { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-sm) var(--space-md); background: var(--color-surface-1); }
+.tz-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-xs); }
+.tz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-xl); }
+.tz-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-sm); padding: 0.25rem 0; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+.tz-row.base { font-weight: 800; color: var(--color-ink); }
+.tz-row.warn { color: var(--color-warn-text); font-weight: 600; }
+.tz-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tz-day { font-size: var(--text-xs); color: var(--color-ink-subtle); font-weight: 600; }
+.sched-sum { padding: var(--space-sm) var(--space-md); font-size: var(--text-sm); }
 
 /* --------------------------------------------------------------- forms */
 .field { display: flex; flex-direction: column; gap: var(--space-2xs); }
