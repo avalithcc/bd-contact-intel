@@ -56,7 +56,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   const [r] = rowsOf<Row>(
     await db.execute(sql`
       select sm.state, sm.hold_reason, sm.sequence_id::text, p.id::text as person_id, p.email, p.first_name, p.last_name,
-             p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, b.name as sender_name,
+             p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, p.mobile_phone, p.phone, b.name as sender_name,
              ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp
                 where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany}), '[]'::json) as posting_markets,
@@ -72,6 +72,8 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   );
   if (!r) return null;
   const market: MarketKey = recipientMarket({
+    mobilePhone: r.mobile_phone as string | null,
+    phone: r.phone as string | null,
     personCountry: r.person_country as string | null,
     companyCountry: r.company_country as string | null,
     postingMarkets: r.posting_markets as string[],

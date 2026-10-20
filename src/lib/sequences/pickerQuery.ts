@@ -38,7 +38,7 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
   for (const raw of countries) {
     const country = raw.trim().toLowerCase();
     if (!country) continue;
-    if (!isMarketMapped(recipientMarket({ personCountry: country }))) unmapped.add(country);
+    if (!isMarketMapped(recipientMarket({ mobilePhone: null, phone: null, personCountry: country }))) unmapped.add(country);
     else if (classifyMarket(country) === "us") us.add(country);
   }
   return { unmapped: [...unmapped], us: [...us] };
@@ -137,7 +137,7 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
     select p.id::text as person_id, p.first_name, p.last_name, p.email, p.email_status, p.email_source, p.job_title, p.status,
            ${companyNameColumnsSql}, p.company_key, p.merged_into_id::text as merged_into_id, ${clientStatus} as client_status,
            ${hireCount}::int as open_it, (${postingFlorida} or ${homeInFlorida(facts)}) as is_florida,
-           ${suppressedSql} as suppressed, p.country as person_country, ${companyCountry} as company_country,
+           ${suppressedSql} as suppressed, p.country as person_country, p.mobile_phone, p.phone, ${companyCountry} as company_country,
            array_remove(array[case when ${either("posts_us")} then 'us' end, case when ${either("posts_latam")} then 'latam' end], null) as posting_markets
     from person p
     ${canonicalCompanyJoinSql}

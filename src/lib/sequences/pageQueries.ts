@@ -109,12 +109,12 @@ async function pickerCountryFacts(): Promise<CountryFacts> {
  * Round trips: 1 (the page), plus 1 for the country facts when the instance has none cached.
  */
 export async function listPickerPage(query: PickerQuery, meId: string, unnamed: string): Promise<PickerPage> {
-  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; company_country: string | null; posting_markets: string[] }>(
+  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }>(
     await db.execute(buildPickerPageQuery(query, meId, await pickerCountryFacts())),
   );
   const named = withResolvedCompanyName(rows).slice(0, PICKER_PAGE_SIZE);
   const contacts = named.map((r) => {
-    const mapped = isMarketMapped(recipientMarket({ personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }));
+    const mapped = isMarketMapped(recipientMarket({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }));
     // A suppressed address becomes a one-address rule, so the SAME isSuppressed() that guards the add decides the reason.
     const rules: SuppressionRule[] = r.suppressed && r.email ? [{ ruleKind: "address", value: normalizeSuppressionValue("address", r.email) }] : [];
     return toPickerContact({ ...r, market_mapped: mapped }, rules, unnamed);

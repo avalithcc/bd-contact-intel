@@ -91,7 +91,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
     const rows = rowsOf<Row>(
       await tx.execute(sql`
         select p.id::text as person_id, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
-               p.company_key, p.country as person_country, ${clientStatusSql} as client_status,
+               p.company_key, p.country as person_country, p.mobile_phone, p.phone, ${clientStatusSql} as client_status,
                ${companyCountrySql} as company_country,
                exists (select 1 from job_posting jp where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
                   and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))) as has_open_it_posting,
@@ -107,7 +107,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
   }
   if (problems.length) throw new Error(`Cannot resolve the roster, nothing written. Never guessing between matches:\n- ${problems.join("\n- ")}`);
   return found.map(({ entry, row: r }): SeedLine => {
-    const market = recipientMarket({ personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] });
+    const market = recipientMarket({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] });
     const candidate: SeedCandidate = {
       label: `${entry.name} @ ${entry.company}`,
       personId: r.person_id as string,
