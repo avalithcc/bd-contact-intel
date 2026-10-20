@@ -38,7 +38,7 @@ export async function listRosterCandidates(opts: { limit: number; search?: strin
 /**
  * The facts the admission needs, by id. With `judgeMarket` the compliance audience is derived the way drafting and sending
  * derive it (resolveComplianceAudience) and handed to the admission as `marketMapped` (true = has an audience): an add must
- * refuse a Contact no email could carry a legal footer for, or whose jurisdiction is embargoed. Re-admission skips it (`judgeMarket` off): that member was admitted once and a market hold
+ * refuse a Contact no email could carry a legal footer for, or whose jurisdiction is embargoed. Re-admission skips it (`judgeMarket` off): that member was admitted once and a no-audience hold
  * already covers it at send time.
  */
 async function loadCandidates(tx: Tx, personIds: readonly string[], judgeMarket = false): Promise<RosterCandidate[]> {

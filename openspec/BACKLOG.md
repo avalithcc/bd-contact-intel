@@ -1927,18 +1927,32 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `countryNameOf` and `phoneCallingCodeGroups` are deleted, `COMPLIANCE_CONFIG` is
   keyed `mdp` / `miami`. Consequences to know before merging, none of them fixed here:
   (1) **a draft approved BEFORE the switch for a non-Argentine LATAM contact carries the
-  Mar del Plata address and now HOLDS `missing_footer` at send** (pre-send re-checks
-  against the recomputed address); it must be regenerated. (2) **Free text that is not
-  exactly a country now holds where `classifyMarket` used to mail it**: "Florida",
-  "Texas", "Miami, FL", "Buenos Aires" in `company.country` were `us`/`latam`, the
-  audience resolver holds them; the production count is unmeasured. (3) The picker's
-  phone length floor (8 digits, unchanged) hides a phone-only contact in Tokelau or
-  Tristan da Cunha (real 7-digit numbers); pinned in `sequencesPickerQuery.test.ts`.
+  Mar del Plata address and would HOLD `missing_footer` at send** (pre-send re-checks
+  against the recomputed address) and need regenerating. Measured against production
+  2026-10-20: **0 approved unsent drafts exist**, so this is empty in practice (the 1,736
+  contacts that change address are a population count, not a regeneration queue).
+  (2) **Free text that is not exactly a country now holds where `classifyMarket` mailed
+  it.** Measured against production 2026-10-20 18:28 UTC, read-only, over the 58 distinct
+  non-blank EFFECTIVE country strings (person country first, then company country) of live
+  contacts with an email (commit `2a870c78`): 5,129 mailable before and after the switch,
+  **391 contacts across 38 strings gained**, **exactly 1 lost** ("Bolivia, Plurinational
+  State of", fixed by an alias). Strings like "Florida" or "Miami, FL" as a country field
+  are not a measured population beyond that run.
+  (3) The picker's phone length floor (8 digits, unchanged) hides a phone-only contact
+  whose number is shorter than that with no badge. The set is DERIVED, not sampled:
+  `scripts/scan-short-phone-numbers.ts` (exhaustive, deterministic, 2026-10-20) found 14
+  calling codes where libphonenumber accepts a number under 8 digits: ZA, TA, NL, LU, AT,
+  NO, DE, UY, AU, NZ, **NU (Niue)**, TK, KR, IR (Iran is held by the resolver anyway).
+  Whether each is a real subscriber number or a non-subscriber special is NOT established
+  (Uruguay is the case accepted earlier); Niue's 4-digit numbers were reported real by
+  review. Pinned in `sequencesPickerQuery.test.ts` (`SHORT_VALID_WITNESSES`); lowering the
+  floor to 7 would re-admit `+5491` garbage, so it stays an owner decision.
   (4) A Cuban/Iranian/North Korean/Syrian PHONE appears in the default picker view badged
   `unmappedMarket` (the SQL deliberately does not encode the sanctions list); the add
   guard refuses it. (5) The `unmapped_market` / `unmappedMarket` key names are
-  historical; the copy now says the location is unknown or restricted. The seed path
-  still never sets `marketMapped` and approval still has no check: unchanged.
+  historical; the copy now says we cannot place the contact in a country, or its country
+  is under an embargo. The seed path still never sets `marketMapped` and approval still
+  has no check: unchanged.
   Original PR 1 note:
   `MarketKey` (`src/lib/hiring/markets.ts:14-15`) decided the postal address, the
   draft language AND the hiring signal at once, so the owner's rules above cannot

@@ -134,6 +134,7 @@ test("a LATAM member (person country wins over a US posting) is drafted in Spani
   const d = await draftOf(m);
   assert.ok(d.body.includes(COMPLIANCE_CONFIG.mdp!.postalAddress));
   assert.ok(!d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress), "a Spanish email never carries the Florida address");
+  assert.ok(d.body.includes("Formosa 2531, B7600 Mar del Plata") && !d.body.includes("Ansin"), "literal Mar del Plata for an Argentine contact");
 });
 
 test("a contact with no audience is never generated: no draft, member held with the unmapped-market reason", async () => {
@@ -165,6 +166,8 @@ test("the owner's rules, through the real draft path: Mexico and Spain are Spani
     const d = await draftOf(m);
     assert.ok(d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress), "Miami address");
     assert.ok(!d.body.includes(COMPLIANCE_CONFIG.mdp!.postalAddress), "never the Mar del Plata address for a non-Argentine contact");
+    // Literals, not the config: a test that reads the config it checks cannot catch a bad edit of that config.
+    assert.ok(d.body.includes("470 Ansin Blvd Ste G, Hallandale, FL 33009") && !d.body.includes("Formosa 2531"), "literal Hallandale, never Mar del Plata");
   }
 });
 

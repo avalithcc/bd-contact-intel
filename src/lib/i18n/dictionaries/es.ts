@@ -3768,7 +3768,7 @@ export const es: typeof en = {
       unreachable: "Inalcanzable",
       inferred: "Inalcanzable",
       noPosting: "Sin vacantes",
-      // El nombre de la clave es histórico (anterior a la audiencia de cumplimiento); el motivo ahora es "no se puede ubicar al contacto".
+      // El nombre de la clave es histórico (anterior a la audiencia de cumplimiento); el motivo ahora es "no se puede ubicar al contacto en un país".
       unmappedMarket: "Ubicación desconocida o restringida",
       companyLimit: "Límite por empresa",
     },
@@ -3782,7 +3782,7 @@ export const es: typeof en = {
       unreachable: "Su correo rebotó o se descartó (estado: ninguno). No se envía.",
       inferred: "El correo se dedujo por patrón y nadie lo confirmó. No se envía a direcciones inferidas.",
       noPosting: "{company} no tiene vacantes IT abiertas en EE. UU.",
-      unmappedMarket: "No podemos establecer dónde está este contacto (sin país, país de la empresa, búsqueda abierta ni teléfono válido), o su país está bajo embargo, y cada correo debe llevar la dirección postal correcta. No se puede agregar.",
+      unmappedMarket: "No podemos ubicar a este contacto en un país (falta el país o no es un nombre de país, y nada más lo ubica), o su país está bajo embargo. Cada correo debe llevar la dirección postal correcta, así que no se puede agregar.",
       companyLimit: "Ya elegiste {max} contactos de {company} ({names}). El máximo es {max} por empresa.",
     },
     contextBadges: {
@@ -3836,7 +3836,7 @@ export const es: typeof en = {
       suppressed: "la dirección está en la lista de no contactar",
       client_company: "la empresa figura como cliente",
       // Clave histórica: la retención significa sin audiencia de cumplimiento (ubicación desconocida o país bajo embargo), no falta de pie legal de una región.
-      unmapped_market: "no podemos establecer dónde está el contacto, o su país está bajo embargo",
+      unmapped_market: "no podemos ubicar al contacto en un país, o su país está bajo embargo",
       missing_footer: "al correo le falta el pie de baja",
       account_not_connected: "la cuenta de Gmail no está conectada",
       replied: "el contacto ya respondió",

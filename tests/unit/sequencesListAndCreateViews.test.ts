@@ -119,7 +119,7 @@ test("picker: a contact with no compliance audience is blocked with its reason, 
   const unplaced = person("u", "k9", { block: "unmappedMarket" });
   const shown = picker([], [pool[1], unplaced]);
   at(shown, "Person b", "Disponible", "No se pueden agregar · 1", "Person u", "Ubicación desconocida o restringida");
-  assert.ok(shown.includes("No podemos establecer dónde está este contacto") && shown.includes('aria-label="No se puede elegir a Person u"'));
+  assert.ok(shown.includes("No podemos ubicar a este contacto en un país") && shown.includes('aria-label="No se puede elegir a Person u"'));
   const hidden = renderToStaticMarkup(createElement(RosterPicker, { contacts: [pool[1], unplaced], hasMore: false, loadPage: noPage, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }));
   assert.ok(!hidden.includes("Person u") && !hidden.includes("Ubicación desconocida") && hidden.includes("Person b"), "blocked contacts are hidden by default");
   assert.ok(/<input type="checkbox"[^>]*\/> Mostrar los que no se pueden agregar/.test(hidden) && !/checked=""[^>]*\/> Mostrar/.test(hidden));

@@ -202,7 +202,7 @@ test("the picker lists EVERY live contact with an email, wherever they are, and 
   assert.equal(by.get(ok.id)?.block, null);
   assert.equal(by.get(latam.id)?.block, null, "a company with no posting at all is listed: hiring is a filter, not the pool");
   assert.equal(by.get(nocompany.id)?.block, null, "a contact without a company is listed too");
-  assert.equal(by.get(noSignal.id)?.block, "unmappedMarket", "no country and no posting: no market, so no legal footer");
+  assert.equal(by.get(noSignal.id)?.block, "unmappedMarket", "no country, no posting and no phone: nothing places the contact, so no audience");
   assert.equal(by.get(spain.id)?.block, null, "a located country has an address now: Spain is listed and addable");
   assert.equal(by.get(cuba.id)?.block, "unmappedMarket", "an embargoed jurisdiction holds, with its badge (shown, not hidden)");
   assert.equal(by.get(gibberish.id)?.block, "unmappedMarket", "text that is not exactly a country holds");

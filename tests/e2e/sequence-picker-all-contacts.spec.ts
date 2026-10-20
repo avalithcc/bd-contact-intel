@@ -69,7 +69,7 @@ test.afterAll(async () => {
 });
 
 for (const width of [1024, 1440]) {
-  test(`the picker lists every contact, Florida is only a filter, and a region without a legal footer is blocked (${width}px)`, async ({ page }) => {
+  test(`the picker lists every contact, Florida is only a filter, and a contact the audience cannot place (embargoed) is blocked (${width}px)`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await gotoAuthed(page, '/sequences/new');
 
