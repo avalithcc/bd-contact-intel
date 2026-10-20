@@ -336,3 +336,21 @@ test("pinned limit: a city whose name is also a country resolves to the country 
   assert.equal(resolveCountry("Santa Lucía"), "LC");
   assert.deepEqual(audience({ personCountry: "Santa Lucía" }), MIAMI_EN);
 });
+
+test("ISO long-form country names: the one in the data resolves, and a sanctioned long form still holds", () => {
+  // Measured in production 2026-10-20: of the 58 distinct country strings, "Bolivia, Plurinational State of" was the
+  // only ISO long form, and the only text the old classifyMarket admitted (by substring) that this resolver refused —
+  // one contact. Pinned here so the alias is not dropped as noise.
+  assert.equal(resolveCountry("Bolivia, Plurinational State of"), "BO");
+  assert.deepEqual(audience({ personCountry: "Bolivia, Plurinational State of" }), MIAMI_ES);
+  // A long form that is NOT in the alias table holds, and for a sanctioned jurisdiction that is already the right
+  // answer, so the gap fails in the safe direction. Do not "fix" this by matching the text before the comma: that
+  // would turn every "City, Country" string into a country guess.
+  assert.equal(resolveCountry("Iran, Islamic Republic of"), null);
+  assert.equal(audience({ personCountry: "Iran, Islamic Republic of" }), null);
+  // The exact-match discipline is unchanged by the alias.
+  for (const text of ["Miami, FL", "New Mexico", "Greater Buenos Aires", "Canada Bay, Australia"]) {
+    assert.equal(resolveCountry(text), null, text);
+  }
+});
+

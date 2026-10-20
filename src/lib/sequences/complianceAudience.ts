@@ -111,6 +111,11 @@ const ALIASES: Readonly<Record<string, readonly string[]>> = {
   GB: ["uk", "u k", "great britain", "england", "scotland", "wales", "inglaterra"],
   NL: ["the netherlands", "holland", "holanda"],
   DO: ["rep dominicana"],
+  // ISO 3166-1's long form. Measured in production 2026-10-20: "Bolivia, Plurinational State of" is the ONLY long-form
+  // name in the data, and the only country text that `classifyMarket` admitted (by substring) and this resolver did not —
+  // one contact. Other long forms ("Korea, Republic of", "Tanzania, United Republic of") would hold until added here;
+  // for a SANCTIONED one ("Iran, Islamic Republic of") holding is already the correct answer, so that direction is safe.
+  BO: ["bolivia plurinational state of"],
   MX: ["estados unidos mexicanos"],
   AE: ["uae"],
   TR: ["turkey"],
