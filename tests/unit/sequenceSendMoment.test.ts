@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { capOutlook, parseSendChoice, resolveSequenceSend } from "@/lib/sequences/sendMoment";
+import { capOutlook, guardApprovalInput, parseSendChoice, resolveSequenceSend } from "@/lib/sequences/sendMoment";
 import { DEFAULT_SCHEDULE, parseSchedule } from "@/lib/sequences/schedule";
 
 const AFTER_FLOOR = new Date("2026-10-19T14:42:00Z"); // 10:42 Miami (EDT)
@@ -53,8 +53,19 @@ test("capOutlook splits a batch into what leaves now and what waits for the next
   assert.deepEqual(capOutlook({ count: 2, cap: 5, sentToday: 0 }), { now: 2, deferred: 0 });
 });
 
-test("parseSendChoice accepts only the three shapes and falls back to the cadence", () => {
+test("parseSendChoice: only an absent choice is the cadence; anything malformed is refused, never guessed", () => {
+  assert.deepEqual(parseSendChoice(undefined), { kind: "cadence" });
+  assert.deepEqual(parseSendChoice({ kind: "cadence" }), { kind: "cadence" });
   assert.deepEqual(parseSendChoice({ kind: "now" }), { kind: "now" });
   assert.deepEqual(parseSendChoice({ kind: "at", date: "2026-10-22", time: "10:00", extra: 1 }), { kind: "at", date: "2026-10-22", time: "10:00" });
-  for (const bad of [undefined, null, "now", 3, {}, { kind: "at" }, { kind: "at", date: 1, time: "10:00" }, { kind: "later" }]) assert.deepEqual(parseSendChoice(bad), { kind: "cadence" });
+  for (const bad of [null, "now", 3, {}, { kind: "at" }, { kind: "at", date: 1, time: "10:00" }, { kind: "later" }]) assert.equal(parseSendChoice(bad), null);
+});
+
+test("guardApprovalInput: a malformed id is not_found, an unreadable choice is invalid_time, otherwise the parsed choice", () => {
+  const isUuid = (v: string) => /^[0-9a-f-]{36}$/.test(v);
+  const good = "00000000-0000-4000-8000-000000000001";
+  assert.deepEqual(guardApprovalInput([good], { kind: "now" }, isUuid), { ok: true, choice: { kind: "now" } });
+  assert.deepEqual(guardApprovalInput([good], undefined, isUuid), { ok: true, choice: { kind: "cadence" } });
+  assert.deepEqual(guardApprovalInput([good, "nope"], { kind: "now" }, isUuid), { ok: false, rejected: [{ memberId: "nope", reason: "not_found" }] });
+  assert.deepEqual(guardApprovalInput([good], { kind: "NOW" }, isUuid), { ok: false, rejected: [{ memberId: good, reason: "invalid_time" }] });
 });

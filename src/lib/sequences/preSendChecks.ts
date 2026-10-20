@@ -48,6 +48,8 @@ export interface PreSendFacts {
   accountStatus: string;
   /** Outcome of the member's non-failed claim for THIS step, if any. */
   activeClaim: "pending" | "sent" | null;
+  /** When that claim was taken. Unknown (null/absent) reads as stale, which holds: failing toward a manual look. */
+  activeClaimAt?: Date | null;
   repliedAt: Date | null;
   /** Earliest genuine inbound message from the Contact after step 1's send, from email_message (see genuineReplyAfterSend). */
   inboundReplyAt: Date | null;
@@ -57,7 +59,13 @@ export interface PreSendFacts {
   step1ThreadId: string | null;
 }
 
-export type CheckResult = { ok: true } | { ok: false; reason: HoldReason };
+/**
+ * `skip` is not a hold: the member is left exactly as it is and nothing is written or counted. A `pending` claim younger than
+ * this is a send in flight (an "Enviar ahora" a moment ago, or a tick running now), not a crash.
+ */
+export const IN_FLIGHT_CLAIM_MS = 5 * 60_000;
+
+export type CheckResult = { ok: true } | { ok: false; reason: HoldReason } | { ok: false; skip: "in_flight" };
 
 const UNSUBSCRIBE_LINK = /https:\/\/[^\s<>,"]+\/api\/unsubscribe\?t=[A-Za-z0-9_-]{43}/;
 
@@ -72,7 +80,10 @@ export function evaluatePreSendChecks(
 ): CheckResult {
   const hold = (reason: HoldReason): CheckResult => ({ ok: false, reason });
   if (f.memberState !== (f.step === 1 ? "approved" : "sent") || !f.draftApproved) return hold("not_approved");
-  if (f.activeClaim) return hold("manual_check");
+  if (f.activeClaim) {
+    const inFlight = f.activeClaim === "pending" && f.activeClaimAt != null && ctx.now.getTime() - f.activeClaimAt.getTime() < IN_FLIGHT_CLAIM_MS;
+    return inFlight ? { ok: false, skip: "in_flight" } : hold("manual_check");
+  }
   if (f.merged) return hold("merged_contact");
   const email = f.email?.trim();
   if (!email) return hold("no_email");

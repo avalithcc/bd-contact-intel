@@ -14,6 +14,7 @@ assertScratchDatabaseUrl(process.env.DATABASE_URL);
 const run = randomUUID().slice(0, 8);
 const NOW = new Date("2026-10-15T14:00:00Z"); // 10:00 Miami (EDT)
 const DUE = new Date("2026-10-15T13:00:00Z");
+const STALE = new Date(NOW.getTime() - 10 * 60_000); // a pending claim this old is a crash, not a send in flight
 const bdIds: string[] = [];
 const accountIds: string[] = [];
 const personIds: string[] = [];
@@ -165,7 +166,7 @@ test("a pending claim (crash: outcome unknown) is NOT re-sent, is flagged manual
   const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
   const a = await mkAccount("pending");
   const m = await mkMember(a, "pending");
-  await insertClaim(m.memberId, a, { outcome: "pending" });
+  await insertClaim(m.memberId, a, { outcome: "pending", claimedAt: STALE }); // older than the in-flight window: the crash case
   const { ports, sends } = await portsFor([a]);
   const first = await runSequenceRelease(ports);
   const second = await runSequenceRelease(ports);
@@ -176,6 +177,17 @@ test("a pending claim (crash: outcome unknown) is NOT re-sent, is flagged manual
   assert.equal(row.holdReason, "manual_check");
   assert.equal(row.state, "approved");
   assert.deepEqual((await claimsOf(m.memberId)).map((c) => c.outcome), ["pending"]);
+});
+
+test("a YOUNG pending claim is a send in flight: skipped silently, no hold, nothing sent", async () => {
+  const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
+  const a = await mkAccount("inflight");
+  const m = await mkMember(a, "inflight");
+  await insertClaim(m.memberId, a, { outcome: "pending", claimedAt: new Date(NOW.getTime() - 30_000) });
+  const { ports, sends } = await portsFor([a]);
+  assert.deepEqual(await runSequenceRelease(ports), { released: 0, held: 0, deferred: 0, failed: 0 });
+  assert.equal(sends.length, 0);
+  assert.equal((await memberRow(m.memberId)).holdReason, null);
 });
 
 test("a failed claim stays as history and the member is claimed again and sent", async () => {
@@ -201,7 +213,7 @@ test("the cap counts recorded sends AND today's pending claims; failed claims an
   const failedBefore = await mkMember(a, "cap-failed");
   await insertClaim(failedBefore.memberId, a, { outcome: "failed" });
   const stuck = await mkMember(a, "cap-stuck");
-  await insertClaim(stuck.memberId, a, { outcome: "pending" });
+  await insertClaim(stuck.memberId, a, { outcome: "pending", claimedAt: STALE });
   const w = await mkMember(a, "cap-w");
   const v = await mkMember(a, "cap-v");
   const { ports, sends } = await portsFor([a]);

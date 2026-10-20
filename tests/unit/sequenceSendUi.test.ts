@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { releaseToast, sendRecipients } from "@/lib/sequences/sendUi";
 
-const o = (released: number, deferred = 0, held = 0, failed = 0) => ({ released, deferred, held, failed });
+const o = (released: number, deferred = 0, held = 0, failed = 0, lost = 0) => ({ released, deferred, held, failed, lost });
 
 test("everything went out", () => {
   assert.deepEqual(releaseToast(o(1), 1), { key: "sentNow", tone: "success" });
@@ -24,6 +24,15 @@ test("a pre-send check held it: approved, with the reason on the card", () => {
 
 test("a failed send is an error toast", () => {
   assert.deepEqual(releaseToast(o(0, 0, 0, 1), 1), { key: "failed", tone: "error" });
+});
+
+test("nothing left and nothing was held, deferred or failed: it is queued, never 'sent'", () => {
+  assert.deepEqual(releaseToast(o(0), 1), { key: "pending", tone: "success" });
+  assert.deepEqual(releaseToast(o(0, 0, 0, 0, 1), 1), { key: "pending", tone: "success" }); // lost the claim to a concurrent run
+});
+
+test("some sent and some queued behind another run: say how many actually left", () => {
+  assert.deepEqual(releaseToast(o(2, 0, 0, 0, 1), 3), { key: "sentNowMany", n: 2, tone: "success" });
 });
 
 test("no outcome (the release could not run): approved, the minute cron takes it", () => {

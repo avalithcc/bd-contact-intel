@@ -10,6 +10,8 @@ export interface ReleaseCounts {
   deferred: number;
   held: number;
   failed: number;
+  /** Claims another run won first: benign, the member goes with that run or the next tick. */
+  lost?: number;
 }
 
 export type ReleaseToast =
@@ -27,6 +29,8 @@ export function releaseToast(outcome: ReleaseCounts | undefined, total: number):
   if (outcome.failed > 0) return { key: "failed", tone: "error" };
   if (outcome.deferred > 0) return outcome.released > 0 ? { key: "capDeferredMany", sent: outcome.released, n: outcome.deferred, tone: "success" } : { key: "capDeferred", tone: "success" };
   if (outcome.held > 0) return { key: "held", tone: "success" };
+  // "Enviado" only when something actually left; a member queued behind another run, or skipped as in flight, is still approved.
+  if (outcome.released === 0) return { key: "pending", tone: "success" };
   return total === 1 ? { key: "sentNow", tone: "success" } : { key: "sentNowMany", n: outcome.released, tone: "success" };
 }
 

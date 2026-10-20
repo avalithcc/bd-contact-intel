@@ -48,7 +48,7 @@ export interface RunnerPorts {
   load(now: Date): Promise<{ candidates: ReleaseCandidate[]; sentToday: Map<string, number>; suppression: SuppressionRule[]; truncated?: boolean }>;
   setHolds(changes: HoldChange[]): Promise<void>;
   /** INSERT ... ON CONFLICT DO NOTHING: the claim id, or null when the step is already claimed (or no longer approved). */
-  claim(c: ReleaseCandidate): Promise<string | null>;
+  claim(c: ReleaseCandidate, now: Date): Promise<string | null>;
   send(c: ReleaseCandidate, message: ReleaseMessage): Promise<{ messageId: string; threadId: string }>;
   failClaim(claimId: string, error: string): Promise<void>;
   /** One transaction: claim -> sent (+ miami_send_date), member transition, reminderDueAt for step 1. */
@@ -102,6 +102,8 @@ export async function runSequenceRelease(ports: RunnerPorts): Promise<RunSummary
       hold(c, null);
       continue;
     }
+    // A send in flight (a young pending claim) is left alone: not held, not counted, nothing written.
+    if ("skip" in result) continue;
     summary.held++;
     // A member that is no longer approved is not an approved card any more: there is nothing to annotate.
     if (result.reason !== "not_approved") hold(c, result.reason);
@@ -128,7 +130,7 @@ export async function runSequenceRelease(ports: RunnerPorts): Promise<RunSummary
         hold(c, "send_failed");
         continue;
       }
-      const claimId = await ports.claim(c);
+      const claimId = await ports.claim(c, now);
       if (!claimId) {
         // Lost to another run, or the row changed since the read (state, reply, edited text): nothing was sent. Counted
         // as `lost`, NOT folded into `deferred`: deferred already means "over the daily cap" and "account halted", and a

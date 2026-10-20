@@ -277,3 +277,10 @@ test("nothing in the runner sets a status: it never imports the status module no
     assert.doesNotMatch(text, /\.set\(\{[^}]*\bstatus\b/, file);
   }
 });
+
+test("a send in flight (a pending claim under five minutes old) is skipped silently: not held, not counted, nothing written", async () => {
+  const f = fakes([candidate({ activeClaim: "pending", activeClaimAt: new Date(NOW.getTime() - 60_000) })]);
+  assert.deepEqual(await runSequenceRelease(f.ports), { released: 0, held: 0, deferred: 0, failed: 0 });
+  assert.deepEqual(f.holds, []);
+  assert.deepEqual(f.log, []);
+});

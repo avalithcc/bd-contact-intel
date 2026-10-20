@@ -66,7 +66,7 @@ function toCandidate(r: Row): ReleaseCandidate {
     email: (r.email ?? null) as string | null, merged: Boolean(r.merged), hasClientStatus: Boolean(r.has_client_status),
     market: recipientMarket({ personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] }),
     subject: r.subject as string, body: r.body as string, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
-    lastSyncedAt: toDate(r.last_synced_at), activeClaim: (r.active_claim ?? null) as "pending" | "sent" | null,
+    lastSyncedAt: toDate(r.last_synced_at), activeClaim: (r.active_claim ?? null) as "pending" | "sent" | null, activeClaimAt: toDate(r.active_claim_at),
     step1RfcMessageId: (r.step1_rfc ?? null) as string | null, step1ThreadId: (r.step1_thread ?? null) as string | null,
   };
 }
@@ -116,6 +116,7 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, s
              exists (select 1 from company c where ${sameCompany} and c.client_status is not null) as has_client_status,
              ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
              (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,
+             (select cl.claimed_at from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim_at,
              s1.rfc as step1_rfc, s1.thread as step1_thread
       from (values ${keys}) as k(id, step)
       join sequence_draft d on d.sequence_member_id = k.id and d.step = k.step
@@ -187,22 +188,32 @@ const sameDraft = (c: ReleaseCandidate) =>
  * approved members are ever released) holds here even if preSendChecks never ran or a caller forges `memberState`.
  * A reminder additionally needs no recorded reply and a sent step 1 claim.
  */
-export async function claimStep(c: ReleaseCandidate): Promise<string | null> {
+export async function claimStep(c: ReleaseCandidate, now: Date = new Date()): Promise<string | null> {
   // A step 1 moved LATER since the candidate was read ("Cambiar") must not go out at the old time.
   const notMovedLater = c.step === 1 ? sql`and (d.scheduled_for is null or date_trunc('milliseconds', d.scheduled_for) <= ${c.dueAt.toISOString()}::timestamptz)` : sql``;
   const reminderOnly =
     c.step === 2
       ? sql`and sm.replied_at is null and not exists (${genuineReplyAfterSend}) and exists (select 1 from sequence_send_claim s1 where s1.sequence_member_id = sm.id and s1.step = 1 and s1.outcome = 'sent')`
       : sql``;
-  const [row] = rowsOf<{ id: string }>(
-    await db.execute(sql`
-      insert into sequence_send_claim (sequence_member_id, step, sending_account_id, outcome)
-      select sm.id, d.step, ${c.accountId}::uuid, 'pending'
-      from sequence_member sm join sequence_draft d on d.sequence_member_id = sm.id and d.step = ${c.step}
-      where sm.id = ${c.id}::uuid and sm.state = ${REQUIRED_STATE[c.step]} and d.approved_at is not null ${sameDraft(c)} ${notMovedLater} ${reminderOnly}
-      on conflict do nothing returning id::text as id`),
-  );
-  return row?.id ?? null;
+  // The daily cap is enforced HERE, not only in the plan: two runs that both read "14 of 15" would otherwise each plan one more.
+  // A transaction-scoped advisory lock per sending account serialises the claims of one account, and the insert only happens while
+  // today's sent + pending claims are under the cap, so the second claim sees the first one's row. Steps 1 and 2 share the count.
+  const day = miamiCalendarDate(now);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${c.accountId}))`);
+    const [row] = rowsOf<{ id: string }>(
+      await tx.execute(sql`
+        insert into sequence_send_claim (sequence_member_id, step, sending_account_id, outcome)
+        select sm.id, d.step, ${c.accountId}::uuid, 'pending'
+        from sequence_member sm join sequence_draft d on d.sequence_member_id = sm.id and d.step = ${c.step}
+        where sm.id = ${c.id}::uuid and sm.state = ${REQUIRED_STATE[c.step]} and d.approved_at is not null ${sameDraft(c)} ${notMovedLater} ${reminderOnly}
+          and (select count(*) from sequence_send_claim u where u.sending_account_id = ${c.accountId}::uuid
+                 and ((u.outcome = 'sent' and u.miami_send_date = ${day}::date)
+                   or (u.outcome = 'pending' and (u.claimed_at at time zone 'America/New_York')::date = ${day}::date))) < ${c.dailyCap}
+        on conflict do nothing returning id::text as id`),
+    );
+    return row?.id ?? null;
+  });
 }
 
 export async function failClaim(claimId: string, error: string): Promise<void> {
@@ -238,7 +249,34 @@ export async function recordSent(c: ReleaseCandidate, claimId: string, sent: { m
 async function loadForRun(now: Date, scope?: ReleaseScope) {
   const loaded = await loadReleaseCandidates(now, MAX_CANDIDATES, scope);
   if (!loaded.candidates.length) return { ...loaded, sentToday: new Map<string, number>(), suppression: [] };
-  return { ...loaded, sentToday: await countSentToday(now), suppression: await listSuppressionRules() };
+  const caps = scope ? await accountCapsWithDueMembers(now, loaded.candidates) : lowestCapPerAccount(loaded.candidates);
+  const candidates = loaded.candidates.map((c) => ({ ...c, dailyCap: Math.min(c.dailyCap, caps.get(c.accountId) ?? c.dailyCap) }));
+  return { ...loaded, candidates, sentToday: await countSentToday(now), suppression: await listSuppressionRules() };
+}
+
+const lowestCapPerAccount = (candidates: readonly ReleaseCandidate[]) => {
+  const out = new Map<string, number>();
+  for (const c of candidates) out.set(c.accountId, Math.min(out.get(c.accountId) ?? Infinity, c.dailyCap));
+  return out;
+};
+
+/**
+ * The cap an account really has: the LOWEST among all its Sequences that have a due member, exactly what the full cron's plan
+ * sees. A release narrowed to some members would otherwise take their Sequence's own cap and let a Sequence with a bigger cap
+ * spend what a stricter one on the same mailbox is entitled to.
+ */
+async function accountCapsWithDueMembers(now: Date, candidates: readonly ReleaseCandidate[]): Promise<Map<string, number>> {
+  const iso = now.toISOString();
+  const accounts = sql.join([...new Set(candidates.map((c) => c.accountId))].map((id) => sql`${id}::uuid`), sql`, `);
+  const rows = rowsOf<{ account_id: string; cap: number | string }>(
+    await db.execute(sql`
+      select s.email_account_id::text as account_id, min(s.daily_send_cap) as cap
+      from sequence s
+      where s.email_account_id in (${accounts})
+        and exists (select 1 from sequence_draft d join sequence_member sm on sm.id = d.sequence_member_id where sm.sequence_id = s.id and ${dueWhere(iso)})
+      group by s.email_account_id`),
+  );
+  return new Map(rows.map((r) => [r.account_id, Number(r.cap)]));
 }
 
 export const liveRunnerPorts: RunnerPorts = {

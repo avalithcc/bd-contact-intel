@@ -144,7 +144,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       discardReason: (r.discard_reason ?? null) as string | null,
       draft: draftOf(r, "d1"),
       reminderDraft: draftOf(r, "d2"),
-      place: { city: (r.city ?? null) as string | null, region: (r.region ?? null) as string | null, country: ((r.country ?? r.company_country) ?? null) as string | null },
+      place: { city: (r.city ?? null) as string | null, region: (r.region ?? null) as string | null, country: ((r.country || r.company_country) || null) as string | null },
     })),
   };
 }

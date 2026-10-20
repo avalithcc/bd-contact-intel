@@ -232,3 +232,80 @@ test("Cambiar moves an approved member, is refused inside the 2-minute lock, and
   await db.execute(sql`update sequence_draft set scheduled_for = ${new Date(Date.now() + 60_000).toISOString()}::timestamptz where sequence_member_id = ${id}::uuid and step = 1`);
   assert.deepEqual(await rescheduleApproved(a.bdId, id, { kind: "at", ...slotOf(later) }), { ok: false, error: "locked" });
 });
+
+/** Another Sequence on the SAME sending account, with its own cap. */
+async function mkSequenceOn(a: Acct, label: string, cap: number) {
+  const { db } = await import("@/db");
+  const { sequence } = await import("@/db/schema");
+  const [s] = await db.insert(sequence).values({ name: `zz-now-${run}-${label}`, ownerBdId: a.bdId, emailAccountId: a.accountId, dailySendCap: cap, schedule: {} }).returning();
+  return { ...a, sequenceId: s.id };
+}
+
+/** `n` sends already recorded today from the account (the Miami day of the real clock, which is what releaseMembersNow runs on). */
+async function seedSentToday(a: Acct, n: number) {
+  const { db } = await import("@/db");
+  const { person, sequenceMember, sequenceSendClaim } = await import("@/db/schema");
+  const { miamiCalendarDate } = await import("@/lib/sequences/miamiTime");
+  for (let i = 0; i < n; i++) {
+    const email = `zz-now-hist${i}-${a.accountId.slice(0, 6)}-${run}@example.test`;
+    const [p] = await db.insert(person).values({ firstName: `hist${i}`, lastName: run, email, emailNormalized: email, emailStatus: "verified", emailSource: "apollo", country: "United States" }).returning();
+    personIds.push(p.id);
+    const [m] = await db.insert(sequenceMember).values({ sequenceId: a.sequenceId, personId: p.id, state: "sent", sentAt: new Date() }).returning();
+    await db.insert(sequenceSendClaim).values({ sequenceMemberId: m.id, step: 1, sendingAccountId: a.accountId, outcome: "sent", sentAt: new Date(), miamiSendDate: miamiCalendarDate(new Date()) });
+  }
+}
+
+test("daily cap at claim time: two CONCURRENT runs at 14 of 15 send exactly one more", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const { scopedRunnerPorts } = await import("@/lib/sequences/releaseQueries");
+  const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
+  const a = await mkAccount("race15", 15);
+  await seedSentToday(a, 14);
+  const m1 = await mkDrafted(a, "race15a");
+  const m2 = await mkDrafted(a, "race15b");
+  await approveMember(a.bdId, m1, 1, { kind: "now" });
+  await approveMember(a.bdId, m2, 1, { kind: "now" });
+  const { sends, send } = await fakeSend();
+  // Barrier: neither run may plan-and-claim until BOTH have read 14 sent, so each plans one more and only the claim can stop the second.
+  let arrived = 0;
+  let open!: () => void;
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  const runFor = (id: string) => {
+    const base = scopedRunnerPorts({ memberIds: [id], ownerBdId: a.bdId });
+    return runSequenceRelease({
+      ...base,
+      send,
+      draftReminder: async () => undefined,
+      load: async (now) => {
+        const loaded = await base.load(now);
+        if (++arrived >= 2) open();
+        await gate;
+        return loaded;
+      },
+    });
+  };
+  const [r1, r2] = await Promise.all([runFor(m1), runFor(m2)]);
+  assert.equal(sends.length, 1, "15 is the cap: one more, not two");
+  assert.equal(r1.released + r2.released, 1);
+  const states = [await memberState(m1), await memberState(m2)].sort();
+  assert.deepEqual(states, ["approved", "sent"], "the other member stays approved");
+});
+
+test("the effective cap is the lowest among ALL the account's Sequences with due members, not only the scoped ones", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const { releaseMembersNow } = await import("@/lib/sequences/releaseNow");
+  const a = await mkAccount("lowcap", 15); // Sequence A, cap 15
+  const b = await mkSequenceOn(a, "lowcap-b", 5); // Sequence B, cap 5, same sending account
+  await seedSentToday(a, 5);
+  const inA = await mkDrafted(a, "lowA");
+  const inB = await mkDrafted(b, "lowB");
+  await approveMember(a.bdId, inA, 1, { kind: "now" });
+  await approveMember(b.bdId, inB, 1, { kind: "now" });
+  const { sends, send } = await fakeSend();
+  // Only A's member is in scope, but B has a due member on the same account: 5 already sent against the lowest cap (5) leaves 0.
+  const summary = await releaseMembersNow(a.bdId, [inA], { send, draftReminder: async () => undefined });
+  assert.equal(sends.length, 0);
+  assert.equal(summary.released, 0);
+  assert.equal(summary.deferred, 1);
+  assert.equal(await memberState(inA), "approved");
+});
