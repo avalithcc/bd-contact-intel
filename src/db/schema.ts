@@ -1839,6 +1839,10 @@ export const sequenceMember = pgTable(
     ),
     bySequenceState: index("sequence_member_sequence_state_idx").on(t.sequenceId, t.state),
     byPerson: index("sequence_member_person_idx").on(t.personId),
+    // The release runner's idle tick (every minute): the members that can be due are the few `approved` ones and the `sent` ones
+    // with a reminder date, so an idle tick reads those two small slices instead of scanning every member.
+    approved: index("sequence_member_approved_idx").on(t.id).where(sql`${t.state} = 'approved'`),
+    reminderDue: index("sequence_member_reminder_due_idx").on(t.reminderDueAt).where(sql`${t.state} = 'sent'`),
   }),
 );
 

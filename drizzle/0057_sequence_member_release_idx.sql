@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "sequence_member_approved_idx" ON "sequence_member" USING btree ("id") WHERE "sequence_member"."state" = 'approved';--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "sequence_member_reminder_due_idx" ON "sequence_member" USING btree ("reminder_due_at") WHERE "sequence_member"."state" = 'sent';

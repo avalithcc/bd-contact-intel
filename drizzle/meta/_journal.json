@@ -400,6 +400,13 @@
       "when": 1794342000000,
       "tag": "0056_crm_live_updates",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1794428400000,
+      "tag": "0057_sequence_member_release_idx",
+      "breakpoints": true
     }
   ]
 }

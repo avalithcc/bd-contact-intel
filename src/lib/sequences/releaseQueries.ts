@@ -91,12 +91,21 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, s
   if (scope && !scope.memberIds.length) return { candidates: [], truncated: false };
   // "Enviar ahora": the same read and the same checks, narrowed to the members the BD just approved (and to that BD's own Sequences).
   const scoped = scope ? sql`and sm.id in (${sql.join(scope.memberIds.map((id) => sql`${id}::uuid`), sql`, `)}) and s.owner_bd_id = ${scope.ownerBdId}::uuid` : sql``;
+  // Two branches instead of one OR across both tables, so each can use its partial index (sequence_member_approved_idx and
+  // sequence_member_reminder_due_idx): an idle tick reads the few approved members and the sent ones with a reminder date, not
+  // every member. The same rows as `dueWhere`, which still guards the full read below.
   const slim = rowsOf<Row>(
     await db.execute(sql`
-      select sm.id::text as member_id, d.step, d.scheduled_for, sm.reminder_due_at, d.approved_at, s.schedule
-      from sequence_draft d join sequence_member sm on sm.id = d.sequence_member_id join sequence s on s.id = sm.sequence_id
-      where ${dueWhere(iso)} ${scoped}
-      order by coalesce(sm.reminder_due_at, d.scheduled_for), sm.id limit ${MAX_SCAN + 1}`),
+      select * from (
+        (select sm.id::text as member_id, d.step, d.scheduled_for, sm.reminder_due_at, d.approved_at, s.schedule
+           from sequence_member sm join sequence_draft d on d.sequence_member_id = sm.id and d.step = 1 join sequence s on s.id = sm.sequence_id
+           where sm.state = 'approved' and d.approved_at is not null and d.scheduled_for <= ${iso}::timestamptz ${scoped})
+        union all
+        (select sm.id::text, d.step, d.scheduled_for, sm.reminder_due_at, d.approved_at, s.schedule
+           from sequence_member sm join sequence_draft d on d.sequence_member_id = sm.id and d.step = 2 join sequence s on s.id = sm.sequence_id
+           where sm.state = 'sent' and sm.reminder_due_at <= ${iso}::timestamptz and d.approved_at is not null ${scoped})
+      ) due
+      order by coalesce(reminder_due_at, scheduled_for), member_id limit ${MAX_SCAN + 1}`),
   );
   const slimRows: SlimRow[] = slim.slice(0, MAX_SCAN).map((r) => ({
     id: r.member_id as string, step: Number(r.step) as 1 | 2, scheduledFor: toDate(r.scheduled_for), reminderDueAt: toDate(r.reminder_due_at),
