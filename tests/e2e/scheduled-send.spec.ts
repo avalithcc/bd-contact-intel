@@ -284,6 +284,25 @@ test.describe('Scheduled send: scheduling writes one row and is not a touch', ()
     expect(after).toEqual(before);
   });
 
+  test('while the server action runs the send control shows the in-progress state and holds live refreshes, then settles', async ({ page }) => {
+    // A server action is a POST carrying `Next-Action`; holding it open makes the in-flight window long enough to assert on.
+    await page.route('**/*', async (route) => {
+      if (route.request().method() === 'POST' && route.request().headers()['next-action']) await new Promise((r) => setTimeout(r, 2000));
+      await route.continue();
+    });
+    const pop = await openSchedulePopover(page, `Ocupado ${tag}`, 'Se muestra el progreso.');
+    await pop.getByRole('button', { name: S.presetHour, exact: true }).click();
+    await popSubmit(pop).click();
+
+    const group = page.getByRole('group', { name: S.groupLabel, exact: true });
+    await expect(group).toHaveAttribute('aria-busy', 'true');
+    await expect(group.getByRole('button', { name: S.scheduling, exact: true })).toBeDisabled();
+    await expect(page.locator('[data-busy="true"]')).not.toHaveCount(0);
+
+    await expect(page.locator('#toast-region')).toContainText(L.toastEmailScheduled);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('a time typed by hand is stored as the exact instant, read as Argentina time', async ({ page }) => {
     const pop = await openSchedulePopover(page);
     // 10:00 Argentina (UTC-3, no DST) is always 13:00 UTC.

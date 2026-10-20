@@ -3845,6 +3845,8 @@ export const es: typeof en = {
   // A FLAT record of strings with {placeholders}: it is handed to "use client" components.
   sendControl: {
     groupLabel: "Envío",
+    sending: "Enviando…",
+    scheduling: "Programando…",
     moreOptions: "Más opciones de envío",
     sendNow: "Enviar ahora",
     scheduleItem: "Programar…",

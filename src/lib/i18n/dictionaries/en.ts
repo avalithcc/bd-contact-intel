@@ -3842,6 +3842,8 @@ export const en = {
   // A FLAT record of strings with {placeholders}: it is handed to "use client" components.
   sendControl: {
     groupLabel: "Send",
+    sending: "Sending…",
+    scheduling: "Scheduling…",
     moreOptions: "More send options",
     sendNow: "Send now",
     scheduleItem: "Schedule…",

@@ -7,11 +7,12 @@ import type { Slot } from "@/lib/sendSchedule/time";
 import type { SendControlLabels } from "@/lib/sendSchedule/labels";
 import { SchedulePopover, type ScheduleConfig } from "./SchedulePopover";
 import { SendAdviceChip } from "./SendAdvice";
+import { useInFlight } from "./useInFlight";
 
 export interface CadenceOption {
   /** Shown as the item's second line, e.g. "Mañana mar 20 oct, 9:00 (Miami)". */
   hint: string;
-  onPick: () => void;
+  onPick: () => unknown;
 }
 
 /**
@@ -47,7 +48,8 @@ export function SendSplitButton({
   schedule: ScheduleConfig;
   cadence?: CadenceOption | null;
   error?: string | null;
-  onSendNow: () => void;
+  /** May return the call's promise: the button then shows the in-progress state until it settles. */
+  onSendNow: () => unknown;
   /** Answer `true` when it worked: the popover closes. Anything else leaves it open for the caller's `error`. */
   onSchedule: (slot: Slot) => Promise<boolean | void> | boolean | void;
 }) {
@@ -58,6 +60,12 @@ export function SendSplitButton({
   const chevRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const size = small ? " btn-sm" : "";
+  // This control's own call: the label, spinner and leave-page guard. `busy` (the screen's flag) only disables.
+  const flight = useInFlight();
+  const working = busy || flight.kind !== null;
+  const primaryText = flight.kind === "send" ? l.sending : flight.kind === "schedule" ? l.scheduling : primaryLabel;
+  const sendNow = () => void flight.run("send", onSendNow);
+  const pickCadence = () => void flight.run("schedule", async () => cadence?.onPick());
 
   useEffect(() => {
     if (!menuOpen && !popOpen) return;
@@ -115,13 +123,13 @@ export function SendSplitButton({
   };
 
   return (
-    <span className="foot-anchor" style={stackAdvice ? { flexDirection: "column-reverse", alignItems: "flex-end", gap: "var(--space-2xs)" } : undefined} ref={rootRef} onKeyDown={onKeyDown}>
+    <span className="foot-anchor" style={stackAdvice ? { flexDirection: "column-reverse", alignItems: "flex-end", gap: "var(--space-2xs)" } : undefined} ref={rootRef} onKeyDown={onKeyDown} data-busy={flight.kind ? "true" : undefined}>
       {nowAdvice && !popOpen && <SendAdviceChip labels={l} advice={nowAdvice} />}
       <span className="anchor-split">
-        <span className="btn-group split-btn" role="group" aria-label={l.groupLabel}>
-          <button type="button" className={`btn btn-primary${size}`} disabled={disabled || busy} onClick={onSendNow}>
-            <SendIcon className="icon" />
-            {primaryLabel}
+        <span className="btn-group split-btn" role="group" aria-label={l.groupLabel} aria-busy={working ? "true" : undefined}>
+          <button type="button" className={`btn btn-primary${size}`} disabled={disabled || working} onClick={sendNow}>
+            {flight.kind ? <span className="spinner" aria-hidden="true" /> : <SendIcon className="icon" />}
+            {primaryText}
           </button>
           <button
             ref={chevRef}
@@ -130,7 +138,7 @@ export function SendSplitButton({
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={l.moreOptions}
-            disabled={disabled || busy}
+            disabled={disabled || working}
             onClick={() => {
               setPopOpen(false);
               setMenuOpen((v) => !v);
@@ -158,7 +166,7 @@ export function SendSplitButton({
                 className="menu-item mi"
                 onClick={() => {
                   setMenuOpen(false);
-                  cadence.onPick();
+                  pickCadence();
                 }}
               >
                 <ClockIcon className="icon" />
@@ -176,11 +184,11 @@ export function SendSplitButton({
           labels={l}
           config={{ ...schedule, initial: initial ?? schedule.initial }}
           placement={placement}
-          busy={busy}
+          busy={working}
           error={error}
           onClose={closeAll}
           onSubmit={async (slot) => {
-            if ((await onSchedule(slot)) === true) {
+            if ((await flight.run("schedule", () => onSchedule(slot))) === true) {
               setPopOpen(false);
               setMenuOpen(false);
             }

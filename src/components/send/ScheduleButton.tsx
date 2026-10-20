@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SendControlLabels } from "@/lib/sendSchedule/labels";
 import type { Slot } from "@/lib/sendSchedule/time";
 import { SchedulePopover, type ScheduleConfig } from "./SchedulePopover";
+import { useInFlight } from "./useInFlight";
 
 /**
  * A plain button that opens the shared schedule popover ("Cambiar" on an approved card, mockup section 4). Same popover as the
@@ -36,6 +37,8 @@ export function ScheduleButton({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const flight = useInFlight();
+  const working = busy || flight.kind !== null;
 
   useEffect(() => {
     if (!open) return;
@@ -55,6 +58,7 @@ export function ScheduleButton({
     <span
       className="foot-anchor"
       ref={rootRef}
+      data-busy={flight.kind ? "true" : undefined}
       onKeyDown={(e) => {
         if (e.key === "Escape" && open) {
           e.stopPropagation();
@@ -63,19 +67,20 @@ export function ScheduleButton({
         }
       }}
     >
-      <button ref={buttonRef} type="button" className={className} disabled={disabled} title={title} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        {label}
+      <button ref={buttonRef} type="button" className={className} disabled={disabled || working} aria-busy={working ? "true" : undefined} title={title} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {flight.kind && <span className="spinner" aria-hidden="true" />}
+        {flight.kind ? l.scheduling : label}
       </button>
       {open && (
         <SchedulePopover
           labels={l}
           config={schedule}
           placement={placement}
-          busy={busy}
+          busy={working}
           error={error}
           onClose={close}
           onSubmit={async (slot) => {
-            if ((await onSchedule(slot)) === true) setOpen(false);
+            if ((await flight.run("schedule", () => onSchedule(slot))) === true) setOpen(false);
           }}
         />
       )}

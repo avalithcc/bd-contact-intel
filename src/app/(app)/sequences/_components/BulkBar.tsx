@@ -38,8 +38,8 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           busy={send.busy}
           error={send.error}
           schedule={approvalSchedule(send, recipients, "bulk", v.selected)}
-          cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => void onAction({ type: "approve", memberIds: v.ids, when: { kind: "cadence" } }) }}
-          onSendNow={() => void onAction({ type: "approve", memberIds: v.ids, when: { kind: "now" } })}
+          cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => onAction({ type: "approve", memberIds: v.ids, when: { kind: "cadence" } }) }}
+          onSendNow={() => onAction({ type: "approve", memberIds: v.ids, when: { kind: "now" } })}
           onSchedule={(slot) => onAction({ type: "approve", memberIds: v.ids, when: { kind: "at", ...slot } })}
         />
       </div>

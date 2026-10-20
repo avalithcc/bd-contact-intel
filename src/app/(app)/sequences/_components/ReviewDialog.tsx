@@ -71,7 +71,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement) || !memberId) return;
     const data = new FormData(form);
-    onAction({ type: "approve", memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? ""), when });
+    return onAction({ type: "approve", memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? ""), when });
   };
   // Always asks the server without a confirmation: it refuses to overwrite an edit and the container then confirms with the BD.
   const footerButton = (id: ReviewFooterId) =>
@@ -87,7 +87,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         schedule={approvalSchedule(send, [{ name, zone: resolveRecipientZone(m.place ?? {}) }], "one")}
         cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => approveWith({ kind: "cadence" }) }}
         onSendNow={() => approveWith({ kind: "now" })}
-        onSchedule={(slot) => approveWith({ kind: "at", ...slot })}
+        onSchedule={async (slot) => { await approveWith({ kind: "at", ...slot }); }}
       />
     ) : (
       <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>

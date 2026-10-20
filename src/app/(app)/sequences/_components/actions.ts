@@ -29,7 +29,7 @@ export type ReviewAction =
   | { type: "save"; memberId: string; step: 1 | 2; subject: string; body: string }
   /** `when` is the split-button choice; absent for the reminder (step 2), which has no choice. */
   | { type: "approve"; memberId: string; step: 1 | 2; subject: string; body: string; when?: SendChoice };
-export type OnReviewAction = (action: ReviewAction) => void;
+export type OnReviewAction = (action: ReviewAction) => void | Promise<unknown>;
 
 /** What the bulk bar asks for. `remove` only asks to start: the reason is collected by `RemoveReasonDialog`. */
 export type BulkAction = { type: "remove"; memberIds: string[] } | { type: "approve"; memberIds: string[]; when: SendChoice };

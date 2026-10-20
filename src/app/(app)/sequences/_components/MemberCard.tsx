@@ -5,6 +5,7 @@ import { DropdownMenu } from "@/components/DropdownMenu";
 import { GenerateIcon, MoreIcon } from "@/components/icons";
 import { initialsFromName } from "@/components/initials";
 import { ScheduleButton } from "@/components/send/ScheduleButton";
+import { SendNowButton } from "@/components/send/SendNowButton";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { resolveRecipientZone, zoneClock } from "@/lib/sendSchedule/zones";
 import { slotOf } from "@/lib/sendSchedule/time";
@@ -92,8 +93,8 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
               error={send.error}
               placement="down"
               schedule={approvalSchedule(send, recipients, "one")}
-              cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => void onAction({ type: "approveWith", memberId: m.memberId, when: { kind: "cadence" } }) }}
-              onSendNow={() => void onAction({ type: "approveWith", memberId: m.memberId, when: { kind: "now" } })}
+              cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => onAction({ type: "approveWith", memberId: m.memberId, when: { kind: "cadence" } }) }}
+              onSendNow={() => onAction({ type: "approveWith", memberId: m.memberId, when: { kind: "now" } })}
               onSchedule={(slot) => onAction({ type: "approveWith", memberId: m.memberId, when: { kind: "at", ...slot } })}
             />
           );
@@ -113,7 +114,7 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
             />
           );
         }
-        if (a.id === "sendNow") return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={send.busy || locked} title={locked ? l.lockedTitle : undefined} onClick={() => void onAction({ type: "reschedule", memberId: m.memberId, when: { kind: "now" } })}>{l.actions.sendNow}</button>;
+        if (a.id === "sendNow") return <SendNowButton key={a.id} labels={send.labels} label={l.actions.sendNow} className={`btn btn-${a.style} btn-sm`} disabled={send.busy || locked} title={locked ? l.lockedTitle : undefined} onSend={() => onAction({ type: "reschedule", memberId: m.memberId, when: { kind: "now" } })} />;
         if (a.id === "cancel" || a.id === "cancelSchedule") return <button key={a.id} type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--color-danger-text)" }} disabled={locked} title={locked ? l.lockedTitle : undefined} onClick={run("cancel")}>{l.actions[a.id]}</button>;
         return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} onClick={run(a.id)}>{l.actions[a.id]}</button>;
       })}
