@@ -3,7 +3,7 @@
  * is_startup predicate or ranking: target_company.is_startup is a lazily populated, nullable inference, and filtering
  * on it cut a real candidate pool from 18 to 2 (measured 2026-10-14).
  */
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
 import { openFreshPostingSql, openPostingSql } from "@/lib/hiring/openPosting";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
@@ -25,8 +25,18 @@ export const clientStatusSql = sql`(
 /** A `job_posting jp` belongs to the company of `person p`, directly or through a company alias. */
 export const sameCompanyPostingSql = sql`(jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
-/** The person's company country (the second link of recipientMarket), or NULL. */
-export const companyCountrySql = sql`(select c.country from company c where c.company_key = p.company_key or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1)`;
+/**
+ * THE company country rule of recipientMarket's second link, shared by the picker (set-based joins) and the add guard
+ * (by-id read) so they cannot disagree: the person's OWN company row first, then the canonical company its key is an alias
+ * of, a blank value counting as missing. NULL means the postings decide.
+ */
+export const firstFilledCountry = (own: SQL, canonical: SQL): SQL => sql`coalesce(nullif(btrim(${own}), ''), nullif(btrim(${canonical}), ''))`;
+
+/** `firstFilledCountry` for a `from person p` read with no company joins. */
+export const companyCountrySql = firstFilledCountry(
+  sql`(select c.country from company c where c.company_key = p.company_key)`,
+  sql`(select c.country from company c join company_alias ca on ca.company_key = c.company_key where ca.alias_key = p.company_key and c.company_key <> p.company_key limit 1)`,
+);
 
 /** The open IT posting markets of the person's company (the third link of recipientMarket), as a JSON array. */
 export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyPostingSql}), '[]'::json)`;

@@ -21,7 +21,7 @@ import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { isMarketMapped } from "./draftCompose";
 import { PICKER_PAGE_SIZE, searchTokens, type PickerQuery } from "./pickerFilters";
 import { recipientMarket } from "./recipientMarket";
-import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql } from "./rosterQuery";
+import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql, firstFilledCountry } from "./rosterQuery";
 
 /** Lower-cased, trimmed country strings by what the compliance footer can do with them. */
 export type CountryFacts = { unmapped: string[]; us: string[] };
@@ -82,7 +82,7 @@ const jobFacts = sql`pk_jf as (
 const either = (col: string) => sql.raw(`(coalesce(d.${col}, false) or coalesce(a.${col}, false))`);
 const hireCount = sql`(coalesce(d.hire, 0) + coalesce(a.hire, 0))`;
 const postingFlorida = either("florida");
-const companyCountry = sql`coalesce(nullif(btrim(cn.country), ''), nullif(btrim(cca.country), ''))`;
+const companyCountry = firstFilledCountry(sql`cn.country`, sql`cca.country`);
 const clientStatus = sql`coalesce(cn.client_status, cca.client_status)`;
 /** The first country link of recipientMarket that has data; NULL means the postings decide. */
 const effectiveCountry = sql`coalesce(nullif(btrim(p.country), ''), ${companyCountry})`;

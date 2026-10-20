@@ -447,3 +447,31 @@ test("saving the REMINDER edits step 2 only, withdraws its approval, and never m
   assert.deepEqual(await saveDraftEdit(ownerId, drafted.id, { subject: "x", body: "y" }, 2), { ok: false, error: "not_found" });
   assert.deepEqual(await saveDraftEdit(otherId, m.id, { subject: "x", body: "y" }, 2), { ok: false, error: "not_found" });
 });
+
+test("the picker and addMembers read the SAME company country: own row first, then the canonical company, blank ignored", async () => {
+  const { db } = await import("@/db");
+  const { company, companyAlias, targetCompany } = await import("@/db/schema");
+  const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
+  const mk = async (name: string, ownCountry: string, canonCountry: string) => {
+    const own = key(`cc-${name}-own`);
+    const canon = key(`cc-${name}-canon`);
+    companyKeys.push(own, canon);
+    await db.insert(company).values([{ companyKey: own, displayName: own, country: ownCountry }, { companyKey: canon, displayName: canon, country: canonCountry }]);
+    await db.insert(companyAlias).values({ aliasKey: own, companyKey: canon });
+    return mkPerson(`cc-${name}`, own);
+  };
+  const blankOwn = await mk("blank", "  ", "Argentina"); // own blank -> the canonical LATAM country decides: addable
+  const ownWins = await mk("own", "Spain", "Argentina"); // own filled -> it decides, and Spain has no footer
+  const blankCanon = await mk("canon", "Argentina", "  "); // own LATAM, canonical blank
+  const seq = (await db.insert((await import("@/db/schema")).sequence).values({ name: key("cc-seq"), ownerBdId: ownerId, emailAccountId: accountId, schedule: {} }).returning())[0];
+  sequenceIds.push(seq.id);
+  const listed = new Map((await pickerIds({ showBlocked: true, search: `cc- ${run}` })).map((c) => [c.personId, c.block]));
+  assert.equal(listed.get(blankOwn.id), null);
+  assert.equal(listed.get(ownWins.id), "unmappedMarket");
+  assert.equal(listed.get(blankCanon.id), null);
+  const added = await addMembersToSequence(ownerId, seq.id, [blankOwn.id, ownWins.id, blankCanon.id]);
+  assert.ok(added.ok);
+  assert.deepEqual(added.accepted.sort(), [blankOwn.id, blankCanon.id].sort());
+  assert.deepEqual(added.rejected, [{ personId: ownWins.id, reason: "unmapped_market" }]);
+  void targetCompany;
+});
