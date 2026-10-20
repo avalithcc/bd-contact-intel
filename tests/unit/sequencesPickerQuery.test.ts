@@ -5,7 +5,7 @@ import { DEFAULT_PICKER_QUERY, PICKER_PAGE_SIZE, type PickerQuery } from "@/lib/
 import { getCountries, getExampleNumber } from "libphonenumber-js";
 import mobileExamples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
 import { isMarketMapped } from "@/lib/sequences/draftCompose";
-import { buildPickerPageQuery, countryFacts, floridaGeoPattern, phoneFooterPattern } from "@/lib/sequences/pickerQuery";
+import { PHONE_MIN_LENGTH, buildPickerPageQuery, buildPhoneFooterPattern, countryFacts, floridaGeoPattern, phoneFooterPattern } from "@/lib/sequences/pickerQuery";
 import { recipientMarket } from "@/lib/sequences/recipientMarket";
 
 const ME = "00000000-0000-4000-8000-000000000001";
@@ -84,9 +84,9 @@ test("the Florida pattern covers the phrases and the bare FL token, and nothing 
 test("the phone link sits only in the no-country, postings-unresolved branch and costs no join or subquery", () => {
   const { text, params } = render({ showBlocked: true });
   const elseBranch = text.slice(text.indexOf(" else ("));
-  assert.match(elseBranch, /else \(\(coalesce\(d\.posts_us, false\) or coalesce\(a\.posts_us, false\)\) = \(coalesce\(d\.posts_latam, false\) or coalesce\(a\.posts_latam, false\)\) and not \(regexp_replace\(coalesce\(p\.mobile_phone, ''\), '\[\^0-9\+\]', '', 'g'\) ~ \$\d+ or regexp_replace\(coalesce\(p\.phone, ''\), '\[\^0-9\+\]', '', 'g'\) ~ \$\d+\)\)/);
+  assert.match(elseBranch, /else \(\(coalesce\(d\.posts_us, false\) or coalesce\(a\.posts_us, false\)\) = \(coalesce\(d\.posts_latam, false\) or coalesce\(a\.posts_latam, false\)\) and not \(regexp_replace\(translate\(coalesce\(p\.mobile_phone, ''\), [^)]*\), '\[\^0-9\+\]', '', 'g'\) ~ \$\d+ or regexp_replace\(translate\(coalesce\(p\.phone, ''\), [^)]*\), '\[\^0-9\+\]', '', 'g'\) ~ \$\d+\)\)/);
   const before = text.slice(0, text.indexOf(" else ("));
-  assert.doesNotMatch(before, /mobile_phone, ''\), '\[\^0-9\+\]'/, "a country that is present never reaches the phone");
+  assert.doesNotMatch(before, /translate\(coalesce\(p\.mobile_phone/, "a country that is present never reaches the phone");
   assert.ok(params.includes(phoneFooterPattern()), "the dial-code pattern is a bound parameter");
   assert.doesNotMatch(text, /lateral/);
   assert.equal((text.match(/from person p/g) ?? []).length, 1, "no second pass over person for the phone");
@@ -102,6 +102,7 @@ test("the dial-code pattern lists the LATAM-specific +1 prefixes before the bare
 // The picker's SQL decides "blocked", the JS resolver decides the reason a row shows and the add itself. The one unsafe
 // disagreement is SQL hiding a contact JS would allow, so for every phone JS resolves to a footer the SQL pattern must match.
 const sqlSaysFooter = (phone: string) => new RegExp(phoneFooterPattern()).test(phone.replace(/[^0-9+]/g, ""));
+const digitsOf = (phone: string) => phone.replace(/\D/g, "");
 const jsSaysFooter = (phone: string) => isMarketMapped(recipientMarket({ mobilePhone: phone, phone: null }));
 
 test("the SQL phone test never blocks a number the JS resolver allows, across every country's example number", () => {
@@ -129,8 +130,37 @@ test("the SQL phone test never blocks a number the JS resolver allows, across ev
 });
 
 test("the asymmetry is pinned: SQL may show a malformed number or a footer-less +1 country that JS then blocks", () => {
-  for (const phone of ["+5491", "+54", "+1 876 555 1234", "+1 242 555 1234"]) {
+  for (const phone of ["+1 876 555 1234", "+1 242 555 1234"]) {
     assert.equal(sqlSaysFooter(phone), true, `sql shows ${phone}`);
     assert.equal(jsSaysFooter(phone), false, `js still blocks ${phone}`);
   }
+});
+
+test("the length floor rejects implausibly short numbers and clips no real one", () => {
+  for (const short of ["+5491", "+54", "+54 11 555", "+1 305", "+507 123"]) assert.equal(sqlSaysFooter(short), false, short);
+  // The floor is a lower bound, never a validity check: it must sit at or below the shortest REAL number of a mapped country.
+  // Panama is the shortest national plan in the mapped set (7 digits + 507 = 10 digits with the calling code).
+  const panama = "+507 200 1234";
+  assert.equal(jsSaysFooter(panama), true, "fixture is a valid Panama landline");
+  assert.equal(sqlSaysFooter(panama), true);
+  assert.ok(PHONE_MIN_LENGTH <= digitsOf(panama).length);
+  let shortestExample = Infinity;
+  for (const iso of getCountries()) {
+    const example = getExampleNumber(iso, mobileExamples)?.format("E.164");
+    if (!example || !jsSaysFooter(example)) continue;
+    shortestExample = Math.min(shortestExample, digitsOf(example).length);
+    assert.ok(sqlSaysFooter(example), `${iso} ${example} must clear the floor`);
+  }
+  assert.ok(PHONE_MIN_LENGTH <= shortestExample, `floor ${PHONE_MIN_LENGTH} vs shortest example ${shortestExample}`);
+  assert.equal(sqlSaysFooter("+5491155551234 ext 123456"), true, "an extension only lengthens a number: there is no upper bound");
+});
+
+test("an empty prefix list yields a pattern that matches nothing, not every number with a plus", () => {
+  const re = new RegExp(buildPhoneFooterPattern({ latam: [], us: [] }));
+  for (const phone of ["+5491155551234", "+13055551234", "+", "+++++++++++", ""]) assert.equal(re.test(phone), false, phone);
+});
+
+test("phoneFooterPattern is computed once per server instance", () => {
+  assert.equal(phoneFooterPattern(), phoneFooterPattern());
+  assert.ok(Object.is(phoneFooterPattern(), phoneFooterPattern()));
 });

@@ -47,6 +47,18 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
 }
 
 /**
+ * The fewest digits (calling code included) a phone must carry before the SQL link may match it. A floor against garbage,
+ * not a validity check: production holds a few hundred phone values the normalization pass flagged invalid or not-valid
+ * (`+5491`, `+54`...), and without a floor any of them on a no-country contact would match its country prefix and surface
+ * in the default view. DERIVED, not guessed: a brute-force search of libphonenumber's `isValid()` over every mapped country
+ * found the shortest REAL subscriber numbers at 9 digits (Paraguay) and 10 (Panama 507+7, Brazil, Colombia, Peru, El Salvador);
+ * the only shorter "valid" strings are non-subscriber specials (Uruguay 7, Canada 8). 8 sits one below the shortest real
+ * number, so the floor cannot clip one; the unit test asserts it against every country's example number. There is no upper
+ * bound: an extension ("ext 123") only lengthens a number JS accepts.
+ */
+export const PHONE_MIN_LENGTH = 8;
+
+/**
  * Postgres ARE for the fourth link of recipientMarket: a phone whose dial code lands in a market WITH a footer. Built in JS
  * from the same classification (phoneCallingCodeGroups), because SQL has no libphonenumber. Anchored on the `+` of the
  * stored E.164 value; calling codes are prefix-free, so a prefix test never confuses two countries.
@@ -56,13 +68,26 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
  * rule without a per-row lookup. As this only asks "has a footer" the order does not change the boolean today, but it is
  * the order any caller that needs the MARKET (not just the flag) must keep.
  *
- * SQL cannot say `isValid()`, so a malformed `+54...` can match here and still be rejected by the JS resolver. That
- * direction is safe (the row shows with its blocked badge and `staticRosterRejection` stays authoritative at add time);
- * the reverse, SQL blocking what JS allows, cannot happen because every JS-valid number carries its country's prefix.
+ * An empty prefix list (a runtime whose ICU cannot name regions classifies every country `other`) yields `(?!)`, which
+ * matches nothing: a bare `^\+()` would admit every number that starts with a plus.
+ *
+ * RESIDUAL, on purpose: SQL cannot say `isValid()`. A number that clears the length floor can still be malformed, and bare
+ * `1` also covers NANP countries with no footer (Jamaica, the Bahamas, Trinidad, Guam...). Those rows CAN appear in the
+ * default view, badged `unmappedMarket` by the JS admission, and the add guard (`staticRosterRejection`) refuses them. That
+ * is the tolerable direction: a usable row is never hidden and an unusable one is never added, it just shows with its reason.
+ * Fixing it would take a negative area-code list that rots, so it is left. The reverse (SQL hiding a row JS would allow)
+ * is guarded by the length floor and `phoneDigits`, and pinned by the all-countries example test.
  */
+export function buildPhoneFooterPattern(groups: { latam: readonly string[]; us: readonly string[] }): string {
+  const prefixes = [...groups.latam, ...groups.us];
+  if (!prefixes.length) return "(?!)";
+  return `^\\+(?=[0-9+]{${PHONE_MIN_LENGTH},})(${prefixes.join("|")})`;
+}
+
+let footerPatternCache: string | null = null;
+/** Computed once per server instance: ~240 region-name lookups and classifications to produce a constant. */
 export function phoneFooterPattern(): string {
-  const { latam, us } = phoneCallingCodeGroups(marketOfCountry);
-  return `^\\+(${[...latam, ...us].join("|")})`;
+  return (footerPatternCache ??= buildPhoneFooterPattern(phoneCallingCodeGroups(marketOfCountry)));
 }
 
 /** Postgres ARE: substring phrases plus the bare `fl` as a whole word (never inside "Flores"). */
@@ -117,6 +142,17 @@ const homeInFlorida = (f: CountryFacts) =>
   sql`((${effectiveCountry} is null or lower(${effectiveCountry}) = any(${textArray(f.us)})) and concat_ws(' ', p.city, p.region) ~* ${floridaGeoPattern()})`;
 
 /**
+ * A phone reduced to `+` and ASCII digits. libphonenumber-js reads three digit scripts as digits (fullwidth, Arabic-Indic,
+ * Extended Arabic-Indic; checked, Devanagari and Thai it does not), so a stored `+１ 305 555 1234` is a valid number for the
+ * JS resolver. They are folded to ASCII with `translate` first, then everything else is stripped; without the fold the
+ * strip would drop those digits, the prefix anchor would fail and the picker would hide a row JS allows. The fullwidth `＋`
+ * is NOT folded because libphonenumber-js does not accept it as a plus either. One `translate` per phone column per row.
+ */
+const DIGIT_SCRIPTS = [0xff10, 0x0660, 0x06f0].map((zero) => Array.from({ length: 10 }, (_, d) => String.fromCodePoint(zero + d)).join("")).join("");
+const phoneDigits = (col: string) =>
+  sql.raw(`regexp_replace(translate(coalesce(${col}, ''), '${DIGIT_SCRIPTS}', '${"0123456789".repeat(3)}'), '[^0-9+]', '', 'g')`);
+
+/**
  * The fourth link: either phone starts with a dial code that has a footer. Non-digits are stripped first (libphonenumber
  * tolerates spaces, dashes and brackets, a `+54 (9) 11` would otherwise miss the anchor). Two regex tests on columns of the
  * row itself: no subquery, no join, nothing per row beyond the row. Either phone, not "mobile first": a superset of the
@@ -124,8 +160,7 @@ const homeInFlorida = (f: CountryFacts) =>
  */
 const phoneHasFooter = () => {
   const pattern = phoneFooterPattern();
-  const digits = (col: string) => sql.raw(`regexp_replace(coalesce(${col}, ''), '[^0-9+]', '', 'g')`);
-  return sql`(${digits("p.mobile_phone")} ~ ${pattern} or ${digits("p.phone")} ~ ${pattern})`;
+  return sql`(${phoneDigits("p.mobile_phone")} ~ ${pattern} or ${phoneDigits("p.phone")} ~ ${pattern})`;
 };
 
 function blockedSql(f: CountryFacts): SQL {

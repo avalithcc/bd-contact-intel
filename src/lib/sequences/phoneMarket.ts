@@ -54,9 +54,11 @@ export type CallingCodeGroups = { latam: string[]; us: string[] };
  * The dial-code prefixes (digits, no `+`) of every country `marketOf` puts in `latam` or `us`, i.e. the countries with a
  * legal footer. `marketOf` is the same country classification recipientMarket uses, so Canada and the name lists behave
  * identically here. Calling codes are prefix-free (ITU), except the NANP split above, so a prefix test never confuses two
- * countries. SQL-side this is a superset of what libphonenumber accepts: it cannot validate length, and bare `1` also
- * covers NANP countries with no footer (Jamaica, the Bahamas...). That direction only shows a row that the JS admission
- * then blocks with its reason; the reverse (SQL hiding a row JS would allow) cannot happen.
+ * countries. SQL-side this is nearly a superset of what libphonenumber accepts: it cannot validate a number, and bare `1` also
+ * covers NANP countries with no footer (Jamaica, the Bahamas...). That direction only shows a row that the JS admission then
+ * blocks with its reason. The reverse (SQL hiding a row JS would allow) is guarded, not impossible by construction: the SQL
+ * folds the digit scripts libphonenumber accepts (pickerQuery.ts `phoneDigits`) and its length floor is checked against every
+ * country's example number. A format libphonenumber accepts that neither covers would be hidden.
  */
 export function phoneCallingCodeGroups(marketOf: (countryName: string) => MarketKey): CallingCodeGroups {
   const groups: Record<"latam" | "us", Set<string>> = { latam: new Set(), us: new Set() };

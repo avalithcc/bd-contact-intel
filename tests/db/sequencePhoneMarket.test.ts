@@ -29,6 +29,9 @@ const SPECS: Record<string, Spec> = {
   noPhone: {},
   noPlus: { mobilePhone: "5491155551234" },
   malformedAr: { mobilePhone: "+5491" },
+  fullwidthUs: { mobilePhone: "+１ 305 555 1234" },
+  arabicIndicUs: { mobilePhone: "+١ 305 555 1234" },
+  jamaica: { mobilePhone: "+18765551234" },
 };
 
 before(async () => {
@@ -70,22 +73,26 @@ async function page(showBlocked: boolean) {
 
 test("the default picker lists the contacts a phone unblocks and hides the ones with no footer", async () => {
   const listed = await page(false);
-  for (const name of ["arMobile", "arFormatted", "arLandline", "doMobile", "usMobile"]) assert.equal(listed.get(name), null, name);
-  for (const name of ["esMobile", "spainWithArPhone", "noPhone", "noPlus"]) assert.equal(listed.has(name), false, `${name} is hidden`);
+  for (const name of ["arMobile", "arFormatted", "arLandline", "doMobile", "usMobile", "fullwidthUs", "arabicIndicUs"]) assert.equal(listed.get(name), null, name);
+  for (const name of ["esMobile", "spainWithArPhone", "noPhone", "noPlus", "malformedAr"]) assert.equal(listed.has(name), false, `${name} is hidden`);
 });
 
-test("SQL never hides what JS allows: a malformed number the SQL shows is blocked by the JS reason", async () => {
+test("a number too short to be real is hidden by default, and shown with its reason when blocked rows are on", async () => {
   const shown = await page(true);
-  for (const name of ["esMobile", "spainWithArPhone", "noPhone", "noPlus"]) assert.equal(shown.get(name), "unmappedMarket", name);
-  assert.equal(shown.get("malformedAr"), "unmappedMarket", "SQL lets +5491 through, the JS resolver rejects it and says why");
-  assert.equal((await page(false)).has("malformedAr"), true, "so it is listed, with its badge, rather than silently hidden");
+  for (const name of ["esMobile", "spainWithArPhone", "noPhone", "noPlus", "malformedAr"]) assert.equal(shown.get(name), "unmappedMarket", name);
+});
+
+test("residual, pinned: bare +1 also reaches a footer-less NANP country, which the default view lists WITH its badge", async () => {
+  // SQL cannot tell Jamaica from the US by dial code and a negative area-code list would rot. The row is never addable:
+  // the JS admission badges it and the add guard refuses it. A usable row is never hidden; this is the tolerable direction.
+  assert.equal((await page(false)).get("jamaica"), "unmappedMarket");
 });
 
 test("the add guard agrees: a phone-resolved contact is admitted, Spain with an Argentine phone is refused", async () => {
   const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
-  const result = await addMembersToSequence(bdId, sequenceId, ["arMobile", "doMobile", "esMobile", "spainWithArPhone", "malformedAr"].map((n) => ids.get(n)!));
+  const result = await addMembersToSequence(bdId, sequenceId, ["arMobile", "doMobile", "fullwidthUs", "arabicIndicUs", "esMobile", "spainWithArPhone", "malformedAr", "jamaica"].map((n) => ids.get(n)!));
   assert.ok(result.ok);
-  assert.deepEqual([...result.accepted].map(String).sort(), ["arMobile", "doMobile"].map((n) => ids.get(n)!).sort());
+  assert.deepEqual([...result.accepted].map(String).sort(), ["arMobile", "doMobile", "fullwidthUs", "arabicIndicUs"].map((n) => ids.get(n)!).sort());
   const reasons = Object.fromEntries(result.rejected.map((r) => [r.personId, r.reason]));
-  for (const n of ["esMobile", "spainWithArPhone", "malformedAr"]) assert.equal(reasons[ids.get(n)!], "unmapped_market", n);
+  for (const n of ["esMobile", "spainWithArPhone", "malformedAr", "jamaica"]) assert.equal(reasons[ids.get(n)!], "unmapped_market", n);
 });
