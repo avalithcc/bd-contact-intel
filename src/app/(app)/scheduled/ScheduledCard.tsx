@@ -5,6 +5,8 @@ import { AttachmentChips, RecipientsLine } from "@/components/email/AttachmentCh
 import { ClockIcon, EditPencilIcon, WarningIcon } from "@/components/icons";
 import { summarizeRecipients } from "@/lib/email/recipients/summary";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { fillTemplate } from "@/lib/i18n/template";
+import type { UpcomingSequenceStep } from "@/lib/sequences/timelineSteps";
 import { actionsFor, sendNowDisabled, stampLabel, stateOf, wasLabel, whenLabel, type ScheduledAction, type ScheduledItem } from "@/lib/scheduledEmail/view";
 import { ACTION_LABEL, type RunScheduled } from "./useScheduledActions";
 
@@ -114,6 +116,30 @@ export function CancelledLine({ item, l }: { item: ScheduledItem; l: ContactReco
           <span className="when">{item.cancelledAt ? stampLabel(item.cancelledAt) : ""} · {item.actorName}</span>
         </div>
         <div className="tl-body">{l.schedCancelledWas} {whenLabel(item.sendAt, "argentina")}. {l.schedCancelledBodyAfter}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * An approved Sequence email waiting to go out, in "Próximas" (enviar-o-programar.html 4d). It is managed from the Sequence:
+ * changing it from the record would skip the approval and the pre-send checks, so the card only links there.
+ */
+export function SequenceStepCard({ step, l }: { step: UpcomingSequenceStep; l: ContactRecordLabels }) {
+  return (
+    <div className="tl-item">
+      <div className="tl-icon email"><ClockIcon className="icon" /></div>
+      <div className="tl-card">
+        <div className="tl-head">
+          <span className="what">{l.schedCardTitle} · {step.subject}</span>
+          <span className="badge badge-brand no-dot">{l.schedCardSends} {whenLabel(step.at, "argentina")}</span>
+          <span className="badge badge-mono">{fillTemplate(l.schedSeqBadge, { name: step.sequenceName })}</span>
+          {step.approvedAt && <span className="when">{l.schedSeqApproved} {stampLabel(step.approvedAt)}</span>}
+        </div>
+        <div className="tl-body">{step.toAddress ? `${l.schedCardTo} ${step.toAddress}. ` : ""}{l.schedSeqBody}</div>
+        <div className="row mt-lg">
+          <Link className="btn btn-secondary btn-sm" href={`/sequences/${step.sequenceId}`}>{l.schedSeqOpen}</Link>
+        </div>
       </div>
     </div>
   );

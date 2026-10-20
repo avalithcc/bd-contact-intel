@@ -20,6 +20,7 @@ import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
 import { isGmailConnected, listScheduledForPerson } from "@/lib/scheduledEmail/queries";
 import { resolveRecipientZone } from "@/lib/sendSchedule/zones";
+import { upcomingSequenceSteps } from "@/lib/sequences/timelineSteps";
 import { serviceRoleConfigured } from "@/lib/supabase/serviceRole";
 import { stateOf, whenLabel } from "@/lib/scheduledEmail/view";
 import { isAdminRole } from "@/lib/auth/adminRole";
@@ -551,6 +552,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                       associationLabel: companyDisplayName ? `${name} · ${companyDisplayName}` : name,
                     }))}
                     scheduled={scheduled}
+                    sequenceSteps={upcomingSequenceSteps(sequenceMemberships)}
                     meetings={recordMeetings}
                     gmailConnected={gmailConnected}
                     now={nowForScheduled}

@@ -27,6 +27,11 @@ export type ContactMembership = {
   repliedAt: Date | null;
   discardedAt: Date | null;
   discardReason: string | null;
+  /** For the record's "Próximas" card of an approved step (timelineSteps.ts). */
+  sequenceId?: string;
+  subject?: string | null;
+  approvedAt?: Date | null;
+  toAddress?: string | null;
 };
 
 export type MembershipKind = "drafted" | "approved" | "sent" | "noReply" | "replied" | "discardedUnsent" | "discardedSent" | "optedOut";

@@ -130,7 +130,7 @@ export async function listContactMemberships(viewerBdId: string, email: string |
   const rows = rowsOf<Row>(
     await db.execute(sql`
       select sm.id::text as member_id, s.name as sequence_name, s.owner_bd_id::text as owner_bd_id, sm.state, d.scheduled_for,
-             sm.sent_at, sm.replied_at, sm.discarded_at, sm.discard_reason
+             s.id::text as sequence_id, d.subject, d.approved_at, p.email as to_address, sm.sent_at, sm.replied_at, sm.discarded_at, sm.discard_reason
       from sequence_member sm
       join sequence s on s.id = sm.sequence_id
       join person p on p.id = sm.person_id
@@ -139,7 +139,7 @@ export async function listContactMemberships(viewerBdId: string, email: string |
       order by (sm.state = 'discarded' and sm.discard_reason is distinct from 'opt_out'), sm.created_at desc, sm.id
       limit ${MEMBERSHIP_LIMIT}`),
   );
-  return rows.map((r) => toMembership({ ...(r as MembershipDbRow), scheduled_for: date(r.scheduled_for), sent_at: date(r.sent_at), replied_at: date(r.replied_at), discarded_at: date(r.discarded_at) }, viewerBdId));
+  return rows.map((r) => toMembership({ ...(r as MembershipDbRow), scheduled_for: date(r.scheduled_for), approved_at: date(r.approved_at), sent_at: date(r.sent_at), replied_at: date(r.replied_at), discarded_at: date(r.discarded_at) }, viewerBdId));
 }
 
 /**

@@ -101,12 +101,17 @@ export type MembershipDbRow = {
   replied_at: Date | null;
   discarded_at: Date | null;
   discard_reason: string | null;
+  sequence_id?: string;
+  subject?: string | null;
+  approved_at?: Date | null;
+  to_address?: string | null;
 };
 
 export function toMembership(r: MembershipDbRow, viewerBdId: string): ContactMembership {
   return {
     memberId: r.member_id, sequenceName: r.sequence_name, state: r.state as MemberState, ownedByViewer: r.owner_bd_id === viewerBdId,
     scheduledFor: r.scheduled_for, sentAt: r.sent_at, repliedAt: r.replied_at, discardedAt: r.discarded_at, discardReason: r.discard_reason,
+    sequenceId: r.sequence_id, subject: r.subject ?? null, approvedAt: r.approved_at ?? null, toAddress: r.to_address ?? null,
   };
 }
 

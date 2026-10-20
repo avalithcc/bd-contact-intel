@@ -19,7 +19,8 @@ import { isRequestCurrent } from "@/lib/activity/requestGeneration";
 import { contactActionErrorMessage, type ContactRecordLabels } from "@/lib/contacts/labels";
 import { groupTimelineEntries, upcomingTasks } from "@/lib/contacts/timelineGrouping";
 import type { ScheduledItem } from "@/lib/scheduledEmail/view";
-import { CancelledLine, ScheduledCard } from "../../scheduled/ScheduledCard";
+import { CancelledLine, ScheduledCard, SequenceStepCard } from "../../scheduled/ScheduledCard";
+import type { UpcomingSequenceStep } from "@/lib/sequences/timelineSteps";
 import { useNow, useScheduledActions } from "../../scheduled/useScheduledActions";
 import { sortTasksForTimelinePill } from "@/lib/contacts/timelineTasks";
 import {
@@ -139,6 +140,8 @@ export interface TimelineProps {
   tasks: TimelineTask[];
   // This BD's scheduled emails for the Contact (open ones plus recent cancellations), see listScheduledForPerson.
   scheduled: ScheduledItem[];
+  // This BD's approved Sequence emails waiting to go out ("Próximas", managed from the Sequence).
+  sequenceSteps: UpcomingSequenceStep[];
   // Scheduled meetings of this Contact the viewer may see (meeting-outcomes): the dashed "Próximas" cards.
   meetings: RecordMeeting[];
   gmailConnected: boolean;
@@ -378,6 +381,7 @@ export function Timeline({
   activePill,
   tasks,
   scheduled,
+  sequenceSteps,
   meetings,
   gmailConnected,
   now: serverNow,
@@ -1306,12 +1310,15 @@ export function Timeline({
         </>
       ) : (
         <>
-          {(upcoming.length > 0 || openScheduled.length > 0 || meetings.length > 0) && (
+          {(upcoming.length > 0 || openScheduled.length > 0 || sequenceSteps.length > 0 || meetings.length > 0) && (
             <>
               <div className="tl-group">{l.timelineGroupUpcoming}</div>
               <div className="tl">
                 {meetings.map((meeting) => (
                   <UpcomingMeetingCard key={meeting.id} meeting={meeting} personName={personName} company={personCompany} labels={l} />
+                ))}
+                {sequenceSteps.map((step) => (
+                  <SequenceStepCard key={step.memberId} step={step} l={l} />
                 ))}
                 {openScheduled.map((s) => (
                   <ScheduledCard key={s.id} item={s} l={l} run={sched.run} gmailConnected={gmailConnected} now={now} busy={sched.busy} />
@@ -1328,7 +1335,7 @@ export function Timeline({
           )}
           {sched.dialogs}
 
-          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length + openScheduled.length + cancelledScheduled.length + meetings.length, unlisted: unlistedEntries.length }) ? (
+          {isTimelineEmpty({ entries: displayedEntries.length, upcoming: upcoming.length + openScheduled.length + sequenceSteps.length + cancelledScheduled.length + meetings.length, unlisted: unlistedEntries.length }) ? (
             <div className={styles.placeholder}>{l.timelineEmpty}</div>
           ) : (
             groups.map((group, i) => (
