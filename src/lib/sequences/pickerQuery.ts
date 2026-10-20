@@ -11,8 +11,9 @@
  * address. It only ORDERS (blocked last) and FILTERS (hidden by default); the reason a row shows still comes from the
  * JS admission (pickerView.staticBlock), the same one addMembersToSequence re-runs, so a mismatch here can only mis-order.
  *
- * The recipient market is recipientMarket() (person country, company country, then open posting markets). SQL cannot
- * run classifyMarket, so the countries it classes as unmapped / US come in as a list built by `countryFacts`.
+ * The recipient market is recipientMarket() (person country, company country, open posting markets, then the phone's dial
+ * code). SQL cannot run classifyMarket, so the countries it classes as unmapped / US come in as a list built by
+ * `countryFacts`, and the dial codes that have a footer come in as one prefix pattern built by `phoneFooterPattern`.
  */
 import { sql, type SQL } from "drizzle-orm";
 import { FLORIDA_PHRASES, FLORIDA_TOKENS, classifyMarket } from "@/lib/hiring/markets";
@@ -20,7 +21,8 @@ import { openFreshPostingSql, openPostingSql } from "@/lib/hiring/openPosting";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { isMarketMapped } from "./draftCompose";
 import { PICKER_PAGE_SIZE, searchTokens, type PickerQuery } from "./pickerFilters";
-import { recipientMarket } from "./recipientMarket";
+import { phoneCallingCodeGroups } from "./phoneMarket";
+import { marketOfCountry, recipientMarket } from "./recipientMarket";
 import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql, firstFilledCountry } from "./rosterQuery";
 
 /** Lower-cased, trimmed country strings by what the compliance footer can do with them. */
@@ -42,6 +44,25 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
     else if (classifyMarket(country) === "us") us.add(country);
   }
   return { unmapped: [...unmapped], us: [...us] };
+}
+
+/**
+ * Postgres ARE for the fourth link of recipientMarket: a phone whose dial code lands in a market WITH a footer. Built in JS
+ * from the same classification (phoneCallingCodeGroups), because SQL has no libphonenumber. Anchored on the `+` of the
+ * stored E.164 value; calling codes are prefix-free, so a prefix test never confuses two countries.
+ *
+ * LATAM is listed before US on purpose: `+1` is shared, and the only LATAM-under-+1 country is the Dominican Republic
+ * (`1809|1829|1849`) while the US/Canada are bare `1`. Testing the longer LATAM-specific prefixes first is the longest-match
+ * rule without a per-row lookup. As this only asks "has a footer" the order does not change the boolean today, but it is
+ * the order any caller that needs the MARKET (not just the flag) must keep.
+ *
+ * SQL cannot say `isValid()`, so a malformed `+54...` can match here and still be rejected by the JS resolver. That
+ * direction is safe (the row shows with its blocked badge and `staticRosterRejection` stays authoritative at add time);
+ * the reverse, SQL blocking what JS allows, cannot happen because every JS-valid number carries its country's prefix.
+ */
+export function phoneFooterPattern(): string {
+  const { latam, us } = phoneCallingCodeGroups(marketOfCountry);
+  return `^\\+(${[...latam, ...us].join("|")})`;
 }
 
 /** Postgres ARE: substring phrases plus the bare `fl` as a whole word (never inside "Flores"). */
@@ -95,9 +116,22 @@ const suppressedSql = sql`(lower(btrim(p.email)) in (select s.value from email_s
 const homeInFlorida = (f: CountryFacts) =>
   sql`((${effectiveCountry} is null or lower(${effectiveCountry}) = any(${textArray(f.us)})) and concat_ws(' ', p.city, p.region) ~* ${floridaGeoPattern()})`;
 
+/**
+ * The fourth link: either phone starts with a dial code that has a footer. Non-digits are stripped first (libphonenumber
+ * tolerates spaces, dashes and brackets, a `+54 (9) 11` would otherwise miss the anchor). Two regex tests on columns of the
+ * row itself: no subquery, no join, nothing per row beyond the row. Either phone, not "mobile first": a superset of the
+ * JS pick, which is the safe direction (see phoneFooterPattern).
+ */
+const phoneHasFooter = () => {
+  const pattern = phoneFooterPattern();
+  const digits = (col: string) => sql.raw(`regexp_replace(coalesce(${col}, ''), '[^0-9+]', '', 'g')`);
+  return sql`(${digits("p.mobile_phone")} ~ ${pattern} or ${digits("p.phone")} ~ ${pattern})`;
+};
+
 function blockedSql(f: CountryFacts): SQL {
-  // A country decides its market alone; only without one do the postings: exactly one of us / latam is a market.
-  const unmapped = sql`case when ${effectiveCountry} is not null then lower(${effectiveCountry}) = any(${textArray(f.unmapped)}) else ${either("posts_us")} = ${either("posts_latam")} end`;
+  // A country decides its market alone; only without one do the postings (exactly one of us / latam is a market), and only
+  // when those do not either does the phone's dial code (recipientMarket's last link).
+  const unmapped = sql`case when ${effectiveCountry} is not null then lower(${effectiveCountry}) = any(${textArray(f.unmapped)}) else (${either("posts_us")} = ${either("posts_latam")} and not ${phoneHasFooter()}) end`;
   return sql`coalesce((
     p.email_status in ('none', 'bounced')
     or (p.email_source = 'pattern_inferred' and p.email_status <> 'verified')
