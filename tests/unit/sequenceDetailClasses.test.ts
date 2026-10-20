@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { es } from "@/lib/i18n/dictionaries/es";
 import type { DetailMember, SequenceDetail } from "@/lib/sequences/detailQueries";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
+import { SEND } from "./sendContextFixture";
 
 // tsx compiles .tsx with the classic JSX runtime here (tsconfig says "preserve" for Next), which needs `React` in scope.
 // The component is therefore required AFTER the global is set; a static import would be hoisted above it.
@@ -19,6 +20,9 @@ const { SequenceDetailView } = require("@/app/(app)/sequences/_components/Sequen
 // in the stylesheet fails here instead of shipping unstyled.
 const ROOT = join(__dirname, "..", "..");
 const APPROVED = join(ROOT, "openspec/changes/crm-hubspot-ux/mockups/styles.css");
+// The send-now-or-schedule mockup brings its own classes (split button, schedule popover) in an inline <style>; they were promoted to design-system.css.
+const SEND_MOCKUP = join(ROOT, "openspec/changes/send-now-or-schedule/mockups/enviar-o-programar.html");
+const inlineStyle = (file: string) => (readFileSync(file, "utf8").match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "");
 // Both are imported globally by src/app/layout.tsx; a CSS module (page.module.css) is scoped and does not count.
 const SHIPPED = [join(ROOT, "src/app/design-system.css"), join(ROOT, "src/app/globals.css")];
 const COMPONENTS = join(ROOT, "src/app/(app)/sequences/_components");
@@ -71,11 +75,13 @@ const ALL_KINDS: DetailMember[] = [
   member(7, { state: "replied", sentAt: hours(96), repliedAt: hours(6) }),
   member(8, { state: "discarded", discardedAt: hours(24), discardReason: "no title" }),
   member(9, { state: "discarded", discardedAt: hours(24), discardReason: "opt_out" }),
+  // A moment the BD chose (not the cadence of the approval): the "Programado" card.
+  member(10, { state: "approved", draft: draft({ approvedAt: hours(2), scheduledFor: new Date("2026-10-20T14:00:00Z") }) }),
 ];
 
 const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s", name: "Synthetic sequence", ownerBdId: "o", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
 const render = (members: DetailMember[], viewerBdId = "o") =>
-  renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId }));
+  renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId, send: SEND }));
 
 function renderedClasses(html: string): Set<string> {
   const out = new Set<string>();
@@ -118,7 +124,7 @@ test("the fixture renders every card kind, so the class check below is not vacuo
 
 for (const [name, paths] of [["approved mockup styles.css", [APPROVED]], ["shipped global CSS (design-system.css + globals.css)", SHIPPED]] as const) {
   test(`every class the Sequence components use exists in the ${name}`, () => {
-    const known = classesInStylesheet(paths.map((p) => readFileSync(p, "utf8")).join("\n"));
+    const known = classesInStylesheet(paths.map((p) => readFileSync(p, "utf8")).join("\n") + (paths === SHIPPED ? "" : inlineStyle(SEND_MOCKUP)));
     const used = classesInSources();
     for (const html of Object.values(STATES)) for (const c of renderedClasses(html)) used.add(c);
     assert.ok(used.size > 20, `expected a realistic number of classes, got ${used.size}`);

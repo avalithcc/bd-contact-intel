@@ -7,6 +7,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
 import { reviewView } from "@/lib/sequences/reviewDialog";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
+import { SEND } from "./sendContextFixture";
 
 (globalThis as { React?: unknown }).React = React;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -49,11 +50,11 @@ test("the reminder reads the step 2 draft and is a separate variant", () => {
 });
 
 const render = (m: DetailMember, step: 1 | 2 = 1, ownView = true, labels = es.sequences) =>
-  renderToStaticMarkup(createElement(ReviewDialog, { open: true, onClose: () => {}, member: m, step, fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, signals: ["1 vacante IT abierta"], now: NOW, labels, ownView, onAction: () => {} }));
+  renderToStaticMarkup(createElement(ReviewDialog, { open: true, onClose: () => {}, member: m, step, fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, signals: ["1 vacante IT abierta"], now: NOW, labels, ownView, onAction: () => {}, send: SEND }));
 
 test("the draft dialog carries every mockup element in order", () => {
   const html = render(member());
-  const order = ["Test1 Person · Engineering Lead en Acme 1", "Leelo antes de aprobar", "Señales usadas", "1 vacante IT abierta", ">Para<", "p1@example.test", "Desde", "from@example.test", ">Asunto<", "Subject 1", ">Cuerpo<", "Synthetic footer", "Editalo libremente", "Cadencia para este contacto", "Paso 1", "Si lo aprobás ahora, sale el", "Paso 2", "Recordatorio el", "Regenerar", "Guardar sin aprobar", "Aprobar y programar"];
+  const order = ["Test1 Person · Engineering Lead en Acme 1", "Leelo antes de aprobar", "Señales usadas", "1 vacante IT abierta", ">Para<", "p1@example.test", "Desde", "from@example.test", ">Asunto<", "Subject 1", ">Cuerpo<", "Synthetic footer", "Editalo libremente", "Cadencia para este contacto", "Paso 1", "Hoy sale:", "Paso 2", "Recordatorio el", "Regenerar", "Guardar sin aprobar", "Aprobar y enviar ahora"];
   let at = -1;
   for (const needle of order) { const i = html.indexOf(needle, at + 1); assert.ok(i > at, `${needle} missing or out of order`); at = i; }
   assert.match(html, /id="[^"]*-to"[^>]*readOnly=""|readOnly=""[^>]*id="[^"]*-to"/);
@@ -117,7 +118,7 @@ test("a hand-edited draft reports that it is edited and when; a never-edited one
 });
 
 function banner(m: DetailMember, ownView: boolean, lang = es) {
-  return renderToStaticMarkup(createElement(ReviewDialog, { open: true, onClose: () => {}, member: m, step: 1, fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, signals: ["s1"], now: NOW, labels: lang.sequences, ownView, onAction: () => {} }));
+  return renderToStaticMarkup(createElement(ReviewDialog, { open: true, onClose: () => {}, member: m, step: 1, fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, signals: ["s1"], now: NOW, labels: lang.sequences, ownView, onAction: () => {}, send: SEND }));
 }
 
 const strongMine = `<strong>${es.sequences.reviewEditedStrong}</strong>`; // the body help also says "tu versión", so match the notice markup

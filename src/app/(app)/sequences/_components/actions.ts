@@ -1,4 +1,5 @@
 import type { CardActionId } from "@/lib/sequences/memberCard";
+import type { SendChoice } from "@/lib/sequences/sendMoment";
 
 /**
  * What a control on the detail screen asks for. The components only report intent: the container that mounts them
@@ -7,9 +8,14 @@ import type { CardActionId } from "@/lib/sequences/memberCard";
 export type DetailAction =
   | { type: "editSequence" | "approveReady" | "changeCadence" | "createNext" }
   | { type: CardActionId; memberId: string }
+  /** The split button on a draft card: approve with the BD's choice (now, a chosen time, or the cadence). */
+  | { type: "approveWith"; memberId: string; when: SendChoice }
+  /** "Cambiar" (a chosen time) or "Enviar ahora" on an approved card. */
+  | { type: "reschedule"; memberId: string; when: SendChoice }
   /** Only asks to start: the confirmation is `OptOutDialog`, which states the scope before anything is recorded. */
   | { type: "optOut"; memberId: string };
-export type OnAction = (action: DetailAction) => void;
+/** May answer with a promise of `true` once the server accepted it: a popover that asked for it then closes. */
+export type OnAction = (action: DetailAction) => void | Promise<boolean | void>;
 
 /**
  * What the review dialog asks for. `save` and `approve` carry the text as it stands in the form: the container saves
@@ -20,12 +26,14 @@ export type ReviewAction =
   | { type: "markReviewed"; memberId: string; step: 1 | 2 }
   /** `confirmedEdits` (member id -> the `editedAt` the BD was shown) is set only after the BD confirmed losing exactly that text; the server refuses to overwrite an edit otherwise. */
   | { type: "regenerate"; memberId: string; step: 1 | 2; confirmedEdits?: Record<string, number> }
-  | { type: "save" | "approve"; memberId: string; step: 1 | 2; subject: string; body: string };
+  | { type: "save"; memberId: string; step: 1 | 2; subject: string; body: string }
+  /** `when` is the split-button choice; absent for the reminder (step 2), which has no choice. */
+  | { type: "approve"; memberId: string; step: 1 | 2; subject: string; body: string; when?: SendChoice };
 export type OnReviewAction = (action: ReviewAction) => void;
 
 /** What the bulk bar asks for. `remove` only asks to start: the reason is collected by `RemoveReasonDialog`. */
-export type BulkAction = { type: "approve" | "remove"; memberIds: string[] };
-export type OnBulkAction = (action: BulkAction) => void;
+export type BulkAction = { type: "remove"; memberIds: string[] } | { type: "approve"; memberIds: string[]; when: SendChoice };
+export type OnBulkAction = (action: BulkAction) => void | Promise<boolean | void>;
 
 /** What the Contact-record block asks for. Same rule as `optOut` above: the container opens `OptOutDialog`, then calls recordOptOutForMember. */
 export type ContactContextAction = { type: "optOut"; memberId: string };

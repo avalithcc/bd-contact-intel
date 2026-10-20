@@ -6,6 +6,8 @@ import { listReplyPhrases } from "@/lib/sequences/pageQueries";
 import { SequenceDetailScreen } from "./SequenceDetailScreen";
 
 export const dynamic = "force-dynamic";
+// "Enviar ahora" releases right inside the server action that approves (a few Gmail sends in sequence), so allow more than the default.
+export const maxDuration = 60;
 
 /**
  * A Sequence (mockups/secuencia-detalle.html). The owner reads their own; an admin may read another BD's, as a read-only
@@ -25,7 +27,7 @@ export default async function SequencePage({ params }: { params: Promise<{ id: s
   const optOutPhrases = detail.ownerBdId === me.id ? await listReplyPhrases(me.id, replied) : {};
   return (
     <main className="page">
-      <SequenceDetailScreen detail={detail} labels={dict.sequences} now={new Date()} viewerBdId={me.id} optOutPhrases={optOutPhrases} />
+      <SequenceDetailScreen detail={detail} labels={dict.sequences} sendLabels={dict.sendControl} now={new Date()} viewerBdId={me.id} optOutPhrases={optOutPhrases} />
     </main>
   );
 }

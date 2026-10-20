@@ -4,13 +4,14 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
+import { SEND } from "./sendContextFixture";
 
 (globalThis as { React?: unknown }).React = React;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { BulkBar } = require("@/app/(app)/sequences/_components/BulkBar") as typeof import("@/app/(app)/sequences/_components/BulkBar");
 
 const rows = (...reviewed: boolean[]) => reviewed.map((r, i) => ({ id: `m${i + 1}`, reviewed: r }));
-const render = (selection: ReturnType<typeof rows>) => renderToStaticMarkup(createElement(BulkBar, { selection, labels: es.sequences, onAction: () => {} }));
+const render = (selection: ReturnType<typeof rows>) => renderToStaticMarkup(createElement(BulkBar, { selection, labels: es.sequences, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: new Date("2026-10-15T14:00:00Z") }));
 
 test("view model: 1 of 3 reviewed disables approve, 3 of 3 enables it", () => {
   assert.deepEqual(bulkBarView(rows(true, false, false)), { visible: true, selected: 3, reviewed: 1, approveEnabled: false, allReviewed: false, ids: ["m1", "m2", "m3"] });
@@ -31,7 +32,7 @@ test("the bar renders the partial state as the mockup draws it, with the approve
   const html = render(rows(true, false, false));
   assert.ok(html.includes("3 seleccionados") && html.includes("1 de 3 borradores revisados"));
   assert.ok(html.includes("Quitar de la secuencia") && !html.includes("Regenerar"));
-  assert.match(html, /<button[^>]*class="btn btn-primary btn-sm"[^>]*disabled=""[^>]*>Aprobar y programar los 3</);
+  assert.match(html, /<button[^>]*class="btn btn-primary btn-sm"[^>]*disabled=""[^>]*>(?:<svg.*?<\/svg>)?Aprobar y enviar ahora los 3</);
   assert.ok(html.includes("Acciones masivas, revisión incompleta") && html.includes("hasta que los 3 hayan sido abiertos"));
 });
 

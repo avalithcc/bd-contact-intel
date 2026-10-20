@@ -2,6 +2,7 @@
 
 // Roster, drafting and approval actions, mounted by the Sequence pages (go-live, PR 13). Every
 // guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
+import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import {
@@ -122,6 +123,7 @@ async function releaseNow(bdId: string, memberIds: readonly string[]): Promise<R
     const { released, deferred, held, failed } = await releaseMembersNow(bdId, memberIds);
     return { released, deferred, held, failed };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("immediate release failed", error instanceof Error ? error.message : error);
     return undefined;
   }

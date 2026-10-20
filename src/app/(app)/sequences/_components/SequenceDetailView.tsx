@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
 import type { SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnAction } from "./actions";
+import type { SequenceSendContext } from "./sendContext";
 import { CadenceCard } from "./CadenceCard";
 import { MemberCard } from "./MemberCard";
 import { ProgressLine } from "./ProgressLine";
@@ -23,7 +24,7 @@ import { StatCards } from "./StatCards";
  *    click away). Showing the cards here is NOT in the mockup; flagged in the checklist as an owner decision.
  *  - live: header, stat cards, progress, cadence, cards.
  */
-export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, optOutPhrases = {}, selected, onToggle, bulk, generatingId = null }: { detail: SequenceDetail; labels: SequenceLabels; now: Date; onAction: OnAction; viewerBdId: string; optOutPhrases?: Readonly<Record<string, string>>; selected?: ReadonlySet<string>; onToggle?: (memberId: string) => void; bulk?: ReactNode; generatingId?: string | null }) {
+export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, optOutPhrases = {}, selected, onToggle, bulk, generatingId = null, send }: { send: SequenceSendContext; detail: SequenceDetail; labels: SequenceLabels; now: Date; onAction: OnAction; viewerBdId: string; optOutPhrases?: Readonly<Record<string, string>>; selected?: ReadonlySet<string>; onToggle?: (memberId: string) => void; bulk?: ReactNode; generatingId?: string | null }) {
   // An admin reads another BD's Sequence (audited): the cards must not word its approvals as the reader's own.
   const readOnly = isReadOnlyView(viewerBdId, detail.ownerBdId);
   const ownView = !readOnly;
@@ -42,7 +43,7 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, 
       <h2 className={stats.view !== "live" ? "mt-2xl mb-lg" : "mb-lg"}>{labels.membersTitle}</h2>
       {!readOnly && bulk}
       <div className="stack">
-        {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} readOnly={readOnly} optOutPhrase={optOutPhrases[m.memberId] ?? null} generating={generatingId === m.memberId} selection={!readOnly && selected && onToggle ? { selected: selected.has(m.memberId), onToggle: () => onToggle(m.memberId) } : undefined} />)}
+        {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} readOnly={readOnly} optOutPhrase={optOutPhrases[m.memberId] ?? null} generating={generatingId === m.memberId} send={send} selection={!readOnly && selected && onToggle ? { selected: selected.has(m.memberId), onToggle: () => onToggle(m.memberId) } : undefined} />)}
       </div>
     </>
   );

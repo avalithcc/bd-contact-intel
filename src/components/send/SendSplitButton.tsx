@@ -45,7 +45,8 @@ export function SendSplitButton({
   cadence?: CadenceOption | null;
   error?: string | null;
   onSendNow: () => void;
-  onSchedule: (slot: Slot) => void;
+  /** Answer `true` when it worked: the popover closes. Anything else leaves it open for the caller's `error`. */
+  onSchedule: (slot: Slot) => Promise<boolean | void> | boolean | void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [popOpen, setPopOpen] = useState(false);
@@ -163,7 +164,12 @@ export function SendSplitButton({
           busy={busy}
           error={error}
           onClose={closeAll}
-          onSubmit={onSchedule}
+          onSubmit={async (slot) => {
+            if ((await onSchedule(slot)) === true) {
+              setPopOpen(false);
+              setMenuOpen(false);
+            }
+          }}
         />
       )}
     </span>

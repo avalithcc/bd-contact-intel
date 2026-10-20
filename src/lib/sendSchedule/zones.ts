@@ -132,6 +132,9 @@ export function resolveRecipientZone(p: RecipientPlace): RecipientZone | null {
   return { zone, approx, place: label(p.city?.trim() || p.region?.trim()), area, group: entry.key };
 }
 
+/** "9:00": the clock an instant reads in `zone`. */
+export const zoneClock = (instant: Date, zone: string): string => local(instant, zone).clock;
+
 export type ZoneKey = "argentina" | "recipient" | "recipients" | "newYork" | "madrid" | "mexicoCity" | "bogota" | "saoPaulo";
 export interface ZoneRow {
   key: ZoneKey;

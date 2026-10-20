@@ -3,11 +3,15 @@
 import { useEffect, useId, type FormEvent } from "react";
 import { Dialog } from "@/components/Dialog";
 import { EyeIcon, GenerateIcon, InfoIcon } from "@/components/icons";
+import { SendSplitButton } from "@/components/send/SendSplitButton";
+import { resolveRecipientZone } from "@/lib/sendSchedule/zones";
+import type { SendChoice } from "@/lib/sequences/sendMoment";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { reviewView, type ReviewFooterId } from "@/lib/sequences/reviewDialog";
 import type { Schedule } from "@/lib/sequences/schedule";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnReviewAction } from "./actions";
+import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
 type Props = {
   open: boolean;
@@ -28,9 +32,11 @@ type Props = {
   onAction: OnReviewAction;
   busy?: boolean;
   error?: string | null;
+  /** The shared send control: labels, the cadence and the state of the last server call. */
+  send: SequenceSendContext;
 };
 
-export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, error = null }: Props) {
+export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, error = null, send }: Props) {
   const formId = useId();
   const view = m ? reviewView(m, step, schedule, now, readOnly) : null;
   const memberId = m?.memberId;
@@ -56,12 +62,33 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
     if (view?.readOnly || !memberId) return;
     const intent = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
     const data = new FormData(e.currentTarget);
-    if (intent === "save" || intent === "approve") onAction({ type: intent, memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? "") });
+    if (intent === "save") onAction({ type: "save", memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? "") });
+    // The reminder (step 2) is approved with a plain button: it has no choice of moment.
+    if (intent === "approve") onAction({ type: "approve", memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? "") });
   }
+  /** The split button is outside the form's submit flow, so it reads the text as it stands in the form. */
+  const approveWith = (when: SendChoice) => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement) || !memberId) return;
+    const data = new FormData(form);
+    onAction({ type: "approve", memberId, step, subject: String(data.get("subject") ?? ""), body: String(data.get("body") ?? ""), when });
+  };
   // Always asks the server without a confirmation: it refuses to overwrite an edit and the container then confirms with the BD.
   const footerButton = (id: ReviewFooterId) =>
     id === "regenerate" ? (
       <button key={id} type="button" className="btn btn-ghost left" disabled={busy} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}><GenerateIcon className="icon" />{l.reviewRegenerate}</button>
+    ) : id === "approve" && step === 1 ? (
+      <SendSplitButton
+        key={id}
+        labels={send.labels}
+        primaryLabel={l.reviewApproveNow}
+        busy={busy}
+        error={send.error}
+        schedule={approvalSchedule(send, [{ name, zone: resolveRecipientZone(m.place ?? {}) }], "one")}
+        cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => approveWith({ kind: "cadence" }) }}
+        onSendNow={() => approveWith({ kind: "now" })}
+        onSchedule={(slot) => approveWith({ kind: "at", ...slot })}
+      />
     ) : (
       <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
     );
@@ -111,7 +138,13 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         {cadence && (
           <div className="field"><span className="label">{l.reviewCadence}</span>
             <div className="assoc">
-              <div className="assoc-row"><span className="badge badge-mono">{l.cadenceStep1}</span><span className="grow">{step1Lead}{cadence.step1.kind !== "sent" && <> <strong>{when(cadence.step1.at)}</strong> {l.reviewMiami}</>}</span></div>
+              <div className="assoc-row"><span className="badge badge-mono">{l.cadenceStep1}</span><span className="grow">
+                {step === 1 && cadence.step1.kind === "ifApprovedNow" ? (
+                  <>{l.reviewChoiceLead} <strong>{l.reviewChoiceStrong}</strong>{l.reviewChoiceTail}</>
+                ) : (
+                  <>{step1Lead}{cadence.step1.kind !== "sent" && <> <strong>{when(cadence.step1.at)}</strong> {l.reviewMiami}</>}</>
+                )}
+              </span></div>
               <div className="assoc-row"><span className="badge badge-mono">{l.cadenceStep2}</span><span className="grow">{l.reviewReminderOn} <strong>{miamiWhen(cadence.reminderAt, now).ddmm}</strong>{l.cadenceStep2Tail}</span></div>
             </div>
           </div>

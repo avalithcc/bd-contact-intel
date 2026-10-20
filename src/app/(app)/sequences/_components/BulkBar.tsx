@@ -2,27 +2,54 @@
 
 import { useId } from "react";
 import { Dialog } from "@/components/Dialog";
+import { SendSplitButton } from "@/components/send/SendSplitButton";
+import { fillTemplate } from "@/lib/i18n/template";
+import type { SendRecipient } from "@/lib/sendSchedule/advice";
+import { capOutlook } from "@/lib/sequences/sendMoment";
 import type { GateRow } from "@/lib/sequences/bulkApprovalGate";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnBulkAction } from "./actions";
+import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
-/** `selection` is every selected row with its reviewed flag: the counter and the gate are computed from it, nothing else. */
-export function BulkBar({ selection, labels: l, onAction }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction }) {
+/**
+ * `selection` is every selected row with its reviewed flag: the counter and the gate are computed from it, nothing else.
+ * "Aprobar y enviar ahora los N" is the shared split button (one choice for all N); before the BD confirms, a warning says how many
+ * leave now and how many wait because of the account's daily cap.
+ */
+export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date }) {
   const v = bulkBarView(selection);
   if (!v.visible) return null;
   const one = v.selected === 1;
   const n = { n: v.selected };
-  const run = (type: "approve" | "remove") => () => onAction({ type, memberIds: v.ids });
+  const outlook = capOutlook({ count: v.selected, cap: cap.cap, sentToday: cap.sentToday });
   return (
     <>
       <div className="bulk-bar" role="region" aria-label={v.allReviewed ? l.bulkAriaAll : l.bulkAriaPartial}>
         <span className="count">{fill(one ? l.bulkCountOne : l.bulkCount, n)}</span><span className="sep"></span>
         <span>{fill(v.allReviewed ? l.bulkReviewedAll : l.bulkReviewed, { reviewed: v.reviewed, total: v.selected })}</span>
         <span className="grow"></span>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={run("remove")}>{l.bulkRemove}</button>
-        <button type="button" className="btn btn-primary btn-sm" disabled={!v.approveEnabled} onClick={run("approve")}>{fill(one ? l.bulkApproveOne : l.bulkApprove, n)}</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void onAction({ type: "remove", memberIds: v.ids })}>{l.bulkRemove}</button>
+        <SendSplitButton
+          small
+          labels={send.labels}
+          primaryLabel={fill(one ? l.bulkApproveNowOne : l.bulkApproveNow, n)}
+          disabled={!v.approveEnabled}
+          busy={send.busy}
+          error={send.error}
+          schedule={approvalSchedule(send, recipients, "bulk", v.selected)}
+          cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => void onAction({ type: "approve", memberIds: v.ids, when: { kind: "cadence" } }) }}
+          onSendNow={() => void onAction({ type: "approve", memberIds: v.ids, when: { kind: "now" } })}
+          onSchedule={(slot) => onAction({ type: "approve", memberIds: v.ids, when: { kind: "at", ...slot } })}
+        />
       </div>
+      {v.approveEnabled && outlook.deferred > 0 && (
+        <div className="alert alert-warn mt-md" role="status">
+          <div>
+            <strong>{fillTemplate(send.labels.capBulk, { cap: String(cap.cap), n: String(v.selected), now: String(outlook.now), deferred: String(outlook.deferred) })}</strong>
+          </div>
+        </div>
+      )}
       {!v.approveEnabled && <p className="help mt-md">{fill(one ? l.bulkBlockedOne : l.bulkBlocked, n)}</p>}
     </>
   );

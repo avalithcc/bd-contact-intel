@@ -6,6 +6,9 @@ import { useToast } from "@/components/ToastProvider";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
 import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent } from "@/lib/sequences/detailFlow";
 import type { SkippedEdit } from "@/lib/sequences/draftCompose";
+import type { SendControlLabels } from "@/lib/sendSchedule/labels";
+import type { SendChoice } from "@/lib/sequences/sendMoment";
+import { releaseToast, sendRecipients, type ReleaseToast } from "@/lib/sequences/sendUi";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
 import { isReadOnlyAction, isReadOnlyView } from "@/lib/sequences/readOnly";
@@ -24,6 +27,7 @@ import {
   regenerateSequenceReminder,
   reinstateMember,
   removeMembers,
+  rescheduleMember,
   saveSequenceDraft,
   updateSequenceSettings,
 } from "../actions";
@@ -34,6 +38,8 @@ import { RegenerateConfirmDialog } from "../_components/RegenerateConfirmDialog"
 import { ReviewDialog } from "../_components/ReviewDialog";
 import { SequenceDetailView } from "../_components/SequenceDetailView";
 import type { BulkAction, DetailAction, ReviewAction } from "../_components/actions";
+import type { SequenceSendContext } from "../_components/sendContext";
+import type { ReleaseOutcome } from "../actions";
 
 type Review = { memberId: string; step: 1 | 2; signals: string[] | null };
 type Batch = { ok: true; generated: string[]; failed: string[] } | { ok: false };
@@ -45,11 +51,13 @@ type Batch = { ok: true; generated: string[]; failed: string[] } | { ok: false }
  *
  * Dialogs close on success and stay open with the error on failure. Card actions without a dialog report through a toast.
  */
-export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOutPhrases }: { detail: SequenceDetail; labels: SequenceLabels; now: Date; viewerBdId: string; optOutPhrases: Record<string, string> }) {
+export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewerBdId, optOutPhrases }: { detail: SequenceDetail; labels: SequenceLabels; sendLabels: SendControlLabels; now: Date; viewerBdId: string; optOutPhrases: Record<string, string> }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The reason a split-button popover keeps open with (a card or the bulk bar): separate from the dialogs' own `error`.
+  const [sendError, setSendError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [review, setReview] = useState<Review | null>(null);
   const [removeIds, setRemoveIds] = useState<string[] | null>(null);
@@ -76,8 +84,58 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       setBusy(false);
     }
   }
-  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setError(null); };
+  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setError(null); setSendError(null); };
   const reasonText = (reason: string) => (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
+
+  const toastFor = (t: ReleaseToast) => {
+    const text: Record<ReleaseToast["key"], string> = {
+      sentNow: l.toastSentNow,
+      sentNowMany: "n" in t ? fill(l.toastSentNowMany, { n: t.n }) : l.toastSentNow,
+      capDeferred: l.toastCapDeferred,
+      capDeferredMany: "sent" in t ? fill(l.toastCapDeferredMany, { sent: t.sent, n: t.n }) : l.toastCapDeferred,
+      held: l.toastHeldNow,
+      pending: l.toastSendPending,
+      failed: l.actionFailed,
+    };
+    showToast(text[t.key], t.tone);
+  };
+  /** After an approval or a move: "now" says what the immediate release did; anything else says it was approved or scheduled. */
+  const toastApproval = (when: SendChoice, count: number, release: ReleaseOutcome | undefined) => {
+    if (when.kind === "now") return toastFor(releaseToast(release, count));
+    if (count > 1) return showToast(fill(l.toastApprovedMany, { n: count }), "success");
+    showToast(when.kind === "at" ? l.toastScheduledOne : l.toastApproved, "success");
+  };
+
+  /** One server call for a card (one member) or the bulk bar (several, gated). Resolves `true` when it worked, which closes the popover. */
+  async function approveWith(ids: string[], when: SendChoice, bulk: boolean): Promise<boolean> {
+    setSendError(null);
+    const r = await guarded(() => (bulk ? approveBulk(ids, 1, when) : approveMember(ids[0]!, 1, when)), setSendError);
+    if (!r) return false;
+    router.refresh();
+    if (!r.ok) {
+      setSendError(reasonText(r.rejected[0]?.reason ?? "failed"));
+      return false;
+    }
+    toastApproval(when, ids.length, r.release);
+    if (bulk) setSelected([]);
+    return true;
+  }
+
+  async function reschedule(memberId: string, when: SendChoice): Promise<boolean> {
+    setSendError(null);
+    const r = await guarded(() => rescheduleMember(memberId, when), setSendError);
+    if (!r) return false;
+    router.refresh();
+    if (!r.ok) {
+      const message = reasonText(r.error);
+      setSendError(message);
+      if (when.kind === "now") fail(message);
+      return false;
+    }
+    if (when.kind === "now") toastFor(releaseToast(r.release, 1));
+    else showToast(l.toastRescheduled, "success");
+    return true;
+  }
 
   async function reportBatch(result: Batch | undefined, one: string, many: string) {
     if (!result?.ok) return fail();
@@ -115,7 +173,7 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
     setReview({ memberId, step, signals: signals ?? null });
   }
 
-  function onAction(a: DetailAction) {
+  function onAction(a: DetailAction): void | Promise<boolean | void> {
     // The server refuses every write on a foreign Sequence; the screen does not even try.
     if (readOnly && !isReadOnlyAction(a.type)) return;
     switch (a.type) {
@@ -128,6 +186,10 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
       case "remove": return setRemoveIds([a.memberId]);
       case "optOut": return setOptOutId(a.memberId);
       case "regenerate": return void regenerateOne(a.memberId);
+      case "approveWith": return approveWith([a.memberId], a.when, false);
+      case "reschedule": return reschedule(a.memberId, a.when);
+      case "sendNow": return void reschedule(a.memberId, { kind: "now" });
+      case "cancelSchedule": return void guarded(() => cancelApproval(a.memberId, 1)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastCancelled, "success"); else fail(); router.refresh(); });
       case "approve": {
         const m = member(a.memberId);
         if (!m) return;
@@ -166,24 +228,32 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
     if (!("subject" in a)) return;
     const { type: intent, memberId, step, subject, body } = a;
     const stored = (step === 2 ? m.reminderDraft : m.draft) ?? { subject: "", body: "" };
+    const when = a.type === "approve" ? a.when : undefined;
+    let release: ReleaseOutcome | undefined;
     const result = await guarded(() => runReviewIntent(intent, { stored: { subject: stored.subject, body: stored.body }, text: { subject, body } }, {
       save: () => saveSequenceDraft(memberId, { subject, body }, step),
-      approve: () => approveMember(memberId, step),
+      approve: async () => {
+        const approved = await approveMember(memberId, step, when);
+        if (approved.ok) release = approved.release;
+        return approved;
+      },
     }), setError);
     if (!result) return;
     // Always refresh once the server was reached: approving an untouched draft persists nothing client-side but
     // still changes the member's state, and the card must move without a manual reload.
     router.refresh();
-    if (result.ok) { showToast(intent === "save" ? l.toastSaved : l.toastApproved, "success"); closeDialogs(); } else setError(reasonText(result.error));
+    if (result.ok) {
+      if (intent === "save") showToast(l.toastSaved, "success");
+      else if (when) toastApproval(when, 1, release);
+      else showToast(l.toastApproved, "success");
+      closeDialogs();
+    } else setError(reasonText(result.error));
   }
 
-  async function onBulk(a: BulkAction) {
+  async function onBulk(a: BulkAction): Promise<boolean | void> {
     if (readOnly) return;
     if (a.type === "remove") return setRemoveIds(a.memberIds);
-    const r = await guarded(() => approveBulk(a.memberIds, 1));
-    if (!r) return;
-    if (r.ok) { showToast(fill(l.toastApprovedMany, { n: r.approved.length }), "success"); setSelected([]); } else fail(reasonText(r.rejected[0]?.reason ?? "failed"));
-    router.refresh();
+    return approveWith(a.memberIds, a.when, true);
   }
 
   async function onRemove(reason: string) {
@@ -221,15 +291,17 @@ export function SequenceDetailScreen({ detail, labels: l, now, viewerBdId, optOu
   // What this screen can count: the live members of THIS Sequence that share the address. The dialog words it as "acá ves".
   const optOutLive = optOutMember ? detail.members.filter((m) => m.state !== "discarded" && m.email?.trim().toLowerCase() === optOutMember.email?.trim().toLowerCase()).length : 0;
   const rows = gateRows(detail.members, selected);
+  const send: SequenceSendContext = { labels: sendLabels, schedule: detail.schedule, busy, error: sendError };
+  const selectedMembers = detail.members.filter((m) => selected.includes(m.memberId));
 
   return (
     <>
       <SequenceDetailView
-        detail={detail} labels={l} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
+        detail={detail} labels={l} send={send} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
         generatingId={generatingId} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
-        bulk={readOnly ? null : <BulkBar selection={rows} labels={l} onAction={onBulk} />}
+        bulk={readOnly ? null : <BulkBar selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} />}
       />
-      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} error={error} />
+      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} error={error} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
       {regen && (
