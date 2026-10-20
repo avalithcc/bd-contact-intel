@@ -919,9 +919,11 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                   moveDownLabel: l.columnsMoveDown,
                 }}
               />
-              <Link href={toolbarExportHref()} className="btn btn-secondary btn-sm">
+              {/* A plain <a>, never a <Link>: Link prefetches, and prefetching a route handler RUNS it (the 5,000-row CSV
+                  query, on every render and live-update refresh). */}
+              <a href={toolbarExportHref()} className="btn btn-secondary btn-sm">
                 {l.bulkExport}
-              </Link>
+              </a>
             </>
           )}
         </div>
