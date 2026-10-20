@@ -50,11 +50,13 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
  * The fewest digits (calling code included) a phone must carry before the SQL link may match it. A floor against garbage,
  * not a validity check: production holds a few hundred phone values the normalization pass flagged invalid or not-valid
  * (`+5491`, `+54`...), and without a floor any of them on a no-country contact would match its country prefix and surface
- * in the default view. DERIVED, not guessed: a brute-force search of libphonenumber's `isValid()` over every mapped country
- * found the shortest REAL subscriber numbers at 9 digits (Paraguay) and 10 (Panama 507+7, Brazil, Colombia, Peru, El Salvador);
- * the only shorter "valid" strings are non-subscriber specials (Uruguay 7, Canada 8). 8 sits one below the shortest real
- * number, so the floor cannot clip one; the unit test asserts it against every country's example number. There is no upper
- * bound: an extension ("ext 123") only lengthens a number JS accepts.
+ * in the default view. DERIVED, not guessed, by brute force: random national numbers fed to libphonenumber's `isValid()` for
+ * every mapped country, keeping the shortest that validates. The shortest REAL subscriber numbers are Paraguay at 9 digits and
+ * then 10 (Panama 507+7, Brazil, Colombia, Peru); the only shorter "valid" string is a non-subscriber special (Uruguay, 7).
+ * 8 sits one below Paraguay's 9, so the floor cannot clip a real number; the unit test asserts it against every country's
+ * example number. The search gave the same answer under the `min` metadata that phoneMarket.ts imports and under `max`
+ * (phoneNormalize.ts uses `max`), so the variant does not move the floor. The lookahead counts DIGITS only: a `+` in the
+ * class would let `+54+++++` clear it. There is no upper bound: an extension only lengthens a number JS accepts.
  */
 export const PHONE_MIN_LENGTH = 8;
 
@@ -81,11 +83,14 @@ export const PHONE_MIN_LENGTH = 8;
 export function buildPhoneFooterPattern(groups: { latam: readonly string[]; us: readonly string[] }): string {
   const prefixes = [...groups.latam, ...groups.us];
   if (!prefixes.length) return "(?!)";
-  return `^\\+(?=[0-9+]{${PHONE_MIN_LENGTH},})(${prefixes.join("|")})`;
+  return `^\\+(?=[0-9]{${PHONE_MIN_LENGTH},})(${prefixes.join("|")})`;
 }
 
 let footerPatternCache: string | null = null;
-/** Computed once per server instance: ~240 region-name lookups and classifications to produce a constant. */
+/**
+ * Computed once per server instance: ~240 region-name lookups and classifications to produce a constant. The cache is not
+ * observable through behaviour (the value is identical either way), so it has no test; it is a plain `??=`.
+ */
 export function phoneFooterPattern(): string {
   return (footerPatternCache ??= buildPhoneFooterPattern(phoneCallingCodeGroups(marketOfCountry)));
 }
@@ -148,9 +153,13 @@ const homeInFlorida = (f: CountryFacts) =>
  * strip would drop those digits, the prefix anchor would fail and the picker would hide a row JS allows. The fullwidth `＋`
  * is NOT folded because libphonenumber-js does not accept it as a plus either. One `translate` per phone column per row.
  */
-const DIGIT_SCRIPTS = [0xff10, 0x0660, 0x06f0].map((zero) => Array.from({ length: 10 }, (_, d) => String.fromCodePoint(zero + d)).join("")).join("");
+export const DIGIT_SCRIPTS = [0xff10, 0x0660, 0x06f0].map((zero) => Array.from({ length: 10 }, (_, d) => String.fromCodePoint(zero + d)).join("")).join("");
+export const ASCII_DIGITS_FOR_SCRIPTS = "0123456789".repeat(3);
 const phoneDigits = (col: string) =>
-  sql.raw(`regexp_replace(translate(coalesce(${col}, ''), '${DIGIT_SCRIPTS}', '${"0123456789".repeat(3)}'), '[^0-9+]', '', 'g')`);
+  sql.raw(`regexp_replace(translate(coalesce(${col}, ''), '${DIGIT_SCRIPTS}', '${ASCII_DIGITS_FOR_SCRIPTS}'), '[^0-9+]', '', 'g')`);
+/** The same normalization as `phoneDigits`, in JS, built from the same constants: the model of the SQL the unit tests use. */
+export const normalizePhoneLikeSql = (value: string): string =>
+  [...value].map((ch) => { const i = DIGIT_SCRIPTS.indexOf(ch); return i < 0 ? ch : ASCII_DIGITS_FOR_SCRIPTS[i]; }).join("").replace(/[^0-9+]/g, "");
 
 /**
  * The fourth link: either phone starts with a dial code that has a footer. Non-digits are stripped first (libphonenumber

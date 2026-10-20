@@ -5,7 +5,7 @@ import { DEFAULT_PICKER_QUERY, PICKER_PAGE_SIZE, type PickerQuery } from "@/lib/
 import { getCountries, getExampleNumber } from "libphonenumber-js";
 import mobileExamples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
 import { isMarketMapped } from "@/lib/sequences/draftCompose";
-import { PHONE_MIN_LENGTH, buildPickerPageQuery, buildPhoneFooterPattern, countryFacts, floridaGeoPattern, phoneFooterPattern } from "@/lib/sequences/pickerQuery";
+import { PHONE_MIN_LENGTH, buildPickerPageQuery, buildPhoneFooterPattern, countryFacts, floridaGeoPattern, normalizePhoneLikeSql, phoneFooterPattern } from "@/lib/sequences/pickerQuery";
 import { recipientMarket } from "@/lib/sequences/recipientMarket";
 
 const ME = "00000000-0000-4000-8000-000000000001";
@@ -101,7 +101,7 @@ test("the dial-code pattern lists the LATAM-specific +1 prefixes before the bare
 
 // The picker's SQL decides "blocked", the JS resolver decides the reason a row shows and the add itself. The one unsafe
 // disagreement is SQL hiding a contact JS would allow, so for every phone JS resolves to a footer the SQL pattern must match.
-const sqlSaysFooter = (phone: string) => new RegExp(phoneFooterPattern()).test(phone.replace(/[^0-9+]/g, ""));
+const sqlSaysFooter = (phone: string) => new RegExp(phoneFooterPattern()).test(normalizePhoneLikeSql(phone));
 const digitsOf = (phone: string) => phone.replace(/\D/g, "");
 const jsSaysFooter = (phone: string) => isMarketMapped(recipientMarket({ mobilePhone: phone, phone: null }));
 
@@ -139,7 +139,7 @@ test("the asymmetry is pinned: SQL may show a malformed number or a footer-less 
 test("the length floor rejects implausibly short numbers and clips no real one", () => {
   for (const short of ["+5491", "+54", "+54 11 555", "+1 305", "+507 123"]) assert.equal(sqlSaysFooter(short), false, short);
   // The floor is a lower bound, never a validity check: it must sit at or below the shortest REAL number of a mapped country.
-  // Panama is the shortest national plan in the mapped set (7 digits + 507 = 10 digits with the calling code).
+  // Paraguay is the shortest at 9 digits with the calling code (derivation: pickerQuery.ts); Panama, a 7-digit plan, is 10.
   const panama = "+507 200 1234";
   assert.equal(jsSaysFooter(panama), true, "fixture is a valid Panama landline");
   assert.equal(sqlSaysFooter(panama), true);
@@ -160,7 +160,14 @@ test("an empty prefix list yields a pattern that matches nothing, not every numb
   for (const phone of ["+5491155551234", "+13055551234", "+", "+++++++++++", ""]) assert.equal(re.test(phone), false, phone);
 });
 
-test("phoneFooterPattern is computed once per server instance", () => {
-  assert.equal(phoneFooterPattern(), phoneFooterPattern());
-  assert.ok(Object.is(phoneFooterPattern(), phoneFooterPattern()));
+test("the floor counts digits only: plus signs cannot pad a short number past it", () => {
+  for (const padded of ["+54+++++", "+54++++++++", "+1+++++++"]) assert.equal(sqlSaysFooter(padded), false, padded);
+});
+
+test("the unit model of the SQL folds the digit scripts libphonenumber reads, so a fold regression fails here", () => {
+  for (const phone of ["+１ 305 555 1234", "+١ 305 555 1234", "+۱ 305 555 1234"]) {
+    assert.equal(jsSaysFooter(phone), true, `js ${phone}`);
+    assert.equal(sqlSaysFooter(phone), true, `sql ${phone}`);
+  }
+  assert.equal(normalizePhoneLikeSql("＋１ 305"), "1305", "the fullwidth plus is not a plus to libphonenumber either, so it is stripped");
 });
