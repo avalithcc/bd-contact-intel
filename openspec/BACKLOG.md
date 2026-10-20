@@ -1920,7 +1920,26 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   CL 244, UY 208, EC 119, CR 78, BR 35, PE 29, PY 23, PA 11, GT 8, SV 5, VE 5,
   HN 2, DO/NI/BO 1 each); **385 newly unblocked** (ES 133, IE 61, IT 45, UK 30,
   DE 29, FR 14, IL 9, PL 7, NL 6, long tail).
-- **Compliance address/language split — PR 1 of 2 shipped, PR 2 open.**
+- **Compliance address/language split — PR 2 of 2 on branch `feat/compliance-audience-switch`, awaiting merge.**
+  Every caller now reads `resolveComplianceAudience` (picker SQL inputs, add guard,
+  seed plan, draft, pre-send, release, unsubscribe page); `recipientMarket`,
+  `marketOfCountry`, `isMarketMapped`, `draftLanguageForMarket`, `phoneCountryName`,
+  `countryNameOf` and `phoneCallingCodeGroups` are deleted, `COMPLIANCE_CONFIG` is
+  keyed `mdp` / `miami`. Consequences to know before merging, none of them fixed here:
+  (1) **a draft approved BEFORE the switch for a non-Argentine LATAM contact carries the
+  Mar del Plata address and now HOLDS `missing_footer` at send** (pre-send re-checks
+  against the recomputed address); it must be regenerated. (2) **Free text that is not
+  exactly a country now holds where `classifyMarket` used to mail it**: "Florida",
+  "Texas", "Miami, FL", "Buenos Aires" in `company.country` were `us`/`latam`, the
+  audience resolver holds them; the production count is unmeasured. (3) The picker's
+  phone length floor (8 digits, unchanged) hides a phone-only contact in Tokelau or
+  Tristan da Cunha (real 7-digit numbers); pinned in `sequencesPickerQuery.test.ts`.
+  (4) A Cuban/Iranian/North Korean/Syrian PHONE appears in the default picker view badged
+  `unmappedMarket` (the SQL deliberately does not encode the sanctions list); the add
+  guard refuses it. (5) The `unmapped_market` / `unmappedMarket` key names are
+  historical; the copy now says the location is unknown or restricted. The seed path
+  still never sets `marketMapped` and approval still has no check: unchanged.
+  Original PR 1 note:
   `MarketKey` (`src/lib/hiring/markets.ts:14-15`) decided the postal address, the
   draft language AND the hiring signal at once, so the owner's rules above cannot
   be expressed with it. PR 1 (#373, main `18543352`) added the pure resolver
