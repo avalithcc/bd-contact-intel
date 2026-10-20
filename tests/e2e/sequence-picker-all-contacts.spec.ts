@@ -8,11 +8,11 @@ skipUnlessWritesAllowed();
 
 /**
  * The create-Sequence picker lists EVERY live contact with an email. Florida / Miami and "Contratando IT en EE. UU."
- * are filters the BD turns on, never the pool. A contact in a region with no postal address (no legal footer) is
+ * are filters the BD turns on, never the pool. A contact the compliance audience cannot place (no location, or an embargoed country) is
  * listed as blocked, hidden until "Mostrar los que no se pueden agregar", and cannot be chosen.
  *
  * Three synthetic contacts share one last name so a search isolates them: an Argentine one (no posting at all), one at a
- * company with a Miami posting and one at a company with an Austin posting. A fourth lives in Spain.
+ * company with a Miami posting and one at a company with an Austin posting. A fourth lives in Cuba (embargoed, so the compliance audience holds it).
  */
 
 const tag = runTag();
@@ -51,7 +51,7 @@ test.beforeAll(async () => {
     await mkPerson('Ana', 'ar', null, 'Argentina');
     await mkPerson('Flor', 'fl', KEYS.fl, null);
     await mkPerson('Tex', 'tx', KEYS.tx, null);
-    await mkPerson('Esp', 'es', null, 'Spain');
+    await mkPerson('Esp', 'es', null, 'Cuba');
   } catch (err) {
     await cleanup().catch(() => undefined);
     await sql.end();
@@ -86,7 +86,7 @@ for (const width of [1024, 1440]) {
     await expect(row(NAME.tx)).toBeVisible();
     // Screenshot first, so a failing layout assertion still leaves an image.
     await page.locator('.table-wrap').screenshot({ path: `test-results/sequence-picker-all-contacts-${width}.png` });
-    // Spain has no postal address: blocked, so hidden until the toggle.
+    // Cuba is embargoed: blocked, so hidden until the toggle.
     await expect(row(NAME.es)).toHaveCount(0);
 
     // Florida narrows: the Miami posting stays, the Argentine and the Austin ones go.
@@ -109,7 +109,7 @@ for (const width of [1024, 1440]) {
     await page.getByLabel('Mostrar los que no se pueden agregar').check();
     const spain = row(NAME.es);
     await expect(spain).toBeVisible();
-    await expect(spain).toContainText('Sin pie legal para su región');
+    await expect(spain).toContainText('Ubicación desconocida o restringida');
     await expect(spain.getByRole('checkbox')).toBeDisabled();
 
     // An addable contact can be chosen; the counter follows.
