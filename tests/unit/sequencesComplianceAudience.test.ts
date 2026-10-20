@@ -149,8 +149,19 @@ test("every Spanish-speaking country resolves to es", () => {
     assert.equal(result?.language, "es", iso);
     assert.equal(result?.address, iso === "AR" ? "mdp" : "miami", iso);
   }
-  assert.equal(SPANISH_SPEAKING_COUNTRIES.size, 21);
-  assert.equal(SPANISH_SPEAKING_COUNTRIES.has("BR"), false);
+});
+
+test("the Spanish-speaking set is exactly these 21 states, spelled out", () => {
+  // Written in literals ON PURPOSE. Every other assertion about language in this file derives its expectation from
+  // SPANISH_SPEAKING_COUNTRIES, so swapping one member for a wrong one (Bolivia out, Georgia in) keeps the size at 21
+  // and passes all of them. A test that reads the policy set it is checking cannot catch a bad edit of that set, so the
+  // policy is restated here by hand. The same reasoning is why the sanctioned jurisdictions have a literals test.
+  assert.deepEqual(
+    [...SPANISH_SPEAKING_COUNTRIES].sort(),
+    ["AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "ES", "GQ", "GT", "HN", "MX", "NI", "PA", "PE", "PR", "PY", "SV", "UY", "VE"],
+    "Spanish is an official language in exactly these states",
+  );
+  assert.equal(SPANISH_SPEAKING_COUNTRIES.has("BR"), false, "Brazil is an owner decision: English, not Portuguese");
 });
 
 test("no recognized country outside the Spanish-speaking set resolves es", () => {
