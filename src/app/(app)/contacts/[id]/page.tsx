@@ -487,7 +487,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           send={{
             labels: dict.sendControl,
             fromAddress: me.email,
-            // person.country first, then the company's (the same chain recipientMarket uses); a guess, never persisted.
+            // person.country first, then the company's (the same chain the compliance audience uses); a guess, never persisted.
             recipientZone: resolveRecipientZone({ city: record.person.city, region: record.person.region, country: record.person.country || companyRow?.country }),
           }}
           ownerOptions={ownerOptions}

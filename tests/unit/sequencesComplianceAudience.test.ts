@@ -12,9 +12,8 @@ import {
   resolveCountry,
   type ComplianceAudienceInputs,
 } from "../../src/lib/sequences/complianceAudience";
-import { countryNameOf, phoneCountryIso } from "../../src/lib/sequences/phoneMarket";
+import { phoneCountryIso } from "../../src/lib/sequences/phoneMarket";
 import { LATAM_COUNTRY_NAMES } from "../../src/lib/hiring/markets";
-import { recipientMarket } from "../../src/lib/sequences/recipientMarket";
 
 const audience = (over: Partial<ComplianceAudienceInputs>) =>
   resolveComplianceAudience({ mobilePhone: null, phone: null, ...over });
@@ -41,7 +40,7 @@ test("a us posting bucket yields Miami in English", () => {
   assert.deepEqual(audience({ postingMarkets: ["us"] }), MIAMI_EN);
 });
 
-test("postings that conflict or say nothing fall through to the phone, as recipientMarket does", () => {
+test("postings that conflict or say nothing fall through to the phone", () => {
   assert.deepEqual(audience({ postingMarkets: ["us", "latam"], mobilePhone: AR_PHONE }), MDP);
   assert.deepEqual(audience({ postingMarkets: ["other", null], phone: ES_PHONE }), MIAMI_ES);
   assert.equal(audience({ postingMarkets: ["us", "latam"] }), null);
@@ -256,7 +255,7 @@ test("every country libphonenumber can name resolves through the phone link; the
     if (!example) continue;
     const result = audience({ mobilePhone: example.number });
     // +1 numbers, +7 and +44 shared plans can parse to a sibling region; judge by the country actually parsed.
-    const name = example.country ? countryNameOf(example.country) : countryNameOf(iso);
+    const name = example.country ?? iso;
     checked += 1;
     if (SANCTIONED_COUNTRIES.has(iso)) assert.equal(result, null, `${iso} (${name}) must hold by phone`);
     else if (iso === "AR") assert.deepEqual(result, MDP);
@@ -285,9 +284,8 @@ test("pure: the same input twice gives the same answer and the input is not muta
   assert.deepEqual(resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: "Argentina" }), MDP);
 });
 
-test("every country that has a footer today is still mailable: the new table covers the old market lists", () => {
+test("every country that was mailable before the switch is still mailable: the table covers the old LATAM list, the US and Canada", () => {
   for (const name of [...LATAM_COUNTRY_NAMES, "united states", "canada"]) {
-    assert.equal(recipientMarket({ mobilePhone: null, phone: null, personCountry: name }) !== "other", true, name);
     assert.notEqual(audience({ personCountry: name }), null, `${name} had a footer before and must not start holding`);
   }
 });
@@ -338,3 +336,21 @@ test("pinned limit: a city whose name is also a country resolves to the country 
   assert.equal(resolveCountry("Santa Lucía"), "LC");
   assert.deepEqual(audience({ personCountry: "Santa Lucía" }), MIAMI_EN);
 });
+
+test("ISO long-form country names: the one in the data resolves, and a sanctioned long form still holds", () => {
+  // Measured in production 2026-10-20: of the 58 distinct country strings, "Bolivia, Plurinational State of" was the
+  // only ISO long form, and the only text the old classifyMarket admitted (by substring) that this resolver refused —
+  // one contact. Pinned here so the alias is not dropped as noise.
+  assert.equal(resolveCountry("Bolivia, Plurinational State of"), "BO");
+  assert.deepEqual(audience({ personCountry: "Bolivia, Plurinational State of" }), MIAMI_ES);
+  // A long form that is NOT in the alias table holds, and for a sanctioned jurisdiction that is already the right
+  // answer, so the gap fails in the safe direction. Do not "fix" this by matching the text before the comma: that
+  // would turn every "City, Country" string into a country guess.
+  assert.equal(resolveCountry("Iran, Islamic Republic of"), null);
+  assert.equal(audience({ personCountry: "Iran, Islamic Republic of" }), null);
+  // The exact-match discipline is unchanged by the alias.
+  for (const text of ["Miami, FL", "New Mexico", "Greater Buenos Aires", "Canada Bay, Australia"]) {
+    assert.equal(resolveCountry(text), null, text);
+  }
+});
+

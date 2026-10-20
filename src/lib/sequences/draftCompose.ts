@@ -3,7 +3,7 @@
  * model. The footer is attached HERE, by the system, after the model has finished: the model is never asked for an
  * address or an opt-out line, so no prompt rule can be skipped, and the BD approves the exact text that will be sent.
  */
-import type { MarketKey } from "@/lib/hiring/markets";
+import type { ComplianceAddress } from "@/lib/sequences/complianceAudience";
 import { appendFooter, bodyHasFooter } from "@/lib/sequences/complianceFooter";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
 
@@ -12,17 +12,14 @@ export interface GeneratedEmail {
   body: string;
 }
 
-export const isMarketMapped = (market: MarketKey): boolean => Object.hasOwn(COMPLIANCE_CONFIG, market);
-
-/** The generated email with the market's footer appended unmodified; null when the market has no footer to append. */
-export function composeDraft(generated: GeneratedEmail, market: MarketKey, unsubscribeUrl: string): GeneratedEmail | null {
-  const result = appendFooter(generated.body, COMPLIANCE_CONFIG, market, unsubscribeUrl);
+/** The generated email with the address's footer appended unmodified; null when the address has no config entry. */
+export function composeDraft(generated: GeneratedEmail, address: ComplianceAddress, unsubscribeUrl: string): GeneratedEmail | null {
+  const result = appendFooter(generated.body, COMPLIANCE_CONFIG, address, unsubscribeUrl);
   return result.status === "ok" ? { subject: generated.subject, body: result.body } : null;
 }
 
-/** True when a BD's save dropped the footer of a market that needs one: warn, but do not block the save. */
-export const footerRemovedOnSave = (body: string, market: MarketKey): boolean =>
-  isMarketMapped(market) && !bodyHasFooter(body, COMPLIANCE_CONFIG, market);
+/** True when a BD's save dropped the footer its audience's address requires: warn, but do not block the save. */
+export const footerRemovedOnSave = (body: string, address: ComplianceAddress): boolean => !bodyHasFooter(body, COMPLIANCE_CONFIG, address);
 
 export const MAX_REASON_CHARS = 300;
 

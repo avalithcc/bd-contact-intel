@@ -3765,7 +3765,8 @@ export const en = {
       unreachable: "Unreachable",
       inferred: "Unreachable",
       noPosting: "No postings",
-      unmappedMarket: "No legal footer for its region",
+      // The key name is historical (it predates the compliance audience); the reason is now "we cannot place this contact in a country".
+      unmappedMarket: "Location unknown or restricted",
       companyLimit: "Company limit",
     },
     blockWhy: {
@@ -3778,7 +3779,7 @@ export const en = {
       unreachable: "Their email bounced or was discarded (status: none). It is not sent.",
       inferred: "The email was guessed from a pattern and nobody confirmed it. Inferred addresses are not sent to.",
       noPosting: "{company} has no open IT postings in the US.",
-      unmappedMarket: "We have no postal address for this contact's region and every email must carry one. It cannot be added.",
+      unmappedMarket: "We cannot place this contact in a country (the country is missing or is not a country name, and nothing else locates them), or its country is under an embargo. Every email must carry the right postal address, so it cannot be added.",
       companyLimit: "You already chose {max} contacts from {company} ({names}). The maximum is {max} per company.",
     },
     contextBadges: {
@@ -3831,7 +3832,8 @@ export const en = {
       no_email: "the contact has no email",
       suppressed: "the address is on the do-not-contact list",
       client_company: "the company is listed as a client",
-      unmapped_market: "there is no postal address for the contact's market",
+      // Historical key: the hold means no compliance audience (location unknown, or an embargoed country), not a missing region footer.
+      unmapped_market: "we cannot place the contact in a country, or its country is under an embargo",
       missing_footer: "the email is missing its unsubscribe footer",
       account_not_connected: "the Gmail account is not connected",
       replied: "the contact already replied",

@@ -14,8 +14,8 @@ const NOW = new Date("2026-10-15T14:00:00Z");
 const URL_OK = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
 
 // Fixtures come from the real footer producer, never a hand-typed footer.
-function footed(market: "us" | "latam" = "us") {
-  const r = appendFooter("Hello Jane, a short note.", COMPLIANCE_CONFIG, market, URL_OK);
+function footed(address: "miami" | "mdp" = "miami") {
+  const r = appendFooter("Hello Jane, a short note.", COMPLIANCE_CONFIG, address, URL_OK);
   assert.equal(r.status, "ok");
   return r.status === "ok" ? r.body : "";
 }
@@ -28,7 +28,7 @@ function facts(over: Partial<PreSendFacts> = {}): PreSendFacts {
     merged: false,
     email: "jane@acme.test",
     hasClientStatus: false,
-    market: "us",
+    address: "miami",
     body: footed(),
     accountStatus: "connected",
     activeClaim: null,
@@ -73,19 +73,19 @@ test("a company that became a client is held", () => {
   assert.deepEqual(check(facts({ hasClientStatus: true })), held("client_company"));
 });
 
-test("an unmapped recipient market (`other`) is held and never sent, whatever the body says", () => {
-  assert.deepEqual(check(facts({ market: "other" })), held("unmapped_market"));
-  assert.deepEqual(check(reminder({ market: "other" })), held("unmapped_market"));
+test("a recipient with no compliance address (no audience) is held and never sent, whatever the body says", () => {
+  assert.deepEqual(check(facts({ address: null })), held("unmapped_market"));
+  assert.deepEqual(check(reminder({ address: null })), held("unmapped_market"));
 });
 
 test("footer: address deleted, opt-out text deleted, or the per-recipient link deleted: held", () => {
   const ok = footed();
-  const noAddress = ok.replace(COMPLIANCE_CONFIG.us!.postalAddress, "");
-  const noOptOut = ok.replace(COMPLIANCE_CONFIG.us!.optOutText, "");
+  const noAddress = ok.replace(COMPLIANCE_CONFIG.miami!.postalAddress, "");
+  const noOptOut = ok.replace(COMPLIANCE_CONFIG.miami!.optOutText, "");
   const noLink = ok.replace(URL_OK, "");
   for (const body of [noAddress, noOptOut, noLink]) assert.deepEqual(check(facts({ body })), held("missing_footer"));
-  assert.deepEqual(check(facts({ body: footed("latam"), market: "latam" })), { ok: true });
-  assert.deepEqual(check(facts({ body: footed("us"), market: "latam" })), held("missing_footer"));
+  assert.deepEqual(check(facts({ body: footed("mdp"), address: "mdp" })), { ok: true });
+  assert.deepEqual(check(facts({ body: footed("miami"), address: "mdp" })), held("missing_footer"));
 });
 
 test("extractUnsubscribeUrl returns the link the footer producer wrote, and null when there is none", () => {

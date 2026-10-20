@@ -119,7 +119,7 @@ test("a US member is drafted in English with the Florida footer appended after t
   assert.deepEqual(calls.map((c) => [c.language, c.channel]), [["en", "email"]]);
   const d = await draftOf(m);
   assert.ok(d.body.startsWith("Hi usa,"));
-  assert.ok(d.body.includes(COMPLIANCE_CONFIG.us!.postalAddress));
+  assert.ok(d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress));
   assert.match(d.body, /https:\/\/example\.test\/api\/unsubscribe\?t=\S+$/);
   assert.equal((await memberOf(m)).state, "drafted");
 });
@@ -132,21 +132,43 @@ test("a LATAM member (person country wins over a US posting) is drafted in Spani
   await generateMissingDrafts(bdId, sequenceId, deps());
   assert.deepEqual(calls.filter((c) => c.contact.firstName === "latam").map((c) => c.language), ["es"]);
   const d = await draftOf(m);
-  assert.ok(d.body.includes(COMPLIANCE_CONFIG.latam!.postalAddress));
-  assert.ok(!d.body.includes(COMPLIANCE_CONFIG.us!.postalAddress), "a Spanish email never carries the Florida address");
+  assert.ok(d.body.includes(COMPLIANCE_CONFIG.mdp!.postalAddress));
+  assert.ok(!d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress), "a Spanish email never carries the Florida address");
+  assert.ok(d.body.includes("Formosa 2531, B7600 Mar del Plata") && !d.body.includes("Ansin"), "literal Mar del Plata for an Argentine contact");
 });
 
-test("an unmapped market is never generated: no draft, member held with the unmapped-market reason", async () => {
+test("a contact with no audience is never generated: no draft, member held with the unmapped-market reason", async () => {
   const { generateMissingDrafts } = await import("@/lib/sequences/draftQueries");
-  const m = await mkMember("spain", { country: "Spain" });
+  // Cuba is embargoed: the audience holds it. (Spain used to be the held fixture; it is mailable now, see below.)
+  const m = await mkMember("cuba", { country: "Cuba" });
   calls.length = 0;
   const result = await generateMissingDrafts(bdId, sequenceId, deps());
   assert.ok(result.ok && result.held.includes(m));
-  assert.equal(calls.filter((c) => c.contact.firstName === "spain").length, 0);
+  assert.equal(calls.filter((c) => c.contact.firstName === "cuba").length, 0);
   assert.equal(await draftOf(m), undefined);
   const row = await memberOf(m);
   assert.equal(row.holdReason, "unmapped_market");
   assert.ok(row.holdAt);
+});
+
+test("the owner's rules, through the real draft path: Mexico and Spain are Spanish under Miami, Brazil is English under Miami", async () => {
+  const { generateMissingDrafts } = await import("@/lib/sequences/draftQueries");
+  const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
+  const mexico = await mkMember("mexico", { country: "Mexico" });
+  const spain = await mkMember("spainok", { country: "Spain" });
+  const brazil = await mkMember("brazil", { country: "Brazil" });
+  calls.length = 0;
+  const result = await generateMissingDrafts(bdId, sequenceId, deps());
+  assert.ok(result.ok && [mexico, spain, brazil].every((m) => result.generated.includes(m)), JSON.stringify(result));
+  const lang = (first: string) => calls.filter((c) => c.contact.firstName === first).map((c) => c.language);
+  assert.deepEqual([lang("mexico"), lang("spainok"), lang("brazil")], [["es"], ["es"], ["en"]]);
+  for (const m of [mexico, spain, brazil]) {
+    const d = await draftOf(m);
+    assert.ok(d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress), "Miami address");
+    assert.ok(!d.body.includes(COMPLIANCE_CONFIG.mdp!.postalAddress), "never the Mar del Plata address for a non-Argentine contact");
+    // Literals, not the config: a test that reads the config it checks cannot catch a bad edit of that config.
+    assert.ok(d.body.includes("470 Ansin Blvd Ste G, Hallandale, FL 33009") && !d.body.includes("Formosa 2531"), "literal Hallandale, never Mar del Plata");
+  }
 });
 
 test("edit protection: an edited draft is byte-identical after a missing-drafts batch; the empty member is generated", async () => {
@@ -348,7 +370,7 @@ test("a reminder is drafted for a sent member: own prompt purpose, market langua
   assert.deepEqual(calls.map((c) => [c.language, c.channel, c.purpose]), [["en", "email", "reminder"]]);
   const d = await stepDraft(m, 2);
   assert.match(d.body, /^Hi remus,/);
-  assert.ok(d.body.includes(COMPLIANCE_CONFIG.us!.postalAddress));
+  assert.ok(d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress));
   assert.match(d.body, /https:\/\/example\.test\/api\/unsubscribe\?t=\S+$/);
   assert.equal(await tokenCount(m), tokensBefore + 1);
   assert.equal((await stepDraft(m, 1)).body, "what was sent");
@@ -363,8 +385,8 @@ test("a LATAM reminder is drafted in Spanish with the Argentina footer, never th
   await generateReminderDraft(bdId, sequenceId, m, deps());
   assert.deepEqual(calls.map((c) => [c.language, c.purpose]), [["es", "reminder"]]);
   const d = await stepDraft(m, 2);
-  assert.ok(d.body.includes(COMPLIANCE_CONFIG.latam!.postalAddress));
-  assert.ok(!d.body.includes(COMPLIANCE_CONFIG.us!.postalAddress));
+  assert.ok(d.body.includes(COMPLIANCE_CONFIG.mdp!.postalAddress));
+  assert.ok(!d.body.includes(COMPLIANCE_CONFIG.miami!.postalAddress));
 });
 
 test("each reminder issues its own token; a second missing run neither regenerates nor adds a token", async () => {
@@ -415,9 +437,9 @@ test("no reminder without a sent step 1: drafted, replied and no_reply members, 
   for (const id of [drafted, replied, done, noStep1, owned]) assert.equal(await stepDraft(id, 2), undefined);
 });
 
-test("a reminder for an unmapped market is held, never generated", async () => {
+test("a reminder for a contact with no audience (embargoed) is held, never generated", async () => {
   const { generateReminderDraft } = await import("@/lib/sequences/draftQueries");
-  const m = await mkSentMember("remspain", { country: "Spain" });
+  const m = await mkSentMember("remcuba", { country: "Cuba" });
   calls.length = 0;
   assert.equal(await generateReminderDraft(bdId, sequenceId, m, deps()), "skipped");
   assert.equal(calls.length, 0);

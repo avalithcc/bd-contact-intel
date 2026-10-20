@@ -18,8 +18,8 @@ export interface RosterCandidate {
   /** company.client_status. ANY non-empty value ('active' or 'inactive') means the company is a client. */
   clientStatus: string | null;
   /**
-   * False when the Contact's recipient market has no postal address in COMPLIANCE_CONFIG, so no email could carry the
-   * legal footer. Decided by the server read (recipientMarket + isMarketMapped) and handed in as a boolean, so this pure
+   * False when the Contact has no compliance audience (no location signal, or an embargoed jurisdiction), so no email could
+   * carry the legal footer. Decided by the server read (resolveComplianceAudience !== null) and handed in as a boolean, so this pure
    * module (bundled into the client through the picker) never imports the address config. Undefined = not judged.
    */
   marketMapped?: boolean;

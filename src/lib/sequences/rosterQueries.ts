@@ -11,8 +11,7 @@ import { canTransition, type MemberState } from "./memberState";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { clientStatusSql, buildRosterCandidatesQuery, companyCountrySql, postingMarketsSql } from "./rosterQuery";
-import { isMarketMapped } from "./draftCompose";
-import { recipientMarket } from "./recipientMarket";
+import { resolveComplianceAudience } from "./complianceAudience";
 import { evaluateRosterAdds, type RosterCandidate, type RosterDecision, type RosterRejection } from "./rosterGuards";
 import { listSuppressionRules } from "./suppressionQueries";
 
@@ -37,9 +36,9 @@ export async function listRosterCandidates(opts: { limit: number; search?: strin
 }
 
 /**
- * The facts the admission needs, by id. With `judgeMarket` the recipient market is derived the way drafting and sending
- * derive it (recipientMarket) and handed to the admission as `marketMapped`: an add must refuse a Contact no email could
- * carry a legal footer for. Re-admission skips it (`judgeMarket` off): that member was admitted once and a market hold
+ * The facts the admission needs, by id. With `judgeMarket` the compliance audience is derived the way drafting and sending
+ * derive it (resolveComplianceAudience) and handed to the admission as `marketMapped` (true = has an audience): an add must
+ * refuse a Contact no email could carry a legal footer for, or whose jurisdiction is embargoed. Re-admission skips it (`judgeMarket` off): that member was admitted once and a no-audience hold
  * already covers it at send time.
  */
 async function loadCandidates(tx: Tx, personIds: readonly string[], judgeMarket = false): Promise<RosterCandidate[]> {
@@ -59,7 +58,7 @@ async function loadCandidates(tx: Tx, personIds: readonly string[], judgeMarket 
     mergedIntoId: r.merged_into_id,
     companyKey: r.company_key,
     clientStatus: r.client_status,
-    ...(judgeMarket ? { marketMapped: isMarketMapped(recipientMarket({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets })) } : {}),
+    ...(judgeMarket ? { marketMapped: resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }) !== null } : {}),
   }));
 }
 

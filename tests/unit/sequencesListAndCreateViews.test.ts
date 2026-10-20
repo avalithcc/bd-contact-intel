@@ -115,13 +115,13 @@ test("picker: rows, badges and reasons as the mockup draws them", () => {
   assert.ok(html.includes("4 disponibles · 2 que no se pueden agregar, con el motivo") && html.includes("Cupo por empresa: 2") && html.includes("Mostrar los que no se pueden agregar"));
 });
 
-test("picker: a contact in a region without a legal footer is blocked with its reason, hidden until the toggle, and cannot be chosen", () => {
-  const spain = person("u", "k9", { block: "unmappedMarket" });
-  const shown = picker([], [pool[1], spain]);
-  at(shown, "Person b", "Disponible", "No se pueden agregar · 1", "Person u", "Sin pie legal para su región");
-  assert.ok(shown.includes("No tenemos una dirección postal para la región de este contacto") && shown.includes('aria-label="No se puede elegir a Person u"'));
-  const hidden = renderToStaticMarkup(createElement(RosterPicker, { contacts: [pool[1], spain], hasMore: false, loadPage: noPage, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }));
-  assert.ok(!hidden.includes("Person u") && !hidden.includes("Sin pie legal") && hidden.includes("Person b"), "blocked contacts are hidden by default");
+test("picker: a contact with no compliance audience is blocked with its reason, hidden until the toggle, and cannot be chosen", () => {
+  const unplaced = person("u", "k9", { block: "unmappedMarket" });
+  const shown = picker([], [pool[1], unplaced]);
+  at(shown, "Person b", "Disponible", "No se pueden agregar · 1", "Person u", "Ubicación desconocida o restringida");
+  assert.ok(shown.includes("No podemos ubicar a este contacto en un país") && shown.includes('aria-label="No se puede elegir a Person u"'));
+  const hidden = renderToStaticMarkup(createElement(RosterPicker, { contacts: [pool[1], unplaced], hasMore: false, loadPage: noPage, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }));
+  assert.ok(!hidden.includes("Person u") && !hidden.includes("Ubicación desconocida") && hidden.includes("Person b"), "blocked contacts are hidden by default");
   assert.ok(/<input type="checkbox"[^>]*\/> Mostrar los que no se pueden agregar/.test(hidden) && !/checked=""[^>]*\/> Mostrar/.test(hidden));
 });
 

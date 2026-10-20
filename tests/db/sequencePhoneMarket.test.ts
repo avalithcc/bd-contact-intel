@@ -1,5 +1,5 @@
 /**
- * DB-backed pin of the phone link of recipientMarket across the picker's SQL and the add guard. The picker FILTERS on the
+ * DB-backed pin of the phone link of the compliance audience across the picker's SQL and the add guard. The picker FILTERS on the
  * SQL "blocked" flag, so a contact the SQL wrongly blocks never appears; the JS resolver decides the reason a visible row
  * shows and the add itself. Real SQL here, because the unit test can only render it. Opt-in and fail-closed:
  * `npm run test:db`, DATABASE_URL naming a `*_e2e` database.
@@ -32,6 +32,11 @@ const SPECS: Record<string, Spec> = {
   fullwidthUs: { mobilePhone: "+１ 305 555 1234" },
   arabicIndicUs: { mobilePhone: "+١ 305 555 1234" },
   jamaica: { mobilePhone: "+18765551234" },
+  thailand: { mobilePhone: "+66812345678" },
+  georgia: { mobilePhone: "+995555123456" },
+  cuba: { mobilePhone: "+5351234567" },
+  iran: { mobilePhone: "+989121234567" },
+  tokelau: { mobilePhone: "+6907290" },
 };
 
 before(async () => {
@@ -71,28 +76,39 @@ async function page(showBlocked: boolean) {
   return byName;
 }
 
-test("the default picker lists the contacts a phone unblocks and hides the ones with no footer", async () => {
+test("the default picker lists every contact a phone LOCATES, Spain and Thailand included, and hides the ones no phone locates", async () => {
   const listed = await page(false);
-  for (const name of ["arMobile", "arFormatted", "arLandline", "doMobile", "usMobile", "fullwidthUs", "arabicIndicUs"]) assert.equal(listed.get(name), null, name);
-  for (const name of ["esMobile", "spainWithArPhone", "noPhone", "noPlus", "malformedAr"]) assert.equal(listed.has(name), false, `${name} is hidden`);
+  for (const name of ["arMobile", "arFormatted", "arLandline", "doMobile", "usMobile", "fullwidthUs", "arabicIndicUs", "esMobile", "spainWithArPhone", "thailand", "georgia", "jamaica"]) assert.equal(listed.get(name), null, name);
+  for (const name of ["noPhone", "noPlus", "malformedAr"]) assert.equal(listed.has(name), false, `${name} is hidden`);
 });
 
-test("a number too short to be real is hidden by default, and shown with its reason when blocked rows are on", async () => {
+test("a number too short to be real, or no phone at all, is hidden by default and shown with its reason when blocked rows are on", async () => {
   const shown = await page(true);
-  for (const name of ["esMobile", "spainWithArPhone", "noPhone", "noPlus", "malformedAr"]) assert.equal(shown.get(name), "unmappedMarket", name);
+  for (const name of ["noPhone", "noPlus", "malformedAr"]) assert.equal(shown.get(name), "unmappedMarket", name);
 });
 
-test("residual, pinned: bare +1 also reaches a footer-less NANP country, which the default view lists WITH its badge", async () => {
-  // SQL cannot tell Jamaica from the US by dial code and a negative area-code list would rot. The row is never addable:
-  // the JS admission badges it and the add guard refuses it. A usable row is never hidden; this is the tolerable direction.
-  assert.equal((await page(false)).get("jamaica"), "unmappedMarket");
+test("decision, pinned: the SQL does not encode the sanctions list, so an embargoed phone is SHOWN with its badge and the add guard refuses it", async () => {
+  // A usable row is never hidden; an unusable one is never added. The embargo lives only in complianceAudience.ts.
+  const listed = await page(false);
+  for (const name of ["cuba", "iran"]) assert.equal(listed.get(name), "unmappedMarket", name);
 });
 
-test("the add guard agrees: a phone-resolved contact is admitted, Spain with an Argentine phone is refused", async () => {
+test("known limit, pinned: a real 7-digit Tokelau number clears no length floor, so SQL hides a number JS would mail", async () => {
+  // PHONE_MIN_LENGTH is 8 on purpose (it keeps `+5491`-style garbage out); the derived set of calling codes it clips
+  // is SHORT_VALID_WITNESSES in the picker unit test (Tokelau is one of 14). Owner decision, not a silent behaviour.
+  const { resolveComplianceAudience } = await import("@/lib/sequences/complianceAudience");
+  assert.notEqual(resolveComplianceAudience({ mobilePhone: SPECS.tokelau.mobilePhone ?? null, phone: null }), null, "JS mails it");
+  assert.equal((await page(false)).has("tokelau"), false);
+  assert.equal((await page(true)).get("tokelau"), null, "it only surfaces, addable and with no badge, when blocked rows are shown");
+});
+
+test("the add guard agrees: a phone-resolved contact is admitted, embargoed and unplaceable phones are refused", async () => {
   const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
-  const result = await addMembersToSequence(bdId, sequenceId, ["arMobile", "doMobile", "fullwidthUs", "arabicIndicUs", "esMobile", "spainWithArPhone", "malformedAr", "jamaica"].map((n) => ids.get(n)!));
+  const names = ["arMobile", "doMobile", "fullwidthUs", "arabicIndicUs", "esMobile", "spainWithArPhone", "thailand", "georgia", "jamaica", "malformedAr", "cuba", "iran", "tokelau"];
+  const result = await addMembersToSequence(bdId, sequenceId, names.map((n) => ids.get(n)!));
   assert.ok(result.ok);
-  assert.deepEqual([...result.accepted].map(String).sort(), ["arMobile", "doMobile", "fullwidthUs", "arabicIndicUs"].map((n) => ids.get(n)!).sort());
+  const admitted = ["arMobile", "doMobile", "fullwidthUs", "arabicIndicUs", "esMobile", "spainWithArPhone", "thailand", "georgia", "jamaica", "tokelau"];
+  assert.deepEqual([...result.accepted].map(String).sort(), admitted.map((n) => ids.get(n)!).sort());
   const reasons = Object.fromEntries(result.rejected.map((r) => [r.personId, r.reason]));
-  for (const n of ["esMobile", "spainWithArPhone", "malformedAr", "jamaica"]) assert.equal(reasons[ids.get(n)!], "unmapped_market", n);
+  for (const n of ["malformedAr", "cuba", "iran"]) assert.equal(reasons[ids.get(n)!], "unmapped_market", n);
 });

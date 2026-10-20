@@ -32,7 +32,7 @@ async function mkAccount(label: string, cap = 5) {
 }
 type Acct = Awaited<ReturnType<typeof mkAccount>>;
 
-async function footedBody(country: "us" | "latam" = "us") {
+async function footedBody(country: "miami" | "mdp" = "miami") {
   const { appendFooter } = await import("@/lib/sequences/complianceFooter");
   const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
   const { buildUnsubscribeUrl, generateUnsubscribeToken } = await import("@/lib/sequences/unsubscribeToken");
@@ -41,7 +41,7 @@ async function footedBody(country: "us" | "latam" = "us") {
   return r.status === "ok" ? r.body : "";
 }
 
-async function mkMember(a: Acct, name: string, over: { state?: string; step?: 1 | 2; country?: string; email?: string; reminderDueAt?: Date; approvedAt?: Date } = {}) {
+async function mkMember(a: Acct, name: string, over: { state?: string; step?: 1 | 2; country?: string; email?: string; reminderDueAt?: Date; approvedAt?: Date; footer?: "miami" | "mdp" } = {}) {
   const { db } = await import("@/db");
   const { person, sequenceDraft, sequenceMember } = await import("@/db/schema");
   const email = over.email ?? `zz-rel-${name}-${run}@example.test`;
@@ -52,7 +52,7 @@ async function mkMember(a: Acct, name: string, over: { state?: string; step?: 1 
     .insert(sequenceMember)
     .values({ sequenceId: a.sequenceId, personId: p.id, state: over.state ?? "approved", ...(step === 2 ? { sentAt: new Date("2026-10-08T13:00:00Z"), reminderDueAt: over.reminderDueAt ?? DUE } : {}) })
     .returning();
-  await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step, subject: `Hi ${name}`, body: await footedBody(), approvedAt: over.approvedAt ?? new Date("2026-10-14T20:00:00Z"), scheduledFor: DUE });
+  await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step, subject: `Hi ${name}`, body: await footedBody(over.footer), approvedAt: over.approvedAt ?? new Date("2026-10-14T20:00:00Z"), scheduledFor: DUE });
   return { memberId: m.id, personId: p.id, email };
 }
 
@@ -335,11 +335,11 @@ test("a reminder is HELD when email_message shows a genuine post-send reply, alt
   assert.equal((await memberRow(answered.memberId)).holdReason, "replied");
 });
 
-test("holds are persisted: an unmapped market and a suppressed address are not sent and say why", async () => {
+test("holds are persisted: a contact with no audience and a suppressed address are not sent and say why", async () => {
   const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
   const { insertSuppression } = await import("@/lib/sequences/suppressionQueries");
   const a = await mkAccount("holds");
-  const spain = await mkMember(a, "holds-spain", { country: "Spain" });
+  const cuba = await mkMember(a, "holds-cuba", { country: "Cuba" });
   const optOut = await mkMember(a, "holds-optout");
   suppressed.push(optOut.email);
   await insertSuppression({ kind: "address", rawValue: optOut.email, source: "manual" });
@@ -347,9 +347,21 @@ test("holds are persisted: an unmapped market and a suppressed address are not s
   const { ports, sends } = await portsFor([a]);
   assert.deepEqual(await runSequenceRelease(ports), { released: 1, held: 2, deferred: 0, failed: 0 });
   assert.deepEqual(sends.map((s) => s.to), [fine.email]);
-  assert.equal((await memberRow(spain.memberId)).holdReason, "unmapped_market");
+  assert.equal((await memberRow(cuba.memberId)).holdReason, "unmapped_market");
   assert.equal((await memberRow(optOut.memberId)).holdReason, "suppressed");
-  assert.deepEqual(await claimsOf(spain.memberId), []);
+  assert.deepEqual(await claimsOf(cuba.memberId), []);
+});
+
+test("the address change at send time: a Mexican contact is released with the Miami footer, and HELD missing_footer if its approved draft still carries Mar del Plata", async () => {
+  const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
+  const a = await mkAccount("addrchange");
+  const fresh = await mkMember(a, "addr-mx-miami", { country: "Mexico", footer: "miami" });
+  const stale = await mkMember(a, "addr-mx-mdp", { country: "Mexico", footer: "mdp" });
+  const argentine = await mkMember(a, "addr-ar-mdp", { country: "Argentina", footer: "mdp" });
+  const { ports, sends } = await portsFor([a]);
+  assert.deepEqual(await runSequenceRelease(ports), { released: 2, held: 1, deferred: 0, failed: 0 });
+  assert.deepEqual(sends.map((s) => s.to).sort(), [fresh.email, argentine.email].sort());
+  assert.equal((await memberRow(stale.memberId)).holdReason, "missing_footer", "the 1,736-contact address change: drafts written before the switch must be regenerated");
 });
 
 test("the reminder: sent threaded on step 1's stored Message-ID, member -> no_reply, no further reminder drafted", async () => {

@@ -22,12 +22,12 @@ let n = 0;
 function candidate(over: Partial<ReleaseCandidate> = {}): ReleaseCandidate {
   n += 1;
   const url = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
-  const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "us", url);
+  const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", url);
   return {
     id: `m-${String(n).padStart(3, "0")}`, accountId: "acc-1", sequenceId: "seq-1", dailyCap: 5, step: 1,
     dueAt: new Date(NINE_AM.getTime() + n * 1000), approvedAt: new Date("2026-10-14T20:00:00Z"),
     memberState: "approved", draftApproved: true, merged: false, email: `person${n}@acme.test`, hasClientStatus: false,
-    market: "us", body: footed.status === "ok" ? footed.body : "", accountStatus: "connected", activeClaim: null,
+    address: "miami", body: footed.status === "ok" ? footed.body : "", accountStatus: "connected", activeClaim: null,
     repliedAt: null, inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, ownerBdId: "bd-1",
     personId: `p-${n}`, subject: "Hi", accountEmail: "sender@mailbox.test", holdReason: null, schedule: DEFAULT_SCHEDULE,
     ...over,
@@ -236,7 +236,7 @@ test("a run before 09:00 Miami releases no reminder and writes nothing", async (
 });
 
 test("an unmapped market is held with unmapped_market and never claimed or sent", async () => {
-  const f = fakes([candidate({ market: "other" })]);
+  const f = fakes([candidate({ address: null })]);
   assert.deepEqual(await runSequenceRelease(f.ports), { released: 0, held: 1, deferred: 0, failed: 0 });
   assert.deepEqual(f.log, []);
   assert.equal(flat(f.holds)[0].reason, "unmapped_market");

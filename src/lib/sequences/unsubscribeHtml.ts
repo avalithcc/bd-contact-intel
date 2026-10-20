@@ -21,7 +21,7 @@ function shell(content: string, postalAddress?: string): string {
 
 const CHECK = '<svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 
-/** `postalAddress` is the recipient's market address (compliance config); the invalid page never shows one. */
+/** `postalAddress` is the recipient's compliance-audience address (compliance config); the invalid page never shows one. */
 export function renderUnsubscribeHtml(view: UnsubscribeView, postalAddress?: string): string {
   switch (view.kind) {
     case "confirm":

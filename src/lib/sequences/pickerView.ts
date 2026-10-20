@@ -14,6 +14,8 @@ import { COMPANY_MEMBER_LIMIT } from "./rosterGuards";
 import { resolveSeedRoster, type SeedCandidate, type SeedGuards, type SeedRejection } from "./seedRoster";
 import type { LeadStatusKey } from "@/lib/leads/types";
 
+// `unmappedMarket` is a historical name: it predates the compliance audience. It now means "the contact cannot be placed
+// (no location signal, or an embargoed country)", not "this region has no legal footer". Renaming it touches eight files for no behaviour.
 export type BlockKind = "client" | "clientFormer" | "suppressed" | "member" | "merged" | "noEmail" | "unreachable" | "inferred" | "noPosting" | "unmappedMarket" | "companyLimit";
 export type EmailBadge = "verified" | "probable" | "inferred" | "none";
 

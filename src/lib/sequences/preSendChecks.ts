@@ -5,14 +5,15 @@
  * the reason on the member (`hold_reason`) and the UI words it.
  *
  * Two decisions encoded here:
- *  - A market with no compliance entry (`other`) HOLDS as `unmapped_market`. There is no default address (config.ts).
+ *  - A recipient with no compliance address (no audience: no location signal, or an embargoed jurisdiction) HOLDS as
+ *    `unmapped_market`. There is no default address (config.ts). The reason code is historical: it predates the audience.
  *  - Any existing non-failed claim holds as `manual_check`: a `pending` claim is the crash case (Gmail may or may not
  *    have accepted the message) and is NEVER auto-resent; at-most-once beats at-least-once.
  * The "no genuine reply" check reads TWO facts. `repliedAt` is derived and written only by the best-effort sync hook
  * (applyReplies.ts), which is swallowed on failure so mail sync survives. `inboundReplyAt` comes from email_message, the
  * source of truth, so a hook that failed costs nothing here: the last line of defence never depends on an optional step.
  */
-import type { MarketKey } from "@/lib/hiring/markets";
+import type { ComplianceAddress } from "./complianceAudience";
 import { bodyHasFooter } from "./complianceFooter";
 import { COMPLIANCE_CONFIG, SEQUENCE_SYNC_STALE_MS, type ComplianceConfig } from "./config";
 import { isSyncFreshEnough } from "./syncFreshness";
@@ -43,7 +44,8 @@ export interface PreSendFacts {
   merged: boolean;
   email: string | null;
   hasClientStatus: boolean;
-  market: MarketKey;
+  /** The address the recipient's audience resolves to NOW; null = no audience, hold. Recomputed at send time, never stored. */
+  address: ComplianceAddress | null;
   body: string;
   accountStatus: string;
   /** Outcome of the member's non-failed claim for THIS step, if any. */
@@ -90,8 +92,8 @@ export function evaluatePreSendChecks(
   if (isSuppressed(email, ctx.suppression)) return hold("suppressed");
   if (f.hasClientStatus) return hold("client_company");
   const config = ctx.config ?? COMPLIANCE_CONFIG;
-  if (!Object.hasOwn(config, f.market)) return hold("unmapped_market");
-  if (!bodyHasFooter(f.body, config, f.market) || !extractUnsubscribeUrl(f.body)) return hold("missing_footer");
+  if (!f.address || !Object.hasOwn(config, f.address)) return hold("unmapped_market");
+  if (!bodyHasFooter(f.body, config, f.address) || !extractUnsubscribeUrl(f.body)) return hold("missing_footer");
   if (f.accountStatus !== "connected") return hold("account_not_connected");
   if (f.step === 2) {
     if (f.repliedAt || f.inboundReplyAt) return hold("replied");

@@ -255,18 +255,19 @@ after(async () => {
   await db.$client.end();
 });
 
-test("add: a Contact whose market has no postal address is rejected server-side, whatever the client sent", async () => {
+test("add: a Contact with no compliance audience is rejected server-side, whatever the client sent", async () => {
   const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
   const seq = await mkSequence();
-  const spain = await mkPerson("um-spain", await mkCompany("um-spain", null), { country: "Spain" });
+  const cuba = await mkPerson("um-cuba", await mkCompany("um-cuba", null), { country: "Cuba" });
   const unknown = await mkPerson("um-unknown", await mkCompany("um-unknown", null, { posting: "none" }));
   const argentina = await mkPerson("um-arg", await mkCompany("um-arg", null, { posting: "none" }), { country: "Argentina" });
   const canada = await mkPerson("um-canada", await mkCompany("um-canada", null, { posting: "none" }), { country: "Canada" });
+  const spain = await mkPerson("um-spain", await mkCompany("um-spain", null), { country: "Spain" });
   const fromPosting = await mkPerson("um-posting", await mkCompany("um-posting", null));
-  const r = await addMembersToSequence(bdId, seq, [spain, unknown, argentina, canada, fromPosting]);
+  const r = await addMembersToSequence(bdId, seq, [cuba, unknown, argentina, canada, spain, fromPosting]);
   assert.ok(r.ok);
-  assert.deepEqual(r.rejected, [{ personId: spain, reason: "unmapped_market" }, { personId: unknown, reason: "unmapped_market" }]);
-  assert.deepEqual(r.accepted, [argentina, canada, fromPosting]);
+  assert.deepEqual(r.rejected, [{ personId: cuba, reason: "unmapped_market" }, { personId: unknown, reason: "unmapped_market" }]);
+  assert.deepEqual(r.accepted, [argentina, canada, spain, fromPosting], "Spain is located now, so it is mailable (it was refused under the market rule)");
 });
 
 test("add: merged, email-less, opted-out and client Contacts are rejected on a direct request too", async () => {

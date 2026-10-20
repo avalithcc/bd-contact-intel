@@ -5,37 +5,33 @@ import { bodyHasFooter } from "@/lib/sequences/complianceFooter";
 import {
   composeDraft,
   footerRemovedOnSave,
-  isMarketMapped,
   runDraftBatch,
 } from "@/lib/sequences/draftCompose";
 
 const URL = "https://example.test/unsubscribe/tok";
 const generated = { subject: "Senior capacity", body: "Hi Ana,\n\nShort pitch.\n\nCristian Civita" };
 
-test("a mapped market gets the footer appended after the body, unmodified", () => {
-  const draft = composeDraft(generated, "us", URL)!;
+test("an address gets the footer appended after the body, unmodified", () => {
+  const draft = composeDraft(generated, "miami", URL)!;
   assert.ok(draft.body.startsWith(generated.body));
   assert.ok(draft.body.endsWith(URL));
-  assert.equal(bodyHasFooter(draft.body, COMPLIANCE_CONFIG, "us"), true);
+  assert.equal(bodyHasFooter(draft.body, COMPLIANCE_CONFIG, "miami"), true);
 });
 
 test("the footer is added by the system even when the model body has no address", () => {
-  assert.equal(bodyHasFooter(generated.body, COMPLIANCE_CONFIG, "us"), false);
-  assert.equal(bodyHasFooter(composeDraft(generated, "latam", URL)!.body, COMPLIANCE_CONFIG, "latam"), true);
+  assert.equal(bodyHasFooter(generated.body, COMPLIANCE_CONFIG, "miami"), false);
+  assert.equal(bodyHasFooter(composeDraft(generated, "mdp", URL)!.body, COMPLIANCE_CONFIG, "mdp"), true);
 });
 
-test("an unmapped market has no footer to append: composeDraft yields nothing", () => {
-  assert.equal(composeDraft(generated, "other", URL), null);
-  assert.equal(isMarketMapped("other"), false);
-  assert.equal(isMarketMapped("us"), true);
-  assert.equal(isMarketMapped("latam"), true);
+test("an address with no config entry has no footer to append: composeDraft yields nothing", () => {
+  assert.equal(composeDraft(generated, "nowhere" as never, URL), null);
 });
 
-test("saving a body without the footer warns; keeping it does not; an unmapped market never warns here", () => {
-  const withFooter = composeDraft(generated, "us", URL)!.body;
-  assert.equal(footerRemovedOnSave(withFooter, "us"), false);
-  assert.equal(footerRemovedOnSave(generated.body, "us"), true);
-  assert.equal(footerRemovedOnSave(generated.body, "other"), false);
+test("saving a body without the footer warns; keeping it does not; another address's footer does not count", () => {
+  const withFooter = composeDraft(generated, "miami", URL)!.body;
+  assert.equal(footerRemovedOnSave(withFooter, "miami"), false);
+  assert.equal(footerRemovedOnSave(generated.body, "miami"), true);
+  assert.equal(footerRemovedOnSave(withFooter, "mdp"), true);
 });
 
 test("one generator failure among ten leaves nine drafts and a retryable member", async () => {
