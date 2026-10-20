@@ -338,3 +338,12 @@ test("the step 2 reminder is gated by the same footer check", async () => {
   assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: drifted.memberId, reason: "missing_footer" }] });
   await nothingWritten(drifted, "sent", 2);
 });
+
+test("a recipient in an embargoed country is refused as unmapped_market at approval, and nothing is written", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  // The draft is correctly footed (Miami): only the embargo can refuse it, so a resolver that defaulted to Miami would pass it.
+  const m = await mkMember("embargoed", { country: "Cuba" });
+  const r = await approveMember(bdId, m.memberId);
+  assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: m.memberId, reason: "unmapped_market" }] });
+  await nothingWritten(m, "drafted");
+});
