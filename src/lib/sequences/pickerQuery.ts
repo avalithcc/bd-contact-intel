@@ -65,9 +65,11 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
  * then 10 (Panama 507+7, Brazil, Colombia, Peru). 8 sits one below Paraguay's 9, so the floor cannot clip a real
  * SUBSCRIBER number; the unit test asserts it against every country's example number.
  *
- * KNOWN COST 2, measured when every located country became mailable: Tristan da Cunha (+290 8999) and Tokelau (+690 7290)
- * have real 7-digit numbers, so a phone-only contact there is hidden with no badge. About 250 and 1,500 people; pinned in
- * the unit test (`BELOW_THE_FLOOR`) so a third country fails loudly. Same trade, same reasoning as below.
+ * KNOWN COST 2, derived when every located country became mailable: libphonenumber accepts numbers shorter than the floor
+ * for 14 calling codes (ZA, TA, NL, LU, AT, NO, DE, UY, AU, NZ, NU, TK, KR, IR). A phone-only contact whose number is one of
+ * them is hidden with no badge. Whether each is a real subscriber number or a special is NOT established (Uruguay is the
+ * case accepted below). The set is derived by scripts/scan-short-phone-numbers.ts and pinned in the unit test
+ * (`SHORT_VALID_WITNESSES`) so a change fails loudly. Same trade, same reasoning as below.
  *
  * KNOWN COST, measured and accepted: `isValid()` also accepts a few 7-digit Uruguayan non-subscriber specials
  * (`+5982000`, four national digits). Those fail the floor, so SQL calls the row blocked while JS would admit it — the

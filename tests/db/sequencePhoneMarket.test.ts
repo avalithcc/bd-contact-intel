@@ -94,8 +94,8 @@ test("decision, pinned: the SQL does not encode the sanctions list, so an embarg
 });
 
 test("known limit, pinned: a real 7-digit Tokelau number clears no length floor, so SQL hides a number JS would mail", async () => {
-  // PHONE_MIN_LENGTH is 8 on purpose (it keeps `+5491`-style garbage out); Tokelau and Tristan da Cunha are the two
-  // countries it clips (see BELOW_THE_FLOOR in the picker unit test). Owner decision, not a silent behaviour.
+  // PHONE_MIN_LENGTH is 8 on purpose (it keeps `+5491`-style garbage out); the derived set of calling codes it clips
+  // is SHORT_VALID_WITNESSES in the picker unit test (Tokelau is one of 14). Owner decision, not a silent behaviour.
   const { resolveComplianceAudience } = await import("@/lib/sequences/complianceAudience");
   assert.notEqual(resolveComplianceAudience({ mobilePhone: SPECS.tokelau.mobilePhone ?? null, phone: null }), null, "JS mails it");
   assert.equal((await page(false)).has("tokelau"), false);

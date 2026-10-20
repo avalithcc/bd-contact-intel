@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { DEFAULT_PICKER_QUERY, PICKER_PAGE_SIZE, type PickerQuery } from "@/lib/sequences/pickerFilters";
-import { getCountries, getExampleNumber } from "libphonenumber-js";
+import { getCountries, getExampleNumber, parsePhoneNumberFromString } from "libphonenumber-js";
 import mobileExamples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
 import { resolveComplianceAudience } from "@/lib/sequences/complianceAudience";
 import { PHONE_MIN_LENGTH, buildPickerPageQuery, buildPhoneLocatedPattern, countryFacts, floridaGeoPattern, normalizePhoneLikeSql, phoneLocatedPattern } from "@/lib/sequences/pickerQuery";
 import { phoneCallingCodes } from "@/lib/sequences/phoneMarket";
+import { scanShortValid } from "../../scripts/scan-short-phone-numbers";
 
 const ME = "00000000-0000-4000-8000-000000000001";
 const facts = { unmapped: ["atlantis"], us: ["united states"] };
@@ -104,13 +105,38 @@ test("the dial-code pattern is every country calling code, anchored on the plus,
 const sqlSaysFooter = (phone: string) => new RegExp(phoneLocatedPattern()).test(normalizePhoneLikeSql(phone));
 const digitsOf = (phone: string) => phone.replace(/\D/g, "");
 /**
- * MEASURED, accepted: every located country is mailable now, so the length floor (PHONE_MIN_LENGTH, 8) is judged against
- * EVERY country's example number, not only the old footer markets'. Exactly two have a real 7-digit number: Tristan da
- * Cunha (+290 8999) and Tokelau (+690 7290), territories of about 250 and 1,500 people. The SQL hides a phone-only contact
- * there (no badge) while JS would mail it; lowering the floor to 7 would re-admit the `+5491` garbage it exists to keep out.
- * An OWNER decision, pinned so a third short country (or a floor change) fails here loudly instead of silently.
+ * DERIVED, not asserted. Every located country is mailable now, so the length floor (PHONE_MIN_LENGTH, 8 digits with the
+ * calling code) can hide a phone-only contact whose number JS would mail, with no badge. The set of calling codes where
+ * that can happen was computed by `scripts/scan-short-phone-numbers.ts` on 2026-10-20: every digit string shorter than the
+ * floor, for every calling code, parsed with the libphonenumber-js build the resolver imports (default `min` metadata),
+ * kept when `isValid()` accepts it AND it resolves to a country. That is ~10M parses (26 s), too slow for every run, so the
+ * result is committed here as one witness per country and re-checked below (witnesses must still be valid, short and hidden;
+ * a bounded rescan of up to 3 national digits must find nothing outside this set).
+ *
+ * What the method does NOT establish: whether a witness is a real SUBSCRIBER number or a non-subscriber special (the library
+ * cannot tell). I could not establish it for any of the 14. Niue (NU, +683 4xxx) was reported as 4-digit real subscriber
+ * numbers by an independent review; Uruguay (UY) was the case accepted earlier as specials. The rest are unclassified.
+ * An example number is NOT the shortest valid one (Niue's example has 10 digits), so examples cannot derive this set.
+ * IR is Iran: JS holds it anyway, so SQL hiding it costs nothing. Lowering the floor to 7 would re-admit `+5491` garbage:
+ * an OWNER decision, not made here.
  */
-const BELOW_THE_FLOOR = new Set(["TA", "TK"]);
+const SHORT_VALID_WITNESSES: Readonly<Record<string, { country: string; witness: string }>> = {
+  "27": { country: "ZA", witness: "+2780000" },
+  "290": { country: "TA", witness: "+2908000" },
+  "31": { country: "NL", witness: "+3110000" },
+  "352": { country: "LU", witness: "+3522000" },
+  "43": { country: "AT", witness: "+431000" },
+  "47": { country: "NO", witness: "+4700000" },
+  "49": { country: "DE", witness: "+491000" },
+  "598": { country: "UY", witness: "+5982000" },
+  "61": { country: "AU", witness: "+6116300" },
+  "64": { country: "NZ", witness: "+6480000" },
+  "683": { country: "NU", witness: "+6834000" },
+  "690": { country: "TK", witness: "+6902000" },
+  "82": { country: "KR", witness: "+8230000" },
+  "98": { country: "IR", witness: "+989000" },
+};
+const BELOW_THE_FLOOR = new Set(Object.values(SHORT_VALID_WITNESSES).map((w) => w.country));
 const jsSaysFooter = (phone: string) => resolveComplianceAudience({ mobilePhone: phone, phone: null }) !== null;
 
 test("the SQL phone test never blocks a number the JS resolver allows, across every country's example number", () => {
@@ -163,7 +189,7 @@ test("the length floor rejects implausibly short numbers and clips no real one",
     if (!sqlSaysFooter(example)) { clipped.add(iso); continue; }
     shortestExample = Math.min(shortestExample, digitsOf(example).length);
   }
-  assert.deepEqual([...clipped].sort(), [...BELOW_THE_FLOOR].sort(), "the countries the floor clips are exactly the two measured and accepted");
+  for (const iso of clipped) assert.ok(BELOW_THE_FLOOR.has(iso), `${iso}: an example number below the floor that the derived set does not list`);
   assert.ok(PHONE_MIN_LENGTH <= shortestExample, `floor ${PHONE_MIN_LENGTH} vs shortest example ${shortestExample}`);
   assert.equal(sqlSaysFooter("+5491155551234 ext 123456"), true, "an extension only lengthens a number: there is no upper bound");
 });
@@ -183,4 +209,21 @@ test("the unit model of the SQL folds the digit scripts libphonenumber reads, so
     assert.equal(sqlSaysFooter(phone), true, `sql ${phone}`);
   }
   assert.equal(normalizePhoneLikeSql("＋１ 305"), "1305", "the fullwidth plus is not a plus to libphonenumber either, so it is stripped");
+});
+
+test("the committed below-the-floor set still holds: each witness is valid, short, mailable by JS (but Iran) and hidden by SQL", () => {
+  for (const [code, { country, witness }] of Object.entries(SHORT_VALID_WITNESSES)) {
+    const parsed = parsePhoneNumberFromString(witness);
+    assert.ok(parsed?.isValid() && parsed.country === country, `${witness} must still be a valid ${country} number`);
+    assert.ok(witness.startsWith(`+${code}`) && digitsOf(witness).length < PHONE_MIN_LENGTH, `${witness} is below the floor`);
+    assert.equal(sqlSaysFooter(witness), false, `sql hides ${witness}`);
+    assert.equal(jsSaysFooter(witness), country !== "IR", `js ${witness}`);
+  }
+});
+
+test("a bounded deterministic rescan (up to 3 national digits, every calling code) finds nothing outside the committed set", () => {
+  const found = scanShortValid(3);
+  for (const [code, hits] of found) {
+    for (const { country, witness } of hits) assert.equal(SHORT_VALID_WITNESSES[code]?.country, country, `new short valid number ${witness}: regenerate the set with scripts/scan-short-phone-numbers.ts`);
+  }
 });
