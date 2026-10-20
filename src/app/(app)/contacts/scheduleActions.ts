@@ -14,11 +14,14 @@ import { validateNewEmailInput } from "@/lib/contacts/newEmailInput";
 import { cancelScheduled, editScheduled, getOwnScheduled, scheduleEmail } from "@/lib/scheduledEmail/queries";
 import { sendScheduledNowChecked } from "@/lib/scheduledEmail/sendNow";
 import { checkRecipient } from "@/lib/scheduledEmail/recipient";
+import { slotInstant, type Slot } from "@/lib/sendSchedule/time";
 import { isUuid } from "@/lib/uuid";
 import { actionFailure, type ContactActionResult } from "./actionErrors";
 
 /**
- * Server actions behind "Programar envío". Ownership is enforced in the queries (`bd_id = session BD`), the limits and the
+ * Server actions behind "Programar envío". The moment arrives as the Argentina date and clock the BD picked in the shared
+ * popover and is converted HERE (argentinaWallClockToUtc, through slotInstant); a malformed one is refused as too soon.
+ * Ownership is enforced in the queries (`bd_id = session BD`), the limits and the
  * 2-minute lock in the planner/SQL; the client only proposes a time. The typed reasons mirror sendContactEmailAction.
  */
 export async function scheduleContactEmailAction(
@@ -26,7 +29,7 @@ export async function scheduleContactEmailAction(
   to: string,
   subject: string,
   body: string,
-  sendAtIso: string,
+  when: Slot,
   extras?: ComposeExtras,
 ): Promise<ContactActionResult> {
   try {
@@ -44,7 +47,7 @@ export async function scheduleContactEmailAction(
     if (account?.status !== "connected") return { ok: false, reason: "gmail_not_connected" };
     const compose = await scheduledCompose(personId, extras);
     if (!compose.ok) return { ok: false, reason: compose.reason };
-    const result = await scheduleEmail({ bdId: me.id, personId, toAddress: to, subject: input.subject, body: input.body, sendAt: new Date(sendAtIso), compose: compose.compose });
+    const result = await scheduleEmail({ bdId: me.id, personId, toAddress: to, subject: input.subject, body: input.body, sendAt: slotInstant(when) ?? new Date(NaN), compose: compose.compose });
     if (!result.ok) return result;
     revalidatePath(`/contacts/${personId}`);
     revalidateLists("touch");

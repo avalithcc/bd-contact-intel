@@ -17,7 +17,10 @@ import {
   sendContactEmailAction,
 } from "../actions";
 import { scheduleContactEmailAction } from "../scheduleActions";
-import { ScheduleEmailDialog } from "./ScheduleEmailDialog";
+import { SendSplitButton } from "@/components/send/SendSplitButton";
+import { fillTemplate } from "@/lib/i18n/template";
+import type { ContactSendContext } from "@/lib/sendSchedule/labels";
+import type { Slot } from "@/lib/sendSchedule/time";
 import { MANUAL_CALL_DIRECTION } from "@/lib/contacts/call";
 import { CallForm } from "@/components/CallForm";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
@@ -79,9 +82,11 @@ export interface QuickActionsProps {
   hasCompany: boolean;
   // False when the server has no service-role key: an email WITH files cannot be scheduled (the cron could not read them).
   scheduleAttachmentsEnabled: boolean;
+  // Labels, sender and the recipient's probable time zone for the shared "Enviar ahora / Programar…" control.
+  send: ContactSendContext;
 }
 
-type QuickAction = "call" | "email" | "schedule" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
+type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
 
 const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
   wrong_profile: "discardReasonWrongProfile",
@@ -140,6 +145,7 @@ export function QuickActions({
   companyName,
   hasCompany,
   scheduleAttachmentsEnabled,
+  send,
 }: QuickActionsProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -197,6 +203,26 @@ export function QuickActions({
       draft.sent();
       closeQuickAction();
       showToast(l.toastEmailSent);
+      router.refresh();
+    } else {
+      const message = contactActionErrorMessage(l, result.reason);
+      setError({ message, href: contactActionErrorHref(result.reason) });
+      showToast(message, "error");
+    }
+  }
+
+  /** "Programar…": the moment travels as the Argentina date and clock; the server converts and validates it. */
+  async function scheduleEmail(when: Slot) {
+    if (!email) return;
+    setBusy(true);
+    setError(null);
+    const result = await settleAction(() => scheduleContactEmailAction(personId, email, emailSubject, emailBody, when, draft.extras()));
+    setBusy(false);
+    if (!result.ok && result.reason === "unconfirmed") router.refresh();
+    if (result.ok) {
+      draft.sent(); // the scheduled email now holds the files
+      closeQuickAction();
+      showToast(l.toastEmailScheduled);
       router.refresh();
     } else {
       const message = contactActionErrorMessage(l, result.reason);
@@ -366,43 +392,11 @@ export function QuickActions({
             setOpenAction("generate");
           }}
           onCancel={closeQuickAction}
-          onOpenSchedule={() => setOpenAction("schedule")}
+          send={send}
+          scheduleBlocked={draft.attachments.refs.length > 0 && !scheduleAttachmentsEnabled ? l.attachmentsScheduleUnavailable : null}
+          onSchedule={scheduleEmail}
           pendingScheduled={pendingScheduled}
           onSubmit={sendEmail}
-        />
-      )}
-
-      {openAction === "schedule" && email && primary && (
-        <ScheduleEmailDialog
-          labels={l}
-          name={name}
-          compose={{ draft, primary, attachmentsEnabled: scheduleAttachmentsEnabled }}
-          subject={emailSubject}
-          body={emailBody}
-          busy={busy}
-          error={error?.message ?? null}
-          onSubjectChange={setEmailSubject}
-          onBodyChange={setEmailBody}
-          onBack={() => setOpenAction("email")}
-          onSendNow={() => void sendEmail(emailSubject.trim(), emailBody.trim())}
-          onCancel={closeQuickAction}
-          onSubmit={async (sendAt) => {
-            setBusy(true);
-            setError(null);
-            const result = await settleAction(() => scheduleContactEmailAction(personId, email, emailSubject, emailBody, sendAt.toISOString(), draft.extras()));
-            setBusy(false);
-            if (!result.ok && result.reason === "unconfirmed") router.refresh();
-            if (result.ok) {
-              draft.sent(); // the scheduled email now holds the files
-              closeQuickAction();
-              showToast(l.toastEmailScheduled);
-              router.refresh();
-            } else {
-              const message = contactActionErrorMessage(l, result.reason);
-              setError({ message, href: contactActionErrorHref(result.reason) });
-              showToast(message, "error");
-            }
-          }}
         />
       )}
 
@@ -620,7 +614,9 @@ function EmailForm({
   onSubjectChange,
   onBodyChange,
   onOpenGenerate,
-  onOpenSchedule,
+  send,
+  scheduleBlocked,
+  onSchedule,
   pendingScheduled,
   onCancel,
   onSubmit,
@@ -647,8 +643,11 @@ function EmailForm({
   // this composer reusable for a context with no AI draft (none today, but
   // no reason to hard-couple the two).
   onOpenGenerate?: () => void;
-  // "Programar…" (approved mockup envio-programado.html): hands the same draft to the schedule dialog.
-  onOpenSchedule: () => void;
+  // "Enviar ahora / Programar…" (approved mockup enviar-o-programar.html): one split button, the schedule popover is shared with Sequences.
+  send: ContactSendContext;
+  /** Why this draft cannot be scheduled (files the server could not read back), or null. */
+  scheduleBlocked: string | null;
+  onSchedule: (when: Slot) => void;
   pendingScheduled: QuickActionsProps["pendingScheduled"];
   onSubmit: (subject: string, body: string) => void;
 }) {
@@ -686,18 +685,24 @@ function EmailForm({
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {l.cancel}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={onOpenSchedule} disabled={busy}>
-            <ClockIcon className="icon" />
-            {l.scheduleAction}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy || draft.attachments.totals.uploading || !subject.trim() || !body.trim()}
-            onClick={() => subject.trim() && body.trim() && onSubmit(subject.trim(), body.trim())}
-          >
-            {l.emailSend}
-          </button>
+          <SendSplitButton
+            labels={send.labels}
+            primaryLabel={send.labels.sendNow}
+            busy={busy}
+            disabled={draft.attachments.totals.uploading || !subject.trim() || !body.trim()}
+            error={error?.message ?? null}
+            schedule={{
+              title: send.labels.popTitleEmail,
+              submitLabel: send.labels.submitEmail,
+              summary: "sumEmail",
+              foot: fillTemplate(send.labels.footEmail, { from: send.fromAddress }),
+              recipients: [{ name, zone: send.recipientZone }],
+              fallbackZone: null,
+              blockedReason: scheduleBlocked,
+            }}
+            onSendNow={() => subject.trim() && body.trim() && onSubmit(subject.trim(), body.trim())}
+            onSchedule={onSchedule}
+          />
         </>
       }
     >

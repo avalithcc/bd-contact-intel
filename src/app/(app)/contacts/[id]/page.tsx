@@ -19,6 +19,7 @@ import { resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { getTasksForPerson } from "@/lib/tasks/queries";
 import { getCurrentBd } from "@/lib/queries";
 import { isGmailConnected, listScheduledForPerson } from "@/lib/scheduledEmail/queries";
+import { resolveRecipientZone } from "@/lib/sendSchedule/zones";
 import { serviceRoleConfigured } from "@/lib/supabase/serviceRole";
 import { stateOf, whenLabel } from "@/lib/scheduledEmail/view";
 import { isAdminRole } from "@/lib/auth/adminRole";
@@ -482,6 +483,12 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           pendingScheduled={nextScheduled ? { subject: nextScheduled.subject, sendsLabel: whenLabel(nextScheduled.sendAt, "argentina") } : null}
           hasCompany={Boolean(record.person.companyKey)}
           scheduleAttachmentsEnabled={serviceRoleConfigured()}
+          send={{
+            labels: dict.sendControl,
+            fromAddress: me.email,
+            // person.country first, then the company's (the same chain recipientMarket uses); a guess, never persisted.
+            recipientZone: resolveRecipientZone({ city: record.person.city, region: record.person.region, country: record.person.country ?? companyRow?.country }),
+          }}
           ownerOptions={ownerOptions}
           canReassignOwner={isAdminRole(me)}
           assigneeOptions={ownerOptions}

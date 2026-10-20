@@ -45,6 +45,8 @@ export interface AboutPaneProps {
   hasCompany: boolean;
   /** The server can read attachments back for a scheduled email (service-role key set). */
   scheduleAttachmentsEnabled: boolean;
+  /** The shared send control's labels, sender and the recipient's probable time zone. */
+  send: QuickActionsProps["send"];
   ownerOptions: OwnerOption[];
   // Manual owner reassignment is admin-only; false hides the edit control.
   canReassignOwner: boolean;
@@ -104,6 +106,7 @@ export function AboutPane({
   pendingScheduled,
   hasCompany,
   scheduleAttachmentsEnabled,
+  send,
   ownerOptions,
   canReassignOwner,
   assigneeOptions,
@@ -169,6 +172,7 @@ export function AboutPane({
         companyName={company}
         hasCompany={hasCompany}
         scheduleAttachmentsEnabled={scheduleAttachmentsEnabled}
+        send={send}
       />
 
       <div className="section-title">

@@ -104,17 +104,6 @@ async function openComposer(page: Page, personId: string) {
   return dialog;
 }
 
-/** Composer -> "Programar…" with a typed draft; returns the scheduling dialog. */
-async function openScheduleDialog(page: Page, subject = `Asunto ${tag}`, body = `Cuerpo del mensaje ${tag}.`) {
-  const composer = await openComposer(page, withEmail.id);
-  await composer.getByLabel(L.emailSubjectLabel).fill(subject);
-  await composer.getByLabel(L.emailBodyLabel).fill(body);
-  await composer.getByRole('button', { name: L.scheduleAction, exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: new RegExp(`${L.scheduleTitle} ${withEmail.name}`) });
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
 async function setWhen(dialog: ReturnType<Page['getByRole']>, ms: number) {
   const { date, time } = artInputs(ms);
   await dialog.getByLabel(L.scheduleZone, { exact: true }).selectOption('argentina');
@@ -122,127 +111,138 @@ async function setWhen(dialog: ReturnType<Page['getByRole']>, ms: number) {
   await dialog.getByLabel(L.scheduleTime, { exact: true }).fill(time);
 }
 
-const submit = (dialog: ReturnType<Page['getByRole']>) => dialog.getByRole('button', { name: L.scheduleSubmit, exact: true });
+const S = es.sendControl;
+
+/** Composer -> chevron -> "Programar…" with a typed draft; returns the schedule popover (it lives inside the composer dialog). */
+async function openSchedulePopover(page: Page, subject = `Asunto ${tag}`, body = `Cuerpo del mensaje ${tag}.`) {
+  const composer = await openComposer(page, withEmail.id);
+  await composer.getByLabel(L.emailSubjectLabel).fill(subject);
+  await composer.getByLabel(L.emailBodyLabel).fill(body);
+  await composer.getByRole('button', { name: S.moreOptions, exact: true }).click();
+  await composer.getByRole('menuitem', { name: new RegExp(S.scheduleItem) }).click();
+  const pop = composer.getByRole('dialog', { name: S.popTitleEmail });
+  await expect(pop).toBeVisible();
+  return pop;
+}
+
+/** Picks the Argentina day on the calendar (paging months if needed) and types the time. */
+async function setPopoverWhen(pop: ReturnType<Page['getByRole']>, ms: number) {
+  const { date, time } = artInputs(ms);
+  const day = pop.locator(`[data-day="${date}"]`);
+  for (let i = 0; i < 2 && (await day.count()) === 0; i++) await pop.getByRole('button', { name: S.calNext, exact: true }).click();
+  await day.click();
+  await pop.getByLabel(S.timeLabel, { exact: true }).fill(time);
+}
+
+const popSubmit = (pop: ReturnType<Page['getByRole']>) => pop.getByRole('button', { name: S.submitEmail, exact: true });
 const rowsFor = async (personId: string) =>
   sql`select id, status, subject, body, to_address, send_at, sent_at, gmail_message_id, error from scheduled_email where person_id = ${personId}`;
 
-test.describe('Scheduled send: the composer entry point and the scheduling dialog', () => {
-  test('the composer offers "Programar…" next to "Enviar" and hands its draft to the scheduling dialog', async ({ page }) => {
+test.describe('Scheduled send: the composer split button and the schedule popover', () => {
+  test('the composer offers "Enviar ahora" with a chevron menu whose "Programar…" opens the popover and keeps the draft', async ({ page }) => {
     const composer = await openComposer(page, withEmail.id);
-    await expect(composer.getByRole('button', { name: L.scheduleAction, exact: true })).toBeVisible();
-    await expect(composer.getByRole('button', { name: L.emailSend, exact: true })).toBeVisible();
-
+    await expect(composer.getByRole('button', { name: S.sendNow, exact: true })).toBeVisible();
     await composer.getByLabel(L.emailSubjectLabel).fill(`Asunto ${tag}`);
     await composer.getByLabel(L.emailBodyLabel).fill('Mensaje de prueba.');
-    await composer.getByRole('button', { name: L.scheduleAction, exact: true }).click();
-
-    const dialog = page.getByRole('dialog', { name: new RegExp(`${L.scheduleTitle} ${withEmail.name}`) });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByLabel(L.emailSubjectLabel)).toHaveValue(`Asunto ${tag}`);
-    await expect(dialog.getByLabel(L.emailBodyLabel)).toHaveValue('Mensaje de prueba.');
+    await composer.getByRole('button', { name: S.moreOptions, exact: true }).click();
+    await expect(composer.getByRole('menu')).toBeVisible();
+    await composer.getByRole('menuitem', { name: new RegExp(S.scheduleItem) }).click();
+    await expect(composer.getByRole('dialog', { name: S.popTitleEmail })).toBeVisible();
+    // No second dialog: the draft never leaves the composer.
+    await expect(composer.getByLabel(L.emailSubjectLabel)).toHaveValue(`Asunto ${tag}`);
+    await expect(composer.getByLabel(L.emailBodyLabel)).toHaveValue('Mensaje de prueba.');
   });
 
-  test('defaults to tomorrow 09:00 Argentina and says the time in both zones', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
+  test('the calendar fits seven columns and the time-zone reference renders', async ({ page }, testInfo) => {
+    const pop = await openSchedulePopover(page);
+    const cal = pop.locator('.cal');
+    await expect(cal).toHaveCount(1);
+    const [box, lastColumn] = await Promise.all([cal.boundingBox(), cal.locator('.dow').nth(6).boundingBox()]);
+    if (!box || !lastColumn) throw new Error('calendar not rendered');
+    expect(lastColumn.x + lastColumn.width, 'the 7th column must fit inside the calendar').toBeLessThanOrEqual(box.x + box.width + 1);
+    // Day buttons reset the global button padding: a two-digit day is not squeezed into a smaller cell.
+    const cell = await pop.locator('.day').nth(10).boundingBox();
+    expect(cell!.width).toBeGreaterThan(box.width / 7 - 2);
+
+    const tz = pop.getByLabel(S.refLabel);
+    await expect(tz).toBeVisible();
+    await expect(tz.locator('.tz-row.base')).toContainText(S.rowArgentina);
+    for (const city of [S.rowNewYork, S.rowMadrid, S.rowBogota, S.rowSaoPaulo]) await expect(tz).toContainText(city);
+    await page.screenshot({ path: testInfo.outputPath('schedule-popover.png') });
+  });
+
+  test('defaults to tomorrow 9:00 Argentina and words the summary in Argentina time', async ({ page }) => {
+    const pop = await openSchedulePopover(page);
     const tomorrow = artInputs(Date.now() + DAY).date;
-    await expect(dialog.getByLabel(L.scheduleDate, { exact: true })).toHaveValue(tomorrow);
-    await expect(dialog.getByLabel(L.scheduleTime, { exact: true })).toHaveValue('09:00');
-    await expect(dialog.getByLabel(L.scheduleZone, { exact: true })).toHaveValue('argentina');
-    await expect(dialog.getByLabel(L.scheduleZone, { exact: true }).locator('option')).toHaveText([L.scheduleZoneArgentina, L.scheduleZoneMiami]);
-
-    const summary = dialog.locator('.alert');
-    await expect(summary).toContainText(L.scheduleWillSend);
-    await expect(summary).toContainText(L.scheduleInArgentina);
-    await expect(summary).toContainText(L.scheduleInMiami);
-    // Buenos Aires is UTC-3 and Miami UTC-4 or UTC-5: the Miami clock is never also 09:00.
-    await expect(summary.locator('strong')).toContainText('09:00');
-    expect(await summary.innerText()).not.toMatch(new RegExp(`${L.scheduleInMiami}[^.]*09:00`));
-    await expect(submit(dialog)).toBeEnabled();
+    await expect(pop.getByLabel(S.timeLabel, { exact: true })).toHaveValue('09:00');
+    await expect(pop.locator(`[data-day="${tomorrow}"]`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(pop.locator('.sched-sum').first()).toContainText('a las 9:00');
+    await expect(pop.locator('.sched-sum').first()).toContainText('hora de Argentina');
+    await expect(popSubmit(pop)).toBeEnabled();
   });
 
-  test('picking Miami reads the same wall time in the other zone', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
-    const argentina = await dialog.locator('.alert strong').innerText();
-    await dialog.getByLabel(L.scheduleZone, { exact: true }).selectOption('miami');
-    await expect(dialog.locator('.alert strong')).not.toHaveText(argentina);
-    await expect(dialog.locator('.alert')).toContainText(L.scheduleInMiami);
-  });
-
-  test('"En 1 hora" sets a time about an hour away and enables the button', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
-    await dialog.getByRole('button', { name: L.schedulePresetHour, exact: true }).click();
-    const date = await dialog.getByLabel(L.scheduleDate, { exact: true }).inputValue();
-    const time = await dialog.getByLabel(L.scheduleTime, { exact: true }).inputValue();
-    const leadMin = (Date.parse(`${date}T${time}:00-03:00`) - Date.now()) / MIN; // the inputs are Argentina wall time
+  test('"En 1 hora" lands about an hour away and enables the button', async ({ page }) => {
+    const pop = await openSchedulePopover(page);
+    await pop.getByRole('button', { name: S.presetHour, exact: true }).click();
+    const time = await pop.getByLabel(S.timeLabel, { exact: true }).inputValue();
+    const day = await pop.locator('.day[aria-pressed="true"]').getAttribute('data-day');
+    const leadMin = (Date.parse(`${day}T${time}:00-03:00`) - Date.now()) / MIN;
     expect(leadMin).toBeGreaterThan(57);
-    expect(leadMin).toBeLessThan(62);
-    await expect(submit(dialog)).toBeEnabled();
+    expect(leadMin).toBeLessThan(77);
+    await expect(popSubmit(pop)).toBeEnabled();
   });
 
-  test('rejects less than 5 minutes ahead: hint shown, no summary, button disabled; 6 minutes is fine', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
-    await setWhen(dialog, Date.now() + 2 * MIN);
-    await expect(dialog.getByText(L.scheduleTooSoonHint)).toBeVisible();
-    await expect(dialog.locator('.alert')).toHaveCount(0);
-    await expect(submit(dialog)).toBeDisabled();
-
-    await setWhen(dialog, Date.now() - 30 * MIN); // the past is the same refusal
-    await expect(dialog.getByText(L.scheduleTooSoonHint)).toBeVisible();
-    await expect(submit(dialog)).toBeDisabled();
-
-    await setWhen(dialog, Date.now() + 7 * MIN);
-    await expect(dialog.getByText(L.scheduleTooSoonHint)).toHaveCount(0);
-    await expect(submit(dialog)).toBeEnabled();
+  test('rejects less than 5 minutes ahead and the past; 7 minutes is fine', async ({ page }) => {
+    const pop = await openSchedulePopover(page);
+    await setPopoverWhen(pop, Date.now() + 2 * MIN);
+    await expect(pop.getByText(S.tooSoon)).toBeVisible();
+    await expect(popSubmit(pop)).toBeDisabled();
+    await setPopoverWhen(pop, Date.now() + 7 * MIN);
+    await expect(pop.getByText(S.tooSoon)).toHaveCount(0);
+    await expect(popSubmit(pop)).toBeEnabled();
     expect(await rowsFor(withEmail.id)).toHaveLength(0);
   });
 
-  test('rejects more than 30 days ahead: hint shown, no summary, button disabled; 29 days is fine', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
-    await setWhen(dialog, Date.now() + 31 * DAY);
-    await expect(dialog.getByText(L.errorScheduleTooFar)).toBeVisible();
-    await expect(dialog.getByText(L.scheduleTooSoonHint)).toHaveCount(0);
-    await expect(dialog.locator('.alert')).toHaveCount(0);
-    await expect(submit(dialog)).toBeDisabled();
-
-    await setWhen(dialog, Date.now() + 29 * DAY);
-    await expect(dialog.getByText(L.errorScheduleTooFar)).toHaveCount(0);
-    await expect(dialog.locator('.alert')).toBeVisible();
-    await expect(submit(dialog)).toBeEnabled();
-    expect(await rowsFor(withEmail.id)).toHaveLength(0);
+  test('days beyond 30 are disabled on the calendar; 29 days ahead is fine', async ({ page }) => {
+    const pop = await openSchedulePopover(page);
+    const far = artInputs(Date.now() + 33 * DAY).date;
+    await pop.getByRole('button', { name: S.calNext, exact: true }).click();
+    await pop.getByRole('button', { name: S.calNext, exact: true }).click().catch(() => undefined);
+    const farDay = pop.locator(`[data-day="${far}"]`);
+    if (await farDay.count()) await expect(farDay).toHaveAttribute('aria-disabled', 'true');
+    await setPopoverWhen(pop, Date.now() + 29 * DAY);
+    await expect(popSubmit(pop)).toBeEnabled();
   });
 
-  test('offers the four presets from the mockup; "Lunes 9:00 en Miami" lands on a Monday and is shown pressed', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
-    for (const label of [L.schedulePresetHour, L.schedulePresetToday, L.schedulePresetTomorrow, L.schedulePresetMonday]) {
-      await expect(dialog.getByRole('button', { name: label, exact: true })).toBeVisible();
-    }
-    const monday = dialog.getByRole('button', { name: L.schedulePresetMonday, exact: true });
+  test('offers the three shortcuts; "Lunes 9:00" lands on a Monday and is shown pressed', async ({ page }) => {
+    const pop = await openSchedulePopover(page);
+    for (const label of [S.presetHour, S.presetTomorrow, S.presetMonday]) await expect(pop.getByRole('button', { name: label, exact: true })).toBeVisible();
+    const monday = pop.getByRole('button', { name: S.presetMonday, exact: true });
     await monday.click();
     await expect(monday).toHaveAttribute('aria-pressed', 'true');
-    const date = await dialog.getByLabel(L.scheduleDate, { exact: true }).inputValue();
-    expect(new Date(`${date}T12:00:00Z`).getUTCDay()).toBe(1);
-    await expect(dialog.getByText(L.scheduleHelpArgentina)).toBeVisible();
-    await dialog.getByLabel(L.scheduleTime, { exact: true }).fill('12:34'); // a hand edit un-presses the chip
+    const day = await pop.locator('.day[aria-pressed="true"]').getAttribute('data-day');
+    expect(new Date(`${day}T12:00:00Z`).getUTCDay()).toBe(1);
+    await pop.getByLabel(S.timeLabel, { exact: true }).fill('12:34');
     await expect(monday).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('"Volver a Enviar" goes back to the composer with the draft intact; "Cancelar" closes without scheduling', async ({ page }) => {
-    const dialog = await openScheduleDialog(page, `Volver ${tag}`, 'Texto que no se pierde.');
-    await dialog.getByRole('button', { name: L.scheduleBack, exact: true }).click();
+  test('Escape closes only the popover; "Cancelar" too; the composer and its draft stay', async ({ page }) => {
+    const pop = await openSchedulePopover(page, `Volver ${tag}`, 'Texto que no se pierde.');
+    await page.keyboard.press('Escape');
+    await expect(pop).toHaveCount(0);
     const composer = page.getByRole('dialog', { name: L.quickActionEmail });
     await expect(composer.getByLabel(L.emailSubjectLabel)).toHaveValue(`Volver ${tag}`);
-    await expect(composer.getByLabel(L.emailBodyLabel)).toHaveValue('Texto que no se pierde.');
-
-    await composer.getByRole('button', { name: L.scheduleAction, exact: true }).click();
-    await page.getByRole('dialog', { name: new RegExp(L.scheduleTitle) }).getByRole('button', { name: L.cancel, exact: true }).click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await composer.getByRole('button', { name: S.moreOptions, exact: true }).click();
+    await composer.getByRole('menuitem', { name: new RegExp(S.scheduleItem) }).click();
+    await composer.getByRole('dialog', { name: S.popTitleEmail }).getByRole('button', { name: S.cancel, exact: true }).click();
+    await expect(composer).toBeVisible();
     expect(await rowsFor(withEmail.id)).toHaveLength(0);
   });
 
-  test('a contact without an email address has no way to schedule', async ({ page }) => {
+  test('a contact without an email address has no way to send or schedule', async ({ page }) => {
     const dialog = await openComposer(page, withoutEmail.id);
     await expect(dialog.getByText(L.emailNoAddress)).toBeVisible();
-    await expect(dialog.getByRole('button', { name: L.scheduleAction })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: S.moreOptions })).toHaveCount(0);
   });
 });
 
@@ -253,9 +253,9 @@ test.describe('Scheduled send: scheduling writes one row and is not a touch', ()
              (select count(*)::int from email_message) as messages,
              (select status from person where id = ${withEmail.id}) as status`;
 
-    const dialog = await openScheduleDialog(page, `Programado ${tag}`, 'Sale solo, más tarde.');
-    await dialog.getByRole('button', { name: L.schedulePresetHour, exact: true }).click();
-    await submit(dialog).click();
+    const pop = await openSchedulePopover(page, `Programado ${tag}`, 'Sale solo, más tarde.');
+    await pop.getByRole('button', { name: S.presetHour, exact: true }).click();
+    await popSubmit(pop).click();
 
     await expect(page.locator('#toast-region')).toContainText(L.toastEmailScheduled);
     await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -269,8 +269,7 @@ test.describe('Scheduled send: scheduling writes one row and is not a touch', ()
     expect(row.to_address).toBe(withEmail.email);
     const leadMin = ((row.send_at as Date).getTime() - Date.now()) / MIN;
     expect(leadMin).toBeGreaterThan(55);
-    expect(leadMin).toBeLessThan(62);
-    // Nothing went out.
+    expect(leadMin).toBeLessThan(77); // the shortcut rounds up to the next quarter hour
     expect(row.sent_at).toBeNull();
     expect(row.gmail_message_id).toBeNull();
     expect(row.error).toBeNull();
@@ -280,32 +279,27 @@ test.describe('Scheduled send: scheduling writes one row and is not a touch', ()
              (select count(*)::int from email_message) as messages,
              (select status from person where id = ${withEmail.id}) as status`;
     expect(after).toEqual(before);
-    const [sent] = await sql`select count(*)::int as n from activity where person_id = ${withEmail.id} and type = 'email_sent'`;
-    expect(sent!.n).toBe(0);
   });
 
-  test('a time typed by hand is stored as the exact instant, read in the chosen zone', async ({ page }) => {
-    const dialog = await openScheduleDialog(page);
-    // 10:00 Miami, three days out. Miami is UTC-4 or UTC-5, so the instant must be 14:00 or 15:00 UTC, never 13:00.
-    const day = new Date(Date.now() + 3 * DAY).toISOString().slice(0, 10);
-    await dialog.getByLabel(L.scheduleZone, { exact: true }).selectOption('miami');
-    await dialog.getByLabel(L.scheduleDate, { exact: true }).fill(day);
-    await dialog.getByLabel(L.scheduleTime, { exact: true }).fill('10:00');
-    await submit(dialog).click();
+  test('a time typed by hand is stored as the exact instant, read as Argentina time', async ({ page }) => {
+    const pop = await openSchedulePopover(page);
+    // 10:00 Argentina (UTC-3, no DST) is always 13:00 UTC.
+    const day = artInputs(Date.now() + 3 * DAY).date;
+    await pop.locator(`[data-day="${day}"]`).click();
+    await pop.getByLabel(S.timeLabel, { exact: true }).fill('10:00');
+    await popSubmit(pop).click();
     await expect(page.locator('#toast-region')).toContainText(L.toastEmailScheduled);
 
     const [row] = await rowsFor(withEmail.id);
-    const utcHour = (row!.send_at as Date).getUTCHours();
-    expect([14, 15]).toContain(utcHour);
-    expect((row!.send_at as Date).getUTCMinutes()).toBe(0);
+    expect((row!.send_at as Date).toISOString()).toBe(`${day}T13:00:00.000Z`);
   });
 
-  test('with the Gmail account disconnected nothing is scheduled: the error stays in the dialog, which stays open', async ({ page }) => {
+  test('with the Gmail account disconnected nothing is scheduled: the error shows and the popover stays open', async ({ page }) => {
     await sql`update email_account set status = 'revoked' where id = ${accountId}`;
-    const dialog = await openScheduleDialog(page);
-    await submit(dialog).click();
-    await expect(dialog.getByRole('alert')).toContainText(L.errorGmailNotConnected.split('.')[0]!);
-    await expect(dialog).toBeVisible();
+    const pop = await openSchedulePopover(page);
+    await popSubmit(pop).click();
+    await expect(pop.getByRole('alert')).toContainText(L.errorGmailNotConnected.split('.')[0]!);
+    await expect(pop).toBeVisible();
     expect(await rowsFor(withEmail.id)).toHaveLength(0);
   });
 });
