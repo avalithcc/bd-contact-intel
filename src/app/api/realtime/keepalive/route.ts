@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { isValidBearer } from "@/lib/cronAuth";
 
@@ -34,17 +35,28 @@ export async function GET(request: Request) {
   try {
     status = await new Promise<string>((resolve) => {
       const timer = setTimeout(() => resolve("TIMED_OUT"), JOIN_TIMEOUT_MS);
-      channel.subscribe((s) => {
-        if (s === "SUBSCRIBED" || s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
-          clearTimeout(timer);
-          resolve(s);
-        }
-      });
+      try {
+        channel.subscribe((s) => {
+          if (s === "SUBSCRIBED" || s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
+            clearTimeout(timer);
+            resolve(s);
+          }
+        });
+      } catch (error) {
+        unstable_rethrow(error);
+        // No usable WebSocket transport in this runtime: answer with a clear status instead of an unhandled 500.
+        console.warn("[realtime keepalive] subscribe threw", error instanceof Error ? error.message : String(error));
+        clearTimeout(timer);
+        resolve("NO_TRANSPORT");
+      }
     });
   } finally {
     await supabase.removeChannel(channel).catch(() => undefined);
-    await supabase.realtime.disconnect();
+    await Promise.resolve()
+      .then(() => supabase.realtime.disconnect())
+      .catch(() => undefined);
   }
   const ok = status === "SUBSCRIBED";
+  if (!ok) console.warn("[realtime keepalive] join did not succeed", status);
   return NextResponse.json({ ok, status, ms: Date.now() - started }, { status: ok ? 200 : 502 });
 }
