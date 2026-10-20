@@ -12,7 +12,7 @@ test("a remembered query is carried back onto /contacts", () => {
 });
 
 test("a stored value can only ever add query params to /contacts", () => {
-  assert.equal(contactsListHref("?q=a"), "/contacts?q=a");
+  assert.equal(contactsListHref("?view=a"), "/contacts?view=a");
   assert.equal(contactsListHref("//evil.com"), "/contacts?%2F%2Fevil.com=");
 });
 
@@ -21,4 +21,10 @@ test("only the list itself is remembered, not a record or another page", () => {
   assert.equal(listQueryToRemember("/contacts", ""), "");
   assert.equal(listQueryToRemember("/contacts/abc", "x=1"), null);
   assert.equal(listQueryToRemember("/companies", "x=1"), null);
+});
+
+test("the search box is never carried back: leaving the list clears the search, filters stay", () => {
+  assert.equal(listQueryToRemember("/contacts", "?q=acme&view=outreach&page=2"), "view=outreach&page=2");
+  assert.equal(contactsListHref("q=acme&view=outreach"), "/contacts?view=outreach");
+  assert.equal(contactsListHref("q=acme"), "/contacts");
 });
