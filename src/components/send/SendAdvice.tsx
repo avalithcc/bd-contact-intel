@@ -1,6 +1,7 @@
 "use client";
 
 import { WarningIcon } from "@/components/icons";
+import { Tooltip } from "@/components/Tooltip";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Advice } from "@/lib/sendSchedule/advice";
 import { summaryLine, type Slot } from "@/lib/sendSchedule/time";
@@ -33,5 +34,30 @@ export function SendAdvice({ labels: l, advice, onUse }: { labels: SendControlLa
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The compact form for tight rows (member card, bulk bar, dialog footers): a one-line warn badge, with the full sentence in the
+ * shared tooltip. The "Usar ..." suggestion lives only in the schedule popover, where there is room for it.
+ */
+export function SendAdviceChip({ labels: l, advice }: { labels: SendControlLabels; advice: Advice }) {
+  const text =
+    advice.kind === "bulk"
+      ? fillTemplate(l.adviceChipBulk, { n: String(advice.n), total: String(advice.total) })
+      : fillTemplate(advice.kind === "miami" ? l.adviceChipMiami : l.adviceChipKnown, {
+          clock: advice.clock,
+          weekday: l[`wd${advice.weekday}` as "wd0"],
+          name: advice.kind === "single" ? (advice.name.split(" ")[0] ?? advice.name) : "",
+        });
+  return (
+    <span className="advice-chip">
+      <Tooltip title={l.adviceTipTitle} body={adviceText(l, advice)} actionLabel="" align="end">
+        <span className="badge badge-warn no-dot" role="status">
+          <WarningIcon className="icon" />
+          {text}
+        </span>
+      </Tooltip>
+    </span>
   );
 }

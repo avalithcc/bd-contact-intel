@@ -247,7 +247,11 @@ button.cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
 .anchor-split { position: relative; display: inline-block; }
 .split-btn .split-chev { width: var(--control-height); padding: 0; border-left: 1px solid color-mix(in srgb, var(--color-accent-fg) 35%, transparent); }
 .split-btn .btn-sm.split-chev { width: var(--control-height-sm); }
-.foot-anchor { position: relative; display: inline-flex; gap: var(--space-sm); }
+.foot-anchor { position: relative; display: inline-flex; align-items: center; gap: var(--space-sm); flex: none; }
+/* The send-time warning in a tight row: one line, never wider than its text, never shrinks the neighbouring column. */
+.advice-chip { display: inline-flex; flex: none; white-space: nowrap; }
+.advice-chip .badge { white-space: nowrap; }
+.advice-chip .icon { width: 12px; height: 12px; }
 .menu.up { top: auto; bottom: calc(100% + 6px); right: 0; min-width: 19rem; }
 .mi { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; align-items: flex-start; }
 .mi .icon { margin-top: 3px; }

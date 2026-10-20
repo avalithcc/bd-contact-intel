@@ -6,7 +6,7 @@ import { buildAdvice, type Advice } from "@/lib/sendSchedule/advice";
 import type { Slot } from "@/lib/sendSchedule/time";
 import type { SendControlLabels } from "@/lib/sendSchedule/labels";
 import { SchedulePopover, type ScheduleConfig } from "./SchedulePopover";
-import { SendAdvice } from "./SendAdvice";
+import { SendAdviceChip } from "./SendAdvice";
 
 export interface CadenceOption {
   /** Shown as the item's second line, e.g. "Mañana mar 20 oct, 9:00 (Miami)". */
@@ -26,6 +26,7 @@ export function SendSplitButton({
   labels: l,
   primaryLabel,
   small = false,
+  stackAdvice = false,
   disabled = false,
   busy = false,
   placement = "up",
@@ -38,6 +39,8 @@ export function SendSplitButton({
   labels: SendControlLabels;
   primaryLabel: string;
   small?: boolean;
+  /** Puts the send-time warning under the button instead of beside it: for a card's actions column. */
+  stackAdvice?: boolean;
   disabled?: boolean;
   busy?: boolean;
   placement?: "up" | "down";
@@ -112,8 +115,8 @@ export function SendSplitButton({
   };
 
   return (
-    <span className="foot-anchor" ref={rootRef} onKeyDown={onKeyDown}>
-      {nowAdvice && !popOpen && <SendAdvice labels={l} advice={nowAdvice} onUse={openPopover} />}
+    <span className="foot-anchor" style={stackAdvice ? { flexDirection: "column-reverse", alignItems: "flex-end", gap: "var(--space-2xs)" } : undefined} ref={rootRef} onKeyDown={onKeyDown}>
+      {nowAdvice && !popOpen && <SendAdviceChip labels={l} advice={nowAdvice} />}
       <span className="anchor-split">
         <span className="btn-group split-btn" role="group" aria-label={l.groupLabel}>
           <button type="button" className={`btn btn-primary${size}`} disabled={disabled || busy} onClick={onSendNow}>
