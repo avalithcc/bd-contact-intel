@@ -34,8 +34,10 @@ test("a known city fixes a multi-zone country: no 'aprox.'", () => {
 
 test("US: the state (name or abbreviation) fixes the zone, the city is the fallback, otherwise Eastern 'aprox.'", () => {
   const tampa = zone({ country: "United States", city: "Tampa", region: "Florida" });
-  assert.deepEqual([tampa.zone, tampa.approx, tampa.area], ["America/New_York", false, "Florida"]);
+  assert.deepEqual([tampa.zone, tampa.approx, tampa.area], ["America/New_York", true, "Florida"]); // Florida spans two zones: still a guess
   assert.equal(zone({ country: "United States", region: "TX" }).zone, "America/Chicago");
+  for (const state of ["TX", "FL", "TN", "KY", "IN", "MI", "NE", "KS", "ID", "OR", "ND", "SD"]) assert.equal(zone({ country: "United States", region: state }).approx, true, state);
+  for (const state of ["NY", "CA", "IL", "AZ", "CO", "GA"]) assert.equal(zone({ country: "United States", region: state }).approx, false, state);
   assert.equal(zone({ country: "United States", region: "California" }).zone, "America/Los_Angeles");
   assert.equal(zone({ country: "United States", region: "Arizona" }).zone, "America/Phoenix");
   assert.equal(zone({ country: "United States", city: "Austin" }).zone, "America/Chicago");

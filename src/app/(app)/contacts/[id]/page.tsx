@@ -488,7 +488,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
             labels: dict.sendControl,
             fromAddress: me.email,
             // person.country first, then the company's (the same chain recipientMarket uses); a guess, never persisted.
-            recipientZone: resolveRecipientZone({ city: record.person.city, region: record.person.region, country: record.person.country ?? companyRow?.country }),
+            recipientZone: resolveRecipientZone({ city: record.person.city, region: record.person.region, country: record.person.country || companyRow?.country }),
           }}
           ownerOptions={ownerOptions}
           canReassignOwner={isAdminRole(me)}

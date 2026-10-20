@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon, ClockIcon, SendIcon } from "@/components/icons";
-import { buildAdvice } from "@/lib/sendSchedule/advice";
+import { buildAdvice, type Advice } from "@/lib/sendSchedule/advice";
 import type { Slot } from "@/lib/sendSchedule/time";
 import type { SendControlLabels } from "@/lib/sendSchedule/labels";
 import { SchedulePopover, type ScheduleConfig } from "./SchedulePopover";
@@ -91,8 +91,18 @@ export function SendSplitButton({
     items[(at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
   };
 
-  // The note beside the button: where "now" falls for the recipient. Evaluated when rendered, which is when it matters.
-  const nowAdvice = disabled ? null : buildAdvice(new Date(), schedule.recipients, schedule.fallbackZone);
+  // The note beside the button: where "now" falls for the recipient. Computed after mount and refreshed every minute, never during
+  // render, so the server's HTML (which has no meaningful "now" for the BD) cannot disagree with the client's first paint.
+  const [nowAdvice, setNowAdvice] = useState<Advice | null>(null);
+  const scheduleRef = useRef(schedule);
+  scheduleRef.current = schedule;
+  useEffect(() => {
+    if (disabled) return setNowAdvice(null);
+    const tick = () => setNowAdvice(buildAdvice(new Date(), scheduleRef.current.recipients, scheduleRef.current.fallbackZone));
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [disabled]);
   const openPopover = (from: Slot | null) => {
     setInitial(from);
     setMenuOpen(false);

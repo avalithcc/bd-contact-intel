@@ -85,7 +85,7 @@ const CITY_ZONES: Record<string, Record<string, string>> = {
 // US states by zone, "Name,AB" pairs: a short table, enough for a visual reference.
 const US_STATES: Record<string, string> = {
   "America/New_York": "Florida,FL;Georgia,GA;New York,NY;New Jersey,NJ;Massachusetts,MA;Pennsylvania,PA;North Carolina,NC;South Carolina,SC;Virginia,VA;Ohio,OH;Michigan,MI;Connecticut,CT;Maryland,MD;Delaware,DE;Maine,ME;New Hampshire,NH;Vermont,VT;Rhode Island,RI;West Virginia,WV;Indiana,IN",
-  "America/Chicago": "Texas,TX;Illinois,IL;Minnesota,MN;Wisconsin,WI;Missouri,MO;Louisiana,LA;Alabama,AL;Mississippi,MS;Oklahoma,OK;Arkansas,AR;Iowa,IA;Kansas,KS;Nebraska,NE;Tennessee,TN;Kentucky,KY",
+  "America/Chicago": "Texas,TX;Illinois,IL;Minnesota,MN;Wisconsin,WI;Missouri,MO;Louisiana,LA;Alabama,AL;Mississippi,MS;Oklahoma,OK;Arkansas,AR;Iowa,IA;Kansas,KS;Nebraska,NE;Tennessee,TN;Kentucky,KY;North Dakota,ND;South Dakota,SD",
   "America/Denver": "Colorado,CO;Utah,UT;New Mexico,NM;Montana,MT;Wyoming,WY;Idaho,ID",
   "America/Phoenix": "Arizona,AZ",
   "America/Los_Angeles": "California,CA;Washington,WA;Oregon,OR;Nevada,NV",
@@ -96,12 +96,15 @@ const US_STATES: Record<string, string> = {
 const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const hasName = (list: string, name: string) => list.split("|").includes(name);
 
-function usState(region: string): { name: string; zone: string } | null {
+// States that straddle two time zones: knowing the state is still a guess for them.
+const SPLIT_STATES = new Set(["TX", "FL", "TN", "KY", "IN", "MI", "NE", "KS", "ID", "OR", "ND", "SD"]);
+
+function usState(region: string): { name: string; zone: string; split: boolean } | null {
   const wanted = normalize(region);
   for (const [zone, pairs] of Object.entries(US_STATES)) {
     for (const pair of pairs.split(";")) {
       const [name, abbr] = pair.split(",");
-      if (normalize(name!) === wanted || normalize(abbr!) === wanted) return { name: name!, zone };
+      if (normalize(name!) === wanted || normalize(abbr!) === wanted) return { name: name!, zone, split: SPLIT_STATES.has(abbr!) };
     }
   }
   return null;
@@ -120,7 +123,7 @@ export function resolveRecipientZone(p: RecipientPlace): RecipientZone | null {
   const state = entry.key === "us" && p.region?.trim() ? usState(p.region) : null;
   if (state) {
     zone = state.zone;
-    approx = false;
+    approx = state.split;
     area = state.name;
   } else {
     const byCity = city ? Object.entries(CITY_ZONES[entry.key] ?? {}).find(([, cities]) => hasName(cities, city)) : undefined;
