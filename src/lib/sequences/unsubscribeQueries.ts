@@ -9,6 +9,7 @@ import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { openPostingSql } from "@/lib/hiring/openPosting";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
 import { recipientMarket } from "@/lib/sequences/recipientMarket";
+import { companyCountrySql } from "@/lib/sequences/rosterQuery";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
 import type { UnsubscribePort } from "@/lib/sequences/unsubscribeHandlers";
@@ -117,7 +118,7 @@ export async function postalAddressForToken(tokenHash: string): Promise<string |
   const sameCompany = (alias: string) => sql.raw(`(${alias}.company_key = p.company_key or ${alias}.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`);
   const rows = (await db.execute(sql`
     select p.country as person_country,
-           (select c.country from company c where ${sameCompany("c")} limit 1) as company_country,
+           ${companyCountrySql} as company_country,
            coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany("jp")}), '[]'::json) as posting_markets
     from sequence_unsubscribe_token t
     join sequence_member sm on sm.id = t.sequence_member_id

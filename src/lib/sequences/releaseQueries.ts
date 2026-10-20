@@ -23,6 +23,7 @@ import { miamiCalendarDate } from "./miamiTime";
 import { assertTransition } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { recipientMarket } from "./recipientMarket";
+import { companyCountrySql } from "./rosterQuery";
 import { generateReminderDraft } from "./draftQueries";
 import { parseSchedule, reminderDueAt } from "./schedule";
 import { pickReleaseKeys, releaseInstant, type SlimRow } from "./releaseSelection";
@@ -119,7 +120,7 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, s
       select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
              s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
              sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country,
-             (select c.country from company c where ${sameCompany} limit 1) as company_country,
+             ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
                 and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets,
              exists (select 1 from company c where ${sameCompany} and c.client_status is not null) as has_client_status,

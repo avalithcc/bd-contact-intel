@@ -14,7 +14,7 @@ import { auditLog, sequence, sequenceMember } from "@/db/schema";
 import type { MarketKey } from "@/lib/hiring/markets";
 import { draftLanguageForMarket } from "./draftInput";
 import { recipientMarket } from "./recipientMarket";
-import { clientStatusSql } from "./rosterQuery";
+import { clientStatusSql, companyCountrySql } from "./rosterQuery";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import {
   SEED_DAILY_SEND_CAP,
@@ -92,8 +92,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
       await tx.execute(sql`
         select p.id::text as person_id, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
                p.company_key, p.country as person_country, ${clientStatusSql} as client_status,
-               (select c.country from company c where c.company_key = p.company_key
-                  or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1) as company_country,
+               ${companyCountrySql} as company_country,
                exists (select 1 from job_posting jp where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
                   and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))) as has_open_it_posting,
                coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
