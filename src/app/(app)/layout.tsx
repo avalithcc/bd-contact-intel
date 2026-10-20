@@ -5,7 +5,7 @@ import { pickTopBarSearchLabels } from "@/lib/i18n/topBarSearchLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
-import { BackgroundRefresh } from "@/components/BackgroundRefresh";
+import { LiveUpdates } from "@/components/LiveUpdates";
 import { CallAttemptProvider } from "@/components/CallAttemptProvider";
 import { pickCallFormLabels } from "@/lib/contacts/callFormLabels";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
@@ -57,7 +57,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
-      <BackgroundRefresh />
+      <LiveUpdates />
       <CallAttemptProvider labels={dict.callAttempt} details={callDetails}>
         <div className="app">
           <Sidebar
