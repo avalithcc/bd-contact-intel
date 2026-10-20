@@ -124,3 +124,9 @@ test("the hand-picked roster is the owner's nine, in tier order, with at most tw
   ]);
   assert.equal(SEED_ROSTER.length, 9);
 });
+
+test("a candidate with no compliance audience is rejected as unmapped_market, and an unjudged one is not", () => {
+  const r = resolveSeedRoster([candidate("nomarket", { marketMapped: false }), candidate("mapped", { marketMapped: true }), candidate("unjudged")], guards());
+  assert.deepEqual(reasons(r), { nomarket: "unmapped_market" });
+  assert.deepEqual(r.admitted.map((c) => c.personId), ["mapped", "unjudged"]);
+});

@@ -87,6 +87,7 @@ before(async () => {
   await mkPerson("closed", { posting: false });
   await mkPerson("noemail", { email: null });
   await mkPerson("merged", { merged: true });
+  await mkPerson("embargoed", { country: "Cuba" });
   const blocked = `${key("blocked")}@example.test`;
   await mkPerson("blocked", { email: blocked });
   suppressionValues.push(blocked);
@@ -114,7 +115,7 @@ test("a dry run reports the split and the address per person and writes nothing"
   assert.equal(r.applied, false);
   assert.deepEqual(labels(r.plan.resolution.admitted), ["ok1", "ok2", "brazil"]);
   const reasons = Object.fromEntries(r.plan.resolution.rejected.map((x) => [x.candidate.label.split(" ")[0], x.reason]));
-  assert.deepEqual(reasons, { pastclient: "client", activeclient: "client", closed: "no_open_posting", noemail: "no_email", merged: "merged", blocked: "suppressed" });
+  assert.deepEqual(reasons, { pastclient: "client", activeclient: "client", closed: "no_open_posting", noemail: "no_email", merged: "merged", embargoed: "unmapped_market", blocked: "suppressed" });
   const lang = Object.fromEntries(r.plan.lines.map((l) => [l.candidate.label.split(" ")[0], [l.address, l.language]]));
   assert.deepEqual(lang.ok1, ["miami", "en"]);
   assert.deepEqual(lang.brazil, ["miami", "en"], "Brazil is English under the Miami address (it was Spanish under the old LATAM market)");

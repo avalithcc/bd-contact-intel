@@ -1884,6 +1884,48 @@ investigated further in this pass — **unverified**; for what it is worth,
 `npm run test:unit` passed 2317 of 2317 in each of 4 runs on 2026-10-01 (default
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
+### Open, noted 2026-10-20
+- ~~**Approval had no compliance check**~~ **Fixed on branch
+  `feat/approval-compliance-gate`** (commits `6bf9cdbd`, `38dec5e7`, `ec64a91c`; not
+  yet merged). Nothing wrong was ever SENT — `preSendChecks.ts:95-96` recomputes the
+  audience at release and holds — but the hold landed hours later with nobody watching
+  while the card read "programado". The refusal now happens at approve time, where the
+  human is.
+  - `src/lib/sequences/complianceGate.ts` is the ONE pre-send predicate
+    (`complianceRefusal(address, body, config)`), pure, no I/O. `preSendChecks.ts` calls
+    it and re-exports `extractUnsubscribeUrl`, so there is a single implementation of
+    "can this body go out" rather than a second hand-written copy.
+  - `approve()` (`approvalQueries.ts:67`) gates step 1 AND the step 2 reminder, inside
+    the existing transaction after the member `FOR UPDATE`, all-or-nothing. It **fails
+    CLOSED**: a person missing from the set-based read resolves `unmapped_market`
+    (`approvalQueries.ts:89` -> `complianceGate.ts:23`), never "no refusal".
+  - The seed plan now sets `marketMapped` (`seedQueries.ts`), so an unmapped candidate is
+    rejected `unmapped_market` in the plan instead of being admitted and held later at
+    the draft step. `resolveSeedRoster` already honoured the field.
+  - The embargoed path is pinned at the approval boundary by a DB test (a "Cuba"
+    recipient with a CORRECTLY footed Miami body is refused), because the OFAC bypass
+    found on 2026-10-20 proved a well-formed footer is not evidence of a mailable
+    recipient.
+  - **Blast radius, measured against production read-only 2026-10-20 21:09 UTC:** 11
+    `sequence_draft` rows exist, 9 unapproved, of which **6 pass, 3 refused
+    `missing_footer`, 0 refused `unmapped_market`**. All 3 belong to one BD (Cristian);
+    2 are step 1, 1 is a step 2 reminder. Same cause in all 3: the body carries the `mdp`
+    footer and the audience now resolves `miami` — the #374 effect. The unsubscribe link
+    is intact in all 3, so none is refused for a missing link. Approved-and-unsent: still
+    **0**. The 1,736 contacts that changed address were a POPULATION count, never a
+    regeneration queue.
+- **Three follow-ups found by the fresh-context review of that branch. None is fixed,
+  none was introduced by it:**
+  1. Three byte-identical copies of the posting alias clause (`draftQueries.ts:47`,
+     `releaseQueries.ts`, `seedQueries.ts`) sit beside the shared
+     `sameCompanyPostingSql`. They agree today, and they are the same shape of copy that
+     drifted before #372. Mechanical to collapse.
+  2. Bulk approval has no cap on `memberIds`: the client selection reaches the `in (...)`
+     list directly (`SequenceDetailScreen.tsx:112` -> `approveBulk`).
+  3. The approval error renders only the FIRST rejection (`SequenceDetailScreen.tsx:116`,
+     `r.rejected[0]`), so a bulk refusal shows one reason with no indication of WHICH
+     member caused it. Academic at 9 drafts, not at 900.
+
 ### Open, noted 2026-10-19
 - ~~**Sequences picker limited to US-hiring companies**~~ **Shipped 2026-10-20**
   (main `52c950ba`): picker lists every non-merged contact with an email
@@ -1920,7 +1962,7 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   CL 244, UY 208, EC 119, CR 78, BR 35, PE 29, PY 23, PA 11, GT 8, SV 5, VE 5,
   HN 2, DO/NI/BO 1 each); **385 newly unblocked** (ES 133, IE 61, IT 45, UK 30,
   DE 29, FR 14, IL 9, PL 7, NL 6, long tail).
-- **Compliance address/language split — PR 2 of 2 on branch `feat/compliance-audience-switch`, awaiting merge.**
+- ~~**Compliance address/language split — PR 2 of 2**~~ **Shipped 2026-10-20** (#374, main `5540b0aa`).
   Every caller now reads `resolveComplianceAudience` (picker SQL inputs, add guard,
   seed plan, draft, pre-send, release, unsubscribe page); `recipientMarket`,
   `marketOfCountry`, `isMarketMapped`, `draftLanguageForMarket`, `phoneCountryName`,
@@ -1951,8 +1993,8 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `unmappedMarket` (the SQL deliberately does not encode the sanctions list); the add
   guard refuses it. (5) The `unmapped_market` / `unmappedMarket` key names are
   historical; the copy now says we cannot place the contact in a country, or its country
-  is under an embargo. The seed path still never sets `marketMapped` and approval still
-  has no check: unchanged.
+  is under an embargo. The seed path not setting `marketMapped` and approval having no
+  check are both fixed on `feat/approval-compliance-gate` — see **Open, noted 2026-10-20**.
   Original PR 1 note:
   `MarketKey` (`src/lib/hiring/markets.ts:14-15`) decided the postal address, the
   draft language AND the hiring signal at once, so the owner's rules above cannot

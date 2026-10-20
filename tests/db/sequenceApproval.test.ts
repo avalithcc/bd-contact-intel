@@ -18,15 +18,25 @@ let otherBdId: string;
 let sequenceId: string;
 const personIds: string[] = [];
 
-async function mkMember(name: string, over: { state?: string; subject?: string; reviewed?: boolean; noDraft?: boolean } = {}) {
+/** A body from the real footer producer, never a hand-typed footer. The default recipient (United States) resolves to "miami". */
+async function footedBody(address: "miami" | "mdp" = "miami") {
+  const { appendFooter } = await import("@/lib/sequences/complianceFooter");
+  const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
+  const { buildUnsubscribeUrl, generateUnsubscribeToken } = await import("@/lib/sequences/unsubscribeToken");
+  const r = appendFooter("Hello there", COMPLIANCE_CONFIG, address, buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
+  assert.equal(r.status, "ok");
+  return r.status === "ok" ? r.body : "";
+}
+
+async function mkMember(name: string, over: { state?: string; subject?: string; reviewed?: boolean; noDraft?: boolean; body?: string; country?: string | null } = {}) {
   const { db } = await import("@/db");
   const { person, sequenceDraft, sequenceMember } = await import("@/db/schema");
   const email = `${key(name)}@example.test`;
-  const [p] = await db.insert(person).values({ firstName: name, lastName: run, email, emailNormalized: email, emailStatus: "verified", emailSource: "apollo", country: "United States" }).returning();
+  const [p] = await db.insert(person).values({ firstName: name, lastName: run, email, emailNormalized: email, emailStatus: "verified", emailSource: "apollo", country: over.country === undefined ? "United States" : over.country }).returning();
   personIds.push(p.id);
   const [m] = await db.insert(sequenceMember).values({ sequenceId, personId: p.id, state: over.state ?? "drafted" }).returning();
   if (!over.noDraft) {
-    await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step: 1, subject: over.subject ?? `Hello ${name}`, body: "Body", reviewedAt: over.reviewed ? new Date() : null });
+    await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step: 1, subject: over.subject ?? `Hello ${name}`, body: over.body ?? (await footedBody()), reviewedAt: over.reviewed ? new Date() : null });
   }
   return { memberId: m.id, personId: p.id };
 }
@@ -170,7 +180,7 @@ test("an edit after review clears it, so a bulk approval cannot cover unseen con
   const { approveBulk } = await import("@/lib/sequences/approvalQueries");
   const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
   const m = await mkMember("edited", { reviewed: true });
-  await saveDraftEdit(bdId, m.memberId, { subject: "New subject", body: "New body" });
+  await saveDraftEdit(bdId, m.memberId, { subject: "New subject", body: `${await footedBody()}\n\nEdited.` });
   const result = await approveBulk(bdId, [m.memberId]);
   assert.ok(!result.ok && result.rejected[0].reason === "unreviewed");
 });
@@ -205,7 +215,7 @@ test("discard, re-admit and regenerate each write the actor BD and a timestamp",
   }
 });
 
-async function mkSent(name: string, over: { reviewed?: boolean; reminderDueAt?: Date | null; noReminder?: boolean } = {}) {
+async function mkSent(name: string, over: { reviewed?: boolean; reminderDueAt?: Date | null; noReminder?: boolean; reminderBody?: string } = {}) {
   const { db } = await import("@/db");
   const { sequenceDraft, sequenceMember } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
@@ -213,7 +223,7 @@ async function mkSent(name: string, over: { reviewed?: boolean; reminderDueAt?: 
   const dueAt = over.reminderDueAt === undefined ? new Date(Date.now() + 7 * 86_400_000) : over.reminderDueAt;
   await db.update(sequenceMember).set({ sentAt: new Date(), reminderDueAt: dueAt }).where(eq(sequenceMember.id, m.memberId));
   if (!over.noReminder) {
-    await db.insert(sequenceDraft).values({ sequenceMemberId: m.memberId, step: 2, subject: "Re: Hello", body: "Reminder", reviewedAt: over.reviewed ? new Date() : null });
+    await db.insert(sequenceDraft).values({ sequenceMemberId: m.memberId, step: 2, subject: "Re: Hello", body: over.reminderBody ?? (await footedBody()), reviewedAt: over.reviewed ? new Date() : null });
   }
   return m;
 }
@@ -283,4 +293,57 @@ test("cancelling a reminder approval clears only the reminder and leaves the mem
   assert.equal((await stateOf(m.memberId)).state, "sent");
   const audit = await auditFor(m.personId, "sequence_member_cancel");
   assert.deepEqual(audit.map((a) => (a.metadata as { step: number }).step), [2]);
+});
+
+async function nothingWritten(m: { memberId: string; personId: string }, state: string, step = 1) {
+  const d = await draftOf(m.memberId, step);
+  assert.deepEqual([d.approvedAt, d.approvedByBdId, d.scheduledFor], [null, null, null]);
+  assert.equal((await stateOf(m.memberId)).state, state);
+  assert.equal((await auditFor(m.personId, "sequence_member_approve")).length, 0);
+}
+
+test("a draft footed for another address than the audience now resolves to is refused as missing_footer, and nothing is written", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  // The draft carries the Mar del Plata footer; the recipient (United States) resolves to Miami today.
+  const m = await mkMember("drift", { body: await footedBody("mdp") });
+  const r = await approveMember(bdId, m.memberId);
+  assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: m.memberId, reason: "missing_footer" }] });
+  await nothingWritten(m, "drafted");
+});
+
+test("a recipient with no location signal is refused as unmapped_market, and nothing is written", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("nowhere", { country: null });
+  const r = await approveMember(bdId, m.memberId);
+  assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: m.memberId, reason: "unmapped_market" }] });
+  await nothingWritten(m, "drafted");
+});
+
+test("a healthy member still approves, and one refused member refuses the whole bulk request", async () => {
+  const { approveBulk, approveMember } = await import("@/lib/sequences/approvalQueries");
+  const ok = await mkMember("healthy");
+  assert.deepEqual(await approveMember(bdId, ok.memberId), { ok: true, approved: [ok.memberId] });
+  const good = await mkMember("bulk-good", { reviewed: true });
+  const bad = await mkMember("bulk-bad", { reviewed: true, body: "Body without a footer" });
+  const r = await approveBulk(bdId, [good.memberId, bad.memberId]);
+  assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: bad.memberId, reason: "missing_footer" }] });
+  await nothingWritten(good, "drafted");
+  await nothingWritten(bad, "drafted");
+});
+
+test("the step 2 reminder is gated by the same footer check", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const drifted = await mkSent("rem-drift", { reminderBody: await footedBody("mdp") });
+  const r = await approveMember(bdId, drifted.memberId, 2);
+  assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: drifted.memberId, reason: "missing_footer" }] });
+  await nothingWritten(drifted, "sent", 2);
+});
+
+test("a recipient in an embargoed country is refused as unmapped_market at approval, and nothing is written", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  // The draft is correctly footed (Miami): only the embargo can refuse it, so a resolver that defaulted to Miami would pass it.
+  const m = await mkMember("embargoed", { country: "Cuba" });
+  const r = await approveMember(bdId, m.memberId);
+  assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: m.memberId, reason: "unmapped_market" }] });
+  await nothingWritten(m, "drafted");
 });

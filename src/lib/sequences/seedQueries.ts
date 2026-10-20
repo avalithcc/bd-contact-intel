@@ -117,6 +117,8 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
       companyKey: r.company_key as string | null,
       clientStatus: r.client_status as string | null,
       hasOpenItPosting: r.has_open_it_posting as boolean,
+      // No audience = no footer could be written; the plan rejects it as unmapped_market instead of letting the draft step hold it.
+      marketMapped: audience !== null,
     };
     return { candidate, address: audience?.address ?? null, language: audience?.language ?? null };
   });

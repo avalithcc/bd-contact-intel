@@ -4,14 +4,18 @@
  * approves none. Approval binds to the draft content as it stands under the member row lock that every edit also takes;
  * an edit afterwards clears it (draftQueries).
  */
-import { and, eq, exists, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, exists, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence, sequenceDraft, sequenceMember } from "@/db/schema";
 import { sequenceAuditRow } from "./approvalAudit";
 import { checkStep1Subject } from "./approvalChecks";
 import { bulkApprovalGate } from "./bulkApprovalGate";
+import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
+import { complianceRefusal, type ComplianceRefusal } from "./complianceGate";
+import { COMPLIANCE_CONFIG } from "./config";
 import { canTransition, type MemberState } from "./memberState";
 import { LOCK_MS } from "@/lib/scheduledEmail/plan";
+import { companyCountrySql, postingMarketsSql } from "./rosterQuery";
 import { parseSchedule, reminderReleaseAt } from "./schedule";
 import { resolveSequenceSend, type SendChoice, type SendMomentRefusal } from "./sendMoment";
 
@@ -23,7 +27,7 @@ const REVIEWABLE: Record<ApprovalStep, readonly string[]> = { 1: ["drafted", "ap
 
 export type ApprovalRejection = {
   memberId: string;
-  reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | SendMomentRefusal;
+  reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | ComplianceRefusal | SendMomentRefusal;
 };
 export type ApproveResult = { ok: true; approved: string[] } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] };
 
@@ -38,6 +42,22 @@ export async function markDraftReviewed(bdId: string, memberId: string, step: Ap
   if (!row) return { ok: false, error: "not_found" };
   await db.update(sequenceDraft).set({ reviewedAt: new Date(), reviewedByBdId: bdId }).where(and(eq(sequenceDraft.id, row.id), isNull(sequenceDraft.reviewedAt)));
   return { ok: true };
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * The footer address each person's audience resolves to NOW (null = no audience), for all of them in ONE read. Same inputs
+ * and same resolver as the draft step and the roster add, so approval, drafting and the release re-check cannot disagree.
+ */
+async function addressesNow(tx: Tx, personIds: readonly string[]): Promise<Map<string, ComplianceAddress | null>> {
+  if (!personIds.length) return new Map();
+  const ids = sql.join(personIds.map((id) => sql`${id}::uuid`), sql`, `);
+  const rows = (await tx.execute(sql`
+    select p.id::text as person_id, p.country as person_country, p.mobile_phone, p.phone,
+           ${companyCountrySql} as company_country, ${postingMarketsSql} as posting_markets
+    from person p where p.id in (${ids})`)) as unknown as { person_id: string; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
+  return new Map(rows.map((r) => [r.person_id, resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets })?.address ?? null]));
 }
 
 /**
@@ -57,16 +77,21 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
     const byId = new Map(members.map((m) => [m.id, m]));
     const drafts = new Map((await tx.select().from(sequenceDraft).where(and(inArray(sequenceDraft.sequenceMemberId, ids), eq(sequenceDraft.step, step)))).map((d) => [d.sequenceMemberId, d]));
 
+    // The footer was written at draft time; the audience can have moved since (country edited, posting closed, policy change).
+    // Refuse here, with the BD present, instead of at release hours later. Applies to the step 2 reminder too.
+    const addresses = await addressesNow(tx, members.map((m) => m.personId));
     const now = new Date();
     const moments = new Map<string, Date>();
     const rejected: ApprovalRejection[] = [];
     for (const id of ids) {
       const m = byId.get(id);
       const d = drafts.get(id);
+      const refusal = m && d ? complianceRefusal(addresses.get(m.personId) ?? null, d.body, COMPLIANCE_CONFIG) : null;
       if (!m) rejected.push({ memberId: id, reason: "not_found" });
       else if (!(step === 1 ? canTransition(m.state as MemberState, "approved", "approve") : m.state === "sent" && m.reminderDueAt !== null)) rejected.push({ memberId: id, reason: "not_approvable" });
       else if (!d) rejected.push({ memberId: id, reason: "no_draft" });
       else if (step === 1 && !checkStep1Subject(d.subject).ok) rejected.push({ memberId: id, reason: "reply_prefix_subject" });
+      else if (refusal) rejected.push({ memberId: id, reason: refusal });
       else if (step === 1) {
         const moment = resolveSequenceSend(when, { now, schedule: parseSchedule(m.schedule) });
         if (moment.ok) moments.set(id, moment.scheduledFor);
