@@ -11,7 +11,9 @@ import { sequenceAuditRow } from "./approvalAudit";
 import { checkStep1Subject } from "./approvalChecks";
 import { bulkApprovalGate } from "./bulkApprovalGate";
 import { canTransition, type MemberState } from "./memberState";
-import { parseSchedule, reminderReleaseAt, step1DueAt } from "./schedule";
+import { LOCK_MS } from "@/lib/scheduledEmail/plan";
+import { parseSchedule, reminderReleaseAt } from "./schedule";
+import { resolveSequenceSend, type SendChoice, type SendMomentRefusal } from "./sendMoment";
 
 // Step 1 is approved from `drafted` and moves the member. The step 2 reminder is approved on its own from `sent` and
 // never moves the member: approving step 1 implies nothing about it.
@@ -21,7 +23,7 @@ const REVIEWABLE: Record<ApprovalStep, readonly string[]> = { 1: ["drafted", "ap
 
 export type ApprovalRejection = {
   memberId: string;
-  reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject";
+  reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | SendMomentRefusal;
 };
 export type ApproveResult = { ok: true; approved: string[] } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] };
 
@@ -38,7 +40,11 @@ export async function markDraftReviewed(bdId: string, memberId: string, step: Ap
   return { ok: true };
 }
 
-async function approve(bdId: string, memberIds: readonly string[], gated: boolean, step: ApprovalStep): Promise<ApproveResult> {
+/**
+ * `when` is the BD's choice in the split button (sendMoment.ts): the cadence (today's behavior, the default), "now" or a
+ * chosen Argentina time. It only decides `scheduled_for` of a STEP 1 approval; a reminder keeps its own release rule.
+ */
+async function approve(bdId: string, memberIds: readonly string[], gated: boolean, step: ApprovalStep, when: SendChoice = { kind: "cadence" }): Promise<ApproveResult> {
   const ids = [...new Set(memberIds)];
   if (!ids.length) return { ok: true, approved: [] };
   return db.transaction(async (tx) => {
@@ -51,6 +57,8 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
     const byId = new Map(members.map((m) => [m.id, m]));
     const drafts = new Map((await tx.select().from(sequenceDraft).where(and(inArray(sequenceDraft.sequenceMemberId, ids), eq(sequenceDraft.step, step)))).map((d) => [d.sequenceMemberId, d]));
 
+    const now = new Date();
+    const moments = new Map<string, Date>();
     const rejected: ApprovalRejection[] = [];
     for (const id of ids) {
       const m = byId.get(id);
@@ -59,6 +67,11 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
       else if (!(step === 1 ? canTransition(m.state as MemberState, "approved", "approve") : m.state === "sent" && m.reminderDueAt !== null)) rejected.push({ memberId: id, reason: "not_approvable" });
       else if (!d) rejected.push({ memberId: id, reason: "no_draft" });
       else if (step === 1 && !checkStep1Subject(d.subject).ok) rejected.push({ memberId: id, reason: "reply_prefix_subject" });
+      else if (step === 1) {
+        const moment = resolveSequenceSend(when, { now, schedule: parseSchedule(m.schedule) });
+        if (moment.ok) moments.set(id, moment.scheduledFor);
+        else rejected.push({ memberId: id, reason: moment.reason });
+      }
     }
     if (gated) {
       const gate = bulkApprovalGate(ids.filter((id) => drafts.has(id)).map((id) => ({ id, reviewed: drafts.get(id)!.reviewedAt !== null })));
@@ -66,10 +79,8 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
     }
     if (rejected.length) return { ok: false, error: "rejected", rejected } as const;
 
-    const now = new Date();
     for (const m of members) {
-      const schedule = parseSchedule(m.schedule);
-      const scheduledFor = step === 1 ? step1DueAt(now, schedule) : reminderReleaseAt(m.reminderDueAt!, now, schedule);
+      const scheduledFor = step === 1 ? moments.get(m.id)! : reminderReleaseAt(m.reminderDueAt!, now, parseSchedule(m.schedule));
       await tx.update(sequenceDraft).set({ approvedAt: now, approvedByBdId: bdId, scheduledFor }).where(eq(sequenceDraft.id, drafts.get(m.id)!.id));
       if (step === 1) await tx.update(sequenceMember).set({ state: "approved" }).where(eq(sequenceMember.id, m.id));
       await tx.insert(auditLog).values(sequenceAuditRow("approve", { actorBdId: bdId, personId: m.personId, memberId: m.id, sequenceId: m.sequenceId, step, at: now }));
@@ -79,10 +90,10 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
 }
 
 /** "Aprobar" on one card. Not gated by the review counter: approving one visible message is deliberate. */
-export const approveMember = (bdId: string, memberId: string, step: ApprovalStep = 1) => approve(bdId, [memberId], false, step);
+export const approveMember = (bdId: string, memberId: string, step: ApprovalStep = 1, when?: SendChoice) => approve(bdId, [memberId], false, step, when);
 
 /** "Aprobar y programar los M". The server re-asserts the review gate; one unreviewed member rejects the whole request. */
-export const approveBulk = (bdId: string, memberIds: readonly string[], step: ApprovalStep = 1) => approve(bdId, memberIds, true, step);
+export const approveBulk = (bdId: string, memberIds: readonly string[], step: ApprovalStep = 1, when?: SendChoice) => approve(bdId, memberIds, true, step, when);
 
 /** "Cancelar envio": approved -> drafted, approval cleared, actor recorded. A reminder (step 2) only loses its approval. */
 export async function cancelApproval(bdId: string, memberId: string, step: ApprovalStep = 1): Promise<{ ok: true } | { ok: false; error: "not_found" | "not_approved" }> {
@@ -119,4 +130,32 @@ export async function advanceReminder(bdId: string, memberId: string): Promise<{
     .where(and(eq(sequenceMember.id, memberId), eq(sequenceMember.state, "sent"), isNotNull(sequenceMember.reminderDueAt), exists(owned)))
     .returning({ id: sequenceMember.id });
   return moved.length ? { ok: true } : { ok: false, error: "not_found" };
+}
+
+export type RescheduleResult = { ok: true; scheduledFor: Date } | { ok: false; error: "not_found" | "not_approved" | "locked" | SendMomentRefusal };
+
+/**
+ * "Cambiar" and "Enviar ahora" on an approved card: moves the step 1 moment of a member that is still `approved`. Refused
+ * ("locked") when it is due in under two minutes (the runner is about to take it); an overdue one (waiting for cap) can still
+ * be moved. The runner's claim re-checks that the stored moment was not moved later since it read the candidate.
+ */
+export async function rescheduleApproved(bdId: string, memberId: string, when: SendChoice): Promise<RescheduleResult> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ state: sequenceMember.state, schedule: sequence.schedule, draftId: sequenceDraft.id, scheduledFor: sequenceDraft.scheduledFor })
+      .from(sequenceMember)
+      .innerJoin(sequence, eq(sequence.id, sequenceMember.sequenceId))
+      .leftJoin(sequenceDraft, and(eq(sequenceDraft.sequenceMemberId, sequenceMember.id), eq(sequenceDraft.step, 1)))
+      .where(and(eq(sequenceMember.id, memberId), eq(sequence.ownerBdId, bdId)))
+      .for("update", { of: sequenceMember });
+    if (!row) return { ok: false, error: "not_found" } as const;
+    if (row.state !== "approved" || !row.draftId) return { ok: false, error: "not_approved" } as const;
+    const now = new Date();
+    const lead = row.scheduledFor ? row.scheduledFor.getTime() - now.getTime() : Infinity;
+    if (lead >= 0 && lead < LOCK_MS) return { ok: false, error: "locked" } as const;
+    const moment = resolveSequenceSend(when, { now, schedule: parseSchedule(row.schedule) });
+    if (!moment.ok) return { ok: false, error: moment.reason } as const;
+    await tx.update(sequenceDraft).set({ scheduledFor: moment.scheduledFor }).where(eq(sequenceDraft.id, row.draftId));
+    return { ok: true, scheduledFor: moment.scheduledFor } as const;
+  });
 }

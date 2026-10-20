@@ -21,7 +21,7 @@ const member = (id: string, over: Partial<DetailMember> = {}): DetailMember => (
   company: "Acme", companyKey: "acme", email: `p${id}@example.test`, emailVerified: true, openIt: 1, florida: false, leadership: false, lastContactAt: null,
   repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, draft: draft(), reminderDraft: null, ...over,
 });
-const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s1", name: "Synthetic", ownerBdId: "bd1", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, members });
+const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s1", name: "Synthetic", ownerBdId: "bd1", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
 
 // --- the review dialog never claims "no signals" when the signals simply are not known ---------------------------
 

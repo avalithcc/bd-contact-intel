@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { capOutlook, resolveSequenceSend } from "@/lib/sequences/sendMoment";
+import { capOutlook, parseSendChoice, resolveSequenceSend } from "@/lib/sequences/sendMoment";
 import { DEFAULT_SCHEDULE, parseSchedule } from "@/lib/sequences/schedule";
 
 const AFTER_FLOOR = new Date("2026-10-19T14:42:00Z"); // 10:42 Miami (EDT)
@@ -51,4 +51,10 @@ test("capOutlook splits a batch into what leaves now and what waits for the next
   assert.deepEqual(capOutlook({ count: 3, cap: 5, sentToday: 4 }), { now: 1, deferred: 2 });
   assert.deepEqual(capOutlook({ count: 2, cap: 5, sentToday: 9 }), { now: 0, deferred: 2 });
   assert.deepEqual(capOutlook({ count: 2, cap: 5, sentToday: 0 }), { now: 2, deferred: 0 });
+});
+
+test("parseSendChoice accepts only the three shapes and falls back to the cadence", () => {
+  assert.deepEqual(parseSendChoice({ kind: "now" }), { kind: "now" });
+  assert.deepEqual(parseSendChoice({ kind: "at", date: "2026-10-22", time: "10:00", extra: 1 }), { kind: "at", date: "2026-10-22", time: "10:00" });
+  for (const bad of [undefined, null, "now", 3, {}, { kind: "at" }, { kind: "at", date: 1, time: "10:00" }, { kind: "later" }]) assert.deepEqual(parseSendChoice(bad), { kind: "cadence" });
 });

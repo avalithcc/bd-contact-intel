@@ -17,6 +17,7 @@ import { isUuid } from "@/lib/uuid";
 import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { canonicalCompanyJoinSql, companyNameColumnsSql } from "./rosterQuery";
+import { miamiCalendarDate } from "./miamiTime";
 import { parseSchedule, type Schedule } from "./schedule";
 import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 
@@ -56,7 +57,8 @@ export type DetailMember = {
   reminderDraft: DetailDraft | null;
 };
 
-export type SequenceDetail = { id: string; name: string; ownerBdId: string; ownerName: string; fromAddress: string; schedule: Schedule; dailySendCap: number; members: DetailMember[] };
+/** `sentToday`: sends recorded today (Miami day) from this Sequence's sending account, pending claims included: what the daily cap has already used. */
+export type SequenceDetail = { id: string; name: string; ownerBdId: string; ownerName: string; fromAddress: string; schedule: Schedule; dailySendCap: number; sentToday: number; members: DetailMember[] };
 
 type Executor = Pick<typeof db, "execute">;
 type Row = Record<string, unknown>;
@@ -69,8 +71,9 @@ function draftOf(r: Row, p: "d1" | "d2"): DetailDraft | null {
 
 async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string | null): Promise<SequenceDetail | null> {
   const owned = onlyOwnedBy ? sql`and s.owner_bd_id = ${onlyOwnedBy}::uuid` : sql``;
+  const day = miamiCalendarDate(new Date());
   const rows = (await ex.execute(sql`
-    select s.id::text as sid, s.name, s.owner_bd_id::text as owner_id, ob.name as owner_name, s.schedule, s.daily_send_cap, ea.email_address,
+    select s.id::text as sid, s.name, s.owner_bd_id::text as owner_id, ob.name as owner_name, s.schedule, s.daily_send_cap, ea.email_address, used.n as sent_today,
            sm.id::text as member_id, sm.person_id::text as person_id, sm.state, sm.hold_reason, sm.sent_at, sm.replied_at, sm.reminder_due_at,
            sm.discarded_at, sm.discard_reason,
            p.first_name, p.last_name, p.job_title, ${companyNameColumnsSql}, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group,
@@ -81,6 +84,12 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     from sequence s
     join bd ob on ob.id = s.owner_bd_id
     join email_account ea on ea.id = s.email_account_id
+    cross join lateral (
+      select count(*)::int as n from sequence_send_claim cl
+      where cl.sending_account_id = s.email_account_id
+        and ((cl.outcome = 'sent' and cl.miami_send_date = ${day}::date)
+          or (cl.outcome = 'pending' and (cl.claimed_at at time zone 'America/New_York')::date = ${day}::date))
+    ) used
     left join sequence_member sm on sm.sequence_id = s.id
     left join person p on p.id = sm.person_id
     ${canonicalCompanyJoinSql}
@@ -108,6 +117,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     fromAddress: String(head.email_address),
     schedule: parseSchedule(head.schedule),
     dailySendCap: Number(head.daily_send_cap),
+    sentToday: Number(head.sent_today ?? 0),
     members: members.map((r) => ({
       memberId: String(r.member_id),
       personId: String(r.person_id),

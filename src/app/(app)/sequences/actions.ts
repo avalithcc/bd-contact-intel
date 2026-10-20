@@ -4,7 +4,18 @@
 // guard is enforced in src/lib/sequences/rosterQueries.ts and draftQueries.ts; these only resolve the signed-in BD.
 import { getCurrentBd } from "@/lib/queries";
 import { revalidateLists } from "@/lib/contacts/revalidateLists";
-import { advanceReminder as advanceReminderRow, approveBulk as approveBulkRows, approveMember as approveMemberRow, cancelApproval as cancelApprovalRow, markDraftReviewed as markDraftReviewedRow } from "@/lib/sequences/approvalQueries";
+import {
+  advanceReminder as advanceReminderRow,
+  approveBulk as approveBulkRows,
+  approveMember as approveMemberRow,
+  cancelApproval as cancelApprovalRow,
+  markDraftReviewed as markDraftReviewedRow,
+  rescheduleApproved,
+  type ApproveResult,
+  type RescheduleResult,
+} from "@/lib/sequences/approvalQueries";
+import { releaseMembersNow } from "@/lib/sequences/releaseNow";
+import { parseSendChoice } from "@/lib/sequences/sendMoment";
 import { formatOutreachSignalLabel } from "@/lib/outreach/messageSignalLabels";
 import { pickGenerateMessageLabels, signalLabelsFromDict } from "@/lib/outreach/messageLabels";
 import { getDictionary } from "@/lib/i18n/server";
@@ -98,16 +109,52 @@ export async function markDraftReviewed(memberId: string, step: 1 | 2 = 1) {
   return markDraftReviewedRow(me.id, memberId, step);
 }
 
-/** "Aprobar" on one card: not gated by the review counter. */
-export async function approveMember(memberId: string, step: 1 | 2 = 1) {
-  const me = await getCurrentBd();
-  return approveMemberRow(me.id, memberId, step);
+/** What an immediate release did, for the toast: how many left, how many wait for the cap, how many were held or failed. */
+export type ReleaseOutcome = { released: number; deferred: number; held: number; failed: number };
+
+/**
+ * After an approval or a move with "Enviar ahora": the members go through the SAME runner (checks, daily cap, claim), narrowed
+ * to them, so they do not wait for the next minute tick. A failure here never undoes the approval: the minute cron picks the
+ * members up, which is why the outcome is optional.
+ */
+async function releaseNow(bdId: string, memberIds: readonly string[]): Promise<ReleaseOutcome | undefined> {
+  try {
+    const { released, deferred, held, failed } = await releaseMembersNow(bdId, memberIds);
+    return { released, deferred, held, failed };
+  } catch (error) {
+    console.error("immediate release failed", error instanceof Error ? error.message : error);
+    return undefined;
+  }
 }
 
-/** "Aprobar y programar los M": the server re-asserts the review gate and rejects the whole request on any unreviewed member. */
-export async function approveBulk(memberIds: string[], step: 1 | 2 = 1) {
+/**
+ * "Aprobar" on one card: not gated by the review counter. `when` is the split-button choice (cadence by default, "now", or an
+ * Argentina date and time converted and validated in approvalQueries); it only applies to a step 1 approval.
+ */
+export async function approveMember(memberId: string, step: 1 | 2 = 1, when?: unknown): Promise<ApproveResult & { release?: ReleaseOutcome }> {
   const me = await getCurrentBd();
-  return approveBulkRows(me.id, memberIds, step);
+  const choice = parseSendChoice(when);
+  const result = await approveMemberRow(me.id, memberId, step, choice);
+  if (!result.ok || step !== 1 || choice.kind !== "now") return result;
+  return { ...result, release: await releaseNow(me.id, result.approved) };
+}
+
+/** "Aprobar y enviar ahora los N" / "Aprobar y programar los N": the server re-asserts the review gate and rejects the whole request on any unreviewed member. */
+export async function approveBulk(memberIds: string[], step: 1 | 2 = 1, when?: unknown): Promise<ApproveResult & { release?: ReleaseOutcome }> {
+  const me = await getCurrentBd();
+  const choice = parseSendChoice(when);
+  const result = await approveBulkRows(me.id, memberIds, step, choice);
+  if (!result.ok || step !== 1 || choice.kind !== "now") return result;
+  return { ...result, release: await releaseNow(me.id, result.approved) };
+}
+
+/** "Cambiar" / "Enviar ahora" on an approved card. Refused inside the 2-minute lock. */
+export async function rescheduleMember(memberId: string, when: unknown): Promise<RescheduleResult & { release?: ReleaseOutcome }> {
+  const me = await getCurrentBd();
+  const choice = parseSendChoice(when);
+  const result = await rescheduleApproved(me.id, memberId, choice);
+  if (!result.ok || choice.kind !== "now") return result;
+  return { ...result, release: await releaseNow(me.id, [memberId]) };
 }
 
 /** "Cancelar envio". */

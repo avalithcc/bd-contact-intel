@@ -16,6 +16,15 @@ export type SendChoice = { kind: "cadence" } | { kind: "now" } | ({ kind: "at" }
 export type SendMomentRefusal = Exclude<SlotState, "ok">;
 export type SendMoment = { ok: true; scheduledFor: Date; immediate: boolean } | { ok: false; reason: SendMomentRefusal };
 
+/** A server action receives `unknown`: anything that is not exactly one of the three shapes is the cadence (today's behavior). */
+export function parseSendChoice(raw: unknown): SendChoice {
+  if (typeof raw !== "object" || raw === null) return { kind: "cadence" };
+  const r = raw as Record<string, unknown>;
+  if (r.kind === "now") return { kind: "now" };
+  if (r.kind === "at" && typeof r.date === "string" && typeof r.time === "string") return { kind: "at", date: r.date, time: r.time };
+  return { kind: "cadence" };
+}
+
 export function resolveSequenceSend(choice: SendChoice, ctx: { now: Date; schedule?: Schedule }): SendMoment {
   const { now } = ctx;
   if (choice.kind === "cadence") {

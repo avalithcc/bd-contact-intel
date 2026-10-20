@@ -73,7 +73,7 @@ const ALL_KINDS: DetailMember[] = [
   member(9, { state: "discarded", discardedAt: hours(24), discardReason: "opt_out" }),
 ];
 
-const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s", name: "Synthetic sequence", ownerBdId: "o", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, members });
+const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s", name: "Synthetic sequence", ownerBdId: "o", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
 const render = (members: DetailMember[], viewerBdId = "o") =>
   renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId }));
 
