@@ -1898,7 +1898,7 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   (`src/lib/sequences/config.ts:27-36`; `other` has none on purpose), so
   inferring "Spain" from a `+34` phone still yields `other` — phone inference
   could never unblock Europe, and the owner was told that before any code.
-  Three owner decisions:
+  Four owner decisions:
   1. **Infer the country from the phone's E.164 dial code**, as a FOURTH link in
      `recipientMarket` — **shipped**, PR #372, main `d4fc1232`. Resolve-time
      only, nothing written to the database, because `person.country` also drives
