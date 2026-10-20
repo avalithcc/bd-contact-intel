@@ -407,6 +407,13 @@
       "when": 1794428400000,
       "tag": "0057_sequence_member_release_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794514800000,
+      "tag": "0058_email_account_notify_filter",
+      "breakpoints": true
     }
   ]
 }

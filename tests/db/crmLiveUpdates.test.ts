@@ -294,3 +294,122 @@ test("the receive policy admits a confirmed, allowed-domain BD on topic 'crm' an
     for (const denied of ["public", "anon", "service_role"]) assert.ok(!who.includes(denied), `${denied} must not execute crm_live_allowed`);
   });
 });
+
+// --- 0058: an email_account UPDATE broadcasts only when a BD can see the change ---------------------------------------
+
+async function applyFilterMigration(tx: Tx) {
+  await run(tx, "set local client_min_messages = warning");
+  const file = readFileSync("drizzle/0058_email_account_notify_filter.sql", "utf8");
+  for (const chunk of file.split("--> statement-breakpoint")) await run(tx, chunk);
+}
+
+async function seedAccount(tx: Tx, tag: string, lastSyncedAgo: string | null = "1 minute") {
+  const me = await seedBd(tx, tag);
+  const synced = lastSyncedAgo ? `now() - interval '${lastSyncedAgo}'` : "null";
+  await run(tx, `insert into email_account (bd_id, email_address, status, last_synced_at, history_id) values ('${me.id}', 'zz-live-${tag}@example.test', 'connected', ${synced}, '100')`);
+  return me;
+}
+
+async function emitted(tx: Tx, statement: string): Promise<Call[]> {
+  await run(tx, "delete from realtime.calls");
+  await run(tx, statement);
+  return calls(tx);
+}
+
+test("0058: the sync bookkeeping UPDATE (last_synced_at, history_id, backfill token, updated_at) emits nothing", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    await applyFilterMigration(tx);
+    await installRealtimeStub(tx);
+    const me = await seedAccount(tx, "sync");
+    const got = await emitted(tx, `update email_account set last_synced_at = now(), history_id = '101', backfill_page_token = 'x', updated_at = now() where bd_id = '${me.id}'`);
+    assert.deepEqual(got, []);
+  });
+});
+
+test("0058: every UI-visible change emits exactly once, with the owner's bdId", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    await applyFilterMigration(tx);
+    await installRealtimeStub(tx);
+    const me = await seedAccount(tx, "vis");
+    const changes = [
+      "status = 'error'",
+      "status = 'connected'",
+      "sync_error = 'Gmail API failed'",
+      "sync_error = null",
+      "granted_scopes = 'gmail.send'",
+      "email_address = 'zz-live-vis2@example.test'",
+      "last_error_message = 'boom'",
+      "connected_at = now() + interval '1 second'",
+      "disconnected_at = now()",
+    ];
+    for (const change of changes) {
+      const got = await emitted(tx, `update email_account set ${change} where bd_id = '${me.id}'`);
+      assert.equal(got.length, 1, change);
+      assert.deepEqual(got[0]!.payload, { kind: "email_account", op: "UPDATE", ids: {}, bdId: me.id }, change);
+    }
+  });
+});
+
+test("0058: the first success, and recovery from a stale sync, still emit; a fresh success does not", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    await applyFilterMigration(tx);
+    await installRealtimeStub(tx);
+    const fresh = await seedAccount(tx, "fresh", "1 minute");
+    assert.equal((await emitted(tx, `update email_account set last_synced_at = now() where bd_id = '${fresh.id}'`)).length, 0);
+    const stale = await seedAccount(tx, "stale", "2 hours");
+    assert.equal((await emitted(tx, `update email_account set last_synced_at = now() where bd_id = '${stale.id}'`)).length, 1);
+    const never = await seedAccount(tx, "never", null);
+    assert.equal((await emitted(tx, `update email_account set last_synced_at = now() where bd_id = '${never.id}'`)).length, 1);
+  });
+});
+
+test("0058: INSERT and DELETE still emit; a statement with one visible row among sync-only rows emits once", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    await applyFilterMigration(tx);
+    await installRealtimeStub(tx);
+    const a = await seedBd(tx, "ia");
+    const ins = await emitted(tx, `insert into email_account (bd_id, email_address) values ('${a.id}', 'zz-live-ia@example.test')`);
+    assert.deepEqual(ins.map((c) => c.payload.op), ["INSERT"]);
+    const b = await seedAccount(tx, "ib");
+    const mixed = await emitted(tx, `update email_account set last_synced_at = now(), status = case when bd_id = '${b.id}' then 'error' else status end`);
+    assert.equal(mixed.length, 1);
+    const del = await emitted(tx, `delete from email_account where bd_id = '${a.id}'`);
+    assert.deepEqual(del.map((c) => c.payload.op), ["DELETE"]);
+  });
+});
+
+test("0058: other tables keep notifying, and missing email_account triggers are recreated once (re-runnable)", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    await installRealtimeStub(tx);
+    for (const name of ["crm_notify_ins", "crm_notify_upd", "crm_notify_del"]) await run(tx, `drop trigger ${name} on email_account`);
+    const oids = async () => [...(await run(tx, "select oid::text as oid from pg_trigger where tgname like 'crm_notify_%' and not tgisinternal order by oid"))].map((r) => (r as unknown as { oid: string }).oid);
+    assert.equal((await oids()).length, 30);
+    await applyFilterMigration(tx);
+    const first = await oids();
+    assert.equal(first.length, 33);
+    await applyFilterMigration(tx);
+    assert.deepEqual(await oids(), first);
+    const me = await seedBd(tx, "other");
+    const [p] = await seedPeople(tx, 1);
+    const { task } = await import("@/db/schema");
+    await run(tx, "delete from realtime.calls");
+    await tx.insert(task).values({ personId: p!.id, assignedToBdId: me.id, title: "t" });
+    assert.deepEqual((await calls(tx)).map((c) => `${c.payload.kind}:${c.payload.op}`), ["task:INSERT"]);
+  });
+});
+
+test("0058: a failing realtime.send never fails a visible email_account update", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigration(tx);
+    await applyFilterMigration(tx);
+    const me = await seedBd(tx, "fail");
+    await run(tx, `insert into email_account (bd_id, email_address) values ('${me.id}', 'zz-live-fail@example.test')`);
+    await installRealtimeStub(tx, true);
+    await run(tx, `update email_account set status = 'error' where bd_id = '${me.id}'`);
+  });
+});
