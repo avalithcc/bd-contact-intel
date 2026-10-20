@@ -1891,13 +1891,92 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   EE. UU., Mis contactos; contacts whose market has no compliance footer show
   as blocked "Sin pie legal para su región" (hidden behind "Mostrar
   bloqueados") and are rejected server-side.
-- **OWNER DECISION PENDING (for 2026-10-21): ~2,400 contacts have no legal
-  footer.** Prod count 2026-10-20 of ~7,500 contacts with email: ~5,100
-  addable; ~2,040 with NO country (person nor company; 2,035 have no single
-  us/latam posting market) and ~390 in other regions (Spain 133, Ireland 61,
-  Italy 45, UK 30, Germany 29, France 14, Israel 9…). Options to present:
-  default footer for unknown country, infer country from phone dial code
-  (E.164 now stored), add an EU/other postal address, or keep blocked.
+- ~~**OWNER DECISION PENDING: ~2,400 contacts have no legal footer**~~
+  **DECIDED 2026-10-20.** Measured in prod (read-only) 2026-10-20 13:52 UTC:
+  7,563 live contacts with an email, 5,132 with a footer, **2,431 blocked**
+  (`unmappedMarket`). Only `us` and `latam` have a footer entry
+  (`src/lib/sequences/config.ts:27-36`; `other` has none on purpose), so
+  inferring "Spain" from a `+34` phone still yields `other` — phone inference
+  could never unblock Europe, and the owner was told that before any code.
+  Three owner decisions:
+  1. **Infer the country from the phone's E.164 dial code**, as a FOURTH link in
+     `recipientMarket` — **shipped**, PR #372, main `d4fc1232`. Resolve-time
+     only, nothing written to the database, because `person.country` also drives
+     send-time zone resolution and a guessed value would silently reschedule
+     mail. Unblocks **871** (820 AR, 22 CL, 7 US, 4 CO, long tail).
+  2. **Address: Argentina → Mar del Plata, every other located country →
+     Miami.** There is no usable Madrid address, despite `contexto/empresa.md:22`
+     listing Madrid among four countries. Reaffirmed literally after being shown
+     the blast radius.
+  3. **Language: a Spanish-speaking country → `es`, everything else → `en`.**
+     Puerto Rico → `es`; Brazil (35 contacts) → `en`, chosen over Portuguese even
+     though `pt` exists (`src/lib/outreach/messageLanguage.ts:8`). The two answers
+     collapse into one predicate with no exception list.
+  4. **Contacts with no location signal at all stay blocked.** The market also
+     picks the draft language, so guessing it blind is wrong.
+  Blast radius of 2 and 3, measured 2026-10-20 14:41 UTC: Mar del Plata
+  5,145 → **3,409**; Miami 867 → **2,988**; blocked 1,551 → **1,166**.
+  **1,736 already-contactable contacts change postal address** (MX 575, CO 389,
+  CL 244, UY 208, EC 119, CR 78, BR 35, PE 29, PY 23, PA 11, GT 8, SV 5, VE 5,
+  HN 2, DO/NI/BO 1 each); **385 newly unblocked** (ES 133, IE 61, IT 45, UK 30,
+  DE 29, FR 14, IL 9, PL 7, NL 6, long tail).
+- **Compliance address/language split — PR 1 of 2 shipped, PR 2 open.**
+  `MarketKey` (`src/lib/hiring/markets.ts:14-15`) decided the postal address, the
+  draft language AND the hiring signal at once, so the owner's rules above cannot
+  be expressed with it. PR 1 (#373, main `18543352`) added the pure resolver
+  `src/lib/sequences/complianceAudience.ts` — inert, nothing imports it yet.
+  Country recognition is enumerated from `Intl.DisplayNames` over every ISO
+  region in `en` and `es` (251 regions), never a hand-written list; only POLICY is
+  written out (the 21 Spanish-speaking states, and the embargoed jurisdictions).
+  **Cuba, Iran, North Korea and Syria HOLD rather than taking the Miami
+  address**: a US-entity postal footer on mail to an embargoed jurisdiction is a
+  sanctions question the owner has not answered, and holding is reversible.
+  PR 2 must switch EVERY caller at once (picker, add guard, draft, release,
+  unsubscribe) — admission differs from `recipientMarket` for Spain, for
+  sanctioned countries and for a Georgia phone — and must rebuild the SQL
+  pre-filters, because `phoneCallingCodeGroups` (`src/lib/sequences/phoneMarket.ts:63`)
+  and the picker's blocked clause are built from the latam/us lists and would
+  HIDE phone-only contacts the resolver now admits (Thailand). The picker
+  FILTERS on the blocked flag rather than only ordering by it, so a hidden row is
+  invisible with no badge.
+- **Disclosed consequences of #372, carried forward (not defects):** a contact's
+  market can now change over time — if a company's postings close, a no-country
+  contact with a `+54` phone flips from held to `latam`, so a reminder can be
+  Spanish/Mar del Plata on a thread whose step 1 was English/Hallandale. The SEND
+  is protected (`src/lib/sequences/preSendChecks.ts:94` re-checks `bodyHasFooter`
+  against the recomputed market, so a mismatch holds as `missing_footer` rather
+  than mailing a wrong address). The UNSUBSCRIBE PAGE is not: it recomputes at
+  view time (`src/lib/sequences/unsubscribeQueries.ts:117-132`) and can show a
+  different address than the one already mailed. Separately, #372 unified four
+  readers onto the picker's company-country rule, replacing an arbitrary
+  `... or company_key in (alias) limit 1` pick, so contacts whose own and
+  canonical company countries differ can get a different footer than before.
+- **Pre-existing gaps found while mapping the market (2026-10-20), NOT fixed:**
+  the seed path never sets `marketMapped` (`src/lib/sequences/seedQueries.ts:111-121`),
+  so `staticRosterRejection` cannot return `unmapped_market` there and the only
+  gate is draft time; `approvalQueries.ts` has no market or footer check at all;
+  and the unsubscribe page is hard-wired to English
+  (`src/lib/sequences/unsubscribeHtml.ts:13`), so a Spanish email links to an
+  English page. Also: `person.country` can only ever hold "United States" or one
+  of the 15 LATAM country names, because `splitLocation`
+  (`src/lib/contacts/locationSplit.ts:21`) writes a country only when the last
+  token passes `isKnownCountryName` (`src/lib/hiring/markets.ts:437-441`) — so a
+  contact created from "Madrid, Spain" stores `city = "Madrid, Spain"` and no
+  country, and European contacts are reachable only through their company's
+  country.
+- **`tests/db/gmailFleet.test.ts:192` flakes in PARALLEL runs on `main`** (6 of 7
+  runs measured 2026-10-20). Pre-existing, unrelated to the sequences work. The
+  serial run is green. A fleet-wide count that other test files perturb.
+- **A constants edit in `src/lib/hiring/markets.ts` is a PRODUCTION DATA
+  MIGRATION.** `src/lib/hiring/sync.ts:123` upserts `market = excluded.market`,
+  so adding a country name makes the next daily hiring sync rewrite the stored
+  `market` of every existing `job_posting` row in that place. A change adding El
+  Salvador, Honduras, Nicaragua and Puerto Rico was reverted out of #372 for this
+  reason (plus: it unblocked an unmeasured population through `person.country`
+  directly, and asserted in a comment that an English draft is correct for a
+  Puerto Rican recipient, which is an owner decision). It must return as its own
+  change, with a before/after count and the owner's OK. Cost accepted meanwhile:
+  `+503`/`+504`/`+505` phones and Puerto Rico contacts stay blocked, ~8 contacts.
 - **Flaky e2e (noted 2026-10-20):** `tests/e2e/scheduled-send.spec.ts` "a reply
   puts the row on hold… Enviar igual" (:429) and "a dead-token row… Enviar ahora
   waits for the reconnection" (:452) fail intermittently on the first
