@@ -16,11 +16,11 @@ import { miamiCalendarDate } from "./miamiTime";
 import { canTransition, type MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 
-export type CardKind = "draft" | "noDraft" | "approved" | "sent" | "reminderToday" | "noReply" | "replied" | "discarded";
+export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" | "reminderToday" | "noReply" | "replied" | "discarded";
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
   | "generate" | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
-  | "viewDraft" | "viewReminder" | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
+  | "viewDraft" | "viewReminder" | "change" | "sendNow" | "cancelSchedule" | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
 export type CardFacts = {
@@ -31,6 +31,8 @@ export type CardFacts = {
   reminderDueAt: Date | null;
   florida: boolean;
   discardReason: string | null;
+  /** Approved only: the BD chose the moment ("scheduled") or it follows the cadence (approvedMoment.ts). Unknown reads as the cadence. */
+  approvedMode?: "cadence" | "scheduled";
 };
 
 export type CardView = {
@@ -70,7 +72,13 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
       if (!f.hasDraft) return { ...base, kind: "noDraft", tone: "neutral", actions: [act("generate", "primary")], menu: ["openContact", "remove"] };
       return { ...base, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
     case "approved":
-      return { ...base, kind: "approved", tone: "brand", actions: [act("viewEmail", "ghost"), act("cancel", "secondary")] };
+      // "Cambiar" and "Enviar ahora" are on both approved cards (send-now-or-schedule); only the cancel wording differs.
+      return {
+        ...base,
+        kind: f.approvedMode === "scheduled" ? "scheduled" : "approved",
+        tone: "brand",
+        actions: [act("viewEmail", "ghost"), act("change", "secondary"), act("sendNow", "secondary"), act(f.approvedMode === "scheduled" ? "cancelSchedule" : "cancel", "ghost")],
+      };
     case "sent":
       return reminderDue(f, now)
         ? { ...base, kind: "reminderToday", tone: "warn", actions: [act("reviewReminder", "secondary"), act("approve", "primary")] }

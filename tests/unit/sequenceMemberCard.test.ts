@@ -33,12 +33,14 @@ test("the Florida outline is a drafted-only badge, as in the mockup", () => {
   }
 });
 
-test("approved: brand badge, view the email or cancel the send", () => {
+test("approved: brand badge, view the email, change it, send it now or cancel the send", () => {
   const c = mapMemberCard(facts({ state: "approved" }), NOW);
   assert.deepEqual([c.kind, c.tone], ["approved", "brand"]);
   assert.deepEqual(c.actions, [
     { id: "viewEmail", style: "ghost" },
-    { id: "cancel", style: "secondary" },
+    { id: "change", style: "secondary" },
+    { id: "sendNow", style: "secondary" },
+    { id: "cancel", style: "ghost" },
   ]);
 });
 
@@ -104,7 +106,7 @@ test("every hold reason reaches the card, in every state", () => {
 });
 
 test("a held approved member can still be cancelled", () => {
-  assert.deepEqual(ids(mapMemberCard(facts({ state: "approved", holdReason: "sync_stale" }), NOW)), ["viewEmail", "cancel"]);
+  assert.deepEqual(ids(mapMemberCard(facts({ state: "approved", holdReason: "sync_stale" }), NOW)), ["viewEmail", "change", "sendNow", "cancel"]);
 });
 
 test("a drafted member with no draft offers neither review nor approve, only its own Generar borrador", () => {
