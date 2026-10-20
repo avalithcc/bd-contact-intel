@@ -22,6 +22,7 @@ import { buildSequenceDraftInput, draftLanguageForMarket, draftSignals, senderId
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
 import { recipientMarket } from "./recipientMarket";
+import { companyCountrySql } from "./rosterQuery";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
 import { openPostingSql } from "@/lib/hiring/openPosting";
@@ -46,13 +47,17 @@ type Row = Record<string, unknown>;
 const rowsOf = <T>(r: unknown) => r as T[];
 const sameCompany = sql`(jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
+/**
+ * The company country comes from `companyCountrySql`, the one rule the picker and the add guard also use (own company row,
+ * then the canonical one, blank counting as missing). The older `... or ... in (alias) limit 1` returned an arbitrary row of
+ * the two, so this path, which writes the footer, could disagree with the picker and put the wrong region's address in the body.
+ */
 async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   const [r] = rowsOf<Row>(
     await db.execute(sql`
       select sm.state, sm.hold_reason, sm.sequence_id::text, p.id::text as person_id, p.email, p.first_name, p.last_name,
-             p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, b.name as sender_name,
-             (select c.country from company c where c.company_key = p.company_key
-                or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1) as company_country,
+             p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, p.mobile_phone, p.phone, b.name as sender_name,
+             ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp
                 where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany}), '[]'::json) as posting_markets,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
@@ -67,6 +72,8 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   );
   if (!r) return null;
   const market: MarketKey = recipientMarket({
+    mobilePhone: r.mobile_phone as string | null,
+    phone: r.phone as string | null,
     personCountry: r.person_country as string | null,
     companyCountry: r.company_country as string | null,
     postingMarkets: r.posting_markets as string[],

@@ -11,8 +11,9 @@
  * address. It only ORDERS (blocked last) and FILTERS (hidden by default); the reason a row shows still comes from the
  * JS admission (pickerView.staticBlock), the same one addMembersToSequence re-runs, so a mismatch here can only mis-order.
  *
- * The recipient market is recipientMarket() (person country, company country, then open posting markets). SQL cannot
- * run classifyMarket, so the countries it classes as unmapped / US come in as a list built by `countryFacts`.
+ * The recipient market is recipientMarket() (person country, company country, open posting markets, then the phone's dial
+ * code). SQL cannot run classifyMarket, so the countries it classes as unmapped / US come in as a list built by
+ * `countryFacts`, and the dial codes that have a footer come in as one prefix pattern built by `phoneFooterPattern`.
  */
 import { sql, type SQL } from "drizzle-orm";
 import { FLORIDA_PHRASES, FLORIDA_TOKENS, classifyMarket } from "@/lib/hiring/markets";
@@ -20,7 +21,8 @@ import { openFreshPostingSql, openPostingSql } from "@/lib/hiring/openPosting";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { isMarketMapped } from "./draftCompose";
 import { PICKER_PAGE_SIZE, searchTokens, type PickerQuery } from "./pickerFilters";
-import { recipientMarket } from "./recipientMarket";
+import { phoneCallingCodeGroups } from "./phoneMarket";
+import { marketOfCountry, recipientMarket } from "./recipientMarket";
 import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql, firstFilledCountry } from "./rosterQuery";
 
 /** Lower-cased, trimmed country strings by what the compliance footer can do with them. */
@@ -38,10 +40,67 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
   for (const raw of countries) {
     const country = raw.trim().toLowerCase();
     if (!country) continue;
-    if (!isMarketMapped(recipientMarket({ personCountry: country }))) unmapped.add(country);
+    if (!isMarketMapped(recipientMarket({ mobilePhone: null, phone: null, personCountry: country }))) unmapped.add(country);
     else if (classifyMarket(country) === "us") us.add(country);
   }
   return { unmapped: [...unmapped], us: [...us] };
+}
+
+/**
+ * The fewest digits (calling code included) a phone must carry before the SQL link may match it. A floor against garbage,
+ * not a validity check: production holds a few hundred phone values the normalization pass flagged invalid or not-valid
+ * (`+5491`, `+54`...), and without a floor any of them on a no-country contact would match its country prefix and surface
+ * in the default view. DERIVED, not guessed, by brute force: random national numbers fed to libphonenumber's `isValid()` for
+ * every mapped country, keeping the shortest that validates. The shortest REAL subscriber numbers are Paraguay at 9 digits and
+ * then 10 (Panama 507+7, Brazil, Colombia, Peru). 8 sits one below Paraguay's 9, so the floor cannot clip a real
+ * SUBSCRIBER number; the unit test asserts it against every country's example number.
+ *
+ * KNOWN COST, measured and accepted: `isValid()` also accepts a few 7-digit Uruguayan non-subscriber specials
+ * (`+5982000`, four national digits). Those fail the floor, so SQL calls the row blocked while JS would admit it — the
+ * SEVERE direction, a row hidden from the default view with no badge to explain it. Accepted because no person answers
+ * one of those numbers, and dropping the floor to 7 would re-admit the `+5491` garbage the floor exists to keep out. Do
+ * not lower it without something that separates those two cases.
+ *
+ * The search gave the same answer under the `min` metadata that phoneMarket.ts imports and under `max`
+ * (phoneNormalize.ts uses `max`), so the variant does not move the floor. The lookahead counts DIGITS only: a `+` in the
+ * class would let `+54+++++` clear it. There is no upper bound: an extension only lengthens a number JS accepts.
+ */
+export const PHONE_MIN_LENGTH = 8;
+
+/**
+ * Postgres ARE for the fourth link of recipientMarket: a phone whose dial code lands in a market WITH a footer. Built in JS
+ * from the same classification (phoneCallingCodeGroups), because SQL has no libphonenumber. Anchored on the `+` of the
+ * stored E.164 value; calling codes are prefix-free, so a prefix test never confuses two countries.
+ *
+ * LATAM is listed before US on purpose: `+1` is shared, and the only LATAM-under-+1 country is the Dominican Republic
+ * (`1809|1829|1849`) while the US/Canada are bare `1`. Testing the longer LATAM-specific prefixes first is the longest-match
+ * rule without a per-row lookup. As this only asks "has a footer" the order does not change the boolean today, but it is
+ * the order any caller that needs the MARKET (not just the flag) must keep.
+ *
+ * An empty prefix list (a runtime whose ICU cannot name regions classifies every country `other`) yields `(?!)`, which
+ * matches nothing: a bare `^\+()` would admit every number that starts with a plus.
+ *
+ * RESIDUAL, on purpose: SQL cannot say `isValid()`. A number that clears the length floor can still be malformed, and bare
+ * `1` also covers NANP countries with no footer (Jamaica, the Bahamas, Trinidad, Guam...). Those rows CAN appear in the
+ * default view, badged `unmappedMarket` by the JS admission, and the add guard (`staticRosterRejection`) refuses them. That
+ * is the tolerable direction: a usable row is never hidden and an unusable one is never added, it just shows with its reason.
+ * Fixing it would take a negative area-code list that rots, so it is left. The reverse (SQL hiding a row JS would allow)
+ * is guarded by the length floor and `phoneDigits` and pinned by the all-countries example test, with one measured
+ * exception named on PHONE_MIN_LENGTH: Uruguayan 7-digit specials fall below the floor.
+ */
+export function buildPhoneFooterPattern(groups: { latam: readonly string[]; us: readonly string[] }): string {
+  const prefixes = [...groups.latam, ...groups.us];
+  if (!prefixes.length) return "(?!)";
+  return `^\\+(?=[0-9]{${PHONE_MIN_LENGTH},})(${prefixes.join("|")})`;
+}
+
+let footerPatternCache: string | null = null;
+/**
+ * Computed once per server instance: ~240 region-name lookups and classifications to produce a constant. The cache is not
+ * observable through behaviour (the value is identical either way), so it has no test; it is a plain `??=`.
+ */
+export function phoneFooterPattern(): string {
+  return (footerPatternCache ??= buildPhoneFooterPattern(phoneCallingCodeGroups(marketOfCountry)));
 }
 
 /** Postgres ARE: substring phrases plus the bare `fl` as a whole word (never inside "Flores"). */
@@ -95,9 +154,36 @@ const suppressedSql = sql`(lower(btrim(p.email)) in (select s.value from email_s
 const homeInFlorida = (f: CountryFacts) =>
   sql`((${effectiveCountry} is null or lower(${effectiveCountry}) = any(${textArray(f.us)})) and concat_ws(' ', p.city, p.region) ~* ${floridaGeoPattern()})`;
 
+/**
+ * A phone reduced to `+` and ASCII digits. libphonenumber-js reads three digit scripts as digits (fullwidth, Arabic-Indic,
+ * Extended Arabic-Indic; checked, Devanagari and Thai it does not), so a stored `+１ 305 555 1234` is a valid number for the
+ * JS resolver. They are folded to ASCII with `translate` first, then everything else is stripped; without the fold the
+ * strip would drop those digits, the prefix anchor would fail and the picker would hide a row JS allows. The fullwidth `＋`
+ * is NOT folded because libphonenumber-js does not accept it as a plus either. One `translate` per phone column per row.
+ */
+export const DIGIT_SCRIPTS = [0xff10, 0x0660, 0x06f0].map((zero) => Array.from({ length: 10 }, (_, d) => String.fromCodePoint(zero + d)).join("")).join("");
+export const ASCII_DIGITS_FOR_SCRIPTS = "0123456789".repeat(3);
+const phoneDigits = (col: string) =>
+  sql.raw(`regexp_replace(translate(coalesce(${col}, ''), '${DIGIT_SCRIPTS}', '${ASCII_DIGITS_FOR_SCRIPTS}'), '[^0-9+]', '', 'g')`);
+/** The same normalization as `phoneDigits`, in JS, built from the same constants: the model of the SQL the unit tests use. */
+export const normalizePhoneLikeSql = (value: string): string =>
+  [...value].map((ch) => { const i = DIGIT_SCRIPTS.indexOf(ch); return i < 0 ? ch : ASCII_DIGITS_FOR_SCRIPTS[i]; }).join("").replace(/[^0-9+]/g, "");
+
+/**
+ * The fourth link: either phone starts with a dial code that has a footer. Non-digits are stripped first (libphonenumber
+ * tolerates spaces, dashes and brackets, a `+54 (9) 11` would otherwise miss the anchor). Two regex tests on columns of the
+ * row itself: no subquery, no join, nothing per row beyond the row. Either phone, not "mobile first": a superset of the
+ * JS pick, which is the safe direction (see phoneFooterPattern).
+ */
+const phoneHasFooter = () => {
+  const pattern = phoneFooterPattern();
+  return sql`(${phoneDigits("p.mobile_phone")} ~ ${pattern} or ${phoneDigits("p.phone")} ~ ${pattern})`;
+};
+
 function blockedSql(f: CountryFacts): SQL {
-  // A country decides its market alone; only without one do the postings: exactly one of us / latam is a market.
-  const unmapped = sql`case when ${effectiveCountry} is not null then lower(${effectiveCountry}) = any(${textArray(f.unmapped)}) else ${either("posts_us")} = ${either("posts_latam")} end`;
+  // A country decides its market alone; only without one do the postings (exactly one of us / latam is a market), and only
+  // when those do not either does the phone's dial code (recipientMarket's last link).
+  const unmapped = sql`case when ${effectiveCountry} is not null then lower(${effectiveCountry}) = any(${textArray(f.unmapped)}) else (${either("posts_us")} = ${either("posts_latam")} and not ${phoneHasFooter()}) end`;
   return sql`coalesce((
     p.email_status in ('none', 'bounced')
     or (p.email_source = 'pattern_inferred' and p.email_status <> 'verified')
@@ -137,7 +223,7 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
     select p.id::text as person_id, p.first_name, p.last_name, p.email, p.email_status, p.email_source, p.job_title, p.status,
            ${companyNameColumnsSql}, p.company_key, p.merged_into_id::text as merged_into_id, ${clientStatus} as client_status,
            ${hireCount}::int as open_it, (${postingFlorida} or ${homeInFlorida(facts)}) as is_florida,
-           ${suppressedSql} as suppressed, p.country as person_country, ${companyCountry} as company_country,
+           ${suppressedSql} as suppressed, p.country as person_country, p.mobile_phone, p.phone, ${companyCountry} as company_country,
            array_remove(array[case when ${either("posts_us")} then 'us' end, case when ${either("posts_latam")} then 'latam' end], null) as posting_markets
     from person p
     ${canonicalCompanyJoinSql}

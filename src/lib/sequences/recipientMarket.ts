@@ -9,15 +9,27 @@
  *      posting still locates the recipient. A Contact is seeded because the company had a FRESH posting, but may later
  *      have no country and no fresh posting; the open one still resolves the market. A company whose postings all
  *      closed yields no markets and falls to `other` (hold).
+ *   4. the dial code of the person's phone (phoneMarket.ts), consulted LAST and only when no country at all resolved and
+ *      the postings did not decide. Last on purpose: a contact that resolves a market today through links 1-3 can never
+ *      change market because of a phone. Never stored; see phoneMarket.ts for why person.country is not written.
  *
  * A link "has data" when its value is non-empty. A country that is present but unmapped (e.g. Spain) DECIDES `other`
  * and does not fall through: the person is known to be somewhere we have no address for, and guessing from a posting
  * would put the wrong country's address in the message. Link 3 only resolves when its non-`other` markets agree;
- * none, or a us/latam conflict, is `other`. `other` is the hold-and-do-not-send result, never a default address.
+ * none, or a us/latam conflict, is `other`. `other` is the hold-and-do-not-send result, never a default address. The same holds
+ * for link 4: it is reached only when there is no country, so a Spanish contact with an Argentine phone stays `other`.
  */
 import { classifyMarket, isMarketKey, type MarketKey } from "@/lib/hiring/markets";
+import { phoneCountryName } from "./phoneMarket";
 
+/**
+ * The two phone fields are REQUIRED (null when the person has none), unlike the country links. This resolver is the one rule
+ * the picker, the add guard, the draft, the release and the unsubscribe page must share; an optional field would let one of
+ * them skip the phone and disagree with the others about who gets a footer. Required, the compiler lists every caller.
+ */
 export interface MarketInputs {
+  readonly mobilePhone: string | null;
+  readonly phone: string | null;
   readonly personCountry?: string | null;
   readonly companyCountry?: string | null;
   /** job_posting.market of the company's open IT postings; null where the backfill has not run. */
@@ -33,7 +45,7 @@ export interface MarketInputs {
  */
 const CANADA = /^canada$/i;
 
-function fromCountry(country: string): MarketKey {
+export function marketOfCountry(country: string): MarketKey {
   const market = classifyMarket(country);
   return market === "other" && CANADA.test(country) ? "us" : market;
 }
@@ -48,8 +60,11 @@ function fromPostings(markets: readonly (string | null)[] | null | undefined): M
 
 export function recipientMarket(input: MarketInputs): MarketKey {
   const person = input.personCountry?.trim();
-  if (person) return fromCountry(person);
+  if (person) return marketOfCountry(person);
   const company = input.companyCountry?.trim();
-  if (company) return fromCountry(company);
-  return fromPostings(input.postingMarkets);
+  if (company) return marketOfCountry(company);
+  const posted = fromPostings(input.postingMarkets);
+  if (posted !== "other") return posted;
+  const phoneCountry = phoneCountryName(input.mobilePhone, input.phone);
+  return phoneCountry ? marketOfCountry(phoneCountry) : "other";
 }

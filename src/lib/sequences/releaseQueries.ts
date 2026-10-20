@@ -23,6 +23,7 @@ import { miamiCalendarDate } from "./miamiTime";
 import { assertTransition } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { recipientMarket } from "./recipientMarket";
+import { companyCountrySql } from "./rosterQuery";
 import { generateReminderDraft } from "./draftQueries";
 import { parseSchedule, reminderDueAt } from "./schedule";
 import { pickReleaseKeys, releaseInstant, type SlimRow } from "./releaseSelection";
@@ -64,7 +65,7 @@ function toCandidate(r: Row): ReleaseCandidate {
     accountId: r.account_id as string, dailyCap: Number(r.daily_send_cap), step, dueAt, approvedAt, schedule,
     memberState: r.state as string, draftApproved: true, repliedAt: toDate(r.replied_at), inboundReplyAt: toDate(r.inbound_reply_at), holdReason: (r.hold_reason ?? null) as HoldReason | null,
     email: (r.email ?? null) as string | null, merged: Boolean(r.merged), hasClientStatus: Boolean(r.has_client_status),
-    market: recipientMarket({ personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] }),
+    market: recipientMarket({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] }),
     subject: r.subject as string, body: r.body as string, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
     lastSyncedAt: toDate(r.last_synced_at), activeClaim: (r.active_claim ?? null) as "pending" | "sent" | null, activeClaimAt: toDate(r.active_claim_at),
     step1RfcMessageId: (r.step1_rfc ?? null) as string | null, step1ThreadId: (r.step1_thread ?? null) as string | null,
@@ -118,8 +119,8 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, s
     await db.execute(sql`
       select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
              s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
-             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country,
-             (select c.country from company c where ${sameCompany} limit 1) as company_country,
+             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country, p.mobile_phone, p.phone,
+             ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
                 and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets,
              exists (select 1 from company c where ${sameCompany} and c.client_status is not null) as has_client_status,

@@ -414,10 +414,14 @@ test("the cap cuts by the release instant (reminderReleaseAt), and says so when 
   const late = { state: "sent", step: 2 as const, reminderDueAt: new Date("2026-10-11T13:00:00Z"), approvedAt: new Date("2026-10-09T20:00:00Z") };
   const ma = await mkMember(a, "order-a", early);
   const mb = await mkMember(a, "order-b", late);
-  const one = await loadReleaseCandidates(NOW, 1);
+  // Scoped to these two members: the read is otherwise global, and another test file's approved reminder due at the SAME
+  // instant as B (2026-10-11T13:00Z, e.g. sequenceReplies) wins the cap of 1 whenever the files overlap, which only
+  // depends on how the runner schedules them. The ordering under test is between A and B, not against the whole database.
+  const scope = { memberIds: [ma.memberId, mb.memberId], ownerBdId: a.bdId };
+  const one = await loadReleaseCandidates(NOW, 1, scope);
   assert.deepEqual(one.candidates.map((c) => c.id), [mb.memberId], "B releases first");
   assert.equal(one.truncated, true);
-  const many = await loadReleaseCandidates(NOW, 1000);
+  const many = await loadReleaseCandidates(NOW, 1000, scope);
   assert.equal(many.truncated, false);
   const mine = many.candidates.filter((c) => c.id === ma.memberId || c.id === mb.memberId);
   assert.equal(mine.find((c) => c.id === ma.memberId)!.dueAt.toISOString(), "2026-10-13T13:00:00.000Z", "dueAt comes from the same helper as the ordering");
