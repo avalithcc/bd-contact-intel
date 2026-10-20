@@ -4,7 +4,7 @@ import { localeForMessageLanguage } from "@/lib/outreach/messageLanguage";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
 import { unsubscribePageAudience } from "@/lib/sequences/unsubscribePageAudience";
 import { pageLocale, renderUnsubscribeHtml } from "@/lib/sequences/unsubscribeHtml";
-import { handleUnsubscribeGetRequest, handleUnsubscribePostRequest, unsubscribeDocument } from "@/lib/sequences/unsubscribeRequest";
+import { handleUnsubscribeGetRequest, handleUnsubscribePostRequest, renderUnsubscribePage, unsubscribeDocument, type UnsubscribeRequestDeps } from "@/lib/sequences/unsubscribeRequest";
 import type { UnsubscribePort, UnsubscribeView } from "@/lib/sequences/unsubscribeHandlers";
 import { generateUnsubscribeToken } from "@/lib/sequences/unsubscribeToken";
 
@@ -79,40 +79,58 @@ test("MessageLanguage narrows to a page locale totally: pt is English by the own
   assert.equal(localeForMessageLanguage("pt"), "en");
 });
 
-function requestDeps(locale: "es" | "en") {
+function requestDeps(locale: "es" | "en", audienceFor: UnsubscribeRequestDeps["audienceFor"] = async () => ({ postalAddress: ADDRESS, locale })): UnsubscribeRequestDeps {
   const port: UnsubscribePort = {
     findToken: async () => ({ email: EMAIL }),
     suppressByToken: async () => ({ email: EMAIL }),
   };
-  return {
-    port,
-    audienceFor: async () => ({ postalAddress: ADDRESS, locale }),
-    render: (view: UnsubscribeView, page?: { postalAddress?: string; locale: "es" | "en" }) =>
-      unsubscribeDocument(renderUnsubscribeHtml(view, page), "", page?.locale ?? "en"),
-  };
+  // The production wiring (route.ts) is exactly this: the page function with the stylesheet.
+  return { port, audienceFor, render: (view, page) => renderUnsubscribePage(view, page, "") };
 }
 
+const getPage = (query: string, deps: UnsubscribeRequestDeps) => handleUnsubscribeGetRequest(new Request(`https://example.test/api/unsubscribe${query}`), deps);
+const postPage = (deps: UnsubscribeRequestDeps) =>
+  handleUnsubscribePostRequest(
+    new Request(`https://example.test/api/unsubscribe?t=${TOKEN}`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "List-Unsubscribe=One-Click" }),
+    deps,
+  );
+
 test("GET and POST both render in the token's language, document language included", async () => {
-  const got = await handleUnsubscribeGetRequest(new Request(`https://example.test/api/unsubscribe?t=${TOKEN}`), requestDeps("es"));
-  const gotHtml = await got.text();
+  const gotHtml = await (await getPage(`?t=${TOKEN}`, requestDeps("es"))).text();
   assert.match(gotHtml, /<html lang="es">/);
   assert.match(gotHtml, /Sí, darme de baja/);
-  const posted = await handleUnsubscribePostRequest(
-    new Request(`https://example.test/api/unsubscribe?t=${TOKEN}`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "List-Unsubscribe=One-Click" }),
-    requestDeps("es"),
-  );
-  const postedHtml = await posted.text();
+  const postedHtml = await (await postPage(requestDeps("es"))).text();
   assert.match(postedHtml, /<html lang="es">/);
   assert.match(postedHtml, /Te diste de baja/);
 });
 
-test("an invalid token is English with lang=en and never asks for an audience", async () => {
+test("an English audience: lang=en and English copy on both screens", async () => {
+  const gotHtml = await (await getPage(`?t=${TOKEN}`, requestDeps("en"))).text();
+  assert.match(gotHtml, /<html lang="en">/);
+  assert.match(gotHtml, /Yes, unsubscribe me/);
+  const postedHtml = await (await postPage(requestDeps("en"))).text();
+  assert.match(postedHtml, /<html lang="en">/);
+  assert.match(postedHtml, /You&#39;re unsubscribed|You're unsubscribed/);
+});
+
+test("an invalid token is English with lang=en, 404, no address, and never asks for an audience", async () => {
   let asked = 0;
-  const deps = { ...requestDeps("es"), audienceFor: async () => (asked++, undefined) };
-  const res = await handleUnsubscribeGetRequest(new Request("https://example.test/api/unsubscribe?t=short"), deps);
+  const res = await getPage("?t=short", requestDeps("es", async () => (asked++, { postalAddress: ADDRESS, locale: "es" })));
   const html = await res.text();
   assert.equal(res.status, 404);
   assert.match(html, /<html lang="en">/);
   assert.match(html, /This link is no longer valid/);
+  assert.doesNotMatch(html, /help center mt-md|válido/);
   assert.equal(asked, 0);
+});
+
+test("Mexico through the full wiring: Miami address with Spanish copy and lang=es", async () => {
+  const mexico = unsubscribePageAudience({ mobilePhone: null, phone: null, personCountry: "Mexico" });
+  assert.ok(mexico);
+  const html = await (await getPage(`?t=${TOKEN}`, requestDeps("es", async () => mexico))).text();
+  const miami = COMPLIANCE_CONFIG.miami?.postalAddress;
+  assert.ok(miami);
+  assert.match(html, /<html lang="es">/);
+  assert.match(html, /Sí, darme de baja/);
+  assert.ok(html.includes(miami.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`)));
 });

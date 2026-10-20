@@ -1,9 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { unstable_rethrow } from "next/navigation";
-import { pageLocale, renderUnsubscribeHtml } from "@/lib/sequences/unsubscribeHtml";
 import { unsubscribeAudienceForToken, unsubscribePort } from "@/lib/sequences/unsubscribeQueries";
-import { handleUnsubscribeGetRequest, handleUnsubscribePostRequest, unsubscribeDocument, type UnsubscribeRequestDeps } from "@/lib/sequences/unsubscribeRequest";
+import { handleUnsubscribeGetRequest, handleUnsubscribePostRequest, renderUnsubscribePage, type UnsubscribeRequestDeps } from "@/lib/sequences/unsubscribeRequest";
 
 /**
  * The public unsubscribe link (outreach-sequences D6). Session-exempt in src/lib/auth/sessionExemptRoutes.ts: the
@@ -46,7 +45,7 @@ function css(): string {
 const deps: UnsubscribeRequestDeps = {
   port: unsubscribePort,
   audienceFor: unsubscribeAudienceForToken,
-  render: (view, page) => unsubscribeDocument(renderUnsubscribeHtml(view, page), css(), pageLocale(view, page)),
+  render: (view, page) => renderUnsubscribePage(view, page, css()),
 };
 
 export const GET = (request: Request) => handleUnsubscribeGetRequest(request, deps);

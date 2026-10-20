@@ -35,7 +35,12 @@ export function pageLocale(view: UnsubscribeView, page?: UnsubscribePageAudience
 
 /** `page` is the recipient's compliance audience (postal address from the compliance config, and email language); the invalid page never shows an address. */
 export function renderUnsubscribeHtml(view: UnsubscribeView, page?: UnsubscribePageAudience): string {
-  const copy = t(pageLocale(view, page)).sequenceUnsubscribe;
+  return renderUnsubscribeMarkup(view, page, pageLocale(view, page));
+}
+
+/** The markup in an already-decided `locale`. Production goes through `renderUnsubscribePage`, which decides it once. */
+export function renderUnsubscribeMarkup(view: UnsubscribeView, page: UnsubscribePageAudience | undefined, locale: Locale): string {
+  const copy = t(locale).sequenceUnsubscribe;
   const postalAddress = page?.postalAddress;
   switch (view.kind) {
     case "confirm":

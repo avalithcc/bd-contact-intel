@@ -14,6 +14,7 @@ import {
   type UnsubscribeView,
 } from "./unsubscribeHandlers";
 import type { UnsubscribePageAudience } from "./unsubscribePageAudience";
+import { pageLocale, renderUnsubscribeMarkup } from "./unsubscribeHtml";
 import { hashUnsubscribeToken, isWellFormedUnsubscribeToken } from "./unsubscribeToken";
 
 export interface UnsubscribeRequestDeps {
@@ -34,6 +35,15 @@ const HEADERS = {
 /** `locale` is the page's language (`pageLocale`), so a screen reader pronounces the copy in the right language. */
 export function unsubscribeDocument(bodyHtml: string, css: string, locale: Locale): string {
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>avalith.</title><style>${css}</style></head><body>${bodyHtml}</body></html>`;
+}
+
+/**
+ * The finished document for a view: the ONE place the page language is decided. `pageLocale` is called once and its
+ * value feeds both the copy and `<html lang>`, so they cannot be given different locales (there is no second parameter).
+ */
+export function renderUnsubscribePage(view: UnsubscribeView, page: UnsubscribePageAudience | undefined, css: string): string {
+  const locale = pageLocale(view, page);
+  return unsubscribeDocument(renderUnsubscribeMarkup(view, page, locale), css, locale);
 }
 
 async function respond(view: UnsubscribeView, token: string | null | undefined, deps: UnsubscribeRequestDeps): Promise<Response> {
