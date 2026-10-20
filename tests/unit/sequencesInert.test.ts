@@ -130,6 +130,8 @@ test("no other file in src imports the runner or its ports (no indirect path to 
   const allowed = new Set([
     "src/lib/sequences/runSequenceRelease.ts",
     "src/lib/sequences/releaseQueries.ts",
+    // "Enviar ahora": the same runner narrowed to the members just approved. See the test below for who may import it.
+    "src/lib/sequences/releaseNow.ts",
     "src/app/api/sequences/run/route.ts",
     // Names the RunSummary TYPE only (asserted below): erased at compile time, so it is no path to a send.
     "src/lib/sequences/runHandler.ts",
@@ -147,4 +149,14 @@ test("the one other allowed importer, the run handler, imports the runner as a t
   const imports = [...handler.matchAll(/^import .*["']\.\/(?:runSequenceRelease|releaseQueries)["'];?$/gm)].map((m) => m[0]);
   assert.ok(imports.length > 0);
   for (const line of imports) assert.match(line, /^import type /, line);
+});
+
+test("the immediate release (releaseNow) is reachable from exactly one file under src/app: the Sequence actions", () => {
+  const importers = walk(APP)
+    .filter((f) => /\.(ts|tsx)$/.test(f))
+    .filter((f) => /["'`](?:@\/lib\/sequences\/|(?:\.{1,2}\/)+(?:[\w.-]+\/)*)releaseNow["'`]/.test(readFileSync(f, "utf8")))
+    .map(rel);
+  assert.deepEqual(importers, ["src/app/(app)/sequences/actions.ts"]);
+  const source = read("src", "lib", "sequences", "releaseNow.ts");
+  assert.match(source, /scopedRunnerPorts/, "narrowed to the given members");
 });

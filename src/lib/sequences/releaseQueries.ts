@@ -31,6 +31,11 @@ import { listSuppressionRules } from "./suppressionQueries";
 import { openPostingSql } from "@/lib/hiring/openPosting";
 
 const MAX_CANDIDATES = 500;
+/** The members an immediate release may look at, and whose Sequences they must belong to. */
+export interface ReleaseScope {
+  memberIds: readonly string[];
+  ownerBdId: string;
+}
 /** Hard bound on the slim scan that precedes the cap. Hitting it is reported as truncation too. */
 const MAX_SCAN = 5000;
 type Row = Record<string, unknown>;
@@ -81,13 +86,16 @@ const dueWhere = (iso: string) => sql`d.approved_at is not null
  * `pickReleaseKeys` then orders the survivors exactly. Cutting the scan by uuid instead, as this first did, means the
  * oldest due member can sit behind lower-uuid members on every single run, permanently if those are held.
  */
-export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES): Promise<{ candidates: ReleaseCandidate[]; truncated: boolean }> {
+export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, scope?: ReleaseScope): Promise<{ candidates: ReleaseCandidate[]; truncated: boolean }> {
   const iso = now.toISOString();
+  if (scope && !scope.memberIds.length) return { candidates: [], truncated: false };
+  // "Enviar ahora": the same read and the same checks, narrowed to the members the BD just approved (and to that BD's own Sequences).
+  const scoped = scope ? sql`and sm.id in (${sql.join(scope.memberIds.map((id) => sql`${id}::uuid`), sql`, `)}) and s.owner_bd_id = ${scope.ownerBdId}::uuid` : sql``;
   const slim = rowsOf<Row>(
     await db.execute(sql`
       select sm.id::text as member_id, d.step, d.scheduled_for, sm.reminder_due_at, d.approved_at, s.schedule
       from sequence_draft d join sequence_member sm on sm.id = d.sequence_member_id join sequence s on s.id = sm.sequence_id
-      where ${dueWhere(iso)}
+      where ${dueWhere(iso)} ${scoped}
       order by coalesce(sm.reminder_due_at, d.scheduled_for), sm.id limit ${MAX_SCAN + 1}`),
   );
   const slimRows: SlimRow[] = slim.slice(0, MAX_SCAN).map((r) => ({
@@ -121,7 +129,7 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES): 
         left join email_message em on em.bd_id = ea.bd_id and em.gmail_message_id = cl.gmail_message_id
         where d.step = 2 and cl.sequence_member_id = sm.id and cl.step = 1 and cl.outcome = 'sent' limit 1
       ) s1 on true
-      where ${dueWhere(iso)}`),
+      where ${dueWhere(iso)} ${scoped}`),
   );
   return { candidates: rows.map(toCandidate), truncated: picked.truncated || slim.length > MAX_SCAN };
 }
@@ -180,6 +188,8 @@ const sameDraft = (c: ReleaseCandidate) =>
  * A reminder additionally needs no recorded reply and a sent step 1 claim.
  */
 export async function claimStep(c: ReleaseCandidate): Promise<string | null> {
+  // A step 1 moved LATER since the candidate was read ("Cambiar") must not go out at the old time.
+  const notMovedLater = c.step === 1 ? sql`and (d.scheduled_for is null or date_trunc('milliseconds', d.scheduled_for) <= ${c.dueAt.toISOString()}::timestamptz)` : sql``;
   const reminderOnly =
     c.step === 2
       ? sql`and sm.replied_at is null and not exists (${genuineReplyAfterSend}) and exists (select 1 from sequence_send_claim s1 where s1.sequence_member_id = sm.id and s1.step = 1 and s1.outcome = 'sent')`
@@ -189,7 +199,7 @@ export async function claimStep(c: ReleaseCandidate): Promise<string | null> {
       insert into sequence_send_claim (sequence_member_id, step, sending_account_id, outcome)
       select sm.id, d.step, ${c.accountId}::uuid, 'pending'
       from sequence_member sm join sequence_draft d on d.sequence_member_id = sm.id and d.step = ${c.step}
-      where sm.id = ${c.id}::uuid and sm.state = ${REQUIRED_STATE[c.step]} and d.approved_at is not null ${sameDraft(c)} ${reminderOnly}
+      where sm.id = ${c.id}::uuid and sm.state = ${REQUIRED_STATE[c.step]} and d.approved_at is not null ${sameDraft(c)} ${notMovedLater} ${reminderOnly}
       on conflict do nothing returning id::text as id`),
   );
   return row?.id ?? null;
@@ -221,9 +231,19 @@ export async function recordSent(c: ReleaseCandidate, claimId: string, sent: { m
   });
 }
 
+/**
+ * The runner's read. A tick with nothing due costs ONE statement (the slim scan): the per-account counts and the
+ * suppression list are only read when there is something to release, so a every-minute cron stays cheap.
+ */
+async function loadForRun(now: Date, scope?: ReleaseScope) {
+  const loaded = await loadReleaseCandidates(now, MAX_CANDIDATES, scope);
+  if (!loaded.candidates.length) return { ...loaded, sentToday: new Map<string, number>(), suppression: [] };
+  return { ...loaded, sentToday: await countSentToday(now), suppression: await listSuppressionRules() };
+}
+
 export const liveRunnerPorts: RunnerPorts = {
   now: () => new Date(),
-  load: async (now) => ({ ...(await loadReleaseCandidates(now)), sentToday: await countSentToday(now), suppression: await listSuppressionRules() }),
+  load: (now) => loadForRun(now),
   setHolds,
   claim: claimStep,
   send: (c, message) => sendGmailMessageFromAccount({ accountId: c.accountId, ...message }),
@@ -231,3 +251,6 @@ export const liveRunnerPorts: RunnerPorts = {
   recordSent,
   draftReminder: async (c) => void (await generateReminderDraft(c.ownerBdId, c.sequenceId, c.id)),
 };
+
+/** The real ports narrowed to some members: what "Enviar ahora" releases right after approval. */
+export const scopedRunnerPorts = (scope: ReleaseScope): RunnerPorts => ({ ...liveRunnerPorts, load: (now) => loadForRun(now, scope) });

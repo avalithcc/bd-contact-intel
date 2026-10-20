@@ -5,7 +5,9 @@ import { runSequenceRelease } from "@/lib/sequences/runSequenceRelease";
 /**
  * Releases approved Sequence emails (outreach-sequences, design D9). Triggered by the two daily Vercel crons in
  * vercel.json (13:00 and 14:00 UTC, so one of them lands at 09:00 Miami whichever side of daylight saving it is) with
- * the same bearer convention as src/app/api/tasks/digest/route.ts. Session-exempt in src/lib/auth/sessionExemptRoutes.ts;
+ * the same bearer convention as src/app/api/tasks/digest/route.ts, and (send-now-or-schedule) every minute by the Supabase pg_cron job in
+ * scripts/sequences-run-cron.sql. The Vercel crons stay as the daily fallback. Every minute is safe: a member is only released through the
+ * at-most-once claim, and an idle tick costs one statement (see loadForRun in releaseQueries.ts). Session-exempt in src/lib/auth/sessionExemptRoutes.ts;
  * authenticated only by CRON_SECRET, so no signed-in user can trigger it.
  *
  * The decisions live in src/lib/sequences/runHandler.ts (auth, status codes, and the log of the whole RunSummary, which
