@@ -75,7 +75,7 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
   const locked = moment?.phase === "locked";
   const lockProps = locked ? { disabled: true, title: l.lockedTitle } : {};
   return (
-    <div className="row wrap" style={{ justifyContent: "flex-end", flex: "none", alignItems: "flex-start" }}>
+    <div className="row wrap" style={{ justifyContent: "flex-end", flex: "none", marginLeft: "auto", alignItems: "flex-start" }}>
       {card.actions.map((a) => {
         if (a.id === "openConversation") return <Link key={a.id} className={`btn btn-${a.style} btn-sm`} href={contactHref}>{l.actions[a.id]}</Link>;
         if (a.id === "generate") return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={generating} onClick={run(a.id)}><GenerateIcon className="icon" />{generating ? l.generating : l.actions[a.id]}</button>;
@@ -150,10 +150,10 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
     : [];
   return (
     <div className="card">
-      <div className="card-body row row-lg">
+      <div className="card-body row row-lg" style={{ flexWrap: "wrap" }}>
         {selection && card.kind === "draft" && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} aria-label={fill(l.selectMember, { name })} />}
         <Avatar id={m.personId} initials={initialsFromName(name)} />
-        <div className="grow stack-sm" style={{ minWidth: 0 }}>
+        <div className="stack-sm" style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="row wrap">
             <Link className="strong" href={`/contacts/${m.personId}`}>{name}</Link>
             <span className={`badge badge-${card.tone}`}>{l.badges[card.kind]}</span>

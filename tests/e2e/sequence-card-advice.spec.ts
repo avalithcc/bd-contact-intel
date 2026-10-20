@@ -81,10 +81,21 @@ for (const width of [1024, 1440]) {
     await chip.hover();
     await expect(page.getByRole('tooltip').filter({ hasText: '¿Seguro?' })).toBeVisible();
 
-    const main = card.locator('.card-body > .grow').first();
-    const [cardBox, mainBox, chipBox] = await Promise.all([card.boundingBox(), main.boundingBox(), chip.boundingBox()]);
-    expect(cardBox && mainBox && chipBox).toBeTruthy();
-    expect(mainBox!.width).toBeGreaterThanOrEqual(cardBox!.width * 0.4);
+    // Screenshot first, so a failing layout assertion still leaves an image.
+    await card.screenshot({ path: `test-results/sequence-card-advice-${width}.png` });
+
+    const main = card.locator('.card-body > div').filter({ has: page.locator('.headline') }).first();
+    const actions = main.locator('xpath=following-sibling::div[1]');
+    const [cardBox, mainBox, chipBox, actionsBox] = await Promise.all([card.boundingBox(), main.boundingBox(), chip.boundingBox(), actions.boundingBox()]);
+    expect(cardBox && mainBox && chipBox && actionsBox).toBeTruthy();
+    // Narrow cards wrap the actions under the member; wide ones keep them on the same row.
+    const wrapped = actionsBox!.y >= mainBox!.y + mainBox!.height - 1;
+    // The avatar and the card padding sit beside the main column, so it cannot reach 90% of the card box; 75% is what a full row gives.
+    if (wrapped) {
+      expect(mainBox!.width).toBeGreaterThanOrEqual(cardBox!.width * 0.75);
+    } else {
+      expect(mainBox!.width).toBeGreaterThanOrEqual(cardBox!.width * 0.4);
+    }
     expect(cardBox!.height).toBeLessThan(260);
     // The chip sits beside the main column, never over it.
     const overlapX = Math.min(mainBox!.x + mainBox!.width, chipBox!.x + chipBox!.width) - Math.max(mainBox!.x, chipBox!.x);
@@ -92,7 +103,5 @@ for (const width of [1024, 1440]) {
     expect(overlapX > 0 && overlapY > 0).toBe(false);
     // No horizontal page scroll.
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-
-    await card.screenshot({ path: `test-results/sequence-card-advice-${width}.png` });
   });
 }
