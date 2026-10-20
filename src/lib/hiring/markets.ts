@@ -285,7 +285,7 @@ const US_RULES: MarketRules = {
 // to work with. Does NOT change classifyMarket's output (Florida postings
 // are still just "us"). "fl" is matched as a whole token, never a substring,
 // for the same reason as the country codes above.
-const FLORIDA_PHRASES = [
+export const FLORIDA_PHRASES = [
   "florida",
   "miami",
   "fort lauderdale",
@@ -307,7 +307,7 @@ const FLORIDA_PHRASES = [
   "cape coral",
   "fort myers",
 ];
-const FLORIDA_TOKENS = ["fl"];
+export const FLORIDA_TOKENS = ["fl"];
 
 /**
  * Classifies a job posting's free-text location into a market bucket.

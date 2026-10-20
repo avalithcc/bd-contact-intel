@@ -22,26 +22,26 @@ const personIds: string[] = [];
 const companyKeys: string[] = [];
 const sequenceIds: string[] = [];
 
-async function mkCompany(name: string, over: { clientStatus?: string; postings?: boolean } = {}) {
+async function mkCompany(name: string, over: { clientStatus?: string; postings?: boolean; texas?: boolean; country?: string } = {}) {
   const { db } = await import("@/db");
   const { company, jobPosting, targetCompany } = await import("@/db/schema");
   const ck = key(`co-${name}`);
   companyKeys.push(ck);
-  await db.insert(company).values({ companyKey: ck, displayName: ck, clientStatus: over.clientStatus ?? null });
+  await db.insert(company).values({ companyKey: ck, displayName: ck, clientStatus: over.clientStatus ?? null, country: over.country ?? null });
   await db.insert(targetCompany).values({ companyKey: ck, displayName: ck, ats: "lever", config: {} });
   if (over.postings !== false) {
-    await db.insert(jobPosting).values({ companyKey: ck, externalId: "1", title: "Engineer", location: "Miami, FL", url: "https://example.test", isIt: true, market: "us", isMiami: true });
+    await db.insert(jobPosting).values({ companyKey: ck, externalId: "1", title: "Engineer", location: over.texas ? "Austin, TX" : "Miami, FL", url: "https://example.test", isIt: true, market: "us", isMiami: !over.texas });
   }
   return ck;
 }
 
-async function mkPerson(name: string, ck: string | null, over: { email?: string | null; emailStatus?: string; mergedIntoId?: string; company?: string | null } = {}) {
+async function mkPerson(name: string, ck: string | null, over: { email?: string | null; emailStatus?: string; mergedIntoId?: string; company?: string | null; country?: string | null; city?: string | null; region?: string | null; ownerBdId?: string; jobTitle?: string } = {}) {
   const { db } = await import("@/db");
   const { person } = await import("@/db/schema");
   const email = over.email === undefined ? `${key(name)}@example.test` : over.email;
   const [p] = await db
     .insert(person)
-    .values({ firstName: name, lastName: run, email, emailNormalized: email?.toLowerCase().trim() ?? null, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", company: over.company === undefined ? ck : over.company, companyKey: ck, mergedIntoId: over.mergedIntoId })
+    .values({ firstName: name, lastName: run, email, emailNormalized: email?.toLowerCase().trim() ?? null, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", company: over.company === undefined ? ck : over.company, companyKey: ck, mergedIntoId: over.mergedIntoId, country: over.country ?? null, city: over.city ?? null, region: over.region ?? null, ownerBdId: over.ownerBdId, jobTitle: over.jobTitle })
     .returning();
   personIds.push(p.id);
   return p;
@@ -167,40 +167,114 @@ test("a Sequence with no members still appears in the list", async () => {
   assert.deepEqual(row.members, []);
 });
 
-test("the picker KEEPS contacts that cannot be added, each with its reason, and every row has a company key", async () => {
+const ARG = "Argentina";
+const pickerQuery = (over: Record<string, unknown> = {}) => ({ search: run, florida: false, hiring: false, mine: false, showBlocked: false, offset: 0, ...over });
+const pickerIds = async (over: Record<string, unknown> = {}, me = ownerId) => {
+  const { clearPickerCountryFacts, listPickerPage } = await import("@/lib/sequences/pageQueries");
+  const { normalizePickerQuery } = await import("@/lib/sequences/pickerFilters");
+  clearPickerCountryFacts(); // each test adds countries; the server caches the list for minutes
+  return (await listPickerPage(normalizePickerQuery(pickerQuery(over)), me, "Sin nombre")).contacts;
+};
+
+test("the picker lists EVERY live contact with an email, wherever they are, and keeps the reason of each one it cannot add", async () => {
   const { db } = await import("@/db");
   const { emailSuppression } = await import("@/db/schema");
-  const { listPickerContacts } = await import("@/lib/sequences/pageQueries");
+  const { clearPickerCountryFacts } = await import("@/lib/sequences/pageQueries");
   const ok = await mkPerson("pk-ok", await mkCompany("pk-ok"));
+  const latam = await mkPerson("pk-latam", await mkCompany("pk-latam", { postings: false }), { country: ARG });
+  const noSignal = await mkPerson("pk-nosignal", await mkCompany("pk-nosignal", { postings: false }));
+  const spain = await mkPerson("pk-spain", await mkCompany("pk-spain"), { country: "Spain" });
   const client = await mkPerson("pk-client", await mkCompany("pk-client", { clientStatus: "active" }));
   const former = await mkPerson("pk-former", await mkCompany("pk-former", { clientStatus: "inactive" }));
   const survivor = await mkPerson("pk-survivor", await mkCompany("pk-survivor"));
   const merged = await mkPerson("pk-merged", await mkCompany("pk-merged"), { mergedIntoId: survivor.id });
   const noEmail = await mkPerson("pk-noemail", await mkCompany("pk-noemail"), { email: null, emailStatus: "none" });
+  const none = await mkPerson("pk-none", await mkCompany("pk-none"), { emailStatus: "none" });
   const suppressed = await mkPerson("pk-supp", await mkCompany("pk-supp"));
+  const nocompany = await mkPerson("pk-nocompany", null, { country: ARG });
   await db.insert(emailSuppression).values({ kind: "address", value: suppressed.email!.toLowerCase(), source: "manual", personId: suppressed.id });
-  await mkPerson("pk-noposting", await mkCompany("pk-noposting", { postings: false }));
-  await mkPerson("pk-nocompany", null);
+  clearPickerCountryFacts();
 
-  const pool = await listPickerContacts("Sin nombre");
-  const by = new Map(pool.map((c) => [c.personId, c]));
+  const all = await pickerIds({ showBlocked: true });
+  const by = new Map(all.map((c) => [c.personId, c]));
   assert.equal(by.get(ok.id)?.block, null);
+  assert.equal(by.get(latam.id)?.block, null, "a company with no posting at all is listed: hiring is a filter, not the pool");
+  assert.equal(by.get(nocompany.id)?.block, null, "a contact without a company is listed too");
+  assert.equal(by.get(noSignal.id)?.block, "unmappedMarket", "no country and no posting: no market, so no legal footer");
+  assert.equal(by.get(spain.id)?.block, "unmappedMarket");
   assert.equal(by.get(client.id)?.block, "client");
   assert.equal(by.get(former.id)?.block, "clientFormer");
-  assert.equal(by.get(merged.id)?.block, "merged");
-  assert.equal(by.get(merged.id)?.survivorId, survivor.id);
-  assert.equal(by.get(noEmail.id)?.block, "noEmail");
+  assert.equal(by.get(none.id)?.block, "unreachable");
   assert.equal(by.get(suppressed.id)?.block, "suppressed");
   assert.equal(by.get(ok.id)?.openIt, 1);
   assert.equal(by.get(ok.id)?.florida, true);
+  assert.equal(by.get(latam.id)?.openIt, 0);
   assert.equal(by.get(ok.id)?.status, "new");
-  // Outside the pool by construction: no open IT posting, no company at all.
-  assert.ok(![...by.values()].some((c) => c.name.startsWith("pk-noposting") || c.name.startsWith("pk-nocompany")));
-  assert.ok(pool.every((c) => c.companyKey), "a company-less contact would count as its own company");
-  // Addable contacts sort ahead of the merged and email-less ones, so a pool bound could only cut the unaddable.
-  const order = pool.map((c) => c.personId);
-  assert.ok(order.indexOf(ok.id) < order.indexOf(merged.id));
-  assert.ok(order.indexOf(ok.id) < order.indexOf(noEmail.id));
+  // Merged and email-less people are not live contacts with an email: not in the pool at all.
+  assert.ok(!by.has(merged.id) && !by.has(noEmail.id));
+  // Addable contacts sort ahead of every blocked one.
+  const order = all.map((c) => c.personId);
+  const lastAddable = Math.max(...all.filter((c) => !c.block).map((c) => order.indexOf(c.personId)));
+  const firstBlocked = Math.min(...all.filter((c) => c.block).map((c) => order.indexOf(c.personId)));
+  assert.ok(lastAddable < firstBlocked, "blocked contacts come last");
+
+  // Hidden by default: exactly the addable ones, and none of the blocked.
+  const hidden = await pickerIds();
+  assert.deepEqual(hidden.map((c) => c.personId).sort(), all.filter((c) => !c.block).map((c) => c.personId).sort());
+  assert.ok(hidden.every((c) => c.block === null), "the SQL filter and the JS admission agree on what is blocked");
+});
+
+test("the Florida filter keeps companies with a Florida posting and people whose own city or region says Florida, and nobody else", async () => {
+  const fl = await mkPerson("fl-posting", await mkCompany("fl-posting"));
+  const tx = await mkPerson("fl-texas", await mkCompany("fl-texas", { texas: true }));
+  const home = await mkPerson("fl-home", await mkCompany("fl-home", { postings: false, country: "United States" }), { city: "Miami", region: "Florida" });
+  const italy = await mkPerson("fl-naples", await mkCompany("fl-naples", { postings: false }), { country: "Italy", city: "Naples" });
+  const flores = await mkPerson("fl-flores", await mkCompany("fl-flores", { postings: false, country: "United States" }), { city: "Flores" });
+  const ids = (await pickerIds({ florida: true, showBlocked: true })).map((c) => c.personId);
+  assert.ok(ids.includes(fl.id) && ids.includes(home.id));
+  assert.ok(!ids.includes(tx.id) && !ids.includes(italy.id) && !ids.includes(flores.id));
+  const everyone = (await pickerIds({ showBlocked: true })).map((c) => c.personId);
+  assert.ok([fl, tx, home, italy, flores].every((p) => everyone.includes(p.id)), "without the filter all of them are there");
+});
+
+test("the hiring filter keeps only companies with an open fresh US IT posting", async () => {
+  const hiring = await mkPerson("hi-yes", await mkCompany("hi-yes"));
+  const idle = await mkPerson("hi-no", await mkCompany("hi-no", { postings: false }), { country: ARG });
+  const ids = (await pickerIds({ hiring: true })).map((c) => c.personId);
+  assert.ok(ids.includes(hiring.id) && !ids.includes(idle.id));
+  assert.ok((await pickerIds()).some((c) => c.personId === idle.id));
+});
+
+test("'my contacts' keeps the contacts owned by the signed-in BD", async () => {
+  const mine = await mkPerson("mine-yes", await mkCompany("mine-yes"), { ownerBdId: ownerId });
+  const theirs = await mkPerson("mine-no", await mkCompany("mine-no"), { ownerBdId: otherId });
+  const ids = (await pickerIds({ mine: true })).map((c) => c.personId);
+  assert.ok(ids.includes(mine.id) && !ids.includes(theirs.id));
+  assert.ok((await pickerIds({ mine: true }, otherId)).some((c) => c.personId === theirs.id));
+});
+
+test("search folds accents across name, company, email and title; pages of 50 do not overlap and say when there is more", async () => {
+  const { listPickerPage } = await import("@/lib/sequences/pageQueries");
+  const { PICKER_PAGE_SIZE } = await import("@/lib/sequences/pickerFilters");
+  const ck = await mkCompany("search-co");
+  const pena = await mkPerson("Peña", ck, { jobTitle: `Directora de Ingeniería ${run}` });
+  assert.ok((await pickerIds({ search: `pena ${run}` })).some((c) => c.personId === pena.id), "accent-insensitive on the name");
+  assert.ok((await pickerIds({ search: `ingenieria ${run}` })).some((c) => c.personId === pena.id), "the job title is searched");
+  assert.ok((await pickerIds({ search: `${run} ${ck}` })).some((c) => c.personId === pena.id), "every token must match, across columns");
+  assert.equal((await pickerIds({ search: `${run} no-such-token-zz` })).length, 0);
+
+  const { db } = await import("@/db");
+  const { person } = await import("@/db/schema");
+  const rows = Array.from({ length: PICKER_PAGE_SIZE + 12 }, (_, i) => ({ firstName: `pg${String(i).padStart(3, "0")}`, lastName: `pgz${run}`, email: `pg${i}-${run}@example.test`, emailNormalized: `pg${i}-${run}@example.test`, emailStatus: "verified", emailSource: "apollo", country: ARG }));
+  personIds.push(...(await db.insert(person).values(rows).returning({ id: person.id })).map((r) => r.id));
+  const { normalizePickerQuery } = await import("@/lib/sequences/pickerFilters");
+  const first = await listPickerPage(normalizePickerQuery(pickerQuery({ search: `pgz${run}` })), ownerId, "Sin nombre");
+  const second = await listPickerPage(normalizePickerQuery(pickerQuery({ search: `pgz${run}`, offset: PICKER_PAGE_SIZE })), ownerId, "Sin nombre");
+  assert.equal(first.contacts.length, PICKER_PAGE_SIZE);
+  assert.equal(first.hasMore, true);
+  assert.equal(second.contacts.length, 12);
+  assert.equal(second.hasMore, false);
+  assert.equal(new Set([...first.contacts, ...second.contacts].map((c) => c.personId)).size, PICKER_PAGE_SIZE + 12, "no contact repeats across pages");
 });
 
 // --- the company NAME a Contact shows: free text wins, the canonical name fills a null (companyDisplayName.ts) ----------
@@ -231,12 +305,11 @@ test("the list shows the canonical company for a null free text, the free text w
 });
 
 test("the picker shows the canonical company for a null free text and orders by the name it SHOWS", async () => {
-  const { listPickerContacts } = await import("@/lib/sequences/pageQueries");
   const mid = await mkPerson("po-mid", await mkNamedCompany("p1", `Zzz canonical ${run}`), { company: `Mmm free ${run}` });
   const low = await mkPerson("po-low", await mkNamedCompany("p2", `Aaa canonical ${run}`), { company: null });
   const high = await mkPerson("po-high", await mkNamedCompany("p3", `Ttt canonical ${run}`), { company: null });
   const dangling = await mkPerson("po-dangling", await mkNamedCompany("p4", null), { company: null });
-  const pool = await listPickerContacts("Sin nombre");
+  const pool = await pickerIds({ showBlocked: true });
   const by = new Map(pool.map((c) => [c.personId, c]));
   assert.equal(by.get(mid.id)?.company, `Mmm free ${run}`);
   assert.equal(by.get(low.id)?.company, `Aaa canonical ${run}`);

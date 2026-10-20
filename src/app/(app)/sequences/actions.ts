@@ -18,6 +18,8 @@ import {
 import { releaseMembersNow } from "@/lib/sequences/releaseNow";
 import { guardApprovalInput } from "@/lib/sequences/sendMoment";
 import { isUuid } from "@/lib/uuid";
+import { normalizePickerQuery, type PickerPage } from "@/lib/sequences/pickerFilters";
+import { listPickerPage } from "@/lib/sequences/pageQueries";
 import { formatOutreachSignalLabel } from "@/lib/outreach/messageSignalLabels";
 import { pickGenerateMessageLabels, signalLabelsFromDict } from "@/lib/outreach/messageLabels";
 import { getDictionary } from "@/lib/i18n/server";
@@ -56,6 +58,13 @@ function withoutReasons(result: DraftBatchResult): ClientDraftBatchResult {
 export async function createSequence(input: { name: string; emailAccountId: string; dailySendCap?: number }): Promise<CreateSequenceResult> {
   const me = await getCurrentBd();
   return createSequenceRow(me.id, input);
+}
+
+/** One page of the contact picker (search, filters and paging all run in SQL). The input is untrusted: it is normalized here. */
+export async function loadPickerPage(raw: unknown): Promise<PickerPage> {
+  const me = await getCurrentBd();
+  const dict = await getDictionary();
+  return listPickerPage(normalizePickerQuery(raw), me.id, dict.sequences.unnamed);
 }
 
 export async function addMembers(sequenceId: string, personIds: string[]): Promise<AddMembersResult> {

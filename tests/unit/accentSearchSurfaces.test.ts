@@ -10,7 +10,8 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { company } from "@/db/schema";
 import { companySearchCondition } from "@/lib/companies/searchCondition";
 import { companyNameMatchesTerm } from "@/lib/contacts/companyDisplayName";
-import { pickerView, type PickerContact } from "@/lib/sequences/pickerView";
+import { DEFAULT_PICKER_QUERY } from "@/lib/sequences/pickerFilters";
+import { buildPickerPageQuery } from "@/lib/sequences/pickerQuery";
 import { buildRosterCandidatesQuery } from "@/lib/sequences/rosterQuery";
 
 const dialect = new PgDialect();
@@ -33,17 +34,10 @@ test("Sequences roster picker folds accents on the name and escapes the user's w
   assert.equal(q.params[2], "%50\\%\\_José%");
 });
 
-const contact = (over: Partial<PickerContact>): PickerContact =>
-  ({ personId: "p", name: "X", company: null, email: null, florida: false, block: null, ...over }) as PickerContact;
-
-test("roster picker's in-memory search finds José, Peña and Pérez by their unaccented spelling and the reverse", () => {
-  const contacts = [contact({ personId: "1", name: "José Peña" }), contact({ personId: "2", name: "Ana", company: "Pérez SA" })];
-  const ids = (search: string) =>
-    pickerView(contacts, new Map(), { search, florida: false, showBlocked: true }).rows.map((r) => r.contact.personId);
-  assert.deepEqual(ids("jose"), ["1"]);
-  assert.deepEqual(ids("PENA"), ["1"]);
-  assert.deepEqual(ids("perez"), ["2"]);
-  assert.deepEqual(ids("Pérez"), ["2"]);
+test("the roster picker's page query folds accents over name, company, email and title with the user's wildcards escaped", () => {
+  const q = flat(buildPickerPageQuery({ ...DEFAULT_PICKER_QUERY, search: "50%_José" }, "00000000-0000-4000-8000-000000000001", { unmapped: [], us: [] }));
+  assert.match(q.sql, /unaccent\(concat_ws\(' ', p\.first_name, p\.last_name, .*p\.email, p\.job_title\)\) ilike \(select unaccent\(\$\d+\)\)/);
+  assert.ok(q.params.includes("%50\\%\\_José%"));
 });
 
 test("the Empresa filter's JS twin folds accents too", () => {

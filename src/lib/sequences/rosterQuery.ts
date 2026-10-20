@@ -5,7 +5,7 @@
  */
 import { sql } from "drizzle-orm";
 import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
-import { openFreshPostingSql } from "@/lib/hiring/openPosting";
+import { openFreshPostingSql, openPostingSql } from "@/lib/hiring/openPosting";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 
 export const ROSTER_PICKER_MAX_LIMIT = 200;
@@ -21,6 +21,15 @@ export const clientStatusSql = sql`(
       or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
   limit 1
 )`;
+
+/** A `job_posting jp` belongs to the company of `person p`, directly or through a company alias. */
+export const sameCompanyPostingSql = sql`(jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
+
+/** The person's company country (the second link of recipientMarket), or NULL. */
+export const companyCountrySql = sql`(select c.country from company c where c.company_key = p.company_key or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key) limit 1)`;
+
+/** The open IT posting markets of the person's company (the third link of recipientMarket), as a JSON array. */
+export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyPostingSql}), '[]'::json)`;
 
 /**
  * The company NAME a Sequence read shows, same rule and same join as the Contacts list (companyDisplayName.ts): free

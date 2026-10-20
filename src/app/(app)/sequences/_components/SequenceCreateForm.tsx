@@ -6,6 +6,7 @@ import { InfoIcon, WarningIcon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { DAILY_SEND_CAP_CEILING, DAILY_SEND_CAP_DEFAULT, DAILY_SEND_CAP_WARN_ABOVE } from "@/lib/sequences/capValidation";
 import { createFormView } from "@/lib/sequences/createForm";
+import type { PickerPage, PickerQuery } from "@/lib/sequences/pickerFilters";
 import { selectionSummary, type PickerContact, type Selection } from "@/lib/sequences/pickerView";
 import { COMPANY_MEMBER_LIMIT } from "@/lib/sequences/rosterGuards";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
@@ -23,7 +24,7 @@ function chosenLine(template: string, vars: { n: number; c: number; contacts: st
  * calls an action; the container closes over success and passes `error` / `busy` back. `account` is null when the BD has
  * no connected Gmail account: nothing can be created then, and the form says so instead of inventing an address.
  */
-export function SequenceCreateForm({ contacts, account, labels: l, statusLabels, onSubmit, busy = false, error = null }: { contacts: readonly PickerContact[]; account: { address: string } | null; labels: SequenceLabels; statusLabels: Dictionary["leadStatuses"]; onSubmit: OnCreateSequence; busy?: boolean; error?: string | null }) {
+export function SequenceCreateForm({ contacts, hasMore, loadPage, account, labels: l, statusLabels, onSubmit, busy = false, error = null }: { contacts: readonly PickerContact[]; hasMore: boolean; loadPage: (query: PickerQuery) => Promise<PickerPage>; account: { address: string } | null; labels: SequenceLabels; statusLabels: Dictionary["leadStatuses"]; onSubmit: OnCreateSequence; busy?: boolean; error?: string | null }) {
   const id = useId();
   const [name, setName] = useState("");
   const [cap, setCap] = useState(String(DAILY_SEND_CAP_DEFAULT));
@@ -80,7 +81,7 @@ export function SequenceCreateForm({ contacts, account, labels: l, statusLabels,
           <span className="meta">{chosenLine(l.newChosen, { n: selection.size, c: companies, contacts: selection.size === 1 ? l.unitContactOne : l.unitContactMany, companies: companies === 1 ? l.unitCompanyOne : l.unitCompanyMany })}</span></div>
           <div className="card-body">
             <div className="alert alert-neutral mb-lg"><InfoIcon className="icon" /><div>{l.newRulesLead} <strong>{fill(l.newRulesStrong, { limit: COMPANY_MEMBER_LIMIT })}</strong>{l.newRulesTail}</div></div>
-            <RosterPicker contacts={contacts} selection={selection} onChange={setSelection} labels={l} statusLabels={statusLabels} />
+            <RosterPicker contacts={contacts} hasMore={hasMore} loadPage={loadPage} selection={selection} onChange={setSelection} labels={l} statusLabels={statusLabels} />
           </div>
         </div>
         <div className="form-actions">

@@ -3,7 +3,7 @@
  * admission and `COMPANY_MEMBER_LIMIT`), this only turns them into rows and counters.
  *
  * Every counter (chosen, companies, per-company quota) comes from the SELECTION, a map of the contacts chosen, never
- * from the rows on screen: a search or the Florida filter changes which rows are shown, not what was chosen, and a
+ * from the rows on screen: a search or a filter changes which rows are loaded, not what was chosen, and a
  * chosen contact stays counted even when the loaded list no longer contains it.
  *
  * The spec says contacts that cannot be added are "not offered". The owner approved showing them last, dimmed, with the
@@ -13,9 +13,8 @@
 import { COMPANY_MEMBER_LIMIT } from "./rosterGuards";
 import { resolveSeedRoster, type SeedCandidate, type SeedGuards, type SeedRejection } from "./seedRoster";
 import type { LeadStatusKey } from "@/lib/leads/types";
-import { foldedIncludes } from "@/lib/search/foldAccents";
 
-export type BlockKind = "client" | "clientFormer" | "suppressed" | "member" | "merged" | "noEmail" | "unreachable" | "inferred" | "noPosting" | "companyLimit";
+export type BlockKind = "client" | "clientFormer" | "suppressed" | "member" | "merged" | "noEmail" | "unreachable" | "inferred" | "noPosting" | "unmappedMarket" | "companyLimit";
 export type EmailBadge = "verified" | "probable" | "inferred" | "none";
 
 export type PickerContact = {
@@ -39,12 +38,13 @@ export type PickerContact = {
 };
 
 export type Selection = ReadonlyMap<string, PickerContact>;
-export type PickerFilter = { search: string; florida: boolean; showBlocked: boolean };
+/** Search, Florida, hiring and owner are decided by the SERVER (pickerFilters.ts); the view only hides or shows the blocked rows. */
+export type PickerFilter = { showBlocked: boolean };
 export type PickerRow = { contact: PickerContact; kind: "selected" | "available" | "blocked"; block: BlockKind | null; inCompany: number; limitNames: string[] };
 
 const KIND: Record<SeedRejection, BlockKind> = {
   already_member: "member", merged: "merged", no_email: "noEmail", unreachable: "unreachable",
-  no_open_posting: "noPosting", client: "client", suppressed: "suppressed", company_limit: "companyLimit",
+  no_open_posting: "noPosting", client: "client", suppressed: "suppressed", unmapped_market: "unmappedMarket", company_limit: "companyLimit",
 };
 
 /** The static reason a contact cannot be added (null when it can): the seed admission, with the two reasons the picker words twice split. */
@@ -78,9 +78,6 @@ export function selectionSummary(selection: Selection) {
 }
 
 export function pickerView(contacts: readonly PickerContact[], selection: Selection, filter: PickerFilter) {
-  const term = filter.search.trim();
-  const matches = (c: PickerContact) =>
-    (!filter.florida || c.florida) && (!term || [c.name, c.company ?? "", c.email ?? ""].some((s) => foldedIncludes(s, term)));
   const build = (c: PickerContact): PickerRow => {
     const chosen = chosenIn(selection, c);
     const picked = selection.has(c.personId);
@@ -88,12 +85,12 @@ export function pickerView(contacts: readonly PickerContact[], selection: Select
     const block = c.block ?? (limited ? "companyLimit" : null);
     return { contact: c, kind: picked ? "selected" : block ? "blocked" : "available", block, inCompany: chosen.length, limitNames: limited ? chosen.map((s) => s.name) : [] };
   };
-  const rows = contacts.filter(matches).map(build);
+  const rows = contacts.map(build);
   const open = rows.filter((r) => r.kind !== "blocked");
   const blocked = rows.filter((r) => r.kind === "blocked");
   const shown = filter.showBlocked ? [...open, ...blocked] : open;
 
-  return { rows: shown, ...selectionSummary(selection), availableShown: open.length, blockedShown: shown.length - open.length, blockedMatching: blocked.length };
+  return { rows: shown, ...selectionSummary(selection), availableShown: open.length, blockedShown: shown.length - open.length };
 }
 
 /** Adds or removes one contact. An add that a block or the company limit refuses returns the SAME map, so callers can tell. */

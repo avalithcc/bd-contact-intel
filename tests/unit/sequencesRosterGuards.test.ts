@@ -116,3 +116,14 @@ test("a Contact with no company key is not grouped under the company limit", () 
   const r = evaluateRosterAdds([candidate("a", { companyKey: null }), candidate("b", { companyKey: null }), candidate("c", { companyKey: null })], ctx());
   assert.deepEqual(r.accepted, ["a", "b", "c"]);
 });
+
+test("a Contact whose market has no postal address is refused, whatever the client asked; an unknown market is not judged", () => {
+  const r = evaluateRosterAdds([candidate("spain", { marketMapped: false }), candidate("us", { marketMapped: true }), candidate("unknown")], ctx());
+  assert.deepEqual(reasons(r), { spain: "unmapped_market" });
+  assert.deepEqual(r.accepted, ["us", "unknown"]);
+});
+
+test("the market never takes the place of an earlier reason: a client in an unmapped market is a client", () => {
+  const r = evaluateRosterAdds([candidate("a", { marketMapped: false, clientStatus: "active" }), candidate("b", { marketMapped: false, emailStatus: "none" })], ctx());
+  assert.deepEqual(reasons(r), { a: "client", b: "unreachable" });
+});

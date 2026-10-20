@@ -10,7 +10,9 @@ import { validateDailySendCap, type CapRejection } from "./capValidation";
 import { canTransition, type MemberState } from "./memberState";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
-import { clientStatusSql, buildRosterCandidatesQuery } from "./rosterQuery";
+import { clientStatusSql, buildRosterCandidatesQuery, companyCountrySql, postingMarketsSql } from "./rosterQuery";
+import { isMarketMapped } from "./draftCompose";
+import { recipientMarket } from "./recipientMarket";
 import { evaluateRosterAdds, type RosterCandidate, type RosterDecision, type RosterRejection } from "./rosterGuards";
 import { listSuppressionRules } from "./suppressionQueries";
 
@@ -34,12 +36,19 @@ export async function listRosterCandidates(opts: { limit: number; search?: strin
   return withResolvedCompanyName(rowsOf<PickerRow & { companyCanonicalName: string | null }>(await db.execute(buildRosterCandidatesQuery(opts))));
 }
 
-async function loadCandidates(tx: Tx, personIds: readonly string[]): Promise<RosterCandidate[]> {
+/**
+ * The facts the admission needs, by id. With `judgeMarket` the recipient market is derived the way drafting and sending
+ * derive it (recipientMarket) and handed to the admission as `marketMapped`: an add must refuse a Contact no email could
+ * carry a legal footer for. Re-admission skips it (`judgeMarket` off): that member was admitted once and a market hold
+ * already covers it at send time.
+ */
+async function loadCandidates(tx: Tx, personIds: readonly string[], judgeMarket = false): Promise<RosterCandidate[]> {
   if (!personIds.length) return [];
-  const rows = rowsOf<{ person_id: string; email: string | null; email_status: string; email_source: string | null; merged_into_id: string | null; company_key: string | null; client_status: string | null }>(
+  const rows = rowsOf<{ person_id: string; email: string | null; email_status: string; email_source: string | null; merged_into_id: string | null; company_key: string | null; client_status: string | null; person_country: string | null; company_country: string | null; posting_markets: string[] }>(
     await tx.execute(sql`
       select p.id::text as person_id, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
-             p.company_key, ${clientStatusSql} as client_status
+             p.company_key, ${clientStatusSql} as client_status,
+             p.country as person_country, ${companyCountrySql} as company_country, ${postingMarketsSql} as posting_markets
       from person p where p.id in (${idList(personIds)})`),
   );
   return rows.map((r) => ({
@@ -50,6 +59,7 @@ async function loadCandidates(tx: Tx, personIds: readonly string[]): Promise<Ros
     mergedIntoId: r.merged_into_id,
     companyKey: r.company_key,
     clientStatus: r.client_status,
+    ...(judgeMarket ? { marketMapped: isMarketMapped(recipientMarket({ personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets })) } : {}),
   }));
 }
 
@@ -99,7 +109,7 @@ export async function addMembersToSequence(bdId: string, sequenceId: string, per
     if (!(await lockOwnedSequence(tx, bdId, sequenceId))) return { ok: false, error: "not_found" } as const;
     const existing = await tx.select({ personId: sequenceMember.personId }).from(sequenceMember).where(eq(sequenceMember.sequenceId, sequenceId));
     // A requested id that matches no person is reported, never dropped: loadCandidates simply omits it.
-    const loaded = new Map((await loadCandidates(tx, ids)).map((c) => [c.personId, c]));
+    const loaded = new Map((await loadCandidates(tx, ids, true)).map((c) => [c.personId, c]));
     // Evaluate in request order, so which Contacts win the company limit is deterministic.
     const candidates = ids.flatMap((id) => loaded.get(id) ?? []);
     const decision = evaluateRosterAdds(candidates, {

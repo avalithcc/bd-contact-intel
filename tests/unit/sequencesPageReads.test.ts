@@ -46,7 +46,7 @@ test("a member's draft flag and release instant survive the grouping (the queue 
 
 const pickerRow = (over: Partial<PickerDbRow> = {}): PickerDbRow => ({
   person_id: "p1", first_name: "Ada", last_name: "Test", email: "ada@acme.test", email_status: "verified", email_source: null, job_title: "CTO", status: "new",
-  company: "Acme", company_key: "acme", merged_into_id: null, client_status: null, open_it: 2, is_florida: false, ...over,
+  company: "Acme", company_key: "acme", merged_into_id: null, client_status: null, open_it: 2, is_florida: false, market_mapped: true, ...over,
 });
 const toContact = (over: Partial<PickerDbRow> = {}, rules: Parameters<typeof toPickerContact>[1] = []) => toPickerContact(pickerRow(over), rules, "Sin nombre");
 
@@ -61,7 +61,8 @@ test("every static reason survives into the picker instead of being filtered out
   assert.equal(toContact({ email: null, email_status: "none" }).block, "noEmail");
   assert.equal(toContact({ email: "x@acme.test", email_status: "none" }).block, "unreachable");
   assert.equal(toContact({ email_status: "probable", email_source: "pattern_inferred" }).block, "inferred");
-  assert.equal(toContact({ open_it: 0 }).block, "noPosting");
+  assert.equal(toContact({ open_it: 0 }).block, null, "no open posting is a filter now, not a reason to block");
+  assert.equal(toContact({ market_mapped: false }).block, "unmappedMarket");
   assert.equal(toContact({}, [{ ruleKind: "address", value: "ada@acme.test" }]).block, "suppressed");
   assert.equal(toContact({}, [{ ruleKind: "domain", value: "acme.test" }]).block, "suppressed");
 });
@@ -81,7 +82,7 @@ test("the guards are empty: a static company_limit can never be handed to the pi
   assert.equal(c.block, null);
   let selection = toggleOne(new Map(), a);
   selection = toggleOne(selection, b);
-  const view = pickerView([a, b, c], selection, { search: "", florida: false, showBlocked: true });
+  const view = pickerView([a, b, c], selection, { showBlocked: true });
   const blocked = view.rows.find((r) => r.contact.personId === "c");
   assert.equal(blocked?.block, "companyLimit");
   assert.deepEqual(blocked?.limitNames, [a.name, b.name], "the reason names the two chosen, never an empty list");

@@ -6,23 +6,24 @@
  *   listSequencesForBd      1   (sequences + members + step 1 drafts + companies, one flat join)
  *   listAllSequences        1   (the same join, every owner, plus the owner name: admin only)
  *   getSendingAccount       1
- *   listPickerContacts      2   (the pool, then the company-wide suppression list that staticBlock needs)
+ *   listPickerPage          1   (one page; +1 for the country facts when the instance has none cached)
  *   listContactMemberships  1
  *   listReplyPhrases        1   (skipped when no member has replied)
  */
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 import { emailAccount } from "@/db/schema";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
-import { normalizeSuppressionValue } from "./suppression";
+import { normalizeSuppressionValue, type SuppressionRule } from "./suppression";
 import type { ContactMembership } from "./contactContext";
 import type { SequenceListRow } from "./listView";
 import { groupListRows, replyPhrases, toMembership, toPickerContact, type ListDbRow, type MembershipDbRow, type PickerDbRow } from "./pageReads";
-import type { PickerContact } from "./pickerView";
+import { PICKER_PAGE_SIZE, type PickerPage, type PickerQuery } from "./pickerFilters";
+import { buildPickerPageQuery, countryFacts, distinctCountriesSql, type CountryFacts } from "./pickerQuery";
+import { recipientMarket } from "./recipientMarket";
+import { isMarketMapped } from "./draftCompose";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
-import { canonicalCompanyJoinSql, clientStatusSql, companyNameColumnsSql, displayedCompanySql } from "./rosterQuery";
-import { listSuppressionRules } from "./suppressionQueries";
+import { companyNameColumnsSql, canonicalCompanyJoinSql } from "./rosterQuery";
 
 type Row = Record<string, unknown>;
 const rowsOf = <T>(r: unknown) => r as T[];
@@ -79,39 +80,46 @@ export async function getSendingAccount(bdId: string): Promise<{ id: string; add
   return row ?? null;
 }
 
-/**
- * Hard bound on the picker pool. The pool is Contacts at companies with an open US IT posting; the picker searches it
- * client-side, so a pool past this bound would hide people from the search. Addable Contacts sort first, so what a
- * bound would cut is the ones that could not be added anyway.
- */
-export const PICKER_POOL_LIMIT = 500;
+const COUNTRY_FACTS_TTL_MS = 5 * 60_000;
+let countryFactsCache: { at: number; facts: CountryFacts } | null = null;
+
+/** Test hook: the facts are cached per server instance, so a test that adds a country must forget them. */
+export function clearPickerCountryFacts() {
+  countryFactsCache = null;
+}
 
 /**
- * The roster picker pool for a NEW Sequence. Unlike buildRosterCandidatesQuery, which removes non-addable Contacts in
- * SQL, this KEEPS them: the picker shows them last with the reason, and the reason comes from `staticBlock`
- * (pageReads.toPickerContact), the same admission the server re-runs on add. Every row has a company key by
- * construction: the postings join matches on it.
+ * Which country texts have no postal address / are the US, for the SQL that orders and filters the picker. Cached for a
+ * few minutes (one round trip saved per page): a stale entry can only mis-order a row, never mis-admit it, because the
+ * reason a row shows and the add itself re-derive the market from the row (recipientMarket).
  */
-export async function listPickerContacts(unnamed: string): Promise<PickerContact[]> {
-  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null }>(
-    await db.execute(sql`
-      select p.id::text as person_id, p.first_name, p.last_name, p.email, p.email_status, p.email_source, p.job_title, p.status,
-             ${companyNameColumnsSql}, p.company_key, p.merged_into_id::text as merged_into_id, ${clientStatusSql} as client_status,
-             h.open_it::int as open_it, h.is_florida
-      from person p
-      ${canonicalCompanyJoinSql}
-      join lateral (
-        select count(*) as open_it, coalesce(bool_or(jp.is_miami), false) as is_florida
-        from job_posting jp
-        where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
-          and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
-      ) h on h.open_it > 0
-      where p.company_key is not null
-      order by (p.merged_into_id is not null), (btrim(coalesce(p.email, '')) = ''), ${displayedCompanySql}, p.last_name, p.first_name, p.id
-      limit ${PICKER_POOL_LIMIT}`),
+async function pickerCountryFacts(): Promise<CountryFacts> {
+  if (countryFactsCache && Date.now() - countryFactsCache.at < COUNTRY_FACTS_TTL_MS) return countryFactsCache.facts;
+  const facts = countryFacts(rowsOf<{ country: string }>(await db.execute(distinctCountriesSql)).map((r) => r.country));
+  countryFactsCache = { at: Date.now(), facts };
+  return facts;
+}
+
+/**
+ * One page of the roster picker for a NEW Sequence: every live contact with an email, filtered and searched on the
+ * server (pickerQuery.ts), PICKER_PAGE_SIZE at a time. Unlike a roster query that removes non-addable Contacts, this
+ * KEEPS them when `showBlocked` is on: the picker shows them last with the reason, and the reason comes from
+ * `staticBlock` (pageReads.toPickerContact), the same admission the server re-runs on add.
+ *
+ * Round trips: 1 (the page), plus 1 for the country facts when the instance has none cached.
+ */
+export async function listPickerPage(query: PickerQuery, meId: string, unnamed: string): Promise<PickerPage> {
+  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; company_country: string | null; posting_markets: string[] }>(
+    await db.execute(buildPickerPageQuery(query, meId, await pickerCountryFacts())),
   );
-  const rules = await listSuppressionRules();
-  return withResolvedCompanyName(rows).map((r) => toPickerContact(r, rules, unnamed));
+  const named = withResolvedCompanyName(rows).slice(0, PICKER_PAGE_SIZE);
+  const contacts = named.map((r) => {
+    const mapped = isMarketMapped(recipientMarket({ personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }));
+    // A suppressed address becomes a one-address rule, so the SAME isSuppressed() that guards the add decides the reason.
+    const rules: SuppressionRule[] = r.suppressed && r.email ? [{ ruleKind: "address", value: normalizeSuppressionValue("address", r.email) }] : [];
+    return toPickerContact({ ...r, market_mapped: mapped }, rules, unnamed);
+  });
+  return { contacts, hasMore: rows.length > PICKER_PAGE_SIZE };
 }
 
 /** Newest history first, live and opted-out first, so a bound could only ever cut old discarded history. */

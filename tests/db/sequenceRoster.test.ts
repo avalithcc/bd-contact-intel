@@ -254,3 +254,34 @@ after(async () => {
   const { db } = await import("@/db");
   await db.$client.end();
 });
+
+test("add: a Contact whose market has no postal address is rejected server-side, whatever the client sent", async () => {
+  const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
+  const seq = await mkSequence();
+  const spain = await mkPerson("um-spain", await mkCompany("um-spain", null), { country: "Spain" });
+  const unknown = await mkPerson("um-unknown", await mkCompany("um-unknown", null, { posting: "none" }));
+  const argentina = await mkPerson("um-arg", await mkCompany("um-arg", null, { posting: "none" }), { country: "Argentina" });
+  const canada = await mkPerson("um-canada", await mkCompany("um-canada", null, { posting: "none" }), { country: "Canada" });
+  const fromPosting = await mkPerson("um-posting", await mkCompany("um-posting", null));
+  const r = await addMembersToSequence(bdId, seq, [spain, unknown, argentina, canada, fromPosting]);
+  assert.ok(r.ok);
+  assert.deepEqual(r.rejected, [{ personId: spain, reason: "unmapped_market" }, { personId: unknown, reason: "unmapped_market" }]);
+  assert.deepEqual(r.accepted, [argentina, canada, fromPosting]);
+});
+
+test("add: merged, email-less, opted-out and client Contacts are rejected on a direct request too", async () => {
+  const { db } = await import("@/db");
+  const { emailSuppression } = await import("@/db/schema");
+  const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
+  const seq = await mkSequence();
+  const survivor = await mkPerson("dr-survivor", await mkCompany("dr-survivor", null));
+  const merged = await mkPerson("dr-merged", await mkCompany("dr-merged", null), { mergedIntoId: survivor });
+  const noEmail = await mkPerson("dr-noemail", await mkCompany("dr-noemail", null), { email: null, emailNormalized: null });
+  const optedOut = await mkPerson("dr-optout", await mkCompany("dr-optout", null));
+  const client = await mkPerson("dr-client", await mkCompany("dr-client", "active"));
+  await db.insert(emailSuppression).values({ kind: "address", value: `${key("dr-optout")}@example.test`, source: `zz-${run}` });
+  const r = await addMembersToSequence(bdId, seq, [merged, noEmail, optedOut, client]);
+  assert.ok(r.ok);
+  assert.deepEqual(r.rejected, [{ personId: merged, reason: "unreachable" }, { personId: noEmail, reason: "unreachable" }, { personId: optedOut, reason: "suppressed" }, { personId: client, reason: "client" }]);
+  assert.deepEqual(r.accepted, []);
+});

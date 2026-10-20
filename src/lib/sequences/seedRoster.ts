@@ -50,7 +50,7 @@ export interface SeedGuards {
   activeCountByCompany: ReadonlyMap<string, number>;
 }
 
-export type SeedRejection = "already_member" | "merged" | "no_email" | "unreachable" | "no_open_posting" | "client" | "suppressed" | "company_limit";
+export type SeedRejection = "already_member" | "merged" | "no_email" | "unreachable" | "no_open_posting" | "client" | "suppressed" | "unmapped_market" | "company_limit";
 
 export interface SeedResolution {
   admitted: SeedCandidate[];
@@ -99,7 +99,7 @@ function rejection(c: SeedCandidate, g: SeedGuards, counts: ReadonlyMap<string, 
   if (!c.email?.trim()) return "no_email";
   if (!c.hasOpenItPosting) return "no_open_posting";
   const shared = staticRosterRejection(c, g.suppressionRules);
-  if (shared === "unreachable" || shared === "client" || shared === "suppressed") return shared;
+  if (shared === "unreachable" || shared === "client" || shared === "suppressed" || shared === "unmapped_market") return shared;
   if (c.companyKey && (counts.get(c.companyKey) ?? 0) >= COMPANY_MEMBER_LIMIT) return "company_limit";
   return null;
 }

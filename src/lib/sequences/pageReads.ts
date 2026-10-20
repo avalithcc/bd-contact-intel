@@ -65,11 +65,15 @@ export type PickerDbRow = {
   client_status: string | null;
   open_it: number;
   is_florida: boolean;
+  /** isMarketMapped(recipientMarket(...)), decided by the server read: false means no postal address for the market. */
+  market_mapped: boolean;
 };
 
 /**
  * A picker candidate with the reason it cannot be added, if any. The read KEEPS the ones that cannot be added (the
  * picker shows them last, dimmed, with the reason): the reason is the seed admission, `staticBlock`.
+ *
+ * `rules` holds only what applies to THIS contact (the read flags a suppressed address in SQL).
  *
  * The guards are EMPTY on purpose. A new Sequence has no members, and `company_limit` is the one reason that depends on
  * the selection, so the picker derives it live. Handing `staticBlock` a count of 2 would render that reason with no
@@ -80,7 +84,9 @@ export function toPickerContact(r: PickerDbRow, rules: readonly SuppressionRule[
   const block = staticBlock(
     {
       personId: r.person_id, email: r.email, emailStatus: r.email_status, emailSource: r.email_source, mergedIntoId: r.merged_into_id,
-      companyKey: r.company_key, clientStatus: r.client_status, label: name, hasOpenItPosting: Number(r.open_it) > 0,
+      companyKey: r.company_key, clientStatus: r.client_status, label: name,
+      // Hiring is a picker FILTER now, not an admission rule: a contact at a company with no open posting can be added.
+      hasOpenItPosting: true, marketMapped: r.market_mapped,
     },
     { suppressionRules: rules, alreadyMemberPersonIds: new Set(), activeCountByCompany: new Map() },
   );

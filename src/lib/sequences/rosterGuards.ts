@@ -6,7 +6,7 @@ import { isSuppressed, type SuppressionRule } from "./suppression";
 
 export const COMPANY_MEMBER_LIMIT = 2;
 
-export type RosterRejection = "unreachable" | "company_limit" | "client" | "suppressed" | "duplicate";
+export type RosterRejection = "unreachable" | "company_limit" | "client" | "suppressed" | "unmapped_market" | "duplicate";
 
 export interface RosterCandidate {
   personId: string;
@@ -17,6 +17,12 @@ export interface RosterCandidate {
   companyKey: string | null;
   /** company.client_status. ANY non-empty value ('active' or 'inactive') means the company is a client. */
   clientStatus: string | null;
+  /**
+   * False when the Contact's recipient market has no postal address in COMPLIANCE_CONFIG, so no email could carry the
+   * legal footer. Decided by the server read (recipientMarket + isMarketMapped) and handed in as a boolean, so this pure
+   * module (bundled into the client through the picker) never imports the address config. Undefined = not judged.
+   */
+  marketMapped?: boolean;
 }
 
 export interface RosterContext {
@@ -41,6 +47,7 @@ export function staticRosterRejection(c: RosterCandidate, rules: readonly Suppre
   if (!isReachable(c)) return "unreachable";
   if (c.clientStatus) return "client";
   if (isSuppressed(c.email as string, rules)) return "suppressed";
+  if (c.marketMapped === false) return "unmapped_market";
   return null;
 }
 

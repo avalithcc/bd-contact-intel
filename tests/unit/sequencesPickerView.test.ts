@@ -12,7 +12,7 @@ const contact = (id: string, companyKey: string | null, over: Partial<PickerCont
   personId: id, name: `Person ${id}`, jobTitle: "Lead", status: "new", company: companyKey && `Co ${companyKey}`, companyKey,
   florida: false, openIt: 2, email: `${id}@x.example`, emailStatus: "verified", emailSource: null, block: null, blockDetail: null, survivorId: null, ...over,
 });
-const all: PickerFilter = { search: "", florida: false, showBlocked: true };
+const all: PickerFilter = { showBlocked: true };
 const sel = (...cs: PickerContact[]): Selection => new Map(cs.map((c) => [c.personId, c]));
 
 test("staticBlock reuses the seed admission and splits only the two reasons the picker words twice", () => {
@@ -27,6 +27,9 @@ test("staticBlock reuses the seed admission and splits only the two reasons the 
   assert.equal(kind({ emailStatus: "none" }), "unreachable");
   assert.equal(kind({ emailStatus: "probable", emailSource: "pattern_inferred" }), "inferred");
   assert.equal(kind({ hasOpenItPosting: false }), "noPosting");
+  assert.equal(kind({ marketMapped: false }), "unmappedMarket");
+  assert.equal(kind({ marketMapped: true }), null);
+  assert.equal(kind({ marketMapped: false, clientStatus: "active" }), "client");
   assert.equal(kind({}, { alreadyMemberPersonIds: new Set(["p"]) }), "member");
   assert.equal(kind({ email: "gone@x.example" }, { suppressionRules: [{ ruleKind: "address", value: "gone@x.example" }] }), "suppressed");
 });
@@ -55,10 +58,10 @@ test("blocked contacts go last, after available and selected ones, keeping input
   assert.deepEqual(v.rows.map((r) => r.contact.personId), ["a", "b", "x"]);
 });
 
-test("counters come from the selection, not from the rows shown: a search that hides the chosen ones changes nothing", () => {
+test("counters come from the selection, not from the rows shown: a list that no longer holds the chosen ones changes nothing", () => {
   const [a, b, c] = [contact("a", "k1"), contact("b", "k1"), contact("c", "k2")];
   const selection = sel(a, b, c);
-  const v = pickerView([a, b, c], selection, { ...all, search: "no such person" });
+  const v = pickerView([], selection, all);
   assert.equal(v.rows.length, 0);
   assert.deepEqual([v.selectedCount, v.companyCount], [3, 2]);
   assert.deepEqual(v.full, [{ company: "Co k1", count: 2 }]);
@@ -73,17 +76,14 @@ test("contacts without a company are each their own company", () => {
   assert.equal(v.companyCount, 2);
 });
 
-test("filters: search matches name, company and email; Florida keeps only Florida; hiding the blocked drops them", () => {
-  const list = [contact("a", "k1", { florida: true, name: "Ana Demo" }), contact("b", "k2"), contact("x", "k3", { block: "suppressed", florida: true })];
-  const ids = (f: Partial<PickerFilter>) => pickerView(list, sel(), { ...all, ...f }).rows.map((r) => r.contact.personId);
-  assert.deepEqual(ids({ search: "ANA" }), ["a"]);
-  assert.deepEqual(ids({ search: "co k2" }), ["b"]);
-  assert.deepEqual(ids({ search: "b@x.example" }), ["b"]);
-  assert.deepEqual(ids({ florida: true }), ["a", "x"]);
-  assert.deepEqual(ids({ showBlocked: false }), ["a", "b"]);
-  const v = pickerView(list, sel(), { ...all, showBlocked: false });
-  assert.deepEqual([v.availableShown, v.blockedShown, v.blockedMatching], [2, 0, 1]);
-  assert.equal(pickerView(list, sel(), all).blockedShown, 1);
+test("hiding the blocked drops them from the rows and the counters, showing them puts them last", () => {
+  const list = [contact("x", "k3", { block: "suppressed" }), contact("a", "k1"), contact("u", "k4", { block: "unmappedMarket" }), contact("b", "k2")];
+  const hidden = pickerView(list, sel(), { showBlocked: false });
+  assert.deepEqual(hidden.rows.map((r) => r.contact.personId), ["a", "b"]);
+  assert.deepEqual([hidden.availableShown, hidden.blockedShown], [2, 0]);
+  const shown = pickerView(list, sel(), all);
+  assert.deepEqual(shown.rows.map((r) => [r.contact.personId, r.kind, r.block]), [["a", "available", null], ["b", "available", null], ["x", "blocked", "suppressed"], ["u", "blocked", "unmappedMarket"]]);
+  assert.equal(shown.blockedShown, 2);
 });
 
 test("per-row company count is the number selected in that company", () => {
@@ -111,6 +111,6 @@ test("toggleAllVisible adds the available ones in order within the limit, and a 
   assert.equal(pickerView(list, first, all).rows.find((r) => r.contact.personId === "c")!.kind, "blocked");
   const second = toggleAllVisible(first, pickerView(list, first, all).rows);
   assert.deepEqual([...second.keys()], []);
-  const keepOutside = toggleAllVisible(sel(contact("z", "q")), pickerView(list, sel(), { ...all, search: "Person d" }).rows);
+  const keepOutside = toggleAllVisible(sel(contact("z", "q")), pickerView([list[3]], sel(), all).rows);
   assert.deepEqual([...keepOutside.keys()], ["z", "d"]);
 });

@@ -5,9 +5,9 @@ import { useState } from "react";
 import { useToast } from "@/components/ToastProvider";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
-import type { PickerContact } from "@/lib/sequences/pickerView";
+import type { PickerPage } from "@/lib/sequences/pickerFilters";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
-import { addMembers, createSequence } from "../actions";
+import { addMembers, createSequence, loadPickerPage } from "../actions";
 import type { CreateSequenceIntent } from "../_components/actions";
 import { SequenceCreateForm } from "../_components/SequenceCreateForm";
 
@@ -17,7 +17,7 @@ import { SequenceCreateForm } from "../_components/SequenceCreateForm";
  * refuses is never dropped silently: the BD lands on the new Sequence with a toast that says how many were left out.
  * A failure stays on the form with the reason.
  */
-export function NewSequenceScreen({ contacts, account, labels: l, statusLabels }: { contacts: readonly PickerContact[]; account: { id: string; address: string } | null; labels: SequenceLabels; statusLabels: Dictionary["leadStatuses"] }) {
+export function NewSequenceScreen({ firstPage, account, labels: l, statusLabels }: { firstPage: PickerPage; account: { id: string; address: string } | null; labels: SequenceLabels; statusLabels: Dictionary["leadStatuses"] }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -47,5 +47,5 @@ export function NewSequenceScreen({ contacts, account, labels: l, statusLabels }
     }
   }
 
-  return <SequenceCreateForm contacts={contacts} account={account} labels={l} statusLabels={statusLabels} onSubmit={submit} busy={busy} error={error} />;
+  return <SequenceCreateForm contacts={firstPage.contacts} hasMore={firstPage.hasMore} loadPage={loadPickerPage} account={account} labels={l} statusLabels={statusLabels} onSubmit={submit} busy={busy} error={error} />;
 }

@@ -40,15 +40,16 @@ const pool = [
   person("a", "k1", { florida: true }), person("b", "k1"), person("c", "k1"), person("d", "k2", { emailStatus: "probable" }),
   person("m", "k3", { block: "merged", survivorId: "live-id" }), person("s", "k4", { block: "client" }),
 ];
+const noPage = async () => ({ contacts: [], hasMore: false });
 const picker = (selection: PickerContact[], list: PickerContact[] = pool) =>
-  renderToStaticMarkup(createElement(RosterPicker, { contacts: list, selection: new Map(selection.map((c) => [c.personId, c])), onChange: () => {}, labels: l, statusLabels: st }));
-const form = renderToStaticMarkup(createElement(SequenceCreateForm, { contacts: pool, account: { address: "bd@avalith.example" }, labels: l, statusLabels: st, onSubmit: () => {} }));
+  renderToStaticMarkup(createElement(RosterPicker, { contacts: list, hasMore: false, loadPage: noPage, initialShowBlocked: true, selection: new Map(selection.map((c) => [c.personId, c])), onChange: () => {}, labels: l, statusLabels: st }));
+const form = renderToStaticMarkup(createElement(SequenceCreateForm, { contacts: pool, hasMore: false, loadPage: noPage, account: { address: "bd@avalith.example" }, labels: l, statusLabels: st, onSubmit: () => {} }));
 
 test("the company-limit reason joins names through the locale, never a hardcoded conjunction", () => {
   const chosen = [pool[0], pool[1]];
   const sel = new Map(chosen.map((c) => [c.personId, c]));
   const render = (labels: typeof es.sequences) =>
-    renderToStaticMarkup(createElement(RosterPicker, { contacts: pool, selection: sel, onChange: () => {}, labels, statusLabels: st }));
+    renderToStaticMarkup(createElement(RosterPicker, { contacts: pool, hasMore: false, loadPage: noPage, initialShowBlocked: true, selection: sel, onChange: () => {}, labels, statusLabels: st }));
   assert.match(render(es.sequences), /Person a y Person b/, "Spanish joins with 'y'");
   assert.match(render(en.sequences), /Person a and Person b/, "English must not inherit the Spanish conjunction");
 });
@@ -89,11 +90,13 @@ test("form: settings first, one cadence option, default cap, no warning, button 
   assert.ok(form.includes("Predeterminado 5 · máximo 15") && form.includes("bd@avalith.example") && form.includes("Conectada"));
   assert.ok(!form.includes("alert-warn") && !form.includes("subdominio"));
   assert.match(form, /<button[^>]*class="btn btn-primary"[^>]*disabled=""[^>]*>Elegí al menos un contacto para crear</);
-  assert.ok(form.includes('<div class="segmented"') && form.includes("Todo EE. UU."));
+  // The location is a set of independent filters (chips), not a US restriction: none is pressed by default.
+  for (const chip of ["Florida / Miami", "Contratando IT en EE. UU.", "Mis contactos"]) assert.ok(new RegExp(`<button[^>]*class="chip"[^>]*aria-pressed="false"[^>]*>${chip}</button>`).test(form), chip);
+  assert.ok(!form.includes("Todo EE. UU.") && !form.includes("segmented"));
 });
 
 test("form: without a connected account it says so and cannot be submitted", () => {
-  const html = renderToStaticMarkup(createElement(SequenceCreateForm, { contacts: pool, account: null, labels: l, statusLabels: st, onSubmit: () => {} }));
+  const html = renderToStaticMarkup(createElement(SequenceCreateForm, { contacts: pool, hasMore: false, loadPage: noPage, account: null, labels: l, statusLabels: st, onSubmit: () => {} }));
   assert.ok(html.includes("Sin conectar") && html.includes("No tenés una cuenta de Gmail conectada"));
 });
 
@@ -112,8 +115,26 @@ test("picker: rows, badges and reasons as the mockup draws them", () => {
   assert.ok(html.includes("4 disponibles · 2 que no se pueden agregar, con el motivo") && html.includes("Cupo por empresa: 2") && html.includes("Mostrar los que no se pueden agregar"));
 });
 
+test("picker: a contact in a region without a legal footer is blocked with its reason, hidden until the toggle, and cannot be chosen", () => {
+  const spain = person("u", "k9", { block: "unmappedMarket" });
+  const shown = picker([], [pool[1], spain]);
+  at(shown, "Person b", "Disponible", "No se pueden agregar · 1", "Person u", "Sin pie legal para su región");
+  assert.ok(shown.includes("No tenemos una dirección postal para la región de este contacto") && shown.includes('aria-label="No se puede elegir a Person u"'));
+  const hidden = renderToStaticMarkup(createElement(RosterPicker, { contacts: [pool[1], spain], hasMore: false, loadPage: noPage, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }));
+  assert.ok(!hidden.includes("Person u") && !hidden.includes("Sin pie legal") && hidden.includes("Person b"), "blocked contacts are hidden by default");
+  assert.ok(/<input type="checkbox"[^>]*\/> Mostrar los que no se pueden agregar/.test(hidden) && !/checked=""[^>]*\/> Mostrar/.test(hidden));
+});
+
+test("picker: 'Cargar más' appears only while the server has more, and an empty page says so", () => {
+  const more = renderToStaticMarkup(createElement(RosterPicker, { contacts: pool, hasMore: true, loadPage: noPage, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }));
+  assert.ok(more.includes("Cargar más"));
+  assert.ok(!picker([]).includes("Cargar más"));
+  const empty = renderToStaticMarkup(createElement(RosterPicker, { contacts: [], hasMore: false, loadPage: noPage, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }));
+  assert.ok(empty.includes("Ningún contacto coincide con estos filtros."));
+});
+
 test("every block reason is worded in both languages", () => {
-  const kinds = { client: 1, clientFormer: 1, suppressed: 1, member: 1, merged: 1, noEmail: 1, unreachable: 1, inferred: 1, noPosting: 1, companyLimit: 1 } satisfies Record<BlockKind, 1>;
+  const kinds = { client: 1, clientFormer: 1, suppressed: 1, member: 1, merged: 1, noEmail: 1, unreachable: 1, inferred: 1, noPosting: 1, unmappedMarket: 1, companyLimit: 1 } satisfies Record<BlockKind, 1>;
   for (const d of [es.sequences, en.sequences]) for (const k of Object.keys(kinds)) assert.ok(d.blockLabels[k as BlockKind] && d.blockWhy[k as BlockKind], k);
   assert.deepEqual(Object.keys(es.sequences).sort(), Object.keys(en.sequences).sort());
 });
@@ -124,7 +145,7 @@ test("every class the list, form and picker render exists in the approved styles
   for (const p of css.match(/[^{}]+(?=\{)/g) ?? []) for (const m of p.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) known.add(m[1]);
   const used = new Set<string>();
   const statuses = es.leadStatuses;
-  const all = [list, form, picker([pool[0]]), renderToStaticMarkup(createElement(RosterPicker, { contacts: Object.keys(statuses).flatMap((s, i) => [person(`s${i}`, `q${i}`, { status: s as PickerContact["status"] }), person(`i${i}`, `r${i}`, { emailStatus: "probable", emailSource: "pattern_inferred" }), person(`n${i}`, `t${i}`, { emailStatus: "none" })]), selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }))];
+  const all = [list, form, picker([pool[0]]), renderToStaticMarkup(createElement(RosterPicker, { contacts: Object.keys(statuses).flatMap((s, i) => [person(`s${i}`, `q${i}`, { status: s as PickerContact["status"] }), person(`i${i}`, `r${i}`, { emailStatus: "probable", emailSource: "pattern_inferred" }), person(`n${i}`, `t${i}`, { emailStatus: "none" })]), hasMore: false, loadPage: noPage, initialShowBlocked: true, selection: new Map(), onChange: () => {}, labels: l, statusLabels: st }))];
   for (const html of all) for (const m of html.matchAll(/class="([^"]*)"/g)) for (const t of m[1].split(/\s+/).filter(Boolean)) used.add(t);
   assert.ok(used.size > 40);
   assert.deepEqual([...used].filter((c) => !known.has(c)).sort(), []);
