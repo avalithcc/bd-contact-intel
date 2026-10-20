@@ -146,3 +146,15 @@ test("all three links absent resolves to other (hold, never send)", () => {
   assert.equal(recipientMarket({ ...NO_PHONE }), "other");
   assert.equal(recipientMarket({ ...NO_PHONE, personCountry: null, companyCountry: null, postingMarkets: null }), "other");
 });
+
+test("Cuba is unmapped on purpose, not by oversight", () => {
+  // A US-entity postal footer on mail to Cuba raises an OFAC sanctions question that is the owner's to answer, so Cuba is
+  // deliberately absent from the LATAM country names and from the dial-code groups. This pins that absence: admitting Cuba
+  // has to be a decision, never a side effect of someone extending a country list.
+  assert.equal(recipientMarket({ ...NO_PHONE, personCountry: "Cuba" }), "other");
+});
+
+test("Cuba is not a known country name either, so no link can reach it", async () => {
+  const { isKnownCountryName } = await import("../../src/lib/hiring/markets");
+  assert.equal(isKnownCountryName("Cuba"), false);
+});

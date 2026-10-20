@@ -52,9 +52,16 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
  * (`+5491`, `+54`...), and without a floor any of them on a no-country contact would match its country prefix and surface
  * in the default view. DERIVED, not guessed, by brute force: random national numbers fed to libphonenumber's `isValid()` for
  * every mapped country, keeping the shortest that validates. The shortest REAL subscriber numbers are Paraguay at 9 digits and
- * then 10 (Panama 507+7, Brazil, Colombia, Peru); the only shorter "valid" string is a non-subscriber special (Uruguay, 7).
- * 8 sits one below Paraguay's 9, so the floor cannot clip a real number; the unit test asserts it against every country's
- * example number. The search gave the same answer under the `min` metadata that phoneMarket.ts imports and under `max`
+ * then 10 (Panama 507+7, Brazil, Colombia, Peru). 8 sits one below Paraguay's 9, so the floor cannot clip a real
+ * SUBSCRIBER number; the unit test asserts it against every country's example number.
+ *
+ * KNOWN COST, measured and accepted: `isValid()` also accepts a few 7-digit Uruguayan non-subscriber specials
+ * (`+5982000`, four national digits). Those fail the floor, so SQL calls the row blocked while JS would admit it — the
+ * SEVERE direction, a row hidden from the default view with no badge to explain it. Accepted because no person answers
+ * one of those numbers, and dropping the floor to 7 would re-admit the `+5491` garbage the floor exists to keep out. Do
+ * not lower it without something that separates those two cases.
+ *
+ * The search gave the same answer under the `min` metadata that phoneMarket.ts imports and under `max`
  * (phoneNormalize.ts uses `max`), so the variant does not move the floor. The lookahead counts DIGITS only: a `+` in the
  * class would let `+54+++++` clear it. There is no upper bound: an extension only lengthens a number JS accepts.
  */
@@ -78,7 +85,8 @@ export const PHONE_MIN_LENGTH = 8;
  * default view, badged `unmappedMarket` by the JS admission, and the add guard (`staticRosterRejection`) refuses them. That
  * is the tolerable direction: a usable row is never hidden and an unusable one is never added, it just shows with its reason.
  * Fixing it would take a negative area-code list that rots, so it is left. The reverse (SQL hiding a row JS would allow)
- * is guarded by the length floor and `phoneDigits`, and pinned by the all-countries example test.
+ * is guarded by the length floor and `phoneDigits` and pinned by the all-countries example test, with one measured
+ * exception named on PHONE_MIN_LENGTH: Uruguayan 7-digit specials fall below the floor.
  */
 export function buildPhoneFooterPattern(groups: { latam: readonly string[]; us: readonly string[] }): string {
   const prefixes = [...groups.latam, ...groups.us];
