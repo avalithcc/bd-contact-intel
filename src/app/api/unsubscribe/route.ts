@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { unstable_rethrow } from "next/navigation";
-import { renderUnsubscribeHtml } from "@/lib/sequences/unsubscribeHtml";
-import { postalAddressForToken, unsubscribePort } from "@/lib/sequences/unsubscribeQueries";
+import { pageLocale, renderUnsubscribeHtml } from "@/lib/sequences/unsubscribeHtml";
+import { unsubscribeAudienceForToken, unsubscribePort } from "@/lib/sequences/unsubscribeQueries";
 import { handleUnsubscribeGetRequest, handleUnsubscribePostRequest, unsubscribeDocument, type UnsubscribeRequestDeps } from "@/lib/sequences/unsubscribeRequest";
 
 /**
@@ -45,8 +45,8 @@ function css(): string {
 
 const deps: UnsubscribeRequestDeps = {
   port: unsubscribePort,
-  addressFor: postalAddressForToken,
-  render: (view, postalAddress) => unsubscribeDocument(renderUnsubscribeHtml(view, postalAddress), css()),
+  audienceFor: unsubscribeAudienceForToken,
+  render: (view, page) => unsubscribeDocument(renderUnsubscribeHtml(view, page), css(), pageLocale(view, page)),
 };
 
 export const GET = (request: Request) => handleUnsubscribeGetRequest(request, deps);

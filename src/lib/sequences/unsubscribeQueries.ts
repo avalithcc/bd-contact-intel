@@ -7,12 +7,11 @@ import { db } from "@/db";
 import { emailSuppression, person, sequenceMember, sequenceUnsubscribeToken } from "@/db/schema";
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { openPostingSql } from "@/lib/hiring/openPosting";
-import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
-import { resolveComplianceAudience } from "@/lib/sequences/complianceAudience";
 import { companyCountrySql } from "@/lib/sequences/rosterQuery";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
 import type { UnsubscribePort } from "@/lib/sequences/unsubscribeHandlers";
+import { unsubscribePageAudience, type UnsubscribePageAudience } from "@/lib/sequences/unsubscribePageAudience";
 import { generateUnsubscribeToken, hashUnsubscribeToken } from "@/lib/sequences/unsubscribeToken";
 
 /** One indexed read on token_hash. Writes nothing. */
@@ -109,12 +108,12 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
 }
 
 /**
- * The postal address the recipient's own email carried: the compliance entry of their audience (config.ts), found from the
- * token the same way the draft found it (resolveComplianceAudience: person country, company country, postings, phone).
- * One read, no writes. Undefined for an unknown token or a contact with no audience: the page then shows none rather than
- * another country's.
+ * What the unsubscribe page needs about the recipient: the postal address AND the language their own email carried, i.e.
+ * their compliance audience (complianceAudience.ts), found from the token the same way the draft found it (person country,
+ * company country, postings, phone). One read, no writes: the GET path is typed read-only on purpose. Undefined for an
+ * unknown token or a contact with no audience: the page then shows no address (never another country's) and English.
  */
-export async function postalAddressForToken(tokenHash: string): Promise<string | undefined> {
+export async function unsubscribeAudienceForToken(tokenHash: string): Promise<UnsubscribePageAudience | undefined> {
   const sameCompany = (alias: string) => sql.raw(`(${alias}.company_key = p.company_key or ${alias}.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`);
   const rows = (await db.execute(sql`
     select p.country as person_country, p.mobile_phone, p.phone,
@@ -127,8 +126,7 @@ export async function postalAddressForToken(tokenHash: string): Promise<string |
     limit 1`)) as unknown as { person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
   const row = rows[0];
   if (!row) return undefined;
-  const audience = resolveComplianceAudience({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets });
-  return audience ? COMPLIANCE_CONFIG[audience.address]?.postalAddress : undefined;
+  return unsubscribePageAudience({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets });
 }
 
 /** The port the unsubscribe route (PR 13) is given. */

@@ -12,9 +12,10 @@ const ROOT = join(__dirname, "..", "..");
 const css = ["design-system.css", "globals.css"].map((f) => readFileSync(join(ROOT, "src", "app", f), "utf8")).join("\n");
 const TOKEN = generateUnsubscribeToken();
 const ADDRESS = "Synthetic Co, 1 Test Street";
+const PAGE = { postalAddress: ADDRESS, locale: "en" } as const;
 
-const confirm = (email = "person@example.test") => renderUnsubscribeHtml({ kind: "confirm", email, token: TOKEN }, ADDRESS);
-const done = (email = "person@example.test") => renderUnsubscribeHtml({ kind: "done", email }, ADDRESS);
+const confirm = (email = "person@example.test") => renderUnsubscribeHtml({ kind: "confirm", email, token: TOKEN }, PAGE);
+const done = (email = "person@example.test") => renderUnsubscribeHtml({ kind: "done", email }, PAGE);
 const invalid = () => renderUnsubscribeHtml({ kind: "invalid" });
 
 test("every class the unsubscribe pages use exists in the design system", () => {
@@ -55,7 +56,7 @@ test("the address and the token are escaped, so a hostile value cannot inject ma
   const html = confirm(hostile);
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /&#60;script&#62;/);
-  const forged = renderUnsubscribeHtml({ kind: "confirm", email: "p@example.test", token: `"><img src=x>` }, ADDRESS);
+  const forged = renderUnsubscribeHtml({ kind: "confirm", email: "p@example.test", token: `"><img src=x>` }, PAGE);
   assert.doesNotMatch(forged, /<img/);
-  assert.doesNotMatch(renderUnsubscribeHtml({ kind: "done", email: "p@example.test" }, `<b>${ADDRESS}`), /<b>/);
+  assert.doesNotMatch(renderUnsubscribeHtml({ kind: "done", email: "p@example.test" }, { ...PAGE, postalAddress: `<b>${ADDRESS}` }), /<b>/);
 });
