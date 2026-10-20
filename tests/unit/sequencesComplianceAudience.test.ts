@@ -12,9 +12,8 @@ import {
   resolveCountry,
   type ComplianceAudienceInputs,
 } from "../../src/lib/sequences/complianceAudience";
-import { countryNameOf, phoneCountryIso } from "../../src/lib/sequences/phoneMarket";
+import { phoneCountryIso } from "../../src/lib/sequences/phoneMarket";
 import { LATAM_COUNTRY_NAMES } from "../../src/lib/hiring/markets";
-import { recipientMarket } from "../../src/lib/sequences/recipientMarket";
 
 const audience = (over: Partial<ComplianceAudienceInputs>) =>
   resolveComplianceAudience({ mobilePhone: null, phone: null, ...over });
@@ -41,7 +40,7 @@ test("a us posting bucket yields Miami in English", () => {
   assert.deepEqual(audience({ postingMarkets: ["us"] }), MIAMI_EN);
 });
 
-test("postings that conflict or say nothing fall through to the phone, as recipientMarket does", () => {
+test("postings that conflict or say nothing fall through to the phone", () => {
   assert.deepEqual(audience({ postingMarkets: ["us", "latam"], mobilePhone: AR_PHONE }), MDP);
   assert.deepEqual(audience({ postingMarkets: ["other", null], phone: ES_PHONE }), MIAMI_ES);
   assert.equal(audience({ postingMarkets: ["us", "latam"] }), null);
@@ -256,7 +255,7 @@ test("every country libphonenumber can name resolves through the phone link; the
     if (!example) continue;
     const result = audience({ mobilePhone: example.number });
     // +1 numbers, +7 and +44 shared plans can parse to a sibling region; judge by the country actually parsed.
-    const name = example.country ? countryNameOf(example.country) : countryNameOf(iso);
+    const name = example.country ?? iso;
     checked += 1;
     if (SANCTIONED_COUNTRIES.has(iso)) assert.equal(result, null, `${iso} (${name}) must hold by phone`);
     else if (iso === "AR") assert.deepEqual(result, MDP);
@@ -285,9 +284,8 @@ test("pure: the same input twice gives the same answer and the input is not muta
   assert.deepEqual(resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: "Argentina" }), MDP);
 });
 
-test("every country that has a footer today is still mailable: the new table covers the old market lists", () => {
+test("every country that was mailable before the switch is still mailable: the table covers the old LATAM list, the US and Canada", () => {
   for (const name of [...LATAM_COUNTRY_NAMES, "united states", "canada"]) {
-    assert.equal(recipientMarket({ mobilePhone: null, phone: null, personCountry: name }) !== "other", true, name);
     assert.notEqual(audience({ personCountry: name }), null, `${name} had a footer before and must not start holding`);
   }
 });

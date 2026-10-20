@@ -117,7 +117,7 @@ test("a Contact with no company key is not grouped under the company limit", () 
   assert.deepEqual(r.accepted, ["a", "b", "c"]);
 });
 
-test("a Contact whose market has no postal address is refused, whatever the client asked; an unknown market is not judged", () => {
+test("a Contact with no compliance audience is refused, whatever the client asked; an unknown market is not judged", () => {
   const r = evaluateRosterAdds([candidate("spain", { marketMapped: false }), candidate("us", { marketMapped: true }), candidate("unknown")], ctx());
   assert.deepEqual(reasons(r), { spain: "unmapped_market" });
   assert.deepEqual(r.accepted, ["us", "unknown"]);

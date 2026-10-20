@@ -3,33 +3,35 @@
  * under src/lib/sequences may carry these strings (tests/unit/sequencesNoHardcodedAddress.test.ts enforces it), so a
  * later change of office is an edit to this file only.
  *
- * Keyed by the RECIPIENT's market (classifyMarket in src/lib/hiring/markets.ts), and the key is mandatory, not a
- * default. `other` has deliberately NO entry: the system refuses to send rather than pick an address, because a wrong
- * country's address is still a compliance failure. Do not add a fallback here.
+ * Keyed by the ADDRESS the recipient's audience resolves to (resolveComplianceAudience in complianceAudience.ts):
+ * "mdp" for Argentina, "miami" for every other located country. The key is mandatory, not a default. A contact with no
+ * audience (no location signal, or an embargoed jurisdiction) has NO address: the system refuses to send rather than pick
+ * one, because a wrong country's address is still a compliance failure. Do not add a fallback here. The keys are about the
+ * postal address only; the language is the audience's other field and is not decided in this file.
  *
  * `Ste G` is confirmed against the primary Florida record (search.sunbiz.org, document P18000083350). Commercial
  * aggregators report `Ste K`; they are wrong and are not a source for this field.
  */
-import type { MarketKey } from "@/lib/hiring/markets";
+import type { ComplianceAddress } from "./complianceAudience";
 
-export interface MarketComplianceEntry {
+export interface AddressComplianceEntry {
   /** One line, exactly as it must appear in the message. */
   readonly postalAddress: string;
   /** The opt-out instruction. The per-recipient link is appended after it by the footer builder. */
   readonly optOutText: string;
 }
 
-export type ComplianceConfig = Readonly<Partial<Record<MarketKey, MarketComplianceEntry>>>;
+export type ComplianceConfig = Readonly<Partial<Record<ComplianceAddress, AddressComplianceEntry>>>;
 
 const OPT_OUT_TEXT =
   "If you would rather not receive further emails from us, use the link below or simply reply with \"unsubscribe\".";
 
 export const COMPLIANCE_CONFIG: ComplianceConfig = {
-  us: {
+  miami: {
     postalAddress: "Avalith Corporation, 470 Ansin Blvd Ste G, Hallandale, FL 33009, USA",
     optOutText: OPT_OUT_TEXT,
   },
-  latam: {
+  mdp: {
     postalAddress: "Avalith, Formosa 2531, B7600 Mar del Plata, Buenos Aires, Argentina",
     optOutText: OPT_OUT_TEXT,
   },

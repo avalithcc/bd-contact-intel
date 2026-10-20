@@ -11,9 +11,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence, sequenceMember } from "@/db/schema";
-import type { MarketKey } from "@/lib/hiring/markets";
-import { draftLanguageForMarket } from "./draftInput";
-import { recipientMarket } from "./recipientMarket";
+import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
 import { clientStatusSql, companyCountrySql } from "./rosterQuery";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import {
@@ -46,8 +44,9 @@ export interface SeedOptions {
 
 export interface SeedLine {
   candidate: SeedCandidate;
-  market: MarketKey;
-  /** "en" | "es", or null when the market has no language (the member would be held, not drafted). */
+  /** The postal address the footer would carry, or null when the contact has no audience (the member would be held, not drafted). */
+  address: ComplianceAddress | null;
+  /** "en" | "es", or null when the contact has no audience. */
   language: string | null;
 }
 
@@ -107,7 +106,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
   }
   if (problems.length) throw new Error(`Cannot resolve the roster, nothing written. Never guessing between matches:\n- ${problems.join("\n- ")}`);
   return found.map(({ entry, row: r }): SeedLine => {
-    const market = recipientMarket({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] });
+    const audience = resolveComplianceAudience({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] });
     const candidate: SeedCandidate = {
       label: `${entry.name} @ ${entry.company}`,
       personId: r.person_id as string,
@@ -119,7 +118,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
       clientStatus: r.client_status as string | null,
       hasOpenItPosting: r.has_open_it_posting as boolean,
     };
-    return { candidate, market, language: draftLanguageForMarket(market) };
+    return { candidate, address: audience?.address ?? null, language: audience?.language ?? null };
   });
 }
 

@@ -119,7 +119,7 @@ test("replyPhrases raises the prompt on any reply, keeps the first phrase per me
 });
 
 test("our own footer quoted back in a reply does not raise the prompt", () => {
-  const footer = COMPLIANCE_CONFIG.us!.optOutText;
+  const footer = COMPLIANCE_CONFIG.miami!.optOutText;
   assert.deepEqual(replyPhrases([{ member_id: "m1", body_text: `Interesting, tell me more.\n\n${footer}` }]), {});
 });
 

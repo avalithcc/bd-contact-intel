@@ -20,8 +20,7 @@ import type { SequenceListRow } from "./listView";
 import { groupListRows, replyPhrases, toMembership, toPickerContact, type ListDbRow, type MembershipDbRow, type PickerDbRow } from "./pageReads";
 import { PICKER_PAGE_SIZE, type PickerPage, type PickerQuery } from "./pickerFilters";
 import { buildPickerPageQuery, countryFacts, distinctCountriesSql, type CountryFacts } from "./pickerQuery";
-import { recipientMarket } from "./recipientMarket";
-import { isMarketMapped } from "./draftCompose";
+import { resolveComplianceAudience } from "./complianceAudience";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { companyNameColumnsSql, canonicalCompanyJoinSql } from "./rosterQuery";
 
@@ -89,9 +88,9 @@ export function clearPickerCountryFacts() {
 }
 
 /**
- * Which country texts have no postal address / are the US, for the SQL that orders and filters the picker. Cached for a
+ * Which country texts have no compliance audience / are the US, for the SQL that orders and filters the picker. Cached for a
  * few minutes (one round trip saved per page): a stale entry can only mis-order a row, never mis-admit it, because the
- * reason a row shows and the add itself re-derive the market from the row (recipientMarket).
+ * reason a row shows and the add itself re-derive the audience from the row (resolveComplianceAudience).
  */
 async function pickerCountryFacts(): Promise<CountryFacts> {
   if (countryFactsCache && Date.now() - countryFactsCache.at < COUNTRY_FACTS_TTL_MS) return countryFactsCache.facts;
@@ -114,7 +113,7 @@ export async function listPickerPage(query: PickerQuery, meId: string, unnamed: 
   );
   const named = withResolvedCompanyName(rows).slice(0, PICKER_PAGE_SIZE);
   const contacts = named.map((r) => {
-    const mapped = isMarketMapped(recipientMarket({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }));
+    const mapped = resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }) !== null;
     // A suppressed address becomes a one-address rule, so the SAME isSuppressed() that guards the add decides the reason.
     const rules: SuppressionRule[] = r.suppressed && r.email ? [{ ruleKind: "address", value: normalizeSuppressionValue("address", r.email) }] : [];
     return toPickerContact({ ...r, market_mapped: mapped }, rules, unnamed);

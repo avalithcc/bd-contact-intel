@@ -35,13 +35,13 @@ async function mkCompany(name: string, over: { clientStatus?: string; postings?:
   return ck;
 }
 
-async function mkPerson(name: string, ck: string | null, over: { email?: string | null; emailStatus?: string; mergedIntoId?: string; company?: string | null; country?: string | null; city?: string | null; region?: string | null; ownerBdId?: string; jobTitle?: string } = {}) {
+async function mkPerson(name: string, ck: string | null, over: { email?: string | null; emailStatus?: string; mergedIntoId?: string; company?: string | null; country?: string | null; mobilePhone?: string | null; city?: string | null; region?: string | null; ownerBdId?: string; jobTitle?: string } = {}) {
   const { db } = await import("@/db");
   const { person } = await import("@/db/schema");
   const email = over.email === undefined ? `${key(name)}@example.test` : over.email;
   const [p] = await db
     .insert(person)
-    .values({ firstName: name, lastName: run, email, emailNormalized: email?.toLowerCase().trim() ?? null, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", company: over.company === undefined ? ck : over.company, companyKey: ck, mergedIntoId: over.mergedIntoId, country: over.country ?? null, city: over.city ?? null, region: over.region ?? null, ownerBdId: over.ownerBdId, jobTitle: over.jobTitle })
+    .values({ firstName: name, lastName: run, email, emailNormalized: email?.toLowerCase().trim() ?? null, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", company: over.company === undefined ? ck : over.company, companyKey: ck, mergedIntoId: over.mergedIntoId, country: over.country ?? null, mobilePhone: over.mobilePhone ?? null, city: over.city ?? null, region: over.region ?? null, ownerBdId: over.ownerBdId, jobTitle: over.jobTitle })
     .returning();
   personIds.push(p.id);
   return p;
@@ -184,6 +184,8 @@ test("the picker lists EVERY live contact with an email, wherever they are, and 
   const latam = await mkPerson("pk-latam", await mkCompany("pk-latam", { postings: false }), { country: ARG });
   const noSignal = await mkPerson("pk-nosignal", await mkCompany("pk-nosignal", { postings: false }));
   const spain = await mkPerson("pk-spain", await mkCompany("pk-spain"), { country: "Spain" });
+  const cuba = await mkPerson("pk-cuba", await mkCompany("pk-cuba"), { country: "Cuba" });
+  const gibberish = await mkPerson("pk-gibberish", await mkCompany("pk-gibberish"), { country: "Greater Buenos Aires" });
   const client = await mkPerson("pk-client", await mkCompany("pk-client", { clientStatus: "active" }));
   const former = await mkPerson("pk-former", await mkCompany("pk-former", { clientStatus: "inactive" }));
   const survivor = await mkPerson("pk-survivor", await mkCompany("pk-survivor"));
@@ -201,7 +203,9 @@ test("the picker lists EVERY live contact with an email, wherever they are, and 
   assert.equal(by.get(latam.id)?.block, null, "a company with no posting at all is listed: hiring is a filter, not the pool");
   assert.equal(by.get(nocompany.id)?.block, null, "a contact without a company is listed too");
   assert.equal(by.get(noSignal.id)?.block, "unmappedMarket", "no country and no posting: no market, so no legal footer");
-  assert.equal(by.get(spain.id)?.block, "unmappedMarket");
+  assert.equal(by.get(spain.id)?.block, null, "a located country has an address now: Spain is listed and addable");
+  assert.equal(by.get(cuba.id)?.block, "unmappedMarket", "an embargoed jurisdiction holds, with its badge (shown, not hidden)");
+  assert.equal(by.get(gibberish.id)?.block, "unmappedMarket", "text that is not exactly a country holds");
   assert.equal(by.get(client.id)?.block, "client");
   assert.equal(by.get(former.id)?.block, "clientFormer");
   assert.equal(by.get(none.id)?.block, "unreachable");
@@ -461,7 +465,7 @@ test("the picker and addMembers read the SAME company country: own row first, th
     return mkPerson(`cc-${name}`, own);
   };
   const blankOwn = await mk("blank", "  ", "Argentina"); // own blank -> the canonical LATAM country decides: addable
-  const ownWins = await mk("own", "Spain", "Argentina"); // own filled -> it decides, and Spain has no footer
+  const ownWins = await mk("own", "Cuba", "Argentina"); // own filled -> it decides, and Cuba is embargoed
   const blankCanon = await mk("canon", "Argentina", "  "); // own LATAM, canonical blank
   const seq = (await db.insert((await import("@/db/schema")).sequence).values({ name: key("cc-seq"), ownerBdId: ownerId, emailAccountId: accountId, schedule: {} }).returning())[0];
   sequenceIds.push(seq.id);
@@ -474,4 +478,53 @@ test("the picker and addMembers read the SAME company country: own row first, th
   assert.deepEqual(added.accepted.sort(), [blankOwn.id, blankCanon.id].sort());
   assert.deepEqual(added.rejected, [{ personId: ownWins.id, reason: "unmapped_market" }]);
   void targetCompany;
+});
+
+test("SQL/JS AGREEMENT: the picker's blocked flag never hides a contact the audience would mail, across every link and conflict", async () => {
+  const { resolveComplianceAudience } = await import("@/lib/sequences/complianceAudience");
+  const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
+  const { db } = await import("@/db");
+  const { sequence } = await import("@/db/schema");
+  const AR = "+5491155551234", ES = "+34612345678", TH = "+66812345678", GE = "+995555123456", CA = "+14165550123";
+  const CU = "+5351234567", IR = "+989121234567", KP = "+85021234567", SY = "+963944123456";
+  type Spec = { country?: string; companyCountry?: string; posting?: boolean; mobile?: string };
+  const specs: Spec[] = [
+    // person country, every policy bucket and every way a string can fail to be a country
+    ...["Argentina", "Mexico", "Brazil", "Spain", "Ireland", "Georgia", "Japan", "Thailand", "Canada", "ESPAÑA", " argentina ", "Puerto Rico"].map((country) => ({ country })),
+    ...["Cuba", "Iran", "North Korea", "Syria", "Atlantis", "Miami, FL", "Greater Buenos Aires", "Latin America"].map((country) => ({ country })),
+    // company country alone, then conflicting with a person country / a phone
+    { companyCountry: "Spain" }, { companyCountry: "Mexico" }, { companyCountry: "Cuba" }, { companyCountry: "Atlantis" },
+    { country: "Spain", companyCountry: "Cuba" }, { country: "Cuba", companyCountry: "Spain" }, { companyCountry: "Cuba", mobile: AR }, { country: "Atlantis", mobile: AR },
+    // postings alone and with phones (postings decide before the phone)
+    { posting: true }, { posting: true, mobile: CU }, { posting: true, mobile: "+5491" },
+    // phone alone: located, embargoed, garbage
+    { mobile: AR }, { mobile: ES }, { mobile: TH }, { mobile: GE }, { mobile: CA }, { mobile: CU }, { mobile: IR }, { mobile: KP }, { mobile: SY },
+    { mobile: "+5491" }, { mobile: "5491155551234" }, {},
+  ];
+  assert.ok(specs.length < 50, "one page");
+  const made: { id: string; spec: Spec; label: string }[] = [];
+  for (const [i, spec] of specs.entries()) {
+    const needsCompany = spec.companyCountry !== undefined || spec.posting !== undefined;
+    const ck = needsCompany ? await mkCompany(`agr${i}`, { postings: spec.posting === true, country: spec.companyCountry }) : null;
+    const p = await mkPerson(`agr-${i}`, ck, { country: spec.country, mobilePhone: spec.mobile });
+    made.push({ id: p.id, spec, label: JSON.stringify(spec) });
+  }
+  const js = (spec: Spec) => resolveComplianceAudience({ mobilePhone: spec.mobile ?? null, phone: null, personCountry: spec.country ?? null, companyCountry: spec.companyCountry ?? null, postingMarkets: spec.posting ? ["us"] : [] }) !== null;
+  const visible = new Map((await pickerIds({ search: `agr- ${run}` })).map((c) => [c.personId, c.block]));
+  const everything = new Map((await pickerIds({ search: `agr- ${run}`, showBlocked: true })).map((c) => [c.personId, c.block]));
+  let shownButHeld = 0;
+  for (const { id, spec, label } of made) {
+    if (js(spec)) {
+      assert.equal(visible.get(id), null, `HIDDEN or badged though the audience would mail it: ${label}`);
+    } else {
+      assert.equal(everything.get(id), "unmappedMarket", `a held contact must always carry its badge: ${label}`);
+      if (visible.has(id)) shownButHeld += 1; // the tolerable direction: shown with a badge, refused by the add guard
+    }
+  }
+  assert.ok(shownButHeld >= 4, `the embargoed phones are shown (badged), not hidden: ${shownButHeld}`);
+  const [seq] = await db.insert(sequence).values({ name: key("agr-seq"), ownerBdId: ownerId, emailAccountId: accountId, schedule: {} }).returning();
+  sequenceIds.push(seq.id);
+  const added = await addMembersToSequence(ownerId, seq.id, made.map((m) => m.id));
+  assert.ok(added.ok);
+  assert.deepEqual(added.accepted.sort(), made.filter((m) => js(m.spec)).map((m) => m.id).sort(), "the add guard admits exactly what the audience mails");
 });

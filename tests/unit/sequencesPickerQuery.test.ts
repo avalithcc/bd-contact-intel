@@ -4,12 +4,12 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { DEFAULT_PICKER_QUERY, PICKER_PAGE_SIZE, type PickerQuery } from "@/lib/sequences/pickerFilters";
 import { getCountries, getExampleNumber } from "libphonenumber-js";
 import mobileExamples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
-import { isMarketMapped } from "@/lib/sequences/draftCompose";
-import { PHONE_MIN_LENGTH, buildPickerPageQuery, buildPhoneFooterPattern, countryFacts, floridaGeoPattern, normalizePhoneLikeSql, phoneFooterPattern } from "@/lib/sequences/pickerQuery";
-import { recipientMarket } from "@/lib/sequences/recipientMarket";
+import { resolveComplianceAudience } from "@/lib/sequences/complianceAudience";
+import { PHONE_MIN_LENGTH, buildPickerPageQuery, buildPhoneLocatedPattern, countryFacts, floridaGeoPattern, normalizePhoneLikeSql, phoneLocatedPattern } from "@/lib/sequences/pickerQuery";
+import { phoneCallingCodes } from "@/lib/sequences/phoneMarket";
 
 const ME = "00000000-0000-4000-8000-000000000001";
-const facts = { unmapped: ["spain"], us: ["united states"] };
+const facts = { unmapped: ["atlantis"], us: ["united states"] };
 const render = (over: Partial<PickerQuery> = {}) => {
   const q = new PgDialect().sqlToQuery(buildPickerPageQuery({ ...DEFAULT_PICKER_QUERY, ...over }, ME, facts));
   return { text: q.sql.replace(/\s+/g, " "), params: q.params };
@@ -69,10 +69,10 @@ test("the unmapped-country list is a bound array, and an empty one is still vali
   assert.match(empty, /array\[\]::text\[\]/);
 });
 
-test("countryFacts uses recipientMarket: only countries without a postal address are unmapped, Canada rides with the US", () => {
+test("countryFacts reads the audience: Spain, Japan and Canada are located (not unmapped); the US list is classifyMarket's alone", () => {
   const f = countryFacts(["Spain", "argentina", "canada", "United States", "  ", "spain", "Japan"]);
-  assert.deepEqual(f.unmapped.sort(), ["japan", "spain"]);
-  assert.deepEqual(f.us, ["united states"]);
+  assert.deepEqual(f.unmapped, []);
+  assert.deepEqual(f.us, ["united states"], "Canada is a located country but not a US HIRING market");
 });
 
 test("the Florida pattern covers the phrases and the bare FL token, and nothing else", () => {
@@ -87,23 +87,31 @@ test("the phone link sits only in the no-country, postings-unresolved branch and
   assert.match(elseBranch, /else \(\(coalesce\(d\.posts_us, false\) or coalesce\(a\.posts_us, false\)\) = \(coalesce\(d\.posts_latam, false\) or coalesce\(a\.posts_latam, false\)\) and not \(regexp_replace\(translate\(coalesce\(p\.mobile_phone, ''\), [^)]*\), '\[\^0-9\+\]', '', 'g'\) ~ \$\d+ or regexp_replace\(translate\(coalesce\(p\.phone, ''\), [^)]*\), '\[\^0-9\+\]', '', 'g'\) ~ \$\d+\)\)/);
   const before = text.slice(0, text.indexOf(" else ("));
   assert.doesNotMatch(before, /translate\(coalesce\(p\.mobile_phone/, "a country that is present never reaches the phone");
-  assert.ok(params.includes(phoneFooterPattern()), "the dial-code pattern is a bound parameter");
+  assert.ok(params.includes(phoneLocatedPattern()), "the dial-code pattern is a bound parameter");
   assert.doesNotMatch(text, /lateral/);
   assert.equal((text.match(/from person p/g) ?? []).length, 1, "no second pass over person for the phone");
 });
 
-test("the dial-code pattern lists the LATAM-specific +1 prefixes before the bare US one", () => {
-  const pattern = phoneFooterPattern();
-  assert.ok(pattern.startsWith("^\\+("));
-  assert.ok(pattern.indexOf("1809") < pattern.lastIndexOf("|1)"), pattern);
-  assert.ok(pattern.endsWith("|1)"), "the bare US/Canada prefix is last");
+test("the dial-code pattern is every country calling code, anchored on the plus, with the length floor", () => {
+  const pattern = phoneLocatedPattern();
+  assert.equal(pattern, buildPhoneLocatedPattern(phoneCallingCodes()));
+  assert.ok(pattern.startsWith(`^\\+(?=[0-9]{${PHONE_MIN_LENGTH},})(`));
+  for (const code of ["1", "34", "53", "54", "995"]) assert.match(pattern, new RegExp(`[(|]${code}[|)]`), code);
 });
 
 // The picker's SQL decides "blocked", the JS resolver decides the reason a row shows and the add itself. The one unsafe
 // disagreement is SQL hiding a contact JS would allow, so for every phone JS resolves to a footer the SQL pattern must match.
-const sqlSaysFooter = (phone: string) => new RegExp(phoneFooterPattern()).test(normalizePhoneLikeSql(phone));
+const sqlSaysFooter = (phone: string) => new RegExp(phoneLocatedPattern()).test(normalizePhoneLikeSql(phone));
 const digitsOf = (phone: string) => phone.replace(/\D/g, "");
-const jsSaysFooter = (phone: string) => isMarketMapped(recipientMarket({ mobilePhone: phone, phone: null }));
+/**
+ * MEASURED, accepted: every located country is mailable now, so the length floor (PHONE_MIN_LENGTH, 8) is judged against
+ * EVERY country's example number, not only the old footer markets'. Exactly two have a real 7-digit number: Tristan da
+ * Cunha (+290 8999) and Tokelau (+690 7290), territories of about 250 and 1,500 people. The SQL hides a phone-only contact
+ * there (no badge) while JS would mail it; lowering the floor to 7 would re-admit the `+5491` garbage it exists to keep out.
+ * An OWNER decision, pinned so a third short country (or a floor change) fails here loudly instead of silently.
+ */
+const BELOW_THE_FLOOR = new Set(["TA", "TK"]);
+const jsSaysFooter = (phone: string) => resolveComplianceAudience({ mobilePhone: phone, phone: null }) !== null;
 
 test("the SQL phone test never blocks a number the JS resolver allows, across every country's example number", () => {
   let checked = 0;
@@ -111,7 +119,7 @@ test("the SQL phone test never blocks a number the JS resolver allows, across ev
     const example = getExampleNumber(iso, mobileExamples)?.format("E.164");
     if (!example) continue;
     checked += 1;
-    if (jsSaysFooter(example)) assert.ok(sqlSaysFooter(example), `${iso} ${example}`);
+    if (jsSaysFooter(example) && !BELOW_THE_FLOOR.has(iso)) assert.ok(sqlSaysFooter(example), `${iso} ${example}`);
   }
   assert.ok(checked > 200);
   for (const [phone, js, sql] of [
@@ -119,8 +127,9 @@ test("the SQL phone test never blocks a number the JS resolver allows, across ev
     ["+54 (9) 11 5555 1234", true, true],
     ["+1 (809) 555-1234", true, true],
     ["+1 (305) 555-1234", true, true],
-    ["+34 612 345 678", false, false],
-    ["+995 555 123 456", false, false],
+    ["+34 612 345 678", true, true],
+    ["+995 555 123 456", true, true],
+    ["+53 5 123 4567", false, true],
     ["5491155551234", false, false],
     ["", false, false],
   ] as const) {
@@ -129,10 +138,12 @@ test("the SQL phone test never blocks a number the JS resolver allows, across ev
   }
 });
 
-test("the asymmetry is pinned: SQL may show a malformed number or a footer-less +1 country that JS then blocks", () => {
-  for (const phone of ["+1 876 555 1234", "+1 242 555 1234"]) {
-    assert.equal(sqlSaysFooter(phone), true, `sql shows ${phone}`);
-    assert.equal(jsSaysFooter(phone), false, `js still blocks ${phone}`);
+test("the asymmetry is pinned and goes ONE way: SQL shows an embargoed phone that JS then holds, never the reverse", () => {
+  // The decision: the sanctions list lives in complianceAudience.ts only. The SQL pre-filter does not encode it, so a Cuban,
+  // Iranian, North Korean or Syrian phone appears in the default view badged `unmappedMarket` and the add guard refuses it.
+  for (const phone of ["+53 5 123 4567", "+98 912 123 4567", "+850 191 234 5678", "+963 944 123 456"]) {
+    assert.equal(jsSaysFooter(phone), false, `js holds ${phone}`);
+    assert.equal(sqlSaysFooter(phone), true, `sql still shows ${phone}`);
   }
 });
 
@@ -145,18 +156,20 @@ test("the length floor rejects implausibly short numbers and clips no real one",
   assert.equal(sqlSaysFooter(panama), true);
   assert.ok(PHONE_MIN_LENGTH <= digitsOf(panama).length);
   let shortestExample = Infinity;
+  const clipped = new Set<string>();
   for (const iso of getCountries()) {
     const example = getExampleNumber(iso, mobileExamples)?.format("E.164");
     if (!example || !jsSaysFooter(example)) continue;
+    if (!sqlSaysFooter(example)) { clipped.add(iso); continue; }
     shortestExample = Math.min(shortestExample, digitsOf(example).length);
-    assert.ok(sqlSaysFooter(example), `${iso} ${example} must clear the floor`);
   }
+  assert.deepEqual([...clipped].sort(), [...BELOW_THE_FLOOR].sort(), "the countries the floor clips are exactly the two measured and accepted");
   assert.ok(PHONE_MIN_LENGTH <= shortestExample, `floor ${PHONE_MIN_LENGTH} vs shortest example ${shortestExample}`);
   assert.equal(sqlSaysFooter("+5491155551234 ext 123456"), true, "an extension only lengthens a number: there is no upper bound");
 });
 
 test("an empty prefix list yields a pattern that matches nothing, not every number with a plus", () => {
-  const re = new RegExp(buildPhoneFooterPattern({ latam: [], us: [] }));
+  const re = new RegExp(buildPhoneLocatedPattern([]));
   for (const phone of ["+5491155551234", "+13055551234", "+", "+++++++++++", ""]) assert.equal(re.test(phone), false, phone);
 });
 

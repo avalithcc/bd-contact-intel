@@ -26,7 +26,7 @@ export const clientStatusSql = sql`(
 export const sameCompanyPostingSql = sql`(jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
 /**
- * THE company country rule of recipientMarket's second link, shared by the picker (set-based joins) and the add guard
+ * THE company country rule of the audience's second link, shared by the picker (set-based joins) and the add guard
  * (by-id read) so they cannot disagree: the person's OWN company row first, then the canonical company its key is an alias
  * of, a blank value counting as missing. NULL means the postings decide.
  */
@@ -38,7 +38,7 @@ export const companyCountrySql = firstFilledCountry(
   sql`(select c.country from company c join company_alias ca on ca.company_key = c.company_key where ca.alias_key = p.company_key and c.company_key <> p.company_key limit 1)`,
 );
 
-/** The open IT posting markets of the person's company (the third link of recipientMarket), as a JSON array. */
+/** The open IT posting markets of the person's company (the third link of the compliance audience), as a JSON array. */
 export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyPostingSql}), '[]'::json)`;
 
 /**

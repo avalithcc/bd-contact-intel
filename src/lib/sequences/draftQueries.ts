@@ -1,7 +1,7 @@
 /**
  * DB layer for Sequence drafting: the ONLY file under src/lib/sequences that calls the live generator, and only
- * through buildSequenceDraftInput (tests/unit/sequencesDraftLanguageGuard.test.ts). One market per member decides both
- * the draft language and the footer address (recipientMarket); a market with neither is held, never drafted.
+ * through buildSequenceDraftInput (tests/unit/sequencesDraftLanguageGuard.test.ts). One compliance audience per member
+ * (resolveComplianceAudience) carries both the footer address and the draft language; no audience is held, never drafted.
  * Edit protection is enforced twice: eligibility is re-checked under a row lock, and the missing-drafts insert is
  * ON CONFLICT DO NOTHING, so a draft that exists (edited or not) can only be replaced by an explicit regenerate.
  * Actions pass the signed-in BD's id; nothing here trusts the client.
@@ -9,7 +9,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, personBdConnection, sequence, sequenceDraft, sequenceMember, signal } from "@/db/schema";
-import type { MarketKey } from "@/lib/hiring/markets";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { getSiteUrl } from "@/lib/config/siteUrl";
 import { runGenerateOutreachMessage } from "@/lib/outreach/generateMessage";
@@ -18,10 +17,10 @@ import { sequenceAuditRow } from "./approvalAudit";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
-import { buildSequenceDraftInput, draftLanguageForMarket, draftSignals, senderIdentity } from "@/lib/sequences/draftInput";
+import { buildSequenceDraftInput, draftSignals, senderIdentity } from "@/lib/sequences/draftInput";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
-import { recipientMarket } from "./recipientMarket";
+import { resolveComplianceAudience, type ComplianceAudience } from "./complianceAudience";
 import { companyCountrySql } from "./rosterQuery";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
@@ -71,14 +70,14 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
       where sm.id = ${memberId}::uuid ${sequenceId ? sql`and sm.sequence_id = ${sequenceId}::uuid` : sql``}`),
   );
   if (!r) return null;
-  const market: MarketKey = recipientMarket({
+  const audience: ComplianceAudience | null = resolveComplianceAudience({
     mobilePhone: r.mobile_phone as string | null,
     phone: r.phone as string | null,
     personCountry: r.person_country as string | null,
     companyCountry: r.company_country as string | null,
     postingMarkets: r.posting_markets as string[],
   });
-  return { r, market, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
+  return { r, audience, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
 }
 
 /** Everything the model may see, loaded as the signed-in owner (R6: counts and shared notes only, never messages). */
@@ -118,7 +117,7 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const facts = await loadFacts(bdId, memberId, sequenceId);
   if (!facts || !editable.includes(facts.state)) return "skipped";
   if (reminder ? !facts.hasDraft || (mode === "missing" && facts.hasReminderDraft) : mode === "missing" && (facts.state !== "drafted" || facts.hasDraft)) return "skipped";
-  const { r, market } = facts;
+  const { r, audience } = facts;
   // Cheap early exit so a refused overwrite does not spend a model call. The authoritative check is inside the transaction below.
   const seenEditedAt = reminder ? facts.reminderEditedAt : facts.draftEditedAt;
   if (blocksEditedOverwrite(mode, guard.confirmed[memberId] ?? null, seenEditedAt)) {
@@ -126,10 +125,9 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
     return "skipped";
   }
 
-  const language = draftLanguageForMarket(market);
-  const input = language && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", language) }, market, reminder ? "reminder" : "first");
-  if (!input) {
-    // No language means no postal address either: hold, do not draft. The reason is a code; the UI words it.
+  const input = audience && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", audience.language) }, audience, reminder ? "reminder" : "first");
+  if (!audience || !input) {
+    // No audience (no location signal, or an embargoed jurisdiction): hold, do not draft. The reason is a code; the UI words it.
     await db.update(sequenceMember).set({ holdReason: UNMAPPED_MARKET_HOLD, holdAt: new Date() }).where(and(eq(sequenceMember.id, memberId), sql`${sequenceMember.holdReason} is distinct from ${UNMAPPED_MARKET_HOLD}`));
     held.push(memberId);
     return "skipped";
@@ -138,8 +136,8 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const generated = await deps.generate(input, 0);
   if (!generated.ok || !generated.subject || !generated.body) throw new Error(`generation failed: ${generated.ok ? "empty output" : generated.errorKey}`);
   const token = await deps.issueToken({ sequenceMemberId: memberId, email: r.email as string });
-  const draft = composeDraft({ subject: generated.subject, body: generated.body }, market, buildUnsubscribeUrl(deps.siteUrl, token));
-  if (!draft) throw new Error("no footer for a market that has a language");
+  const draft = composeDraft({ subject: generated.subject, body: generated.body }, audience.address, buildUnsubscribeUrl(deps.siteUrl, token));
+  if (!draft) throw new Error("no footer for an address that has an audience");
 
   return db.transaction(async (tx) => {
     const [m] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
@@ -173,14 +171,13 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
  * The "Señales usadas" chips of the review dialog: derived from the SAME input the generator gets (buildSequenceDraftInput
  * over loadPromptArgs), never from model output and never from the card's own facts, so the chips describe what the
  * model was actually shown. Owner-only (loadFacts joins the Sequence on the owner): null for anyone else, [] when the
- * market has no draft language (a member that can have no draft). Read-only, no generator call.
+ * contact has no audience (a member that can have no draft). Read-only, no generator call.
  */
 export async function memberDraftSignals(bdId: string, memberId: string, step: 1 | 2 = STEP): Promise<OutreachSignal[] | null> {
   const facts = await loadFacts(bdId, memberId);
   if (!facts) return null;
-  const language = draftLanguageForMarket(facts.market);
-  if (!language) return [];
-  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.market, step === REMINDER_STEP ? "reminder" : "first");
+  if (!facts.audience) return [];
+  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", facts.audience.language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first");
   return input ? draftSignals(input) : [];
 }
 
@@ -257,5 +254,5 @@ export async function saveDraftEdit(bdId: string, memberId: string, input: { sub
     }
     return true;
   });
-  return saved ? { ok: true, footerWarning: footerRemovedOnSave(input.body, facts.market) } : { ok: false, error: "not_editable" };
+  return saved ? { ok: true, footerWarning: facts.audience ? footerRemovedOnSave(input.body, facts.audience.address) : false } : { ok: false, error: "not_editable" };
 }

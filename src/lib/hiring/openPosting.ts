@@ -68,7 +68,7 @@ export function openFreshPostingSql(alias = "jp"): SQL {
 
 /**
  * OPEN only, NO freshness window. Use it ONLY for geography/compliance questions ("where is this recipient?", i.e.
- * the `posting_markets` that feed recipientMarket), never for hiring signals. The two questions differ: a 60-day-old
+ * the `posting_markets` that feed the compliance audience), never for hiring signals. The two questions differ: a 60-day-old
  * open posting no longer proves the company is hot, but it still says the person is in the US, and a Sequence member
  * seeded on a fresh posting must not lose its market (and get an invisible `other` hold) the day that posting ages out.
  */

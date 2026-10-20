@@ -6,7 +6,7 @@ import { buildReleaseMessage, type ReleaseMessageFacts } from "@/lib/sequences/r
 import { buildUnsubscribeUrl, generateUnsubscribeToken } from "@/lib/sequences/unsubscribeToken";
 
 const URL_OK = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
-const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "us", URL_OK);
+const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", URL_OK);
 const body = footed.status === "ok" ? footed.body : "";
 
 const facts = (over: Partial<ReleaseMessageFacts> = {}): ReleaseMessageFacts => ({

@@ -21,14 +21,14 @@ test("an ordinary reply, an empty body and a missing body detect nothing", () =>
 });
 
 test("our own footer, quoted back in a reply, is NOT an opt-out request (it literally says 'unsubscribe')", () => {
-  const quote = `Sounds good, send the details.\n\nOn Mon, Oct 12, 2026 at 9:00 AM Cristian <bd@avalith.net> wrote:\n> --\n> ${COMPLIANCE_CONFIG.us!.optOutText}`;
+  const quote = `Sounds good, send the details.\n\nOn Mon, Oct 12, 2026 at 9:00 AM Cristian <bd@avalith.net> wrote:\n> --\n> ${COMPLIANCE_CONFIG.miami!.optOutText}`;
   assert.equal(detectOptOutPhrase(quote), null);
-  const outlook = `Sounds good.\n\n-----Original Message-----\nFrom: Cristian\n${COMPLIANCE_CONFIG.us!.optOutText}`;
+  const outlook = `Sounds good.\n\n-----Original Message-----\nFrom: Cristian\n${COMPLIANCE_CONFIG.miami!.optOutText}`;
   assert.equal(detectOptOutPhrase(outlook), null);
-  assert.equal(detectOptOutPhrase(`> ${COMPLIANCE_CONFIG.us!.optOutText}\nplease unsubscribe me`), "unsubscribe");
+  assert.equal(detectOptOutPhrase(`> ${COMPLIANCE_CONFIG.miami!.optOutText}\nplease unsubscribe me`), "unsubscribe");
 });
 
-const FOOTER = COMPLIANCE_CONFIG.us!.optOutText;
+const FOOTER = COMPLIANCE_CONFIG.miami!.optOutText;
 const LINK = "https://bd-contact-intel.vercel.app/api/unsubscribe?t=" + "A".repeat(43);
 
 test("Spanish quote markers: Gmail 'El ... escribió:' and Outlook 'Mensaje original' / De: Enviado: blocks never prompt", () => {

@@ -107,7 +107,7 @@ after(async () => {
   await db.delete(bd).where(inArray(bd.id, [bdId]));
 });
 
-test("a dry run reports the split and the market per person and writes nothing", async () => {
+test("a dry run reports the split and the address per person and writes nothing", async () => {
   const before = await counts();
   const r = await seed(false);
   assert.deepEqual(await counts(), before);
@@ -115,9 +115,9 @@ test("a dry run reports the split and the market per person and writes nothing",
   assert.deepEqual(labels(r.plan.resolution.admitted), ["ok1", "ok2", "brazil"]);
   const reasons = Object.fromEntries(r.plan.resolution.rejected.map((x) => [x.candidate.label.split(" ")[0], x.reason]));
   assert.deepEqual(reasons, { pastclient: "client", activeclient: "client", closed: "no_open_posting", noemail: "no_email", merged: "merged", blocked: "suppressed" });
-  const lang = Object.fromEntries(r.plan.lines.map((l) => [l.candidate.label.split(" ")[0], [l.market, l.language]]));
-  assert.deepEqual(lang.ok1, ["us", "en"]);
-  assert.deepEqual(lang.brazil, ["latam", "es"]);
+  const lang = Object.fromEntries(r.plan.lines.map((l) => [l.candidate.label.split(" ")[0], [l.address, l.language]]));
+  assert.deepEqual(lang.ok1, ["miami", "en"]);
+  assert.deepEqual(lang.brazil, ["miami", "en"], "Brazil is English under the Miami address (it was Spanish under the old LATAM market)");
 });
 
 test("apply seeds the survivors as drafted, never approved or sent, with one audit row", async () => {
@@ -158,7 +158,7 @@ test("apply seeds the survivors as drafted, never approved or sent, with one aud
   assert.deepEqual(await counts(), { sequences: 1, members: 3, audits: 1 });
 });
 
-test("the drafts come from the real market-keyed path: English for US, Spanish for LATAM", async () => {
+test("the drafts come from the real audience-keyed path: English for the US and for Brazil", async () => {
   const { db } = await import("@/db");
   const { sequenceDraft, sequenceMember } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
@@ -168,7 +168,7 @@ test("the drafts come from the real market-keyed path: English for US, Spanish f
     .innerJoin(sequenceMember, eq(sequenceMember.id, sequenceDraft.sequenceMemberId));
   const byPerson = new Map(rows.map((r) => [r.p, r.first]));
   const brazilId = personIds[2];
-  assert.match(byPerson.get(brazilId)!, /Pitch in es/);
+  assert.match(byPerson.get(brazilId)!, /Pitch in en/);
   assert.match(byPerson.get(personIds[0])!, /Pitch in en/);
 });
 

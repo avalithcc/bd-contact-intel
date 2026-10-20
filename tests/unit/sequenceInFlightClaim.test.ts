@@ -11,11 +11,11 @@ import { buildUnsubscribeUrl, generateUnsubscribeToken } from "@/lib/sequences/u
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const body = (() => {
-  const r = appendFooter("Hello", COMPLIANCE_CONFIG, "us", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
+  const r = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
   return r.status === "ok" ? r.body : "";
 })();
 const facts = (over: Partial<PreSendFacts>): PreSendFacts => ({
-  step: 1, memberState: "approved", draftApproved: true, merged: false, email: "jane@acme.test", hasClientStatus: false, market: "us", body,
+  step: 1, memberState: "approved", draftApproved: true, merged: false, email: "jane@acme.test", hasClientStatus: false, address: "miami", body,
   accountStatus: "connected", activeClaim: null, activeClaimAt: null, repliedAt: null, inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, ...over,
 });
 const ctx = { now: NOW, suppression: [] };

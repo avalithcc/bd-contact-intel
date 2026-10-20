@@ -65,7 +65,7 @@ export type PickerDbRow = {
   client_status: string | null;
   open_it: number;
   is_florida: boolean;
-  /** isMarketMapped(recipientMarket(...)), decided by the server read: false means no postal address for the market. */
+  /** resolveComplianceAudience(...) !== null, decided by the server read: false means the contact has no audience (no location, or embargoed). */
   market_mapped: boolean;
 };
 

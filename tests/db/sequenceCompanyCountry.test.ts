@@ -101,7 +101,7 @@ test("the unsubscribe page shows the LATAM address from the token the draft issu
   assert.ok((await postalAddressForToken(token.tokenHash))?.includes(LATAM_ADDRESS));
 });
 
-test("the release read resolves the member's market as latam", async () => {
+test("the release read resolves the member's address as mdp", async () => {
   const { db } = await import("@/db");
   const { sequenceDraft, sequenceMember } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
@@ -111,12 +111,12 @@ test("the release read resolves the member's market as latam", async () => {
   await db.update(sequenceMember).set({ state: "approved" }).where(eq(sequenceMember.id, memberId));
   const { candidates } = await loadReleaseCandidates(new Date(), 500, { memberIds: [memberId], ownerBdId: bdId });
   assert.equal(candidates.length, 1);
-  assert.equal(candidates[0].market, "latam");
+  assert.equal(candidates[0].address, "mdp");
 });
 
-test("the seed dry run resolves the same contact to latam", async () => {
+test("the seed dry run resolves the same contact to mdp", async () => {
   const { seedFirstSequence } = await import("@/lib/sequences/seedQueries");
   const result = await seedFirstSequence({ actorBdId: bdId, apply: false, roster: [{ name: `${firstName} ${run}`, company: ownDisplayName }], sequenceName: key("seed") });
   assert.equal(result.plan.lines.length, 1);
-  assert.equal(result.plan.lines[0].market, "latam");
+  assert.equal(result.plan.lines[0].address, "mdp");
 });

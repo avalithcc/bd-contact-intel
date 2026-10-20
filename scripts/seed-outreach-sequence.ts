@@ -37,12 +37,12 @@ function print(r: SeedResult, apply: boolean) {
   console.log(`ADMITTED (${plan.resolution.admitted.length})`);
   for (const c of plan.resolution.admitted) {
     const line = plan.lines.find((l) => l.candidate.personId === c.personId)!;
-    console.log(`  + ${c.label}  market=${line.market}  draft language=${line.language ?? "none (would be held: unmapped market)"}`);
+    console.log(`  + ${c.label}  address=${line.address ?? "none"}  draft language=${line.language ?? "none (would be held: no compliance audience)"}`);
   }
   console.log(`\nLEFT OUT (${plan.resolution.rejected.length}), never replaced`);
   for (const x of plan.resolution.rejected) {
     const line = plan.lines.find((l) => l.candidate.personId === x.candidate.personId)!;
-    console.log(`  - ${x.candidate.label}: ${x.reason}  (market=${line.market}, language=${line.language ?? "none"})`);
+    console.log(`  - ${x.candidate.label}: ${x.reason}  (address=${line.address ?? "none"}, language=${line.language ?? "none"})`);
   }
   if (!apply) return void console.log("\nNothing written. Re-run with --apply --actor=<bd id> to apply.");
   if (r.applied) console.log(`\nDone. ${r.createdSequence ? "Created the Sequence and added" : "Added"} ${r.addedPersonIds.length} member(s), all in state 'drafted'. audit_log id: ${r.auditLogId}`);

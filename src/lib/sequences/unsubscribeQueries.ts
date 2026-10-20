@@ -8,7 +8,7 @@ import { emailSuppression, person, sequenceMember, sequenceUnsubscribeToken } fr
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { openPostingSql } from "@/lib/hiring/openPosting";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
-import { recipientMarket } from "@/lib/sequences/recipientMarket";
+import { resolveComplianceAudience } from "@/lib/sequences/complianceAudience";
 import { companyCountrySql } from "@/lib/sequences/rosterQuery";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
@@ -109,9 +109,9 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
 }
 
 /**
- * The postal address the recipient's own email carried: the compliance entry of their market (config.ts), found from the
- * token the same way the draft found it (recipientMarket: person country, company country, then posting markets).
- * One read, no writes. Undefined for an unknown token or a market with no address: the page then shows none rather than
+ * The postal address the recipient's own email carried: the compliance entry of their audience (config.ts), found from the
+ * token the same way the draft found it (resolveComplianceAudience: person country, company country, postings, phone).
+ * One read, no writes. Undefined for an unknown token or a contact with no audience: the page then shows none rather than
  * another country's.
  */
 export async function postalAddressForToken(tokenHash: string): Promise<string | undefined> {
@@ -127,8 +127,8 @@ export async function postalAddressForToken(tokenHash: string): Promise<string |
     limit 1`)) as unknown as { person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
   const row = rows[0];
   if (!row) return undefined;
-  const market = recipientMarket({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets });
-  return COMPLIANCE_CONFIG[market]?.postalAddress;
+  const audience = resolveComplianceAudience({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets });
+  return audience ? COMPLIANCE_CONFIG[audience.address]?.postalAddress : undefined;
 }
 
 /** The port the unsubscribe route (PR 13) is given. */

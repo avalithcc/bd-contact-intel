@@ -8,9 +8,16 @@
  *               over Portuguese), so this module never emits "pt".
  *   - hold:     no location signal at all -> `null`, as today.
  *
- * The input chain mirrors `recipientMarket` (recipientMarket.ts) link for link so the two cannot drift: person country,
- * company country, the open postings' markets, the phone's dial code. A link "has data" when non-empty, and a present but
- * unrecognized country DECIDES (hold); it does not fall through to a weaker link.
+ * THE INVARIANT THAT INVERTED. This module replaced `recipientMarket`, whose result `other` meant "no footer: hold, never
+ * send". Under that rule a LOCATED contact in Spain, Ireland or Italy was held. Under this one it is MAILABLE with the Miami
+ * address (Spanish for Spain). What holds now is only a contact that cannot be LOCATED (no signal, or text that is not
+ * exactly a country) or sits in an embargoed jurisdiction (Cuba, Iran, North Korea, Syria). Anything that still reads
+ * "unmapped market = no postal address for the region" is describing the old rule, and is wrong. The old resolver and its
+ * market-keyed helpers were deleted rather than kept alongside: a second, unused resolver is how the footer-writing path and
+ * the admission path drift apart.
+ *
+ * The input chain, in order: person country, company country, the open postings' markets, the phone's dial code. A link
+ * "has data" when non-empty, and a present but unrecognized country DECIDES (hold); it does not fall through to a weaker link.
  *
  * Free text -> country. `person.country` / `company.country` are free text and `classifyMarket` is a lossy substring matcher
  * (it files "New Mexico" under latam). It must not be reused here. `resolveCountry` matches the WHOLE normalized string
@@ -19,18 +26,38 @@
  * holds (fail closed). Recognition is complete on purpose: the owner's rule is "every other LOCATED country", so there is
  * no list of the world to maintain. Only the policy sets below (sanctioned, Spanish-speaking) are written by hand.
  */
-import { normalizeText } from "@/lib/hiring/markets";
+import { isMarketKey, normalizeText, type MarketKey } from "@/lib/hiring/markets";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import { phoneCountryIso } from "./phoneMarket";
-import { fromPostings, type MarketInputs } from "./recipientMarket";
+
+/**
+ * The inputs of the audience, shared by every caller (picker, add guard, draft, release, unsubscribe page). The two phone
+ * fields are REQUIRED (null when the person has none): an optional field would let one caller skip the phone and disagree
+ * with the others about who is mailable. Required, the compiler lists every caller.
+ */
+export interface ComplianceAudienceInputs {
+  readonly mobilePhone: string | null;
+  readonly phone: string | null;
+  readonly personCountry?: string | null;
+  readonly companyCountry?: string | null;
+  /** job_posting.market of the company's open IT postings; null where the backfill has not run. */
+  readonly postingMarkets?: readonly (string | null)[] | null;
+}
+
+/** The posting bucket, only when the open postings agree on exactly one of `us` / `latam`; `other` otherwise (no signal). */
+export function fromPostings(markets: readonly (string | null)[] | null | undefined): MarketKey {
+  const known = new Set<MarketKey>();
+  for (const m of markets ?? []) {
+    if (isMarketKey(m) && m !== "other") known.add(m);
+  }
+  return known.size === 1 ? [...known][0] : "other";
+}
 
 export type ComplianceAddress = "mdp" | "miami";
 export interface ComplianceAudience {
   readonly address: ComplianceAddress;
   readonly language: MessageLanguage;
 }
-/** Same shape as recipientMarket's inputs on purpose: the compiler keeps every caller feeding both the same fields. */
-export type ComplianceAudienceInputs = MarketInputs;
 
 /**
  * Comprehensively US-embargoed jurisdictions. These HOLD instead of receiving the Miami address.
@@ -173,8 +200,8 @@ function audienceOfCountry(iso: string): ComplianceAudience | null {
  *   - latam -> Miami, because Argentina is unprovable from a bucket; Spanish, because that is what these contacts receive
  *     today, and this change must not alter their language.
  *   - us    -> Miami, English (today's behaviour exactly).
- * The bucket itself is read by recipientMarket's own `fromPostings` (imported, not copied), so the footer path and the
- * admission path cannot read the postings under two rules.
+ * The bucket itself is read by `fromPostings` above, the one reader of job_posting.market for compliance, so the footer
+ * path and the admission path cannot read the postings under two rules.
  */
 function fromPostingBucket(markets: readonly (string | null)[] | null | undefined): ComplianceAudience | null {
   const bucket = fromPostings(markets);
