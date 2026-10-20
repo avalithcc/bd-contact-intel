@@ -1885,6 +1885,14 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- ~~**Send now or schedule (Sequences + contact composer)**~~ **Shipped 2026-10-20**
+  (main `ec2218a6`; migration 0057 indexes; pg_cron `sequences-run-every-minute`):
+  shared split button "Enviar ahora" + "Programar…" popover (calendar, presets
+  in Argentina time, recipient-time reference with a before-09:00/weekend
+  warning). Explicit times are respected; the 09:00 Miami floor applies only to
+  "Según la cadencia". Daily cap enforced at claim time.
+- **Contacts search resets when leaving the list** — shipped 2026-10-20: the
+  remembered list query drops `q`, filters stay.
 - ~~**Replace the 60 s background polling with push updates**~~ **Shipped 2026-10-20** (main `cdf818e4`, migration 0056, owner verified with two tabs;
   `src/components/LiveUpdates.tsx`). Statement-level triggers broadcast an id-only message on the private Realtime topic
   'crm' (`realtime.send`, no postgres_changes, publication stays empty); the browser refreshes only the screens the
