@@ -39,7 +39,11 @@ Both are unrouted until PR 13. Columns: element | mockup ref | status | evidence
 | Cadencia select with exactly ONE option, help | N:67 | done | C/SequenceCreateForm.tsx:68-72 | Text filled from DEFAULT_SCHEDULE. The second option is not added back. |
 | Contactos card header "Elegiste N contactos de M empresas" | N:71 | done | C/SequenceCreateForm.tsx:79-80 | Counts from `selectionSummary`. |
 | Neutral alert with reachability rules and "Máximo 2 contactos por empresa" | N:73 | done | C/SequenceCreateForm.tsx:82 | |
-| Toolbar: search, segmented Todo EE. UU. / Florida, "Mostrar los que no se pueden agregar (N)" | N:75-80 | done | C/RosterPicker.tsx:83-91 | Search is client-side over the loaded list. |
+| Toolbar: search | N:75 | done | C/RosterPicker.tsx:130 | Owner request 2026-10-20: server-side, debounced 300 ms (RosterPicker.tsx:73,106), over name, displayed company, email and job title (S/pickerQuery.ts searchSql). |
+| Toolbar: location filters replace the "Todo EE. UU. / Florida" segmented control | N:76-79 | deviation | C/RosterPicker.tsx:131-134 | Owner request 2026-10-20: the picker lists ALL contacts; location is only a filter. Three independent `.chip` toggles with `aria-pressed`, all off by default: "Florida / Miami", "Contratando IT en EE. UU.", "Mis contactos". Owner-requested, mockup not redrawn. |
+| Toolbar: "Mostrar los que no se pueden agregar" | N:80 | deviation | C/RosterPicker.tsx:135 | Off by default now (the pool is every contact, blocked ones are noise) and the "(N)" count is dropped: a count over 26k rows costs a second full pass. Owner decision. |
+| "Cargar más" (50 per page) and the loading / error states | not drawn | deviation | C/RosterPicker.tsx:141-143,160 | Needed once the pool is every contact. `role="status"` footer, `aria-busy` table, `role="alert"` with "Reintentar" on failure. Owner-requested paging. |
+| Reason "Sin pie legal para su región" (market without a postal address) | not drawn | deviation | S/pickerView.ts `unmappedMarket`, es.ts blockLabels/blockWhy | New blocked reason, same blocked look; enforced again on add (S/rosterGuards.ts `unmapped_market`, S/rosterQueries.ts loadCandidates). Owner-requested. |
 | Selection bar: "N elegidos", companies, quota, "Quitar selección" | N:82 | done | C/RosterPicker.tsx:92-96 | Always shown; clear disabled at zero. |
 | Table header with "Elegir todos los disponibles" | N:85 | done | C/RosterPicker.tsx:98-101, S/pickerView.ts toggleAllVisible | Stops at the company limit; the contact it stops reads as blocked. |
 | Contact cell: avatar, name link, status badge, job title | N:89 | done | C/RosterPicker.tsx:55-61 | |
@@ -49,7 +53,7 @@ Both are unrouted until PR 13. Columns: element | mockup ref | status | evidence
 | Disponibilidad: Elegido / Disponible + "N de 2 en la empresa" | N:92,120 | done | C/RosterPicker.tsx:33-41 | |
 | Separator "No se pueden agregar · N" | N:150 | done | C/RosterPicker.tsx:105,115 | |
 | Blocked rows last, dimmed, disabled checkbox, reason | N:151-220 | deviation | S/pickerView.ts:73-83 | Approved reading of "not offered". Owner-approved. |
-| Ten reasons worded | N:156-219 | done | S/pickerView.ts:44-52, es.ts blockLabels/blockWhy | Uses the seed admission; company limit derived from the selection. |
+| Eleven reasons worded | N:156-219 | done | S/pickerView.ts:44-52, es.ts blockLabels/blockWhy | Uses the seed admission; company limit derived from the selection. `noPosting` is no longer produced (hiring is a filter) and merged / email-less people are not in the pool; both stay worded as defence in depth. |
 | "Ya es miembro" names another sequence | N:184 | deviation | S/pickerView.ts `blockDetail` | No spec rule blocks a Contact from a second sequence. The read decides whether to supply it. Owner decision. |
 | Merged row links to the current record | N:191 | done | C/RosterPicker.tsx:41 | |
 | Table footer with counts and quota | N:222 | done | C/RosterPicker.tsx:111-114 | Counts the rows shown. |
