@@ -1885,6 +1885,15 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-19
+- **Flaky e2e (noted 2026-10-20):** `tests/e2e/scheduled-send.spec.ts` "a reply
+  puts the row on hold… Enviar igual" (:429) and "a dead-token row… Enviar ahora
+  waits for the reconnection" (:452) fail intermittently on the first
+  interaction after `gotoAuthed`/`page.reload()` on `/contacts/[id]` (likely a
+  click before hydration). Pass when re-run. Stabilize (wait for hydration).
+- **Shipped 2026-10-20:** sending in-progress state + leave-page guard
+  (`51098186`); email_account broadcasts only on visible changes (migration
+  0058) and the contacts export link no longer prefetched (`58892fa3`, probable
+  cause of the 25 s page timeouts).
 - ~~**Send now or schedule (Sequences + contact composer)**~~ **Shipped 2026-10-20**
   (main `ec2218a6`; migration 0057 indexes; pg_cron `sequences-run-every-minute`):
   shared split button "Enviar ahora" + "Programar…" popover (calendar, presets
