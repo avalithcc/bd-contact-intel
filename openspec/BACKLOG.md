@@ -1885,9 +1885,8 @@ investigated further in this pass — **unverified**; for what it is worth,
 zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
 
 ### Open, noted 2026-10-20
-- ~~**Approval had no compliance check**~~ **Fixed on branch
-  `feat/approval-compliance-gate`** (commits `6bf9cdbd`, `38dec5e7`, `ec64a91c`; not
-  yet merged). Nothing wrong was ever SENT — `preSendChecks.ts:95-96` recomputes the
+- ~~**Approval had no compliance check**~~ **Shipped 2026-10-20** (#375, main
+  `8a095603`). Nothing wrong was ever SENT — `preSendChecks.ts:95-96` recomputes the
   audience at release and holds — but the hold landed hours later with nobody watching
   while the card read "programado". The refusal now happens at approve time, where the
   human is.
