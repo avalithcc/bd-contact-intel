@@ -204,6 +204,8 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorLushaOutcomeUnknown;
     case "lusha_cap_reached":
       return l.errorLushaCapReached;
+    case "lusha_monthly_cap_reached":
+      return l.errorLushaMonthlyCapReached;
     case "lusha_busy":
       return l.errorLushaBusy;
     case "lusha_not_eligible":

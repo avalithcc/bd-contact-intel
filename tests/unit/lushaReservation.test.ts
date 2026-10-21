@@ -24,24 +24,24 @@ test("the window is half-open at ART midnight, and ignores Lusha's resetsAt", ()
 });
 
 test("a reveal is capped on the price read now: at the cap is allowed, one over is refused", () => {
-  assert.deepEqual(planReservation({ field: "phones", canReveal: PRICES, spentToday: 7, cap: 12 }), { ok: true, credits: 5 });
-  assert.deepEqual(planReservation({ field: "phones", canReveal: PRICES, spentToday: 8, cap: 12 }), { ok: false, reason: "cap_exceeded", remaining: 4 });
+  assert.deepEqual(planReservation({ field: "phones", canReveal: PRICES, spentToday: 7, spentCycle: 7, dailyCap: 12, monthlyCap: 400 }), { ok: true, credits: 5 });
+  assert.deepEqual(planReservation({ field: "phones", canReveal: PRICES, spentToday: 8, spentCycle: 8, dailyCap: 12, monthlyCap: 400 }), { ok: false, reason: "cap_exceeded", cap: "daily", remaining: 4 });
 });
 
 test("a stored price of 0 is never an uncapped free action: it reserves at least one credit", () => {
-  assert.deepEqual(planReservation({ field: "free" as never, canReveal: PRICES, spentToday: 0, cap: 12 }), { ok: true, credits: 1 });
-  assert.equal(planReservation({ field: "free" as never, canReveal: PRICES, spentToday: 12, cap: 12 }).ok, false);
-  assert.equal(planReservation({ field: "free" as never, canReveal: PRICES, spentToday: 0, cap: 0 }).ok, false, "cap 0 is the kill switch");
+  assert.deepEqual(planReservation({ field: "free" as never, canReveal: PRICES, spentToday: 0, spentCycle: 0, dailyCap: 12, monthlyCap: 400 }), { ok: true, credits: 1 });
+  assert.equal(planReservation({ field: "free" as never, canReveal: PRICES, spentToday: 12, spentCycle: 12, dailyCap: 12, monthlyCap: 400 }).ok, false);
+  assert.equal(planReservation({ field: "free" as never, canReveal: PRICES, spentToday: 0, spentCycle: 0, dailyCap: 0, monthlyCap: 400 }).ok, false, "cap 0 is the kill switch");
 });
 
 test("a search reserves its fixed cost without a price list; a reveal without one is refused", () => {
-  assert.deepEqual(planReservation({ field: "search", canReveal: null, spentToday: 0, cap: 12 }), { ok: true, credits: 1 });
-  assert.deepEqual(planReservation({ field: "emails", canReveal: null, spentToday: 0, cap: 12 }), { ok: false, reason: "no_price_list" });
-  assert.deepEqual(planReservation({ field: "emails", canReveal: [], spentToday: 0, cap: 12 }), { ok: false, reason: "not_revealable" });
+  assert.deepEqual(planReservation({ field: "search", canReveal: null, spentToday: 0, spentCycle: 0, dailyCap: 12, monthlyCap: 400 }), { ok: true, credits: 1 });
+  assert.deepEqual(planReservation({ field: "emails", canReveal: null, spentToday: 0, spentCycle: 0, dailyCap: 12, monthlyCap: 400 }), { ok: false, reason: "no_price_list" });
+  assert.deepEqual(planReservation({ field: "emails", canReveal: [], spentToday: 0, spentCycle: 0, dailyCap: 12, monthlyCap: 400 }), { ok: false, reason: "not_revealable" });
 });
 
 test("a non-numeric spend (raw aggregate string) is refused, never allowed", () => {
-  assert.equal(planReservation({ field: "emails", canReveal: PRICES, spentToday: "7" as never, cap: 12 }).ok, false);
+  assert.equal(planReservation({ field: "emails", canReveal: PRICES, spentToday: "7" as never, spentCycle: 0, dailyCap: 12, monthlyCap: 400 }).ok, false);
 });
 
 test("toLatestRows maps one row per field and carries the compliance flag from any row", () => {

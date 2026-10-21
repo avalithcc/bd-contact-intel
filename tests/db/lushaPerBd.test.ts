@@ -12,6 +12,7 @@ import { assertScratchDatabaseUrl } from "../launch-readiness/scratchDbGuard";
 
 assertScratchDatabaseUrl(process.env.DATABASE_URL);
 
+const OPEN_LIMITS = { dailyCap: 1_000_000, monthlyCap: 1_000_000, cycleStartDay: 1 };
 const run = randomUUID().slice(0, 8);
 const bdIds: string[] = [];
 const personIds: string[] = [];
@@ -84,10 +85,10 @@ test("reserve() refuses a disabled BD inside the lock: no ledger row is written"
   const [p] = await db.insert(person).values({ firstName: "Off", lastName: run }).returning();
   personIds.push(p.id);
   const longAgo = new Date("2020-03-15T15:00:00Z"); // a day of its own: the cap is global, so a test must not add to today's spend, nor reap other files' rows
-  const r = await reserve({ personId: p.id, field: "search", actorBdId: off.id, cap: 1_000_000, now: longAgo });
+  const r = await reserve({ personId: p.id, field: "search", actorBdId: off.id, limits: OPEN_LIMITS, now: longAgo });
   assert.deepEqual(r, { ok: false, reason: "not_enabled" });
   assert.equal((await db.select().from(lushaReveal).where(eq(lushaReveal.personId, p.id))).length, 0);
-  const on = await reserve({ personId: p.id, field: "search", actorBdId: ana.id, cap: 1_000_000, now: longAgo });
+  const on = await reserve({ personId: p.id, field: "search", actorBdId: ana.id, limits: OPEN_LIMITS, now: longAgo });
   assert.equal(on.ok, true, "the same Contact is reservable by an enabled BD");
 });
 

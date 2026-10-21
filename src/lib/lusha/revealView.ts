@@ -12,7 +12,7 @@ import { isOutcomeUnknown, resolveRevealState, type LatestRows, type RevealState
 /** Shown before any search exists, labelled "~"; the real price comes from the search's own canReveal list afterwards. */
 const ESTIMATED_FIELD_PRICE = { emails: 1, phones: 5 } as const;
 
-export type LushaNote = "no_value" | "no_match" | "rejected" | "blocked" | "already_held" | "outcome_unknown" | "not_revealable" | "write_failed" | "capped" | "unconfigured" | "not_enabled";
+export type LushaNote = "no_value" | "no_match" | "rejected" | "blocked" | "already_held" | "outcome_unknown" | "not_revealable" | "write_failed" | "capped" | "capped_monthly" | "unconfigured" | "not_enabled";
 export type LushaField = "emails" | "phones";
 
 export interface LushaFieldView {
@@ -40,8 +40,13 @@ export interface LushaView {
   companyHref: string | null;
   /** The Contact already holds a phone: Lusha may return the same number and still charge 5 credits (PR 5 review). */
   holdsPhone: boolean;
-  spent: number;
-  cap: number;
+  /** Credits used in the Argentina day / in the billing cycle, and the two ceilings. */
+  spentToday: number;
+  dailyCap: number;
+  spentCycle: number;
+  monthlyCap: number;
+  /** The day the cycle's credits come back, already formatted ("21 nov"). */
+  cycleResetsOn: string;
 }
 
 export type ViewPerson = { email: string | null; emailStatus: string; emailSource: string | null; phone: string | null; mobilePhone: string | null };
@@ -58,7 +63,11 @@ export function buildLushaView(i: {
   enabled: boolean;
   rows: LatestRows;
   spentToday: number;
-  cap: number;
+  spentCycle: number;
+  dailyCap: number;
+  monthlyCap: number;
+  /** End of the billing cycle containing now (lushaCycleWindow().end): when the monthly credits are replenished. */
+  cycleEnd: Date;
   person: ViewPerson;
   crm: IdentityFields;
   companyHref: string | null;
@@ -76,7 +85,7 @@ export function buildLushaView(i: {
     const otherRow = rows[field === "emails" ? "phones" : "emails"];
     const confirmed = tied(otherRow) && otherRow?.outcome === "revealed";
     const out: LushaFieldView = { control: null, note: null, hint: null, confirmed, revealed: null, twin: own?.twin ?? null };
-    const live = resolveRevealState(field, rows, { spentToday: i.spentToday, cap: i.cap }, i.config);
+    const live = resolveRevealState(field, rows, { spentToday: i.spentToday, spentCycle: i.spentCycle, dailyCap: i.dailyCap, monthlyCap: i.monthlyCap }, i.config);
 
     // A paid value parked by a failed settle (state failed, payload keeps it): apply it for free, never buy it again.
     if (live.kind !== "revealed" && own?.state === "failed" && own.errorCode === "settle_failed") {
@@ -101,7 +110,7 @@ export function buildLushaView(i: {
     if (!i.enabled) return { ...out, twin: null, note: "not_enabled" };
 
     // A capped action keeps its priced control, disabled: describe what is open without the cap, then close it.
-    const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, cap: Number.MAX_SAFE_INTEGER }, i.config) : live;
+    const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, spentCycle: 0, dailyCap: Number.MAX_SAFE_INTEGER, monthlyCap: Number.MAX_SAFE_INTEGER }, i.config) : live;
     const unknownOutcome = open.kind === "revealable" && isOutcomeUnknown(own);
     const control = (kind: "search" | "reveal" | "research", price: number | null) => ({ kind, price, disabled: live.kind === "capped" || !i.config.ok });
     switch (open.kind) {
@@ -137,7 +146,7 @@ export function buildLushaView(i: {
         break;
     }
     if (live.kind === "capped") {
-      out.note = "capped";
+      out.note = live.cap === "monthly" ? "capped_monthly" : "capped";
       out.hint = null;
     }
     return out;
@@ -156,8 +165,11 @@ export function buildLushaView(i: {
     crm: i.crm,
     companyHref: i.companyHref,
     holdsPhone: !!(person.phone?.trim() || person.mobilePhone?.trim()),
-    spent: i.spentToday,
-    cap: i.cap,
+    spentToday: i.spentToday,
+    dailyCap: i.dailyCap,
+    spentCycle: i.spentCycle,
+    monthlyCap: i.monthlyCap,
+    cycleResetsOn: i.formatDay(i.cycleEnd),
   };
 }
 

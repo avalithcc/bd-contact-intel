@@ -388,7 +388,9 @@ credits from one shared pool, so the feature is gated and capped server-side.
 | Variable | Where | Meaning |
 | --- | --- | --- |
 | `LUSHA_API_KEY` | **Vercel production only** | The on-switch. Without it (or outside `VERCEL_ENV=production`) the feature is off: no control, no request, no ledger row. Removing it is the kill switch. Never set it in Preview or Development. |
-| `LUSHA_DAILY_CREDIT_CAP` | production, optional | Credits the team may spend per Argentina business day. Default `12`. `0` is a soft kill switch (every spend is refused). An unparsable value fails closed to `0`. |
+| `LUSHA_MONTHLY_CREDIT_CAP` | production, optional | Credits the team may spend per Lusha billing cycle (the budget). Default `400`. `0` is a soft kill switch. An unparsable value fails closed to `0`. |
+| `LUSHA_CYCLE_START_DAY` | production, optional | Day of the month the Lusha plan renews, `1`-`28` only. Default `1` (calendar month); production sets `21`. Anything else fails closed: the monthly cap becomes `0`. |
+| `LUSHA_DAILY_CREDIT_CAP` | production, optional | Runaway rail per Argentina business day, checked together with the monthly cap. Default `60`. `0` is a soft kill switch. An unparsable value fails closed to `0`. |
 
 Changing either variable needs **one Vercel variable edit plus a redeploy**: Vercel applies environment
 changes only to new deployments.
