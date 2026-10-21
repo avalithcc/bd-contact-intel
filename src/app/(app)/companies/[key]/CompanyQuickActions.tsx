@@ -132,6 +132,7 @@ export function CompanyQuickActions({
         <NewContactDialog
           labels={newContactLabels}
           initialCompany={companyName}
+          initialCompanyKey={companyKey}
           renderTrigger={(onClick) => (
             <button type="button" className="qa" onClick={onClick}>
               <span className="qa-icon">
