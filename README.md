@@ -278,14 +278,22 @@ the same journal. Rules:
 
 - Generate migrations with `npm run db:generate` and commit the SQL file
   together with the updated `drizzle/meta/` files.
-- **Hand-set the new entry's `when`.** The journal chain is future-dated
-  (ends ~2026-10-19) and production's latest `created_at` equals its last
-  `when`, so `npm run db:generate` (real clock, lower) produces an entry that
-  `migrate` silently skips. Set it to the previous entry's `when` + 86,400,000.
+- **Hand-set the new entry's `when`.** The journal chain is future-dated and
+  production's latest `created_at` equals its last `when`, so `npm run
+  db:generate` (real clock, lower) produces an entry that `migrate` silently
+  skips. Set it to the previous entry's `when` + 86,400,000.
   `tests/unit/drizzleJournal.test.ts` prints the exact value. Never rewrite
   older entries: the ledger rows keep their old `created_at`, so lowering them
-  would make every new real-clock migration skip. Once the clock passes the
-  chain (after 2026-10-19), `db:generate` works unaided again.
+  would make every new real-clock migration skip.
+- **Do not trust a date written here for when that stops being necessary.**
+  This note used to say the chain ended ~2026-10-19 and that `db:generate`
+  then worked unaided. That was already false on 2026-10-21: the chain ran to
+  2026-11-12, so a real-clock entry would still have been skipped silently.
+  Every hand-set entry pushes the end of the chain another day out, so any
+  date written here rots the next time someone follows this very instruction.
+  Read the LAST entry's `when` in `drizzle/meta/_journal.json` and compare it
+  with today: `db:generate` works unaided only once the real clock has passed
+  it.
 - Vercel does not run migrations. Apply them by hand with
   `node --env-file=.env.local node_modules/.bin/drizzle-kit migrate`.
 - Never trust the success message: verify the objects exist afterwards, e.g.

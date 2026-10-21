@@ -37,6 +37,14 @@ async function run(tx: Tx, statement: string) {
   return tx.execute(sql.raw(statement));
 }
 
+/** 0056 plus the later redefinitions of crm_notify_change(), in journal order. */
+async function applyMigrationChain(tx: Tx) {
+  await run(tx, "set local client_min_messages = warning");
+  for (const name of ["0056_crm_live_updates", "0058_email_account_notify_filter", "0059_crm_live_company_key"]) {
+    for (const chunk of readFileSync(`drizzle/${name}.sql`, "utf8").split("--> statement-breakpoint")) await run(tx, chunk);
+  }
+}
+
 async function applyMigration(tx: Tx) {
   await run(tx, "set local client_min_messages = warning"); // the DROP ... IF EXISTS notices of a first apply
   const file = readFileSync("drizzle/0056_crm_live_updates.sql", "utf8");
@@ -411,5 +419,65 @@ test("0058: a failing realtime.send never fails a visible email_account update",
     await run(tx, `insert into email_account (bd_id, email_address) values ('${me.id}', 'zz-live-fail@example.test')`);
     await installRealtimeStub(tx, true);
     await run(tx, `update email_account set status = 'error' where bd_id = '${me.id}'`);
+  });
+});
+
+test("a contact-scoped activity/task broadcasts the CANONICAL company key of its person (0059)", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    await applyMigrationChain(tx);
+    await installRealtimeStub(tx);
+    const me = await seedBd(tx, "ck");
+    const { person, activity, task } = await import("@/db/schema");
+    for (const key of ["zz-canon", "zz-both"]) await run(tx, `insert into company (company_key, display_name) values ('${key}', '${key}')`);
+    // zz-alias is a real alias of zz-canon; zz-both is a live company AND named by an alias row: it must resolve to itself.
+    await run(tx, "insert into company_alias (alias_key, company_key) values ('zz-alias', 'zz-canon'), ('zz-both', 'zz-canon')");
+    const onKey = async (companyKey: string | null) => (await tx.insert(person).values({ firstName: "Zz", lastName: "Key", companyKey }).returning())[0]!;
+    const canon = await onKey("zz-canon");
+    const alias = await onKey("zz-alias");
+    const both = await onKey("zz-both");
+    const unknown = await onKey("zz-unknown");
+    const none = await onKey(null);
+    const expectKey = async (personId: string, expected: string[] | undefined) => {
+      await run(tx, "delete from realtime.calls");
+      await tx.insert(activity).values({ personId, actorBdId: me.id, type: "note" });
+      assert.deepEqual((await calls(tx))[0]!.payload.ids!.companyKey, expected);
+      await run(tx, "delete from realtime.calls");
+      await tx.insert(task).values({ personId, assignedToBdId: me.id, title: "t" });
+      assert.deepEqual((await calls(tx))[0]!.payload.ids!.companyKey, expected);
+    };
+    await expectKey(canon.id, ["zz-canon"]);
+    await expectKey(alias.id, ["zz-canon"]);
+    await expectKey(both.id, ["zz-both"]);
+    await expectKey(unknown.id, undefined);
+    await expectKey(none.id, undefined);
+    // A company-scoped row keeps its own key and ignores the person's.
+    await run(tx, "delete from realtime.calls");
+    await tx.insert(activity).values({ personId: canon.id, companyKey: "zz-both", type: "note" });
+    assert.deepEqual((await calls(tx))[0]!.payload.ids!.companyKey, ["zz-both"]);
+    // Deleting an activity whose person is STILL THERE is the ordinary path (a note
+    // removed from a contact), and the company page has to hear about it: the DELETE
+    // reads crm_old but resolves the person against current state, so the canonical
+    // key is still carried. Distinct from the cascade case below, where the person is
+    // already gone and the key is legitimately absent.
+    await run(tx, "delete from realtime.calls");
+    const [doomed] = await tx
+      .insert(activity)
+      .values({ personId: alias.id, actorBdId: me.id, type: "note" })
+      .returning({ id: activity.id });
+    await run(tx, "delete from realtime.calls");
+    await run(tx, `delete from activity where id = '${doomed!.id}'`);
+    const liveDel = (await calls(tx)).filter((c) => c.payload.kind === "activity");
+    assert.equal(liveDel.length, 1);
+    assert.equal(liveDel[0]!.payload.op, "DELETE");
+    assert.deepEqual(liveDel[0]!.payload.ids!.companyKey, ["zz-canon"]);
+
+    // person_id NULL (company-scoped only) and a DELETE after the person is gone still emit, without a company key.
+    await run(tx, "delete from realtime.calls");
+    await tx.insert(activity).values({ companyKey: "zz-canon", type: "note" });
+    assert.deepEqual((await calls(tx))[0]!.payload.ids, { companyKey: ["zz-canon"] });
+    await run(tx, "delete from realtime.calls");
+    await run(tx, `delete from person where id = '${alias.id}'`);
+    const del = (await calls(tx)).filter((c) => c.payload.kind === "activity");
+    assert.ok(del.length >= 1 && del.every((c) => c.payload.ids?.companyKey === undefined));
   });
 });
