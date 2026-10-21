@@ -1,8 +1,9 @@
 "use server";
 
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { revalidatePath } from "next/cache";
-import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { unstable_rethrow } from "next/navigation";
+import { getCanonicalCompanyKeyForPerson } from "@/lib/companies/aliasResolutionDb";
 import { getCurrentBd } from "@/lib/queries";
 import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contacts/propertyEdit";
@@ -61,8 +62,7 @@ export async function updateContactPropertyAction(
     if (!isEditablePersonProperty(property)) throw new PropertyNotEditableError(property);
     const me = await getCurrentBd();
     await updateContactProperty(personId, property, value, me.id);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
+    await revalidateContactSurfaces(personId, "touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -87,8 +87,7 @@ export async function updateContactLocationAction(
   try {
     const me = await getCurrentBd();
     await updateContactProperties(personId, fields, me.id);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("contactList");
+    await revalidateContactSurfaces(personId, "contactList");
     return { ok: true };
   } catch (err) {
     const located = contactLocationActionErrorReason(err);
@@ -125,8 +124,7 @@ export async function updateContactOwnerAction(
     // list-page bulk/filter-wide reassignment; the audit_log row must say
     // so (see bulkOwnerAudit.ts's "owner_change" vs "bulk_owner_change").
     await bulkAssignOwner([personId], ownerBdId, me.id, { mode: "single" });
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
+    await revalidateContactSurfaces(personId, "touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -159,9 +157,19 @@ export async function changeContactCompanyAction(
 ): Promise<ContactActionResult> {
   try {
     const me = await getCurrentBd();
+    // The helper below only ever sees the NEW company, yet the OLD company's page keeps unioning in this contact's history
+    // until something refreshes it. That key can only be read BEFORE the write (afterwards the person no longer points at
+    // it), so it is captured here. Best-effort like the helper: the write has not happened yet, but a failed read must not
+    // block a legitimate company change, and costs only one stale page.
+    let previousCompanyKey: string | null = null;
+    try {
+      previousCompanyKey = await getCanonicalCompanyKeyForPerson(personId);
+    } catch (err) {
+      unstable_rethrow(err);
+    }
     await changeContactCompany(personId, companyKey, me.id);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("contactList");
+    await revalidateContactSurfaces(personId, "contactList");
+    if (previousCompanyKey) revalidatePath(`/companies/${previousCompanyKey}`);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -189,8 +197,7 @@ export async function deleteContactNoteAction(noteId: string): Promise<ContactAc
     if (!isUuid(noteId)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
     const { personId } = await softDeleteContactNote(me, noteId);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("contactList");
+    await revalidateContactSurfaces(personId, "contactList");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -225,7 +232,7 @@ export async function addContactTaskAction(
  * (src/lib/tasks/updateWithActivity.ts), shared by every completion/reopen
  * entry point in the app (task-edit change). It reads the task's OWN real
  * subject fresh (not this `personId` argument, kept only for
- * `revalidatePath` below), so a task that exists but belongs to someone
+ * `revalidateContactSurfaces` below), so a task that exists but belongs to someone
  * else still throws `TaskNotFoundError` (-> "not_found") — same guarantee
  * the original IDOR fix (review, timeline-tasks-pill) established.
  */
@@ -233,8 +240,7 @@ export async function completeContactTaskAction(taskId: string, personId: string
   try {
     const me = await getCurrentBd();
     await setTaskStatusChecked(taskId, "done", me);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("tasks");
+    await revalidateContactSurfaces(personId, "tasks");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -250,8 +256,7 @@ export async function reopenContactTaskAction(taskId: string, personId: string):
   try {
     const me = await getCurrentBd();
     await setTaskStatusChecked(taskId, "open", me);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("tasks");
+    await revalidateContactSurfaces(personId, "tasks");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -276,8 +281,7 @@ export async function logContactMeetingAction(
     const me = await getCurrentBd();
     await assertContactEditableById(personId);
     const { kind } = await registerContactMeeting(personId, me.id, date, time, notes, new Date(), { allowScheduling });
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch", "meetings", "tasks");
+    await revalidateContactSurfaces(personId, "touch", "meetings", "tasks");
     return { ok: true, kind };
   } catch (err) {
     return actionFailure(err);
@@ -299,9 +303,8 @@ export async function logCallAction(
   try {
     await assertContactEditableById(personId);
     const metadata = planCall(outcome, direction, date, time, notes);
+    // createActivityAction owns the revalidation (contact, touch lists and company page).
     await createActivityAction({ type: "call", personId, metadata: { ...metadata } });
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -320,7 +323,7 @@ export async function recordCallAttemptAction(personId: string, number: string):
     if (!isUuid(personId)) return { ok: false };
     const me = await getCurrentBd();
     const attempt = await recordCallAttempt(personId, me.id, number);
-    revalidatePath(`/contacts/${personId}`);
+    await revalidateContactSurfaces(personId);
     return { ok: true, attemptId: attempt.attemptId, field: attempt.field };
   } catch (err) {
     unstable_rethrow(err);
@@ -340,8 +343,7 @@ export async function resolveCallAttemptAction(
     if (!isUuid(attemptId) || !isUuid(personId)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
     await resolveCallAttempt(attemptId, personId, me.id, outcome, notes);
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
+    await revalidateContactSurfaces(personId, "touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -365,8 +367,7 @@ export async function settleCallAttemptAction(
     if (!isUuid(attemptId) || !isUuid(personId)) return { ok: false, reason: "not_found" };
     const me = await getCurrentBd();
     await settleCallAttempt(attemptId, personId, me.id, { outcome, date, time, notes });
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
+    await revalidateContactSurfaces(personId, "touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -382,9 +383,8 @@ export async function discardContactAction(
   try {
     await assertContactEditableById(personId);
     const metadata = planDiscard(reason, note);
+    // createActivityAction owns the revalidation (contact, touch lists and company page).
     await createActivityAction({ type: "discarded", personId, metadata: { ...metadata } });
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -402,7 +402,7 @@ export async function addContactSignalAction(personId: string, text: string): Pr
     await assertContactEditableById(personId);
     const me = await getCurrentBd();
     await addManualSignal(personId, text, me.id);
-    revalidatePath(`/contacts/${personId}`);
+    await revalidateContactSurfaces(personId);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -451,9 +451,10 @@ export async function sendContactEmailAction(
       });
       await removeSentAttachments(prepared.files.map((f) => f.storagePath));
     }
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
-    for (const other of extras?.recipientPersonIds ?? []) if (isUuid(other)) revalidatePath(`/contacts/${other}`);
+    await revalidateContactSurfaces(personId, "touch");
+    // The other "Para" contacts are different people (and may sit in other companies), so each one resolves its own company.
+    // Sequential on purpose: the pool is small and a compose has a handful of recipients.
+    for (const other of extras?.recipientPersonIds ?? []) if (isUuid(other)) await revalidateContactSurfaces(other);
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
@@ -496,8 +497,7 @@ export async function sendThreadReplyAction(
       attachments: files.files,
     });
     await removeSentAttachments(files.files.map((f) => f.storagePath));
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
+    await revalidateContactSurfaces(personId, "touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);
