@@ -23,7 +23,7 @@ import { miamiCalendarDate } from "./miamiTime";
 import { assertTransition } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { resolveComplianceAudience } from "./complianceAudience";
-import { companyCountrySql } from "./rosterQuery";
+import { companyCountrySql, sameCompanyAs } from "./rosterQuery";
 import { generateReminderDraft } from "./draftQueries";
 import { parseSchedule, reminderDueAt } from "./schedule";
 import { pickReleaseKeys, releaseInstant, type SlimRow } from "./releaseSelection";
@@ -42,7 +42,6 @@ const MAX_SCAN = 5000;
 type Row = Record<string, unknown>;
 const rowsOf = <T>(r: unknown) => r as T[];
 const toDate = (v: unknown): Date | null => (v === null || v === undefined ? null : v instanceof Date ? v : new Date(v as string));
-const sameCompany = sql`(c.company_key = p.company_key or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
 /**
  * THE definition of "a genuine reply after step 1" for the runner, read from email_message (the source of truth) and used
@@ -122,8 +121,8 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, s
              sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country, p.mobile_phone, p.phone,
              ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
-                and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets,
-             exists (select 1 from company c where ${sameCompany} and c.client_status is not null) as has_client_status,
+                and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets,
+             exists (select 1 from company c where ${sameCompanyAs("c")} and c.client_status is not null) as has_client_status,
              ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
              (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,
              (select cl.claimed_at from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim_at,

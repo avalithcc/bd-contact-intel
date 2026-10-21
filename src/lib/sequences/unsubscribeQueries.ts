@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { emailSuppression, person, sequenceMember, sequenceUnsubscribeToken } from "@/db/schema";
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
 import { openPostingSql } from "@/lib/hiring/openPosting";
-import { companyCountrySql } from "@/lib/sequences/rosterQuery";
+import { companyCountrySql, sameCompanyAs } from "@/lib/sequences/rosterQuery";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
 import type { UnsubscribePort } from "@/lib/sequences/unsubscribeHandlers";
@@ -114,11 +114,10 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
  * unknown token or a contact with no audience: the page then shows no address (never another country's) and English.
  */
 export async function unsubscribeAudienceForToken(tokenHash: string): Promise<UnsubscribePageAudience | undefined> {
-  const sameCompany = (alias: string) => sql.raw(`(${alias}.company_key = p.company_key or ${alias}.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`);
   const rows = (await db.execute(sql`
     select p.country as person_country, p.mobile_phone, p.phone,
            ${companyCountrySql} as company_country,
-           coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany("jp")}), '[]'::json) as posting_markets
+           coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets
     from sequence_unsubscribe_token t
     join sequence_member sm on sm.id = t.sequence_member_id
     join person p on p.id = sm.person_id

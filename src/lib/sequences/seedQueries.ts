@@ -12,7 +12,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence, sequenceMember } from "@/db/schema";
 import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
-import { clientStatusSql, companyCountrySql } from "./rosterQuery";
+import { clientStatusSql, companyCountrySql, sameCompanyAs } from "./rosterQuery";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import {
   SEED_DAILY_SEND_CAP,
@@ -93,13 +93,13 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
                p.company_key, p.country as person_country, p.mobile_phone, p.phone, ${clientStatusSql} as client_status,
                ${companyCountrySql} as company_country,
                exists (select 1 from job_posting jp where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
-                  and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))) as has_open_it_posting,
+                  and ${sameCompanyAs("jp")}) as has_open_it_posting,
                coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
-                  and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))), '[]'::json) as posting_markets
+                  and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets
         from person p
         where lower(btrim(concat_ws(' ', p.first_name, p.last_name))) = lower(${entry.name})
           and exists (select 1 from company c where lower(btrim(c.display_name)) = lower(${entry.company})
-            and (c.company_key = p.company_key or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key)))`),
+            and ${sameCompanyAs("c")})`),
     );
     if (rows.length === 1) found.push({ entry, row: rows[0] });
     else problems.push(`${entry.name} @ ${entry.company}: ${rows.length === 0 ? "no person matches" : `${rows.length} people match (${rows.map((r) => r.person_id).join(", ")})`}`);

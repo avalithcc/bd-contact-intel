@@ -10,6 +10,28 @@ import { termContainsSql } from "@/lib/search/accentInsensitive";
 
 export const ROSTER_PICKER_MAX_LIMIT = 200;
 
+type CompanyAliasTarget = "jp" | "c";
+
+/**
+ * THE "this row belongs to the company of `person p`" predicate: the row's `company_key` is the person's own, or the
+ * canonical key of a company alias the person's key is registered under. `alias` names the table alias of the row being
+ * tested, `jp` for `job_posting` or `c` for `company`; the query must also select `from person p`.
+ *
+ * Every reader of the compliance audience, the picker, drafting, release and the roster goes through this one text, so
+ * they cannot disagree about whose postings or client status count (they did, #372-#374). Do not spell it inline: a
+ * unit test fails on any other copy under src/.
+ *
+ * It uses `sql.raw`, which normally warrants suspicion, so the alias text is looked up from a fixed record and never
+ * interpolated from the argument. The emitted SQL therefore cannot come from the caller at all, not even through an
+ * `as any` cast; the union type is only the compile-time layer on top. Do not "simplify" the lookup back to a template
+ * interpolation: that would make the guarantee compile-time only.
+ */
+const ALIAS_SQL_TEXT: Record<CompanyAliasTarget, string> = { jp: "jp", c: "c" };
+export const sameCompanyAs = (alias: CompanyAliasTarget): SQL => {
+  const a = ALIAS_SQL_TEXT[alias];
+  return sql.raw(`(${a}.company_key = p.company_key or ${a}.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`);
+};
+
 /**
  * The person's company client_status, or NULL. ANY non-null value ('active' or 'inactive') marks a client:
  * an 'inactive' client is a past client and gets no cold outreach.
@@ -17,13 +39,9 @@ export const ROSTER_PICKER_MAX_LIMIT = 200;
 export const clientStatusSql = sql`(
   select c.client_status from company c
   where c.client_status is not null
-    and (c.company_key = p.company_key
-      or c.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
+    and ${sameCompanyAs("c")}
   limit 1
 )`;
-
-/** A `job_posting jp` belongs to the company of `person p`, directly or through a company alias. */
-export const sameCompanyPostingSql = sql`(jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
 /**
  * THE company country rule of the audience's second link, shared by the picker (set-based joins) and the add guard
@@ -39,7 +57,7 @@ export const companyCountrySql = firstFilledCountry(
 );
 
 /** The open IT posting markets of the person's company (the third link of the compliance audience), as a JSON array. */
-export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyPostingSql}), '[]'::json)`;
+export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json)`;
 
 /**
  * The company NAME a Sequence read shows, same rule and same join as the Contacts list (companyDisplayName.ts): free
@@ -72,8 +90,7 @@ export function buildRosterCandidatesQuery(opts: { limit: number; search?: strin
       select count(*) as open_it, coalesce(bool_or(jp.is_miami), false) as is_florida
       from job_posting jp
       where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
-        and (jp.company_key = p.company_key
-          or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
+        and ${sameCompanyAs("jp")}
     ) h on h.open_it > 0
     where p.merged_into_id is null
       and btrim(coalesce(p.email, '')) <> ''
