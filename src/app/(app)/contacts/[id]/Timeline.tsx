@@ -50,6 +50,8 @@ import { useToast } from "@/components/ToastProvider";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import {
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
   CallIcon,
   ChevronDownIcon,
   CloseIcon,
@@ -333,6 +335,23 @@ function monthLabel(at: Date): string {
  */
 function lockedConversationText(l: ContactRecordLabels, ownerName: string): string {
   return `${l.timelineLockedThreadBelongsTo} ${ownerName}. ${l.timelineLockedThreadPrivacyPrefix} ${ownerName} ${l.timelineLockedThreadPrivacySuffix}`;
+}
+
+/**
+ * Leading marker of the three rows that carry a direction. Shape (arrow) carries it,
+ * colour only reinforces and only inbound is coloured; the word lives in the title
+ * and in screen-reader text.
+ */
+function DirectionMarker({ direction, labels }: { direction: "inbound" | "outbound"; labels: ContactRecordLabels }) {
+  const inbound = direction === "inbound";
+  const word = inbound ? labels.timelineThreadInbound : labels.timelineThreadOutbound;
+  const Arrow = inbound ? ArrowDownLeftIcon : ArrowUpRightIcon;
+  return (
+    <div className={`tl-icon ${inbound ? "dir-in" : "dir-out"}`} title={word}>
+      <Arrow className="icon" />
+      <span className="sr-only">{word}</span>
+    </div>
+  );
 }
 
 /**
@@ -1067,9 +1086,7 @@ export function Timeline({
 
     return (
       <div key={`thread-${threadId}`} className="tl-item">
-        <div className="tl-icon email">
-          <MailIcon className="icon" />
-        </div>
+        <DirectionMarker direction={direction} labels={l} />
         <div className="tl-card">
           <div className="tl-head">
             <span className="what">
@@ -1108,7 +1125,7 @@ export function Timeline({
                       </span>
                     </>
                   )}{" "}
-                  · {personName} · {direction === "inbound" ? l.timelineThreadInbound : l.timelineThreadOutbound}
+                  · {personName}
                 </p>
                 {(() => {
                   // Files and recipients of the emails the BD composed here (name and size only, never a download).
@@ -1454,9 +1471,13 @@ export function Timeline({
                 const iconClass = TYPE_ICON_CLASS[timelineEntry.type as TimelineActivityType];
                 return (
                   <div key={timelineEntry.id} className="tl-item">
-                    <div className={iconClass ? `tl-icon ${iconClass}` : "tl-icon"}>
-                      <Icon className="icon" />
-                    </div>
+                    {timelineEntry.type === "email_sent" || timelineEntry.type === "reply_received" ? (
+                      <DirectionMarker direction={timelineEntry.type === "reply_received" ? "inbound" : "outbound"} labels={l} />
+                    ) : (
+                      <div className={iconClass ? `tl-icon ${iconClass}` : "tl-icon"}>
+                        <Icon className="icon" />
+                      </div>
+                    )}
                     <div className={iconClass === "system" ? "tl-card system" : "tl-card"}>
                       <div className="tl-head">
                         <span className="what">
