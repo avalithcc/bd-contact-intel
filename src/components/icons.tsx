@@ -181,6 +181,26 @@ export function MailIcon({ className }: { className?: string }) {
   );
 }
 
+/** Outbound mail marker (timeline-mail-direction mockup). */
+export function ArrowUpRightIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M7 17 17 7" />
+      <path d="M9 7h8v8" />
+    </Svg>
+  );
+}
+
+/** Inbound mail marker (timeline-mail-direction mockup). */
+export function ArrowDownLeftIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M17 7 7 17" />
+      <path d="M15 17H7V9" />
+    </Svg>
+  );
+}
+
 /** Help "?" in a circle; the column-header hint of the Tooltip component (gmail-sync-fleet mockup). */
 export function HelpCircleIcon({ className }: { className?: string }) {
   return (
