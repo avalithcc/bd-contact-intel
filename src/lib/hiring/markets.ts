@@ -71,15 +71,29 @@ export const LATAM_COUNTRY_NAMES: readonly string[] = [
 // in, their main cities, and bare ISO-ish country codes as ATS providers
 // commonly emit them (e.g. Lever's "Palermo, CABA, AR").
 //
-// Known, accepted ambiguity: "ar" (Argentina), "co" (Colombia) and "pa"
-// (Panama) are also US state postal abbreviations (Arkansas, Colorado,
-// Pennsylvania). This module resolves that collision in LATAM's favor
-// (LATAM_RULES is checked before US_RULES in classifyMarket) and does NOT
-// include ar/co/pa in US_RULES' tokens — see the comment there. This app's
-// tracked company boards are overwhelmingly LATAM-first, so a stray US
-// state 2-letter code colliding with a LATAM country code is a much rarer
-// real-world case than an actual LATAM posting; revisit if a US-heavy
-// target company's postings start getting misclassified this way.
+// Known ambiguity, and NOT fixed by the constants-only correction of
+// 2026-10-21: "ar" (Argentina), "co" (Colombia) and "pa" (Panama) are also
+// US state postal abbreviations (Arkansas, Colorado, Pennsylvania).
+// LATAM_RULES is checked first in classifyMarket and returns before
+// US_RULES is consulted, so a posting carrying one of those codes is filed
+// latam even when the rest of the text is plainly American. The earlier
+// assumption here ("a much rarer case than an actual LATAM posting") was
+// measured on 2026-10-21 against 15,810 production rows and is false: 182
+// rows are plainly-US text filed latam (co 118, pa 47, ar 11; 40 open IT,
+// 29 fresh IT), e.g. "Colorado Springs, CO, United States", "Denver, CO,
+// USA", "US-CO-Denver", "Philadelphia, PA, United States". Fixing that needs
+// a precedence change in classifyMarket (for example, an explicit US signal
+// such as "united states"/"usa"/"us" outranking a bare 2-letter LATAM code),
+// not a constants edit.
+//
+// Also unfixed, same measurement: bare "ca" is both Canada and California
+// (67 rows, 30 Canada vs 37 California; it is a US token, so Canada files
+// us), and "mexico" matches as a substring inside "New Mexico"
+// ("Albuquerque, New Mexico" files latam, 2 rows). "peru" would fix 1
+// non-live row ("Perugia, IT") as a token, but it lives in
+// LATAM_COUNTRY_NAMES, which also feeds isKnownCountryName (the contact
+// form), and tokenizing "brasil" the same way would lose "Brasilia".
+// tests/unit/hiringMarkets.test.ts pins these at their current values.
 const LATAM_RULES: MarketRules = {
   phrases: [
     ...LATAM_COUNTRY_NAMES,
@@ -91,8 +105,15 @@ const LATAM_RULES: MarketRules = {
     "bogota",
     "ciudad de mexico",
     "sao paulo",
-    "lima",
-    "san jose", // Costa Rica's capital — also San Jose, California (see US_RULES); unresolved without a stronger signal, see module-level ambiguity note.
+    // "lima" is a token below, not a phrase: as a substring it hit
+    // "Limassol, Cyprus" (11 rows, measured 2026-10-21).
+    //
+    // "san jose" was deleted on 2026-10-21. It filed 42 rows latam solely:
+    // 37 say California, 2 are "Santana Row, San Jose" (San Jose, California)
+    // and 3 are bare "San Jose"; none were a live Costa Rica posting (22 open
+    // IT, 8 fresh IT were misfiled). Real Costa Rica rows still match:
+    // "San Jose, Costa Rica" via the "costa rica" phrase, "San Jose, CR" via
+    // the "cr" token. Bare "San Jose" is now other.
     "asuncion",
     "quito",
     "caracas",
@@ -102,6 +123,7 @@ const LATAM_RULES: MarketRules = {
     "guatemala city",
   ],
   tokens: [
+    "lima", // Token, not phrase: see the note above ("Limassol").
     "ar",
     "arg",
     "caba",
@@ -145,11 +167,39 @@ const LATAM_RULES: MarketRules = {
 // Deliberately NOT included as tokens: "ar" (Arkansas), "co" (Colorado),
 // "pa" (Pennsylvania) — they collide with LATAM country codes above. Their
 // full state names ("arkansas", "colorado", "pennsylvania") are still
-// recognized via the phrase list, which has no such collision.
+// recognized via the phrase list, which has no such collision. (That
+// exclusion is why the precedence problem described above LATAM_RULES
+// exists: a bare "CO"/"PA" is never read as US.)
+//
+// REMOVED on 2026-10-21 (measured against 15,810 production rows), because
+// they collided with far more foreign text than real US text:
+// - "in" (Indiana): 239 rows wrong (70 open IT, 50 fresh IT). 43 were
+//   "In-Office", ~56 the English preposition ("Anywhere in France"), ~130
+//   India ("Bengaluru, IN", "IN-Bangalore-MSO", "Chennai, in"). Real Indiana:
+//   3 rows ("Lafayette, IN" x2, "Evansville, IN"), 0 open IT, 0 fresh IT; that
+//   is the accepted cost, pinned in tests. "Indiana" and "Indianapolis" still
+//   match through the "indiana" phrase. It also made 138 rows match
+//   OFFSHORE_HUB_RULES while filed us.
+// - "de" (Delaware): 113 rows wrong (8 open IT, 3 fresh IT): "Berlin, DE",
+//   "Cologne, de", "Pas-de-Calais", "Hauts-de-France", "Rio de Janeiro",
+//   "Cuajimalpa de Morelos". Zero Delaware rows; "delaware" still matches.
+// - "id" (Idaho): 14 rows wrong, all Indonesia ("Jakarta, ID"). Zero Idaho
+//   rows; "idaho" still matches.
+// The accepted cost of the last two is that a US feed writing the postal code
+// instead of the state name ("Wilmington, DE", "Boise, ID") now files other.
+// Zero such rows existed, but the loss is pinned in tests rather than left
+// implied by "zero rows" — see tests/unit/hiringMarkets.test.ts.
+//
+// "usa", "miami" are tokens, not phrases, to avoid substring false
+// positives: "usa" hit "Lausanne, Switzerland", "Busan, South Korea",
+// "Jerusalem, Israel" and "Cusano Milanino, IT" — 7 matches, of which 6 move
+// to other (1 open IT, 1 fresh IT); the 7th, "Azusa, CA, us", stays us
+// through its own "ca"/"us" tokens. "miami" hit "Miamisburg, OH, us" (still
+// us via its "oh"/"us" tokens, so classifyMarket is unchanged; the Florida
+// cut is what that one was corrupting — see FLORIDA_TOKENS).
 const US_RULES: MarketRules = {
   phrases: [
     "united states",
-    "usa",
     "alabama",
     "alaska",
     "arizona",
@@ -201,8 +251,7 @@ const US_RULES: MarketRules = {
     "wisconsin",
     "wyoming",
     "district of columbia",
-    // Major cities.
-    "miami",
+    // Major cities ("miami" is a token below).
     "fort lauderdale",
     "coral gables",
     "doral",
@@ -228,19 +277,17 @@ const US_RULES: MarketRules = {
   ],
   tokens: [
     "us",
-    "usa",
+    "usa", // Token, not phrase: see the note above ("Lausanne", "Busan").
+    "miami", // Token, not phrase: see the note above ("Miamisburg").
     "al",
     "ak",
     "az",
     "ca",
     "ct",
-    "de",
     "fl",
     "ga",
     "hi",
-    "id",
     "il",
-    "in",
     "ia",
     "ks",
     "ky",
@@ -284,10 +331,13 @@ const US_RULES: MarketRules = {
 // into the state from Miami, and Miami-metro alone matched too few postings
 // to work with. Does NOT change classifyMarket's output (Florida postings
 // are still just "us"). "fl" is matched as a whole token, never a substring,
-// for the same reason as the country codes above.
+// for the same reason as the country codes above. "miami" is a token for the
+// same reason: as a substring it matched "Miamisburg, OH, us", so 27 Ohio
+// rows were stored is_miami = true (4 open IT, 3 fresh IT; measured
+// 2026-10-21). "Miami-Dade" and "Miami Beach" still match, since the
+// tokenizer splits on hyphens and spaces.
 export const FLORIDA_PHRASES = [
   "florida",
-  "miami",
   "fort lauderdale",
   "coral gables",
   "doral",
@@ -307,7 +357,7 @@ export const FLORIDA_PHRASES = [
   "cape coral",
   "fort myers",
 ];
-export const FLORIDA_TOKENS = ["fl"];
+export const FLORIDA_TOKENS = ["fl", "miami"];
 
 /**
  * Classifies a job posting's free-text location into a market bucket.

@@ -2116,15 +2116,75 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   runs measured 2026-10-20). Pre-existing, unrelated to the sequences work. The
   serial run is green. A fleet-wide count that other test files perturb.
 - **A constants edit in `src/lib/hiring/markets.ts` is a PRODUCTION DATA
-  MIGRATION.** `src/lib/hiring/sync.ts:123` upserts `market = excluded.market`,
-  so adding a country name makes the next daily hiring sync rewrite the stored
-  `market` of every existing `job_posting` row in that place. A change adding El
-  Salvador, Honduras, Nicaragua and Puerto Rico was reverted out of #372 for this
-  reason (plus: it unblocked an unmeasured population through `person.country`
-  directly, and asserted in a comment that an English draft is correct for a
-  Puerto Rican recipient, which is an owner decision). It must return as its own
-  change, with a before/after count and the owner's OK. Cost accepted meanwhile:
-  `+503`/`+504`/`+505` phones and Puerto Rico contacts stay blocked, ~8 contacts.
+  MIGRATION.** `src/lib/hiring/sync.ts:113-130` upserts `market`, `is_miami` AND
+  `is_offshore_hub` from `excluded`, so the next daily hiring sync recomputes all
+  three — but ONLY for postings the ATS feed still returns. Closed postings are
+  never re-upserted and keep their old values, so a rules edit shipped without a
+  backfill leaves stored data a mix of old and new rules and breaks the
+  `stored == classifyMarket(location)` invariant that every later measurement
+  rests on. Any such edit needs a before/after count, the owner's OK, and a
+  backfill sized against the CLOSED rows specifically.
+- ~~**El Salvador, Honduras, Nicaragua and Puerto Rico in `markets.ts`**~~
+  **premise CORRECTED, change de-prioritized** (measured 2026-10-21, production
+  read-only). The old claim here — that `+503`/`+504`/`+505` phones and Puerto
+  Rico contacts "stay blocked, ~8 contacts" pending this change — was STALE.
+  They were never blocked after #373/#374: `SPANISH_SPEAKING_COUNTRIES`
+  (`complianceAudience.ts:73`) already holds `SV`, `HN`, `NI` and `PR`,
+  `audienceOfIso` returns `{miami, es}` for all four, and the phone link reads
+  the ISO from libphonenumber without passing through `markets.ts`. Every contact
+  whose effective country is one of the four resolves `miami/es` TODAY (38
+  persons by country-or-phone). The change itself is nearly INERT: of 15,810
+  `job_posting` rows only 27 change market (26 `other`->`latam`, 1 `us`->`latam`),
+  ALL are `is_it = false`, so 0 open IT postings move and 0 of 27,491 persons
+  change audience. Adding the capitals adds nothing — the same 27 rows already
+  match by country name or code. The Puerto Rico `latam`-vs-`us` fork is
+  forward-looking only (identical numbers today) and remains an owner decision.
+  Still true and still the reason to be careful: `LATAM_COUNTRY_NAMES` also feeds
+  `isKnownCountryName` -> `locationSplit.ts` -> `createContact.ts`, so adding
+  those names changes how the CONTACT FORM splits "Tegucigalpa, Honduras".
+- **The market classifier's bare 2-letter tokens collide with foreign country and
+  region codes, in BOTH directions** (measured 2026-10-21 against production
+  read-only, 15,810 rows, baseline clean, re-derived independently twice with
+  identical results). Root cause is not the token lists: `matchesRules` is
+  boolean and `classifyMarket` checks `LATAM_RULES` before `US_RULES` and
+  RETURNS, so evaluation ORDER is the tie-breaker and a full country name weighs
+  exactly as much as a bare ambiguous 2-letter code.
+  **Fixed as a constants-only change** on `fix/hiring-market-constants` (pending
+  fresh-context review and the person-impact gate): US tokens `in` removed (239
+  rows, 70 openIT, 50 freshIT — ~130 India, 43 `"In-Office"`, ~56
+  `"Anywhere in France"`-style; real Indiana is 3 rows, none live), `de` removed
+  (113 / 8 / 3 — Germany, French `"Hauts-de-France"`, Spanish
+  `"Rio de Janeiro"`; ZERO Delaware) and `id` removed (14, all Indonesia); US
+  phrase `usa` -> token (6 rows: `"Lausanne"`, `"Busan"`, `"Jerusalem"`,
+  `"Cusano Milanino"`); LATAM phrase `san jose` DELETED (42 / 22 / 8 — 39 are San
+  Jose, California, and there are ZERO live Costa Rica rows;
+  `"San Jose, Costa Rica"` still matches `costa rica` and `"San Jose, CR"` still
+  matches `cr`); LATAM phrase `lima` -> token (11 `"Limassol, Cyprus"` rows);
+  `miami` moved from `FLORIDA_PHRASES` to `FLORIDA_TOKENS`. Totals: 425 postings
+  change market (102 openIT, 63 freshIT) and 27 `is_miami` rows flip true->false,
+  all `"Miamisburg, OH, us"` — Ohio had been sitting inside the Florida cut. It
+  also fixes 120 of the 138 rows that matched an offshore hub while being counted
+  as US hiring. `tests/unit/hiringMarkets.test.ts` is NEW: the module had no unit
+  test at all, which is why none of this ever surfaced.
+  `LATAM_COUNTRY_NAMES` is deliberately untouched, which is what keeps the
+  contact form out of the blast radius.
+  **NOT fixed, needs the precedence change:** 182 rows of plainly-US text filed
+  `latam` via `co` (118), `pa` (47) and `ar` (11) — 40 openIT, 29 freshIT —
+  including `"Colorado Springs, CO, United States"`, `"Denver, CO, USA"`,
+  `"US-CO-Denver"` and `"Philadelphia, PA, United States"`. The module's own
+  comment pre-authorized this revisit ("revisit if a US-heavy target company's
+  postings start getting misclassified this way"). Design warning: precedence by
+  specificity ALONE inverts `"San Jose, CA"` (a LATAM phrase would beat a bare US
+  token), which is why the `san jose` deletion has to land first. Also still
+  open: `ca` alone (67 rows, 30 Canada vs 37 California, only 2 freshIT — a
+  genuine owner call), `tn` / Tamil Nadu (12 wrong vs 20 real Tennessee, 0
+  freshIT either side — and removing `in` EXPOSES it by making `tn` the sole
+  decider on `"Chennai, TN, in"`), `"Albuquerque, New Mexico"` -> `latam` via the
+  `mexico` substring (2 rows), and `peru` -> token (1 `"Perugia, IT"` row;
+  entangled with `LATAM_COUNTRY_NAMES`, and tokenizing `brasil` the same way
+  would LOSE `"Brasilia"`). Two reported "substring accidents" are NOT bugs and
+  must not be "fixed": `indiana` matching `"Indianapolis"` and `brasil` matching
+  `"Brasilia"` are both semantically correct.
 - **Flaky e2e (noted 2026-10-20):** `tests/e2e/scheduled-send.spec.ts` "a reply
   puts the row on hold… Enviar igual" (:429) and "a dead-token row… Enviar ahora
   waits for the reconnection" (:452) fail intermittently on the first
