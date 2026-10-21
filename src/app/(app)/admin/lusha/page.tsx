@@ -4,9 +4,9 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { getDailyCreditCap } from "@/lib/lusha/cap";
+import { getLushaLimits, lushaCycleWindow } from "@/lib/lusha/cap";
 import { getLushaUsageReport } from "@/lib/lusha/adminDb";
-import { getDailySpend } from "@/lib/lusha/revealDb";
+import { getCreditSpend } from "@/lib/lusha/revealDb";
 import { REPORT_PERIODS, isNewBd, parseReportPeriod, periodWindow, shareOf, summarizeUsage } from "@/lib/lusha/usageReport";
 import { formatArgentinaDayMonth, formatArgentinaDayMonthYear, relativeTime } from "@/lib/i18n/format";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
@@ -18,7 +18,7 @@ const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w
 
 /**
  * Administración → Lusha por BD (lusha-per-bd; mockups/lusha-por-bd.html). One switch per BD next to what that BD spent. Reads:
- * getLushaUsageReport (one query, one row per BD, disabled ones included) and getDailySpend (the cap's own sum). Non-admins get
+ * getLushaUsageReport (one query, one row per BD, disabled ones included) and getCreditSpend (the caps' own sums, day and cycle in one query). Non-admins get
  * a 404, like every admin screen. Every number comes from the lusha_reveal ledger; nothing here stores consumption.
  */
 export default async function LushaAdminPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
@@ -35,8 +35,10 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
   const now = new Date();
   const window = periodWindow(period, now);
   const rows = await getLushaUsageReport(window);
-  const spentToday = await getDailySpend(now);
-  const cap = getDailyCreditCap();
+  const limits = getLushaLimits();
+  const spent = await getCreditSpend(now, limits.cycleStartDay);
+  const cap = limits.monthlyCap;
+  const resetsOn = formatArgentinaDayMonth(lushaCycleWindow(now, limits.cycleStartDay).end);
   const totals = summarizeUsage(rows);
   const day = (iso: string) => formatArgentinaDayMonthYear(new Date(`${iso}T12:00:00Z`));
   const range = { from: day(window.firstDay), to: day(window.today) };
@@ -49,7 +51,7 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
     dialogTitle: fill(d.dialogTitle, { name }),
     dialogBody: fill(d.dialogBody, { name }),
     dialogLimitTitle: d.dialogLimitTitle,
-    dialogLimitBody: fill(d.dialogLimitBody, { cap, left: Math.max(0, cap - spentToday) }),
+    dialogLimitBody: fill(d.dialogLimitBody, { cap, left: Math.max(0, cap - spent.cycle), date: resetsOn }),
     dialogRecorded: fill(d.dialogRecorded, { admin: admin.name, name }),
     dialogConfirm: d.dialogConfirm,
     cancel: d.cancel,
@@ -68,7 +70,7 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
             {d.title}
             <span className="dot">.</span>
           </h1>
-          <p className="meta">{fill(d.subtitle, { cap })}</p>
+          <p className="meta">{fill(d.subtitle, { cap, daily: limits.dailyCap, date: resetsOn })}</p>
         </div>
         <div className="actions">
           <div className="segmented" role="group" aria-label={d.periodLabel}>
@@ -100,11 +102,11 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
           <div className="foot">{fill(d.statEnabledFoot, { n: totals.bds - totals.enabled })}</div>
         </div>
         <div className="stat neutral">
-          <div className="label">{d.statToday}</div>
+          <div className="label">{d.statCycle}</div>
           <div className="value">
-            {spentToday} <span className="meta">{fill(d.statTodayOf, { cap })}</span>
+            {spent.cycle} <span className="meta">{fill(d.statCycleOf, { cap })}</span>
           </div>
-          <div className="foot">{d.statTodayFoot}</div>
+          <div className="foot">{fill(d.statCycleFoot, { date: resetsOn })}</div>
         </div>
       </div>
 

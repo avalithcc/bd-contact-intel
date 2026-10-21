@@ -4,7 +4,7 @@
 // in-flight row never blocks a retry (the reservation guard handles a double
 // click).
 
-import { evaluateCap } from "./cap";
+import { evaluateCaps, type CapName, type CapsInput } from "./cap";
 import type { LushaConfigResult } from "./config";
 import { SEARCH_COST, expectedCost, type CanRevealEntry } from "./pricing";
 
@@ -53,7 +53,7 @@ export type RevealState =
   | { kind: "rejected"; retryCost: number }
   | { kind: "blocked" }
   | { kind: "revealed"; value: string | null }
-  | { kind: "capped"; remaining: number; needed: number };
+  | { kind: "capped"; /** Which cap refused: the daily one resets tomorrow, the monthly one on the cycle date. */ cap: CapName; remaining: number; needed: number };
 
 /**
  * How old a `reserved` row must be before it is definitively stranded. A reservation is only ever settled by the function
@@ -89,7 +89,7 @@ function canRevealOf(payload: unknown): CanRevealEntry[] | null {
 export function resolveRevealState(
   field: "emails" | "phones",
   rows: LatestRows,
-  cap: { spentToday: number; cap: number },
+  cap: Omit<CapsInput, "expected">,
   config: LushaConfigResult,
 ): RevealState {
   if (!config.ok) return config.reason === "not_production" ? { kind: "off" } : { kind: "unconfigured", missing: config.missing };
@@ -112,8 +112,8 @@ export function resolveRevealState(
   // Every spend, including a free-looking one and every retry, goes through the cap: a
   // stale price of 0 must never present itself as an uncapped action.
   const gate = (needed: number, open: RevealState): RevealState => {
-    const d = evaluateCap({ ...cap, expected: needed });
-    return d.allowed ? open : { kind: "capped", remaining: d.remaining, needed };
+    const d = evaluateCaps({ ...cap, expected: needed });
+    return d.allowed ? open : { kind: "capped", cap: d.blockedBy, remaining: d.remaining, needed };
   };
 
   if (!search || (search.outcome !== "matched" && search.outcome !== "no_match" && search.outcome !== "match_rejected")) {

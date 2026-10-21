@@ -3,6 +3,7 @@
 // fakes and it can never spend a credit by accident. Nothing is retried, for any error kind: a retry on a paid
 // endpoint is a second charge. The HTTP call always happens between reserve() and a settle, outside any transaction.
 
+import type { CapName, LushaLimits } from "./cap";
 import { isReachable } from "@/lib/sequences/rosterGuards";
 import type { LushaConfigResult } from "./config";
 import { LushaError, isPermanent, isRetryableByBd } from "./errors";
@@ -10,7 +11,7 @@ import { parseEnrichResponse, parseSearchResponse, pickEmail, pickPhone, type Lu
 import { expectedCost, type CanRevealEntry } from "./pricing";
 import { reasonForKind, type LushaReason } from "./reasons";
 import type { LushaResponse, RevealField, SearchInput } from "./client";
-import type { RevealSettlement, ReserveResult } from "./revealDb";
+import type { CreditSpend, RevealSettlement, ReserveResult } from "./revealDb";
 import { isOutcomeUnknown, resolveRevealState, type LatestRows } from "./revealState";
 
 export interface Subject {
@@ -29,15 +30,15 @@ export interface Subject {
 
 export interface RevealPorts {
   config: LushaConfigResult;
-  cap: number;
+  limits: LushaLimits;
   /** The acting BD's Lusha switch (lusha-per-bd), read fresh from the DB on every call. */
   isLushaEnabled(bdId: string): Promise<boolean>;
   /** Throws ContactNotFoundError / ContactMergedError (assertContactEditableById). */
   assertEditable(personId: string): Promise<void>;
   loadSubject(personId: string): Promise<Subject | null>;
   getRevealState(personId: string): Promise<LatestRows>;
-  getDailySpend(): Promise<number>;
-  reserve(input: { personId: string; field: "search" | RevealField; actorBdId: string; cap: number }): Promise<ReserveResult>;
+  getSpend(): Promise<CreditSpend>;
+  reserve(input: { personId: string; field: "search" | RevealField; actorBdId: string; limits: LushaLimits }): Promise<ReserveResult>;
   settleSearch(input: { reservationId: string; outcome: "matched" | "no_match" | "compliance_restricted"; creditsCharged: number | null; lushaContactId?: string | null; payload: unknown }): Promise<boolean>;
   settleReveal(input: { reservationId: string; actorBdId: string; field: RevealField; emails?: unknown; phones?: unknown; creditsCharged: number | null; compliance?: boolean }): Promise<RevealSettlement | null>;
   /** `payload` is merged into the row: it carries a paid-for raw value when the settle itself failed. */
@@ -55,7 +56,7 @@ export interface RevealFailure {
   /** A BD may deliberately try again (never automatic). */
   retryable: boolean;
   permanent: boolean;
-  /** Credits left in today's budget, when the reason is the cap. */
+  /** Credits left under the cap that refused, when the reason is a cap. */
   remaining?: number;
 }
 
@@ -87,6 +88,12 @@ function eligible(s: Subject, field: RevealField): boolean {
   return !isReachable({ personId: s.id, email: s.email, emailStatus: s.emailStatus, emailSource: s.emailSource, mergedIntoId: s.mergedIntoId, companyKey: null, clientStatus: null });
 }
 
+/** The spend read plus the configured limits, in the shape the cap rules take. */
+export const capStateOf = (spent: CreditSpend, limits: LushaLimits) => ({ spentToday: spent.today, spentCycle: spent.cycle, dailyCap: limits.dailyCap, monthlyCap: limits.monthlyCap });
+
+/** The BD-facing reason for a refused cap: the copy differs (tomorrow vs the cycle date). */
+const capReason = (cap: CapName) => (cap === "monthly" ? "lusha_monthly_cap_reached" : "lusha_cap_reached");
+
 type Prepared = { subject: Subject; rows: LatestRows; state: ReturnType<typeof resolveRevealState> };
 
 async function prepare(personId: string, field: RevealField, actorBdId: string, p: RevealPorts): Promise<RevealFailure | Prepared> {
@@ -96,8 +103,8 @@ async function prepare(personId: string, field: RevealField, actorBdId: string, 
   await p.assertEditable(personId); // a merged or missing Contact is refused here, before anything is read or reserved
   const subject = await p.loadSubject(personId);
   if (!subject || !eligible(subject, field)) return no("lusha_not_eligible");
-  const [rows, spentToday] = await Promise.all([p.getRevealState(personId), p.getDailySpend()]);
-  return { subject, rows, state: resolveRevealState(field, rows, { spentToday, cap: p.cap }, p.config) };
+  const [rows, spent] = await Promise.all([p.getRevealState(personId), p.getSpend()]);
+  return { subject, rows, state: resolveRevealState(field, rows, capStateOf(spent, p.limits), p.config) };
 }
 
 /** One failure path for every LushaError: the reservation is settled or failed exactly once, the call is never repeated. */
@@ -130,7 +137,7 @@ export async function searchLushaContact(input: { personId: string; field: Revea
     case "blocked":
       return no("lusha_protected", { permanent: true });
     case "capped":
-      return no("lusha_cap_reached", { remaining: state.remaining });
+      return no(capReason(state.cap), { remaining: state.remaining });
     case "revealed":
       return no("lusha_not_eligible");
     case "unavailable":
@@ -147,7 +154,7 @@ export async function searchLushaContact(input: { personId: string; field: Revea
   }
   const { firstName, lastName } = subject;
   if (!firstName || !lastName || (!subject.companyDomain && !subject.linkedinUrl)) return no("lusha_insufficient_data");
-  const reservation = await p.reserve({ personId: subject.id, field: "search", actorBdId: input.actorBdId, cap: p.cap });
+  const reservation = await p.reserve({ personId: subject.id, field: "search", actorBdId: input.actorBdId, limits: p.limits });
   if (!reservation.ok) return reserveFailure(reservation);
   const id = reservation.reservationId;
   try {
@@ -190,7 +197,7 @@ async function settleOrBusy(settle: Promise<boolean>, id: string, p: RevealPorts
 function reserveFailure(r: Extract<ReserveResult, { ok: false }>): RevealFailure {
   switch (r.reason) {
     case "cap_exceeded":
-      return no("lusha_cap_reached", { remaining: r.remaining });
+      return no(capReason(r.cap), { remaining: r.remaining });
     case "busy":
       return no("lusha_busy");
     case "outcome_unknown":
@@ -220,7 +227,7 @@ export async function revealLushaField(input: { personId: string; field: RevealF
     case "blocked":
       return no("lusha_protected", { permanent: true });
     case "capped":
-      return no("lusha_cap_reached", { remaining: state.remaining });
+      return no(capReason(state.cap), { remaining: state.remaining });
     case "revealable":
       // outcome_unknown may already have been billed: only an explicit new search (a conscious spend) reopens the field.
       if (isOutcomeUnknown(rows[field])) return no("lusha_outcome_unknown");
@@ -234,7 +241,7 @@ export async function revealLushaField(input: { personId: string; field: RevealF
   const search = rows.search;
   const lushaId = payloadOf(search).lushaContactId;
   if (!search || typeof lushaId !== "string") return no("lusha_not_eligible");
-  const reservation = await p.reserve({ personId, field, actorBdId, cap: p.cap });
+  const reservation = await p.reserve({ personId, field, actorBdId, limits: p.limits });
   if (!reservation.ok) return reserveFailure(reservation);
   const id = reservation.reservationId;
   // The reservation re-read the search inside its lock: if the match changed meanwhile, never reveal against the old id.

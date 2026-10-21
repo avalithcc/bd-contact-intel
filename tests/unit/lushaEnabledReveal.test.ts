@@ -14,7 +14,7 @@ function ports(enabled: boolean): { p: RevealPorts; calls: string[] } {
   };
   const p = {
     config: { ok: true, config: { apiKey: "sk-test-never-used" } },
-    cap: 12,
+    limits: { dailyCap: 12, monthlyCap: 400, cycleStartDay: 21 },
     isLushaEnabled: async (bdId: string) => {
       calls.push(`isLushaEnabled:${bdId}`);
       return enabled;
@@ -22,7 +22,7 @@ function ports(enabled: boolean): { p: RevealPorts; calls: string[] } {
     assertEditable: boom("assertEditable"),
     loadSubject: boom("loadSubject"),
     getRevealState: boom("getRevealState"),
-    getDailySpend: boom("getDailySpend"),
+    getSpend: boom("getSpend"),
     reserve: boom("reserve"),
     settleSearch: boom("settleSearch"),
     settleReveal: boom("settleReveal"),

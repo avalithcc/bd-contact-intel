@@ -41,9 +41,9 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { PlusIcon } from "@/components/icons";
 import { whatsappLink } from "@/lib/whatsapp";
-import { getDailyCreditCap } from "@/lib/lusha/cap";
+import { getLushaLimits, lushaCycleWindow } from "@/lib/lusha/cap";
 import { getLushaConfig } from "@/lib/lusha/config";
-import { getDailySpend, getRevealState } from "@/lib/lusha/revealDb";
+import { getCreditSpend, getRevealState } from "@/lib/lusha/revealDb";
 import { buildLushaView, type LushaView } from "@/lib/lusha/revealView";
 import { listContactMemberships } from "@/lib/sequences/pageQueries";
 import { AboutPane, type AboutPaneProperty } from "./AboutPane";
@@ -322,13 +322,19 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
   let lusha: LushaView | null = null;
   try {
     const lushaConfig = getLushaConfig();
-    const [rows, spentToday] = lushaConfig.ok ? await Promise.all([getRevealState(record.person.id), getDailySpend()]) : [{}, 0];
+    const limits = getLushaLimits();
+    const now = new Date();
+    // One query for the day's AND the cycle's spend (getCreditSpend), beside the reveal state.
+    const [rows, spent] = lushaConfig.ok ? await Promise.all([getRevealState(record.person.id), getCreditSpend(now, limits.cycleStartDay)]) : [{}, { today: 0, cycle: 0 }];
     lusha = buildLushaView({
       config: lushaConfig,
       enabled: me.lushaEnabled, // the viewing BD's switch, already on the row getCurrentBd loaded: no extra read
       rows,
-      spentToday,
-      cap: getDailyCreditCap(),
+      spentToday: spent.today,
+      spentCycle: spent.cycle,
+      dailyCap: limits.dailyCap,
+      monthlyCap: limits.monthlyCap,
+      cycleEnd: lushaCycleWindow(now, limits.cycleStartDay).end,
       person: record.person,
       crm: { name, company: companyDisplayName, domain: companyRow?.domain ?? null, linkedin: linkedinProfileHref(record.person.profileKey) },
       companyHref: employerHref,

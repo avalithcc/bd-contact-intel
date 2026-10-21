@@ -15,6 +15,9 @@ import { assertScratchDatabaseUrl } from "../launch-readiness/scratchDbGuard";
 assertScratchDatabaseUrl(process.env.DATABASE_URL);
 
 const run = randomUUID().slice(0, 8);
+const OPEN_LIMITS = { dailyCap: 1_000_000, monthlyCap: 1_000_000, cycleStartDay: 1 };
+/** Credits in the Argentina day of `now`: the daily half of getCreditSpend. */
+const dailySpend = async (now?: Date) => (await (await import("@/lib/lusha/revealDb")).getCreditSpend(now)).today;
 let bdId: string;
 const personIds: string[] = [];
 
@@ -43,7 +46,7 @@ const ledger = async (personId: string) => {
 /** Search reserved, settled as matched with the given price list. */
 async function matchedSearch(personId: string, canReveal = [{ field: "emails", credits: 1 }, { field: "phones", credits: 5 }]) {
   const { reserve, settleSearch } = await import("@/lib/lusha/revealDb");
-  const r = await reserve({ personId, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   await settleSearch({ reservationId: r.reservationId, outcome: "matched", creditsCharged: 1, lushaContactId: "lu-1", payload: { canReveal } });
   return r.reservationId;
@@ -68,31 +71,31 @@ after(async () => {
 test("two concurrent reserve() on the same (person, field) leave exactly one row: a double click is busy", async () => {
   const { reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("dbl");
-  const out = await Promise.all([1, 2].map(() => reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 })));
+  const out = await Promise.all([1, 2].map(() => reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS })));
   assert.deepEqual(out.map((r) => r.ok).sort(), [false, true]);
   assert.ok(out.some((r) => !r.ok && r.reason === "busy"));
   assert.equal((await ledger(p.id)).length, 1);
 });
 
 test("concurrent reservations from different Contacts cannot exceed the cap", async () => {
-  const { getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { reserve } = await import("@/lib/lusha/revealDb");
   const people = await Promise.all(["a", "b", "c", "d", "e"].map((n) => mkPerson(`cap-${n}`)));
-  const cap = (await getDailySpend()) + 2;
-  const out = await Promise.all(people.map((p) => reserve({ personId: p.id, field: "search", actorBdId: bdId, cap })));
+  const cap = (await dailySpend()) + 2;
+  const out = await Promise.all(people.map((p) => reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: { ...OPEN_LIMITS, dailyCap: cap } })));
   assert.equal(out.filter((r) => r.ok).length, 2, "exactly the two credits of headroom were handed out");
   assert.ok(out.filter((r) => !r.ok).every((r) => !r.ok && r.reason === "cap_exceeded"));
-  assert.equal(await getDailySpend(), cap);
+  assert.equal(await dailySpend(), cap);
 });
 
 test("a failed row does not block a later reserve, and its reserved amount keeps counting", async () => {
-  const { failReservation, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("fail");
-  const before = await getDailySpend();
-  const first = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  const before = await dailySpend();
+  const first = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(first.ok);
   await failReservation(first.reservationId, "unavailable");
-  assert.equal(await getDailySpend(), before + 1, "failed keeps the reservation counting");
-  const second = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  assert.equal(await dailySpend(), before + 1, "failed keeps the reservation counting");
+  const second = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(second.ok, "failed is outside the in-flight index");
   const [failed] = (await ledger(p.id)).filter((r) => r.state === "failed");
   assert.equal(failed.creditsCharged, null);
@@ -100,24 +103,24 @@ test("a failed row does not block a later reserve, and its reserved amount keeps
 });
 
 test("outcome_unknown on a reveal keeps the reserved 5 credits counting", async () => {
-  const { failReservation, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("unknown");
   await matchedSearch(p.id);
-  const before = await getDailySpend();
-  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  const before = await dailySpend();
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok && r.credits === 5);
   await failReservation(r.reservationId, "outcome_unknown");
-  assert.equal(await getDailySpend(), before + 5);
+  assert.equal(await dailySpend(), before + 5);
 });
 
 test("the reveal price is re-read at reservation: a stored 0 reserves one credit and obeys the cap", async () => {
-  const { getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("zero");
   await matchedSearch(p.id, [{ field: "emails", credits: 0 }]);
-  const spent = await getDailySpend();
-  const refused = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: spent });
+  const spent = await dailySpend();
+  const refused = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: { ...OPEN_LIMITS, dailyCap: spent } });
   assert.deepEqual(refused.ok, false);
-  const ok = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: spent + 1 });
+  const ok = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: { ...OPEN_LIMITS, dailyCap: spent + 1 } });
   assert.ok(ok.ok && ok.credits === 1);
 });
 
@@ -130,7 +133,7 @@ test("a reveal needs a settled matched search: a rejected one (rejected meanwhil
   assert.equal(row.outcome, "match_rejected");
   assert.equal(row.creditsCharged, 1, "rejecting never touches the charge (D5)");
   assert.equal(row.rejectedByBdId, bdId);
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(r.ok === false && r.reason, "no_search");
   assert.equal(await rejectMatch(p.id, bdId), false, "only a matched search can be rejected");
 });
@@ -143,7 +146,7 @@ test("an email reveal settles ledger, person, history and activity together and 
   const { isReachable } = await import("@/lib/sequences/rosterGuards");
   const p = await mkPerson("rev", { emailSource: "pattern_inferred", email: `guess-${run}@acme.test`, emailNormalized: `guess-${run}@acme.test`, emailStatus: "probable" });
   const searchId = await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   const email = `Real-${run}@Acme.test`;
   const out = await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email, confidence: 70 }], creditsCharged: 1 });
@@ -167,7 +170,7 @@ test("a settle whose Contact write fails leaves no person write and keeps the pa
   const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("rollback");
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   const out = await settleReveal({ reservationId: r.reservationId, actorBdId: randomUUID(), field: "emails", emails: [{ email: `rb-${run}@acme.test` }], creditsCharged: 1 });
   assert.equal(out?.writeFailed, true);
@@ -191,8 +194,8 @@ test("a duplicate email is stored, enqueued as a candidate (pair ordered) and na
   const q = await mkPerson("dupq");
   await matchedSearch(p.id);
   await matchedSearch(q.id);
-  const rp = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
-  const rq = await reserve({ personId: q.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const rp = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
+  const rq = await reserve({ personId: q.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(rp.ok && rq.ok);
   const out = await settleReveal({ reservationId: rp.reservationId, actorBdId: bdId, field: "emails", emails: [{ email: email.toUpperCase() }], creditsCharged: 1 });
   assert.deepEqual([out?.duplicate?.personId, out?.duplicate?.name, out?.written], [holder.id, `holder ${run}`, "email"]);
@@ -214,7 +217,7 @@ test("a revealed phone never overwrites; an unexpected phone shape writes nothin
   const results = [];
   for (const [p, phones] of [[occupied, shape], [wrong, [{ phoneNumber: "+54 11 5555 5555" }]]] as const) {
     await matchedSearch(p.id);
-    const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+    const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
     assert.ok(r.ok);
     results.push(await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones, creditsCharged: 5 }));
   }
@@ -233,8 +236,8 @@ test("merge repoints the ledger to the survivor; two in-flight rows for one fiel
   const { reserve } = await import("@/lib/lusha/revealDb");
   const survivor = await mkPerson("surv");
   const merged = await mkPerson("mrg");
-  const s = await reserve({ personId: survivor.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
-  const m = await reserve({ personId: merged.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  const s = await reserve({ personId: survivor.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
+  const m = await reserve({ personId: merged.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(s.ok && m.ok);
   const { mergeEventId } = await mergeContacts(db, survivor.id, merged.id, "test", bdId);
   const after = await db.select().from(lushaReveal).where(inArray(lushaReveal.id, [s.reservationId, m.reservationId]));
@@ -249,36 +252,36 @@ test("merge repoints the ledger to the survivor; two in-flight rows for one fiel
 });
 
 test("the daily spend window follows the Argentina day: a row reserved at 23:30 ART counts that day only", async () => {
-  const { getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("day");
   const lateThen = new Date("2031-03-10T02:30:00.000Z"); // 23:30 ART on the 9th
   const earlyNext = new Date("2031-03-10T03:30:00.000Z"); // 00:30 ART on the 10th
-  assert.equal(await getDailySpend(lateThen), 0);
-  const r = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000, now: lateThen });
+  assert.equal(await dailySpend(lateThen), 0);
+  const r = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS, now: lateThen });
   assert.ok(r.ok);
-  assert.equal(await getDailySpend(lateThen), 1);
-  assert.equal(await getDailySpend(earlyNext), 0, "the next ART day starts empty");
+  assert.equal(await dailySpend(lateThen), 1);
+  assert.equal(await dailySpend(earlyNext), 0, "the next ART day starts empty");
 });
 
 async function revealEmail(personId: string, email: string) {
   const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
-  const r = await reserve({ personId, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   return settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email }], creditsCharged: 1 });
 }
 
 test("a value we already own is never paid for twice, even after a re-search (W2)", async () => {
-  const { getDailySpend, getRevealState, reserve } = await import("@/lib/lusha/revealDb");
+  const { getRevealState, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("twice");
   await matchedSearch(p.id);
   await revealEmail(p.id, `twice-${run}@acme.test`);
   await matchedSearch(p.id); // a newer search
-  const spent = await getDailySpend();
-  const again = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const spent = await dailySpend();
+  const again = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(again.ok === false && again.reason, "already_revealed");
-  assert.equal(await getDailySpend(), spent, "nothing was reserved");
+  assert.equal(await dailySpend(), spent, "nothing was reserved");
   assert.equal((await getRevealState(p.id)).emails?.outcome, "revealed", "the older search's paid row still wins on the reader (W3)");
-  const phone = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  const phone = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(phone.ok, "the other field is unaffected");
 });
 
@@ -293,7 +296,7 @@ test("after a merge the survivor's newer search does not hide a paid reveal of t
   await matchedSearch(survivor.id); // newer than the merged side's search
   await mergeContacts(db, survivor.id, merged.id, "test", bdId);
   assert.equal((await getRevealState(survivor.id)).emails?.value, `w3-${run}@acme.test`);
-  const r = await reserve({ personId: survivor.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: survivor.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(r.ok === false && r.reason, "already_revealed");
 });
 
@@ -306,9 +309,9 @@ test("reserve refuses a merged-away or missing Contact, and waits for a merge th
   const survivor = await mkPerson("w1s");
   const merged = await mkPerson("w1m");
   await mergeContacts(db, survivor.id, merged.id, "test", bdId);
-  const gone = await reserve({ personId: merged.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  const gone = await reserve({ personId: merged.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(gone.ok === false && gone.reason, "merged");
-  const missing = await reserve({ personId: randomUUID(), field: "search", actorBdId: bdId, cap: 1_000_000 });
+  const missing = await reserve({ personId: randomUUID(), field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(missing.ok === false && missing.reason, "not_found");
 
   const p = await mkPerson("w1wait");
@@ -316,7 +319,7 @@ test("reserve refuses a merged-away or missing Contact, and waits for a merge th
   let pending!: ReturnType<typeof reserve>;
   await db.transaction(async (tx) => {
     await tx.select().from(person).where(eq(person.id, p.id)).for("update"); // what mergeContacts does
-    pending = reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 }).finally(() => (settled = true));
+    pending = reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS }).finally(() => (settled = true));
     await new Promise((r) => setTimeout(r, 400));
     assert.equal(settled, false, "the reservation waits for the merge's row lock");
   });
@@ -326,7 +329,16 @@ test("reserve refuses a merged-away or missing Contact, and waits for a merge th
 // --- PR 5: the orchestration through the REAL ports (fake fetch serving recorded fixtures: no network, no credit) ---
 // Same file as the ledger tests on purpose: node:test runs files in parallel and the cap tests above read the
 // day's global spend, which these would move.
-const ENV = { VERCEL_ENV: "production", LUSHA_API_KEY: "sk-test-never-sent", LUSHA_DAILY_CREDIT_CAP: "1000000" };
+// LUSHA_CYCLE_START_DAY is REQUIRED, not decorative: without it getLushaLimits returns a monthly cap of 0 and every
+// reserve is refused, so these end-to-end tests would be exercising the kill switch instead of the feature. The
+// same is true of production -- see DEFAULT_CYCLE_START_DAY in src/lib/lusha/cap.ts.
+const ENV = {
+  VERCEL_ENV: "production",
+  LUSHA_API_KEY: "sk-test-never-sent",
+  LUSHA_DAILY_CREDIT_CAP: "1000000",
+  LUSHA_MONTHLY_CREDIT_CAP: "1000000",
+  LUSHA_CYCLE_START_DAY: "21",
+};
 const companyKeys: string[] = [];
 
 const fixture = (name: string) => readFileSync(join(__dirname, "..", "unit", "fixtures", "lusha", name), "utf8");
@@ -394,20 +406,19 @@ test("search then reveal through the real ports: one search call, one enrich cal
 });
 
 test("a 2xx with an unreadable body fails the reservation as outcome_unknown and keeps the reserved credits counting", async () => {
-  const { getDailySpend } = await import("@/lib/lusha/revealDb");
-  const { livePorts } = await import("@/lib/lusha/ports");
+    const { livePorts } = await import("@/lib/lusha/ports");
   const { searchLushaContact } = await import("@/lib/lusha/reveal");
   const { db } = await import("@/db");
   const { lushaReveal } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
   const p = await mkPerson("act", { profileKey: `linkedin.com/in/unk-${run}` });
-  const before = await getDailySpend();
+  const before = await dailySpend();
   const ports = livePorts(ENV, async () => new Response("<html>gateway</html>", { status: 200 }));
   const r = await searchLushaContact({ personId: p.id, field: "emails", actorBdId: bdId }, ports);
   assert.deepEqual([r.ok, !r.ok && r.reason, !r.ok && r.retryable], [false, "lusha_outcome_unknown", false]);
   const rows = await db.select().from(lushaReveal).where(eq(lushaReveal.personId, p.id));
   assert.deepEqual([rows[0].state, rows[0].errorCode, rows[0].creditsCharged], ["failed", "outcome_unknown", null]);
-  assert.equal((await getDailySpend()) - before, 1);
+  assert.equal((await dailySpend()) - before, 1);
 });
 
 test("the closed gate never reaches the client or the ledger", async () => {
@@ -430,7 +441,7 @@ test("a paid phone equal to a held number settles as already_held: charge record
   const { eq } = await import("drizzle-orm");
   const p = await mkPerson("held", { phone: "+54 11 5555 5555" });
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   const out = await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones: [{ number: "541155555555", type: "mobile" }], creditsCharged: 5 });
   assert.deepEqual([out?.outcome, out?.written, out?.writeFailed], ["already_held", null, false]);
@@ -448,7 +459,7 @@ test("one phones reveal with a work and a mobile number fills both columns: one 
   const { eq } = await import("drizzle-orm");
   const p = await mkPerson("both");
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   const phones = [{ number: "+54 9 11 5000 0002", type: "mobile", doNotCall: true }, { number: "+54 11 4000 0001", type: "work" }];
   const out = await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones, creditsCharged: 5 });
@@ -469,7 +480,7 @@ test("a stored phones reveal that failed to write applies BOTH numbers with no s
   const { eq } = await import("drizzle-orm");
   const p = await mkPerson("stored");
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "phones", phones: [{ number: "+54 11 4000 0001", type: "work" }, { number: "+54 9 11 5000 0002", type: "mobile" }], creditsCharged: 5 });
   // Park it as a failed write, then clear the columns the first write filled.
@@ -487,7 +498,7 @@ test("failReservation can keep a paid raw value on the row, merged into the payl
   const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("keep");
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   assert.equal(await failReservation(r.reservationId, "settle_failed", { emails: [{ email: `k-${run}@x.test` }], creditsCharged: 1 }), true);
   const [row] = (await ledger(p.id)).filter((x) => x.field === "emails");
@@ -502,7 +513,7 @@ async function paidButUnwritten(name: string, personOver: Record<string, unknown
   const { reserve, settleReveal } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson(name, personOver);
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   const email = `Apply-${name}-${run}@Acme.test`;
   const out = await settleReveal({ reservationId: r.reservationId, actorBdId: randomUUID(), field: "emails", emails: [{ email, confidence: 80 }], creditsCharged: 1 });
@@ -511,12 +522,12 @@ async function paidButUnwritten(name: string, personOver: Record<string, unknown
 }
 
 test("applying a stored value writes the Contact once, clears the error, adds no spend, and a second call is refused", async () => {
-  const { applyStoredReveal, getDailySpend } = await import("@/lib/lusha/revealDb");
+  const { applyStoredReveal } = await import("@/lib/lusha/revealDb");
   const { db } = await import("@/db");
   const { activity, personPropertyHistory } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
   const { p, email } = await paidButUnwritten("apply");
-  const spentBefore = await getDailySpend();
+  const spentBefore = await dailySpend();
   const rowsBefore = await ledger(p.id);
   const out = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
   assert.deepEqual([out.ok, out.ok && out.written, out.ok && out.value], [true, "email", email]);
@@ -529,7 +540,7 @@ test("applying a stored value writes the Contact once, clears the error, adds no
   const row = rows.find((l) => l.field === "emails")!;
   assert.deepEqual([row.errorCode, row.creditsCharged, row.state, row.outcome], [null, 1, "settled", "revealed"]);
   assert.equal("writeError" in (row.payload as object), false);
-  assert.equal(await getDailySpend(), spentBefore, "applying a stored value adds nothing to the day's spend");
+  assert.equal(await dailySpend(), spentBefore, "applying a stored value adds nothing to the day's spend");
   const again = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
   assert.deepEqual([again.ok, !again.ok && again.reason], [false, "not_applicable"]);
 });
@@ -538,7 +549,7 @@ test("applying refuses a row that never failed to write, and records a duplicate
   const { applyStoredReveal, reserve, settleReveal } = await import("@/lib/lusha/revealDb");
   const clean = await mkPerson("clean");
   await matchedSearch(clean.id);
-  const r = await reserve({ personId: clean.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: clean.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email: `clean-${run}@acme.test` }], creditsCharged: 1 });
   assert.deepEqual((await applyStoredReveal({ personId: clean.id, field: "emails", actorBdId: bdId })).ok, false);
@@ -556,7 +567,7 @@ test("getRevealState also returns who paid, when it settled and the live holder 
   await matchedSearch(p.id);
   const email = `meta-${run}@acme.test`;
   const holder = await mkPerson("metaholder", { email, emailNormalized: email, emailStatus: "verified" });
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   await settleReveal({ reservationId: r.reservationId, actorBdId: bdId, field: "emails", emails: [{ email }], creditsCharged: 1 });
   const state = await getRevealState(p.id);
@@ -572,15 +583,15 @@ test("a failed search after a settled match leaves the match, its field rows and
   const { failReservation, getRevealState, rejectMatch, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("hide");
   const searchId = await matchedSearch(p.id);
-  const unknown = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: 1_000_000 });
+  const unknown = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(unknown.ok);
   await failReservation(unknown.reservationId, "outcome_unknown");
-  const failedSearch = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: 1_000_000 });
+  const failedSearch = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(failedSearch.ok);
   await failReservation(failedSearch.reservationId, "rate_limited");
   const state = await getRevealState(p.id);
   assert.deepEqual([state.search?.id, state.search?.outcome, state.phones?.errorCode], [searchId, "matched", "outcome_unknown"]);
-  const again = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const again = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual([again.ok, again.ok && again.searchId], [true, searchId], "reserve reads the same settled search");
   assert.equal(await rejectMatch(p.id, bdId), true, "reject targets the settled match, not the failed attempt");
 });
@@ -589,12 +600,12 @@ test("a paid value parked by a failed settle blocks a second purchase and is app
   const { applyStoredReveal, failReservation, getRevealState, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("parked");
   await matchedSearch(p.id);
-  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 });
+  const r = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok);
   const email = `parked-${run}@acme.test`;
   await failReservation(r.reservationId, "settle_failed", { emails: [{ email, confidence: 60 }], creditsCharged: 1 });
   assert.equal((await getRevealState(p.id)).emails?.errorCode, "settle_failed");
-  assert.deepEqual((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: 1_000_000 })).ok, false, "never bought twice");
+  assert.deepEqual((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS })).ok, false, "never bought twice");
   const out = await applyStoredReveal({ personId: p.id, field: "emails", actorBdId: bdId });
   assert.deepEqual([out.ok, out.ok && out.written], [true, "email"]);
   const [row] = (await ledger(p.id)).filter((x) => x.field === "emails");
@@ -605,28 +616,27 @@ test("a paid value parked by a failed settle blocks a second purchase and is app
 // --- reaping stranded reservations; failed searches are refillable ------------------------------------------------
 
 const MIN = 60_000;
-const BIG = 1_000_000;
 
 test("a reservation older than the threshold is reaped: failed, credits still counted, and the person is reservable again", async () => {
-  const { STRANDED_AFTER_MS, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("reap");
   const old = new Date(Date.now() - STRANDED_AFTER_MS - MIN);
-  const stuck = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: old });
+  const stuck = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS, now: old });
   assert.ok(stuck.ok);
-  assert.deepEqual((await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(old.getTime() + MIN) })).ok, false, "still in flight at that moment");
-  const again = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG });
+  assert.deepEqual((await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS, now: new Date(old.getTime() + MIN) })).ok, false, "still in flight at that moment");
+  const again = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(again.ok, "reaped, so no longer busy");
   const [reaped] = (await ledger(p.id)).filter((r) => r.id === stuck.reservationId);
   assert.deepEqual([reaped.state, reaped.errorCode, reaped.creditsReserved, reaped.creditsCharged, reaped.settledAt instanceof Date], ["failed", "reaped", 1, null, true]);
-  assert.ok((await getDailySpend(old)) >= 1, "the reaped credit still counts in its own day");
+  assert.ok((await dailySpend(old)) >= 1, "the reaped credit still counts in its own day");
 });
 
 test("a reservation inside the window may be in flight and is left alone", async () => {
   const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("fresh");
-  const first = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS + MIN) });
+  const first = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS, now: new Date(Date.now() - STRANDED_AFTER_MS + MIN) });
   assert.ok(first.ok);
-  const second = await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG });
+  const second = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(second.ok === false && second.reason, "busy");
   assert.equal((await ledger(p.id)).filter((r) => r.id === (first.ok ? first.reservationId : "")).map((r) => r.state)[0], "reserved");
 });
@@ -634,33 +644,33 @@ test("a reservation inside the window may be in flight and is left alone", async
 test("two concurrent reserves over one stranded row: one wins, the other is busy, and the winner's fresh row is never reaped", async () => {
   const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("reaprace");
-  await reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
-  const out = await Promise.all([1, 2].map(() => reserve({ personId: p.id, field: "search", actorBdId: bdId, cap: BIG })));
+  await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
+  const out = await Promise.all([1, 2].map(() => reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS })));
   assert.deepEqual(out.map((r) => r.ok).sort(), [false, true]);
   const rows = await ledger(p.id);
   assert.deepEqual(rows.map((r) => r.state).sort(), ["failed", "reserved"]);
 });
 
 test("a stranded REVEAL reservation is reaped and then REFUSED, never re-claimed: the paid call may already have been billed", async () => {
-  const { STRANDED_AFTER_MS, getDailySpend, reserve } = await import("@/lib/lusha/revealDb");
+  const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("reapreveal");
   await matchedSearch(p.id);
   const old = new Date(Date.now() - STRANDED_AFTER_MS - MIN);
-  const stuck = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG, now: old });
+  const stuck = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS, now: old });
   assert.ok(stuck.ok && stuck.credits === 5);
-  const again = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG });
+  const again = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(again.ok === false && again.reason, "outcome_unknown");
   const rows = (await ledger(p.id)).filter((r) => r.field === "phones");
   assert.deepEqual(rows.map((r) => [r.state, r.errorCode, r.creditsReserved]), [["failed", "reaped", 5]], "reaped and counted, and no second reservation was written");
-  assert.ok((await getDailySpend(old)) >= 5);
+  assert.ok((await dailySpend(old)) >= 5);
 });
 
 test("reaping a row of another field or person does not refuse a reveal of this one", async () => {
   const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
   const [a, b] = [await mkPerson("reap-a"), await mkPerson("reap-b")];
   await matchedSearch(b.id);
-  await reserve({ personId: a.id, field: "search", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
-  const r = await reserve({ personId: b.id, field: "emails", actorBdId: bdId, cap: BIG });
+  await reserve({ personId: a.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
+  const r = await reserve({ personId: b.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(r.ok, "only the target (person, field) refuses");
 });
 
@@ -670,14 +680,14 @@ test("INTERLEAVING: another reserve reaps the stranded reveal row first; this re
   const { STRANDED_AFTER_MS, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("interleave");
   await matchedSearch(p.id);
-  const stuck = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
+  const stuck = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS, now: new Date(Date.now() - STRANDED_AFTER_MS - MIN) });
   assert.ok(stuck.ok);
   // Someone else's reserve takes the lock after the threshold and sweeps the row (the sweep is global): it is not ours.
   const other = await mkPerson("interleave-other");
-  assert.ok((await reserve({ personId: other.id, field: "search", actorBdId: bdId, cap: BIG })).ok);
+  assert.ok((await reserve({ personId: other.id, field: "search", actorBdId: bdId, limits: OPEN_LIMITS })).ok);
   assert.equal((await ledger(p.id)).find((r) => r.id === stuck.reservationId)?.errorCode, "reaped", "the other call did the reaping");
   // Our reserve reaps nothing itself, yet must refuse: a paid call may already be billed.
-  const mine = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, cap: BIG });
+  const mine = await reserve({ personId: p.id, field: "phones", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(mine.ok === false && mine.reason, "outcome_unknown");
   assert.equal((await ledger(p.id)).filter((r) => r.field === "phones").length, 1, "no second reservation was written");
 });
@@ -686,10 +696,10 @@ test("the same hole before any reaper: a reveal that timed out between prepare()
   const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("unknown-between");
   await matchedSearch(p.id);
-  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(first.ok);
   await failReservation(first.reservationId, "outcome_unknown");
-  const second = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  const second = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.deepEqual(second.ok === false && second.reason, "outcome_unknown");
 });
 
@@ -697,22 +707,22 @@ test("an explicit NEW search reopens the field: the unknown outcome belonged to 
   const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("reopen");
   await matchedSearch(p.id);
-  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(first.ok);
   await failReservation(first.reservationId, "outcome_unknown");
-  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG })).ok, false);
+  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS })).ok, false);
   await matchedSearch(p.id); // a conscious, paid re-search: a new search id
-  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG })).ok, true);
+  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS })).ok, true);
 });
 
 test("a failure that is NOT an unknown outcome never blocks a later reveal", async () => {
   const { failReservation, reserve } = await import("@/lib/lusha/revealDb");
   const p = await mkPerson("plainfail");
   await matchedSearch(p.id);
-  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG });
+  const first = await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS });
   assert.ok(first.ok);
   await failReservation(first.reservationId, "rate_limited");
-  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, cap: BIG })).ok, true);
+  assert.equal((await reserve({ personId: p.id, field: "emails", actorBdId: bdId, limits: OPEN_LIMITS })).ok, true);
 });
 
 // --- the contacts list: ONE query says which listed Contacts hold a flagged number ---------------------------------------------
@@ -742,4 +752,16 @@ test("flaggedPhonePersonIds resolves a whole page in one call and flags only a n
   const out = await flaggedPhonePersonIds(page);
   assert.deepEqual([...out].sort(), [flagged.id, dup.id].sort(), "edited-away, unflagged, a flag on the other column and a non-settled row are all excluded");
   assert.deepEqual([...(await flaggedPhonePersonIds([]))], []);
+});
+
+test("getCreditSpend answers the day and the billing cycle in one read, and a reserve refuses on the monthly cap", async () => {
+  const { getCreditSpend, reserve } = await import("@/lib/lusha/revealDb");
+  const p = await mkPerson("cycle");
+  const before = await getCreditSpend();
+  assert.ok(before.cycle >= before.today, "the cycle contains the day");
+  const refused = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: { ...OPEN_LIMITS, monthlyCap: before.cycle } });
+  assert.deepEqual(refused, { ok: false, reason: "cap_exceeded", cap: "monthly", remaining: 0 });
+  const ok = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: { ...OPEN_LIMITS, monthlyCap: before.cycle + 1 } });
+  assert.equal(ok.ok, true);
+  assert.deepEqual(await getCreditSpend(), { today: before.today + 1, cycle: before.cycle + 1 });
 });

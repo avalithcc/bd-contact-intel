@@ -21,7 +21,7 @@ type Step = { kind: "cost" } | { kind: "identity"; match: IdentityFields; price:
 
 const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ""));
 const rich = (t: string) => t.split("**").map((s, i) => (i % 2 ? <strong key={i}>{s}</strong> : s));
-const TITLE: Partial<Record<ContactActionErrorReason, keyof ContactRecordLabels>> = { lusha_cap_reached: "lushaTitleCapReached", lusha_no_credits: "lushaTitleNoCredits", lusha_rate_limited: "lushaTitleRateLimited", lusha_protected: "lushaTitleProtected" };
+const TITLE: Partial<Record<ContactActionErrorReason, keyof ContactRecordLabels>> = { lusha_cap_reached: "lushaTitleCapReached", lusha_monthly_cap_reached: "lushaTitleMonthlyCapReached", lusha_no_credits: "lushaTitleNoCredits", lusha_rate_limited: "lushaTitleRateLimited", lusha_protected: "lushaTitleProtected" };
 const DANGER: ContactActionErrorReason[] = ["lusha_no_credits", "lusha_protected", "lusha_outcome_unknown", "lusha_unreadable"];
 const LushaBadge = ({ l }: { l: ContactRecordLabels }) => <span className="badge badge-outline no-dot">{l.lushaBadge}</span>;
 
@@ -36,8 +36,9 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
   const c = f.control;
   const noun = field === "emails" ? l.lushaFieldEmail : l.lushaFieldPhone;
   const credits = (n: number) => (n === 1 ? l.lushaCreditOne : fill(l.lushaCreditMany, { n }));
-  const left = Math.max(0, view.cap - view.spent);
-  const remaining = left === 1 ? fill(l.lushaRemainingOne, { cap: view.cap }) : fill(l.lushaRemaining, { left, cap: view.cap });
+  // The normal state shows the MONTHLY position (the budget); the daily safety limit is named only when it is what blocked.
+  const left = Math.max(0, view.monthlyCap - view.spentCycle);
+  const remaining = left === 1 ? fill(l.lushaRemainingOne, { cap: view.monthlyCap }) : fill(l.lushaRemaining, { left, cap: view.monthlyCap });
   const close = () => {
     setStep(null);
     setError(null);
@@ -72,7 +73,8 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
       outcome_unknown: l.lushaNoteOutcomeUnknown,
       not_revealable: l.lushaNoteNotRevealable,
       write_failed: l.lushaNoteWriteFailed,
-      capped: fill(l.lushaNoteCapped, { spent: view.spent, cap: view.cap }),
+      capped: fill(l.lushaNoteCapped, { spent: view.spentToday, cap: view.dailyCap }),
+      capped_monthly: fill(l.lushaNoteCappedMonthly, { spent: view.spentCycle, cap: view.monthlyCap, date: view.cycleResetsOn }),
       unconfigured: l.lushaNoteUnconfigured,
       // As drawn: the email row says who to ask, the phone row repeats it shorter.
       not_enabled: field === "emails" ? l.lushaNoteNotEnabled : l.lushaNoteNotEnabledShort,
@@ -149,7 +151,8 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
 
   const alert = (e: Failure) => {
     const tk = TITLE[e.reason];
-    const body = fill(contactActionErrorMessage(l, e.reason), { spent: view.spent, cap: view.cap });
+    const monthly = e.reason === "lusha_monthly_cap_reached";
+    const body = fill(contactActionErrorMessage(l, e.reason), monthly ? { spent: view.spentCycle, cap: view.monthlyCap, date: view.cycleResetsOn } : { spent: view.spentToday, cap: view.dailyCap });
     return (
       <div className={`alert ${DANGER.includes(e.reason) ? "alert-danger" : "alert-warn"}`} role="alert">
         {e.reason === "lusha_protected" ? <LockIcon className="icon" /> : <WarningIcon className="icon" />}
@@ -325,7 +328,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
       {isOwnRow && !noteLast && notice}
       {isOwnRow && c && (
         <dd className="row">
-          <button type="button" className="btn btn-secondary btn-sm" disabled={c.disabled} title={c.disabled ? (f.note === "capped" ? l.lushaTitleCap : l.lushaTitleUnconfigured) : undefined} onClick={onControl}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={c.disabled} title={c.disabled ? (f.note === "capped" ? l.lushaTitleCap : f.note === "capped_monthly" ? l.lushaTitleCapMonthly : l.lushaTitleUnconfigured) : undefined} onClick={onControl}>
             <LushaBadge l={l} />
             {label}
           </button>

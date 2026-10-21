@@ -5,22 +5,23 @@
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { isLushaEnabled } from "./adminDb";
 import { getAccountUsage, enrichContact, searchContact, type FetchFn } from "./client";
-import { getDailyCreditCap } from "./cap";
+import { getLushaLimits } from "./cap";
 import { getLushaConfig } from "./config";
 import type { RevealPorts } from "./reveal";
-import { failReservation, getDailySpend, getRevealState, loadRevealSubject, rejectMatch, reserve, settleReveal, settleSearch } from "./revealDb";
+import { failReservation, getCreditSpend, getRevealState, loadRevealSubject, rejectMatch, reserve, settleReveal, settleSearch } from "./revealDb";
 
 export function livePorts(env: Record<string, string | undefined> = process.env, fetchFn: FetchFn = (url, init) => fetch(url, init)): RevealPorts {
   const config = getLushaConfig(env);
   const key = config.ok ? config.config.apiKey : "";
+  const limits = getLushaLimits(env);
   return {
     config,
-    cap: getDailyCreditCap(env),
+    limits,
     isLushaEnabled: (bdId) => isLushaEnabled(bdId),
     assertEditable: assertContactEditableById,
     loadSubject: (id) => loadRevealSubject(id),
     getRevealState: (id) => getRevealState(id),
-    getDailySpend: () => getDailySpend(),
+    getSpend: () => getCreditSpend(new Date(), limits.cycleStartDay),
     reserve: (i) => reserve(i),
     settleSearch: (i) => settleSearch(i),
     settleReveal: (i) => settleReveal(i),

@@ -9,13 +9,13 @@ import {
   resolveDailyCreditCap,
 } from "../../src/lib/lusha/cap";
 
-test("the default ceiling is 12", () => {
-  assert.equal(DEFAULT_DAILY_CREDIT_CAP, 12);
+test("the default daily rail is 60", () => {
+  assert.equal(DEFAULT_DAILY_CREDIT_CAP, 60);
 });
 
-test("unset or blank resolves to the default 12", () => {
+test("unset or blank resolves to the default 60", () => {
   for (const raw of [undefined, "", "   "]) {
-    assert.equal(parseDailyCreditCap(raw), 12, `raw=${String(raw)}`);
+    assert.equal(parseDailyCreditCap(raw), 60, `raw=${String(raw)}`);
     assert.equal(resolveDailyCreditCap(raw).source, "default");
   }
 });
@@ -32,7 +32,7 @@ test("the invalid resolution carries a reason but never the raw value", () => {
   assert.deepEqual(r, { cap: 0, source: "invalid" });
   assert.ok(!JSON.stringify(r).includes("secret"));
   assert.deepEqual(getDailyCreditCapResolution({ LUSHA_DAILY_CREDIT_CAP: "abc" }), { cap: 0, source: "invalid" });
-  assert.deepEqual(getDailyCreditCapResolution({}), { cap: 12, source: "default" });
+  assert.deepEqual(getDailyCreditCapResolution({}), { cap: 60, source: "default" });
 });
 
 test("zero is a valid soft kill switch", () => {
@@ -102,7 +102,7 @@ test("a free action (expected 0) is allowed even at the ceiling", () => {
 });
 
 test("getDailyCreditCap reads LUSHA_DAILY_CREDIT_CAP from the given env", () => {
-  assert.equal(getDailyCreditCap({}), 12);
+  assert.equal(getDailyCreditCap({}), 60);
   assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "30" }), 30);
   assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "0" }), 0);
   assert.equal(getDailyCreditCap({ LUSHA_DAILY_CREDIT_CAP: "oops" }), 0);

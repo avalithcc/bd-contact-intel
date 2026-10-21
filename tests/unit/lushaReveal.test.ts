@@ -55,12 +55,12 @@ function fake(over: Partial<RevealPorts> & { rows?: LatestRows; subject?: Subjec
   };
   const p: RevealPorts = {
     config: { ok: true, config: { apiKey: KEY } },
-    cap: 12,
+    limits: { dailyCap: 12, monthlyCap: 400, cycleStartDay: 21 },
     isLushaEnabled: async () => true,
     assertEditable: rec("assertEditable", undefined),
     loadSubject: rec("loadSubject", over.subject === undefined ? SUBJECT : over.subject),
     getRevealState: rec("getRevealState", over.rows ?? {}),
-    getDailySpend: rec("getDailySpend", over.spent ?? 0),
+    getSpend: rec("getSpend", { today: over.spent ?? 0, cycle: over.spent ?? 0 }),
     reserve: rec("reserve", { ok: true as const, reservationId: "res-1", credits: 1, searchId: "s1" }),
     settleSearch: rec("settleSearch", true),
     settleReveal: rec("settleReveal", { outcome: "revealed" as const, value: "x@example.invalid", written: "email" as const, duplicate: null, writeFailed: false }),
@@ -245,7 +245,7 @@ test("a reservation refused as busy or over the cap makes no Lusha call", async 
   const busy = fake({ rows: WITH_SEARCH, reserve: async () => ({ ok: false, reason: "busy" }) });
   const r = await revealLushaField(input(), busy.p);
   assert.deepEqual([r.ok, !r.ok && r.reason, !r.ok && r.retryable], [false, "lusha_busy", true]);
-  const over = fake({ rows: WITH_SEARCH, reserve: async () => ({ ok: false, reason: "cap_exceeded", remaining: 3 }) });
+  const over = fake({ rows: WITH_SEARCH, reserve: async () => ({ ok: false, reason: "cap_exceeded", cap: "daily", remaining: 3 }) });
   const o = await revealLushaField(input(), over.p);
   assert.deepEqual([!o.ok && o.reason, !o.ok && o.remaining], ["lusha_cap_reached", 3]);
   assert.equal([...busy.calls, ...over.calls].some((c) => ACCOUNT_CALLS.includes(c)), false);
@@ -478,4 +478,14 @@ test("when reserve() itself reaped the row it refuses, and that maps to the outc
   const r = await revealLushaField(input("phones"), f.p);
   assert.deepEqual([r.ok, !r.ok && r.reason], [false, "lusha_outcome_unknown"]);
   assert.equal(f.calls.includes("enrichContact"), false);
+});
+
+test("a refusal by the monthly cap reaches the BD as its own reason, from the state and from the reservation", async () => {
+  const state = fake({ rows: WITH_SEARCH, spent: 0, getSpend: async () => ({ today: 0, cycle: 400 }) });
+  const r = await revealLushaField(input(), state.p);
+  assert.deepEqual([r.ok, !r.ok && r.reason, !r.ok && r.remaining], [false, "lusha_monthly_cap_reached", 0]);
+  const over = fake({ rows: WITH_SEARCH, reserve: async () => ({ ok: false, reason: "cap_exceeded", cap: "monthly", remaining: 2 }) });
+  const o = await revealLushaField(input(), over.p);
+  assert.deepEqual([!o.ok && o.reason, !o.ok && o.remaining], ["lusha_monthly_cap_reached", 2]);
+  assert.deepEqual(spends(over.calls), []);
 });

@@ -3,13 +3,13 @@
 // OUTSIDE any transaction and never under the lock. The cap is read from this ledger only, never from
 // Lusha's eventually consistent /v3/account/usage.
 
-import { and, desc, eq, gte, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, company, duplicateCandidate, lushaReveal, person, personPropertyHistory } from "@/db/schema";
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { isLushaEnabled } from "./adminDb";
-import { artDayWindow, planReservation } from "./cap";
+import { artDayWindow, lushaCycleWindow, planReservation, type CapName, type LushaLimits } from "./cap";
 import { pickEmail, pickPhone, pickPhones } from "./parse";
 import type { CanRevealEntry, LushaField } from "./pricing";
 import { planRevealedEmailWrite, planRevealedPhonesWrite } from "./revealPlan";
@@ -23,27 +23,44 @@ export const LUSHA_CAP_LOCK = 0x4c55_5348; // "LUSH"
 
 type Reader = Pick<typeof db, "select">;
 
-/** Credits spent in the AR business day of `now`: charged where known, else the reserved amount (failed / unknown rows keep counting, D8). */
-export async function getDailySpend(now: Date = new Date(), reader: Reader = db): Promise<number> {
-  const { start, end } = artDayWindow(now);
-  const [row] = await reader
-    .select({ spent: sql<string>`coalesce(sum(coalesce(${lushaReveal.creditsCharged}, ${lushaReveal.creditsReserved})), 0)` })
-    .from(lushaReveal)
-    .where(and(gte(lushaReveal.at, start), lt(lushaReveal.at, end)));
-  return Number(row?.spent); // drizzle returns the bigint sum as a string; evaluateCap refuses a non-integer
+export interface CreditSpend {
+  /** Credits in the Argentina business day of `now`. */
+  today: number;
+  /** Credits in the Lusha billing cycle containing `now` (today included). */
+  cycle: number;
+}
+
+type SpendRow = { spent_today: string | number | null; spent_cycle: string | number | null };
+
+/**
+ * Credits spent today and in the billing cycle, in ONE round trip: charged where known, else the reserved amount (failed /
+ * unknown rows keep counting, D8). The cycle window contains the day window (both start at an ART midnight), so a single scan
+ * of the cycle's rows answers both with FILTER. Never Lusha's usage endpoint: this ledger is the only source.
+ */
+export async function getCreditSpend(now: Date = new Date(), cycleStartDay: number = 1, reader: Pick<typeof db, "execute"> = db): Promise<CreditSpend> {
+  const day = artDayWindow(now);
+  const cycle = lushaCycleWindow(now, cycleStartDay);
+  const rows = (await reader.execute(sql`
+    select
+      coalesce(sum(coalesce(credits_charged, credits_reserved)) filter (where at >= ${day.start.toISOString()}::timestamptz and at < ${day.end.toISOString()}::timestamptz), 0) as spent_today,
+      coalesce(sum(coalesce(credits_charged, credits_reserved)), 0) as spent_cycle
+    from lusha_reveal
+    where at >= ${cycle.start.toISOString()}::timestamptz and at < ${cycle.end.toISOString()}::timestamptz`)) as unknown as SpendRow[];
+  // postgres-js returns the bigint sums as strings; evaluateCaps refuses anything that is not an integer, so convert here.
+  return { today: Number(rows[0]?.spent_today), cycle: Number(rows[0]?.spent_cycle) };
 }
 
 export type ReserveResult =
   | { ok: true; reservationId: string; credits: number; searchId: string | null }
-  | { ok: false; reason: "cap_exceeded"; remaining: number }
+  | { ok: false; reason: "cap_exceeded"; cap: CapName; remaining: number }
   | { ok: false; reason: "busy" | "outcome_unknown" | "not_enabled" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
 
 /**
- * ONE short transaction: advisory lock, the day's spend, a fresh read of the latest search row (price and
+ * ONE short transaction: advisory lock, the day's and cycle's spend, a fresh read of the latest search row (price and
  * staleness: it may have been rejected meanwhile), then the claim insert. `busy` = an in-flight row exists.
  */
 export async function reserve(
-  input: { personId: string; field: LushaField; actorBdId: string; cap: number; now?: Date },
+  input: { personId: string; field: LushaField; actorBdId: string; limits: LushaLimits; now?: Date },
   database: typeof db = db,
 ): Promise<ReserveResult> {
   const now = input.now ?? new Date();
@@ -78,7 +95,7 @@ export async function reserve(
     if (owner.mergedIntoId) return { ok: false, reason: "merged" };
     if (owner.owned) return { ok: false, reason: "already_revealed" };
     if (input.field !== "search" && owner.unknown) return { ok: false, reason: "outcome_unknown" };
-    const spentToday = await getDailySpend(now, tx);
+    const spent = await getCreditSpend(now, input.limits.cycleStartDay, tx);
     let search: { id: string; lushaContactId: string | null; payload: unknown } | null = null;
     if (input.field !== "search") {
       const [s] = await tx
@@ -92,7 +109,7 @@ export async function reserve(
       search = s;
     }
     const list = (search?.payload as { canReveal?: CanRevealEntry[] } | null)?.canReveal ?? null;
-    const plan = planReservation({ field: input.field, canReveal: list, spentToday, cap: input.cap });
+    const plan = planReservation({ field: input.field, canReveal: list, spentToday: spent.today, spentCycle: spent.cycle, dailyCap: input.limits.dailyCap, monthlyCap: input.limits.monthlyCap });
     if (!plan.ok) return plan;
     const [row] = await tx
       .insert(lushaReveal)
