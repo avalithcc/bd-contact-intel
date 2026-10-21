@@ -1941,18 +1941,36 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
     old `postalAddressForToken` — only the name and the mapped result changed.
 - **Three follow-ups found by the fresh-context review of that branch. None was
   introduced by it:**
-  1. **STILL OPEN, and bigger than first recorded.** The posting alias clause is not three
-     copies beside the shared `sameCompanyPostingSql` — it is **nine occurrences across
-     seven files in three alias shapes**: `jp.` (`rosterQuery.ts:26` the shared one, plus
-     `rosterQuery.ts:76`, `draftQueries.ts:47`, `seedQueries.ts:96`, `seedQueries.ts:98`,
-     `releaseQueries.ts:125`, `detailQueries.ts:102`), `c.` (`rosterQuery.ts:21` inside
-     `clientStatusSql`, `releaseQueries.ts:45`, `seedQueries.ts:102`), and one already
-     parameterized by alias with `sql.raw` (`unsubscribeQueries.ts:117`). Collapsing it
-     means ONE predicate taking the alias, which is what `unsubscribeQueries.ts` already
-     reaches for. They agree today, and they are the same shape of copy that drifted
-     before #372. Because the text drives who gets mailed, the only honest verification is
-     to dump the compiled SQL of every affected read before and after and diff it —
-     "the tests pass" is not evidence for raw SQL.
+  1. ~~Three byte-identical copies of the posting alias clause~~ **Shipped 2026-10-21**
+     (#378). It was never three copies: the clause was written out **eleven times across
+     six files** in two alias shapes — `jp.` (`rosterQuery.ts:26` the shared
+     `sameCompanyPostingSql`, plus `rosterQuery.ts:76`, `draftQueries.ts:47`,
+     `seedQueries.ts:96`, `seedQueries.ts:98`, `releaseQueries.ts:125`,
+     `detailQueries.ts:102`) and `c.` (`rosterQuery.ts:21` inside `clientStatusSql`,
+     `releaseQueries.ts:45`, `seedQueries.ts:102`) — plus one already parameterized by
+     alias with `sql.raw` (`unsubscribeQueries.ts:117`), which is where the right answer
+     already was. (An earlier note here said nine across seven files; that was a miscount.)
+     - `sameCompanyAs(alias)` in `rosterQuery.ts` is now the only spelling, and
+       `sameCompanyPostingSql` is DELETED — its one consumer was in the same file. The
+       alias is a closed union AND the emitted text is looked up from a record instead of
+       interpolated from the argument, so the SQL cannot come from the caller even through
+       an `as any`. The doc comment says not to simplify the lookup away.
+     - **The verification, since "the tests pass" is not evidence for raw SQL**: the
+       compiled SQL of every site was dumped before and after WITHOUT touching a database
+       (`DATABASE_URL` at a dead loopback port, `db.execute`/`db.transaction` replaced by a
+       capture, compiled through `PgDialect`), with private reads reached through their
+       exported callers. Every difference is whitespace — the three multi-line clauses
+       collapsing to the helper's single line, each in a plain SQL token position, none
+       inside a string literal, a dollar-quoted body or a comment — plus the deleted
+       constant's own entry disappearing.
+     - **The anti-drift test is the deliverable**, not the collapse:
+       `tests/unit/sameCompanyAs.test.ts` pins the compiled text as literals (not derived
+       from the helper), walks `src/` and fails on the clause appearing anywhere else, and
+       **asserts it actually found files** so it cannot pass vacuously if the path ever
+       resolves wrong. Blind spot documented in place: it matches one spelling, so a
+       renamed person alias or a join rewrite would slip past it. Not widened to
+       `company_alias`, which would hit legitimate unrelated reads such as
+       `companyCountrySql`.
   2. ~~Bulk approval has no cap on `memberIds`~~ **Shipped 2026-10-21** (#377): refused as
      `too_many` with the existing `SEQUENCE_DETAIL_MEMBER_LIMIT` (200), checked after the
      dedupe and BEFORE `db.transaction` opens, so an oversized request takes no lock and
