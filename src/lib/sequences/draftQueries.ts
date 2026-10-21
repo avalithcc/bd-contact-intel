@@ -21,7 +21,7 @@ import { buildSequenceDraftInput, draftSignals, senderIdentity } from "@/lib/seq
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
 import { resolveComplianceAudience, type ComplianceAudience } from "./complianceAudience";
-import { companyCountrySql } from "./rosterQuery";
+import { companyCountrySql, sameCompanyAs } from "./rosterQuery";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
 import { openPostingSql } from "@/lib/hiring/openPosting";
@@ -44,7 +44,6 @@ const liveDeps = (): DraftDeps => ({ generate: runGenerateOutreachMessage, issue
 type Mode = "missing" | "regenerate";
 type Row = Record<string, unknown>;
 const rowsOf = <T>(r: unknown) => r as T[];
-const sameCompany = sql`(jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))`;
 
 /**
  * The company country comes from `companyCountrySql`, the one rule the picker and the add guard also use (own company row,
@@ -58,7 +57,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
              p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, p.mobile_phone, p.phone, b.name as sender_name,
              ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp
-                where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompany}), '[]'::json) as posting_markets,
+                where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft,
              (select d.edited_at from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as draft_edited_at,

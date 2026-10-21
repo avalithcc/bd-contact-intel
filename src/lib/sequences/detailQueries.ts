@@ -16,7 +16,7 @@ import { isLeadershipRoleGroup } from "@/lib/outreach/ranking";
 import { isUuid } from "@/lib/uuid";
 import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
-import { canonicalCompanyJoinSql, companyNameColumnsSql } from "./rosterQuery";
+import { canonicalCompanyJoinSql, companyNameColumnsSql, sameCompanyAs } from "./rosterQuery";
 import type { RecipientPlace } from "@/lib/sendSchedule/zones";
 import { miamiCalendarDate } from "./miamiTime";
 import { parseSchedule, type Schedule } from "./schedule";
@@ -99,7 +99,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     left join lateral (
       select count(*) as open_it, bool_or(jp.is_miami) as is_florida from job_posting jp
       where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
-        and (jp.company_key = p.company_key or jp.company_key in (select ca.company_key from company_alias ca where ca.alias_key = p.company_key))
+        and ${sameCompanyAs("jp")}
     ) h on sm.id is not null
     left join sequence_draft d1 on d1.sequence_member_id = sm.id and d1.step = 1
     left join sequence_draft d2 on d2.sequence_member_id = sm.id and d2.step = 2
