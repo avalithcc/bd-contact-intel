@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/components/ToastProvider";
+import type { ApproveResult } from "@/lib/sequences/approvalQueries";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
-import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent } from "@/lib/sequences/detailFlow";
+import { approveStep, cardStep, gateRows, readyMemberIds, refusalKey, runReviewIntent, summarizeRefusals } from "@/lib/sequences/detailFlow";
 import type { SkippedEdit } from "@/lib/sequences/draftCompose";
 import type { SendControlLabels } from "@/lib/sendSchedule/labels";
 import type { SendChoice } from "@/lib/sequences/sendMoment";
@@ -87,6 +88,24 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
   const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setError(null); setSendError(null); };
   const reasonText = (reason: string) => (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
 
+  /**
+   * A bulk refusal names who was refused. One sentence per reason, joined by a space: the popover shows it in a plain
+   * block that wraps and never clamps, and a line break would collapse anyway.
+   */
+  const bulkRefusalText = (refused: Extract<ApproveResult, { ok: false }>) => {
+    if (refused.error === "too_many") return reasonText("too_many");
+    const text = summarizeRefusals(refused.rejected, detail.members)
+      .map((g) => {
+        // A group with no nameable member (a stale or forged id) is the reason alone: "Affected: +1 more" names nobody.
+        if (!g.names.length) return reasonText(g.reason);
+        const names = [...g.names, ...(g.more > 0 ? [fill(l.bulkRefusedMore, { n: g.more })] : [])];
+        return fill(l.bulkRefusedLine, { reason: reasonText(g.reason), names: names.join(", ") });
+      })
+      .join(" ");
+    // An empty string is falsy: the popover would show nothing at all.
+    return text || reasonText("failed");
+  };
+
   const toastFor = (t: ReleaseToast) => {
     const text: Record<ReleaseToast["key"], string> = {
       sentNow: l.toastSentNow,
@@ -113,7 +132,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     if (!r) return false;
     router.refresh();
     if (!r.ok) {
-      setSendError(reasonText(r.rejected[0]?.reason ?? "failed"));
+      setSendError(bulk ? bulkRefusalText(r) : reasonText(refusalKey(r)));
       return false;
     }
     toastApproval(when, ids.length, r.release);
@@ -196,7 +215,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
         return void guarded(() => approveMember(a.memberId, approveStep(m, now))).then((r) => {
           if (!r) return;
           if (r.ok) showToast(l.toastApproved, "success");
-          else fail(reasonText(r.rejected[0]?.reason ?? "failed"));
+          else fail(reasonText(refusalKey(r)));
           router.refresh();
         });
       }

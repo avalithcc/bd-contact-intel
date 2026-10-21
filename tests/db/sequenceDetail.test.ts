@@ -183,7 +183,7 @@ test("an admin ACTING on another BD's Sequence gets not_found for every write an
   const before = await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
 
   const approved = await approveMember(adminId, memberIds.d1);
-  assert.deepEqual(approved.ok ? null : approved.rejected.map((r) => r.reason), ["not_found"]);
+  assert.deepEqual(approved.ok || approved.error !== "rejected" ? null : approved.rejected.map((r) => r.reason), ["not_found"]);
   assert.deepEqual(await saveDraftEdit(adminId, memberIds.d1, { subject: "Changed", body: "Changed" }), { ok: false, error: "not_found" });
   assert.deepEqual(await cancelApproval(adminId, memberIds.appr1), { ok: false, error: "not_found" });
   assert.deepEqual(await removeMembersFromSequence(adminId, sequenceId, [memberIds.d1], "because"), { ok: false, error: "not_found" });

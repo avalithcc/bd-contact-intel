@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent, sameContent } from "@/lib/sequences/detailFlow";
+import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent, sameContent, summarizeRefusals } from "@/lib/sequences/detailFlow";
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
 
 const NOW = new Date("2026-10-15T15:00:00Z");
@@ -121,4 +121,57 @@ test("'Aprobar' on a card approves the reminder only when the card is the remind
   assert.equal(approveStep(due, NOW), 2);
   assert.equal(approveStep(member("d"), NOW), 1);
   assert.equal(approveStep(notYet, NOW), 1);
+});
+
+// --- a bulk refusal names the members it refused ----------------------------------------------------------------
+
+test("refusal groups: one group per reason, in first-seen order, naming at most 3 and counting the rest", () => {
+  const members = ["1", "2", "3", "4", "5", "6"].map((id) => member(id, { firstName: `N${id}`, lastName: "Z" }));
+  const groups = summarizeRefusals(
+    [
+      { memberId: "1", reason: "unreviewed" },
+      { memberId: "2", reason: "missing_footer" },
+      { memberId: "3", reason: "unreviewed" },
+      { memberId: "4", reason: "unreviewed" },
+      { memberId: "5", reason: "unreviewed" },
+      { memberId: "6", reason: "missing_footer" },
+    ],
+    members,
+  );
+  assert.deepEqual(groups, [
+    { reason: "unreviewed", names: ["N1 Z", "N3 Z", "N4 Z"], more: 1 },
+    { reason: "missing_footer", names: ["N2 Z", "N6 Z"], more: 0 },
+  ]);
+});
+
+test("refusal names fall back to the email, and a nameless or unknown member counts as unnamed", () => {
+  const members = [
+    member("1", { firstName: null, lastName: null, email: "only@acme.test" }),
+    member("2", { firstName: "Ana", lastName: null }),
+    member("3", { firstName: null, lastName: null, email: null }),
+  ];
+  const groups = summarizeRefusals(
+    [
+      { memberId: "1", reason: "no_draft" },
+      { memberId: "2", reason: "no_draft" },
+      { memberId: "3", reason: "no_draft" },
+      { memberId: "ghost", reason: "no_draft" },
+    ],
+    members,
+  );
+  assert.deepEqual(groups, [{ reason: "no_draft", names: ["only@acme.test", "Ana"], more: 2 }]);
+});
+
+test("summarizing refusals is pure: the same input twice gives the same answer and mutates nothing", () => {
+  const members = [member("1"), member("2")];
+  const rejected = [{ memberId: "1", reason: "unreviewed" as const }, { memberId: "2", reason: "unreviewed" as const }];
+  const snapshot = JSON.stringify({ members, rejected });
+  assert.deepEqual(summarizeRefusals(rejected, members), summarizeRefusals(rejected, members));
+  assert.equal(JSON.stringify({ members, rejected }), snapshot);
+});
+
+test("an oversized bulk request reports its own reason to the review dialog, not a generic failure", async () => {
+  const p = ports({ approve: async () => ({ ok: false, error: "too_many", limit: 200 }) });
+  const r = await runReviewIntent("approve", { stored, text: stored }, p.ports);
+  assert.deepEqual(r, { ok: false, error: "too_many", persisted: false });
 });

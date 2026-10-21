@@ -3540,6 +3540,7 @@ export const en = {
       too_far: "You can schedule up to 30 days ahead.",
       locked: "It is about to go out, so it can no longer be changed.",
       not_approved: "This contact is no longer approved.",
+      too_many: "Too many contacts were selected at once. Select fewer and try again.",
       failed: "The action could not be completed. Try again.",
     },
     reinstateErrors: {
@@ -3554,6 +3555,8 @@ export const en = {
     },
     toastSaved: "Draft saved. Open it again to review it.",
     toastApproved: "Approved. It goes out in the next send.",
+    bulkRefusedLine: "{reason} Affected: {names}.",
+    bulkRefusedMore: "+{n} more",
     toastApprovedMany: "{n} drafts approved and scheduled.",
     toastCancelled: "Send cancelled. The contact is back in drafts.",
     toastAdvanced: "The reminder is ready for the next send, if approved.",

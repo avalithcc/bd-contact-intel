@@ -3540,6 +3540,7 @@ export const es: typeof en = {
       too_far: "Solo se puede programar hasta 30 días hacia adelante.",
       locked: "Ya está por salir: no se puede cambiar.",
       not_approved: "Este contacto ya no está aprobado.",
+      too_many: "Seleccionaste demasiados contactos a la vez. Elegí menos y probá de nuevo.",
       failed: "No se pudo completar la acción. Probá de nuevo.",
     },
     reinstateErrors: {
@@ -3554,6 +3555,8 @@ export const es: typeof en = {
     },
     toastSaved: "Borrador guardado. Hay que abrirlo de nuevo para revisarlo.",
     toastApproved: "Aprobado. Sale en el próximo envío.",
+    bulkRefusedLine: "{reason} Afectados: {names}.",
+    bulkRefusedMore: "+{n} más",
     toastApprovedMany: "{n} borradores aprobados y programados.",
     toastCancelled: "Envío cancelado. El contacto volvió a borradores.",
     toastAdvanced: "El recordatorio queda listo para el próximo envío, si está aprobado.",

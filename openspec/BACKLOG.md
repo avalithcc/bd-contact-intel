@@ -1939,17 +1939,48 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   - The GET path still writes nothing (it is handed `{ findToken }` alone, because mail
     scanners open every link in an inbound message), and the SQL is byte-identical to the
     old `postalAddressForToken` — only the name and the mapped result changed.
-- **Three follow-ups found by the fresh-context review of that branch. None is fixed,
-  none was introduced by it:**
-  1. Three byte-identical copies of the posting alias clause (`draftQueries.ts:47`,
-     `releaseQueries.ts`, `seedQueries.ts`) sit beside the shared
-     `sameCompanyPostingSql`. They agree today, and they are the same shape of copy that
-     drifted before #372. Mechanical to collapse.
-  2. Bulk approval has no cap on `memberIds`: the client selection reaches the `in (...)`
-     list directly (`SequenceDetailScreen.tsx:112` -> `approveBulk`).
-  3. The approval error renders only the FIRST rejection (`SequenceDetailScreen.tsx:116`,
-     `r.rejected[0]`), so a bulk refusal shows one reason with no indication of WHICH
-     member caused it. Academic at 9 drafts, not at 900.
+- **Three follow-ups found by the fresh-context review of that branch. None was
+  introduced by it:**
+  1. **STILL OPEN, and bigger than first recorded.** The posting alias clause is not three
+     copies beside the shared `sameCompanyPostingSql` — it is **nine occurrences across
+     seven files in three alias shapes**: `jp.` (`rosterQuery.ts:26` the shared one, plus
+     `rosterQuery.ts:76`, `draftQueries.ts:47`, `seedQueries.ts:96`, `seedQueries.ts:98`,
+     `releaseQueries.ts:125`, `detailQueries.ts:102`), `c.` (`rosterQuery.ts:21` inside
+     `clientStatusSql`, `releaseQueries.ts:45`, `seedQueries.ts:102`), and one already
+     parameterized by alias with `sql.raw` (`unsubscribeQueries.ts:117`). Collapsing it
+     means ONE predicate taking the alias, which is what `unsubscribeQueries.ts` already
+     reaches for. They agree today, and they are the same shape of copy that drifted
+     before #372. Because the text drives who gets mailed, the only honest verification is
+     to dump the compiled SQL of every affected read before and after and diff it —
+     "the tests pass" is not evidence for raw SQL.
+  2. ~~Bulk approval has no cap on `memberIds`~~ **Shipped 2026-10-21** (#377): refused as
+     `too_many` with the existing `SEQUENCE_DETAIL_MEMBER_LIMIT` (200), checked after the
+     dedupe and BEFORE `db.transaction` opens, so an oversized request takes no lock and
+     writes nothing. It is its own `ApproveResult` variant rather than a fake per-member
+     rejection, because naming an arbitrary id would lie about which member is the problem;
+     widening that union let the compiler find every caller.
+  3. ~~The approval error renders only the FIRST rejection~~ **Shipped 2026-10-21** (#377):
+     a bulk refusal now groups the rejections by reason in first-seen order and names up to
+     3 members per reason plus "+N more", via the pure `summarizeRefusals` in
+     `detailFlow.ts`. The single-card path is unchanged on purpose — the card is right
+     there, so a name is noise.
+- **Found while fixing 2 and 3, 2026-10-21. Open, neither introduced by #377:**
+  1. `[firstName, lastName].filter(Boolean).join(" ")` is written inline in ~10 places
+     (`MemberCard.tsx:74`, `ReviewDialog.tsx`, `sendUi.ts`, `contacts/page.tsx` x3,
+     `contacts/[id]/page.tsx:201`, `companies/[key]/page.tsx:295`, `follow-ups/page.tsx:85`,
+     `reports/cohortDrilldown.ts:121`) with a DIFFERENT fallback at each site (`"—"`,
+     `l.ownerNone`, `l.emptyValue`, `dict.contact.unnamed`, `l.unnamed`, `row.id`, the cell
+     value). A shared helper has to take the fallback as a parameter; merging them blindly
+     would change behaviour at call sites, which is why #377 left them alone.
+  2. `reasonText` casts `l.reviewErrors as Record<string, string>`
+     (`SequenceDetailScreen.tsx:89`), so a key missing from BOTH dictionaries falls back to
+     `failed` at runtime instead of failing the build. `es: typeof en` already catches a key
+     missing from `es` only. Typing the parameter as `keyof typeof l.reviewErrors` would
+     close it.
+  3. The cap's placement BEFORE the transaction is not observable from the database: moving
+     it inside, before the first read, leaves every DB assertion passing. Deleting the cap
+     is what turns the test red. Only a spy on `db.transaction` could pin the placement, and
+     the property it protects (no lock taken) is lock hygiene, not correctness.
 
 ### Open, noted 2026-10-19
 - ~~**Sequences picker limited to US-hiring companies**~~ **Shipped 2026-10-20**
