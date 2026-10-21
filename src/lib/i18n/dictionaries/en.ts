@@ -2490,6 +2490,7 @@ export const en = {
     sourceOther: "Other (events, partner accounts)",
     activityTitle: "Activity by BD",
     activityNotes: "Notes",
+    activityCallAttempts: "Call attempts",
     activityCalls: "Calls",
     activityMeetings: "Meetings held",
     activityEmailsSent: "Emails sent",

@@ -2469,6 +2469,7 @@ export const es: typeof en = {
     sourceOther: "Otro (eventos, cuentas partner)",
     activityTitle: "Actividad por BD",
     activityNotes: "Notas",
+    activityCallAttempts: "Intentos de llamada",
     activityCalls: "Llamadas",
     activityMeetings: "Reuniones realizadas",
     activityEmailsSent: "Correos enviados",

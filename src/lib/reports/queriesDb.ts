@@ -108,6 +108,7 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     bd_id: string;
     bd_name: string;
     notes: number;
+    call_attempts: number;
     calls: number;
     meetings: number;
     emails_sent: number;
@@ -122,6 +123,7 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     bdId: r.bd_id,
     bdName: r.bd_name,
     notes: Number(r.notes),
+    callAttempts: Number(r.call_attempts),
     calls: Number(r.calls),
     meetings: Number(r.meetings),
     emailsSent: Number(r.emails_sent),
