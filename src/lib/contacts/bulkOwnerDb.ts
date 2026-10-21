@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { auditLog, bd, person, personPropertyHistory } from "@/db/schema";
 import { planOwnerAssignment, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { buildBulkOwnerAuditRow, type BulkOwnerAuditMode } from "@/lib/contacts/bulkOwnerAudit";
+import { createTtlCache } from "@/lib/ttlCache";
 import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
 import { readManualOwnerPersonIds } from "@/lib/identity/ownerRuleDb";
 
@@ -87,8 +88,36 @@ export async function bulkAssignOwner(
   });
 }
 
-export async function listOwnerOptions(): Promise<{ id: string; name: string }[]> {
+/** Live read of every BD, no cache. For write paths that resolve a name into
+ * an audit/activity record and must never see a stale roster. */
+export async function listOwnerOptionsFresh(): Promise<{ id: string; name: string }[]> {
   return db.select({ id: bd.id, name: bd.name }).from(bd).orderBy(asc(bd.name));
+}
+
+/**
+ * Owner dropdown options (page reads), cached in-process for 60 s.
+ *
+ * What goes stale: the BD roster (id + display name). A BD added or renamed
+ * shows up in an owner/assignee dropdown up to 60 s late, per serverless
+ * instance. The roster changes a few times a year, the dropdown is a
+ * convenience list (nothing validates an owner against it), and the value a BD
+ * picks is still a real `bd.id`. It is the SAME list for every viewer (no role
+ * or per-BD visibility), so nothing viewer-scoped is shared, and writes that
+ * record a name use `listOwnerOptionsFresh` instead.
+ *
+ * The one symptom worth naming, because it reads as a FACT rather than a
+ * delay: the list is also the id -> name lookup for the owner column
+ * (contacts/page.tsx, companies/page.tsx resolve `ownerOptions.find(...)?.name
+ * ?? emptyValue`). So for that same window, a row owned by the new or renamed
+ * BD renders an EMPTY owner cell, which looks like "unassigned" rather than
+ * "loading" — and two viewers on different instances can disagree. Accepted:
+ * it is self-healing within one TTL and only follows a roster change. If the
+ * roster ever starts changing often, join the name in the row read instead of
+ * widening this cache.
+ */
+const ownerOptionsCache = createTtlCache(listOwnerOptionsFresh, { ttlMs: 60_000 });
+export function listOwnerOptions(): Promise<{ id: string; name: string }[]> {
+  return ownerOptionsCache.get();
 }
 
 /** Keeps only live (not merged-away) persons, for bulk writes that don't go

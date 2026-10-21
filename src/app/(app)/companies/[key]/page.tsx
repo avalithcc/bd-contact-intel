@@ -3,6 +3,7 @@ import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { getCompanyByKey } from "@/lib/companies/queries";
 import {
   getCompanyOpenTasks,
+  getCompanyPersonIds,
   getCompanyPeople,
   getCompanyPropertyHistory,
   getCompanyTimeline,
@@ -116,6 +117,10 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     );
   }
 
+  // Resolved ONCE and shared by the three reads that scope to this company's
+  // people (timeline, filter counts, open tasks) — one statement, not three.
+  const personIds = getCompanyPersonIds(key);
+
   const [hiringIndex, people, timelineRows, timelineCounts, openTasks, allPostings, propertyHistoryRows, ownerOptions, absorption, filteredPostings] =
     await Promise.all([
       getHiringMatchIndex(),
@@ -125,12 +130,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
       // that filter's own true page on first paint, not the unfiltered
       // "Todas" pool filtered down client-side (which the OLD component did,
       // capped by TIMELINE_LIMIT — see getCompanyTimeline's doc comment).
-      getCompanyTimeline(key, { filter: activityFilter }),
+      getCompanyTimeline(key, { filter: activityFilter }, personIds),
       // TRUE per-filter totals, unbounded — the ground truth
       // CompanyTimeline.tsx compares its own loaded pool against before
       // trusting a purely local filter switch (isCompanyFilterSelectionComplete).
-      getCompanyTimelineFilterCounts(key),
-      getCompanyOpenTasks(key),
+      getCompanyTimelineFilterCounts(key, personIds),
+      getCompanyOpenTasks(key, personIds),
       getCompanyPostingsForKey(key),
       getCompanyPropertyHistory(key),
       listOwnerOptions(),

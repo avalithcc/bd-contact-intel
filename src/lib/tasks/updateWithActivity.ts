@@ -19,7 +19,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, task, type NewTask, type Task } from "@/db/schema";
 import { assertContactEditableById } from "@/lib/contacts/queries";
-import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
+import { listOwnerOptionsFresh } from "@/lib/contacts/bulkOwnerDb";
 import { recomputePersonStatus } from "@/lib/status/recompute";
 import { assertTaskAuthorized, type TaskAuthActor } from "@/lib/tasks/authorization";
 import { resolveTaskAssignee, InvalidAssigneeError } from "@/lib/tasks/assignee";
@@ -63,7 +63,7 @@ function formatDueAtOrNull(dueAt: Date | null): string | null {
 }
 
 async function buildNameLookup(): Promise<(bdId: string | null) => string | null> {
-  const options = await listOwnerOptions();
+  const options = await listOwnerOptionsFresh();
   const nameById = new Map(options.map((o) => [o.id, o.name]));
   return (bdId) => (bdId ? (nameById.get(bdId) ?? null) : null);
 }
