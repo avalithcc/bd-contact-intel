@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direccion del correo · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions. NOT in crm-hubspot-ux/mockups/styles.css. */
+.spec { border-left: 3px solid var(--color-border, #e5e7eb); padding-left: .875rem; margin: .5rem 0 1.25rem; font-size: .875rem; color: var(--color-ink-muted, #6b7280); max-width: 70ch; }
+.spec b { color: var(--color-ink, #111827); }
+
+/* Timeline rows, today and proposed. */
+.tl-row-old, .tl-row { display: flex; align-items: flex-start; gap: .75rem; padding: .625rem .25rem; border-bottom: 1px solid var(--color-border, #e5e7eb); }
+.tl-row-old:last-child, .tl-row:last-child { border-bottom: 0; }
+.tl-ico { color: var(--color-ink-muted, #6b7280); }
+.grow { flex: 1; min-width: 0; }
+
+/* The direction marker: SHAPE carries it, colour only reinforces, and only inbound is
+   coloured -- a reply is the signal a BD looks for; sending is routine. */
+.dir { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; flex: none; }
+.dir-out { color: var(--color-ink-muted, #6b7280); background: var(--color-surface-sunken, #f3f4f6); border: 1px solid var(--color-border, #e5e7eb); }
+.dir-in  { color: #fff; background: var(--color-accent-strong, #2563eb); }
+
+/* Section 3: the rejected alternative. */
+.tl-bad-out { background: #eef2ff; }
+.tl-bad-in  { background: #ecfdf5; }
+.tl-bad-err { background: #fef2f2; }
+
+/* Combobox. */
+.field { display: block; margin-bottom: .5rem; }
+.field-label { display: block; font-size: .8125rem; font-weight: 600; margin-bottom: .25rem; }
+.w-full { width: 100%; }
+.combo { border: 1px solid var(--color-border, #e5e7eb); border-radius: 8px; overflow: hidden; }
+.combo-opt { display: flex; align-items: center; gap: .75rem; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: .5rem .75rem; cursor: pointer; }
+.combo-opt:hover, .combo-opt.is-active { background: var(--color-surface-sunken, #f3f4f6); }
+.combo-sep { height: 1px; background: var(--color-border, #e5e7eb); }
+.warn-box { display: flex; gap: .625rem; align-items: flex-start; padding: .625rem .75rem; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; margin-top: .5rem; font-size: .875rem; }
+.warn-box .icon { color: #b45309; flex: none; }
+.row { display: flex; } .gap-sm { gap: .5rem; } .mt-md { margin-top: .75rem; }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="reports.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Reportes</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../bd-playbook/mockups/bd-playbook.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Guía de roles</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><span>Administración</span><span class="sep">/</span><span>Reportes</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-primary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/contacts.html#new-contact"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacto</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tarea</a>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+</div>
+</details>
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a3">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">Administrador</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/account.html">Cuenta</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/login.html">Cerrar sesión</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+
+<div class="page-header"><div class="titles"><div class="eyebrow">Mockup</div><h1>Timeline · dirección del correo<span class="dot">.</span></h1></div></div>
+
+<div class="spec">
+  <b>El pedido.</b> «Sería bueno tener más visible con color o algún ícono qué correo es de salida y cuál de entrada, para verlo rápido.»
+  <br><br>
+  <b>El dato ya existe y no puede mentir.</b> La dirección sale del <i>tipo</i> de actividad
+  (<code>email_sent</code> = saliente, <code>reply_received</code> = entrante), no de adivinar quién mandó
+  (<code>emailThreads.ts:145-163</code>). Así que esto es puramente visual: no se toca ninguna consulta ni ningún dato.
+</div>
+
+<h2 class="mt-2xl mb-lg">1 · Cómo se ve hoy</h2>
+
+<div class="spec">
+  La dirección está, pero al final de una línea gris de metadatos, en texto plano y del mismo peso que todo lo demás.
+  Para saber si te contestaron hay que <b>leer</b>, no mirar.
+</div>
+
+<div class="card mb-lg">
+  <div class="card-body">
+    <div class="tl-row-old">
+      <span class="tl-ico"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+      <div class="grow">
+        <div><b>Hilo de correo</b> · Re: Avalith - Disponibilidad de equipo inmediato</div>
+        <div class="meta">Con roberto.gorchs@andina.tech · Roberto Gorchs · saliente</div>
+      </div>
+      <span class="meta">3 jul, 17:26</span>
+    </div>
+    <div class="tl-row-old">
+      <span class="tl-ico"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+      <div class="grow">
+        <div><b>Hilo de correo</b> · Re: Propuesta de squad</div>
+        <div class="meta">Con lucia.fernandez@nubank.com · Lucía Fernández · entrante</div>
+      </div>
+      <span class="meta">9 oct, 21:25</span>
+    </div>
+  </div>
+</div>
+
+<h2 class="mt-2xl mb-lg">2 · Propuesta: ícono primero, color de refuerzo</h2>
+
+<div class="spec">
+  <b>El ícono lleva el peso, no el color.</b> Si la dirección se codifica solo en color se pierde para cualquiera con
+  daltonismo, en escala de grises y si cambia el contraste del tema. Tres capas: <b>forma</b> (flecha), <b>color</b>
+  (refuerzo) y <b>texto</b> (que ya estaba, y se mantiene para lectores de pantalla).
+  <br><br>
+  <b>Y no son dos colores para dos cosas.</b> Entrante y saliente no pesan igual: que te contesten es la señal que
+  buscás; que vos escribas es rutina. Por eso <b>solo el entrante lleva color</b>. El patrón que se lee de lejos pasa a
+  ser «lo coloreado es que me respondieron», y en una ficha con veinte filas eso se ve sin leer una palabra.
+</div>
+
+<div class="card mb-lg">
+  <div class="card-body">
+    <div class="tl-row">
+      <span class="dir dir-out" title="Saliente"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></span>
+      <div class="grow">
+        <div><b>Hilo de correo</b> · Re: Avalith - Disponibilidad de equipo inmediato <span class="badge">2 correos</span></div>
+        <div class="meta">Con roberto.gorchs@andina.tech · Roberto Gorchs</div>
+      </div>
+      <span class="meta">3 jul, 17:26</span>
+    </div>
+    <div class="tl-row">
+      <span class="dir dir-in" title="Entrante"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7 7 17"/><path d="M15 17H7V9"/></svg></span>
+      <div class="grow">
+        <div><b>Hilo de correo</b> · Re: Propuesta de squad</div>
+        <div class="meta">Con lucia.fernandez@nubank.com · Lucía Fernández</div>
+      </div>
+      <span class="meta">9 oct, 21:25</span>
+    </div>
+    <div class="tl-row">
+      <span class="dir dir-out" title="Saliente"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></span>
+      <div class="grow">
+        <div><b>Correo enviado</b> · Seguimiento</div>
+        <div class="meta">A martin.paz@tecpetrol.com</div>
+      </div>
+      <span class="meta">2 oct, 11:04</span>
+    </div>
+    <div class="tl-row">
+      <span class="dir dir-in" title="Entrante"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7 7 17"/><path d="M15 17H7V9"/></svg></span>
+      <div class="grow">
+        <div><b>Respuesta recibida</b> · Re: Seguimiento</div>
+        <div class="meta">De martin.paz@tecpetrol.com</div>
+      </div>
+      <span class="meta">3 oct, 09:12</span>
+    </div>
+  </div>
+  <div class="card-footer meta">La palabra «saliente / entrante» sale de la línea de metadatos y pasa al <code>title</code> y al texto accesible del ícono: el dato no se pierde, deja de competir por la atención.</div>
+</div>
+
+<h2 class="mt-2xl mb-lg">3 · Por qué no pintar la fila entera</h2>
+
+<div class="spec">
+  Es la alternativa obvia y la descarto a propósito: un fondo de color por fila convierte el timeline en un semáforo y
+  compite con los estados que <b>sí</b> son de alerta (rebote, no contesta, baja). El color de estado está reservado
+  para eso. La dirección es una <b>propiedad</b>, no un estado — y una propiedad se señala con forma, no pintando todo.
+</div>
+
+<div class="card mb-lg">
+  <div class="card-body">
+    <div class="tl-row tl-bad-out">
+      <span class="grow"><b>Correo enviado</b> · así se vería pintando la fila</span>
+      <span class="meta">2 oct</span>
+    </div>
+    <div class="tl-row tl-bad-in">
+      <span class="grow"><b>Respuesta recibida</b> · y el rebote de abajo ya no se distingue</span>
+      <span class="meta">3 oct</span>
+    </div>
+    <div class="tl-row tl-bad-err">
+      <span class="grow"><b>Correo rebotado</b> · esto SÍ es un estado y se pierde entre los otros dos</span>
+      <span class="meta">4 oct</span>
+    </div>
+  </div>
+  <div class="card-footer meta">Descartado.</div>
+</div>
+
+<div class="spec mt-2xl">
+  <b>Alcance.</b> Markup y estilos. No cambia ninguna consulta, ningún dato ni ninguna etiqueta de traducción salvo
+  mover «saliente / entrante» al texto accesible. Aplica a la tarjeta de hilo, al correo suelto y a la respuesta
+  recibida — los tres ya traen la dirección.
+</div>
+
+
+</main>
+</div>
+</div>
+</body>
+</html>
