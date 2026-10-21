@@ -1,16 +1,19 @@
-import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, bd, companyPropertyHistory, person, task } from "@/db/schema";
 import { companyContactsCondition } from "@/lib/companies/contactCounts";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { buildCompanyTimelineEntry, type CompanyTimelineEntry } from "@/lib/companies/companyTimelineEntry";
-import { notFoldedAttemptSql } from "@/lib/activity/callAttemptFold";
+import { companyOpenTasksCondition, companyTimelineBaseWhere } from "@/lib/companies/recordConditions";
 import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
 import type {
   CompanyActivityFilter,
   CompanyPropertyHistoryRow,
   CompanyTimelineFilterCounts,
 } from "@/lib/companies/recordMappers";
+
+/** A resolved person-id set, or the promise of one, shared between reads. */
+export type CompanyPersonIds = string[] | Promise<string[]>;
 
 const PEOPLE_LIMIT = 200; // bounded crossover set for the timeline/tasks joins below
 const TIMELINE_LIMIT = 50;
@@ -50,10 +53,19 @@ export async function getCompanyPeople(companyKey: string, limit: number = ASSOC
   return { rows, total: totalRow?.count ?? 0 };
 }
 
-/** Every person id at this company, bounded — used to scope the "Actividad
+/**
+ * Every person id at this company, bounded — used to scope the "Actividad
  * de contactos" timeline filter and the "Tareas abiertas" card to people
- * who actually work here, never an unbounded join. */
-async function getCompanyPersonIds(companyKey: string): Promise<string[]> {
+ * who actually work here, never an unbounded join.
+ *
+ * The company page needs this set in three reads (timeline, filter counts,
+ * open tasks). It resolves it ONCE and hands the same promise to all three
+ * (`CompanyPersonIds`), instead of each issuing the identical statement.
+ * Inlining it as a subselect was rejected: inside `activity.person_id IN
+ * (subselect) OR company_key = $1` Postgres cannot use an index for either
+ * branch of the OR, and that plan change cannot be justified without a DB.
+ */
+export async function getCompanyPersonIds(companyKey: string): Promise<string[]> {
   const rows = await db
     .select({ id: person.id })
     .from(person)
@@ -67,15 +79,6 @@ async function getCompanyPersonIds(companyKey: string): Promise<string[]> {
 // now lives in companyTimelineEntry.ts, next to the pure mapping function
 // that builds it.
 export type { CompanyTimelineEntry as CompanyTimelineRow } from "@/lib/companies/companyTimelineEntry";
-
-/**
- * The Activity tab's base WHERE, shared by the rows and the counts. A soft-deleted Contact note STAYS in the rows (the tab
- * renders a tombstone, never a gap) with its text withheld by buildCompanyTimelineEntry; the counts exclude it.
- */
-function companyTimelineBaseWhere(companyKey: string, personIds: string[]) {
-  const subject = personIds.length ? or(eq(activity.companyKey, companyKey), inArray(activity.personId, personIds)) : eq(activity.companyKey, companyKey);
-  return and(subject, notFoldedAttemptSql());
-}
 
 /**
  * Narrows the Activity tab's base WHERE (company row OR a row from any
@@ -113,8 +116,9 @@ function companyFilterCondition(filter: CompanyActivityFilter | undefined) {
 export async function getCompanyTimeline(
   companyKey: string,
   opts: { filter?: CompanyActivityFilter } = {},
+  personIdsIn?: CompanyPersonIds,
 ): Promise<CompanyTimelineEntry[]> {
-  const personIds = await getCompanyPersonIds(companyKey);
+  const personIds = await (personIdsIn ?? getCompanyPersonIds(companyKey));
 
   const baseWhere = companyTimelineBaseWhere(companyKey, personIds);
   const filterCondition = companyFilterCondition(opts.filter);
@@ -183,8 +187,11 @@ export async function getCompanyTimeline(
  * (no risk of a row landing in two counts, or none, from a race between
  * separate queries).
  */
-export async function getCompanyTimelineFilterCounts(companyKey: string): Promise<CompanyTimelineFilterCounts> {
-  const personIds = await getCompanyPersonIds(companyKey);
+export async function getCompanyTimelineFilterCounts(
+  companyKey: string,
+  personIdsIn?: CompanyPersonIds,
+): Promise<CompanyTimelineFilterCounts> {
+  const personIds = await (personIdsIn ?? getCompanyPersonIds(companyKey));
   const baseWhere = companyTimelineBaseWhere(companyKey, personIds);
 
   const [row] = await db
@@ -229,8 +236,8 @@ export interface CompanyOpenTaskRow {
  * `assignedToBdId`/`assignedToName`/`personName` join in for the task-edit
  * change's "Editar tarea" dialog — same single query, no added round trip.
  */
-export async function getCompanyOpenTasks(companyKey: string): Promise<CompanyOpenTaskRow[]> {
-  const personIds = await getCompanyPersonIds(companyKey);
+export async function getCompanyOpenTasks(companyKey: string, personIdsIn?: CompanyPersonIds): Promise<CompanyOpenTaskRow[]> {
+  const personIds = await (personIdsIn ?? getCompanyPersonIds(companyKey));
 
   const rows = await db
     .select({
@@ -248,12 +255,7 @@ export async function getCompanyOpenTasks(companyKey: string): Promise<CompanyOp
     .from(task)
     .leftJoin(bd, eq(bd.id, task.assignedToBdId))
     .leftJoin(person, eq(person.id, task.personId))
-    .where(
-      and(
-        eq(task.status, "open"),
-        personIds.length ? or(eq(task.companyKey, companyKey), inArray(task.personId, personIds)) : eq(task.companyKey, companyKey),
-      ),
-    )
+    .where(companyOpenTasksCondition(companyKey, personIds))
     .orderBy(asc(sql`${task.dueAt} is null`), asc(task.dueAt))
     .limit(OPEN_TASKS_LIMIT);
 
