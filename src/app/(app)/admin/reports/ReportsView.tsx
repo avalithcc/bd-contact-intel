@@ -202,13 +202,14 @@ export function ReportsView({
   const activityTotal = perBdRows.reduce(
     (acc, r) => ({
       notes: acc.notes + r.notes,
+      callAttempts: acc.callAttempts + r.callAttempts,
       calls: acc.calls + r.calls,
       meetings: acc.meetings + r.meetings,
       emailsSent: acc.emailsSent + r.emailsSent,
       repliesReceived: acc.repliesReceived + r.repliesReceived,
       tasksCompleted: acc.tasksCompleted + r.tasksCompleted,
     }),
-    { notes: 0, calls: 0, meetings: 0, emailsSent: 0, repliesReceived: 0, tasksCompleted: 0 },
+    { notes: 0, callAttempts: 0, calls: 0, meetings: 0, emailsSent: 0, repliesReceived: 0, tasksCompleted: 0 },
   );
   const queueTotal = buildQueueAdherenceRow({
     worked: perBdRows.reduce((s, r) => s + r.queue.worked, 0),
@@ -531,6 +532,7 @@ export function ReportsView({
             <tr>
               <th>{dict.bdColumn}</th>
               <th className="right">{dict.activityNotes}</th>
+              <th className="right">{dict.activityCallAttempts}</th>
               <th className="right">{dict.activityCalls}</th>
               <th className="right">{dict.activityMeetings}</th>
               <th className="right">{dict.activityEmailsSent}</th>
@@ -548,6 +550,7 @@ export function ReportsView({
                   </span>
                 </td>
                 <td className="right num">{r.notes}</td>
+                <td className="right num">{r.callAttempts}</td>
                 <td className="right num">{r.calls}</td>
                 <td className="right num">{r.meetings}</td>
                 <td className="right num">{r.emailsSent}</td>
@@ -558,6 +561,7 @@ export function ReportsView({
             <tr>
               <td className="strong">{dict.total}</td>
               <td className="right num strong">{activityTotal.notes}</td>
+              <td className="right num strong">{activityTotal.callAttempts}</td>
               <td className="right num strong">{activityTotal.calls}</td>
               <td className="right num strong">{activityTotal.meetings}</td>
               <td className="right num strong">{activityTotal.emailsSent}</td>

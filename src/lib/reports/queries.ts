@@ -83,7 +83,13 @@ function wonAtSql() {
       and activity.metadata->>'status' = 'won')`;
 }
 
-const ACTIVITY_BY_BD_TYPES = ["note", "call", "meeting_logged", "email_sent", "reply_received"] as const;
+/**
+ * Only consumer: the `rpt_activity_pivot` type filter in buildReportPerBdQuery. `call_attempt` is the dial; it is counted
+ * as EVERY dial, including one later settled into a `call` (metadata.callActivityId) and hidden from the contact timeline
+ * by notFoldedAttemptSql(). That fold is a display rule and must not be applied here: a dial that became a conversation
+ * is still a dial, and dropping it would break the dials-to-calls ratio the column exists to show.
+ */
+const ACTIVITY_BY_BD_TYPES = ["note", "call_attempt", "call", "meeting_logged", "email_sent", "reply_received"] as const;
 
 /**
  * Midnight UTC of a queue day, as a `timestamptz`. `queue_date` is a `date`,
@@ -242,6 +248,10 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       select
         activity.actor_bd_id as pbc_bd_id,
         count(*) filter (where activity.type = 'note')::int as pbc_notes,
+        -- A dial is dated by happenedAtSql() falling through to created_at: call_attempt is in neither OCCURRED_AT_ACTIVITY_TYPES
+        -- nor NON_TOUCH_ACTIVITY_TYPES, and recordCallAttempt writes the row at click time, so created_at IS the dial time.
+        -- No fold filter and no result filter on purpose (see ACTIVITY_BY_BD_TYPES).
+        count(*) filter (where activity.type = 'call_attempt')::int as pbc_call_attempts,
         count(*) filter (where activity.type = 'call')::int as pbc_calls,
         count(*) filter (where activity.type = 'meeting_logged')::int as pbc_meetings,
         count(*) filter (where activity.type = 'email_sent')::int as pbc_emails_sent,
@@ -305,6 +315,7 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       bd.id as bd_id,
       bd.name as bd_name,
       coalesce(rpt_activity_pivot.pbc_notes, 0) as notes,
+      coalesce(rpt_activity_pivot.pbc_call_attempts, 0) as call_attempts,
       coalesce(rpt_activity_pivot.pbc_calls, 0) as calls,
       coalesce(rpt_activity_pivot.pbc_meetings, 0) as meetings,
       coalesce(rpt_activity_pivot.pbc_emails_sent, 0) as emails_sent,
@@ -349,6 +360,8 @@ export interface ReportPerBdRow {
   bdId: string;
   bdName: string;
   notes: number;
+  /** Every `call_attempt` (dial) in the period, including attempts later settled into a `call`. */
+  callAttempts: number;
   calls: number;
   meetings: number;
   emailsSent: number;
