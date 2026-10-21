@@ -10,10 +10,12 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { CheckIcon, InfoIcon } from "@/components/icons";
+import type { CompanyComboLabels } from "@/lib/companies/companyPickerLabels";
 import { withoutQueryParams } from "@/lib/contacts/linkedinCapture";
 import { PREFILL_PARAM_KEYS, type ProfilePrefill } from "@/lib/contacts/linkedinProfilePrefill";
 import { createContactAction, type CreateContactResult } from "./createContactActions";
 import type { NewContactFormInput } from "@/lib/contacts/createContact";
+import { CompanyCombobox, type CompanyChoice } from "./CompanyCombobox";
 
 export interface NewContactDialogLabels {
   triggerLabel: string;
@@ -24,6 +26,8 @@ export interface NewContactDialogLabels {
   linkedinHelp: string;
   emailLabel: string;
   companyLabel: string;
+  /** Copy for the company autocomplete (mockups/empresa.html). */
+  companyCombo: CompanyComboLabels;
   jobTitleLabel: string;
   locationLabel: string;
   cancelLabel: string;
@@ -53,6 +57,7 @@ const EMPTY_INPUT: NewContactFormInput = {
   linkedinUrl: "",
   email: "",
   company: "",
+  companyKey: null,
   jobTitle: "",
   location: "",
 };
@@ -86,6 +91,7 @@ const PREFILL_FIELDS: readonly PrefillField[] = ["firstName", "lastName", "compa
 export function NewContactDialog({
   labels: l,
   initialCompany,
+  initialCompanyKey,
   initialLinkedin,
   initialPrefill,
   defaultOpen = false,
@@ -93,6 +99,8 @@ export function NewContactDialog({
 }: {
   labels: NewContactDialogLabels;
   initialCompany?: string;
+  /** Canonical key of `initialCompany` when it is an existing company (the company record), stored as is. */
+  initialCompanyKey?: string;
   initialLinkedin?: string;
   initialPrefill?: ProfilePrefill;
   defaultOpen?: boolean;
@@ -105,7 +113,7 @@ export function NewContactDialog({
   const [pending, setPending] = useState(false);
   const emptyInput: NewContactFormInput = {
     ...EMPTY_INPUT,
-    ...(initialCompany ? { company: initialCompany } : {}),
+    ...(initialCompany ? { company: initialCompany, companyKey: initialCompanyKey ?? null } : {}),
     ...(initialLinkedin ? { linkedinUrl: initialLinkedin } : {}),
     ...(initialPrefill ?? {}),
   };
@@ -115,6 +123,19 @@ export function NewContactDialog({
   // Fields still showing the value read from LinkedIn; editing one removes it.
   const [fromLinkedin, setFromLinkedin] = useState<Set<PrefillField>>(prefilledFields);
   const [result, setResult] = useState<CreateContactResult | null>(null);
+  // "Sin empresa" chosen on purpose (as opposed to a field nobody filled in).
+  const [companyNone, setCompanyNone] = useState(false);
+
+  function chooseCompany(next: CompanyChoice) {
+    setInput((s) => ({ ...s, company: next.text, companyKey: next.key }));
+    setCompanyNone(next.none);
+    setFromLinkedin((prev) => {
+      if (!prev.has("company")) return prev;
+      const rest = new Set(prev);
+      rest.delete("company");
+      return rest;
+    });
+  }
 
   function close() {
     setOpen(false);
@@ -124,6 +145,7 @@ export function NewContactDialog({
     }
     setResult(null);
     setInput(emptyInput);
+    setCompanyNone(false);
     setFromLinkedin(prefilledFields());
   }
 
@@ -247,11 +269,14 @@ export function NewContactDialog({
                   </label>
                   <input className="input" id="nc-e" value={input.email} onChange={(e) => edit("email", e.target.value)} />
                 </div>
-                <div className="field">
-                  {fieldLabel("company", "nc-c", l.companyLabel)}
-                  <input className="input" id="nc-c" value={input.company} onChange={(e) => edit("company", e.target.value)} />
-                  {notReadHelp("company")}
-                </div>
+                <CompanyCombobox
+                  id="nc-c"
+                  labels={l.companyCombo}
+                  choice={{ text: input.company, key: input.companyKey ?? null, none: companyNone }}
+                  onChoose={chooseCompany}
+                  label={fieldLabel("company", "nc-c", l.companyLabel)}
+                  extra={notReadHelp("company")}
+                />
               </div>
               <div className="form-grid">
                 <div className="field">

@@ -26,6 +26,12 @@ export interface NewContactFormInput {
   linkedinUrl: string;
   email: string;
   company: string;
+  /**
+   * The canonical `company_key` of an EXISTING company the BD picked in the autocomplete. When present it is stored
+   * as is instead of re-deriving a key from the typed text, which is what split "Andina" from "Andina Tech". The
+   * server action verifies it exists before trusting it. Absent for free text and for "Sin empresa".
+   */
+  companyKey?: string | null;
   /** Free text; optional so callers that never show "Cargo" keep compiling. */
   jobTitle?: string;
   /** Free text "City, Country"; split into city/country by `splitLocation`. */
@@ -70,7 +76,7 @@ export function buildNewContactFields(input: NewContactFormInput): NewContactFie
     email,
     emailStatus: email ? "probable" : "none",
     company,
-    companyKey: company ? normalizeCompanyKey(company) : null,
+    companyKey: company ? (blankToNull(input.companyKey ?? "") ?? normalizeCompanyKey(company)) : null,
     jobTitle: blankToNull((input.jobTitle ?? "").slice(0, FREE_TEXT_MAX)),
     city,
     country,

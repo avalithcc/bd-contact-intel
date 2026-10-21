@@ -1,4 +1,4 @@
-import { and, inArray, isNull, sql } from "drizzle-orm";
+import { and, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import type { db } from "@/db";
 import { companyAlias, person } from "@/db/schema";
 import { buildCompanyMatchKeys, sumCountsByCompany, type CompanyAliasRow, type RawKeyCount } from "@/lib/companies/aliasResolution";
@@ -48,11 +48,13 @@ export function companyContactCountsQuery(database: Pick<typeof db, "select">, k
  * 0.250 ms, and agreement with the record-side count across all 63 companies
  * that hold an alias row plus the worst known discrepancies. Only real
  * aliases count — see aliasRule.ts, shared with the list.
+ * `companyKey` may also be a SQL fragment (a column of an enclosing CTE), so one statement can count per returned
+ * row (companyPickerQuery.ts); with a column the subquery is correlated but stays one index probe per row.
  * `alias_key` is the primary key and `company_alias_company_key_idx` backs the
  * inner filter. The `::text` cast is needed because a bare bind parameter in a
  * select list has no type.
  */
-export function companyContactsCondition(companyKey: string) {
+export function companyContactsCondition(companyKey: string | SQL) {
   return and(
     isNull(person.mergedIntoId),
     sql`${person.companyKey} in (select ${companyKey}::text union select ${companyAlias.aliasKey} from ${companyAlias} where ${companyAlias.companyKey} = ${companyKey} and ${aliasKeyIsNotLiveCompany()})`,

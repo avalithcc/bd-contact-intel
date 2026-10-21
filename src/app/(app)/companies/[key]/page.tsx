@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { companyComboLabels } from "@/lib/companies/companyPickerLabels";
 import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { getCompanyByKey } from "@/lib/companies/queries";
 import {
@@ -175,6 +176,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     linkedinHelp: dict.contactList.newContactLinkedinHelp,
     emailLabel: dict.contactList.newContactEmail,
     companyLabel: dict.contactList.newContactCompany,
+    companyCombo: companyComboLabels(dict.contactList),
     jobTitleLabel: dict.contactList.newContactJobTitle,
     locationLabel: dict.contactList.newContactLocation,
     cancelLabel: dict.contactList.newContactCancel,

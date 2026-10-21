@@ -43,9 +43,12 @@
  * administrador lo revisará" text — without needing `person_id_map`
  * bookkeeping, which only makes sense for legacy-migration rows.
  */
+import { unstable_rethrow } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { duplicateCandidate, person, personBdConnection } from "@/db/schema";
+import { company, duplicateCandidate, person, personBdConnection } from "@/db/schema";
+import type { PickerCompany } from "@/lib/companies/companyPicker";
+import { searchCompanyPicker } from "@/lib/companies/companyPickerDb";
 import { getCurrentBd } from "@/lib/queries";
 import { withIdentityLock } from "@/lib/identity/resolveDb";
 import { buildNewContactFields, type NewContactFormInput } from "@/lib/contacts/createContact";
@@ -58,12 +61,45 @@ import { classifyPosition } from "@/lib/roleGroups";
 
 export type { CreateContactResult } from "@/lib/contacts/createContactFlow";
 
+/**
+ * The dialog's company autocomplete (one bounded statement, see companyPickerQuery.ts). Any signed-in BD. A failed
+ * read returns `null` so the combobox can say so instead of showing "no results".
+ */
+export async function searchCompaniesForContactAction(q: string): Promise<PickerCompany[] | null> {
+  try {
+    await getCurrentBd();
+    return await searchCompanyPicker(q);
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error("[contacts] searchCompaniesForContactAction failed", err);
+    return null;
+  }
+}
+
+/**
+ * A picked company key comes from the client, so it is only trusted after one primary-key read, and then the
+ * company's own display name replaces the typed text. A key that no longer exists (merged away meanwhile) falls back
+ * to deriving one from the text, exactly as free text always did.
+ */
+async function trustPickedCompany(input: NewContactFormInput): Promise<NewContactFormInput> {
+  // typeof, not `?.trim()`: the key comes from the client, and a forged call sending a number or an
+  // object would throw a TypeError and 500 rather than fall back.
+  const picked = typeof input.companyKey === "string" ? input.companyKey.trim() : "";
+  if (!picked) return { ...input, companyKey: null };
+  const [row] = await db
+    .select({ key: company.companyKey, name: company.displayName })
+    .from(company)
+    .where(eq(company.companyKey, picked))
+    .limit(1);
+  return row ? { ...input, company: row.name, companyKey: row.key } : { ...input, companyKey: null };
+}
+
 export async function createContactAction(
-  input: NewContactFormInput,
+  rawInput: NewContactFormInput,
   confirmDuplicate: boolean,
 ): Promise<CreateContactResult> {
   const me = await getCurrentBd();
-  const fields = buildNewContactFields(input);
+  const fields = buildNewContactFields(await trustPickedCompany(rawInput));
 
   return db.transaction(async (tx) => {
     const ports: CreateContactFlowPorts = {

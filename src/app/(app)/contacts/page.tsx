@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { companyComboLabels } from "@/lib/companies/companyPickerLabels";
 import { getCurrentBd } from "@/lib/queries";
 import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
@@ -421,6 +422,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
     linkedinHelp: l.newContactLinkedinHelp,
     emailLabel: l.newContactEmail,
     companyLabel: l.newContactCompany,
+    companyCombo: companyComboLabels(l),
     jobTitleLabel: l.newContactJobTitle,
     locationLabel: l.newContactLocation,
     cancelLabel: l.newContactCancel,
