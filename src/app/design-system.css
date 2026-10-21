@@ -658,9 +658,13 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .tl-icon.discard { color: var(--color-danger-text); background: var(--color-danger-bg); border-color: transparent; }
 .tl-icon.call { color: var(--status-contacted-text); background: var(--status-contacted-bg); border-color: transparent; }
 /* Mail direction: shape (arrow) carries it, colour only reinforces. Only inbound is coloured:
-   a reply is the signal a BD scans for, sending is routine. Never paint the row. */
+   a reply is the signal a BD scans for, sending is routine. Never paint the row.
+   Inbound wears the SUCCESS tint, because a reply is a good outcome, as a soft tint and not a
+   filled disc so it reads like its six siblings above (owner call, 2026-10-21). That tint resolves
+   to the same pair as .tl-icon.meeting, and it may: the glyph is what tells them apart, exactly as
+   .tl-icon.email and .tl-icon.call have always shared --status-contacted-*. */
 .tl-icon.dir-out { color: var(--color-ink-muted); background: var(--color-surface-sunken); border-color: var(--color-border); }
-.tl-icon.dir-in { color: var(--color-accent-fg); background: var(--color-accent-strong); border-color: transparent; }
+.tl-icon.dir-in { color: var(--color-success-text); background: var(--color-success-bg); border-color: transparent; }
 .tl-card { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg); }
 .tl-card.system { background: var(--color-surface-1); border-style: dashed; }
 .tl-head { display: flex; align-items: baseline; gap: var(--space-sm); flex-wrap: wrap; }
