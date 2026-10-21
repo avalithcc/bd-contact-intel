@@ -16,6 +16,13 @@ export interface EmailThreadableEntry {
   id: string;
   type: string;
   createdAt: Date;
+  /**
+   * Effective time (TimelineEntry.at): `metadata.occurredAt` for synced mail,
+   * `created_at` only as the fallback. Thread order and `latestAt` use THIS,
+   * never `createdAt`: the Gmail sync writes every row of a backfill with the
+   * time the sync ran, a year or more after the mail was sent.
+   */
+  at: Date;
   metadata: Record<string, unknown> | null;
   visible: boolean;
 }
@@ -24,6 +31,7 @@ export interface EmailThreadGroup<T extends EmailThreadableEntry> {
   threadId: string;
   // Oldest-first, matching the mockup's own thread reading order.
   messages: T[];
+  /** Effective time of the NEWEST message: the thread card is dated and bucketed as of its latest mail. */
   latestAt: Date;
   visible: boolean;
 }
@@ -61,19 +69,47 @@ export function groupEmailThreads<T extends EmailThreadableEntry>(entries: reado
       result.push({ kind: "single", entry: messages[0] });
       continue;
     }
-    const sorted = [...messages].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const sorted = [...messages].sort((a, b) => a.at.getTime() - b.at.getTime());
     result.push({
       kind: "thread",
       group: {
         threadId,
         messages: sorted,
-        latestAt: sorted[sorted.length - 1].createdAt,
+        latestAt: sorted[sorted.length - 1].at,
         visible: sorted.some((m) => m.visible),
       },
     });
   }
 
   return result;
+}
+
+/**
+ * The synthetic timeline entry a thread card is grouped under, carrying the
+ * thread's EFFECTIVE latest time — never a database `created_at`, which for
+ * synced mail is when the sync ran (see effectiveActivityTime.ts).
+ *
+ * It states that time EXPLICITLY in `metadata.occurredAt`, the field the shared
+ * effective-time rule already reads for an `email_sent` row, instead of leaning
+ * on that rule's fallback to `createdAt`. The fallback would work today, but
+ * only through two coincidences at once: `email_sent` staying in
+ * OCCURRED_AT_ACTIVITY_TYPES, and this entry never gaining an `occurredAt` of
+ * its own. Break either and the card silently goes back to showing the sync
+ * date — a bug this codebase has now shipped twice. `createdAt` carries the
+ * same value so the two can never disagree, and
+ * `tests/unit/emailThreads.test.ts` pins the resulting effective time rather
+ * than the mechanism that produces it.
+ */
+export function threadGroupToTimelineEntry<T extends EmailThreadableEntry>(group: EmailThreadGroup<T>) {
+  return {
+    id: `thread-${group.threadId}`,
+    type: "email_sent",
+    createdAt: group.latestAt,
+    metadata: { isThread: true, occurredAt: group.latestAt.toISOString() } as Record<string, unknown>,
+    actorBdId: null,
+    actorName: null,
+    visible: group.visible,
+  };
 }
 
 /**

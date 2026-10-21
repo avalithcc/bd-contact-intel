@@ -27,6 +27,7 @@ import {
   groupEmailThreads,
   isInferredThread,
   isThreadAttributedThread,
+  threadGroupToTimelineEntry,
   threadContextSummary,
   type EmailThreadGroup,
 } from "@/lib/contacts/emailThreads";
@@ -765,19 +766,7 @@ export function Timeline({
   const threadGroupsById = new Map(
     threaded.filter((t) => t.kind === "thread").map((t) => [`thread-${t.group.threadId}`, t.group]),
   );
-  const processedEntries = threaded.map((t) =>
-    t.kind === "single"
-      ? t.entry
-      : {
-          id: `thread-${t.group.threadId}`,
-          type: "email_sent",
-          createdAt: t.group.latestAt,
-          metadata: { isThread: true },
-          actorBdId: null,
-          actorName: null,
-          visible: t.group.visible,
-        },
-  );
+  const processedEntries = threaded.map((t) => (t.kind === "single" ? t.entry : threadGroupToTimelineEntry(t.group)));
 
   const groups = groupTimelineEntries([
     ...processedEntries,

@@ -148,7 +148,7 @@ test("another BD's auto-reply is as private as their genuine reply (it carries t
 test("it renders under the Correos pill with the replies and joins a thread as an inbound message", () => {
   assert.ok(TIMELINE_PILL_GROUPS.email_sent.includes(AUTO));
   assert.equal(resolveTimelinePillKey(AUTO), "email_sent");
-  const mk = (id: string, type: string, at: string) => ({ id, type, createdAt: new Date(at), metadata: { gmailThreadId: "th-1", matchedEmail: "jane@prospect.com" }, visible: true });
+  const mk = (id: string, type: string, at: string) => ({ id, type, createdAt: new Date(at), at: new Date(at), metadata: { gmailThreadId: "th-1", matchedEmail: "jane@prospect.com" }, visible: true });
   const [threaded] = groupEmailThreads([mk("1", "email_sent", "2026-10-09"), mk("2", AUTO, "2026-10-10")]);
   assert.equal(threaded?.kind, "thread");
   if (threaded?.kind === "thread") assert.equal(threadContextSummary(threaded.group).direction, "inbound");
