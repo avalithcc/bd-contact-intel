@@ -3329,7 +3329,7 @@ export const en = {
     body: "The page you're looking for doesn't exist or was moved.",
     backHome: "Back to home",
   },
-  // Public unsubscribe pages (recipient-facing, rendered in English like the emails). Routed (go-live).
+  // Public unsubscribe pages (recipient-facing, rendered in English for English-language recipients; Spanish ones get the es dictionary). Routed (go-live).
   sequenceUnsubscribe: {
     confirmTitle: "Unsubscribe?",
     confirmBody: (email: string) =>

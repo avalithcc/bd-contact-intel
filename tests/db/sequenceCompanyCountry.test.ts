@@ -96,9 +96,11 @@ test("the unsubscribe page shows the LATAM address from the token the draft issu
   const { db } = await import("@/db");
   const { sequenceUnsubscribeToken } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
-  const { postalAddressForToken } = await import("@/lib/sequences/unsubscribeQueries");
+  const { unsubscribeAudienceForToken } = await import("@/lib/sequences/unsubscribeQueries");
   const [token] = await db.select().from(sequenceUnsubscribeToken).where(eq(sequenceUnsubscribeToken.sequenceMemberId, memberId));
-  assert.ok((await postalAddressForToken(token.tokenHash))?.includes(LATAM_ADDRESS));
+  const page = await unsubscribeAudienceForToken(token.tokenHash);
+  assert.ok(page?.postalAddress?.includes(LATAM_ADDRESS));
+  assert.equal(page?.locale, "es");
 });
 
 test("the release read resolves the member's address as mdp", async () => {

@@ -22,8 +22,8 @@ function harness(known: string[] = [TOKEN]) {
   };
   const deps = {
     port,
-    addressFor: async (hash: string) => (calls.address.push(hash), "1 Test Street"),
-    render: (view: UnsubscribeView, postalAddress?: string) => `<view kind="${view.kind}" address="${postalAddress ?? ""}">`,
+    audienceFor: async (hash: string) => (calls.address.push(hash), { postalAddress: "1 Test Street", locale: "en" as const }),
+    render: (view: UnsubscribeView, page?: { postalAddress?: string }) => `<view kind="${view.kind}" address="${page?.postalAddress ?? ""}">`,
   };
   return { calls, deps };
 }
@@ -98,7 +98,7 @@ test("responses are never cached and never leak the URL token through the referr
 });
 
 test("the document wraps the markup with the stylesheet, and cannot be broken out of by it", () => {
-  const html = unsubscribeDocument("<div>body</div>", ".a{color:red}");
+  const html = unsubscribeDocument("<div>body</div>", ".a{color:red}", "en");
   assert.match(html, /^<!doctype html>/i);
   assert.match(html, /<style>\.a\{color:red\}<\/style>/);
   assert.match(html, /<meta name="robots" content="noindex"/);

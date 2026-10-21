@@ -3317,16 +3317,17 @@ export const es: typeof en = {
     body: "La página que buscás no existe o fue movida.",
     backHome: "Volver al inicio",
   },
-  // Paginas publicas de baja (para el destinatario, se muestran en ingles como los correos). Servidas por /api/unsubscribe.
+  // Páginas públicas de baja (para el destinatario, en el idioma en que se escribió su correo). Servidas por /api/unsubscribe.
+  // Español neutro profesional (sin voseo): los destinatarios están en toda Latinoamérica y España.
   sequenceUnsubscribe: {
-    confirmTitle: "Darte de baja?",
+    confirmTitle: "¿Quieres darte de baja?",
     confirmBody: (email: string) =>
-      `Dejaremos de escribir a ${email} sobre capacidad de ingenieria. Se aplica de inmediato.`,
-    confirmButton: "Si, darme de baja",
+      `Dejaremos de escribir a ${email} sobre capacidad de ingeniería. Se aplica de inmediato.`,
+    confirmButton: "Sí, darme de baja",
     doneTitle: "Te diste de baja",
-    doneBody: (email: string) => `No volveremos a escribir a ${email}. No necesitas hacer nada mas.`,
-    invalidTitle: "Este enlace ya no es valido",
-    invalidBody: "Si todavia queres dejar de recibir nuestros correos, responde a cualquier mensaje con \"unsubscribe\".",
+    doneBody: (email: string) => `No volveremos a escribir a ${email}. No necesitas hacer nada más.`,
+    invalidTitle: "Este enlace ya no es válido",
+    invalidBody: "Si todavía quieres dejar de recibir nuestros correos, responde a cualquier mensaje con \"unsubscribe\".",
   },
   // Sequence detail screen (mockups/secuencia-detalle.html). Plain strings with {n} placeholders: the slice is passed to
   // client components (ClientStrings), so it cannot hold functions. Routed (go-live).
