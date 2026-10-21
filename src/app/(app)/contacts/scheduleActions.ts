@@ -1,7 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { revalidateLists } from "@/lib/contacts/revalidateLists";
 import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
@@ -49,8 +49,7 @@ export async function scheduleContactEmailAction(
     if (!compose.ok) return { ok: false, reason: compose.reason };
     const result = await scheduleEmail({ bdId: me.id, personId, toAddress: to, subject: input.subject, body: input.body, sendAt: slotInstant(when) ?? new Date(NaN), compose: compose.compose });
     if (!result.ok) return result;
-    revalidatePath(`/contacts/${personId}`);
-    revalidateLists("touch");
+    await revalidateContactSurfaces(personId, "touch");
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

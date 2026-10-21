@@ -5,6 +5,7 @@ import { decryptToken } from "@/lib/gmail/crypto";
 import { getGmailOAuthConfig } from "@/lib/gmail/config";
 import { classifyTokenRefreshError, GmailSendError } from "@/lib/gmail/errors";
 import { revalidatePath } from "next/cache";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { recordSentEmail } from "@/lib/gmail/sentEmailQueries";
 import { readSentMessageMetadata } from "@/lib/gmail/sentMessageMetadata";
 import { assertRecipients } from "@/lib/gmail/recipient";
@@ -258,8 +259,10 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
   });
 
   if (leadId) revalidatePath(`/leads/${leadId}`);
+  // The raw key is kept alongside the helper's canonical one: it may be an alias (a no-op path) or the only company a
+  // company-level send (no person) has, and revalidating a path that does not exist costs nothing.
   if (companyKey) revalidatePath(`/companies/${companyKey}`);
-  if (personId) revalidatePath(`/contacts/${personId}`);
+  if (personId) await revalidateContactSurfaces(personId);
 
   return { messageId: sent.id, threadId: sent.threadId };
 }

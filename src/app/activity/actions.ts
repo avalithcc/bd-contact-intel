@@ -1,10 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { unstable_rethrow } from "next/navigation";
-import { revalidateLists } from "@/lib/contacts/revalidateLists";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { createActivity } from "@/lib/activity/queries";
-import { getCanonicalCompanyKeyForPerson } from "@/lib/companies/aliasResolutionDb";
 import { getCurrentBd } from "@/lib/queries";
 import type { NewActivity } from "@/db/schema";
 
@@ -28,34 +26,13 @@ export async function createActivityAction(input: {
 
   // Revalidate all affected paths
   if (input.leadId) revalidatePath(`/leads/${input.leadId}`);
+  // The raw key is revalidated IN ADDITION to the canonical one the helper resolves: a caller may pass a personId and a
+  // `companyKey` of a different company (the company page's quick action), and revalidating a path that does not exist
+  // is a no-op, so both is free. It also covers a resolution that returns null or fails.
   if (input.companyKey) revalidatePath(`/companies/${input.companyKey}`);
   if (input.contactId) revalidatePath(`/contact/${input.contactId}`); // legacy contact route, keyed by contact id (not person id)
-  if (input.personId) {
-    revalidatePath(`/contacts/${input.personId}`);
-    // A note/call/discard on a Contact moves last contact and the follow-up queue.
-    revalidateLists("touch");
-    // The company page's activity timeline unions in every contact's activity
-    // (getCompanyTimeline), so a contact activity changes that page too, yet
-    // only `personId` is passed here, never `companyKey`. The record page exists
-    // only at the canonical key (getCompanyByKey matches it exactly), so the
-    // person's key is resolved through company aliases, the same KEY rule as
-    // the timeline's companyContactsCondition. One extra round trip.
-    //
-    // Best-effort on purpose. The activity has already COMMITTED by this point,
-    // so a transient failure resolving the key must not fail the action: that
-    // would report a successful write as an error and invite a retry that logs
-    // the activity twice. A missed revalidation costs one stale company page
-    // until the next navigation; a duplicate note cannot be undone.
-    try {
-      const canonicalKey = await getCanonicalCompanyKeyForPerson(input.personId);
-      if (canonicalKey) revalidatePath(`/companies/${canonicalKey}`);
-    } catch (err) {
-      // A redirect()/notFound() is thrown, not returned, so it must escape this
-      // catch untouched (tests/unit/rethrowNavigationErrors.test.ts).
-      unstable_rethrow(err);
-      // Anything else is intentionally swallowed — see above.
-    }
-  }
+  // A note/call/discard on a Contact moves last contact and the follow-up queue.
+  if (input.personId) await revalidateContactSurfaces(input.personId, "touch");
 
   return activity;
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { unstable_rethrow } from "next/navigation";
 import { assertAssigneeExists, getTaskById, getTaskCompletionInfo } from "@/lib/tasks/queries";
 import { createTaskWithActivity, updateTaskWithActivity, setTaskStatusChecked, type TaskEditInput } from "@/lib/tasks/updateWithActivity";
@@ -51,7 +52,7 @@ export async function createTaskAction(input: {
   revalidatePath("/tasks");
   revalidatePath("/leads");
   revalidatePath("/companies");
-  if (input.personId) revalidatePath(`/contacts/${input.personId}`);
+  if (input.personId) await revalidateContactSurfaces(input.personId);
 
   return task;
 }
@@ -59,11 +60,13 @@ export async function createTaskAction(input: {
 /** Revalidates every path a task write can affect — the same fixed set
  * every task action here already revalidated, plus whichever record page
  * the task's OWN (just-written) subject points at. */
-function revalidateTaskPaths(task: Task): void {
+async function revalidateTaskPaths(task: Task): Promise<void> {
   revalidatePath("/tasks");
   revalidatePath("/leads");
   revalidatePath("/companies");
-  if (task.personId) revalidatePath(`/contacts/${task.personId}`);
+  if (task.personId) await revalidateContactSurfaces(task.personId);
+  // The task's own company subject, which may exist with no person at all. Raw key kept: for a person-bound task the
+  // helper above has already refreshed the canonical page.
   if (task.companyKey) revalidatePath(`/companies/${task.companyKey}`);
 }
 
@@ -77,7 +80,7 @@ function revalidateTaskPaths(task: Task): void {
 export async function updateTaskAction(taskId: string, updates: TaskEditInput): Promise<Task> {
   const me = await getCurrentBd();
   const task = await updateTaskWithActivity(taskId, me, updates);
-  revalidateTaskPaths(task);
+  await revalidateTaskPaths(task);
   return task;
 }
 
@@ -92,7 +95,7 @@ export async function updateTaskAction(taskId: string, updates: TaskEditInput): 
 export async function setTaskStatusAction(taskId: string, status: "open" | "done"): Promise<Task> {
   const me = await getCurrentBd();
   const task = await setTaskStatusChecked(taskId, status, me);
-  revalidateTaskPaths(task);
+  await revalidateTaskPaths(task);
   return task;
 }
 

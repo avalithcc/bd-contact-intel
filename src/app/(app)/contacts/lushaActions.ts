@@ -4,7 +4,7 @@
 // (getCurrentBd), not admin-only. Every spend is one explicit call: nothing here retries, loops or batches.
 // Only LushaReveal.tsx imports this file (tests/unit/lushaInert.test.ts pins it).
 
-import { revalidatePath } from "next/cache";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { getCurrentBd } from "@/lib/queries";
 import { assertContactEditableById } from "@/lib/contacts/queries";
 import { isUuid } from "@/lib/uuid";
@@ -26,7 +26,7 @@ export async function searchLushaContactAction(personId: string, field: Field) {
     if (!isUuid(personId)) return rejected("not_found");
     if (!isField(field)) return rejected("lusha_not_eligible");
     const result = await searchLushaContact({ personId, field, actorBdId: me.id }, livePorts());
-    revalidatePath(`/contacts/${personId}`);
+    await revalidateContactSurfaces(personId);
     return result;
   } catch (err) {
     const failed = actionFailure(err);
@@ -45,7 +45,7 @@ export async function revealLushaFieldAction(personId: string, field: Field, exp
     if (!isField(field)) return rejected("lusha_not_eligible");
     if (!isExpect(expect)) return rejected("lusha_stale");
     const result = await revealLushaField({ personId, field, actorBdId: me.id, expect }, livePorts());
-    revalidatePath(`/contacts/${personId}`);
+    await revalidateContactSurfaces(personId);
     return result;
   } catch (err) {
     const failed = actionFailure(err);
@@ -58,7 +58,7 @@ export async function rejectLushaMatchAction(personId: string) {
     const me = await getCurrentBd(); // authenticate first, then validate
     if (!isUuid(personId)) return rejected("not_found");
     const result = await rejectLushaMatch({ personId, actorBdId: me.id }, livePorts());
-    revalidatePath(`/contacts/${personId}`);
+    await revalidateContactSurfaces(personId);
     return result;
   } catch (err) {
     const failed = actionFailure(err);
@@ -86,7 +86,7 @@ export async function applyStoredLushaValueAction(personId: string, field: Field
     await assertContactEditableById(personId);
     const result = await applyStoredReveal({ personId, field, actorBdId: me.id });
     if (!result.ok) return rejected("lusha_not_eligible");
-    revalidatePath(`/contacts/${personId}`);
+    await revalidateContactSurfaces(personId);
     return result;
   } catch (err) {
     const failed = actionFailure(err);

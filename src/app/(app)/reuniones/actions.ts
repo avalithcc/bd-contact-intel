@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { revalidateLists } from "@/lib/contacts/revalidateLists";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
@@ -25,10 +24,7 @@ function failure(err: unknown): { ok: false; reason: MeetingActionReason } {
   return { ok: false, reason: "unexpected" };
 }
 
-function revalidateMeetingPaths(personId: string): void {
-  revalidatePath(`/contacts/${personId}`);
-  revalidateLists("touch", "meetings", "tasks");
-}
+const revalidateMeetingPaths = (personId: string) => revalidateContactSurfaces(personId, "touch", "meetings", "tasks");
 
 /**
  * The outcome dialog's save (Se hizo / No se presentó / Reprogramada / Cancelada), from the Reuniones page and from the
@@ -44,7 +40,7 @@ export async function confirmMeetingOutcomeAction(meetingId: string, raw: unknow
       no_show: dict.meetings.followUpTitleNoShow,
       cancelled: dict.meetings.followUpTitleCancelled,
     });
-    revalidateMeetingPaths(result.personId);
+    await revalidateMeetingPaths(result.personId);
     return { ok: true, outcome: result.outcome, followUpTaskCreated: result.followUpTaskId !== null };
   } catch (err) {
     // A redirect()/notFound() from getCurrentBd() must reach Next's router, not turn into a result.
@@ -59,7 +55,7 @@ export async function undoMeetingOutcomeAction(meetingId: string): Promise<UndoM
     const me = await getCurrentBd();
     if (!isUuid(meetingId)) return { ok: false, reason: "meeting_not_found" };
     const { personId } = await undoMeetingOutcome(meetingId, me.id);
-    revalidateMeetingPaths(personId);
+    await revalidateMeetingPaths(personId);
     return { ok: true };
   } catch (err) {
     unstable_rethrow(err);
