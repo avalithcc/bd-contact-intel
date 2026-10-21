@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { auditLog, bd, person, personPropertyHistory } from "@/db/schema";
 import { planOwnerAssignment, sanitizeBulkPersonIds } from "@/lib/contacts/bulkOwner";
 import { buildBulkOwnerAuditRow, type BulkOwnerAuditMode } from "@/lib/contacts/bulkOwnerAudit";
+import { createTtlCache } from "@/lib/ttlCache";
 import { MANUAL_OWNER_SOURCE, OWNER_HISTORY_PROPERTY } from "@/lib/identity/ownerRule";
 import { readManualOwnerPersonIds } from "@/lib/identity/ownerRuleDb";
 
@@ -87,8 +88,26 @@ export async function bulkAssignOwner(
   });
 }
 
-export async function listOwnerOptions(): Promise<{ id: string; name: string }[]> {
+/** Live read of every BD, no cache. For write paths that resolve a name into
+ * an audit/activity record and must never see a stale roster. */
+export async function listOwnerOptionsFresh(): Promise<{ id: string; name: string }[]> {
   return db.select({ id: bd.id, name: bd.name }).from(bd).orderBy(asc(bd.name));
+}
+
+/**
+ * Owner dropdown options (page reads), cached in-process for 60 s.
+ *
+ * What goes stale: the BD roster (id + display name). A BD added or renamed
+ * shows up in an owner/assignee dropdown up to 60 s late, per serverless
+ * instance. That is harmless: the roster changes a few times a year, the
+ * dropdown is a convenience list (nothing validates an owner against it), and
+ * the value a BD picks is still a real `bd.id`. It is the SAME list for every
+ * viewer (no role or per-BD visibility), so nothing viewer-scoped is shared.
+ * Writes that record a name use `listOwnerOptionsFresh` instead.
+ */
+const ownerOptionsCache = createTtlCache(listOwnerOptionsFresh, { ttlMs: 60_000 });
+export function listOwnerOptions(): Promise<{ id: string; name: string }[]> {
+  return ownerOptionsCache.get();
 }
 
 /** Keeps only live (not merged-away) persons, for bulk writes that don't go

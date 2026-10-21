@@ -38,6 +38,7 @@ import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
 import { mapInlineDerivedColumns, type InlineDerivedRawRow } from "@/lib/contacts/inlineDerivedColumns";
 import { contactTypeFilterCondition } from "@/lib/contacts/contactTypeCondition";
+import { createTtlCache } from "@/lib/ttlCache";
 import { roleGroupVisibilityCondition } from "@/lib/contacts/roleVisibility";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { getDictionary } from "@/lib/i18n/server";
@@ -672,7 +673,7 @@ export interface ContactFilterOptions {
   seniorities: string[];
 }
 
-export async function getContactFilterOptions(): Promise<ContactFilterOptions> {
+async function loadContactFilterOptions(): Promise<ContactFilterOptions> {
   const [industryRows, seniorityRows] = await Promise.all([
     db
       .selectDistinct({ v: person.industry })
@@ -689,4 +690,19 @@ export async function getContactFilterOptions(): Promise<ContactFilterOptions> {
     industryGroups: industryRows.map((r) => r.v).filter((v): v is string => !!v),
     seniorities: seniorityRows.map((r) => r.v).filter((v): v is string => !!v),
   };
+}
+
+/**
+ * Cached in-process for 5 min. What goes stale: the set of distinct
+ * industry/seniority values offered in the ad-hoc filter selects. A value
+ * introduced by an import or enrichment appears in the dropdown up to 5 min
+ * late, per serverless instance; one that no longer has any person stays up to
+ * 5 min and yields an empty result, never a wrong row. Harmless: the dropdown
+ * only lists what exists, the list itself is always read live, and the
+ * filter still works by URL. The values are identical for every viewer (no
+ * role or per-BD scoping), and the DISTINCT scans are the costly part.
+ */
+const contactFilterOptionsCache = createTtlCache(loadContactFilterOptions, { ttlMs: 5 * 60_000 });
+export function getContactFilterOptions(): Promise<ContactFilterOptions> {
+  return contactFilterOptionsCache.get();
 }

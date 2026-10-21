@@ -8,7 +8,8 @@ import type { LinkedinPresence } from "@/lib/companies/linkedinPresence";
 import { getCompanyAliasRows } from "@/lib/companies/aliasResolutionDb";
 import { companyContactCountsQuery, countContactsByCompany } from "@/lib/companies/contactCounts";
 import { companyListConditions } from "@/lib/companies/listConditions";
-import { companySearchCondition } from "@/lib/companies/searchCondition";
+import { buildCompanyViewCountsSelection } from "@/lib/companies/viewCounts";
+import { createTtlCache } from "@/lib/ttlCache";
 import { companyLastActivity, companyListOrderBy } from "@/lib/companies/lastActivitySignal";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { HiringMatch } from "@/lib/hiring/queries";
@@ -226,7 +227,7 @@ export interface CompanyViewCounts {
 }
 
 /**
- * View-tab counts (companies.html:65) — three fixed queries, no per-row
+ * View-tab counts (companies.html:65) — one statement, no per-row
  * cost. `q` (owner report 2026-09-30) is ANDed into each of the three
  * view's own condition — same `companySearchCondition` the page/count query
  * above uses, so a BD searching "acme" sees the All/Mine/Hiring tab badges
@@ -238,23 +239,14 @@ export async function getCompanyViewCounts(
   hiringIndex: Map<string, HiringMatch>,
   q?: string,
 ): Promise<CompanyViewCounts> {
-  const hiringKeys = [...hiringIndex.keys()];
-  const searchWhere = companySearchCondition(q);
-  const mineWhere = searchWhere ? and(eq(company.ownerBdId, meBdId), searchWhere) : eq(company.ownerBdId, meBdId);
-  const hiringWhere = searchWhere
-    ? and(inArray(company.companyKey, hiringKeys), searchWhere)
-    : inArray(company.companyKey, hiringKeys);
-  const [[allRow], [mineRow], hiringRows] = await Promise.all([
-    db.select({ count: sql<number>`count(*)::int` }).from(company).where(searchWhere),
-    db.select({ count: sql<number>`count(*)::int` }).from(company).where(mineWhere),
-    hiringKeys.length
-      ? db.select({ count: sql<number>`count(*)::int` }).from(company).where(hiringWhere)
-      : Promise.resolve([{ count: 0 }]),
-  ]);
+  // ONE statement, one table scan: the three badges are `count(*) FILTER`
+  // aggregates over `company` (see viewCounts.ts for the equivalence with the
+  // three separate counts this replaced).
+  const [row] = await db.select(buildCompanyViewCountsSelection(meBdId, [...hiringIndex.keys()], q)).from(company);
   return {
-    all: allRow?.count ?? 0,
-    mine: mineRow?.count ?? 0,
-    hiring: hiringRows[0]?.count ?? 0,
+    all: Number(row?.all ?? 0),
+    mine: Number(row?.mine ?? 0),
+    hiring: Number(row?.hiring ?? 0),
   };
 }
 
@@ -273,7 +265,7 @@ const MAX_INDUSTRY_OPTIONS = 100;
  * `listOwnerOptions()` (src/lib/contacts/bulkOwnerDb.ts) directly — it's
  * already a generic `bd` list, not Contact-specific.
  */
-export async function getCompanyFilterOptions(): Promise<CompanyFilterOptions> {
+async function loadCompanyFilterOptions(): Promise<CompanyFilterOptions> {
   const rows = await db
     .selectDistinct({ industry: company.industry })
     .from(company)
@@ -281,4 +273,17 @@ export async function getCompanyFilterOptions(): Promise<CompanyFilterOptions> {
     .orderBy(asc(company.industry))
     .limit(MAX_INDUSTRY_OPTIONS);
   return { industries: rows.map((r) => r.industry).filter((v): v is string => v !== null) };
+}
+
+/**
+ * Cached in-process for 5 min. What goes stale: the distinct industry values
+ * in the "Agregar filtro" select. A new industry (import, a BD editing a
+ * company) shows up in the dropdown up to 5 min late, per serverless instance;
+ * a removed one lingers for the same time and filters to an empty list. The
+ * table is always read live and the list is the same for every viewer, so no
+ * row data and nothing viewer-scoped is cached.
+ */
+const companyFilterOptionsCache = createTtlCache(loadCompanyFilterOptions, { ttlMs: 5 * 60_000 });
+export function getCompanyFilterOptions(): Promise<CompanyFilterOptions> {
+  return companyFilterOptionsCache.get();
 }
