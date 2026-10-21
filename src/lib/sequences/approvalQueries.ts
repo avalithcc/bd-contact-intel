@@ -13,6 +13,7 @@ import { bulkApprovalGate } from "./bulkApprovalGate";
 import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
 import { complianceRefusal, type ComplianceRefusal } from "./complianceGate";
 import { COMPLIANCE_CONFIG } from "./config";
+import { SEQUENCE_DETAIL_MEMBER_LIMIT } from "./detailQueries";
 import { canTransition, type MemberState } from "./memberState";
 import { LOCK_MS } from "@/lib/scheduledEmail/plan";
 import { companyCountrySql, postingMarketsSql } from "./rosterQuery";
@@ -29,7 +30,8 @@ export type ApprovalRejection = {
   memberId: string;
   reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | ComplianceRefusal | SendMomentRefusal;
 };
-export type ApproveResult = { ok: true; approved: string[] } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] };
+/** `too_many`: the request named more members than the page can ever offer (SEQUENCE_DETAIL_MEMBER_LIMIT). Refused before any lock. */
+export type ApproveResult = { ok: true; approved: string[] } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] } | { ok: false; error: "too_many"; limit: number };
 
 /** Called when the review dialog opens. Passive listing never calls it. Keeps the first review time. */
 export async function markDraftReviewed(bdId: string, memberId: string, step: ApprovalStep = 1): Promise<{ ok: true } | { ok: false; error: "not_found" }> {
@@ -67,6 +69,7 @@ async function addressesNow(tx: Tx, personIds: readonly string[]): Promise<Map<s
 async function approve(bdId: string, memberIds: readonly string[], gated: boolean, step: ApprovalStep, when: SendChoice = { kind: "cadence" }): Promise<ApproveResult> {
   const ids = [...new Set(memberIds)];
   if (!ids.length) return { ok: true, approved: [] };
+  if (ids.length > SEQUENCE_DETAIL_MEMBER_LIMIT) return { ok: false, error: "too_many", limit: SEQUENCE_DETAIL_MEMBER_LIMIT };
   return db.transaction(async (tx) => {
     const members = await tx
       .select({ id: sequenceMember.id, state: sequenceMember.state, personId: sequenceMember.personId, sequenceId: sequenceMember.sequenceId, schedule: sequence.schedule, reminderDueAt: sequenceMember.reminderDueAt })

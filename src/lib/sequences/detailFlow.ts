@@ -8,14 +8,14 @@
  *  - The bulk gate and the "Aprobar los N listos" selection are computed from the rows the page was last given, so a
  *    refetch (after the dialog reports "reviewed") is what moves the "N de M revisados" counter.
  */
-import type { ApproveResult } from "./approvalQueries";
+import type { ApprovalRejection, ApproveResult } from "./approvalQueries";
 import type { DetailMember } from "./detailQueries";
 import type { GateRow } from "./bulkApprovalGate";
 import type { SaveEditResult } from "./draftQueries";
 import { mapMemberCard, type CardActionId } from "./memberCard";
 
 export type ReviewText = { subject: string; body: string };
-export type ReviewFlowError = Extract<SaveEditResult, { ok: false }>["error"] | Extract<ApproveResult, { ok: false }>["rejected"][number]["reason"] | "failed";
+export type ReviewFlowError = Extract<SaveEditResult, { ok: false }>["error"] | Extract<ApproveResult, { error: "rejected" }>["rejected"][number]["reason"] | "too_many" | "failed";
 /** `persisted`: the server now holds the text the form held, so the page should refetch even when the intent failed. */
 export type ReviewFlowResult = { ok: true; persisted: boolean } | { ok: false; error: ReviewFlowError; persisted: boolean };
 
@@ -23,6 +23,9 @@ export interface ReviewPorts {
   save: () => Promise<SaveEditResult>;
   approve: () => Promise<ApproveResult>;
 }
+
+/** The one reason to show for a single refused approval: the first rejection, or the request-level refusal. */
+export const refusalKey = (refused: Extract<ApproveResult, { ok: false }>): ReviewFlowError => (refused.error === "too_many" ? "too_many" : refused.rejected[0]?.reason ?? "failed");
 
 export const sameContent = (a: ReviewText, b: ReviewText) => a.subject === b.subject && a.body === b.body;
 
@@ -43,7 +46,7 @@ export async function runReviewIntent(intent: "save" | "approve", input: { store
   try {
     const approved = await ports.approve();
     if (approved.ok) return { ok: true, persisted };
-    return { ok: false, error: approved.rejected[0]?.reason ?? "failed", persisted };
+    return { ok: false, error: refusalKey(approved), persisted };
   } catch {
     return { ok: false, error: "failed", persisted };
   }
@@ -72,3 +75,26 @@ export function approveStep(m: DetailMember, now: Date): 1 | 2 {
 
 /** The member states whose draft Regenerar may replace, per step. The server uses the same lists, so client and server agree on who is touched. */
 export const REGENERABLE_STATES: Record<1 | 2, readonly string[]> = { 1: ["drafted", "approved"], 2: ["sent"] };
+
+/** At most this many names are written per refusal reason; the rest are counted. */
+export const REFUSAL_NAMES_SHOWN = 3;
+export type RefusalGroup = { reason: ApprovalRejection["reason"]; names: string[]; more: number };
+
+/**
+ * What a bulk refusal tells the BD: one group per distinct reason (first-seen order) with up to REFUSAL_NAMES_SHOWN
+ * members named and the count of the others. A member is named by its person name, else its email; one with neither, or
+ * an id the page does not hold, is not named and counts toward `more`. Pure: neither argument is mutated.
+ */
+export function summarizeRefusals(rejected: readonly ApprovalRejection[], members: readonly Pick<DetailMember, "memberId" | "firstName" | "lastName" | "email">[]): RefusalGroup[] {
+  const byId = new Map(members.map((m) => [m.memberId, m]));
+  const groups = new Map<ApprovalRejection["reason"], { names: string[]; total: number }>();
+  for (const r of rejected) {
+    const group = groups.get(r.reason) ?? { names: [], total: 0 };
+    groups.set(r.reason, group);
+    group.total += 1;
+    const m = byId.get(r.memberId);
+    const name = m ? [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email : null;
+    if (name && group.names.length < REFUSAL_NAMES_SHOWN) group.names.push(name);
+  }
+  return [...groups].map(([reason, g]) => ({ reason, names: g.names, more: g.total - g.names.length }));
+}

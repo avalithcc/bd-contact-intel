@@ -106,7 +106,7 @@ test("another BD cannot mark, approve or cancel a member of someone else's seque
   const m = await mkMember("foreign");
   assert.deepEqual(await markDraftReviewed(otherBdId, m.memberId), { ok: false, error: "not_found" });
   const approved = await approveMember(otherBdId, m.memberId);
-  assert.ok(!approved.ok && approved.rejected[0].reason === "not_found");
+  assert.ok(!approved.ok && approved.error === "rejected" && approved.rejected[0].reason === "not_found");
   assert.deepEqual(await cancelApproval(otherBdId, m.memberId), { ok: false, error: "not_found" });
   assert.equal((await stateOf(m.memberId)).state, "drafted");
 });
@@ -132,7 +132,7 @@ test("approving a member that is not drafted is rejected and changes nothing", a
   const { approveMember } = await import("@/lib/sequences/approvalQueries");
   const m = await mkMember("sent", { state: "sent" });
   const result = await approveMember(bdId, m.memberId);
-  assert.ok(!result.ok && result.rejected[0].reason === "not_approvable");
+  assert.ok(!result.ok && result.error === "rejected" && result.rejected[0].reason === "not_approvable");
   assert.equal((await stateOf(m.memberId)).state, "sent");
   assert.equal((await draftOf(m.memberId)).approvedAt, null);
 });
@@ -141,7 +141,7 @@ test("a step 1 subject starting with Re: is rejected at approval", async () => {
   const { approveMember } = await import("@/lib/sequences/approvalQueries");
   const m = await mkMember("reprefix", { subject: "Re: your engineers" });
   const result = await approveMember(bdId, m.memberId);
-  assert.ok(!result.ok && result.rejected[0].reason === "reply_prefix_subject");
+  assert.ok(!result.ok && result.error === "rejected" && result.rejected[0].reason === "reply_prefix_subject");
   assert.equal((await stateOf(m.memberId)).state, "drafted");
 });
 
@@ -149,7 +149,7 @@ test("a member without a draft cannot be approved", async () => {
   const { approveMember } = await import("@/lib/sequences/approvalQueries");
   const m = await mkMember("nodraft", { noDraft: true });
   const result = await approveMember(bdId, m.memberId);
-  assert.ok(!result.ok && result.rejected[0].reason === "no_draft");
+  assert.ok(!result.ok && result.error === "rejected" && result.rejected[0].reason === "no_draft");
 });
 
 test("bulk approve with every draft reviewed approves all of them", async () => {
@@ -168,7 +168,7 @@ test("a forged bulk request with one unreviewed member approves none and names t
   const b = await mkMember("forge-b", { reviewed: false });
   const c = await mkMember("forge-c", { reviewed: true });
   const result = await approveBulk(bdId, [a.memberId, b.memberId, c.memberId]);
-  assert.ok(!result.ok);
+  assert.ok(!result.ok && result.error === "rejected");
   assert.deepEqual(result.rejected, [{ memberId: b.memberId, reason: "unreviewed" }]);
   for (const m of [a, b, c]) {
     assert.equal((await stateOf(m.memberId)).state, "drafted");
@@ -182,7 +182,7 @@ test("an edit after review clears it, so a bulk approval cannot cover unseen con
   const m = await mkMember("edited", { reviewed: true });
   await saveDraftEdit(bdId, m.memberId, { subject: "New subject", body: `${await footedBody()}\n\nEdited.` });
   const result = await approveBulk(bdId, [m.memberId]);
-  assert.ok(!result.ok && result.rejected[0].reason === "unreviewed");
+  assert.ok(!result.ok && result.error === "rejected" && result.rejected[0].reason === "unreviewed");
 });
 
 test("cancel returns an approved member to drafted, clears the approval and writes the audit row", async () => {
@@ -254,10 +254,10 @@ test("a reminder cannot be approved unless the member is sent and the reminder i
   const { sequenceDraft } = await import("@/db/schema");
   await db.insert(sequenceDraft).values({ sequenceMemberId: drafted.memberId, step: 2, subject: "x", body: "y" });
   const early = await approveMember(bdId, drafted.memberId, 2);
-  assert.ok(!early.ok && early.rejected[0].reason === "not_approvable");
+  assert.ok(!early.ok && early.error === "rejected" && early.rejected[0].reason === "not_approvable");
   const noDue = await mkSent("rem-nodue", { reminderDueAt: null });
   const result = await approveMember(bdId, noDue.memberId, 2);
-  assert.ok(!result.ok && result.rejected[0].reason === "not_approvable");
+  assert.ok(!result.ok && result.error === "rejected" && result.rejected[0].reason === "not_approvable");
 });
 
 test("reminder bulk approval uses the same review gate", async () => {
@@ -265,7 +265,7 @@ test("reminder bulk approval uses the same review gate", async () => {
   const a = await mkSent("rem-bulk-a", { reviewed: true });
   const b = await mkSent("rem-bulk-b", { reviewed: false });
   const blocked = await approveBulk(bdId, [a.memberId, b.memberId], 2);
-  assert.ok(!blocked.ok && blocked.rejected.length === 1 && blocked.rejected[0].memberId === b.memberId);
+  assert.ok(!blocked.ok && blocked.error === "rejected" && blocked.rejected.length === 1 && blocked.rejected[0].memberId === b.memberId);
   assert.equal((await draftOf(a.memberId, 2)).approvedAt, null);
 });
 
@@ -346,4 +346,23 @@ test("a recipient in an embargoed country is refused as unmapped_market at appro
   const r = await approveMember(bdId, m.memberId);
   assert.deepEqual(r, { ok: false, error: "rejected", rejected: [{ memberId: m.memberId, reason: "unmapped_market" }] });
   await nothingWritten(m, "drafted");
+});
+
+test("a bulk request over the roster limit is refused as too_many before anything is locked or written", async () => {
+  const { approveBulk } = await import("@/lib/sequences/approvalQueries");
+  const { SEQUENCE_DETAIL_MEMBER_LIMIT } = await import("@/lib/sequences/detailQueries");
+  // Every id is a real, approvable, reviewed member: were the cap missing, the transaction WOULD approve all of them. (A
+  // filler uuid would make the transaction reject and roll back, so the asserts below could not tell the difference.)
+  const all = [];
+  for (let i = 0; i <= SEQUENCE_DETAIL_MEMBER_LIMIT; i++) all.push(await mkMember(`too-many-${i}`, { reviewed: true }));
+  const m = all[0];
+  const ids = all.map((x) => x.memberId);
+  assert.equal(ids.length, SEQUENCE_DETAIL_MEMBER_LIMIT + 1);
+  assert.deepEqual(await approveBulk(bdId, ids), { ok: false, error: "too_many", limit: SEQUENCE_DETAIL_MEMBER_LIMIT });
+  assert.equal((await stateOf(m.memberId)).state, "drafted");
+  assert.equal((await draftOf(m.memberId)).approvedAt, null);
+  assert.equal((await auditFor(m.personId, "sequence_member_approve")).length, 0);
+  // Duplicates are collapsed first: the same id repeated past the limit is one member, not an oversized request.
+  const repeated = await approveBulk(bdId, Array.from({ length: SEQUENCE_DETAIL_MEMBER_LIMIT + 5 }, () => m.memberId));
+  assert.deepEqual(repeated, { ok: true, approved: [m.memberId] });
 });
