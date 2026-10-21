@@ -331,61 +331,6 @@ export function ReportsView({
         />
       </div>
 
-      <div className="card mb-lg">
-        <div className="card-header">
-          <h3>{dict.discardReasonsTitle}</h3>
-        </div>
-        <div className="card-body">
-          {discardTotal === 0 ? (
-            <div className="empty">
-              <div className="empty-icon">
-                <InfoIcon className="icon icon-lg" />
-              </div>
-              <p>{dict.discardReasonsEmpty}</p>
-              <details className="mt-lg">
-                <summary className="soft small">{dict.discardReferenceSummary}</summary>
-                <div className="bar-track mt-md" role="img" aria-label={dict.discardReferenceAriaLabel}>
-                  {DISCARD_REFERENCE_BAR.map((r) => (
-                    <span key={r.reason} className={r.barClass} style={{ width: `${r.widthPct}%` }} />
-                  ))}
-                </div>
-                <div className="legend">
-                  {DISCARD_REFERENCE_BAR.map((r) => (
-                    <span key={r.reason}>
-                      <i className={r.barClass} />
-                      {discardReasonLabel(r.reason, es)} {r.count}
-                    </span>
-                  ))}
-                </div>
-                <p className="meta mt-md">
-                  {dict.discardReferenceRemainingPrefix}{" "}
-                  {DISCARD_REFERENCE_REMAINING.map((r) => `${discardReasonLabel(r.reason, es)} ${r.count}`).join(" · ")}.
-                </p>
-              </details>
-            </div>
-          ) : (
-            <table className="data compact">
-              <thead>
-                <tr>
-                  <th>{dict.discardReasonsReason}</th>
-                  <th className="right">{dict.discardReasonsCount}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {discardRows
-                  .filter((r) => r.count > 0)
-                  .map((r) => (
-                    <tr key={r.reason}>
-                      <td>{discardReasonLabel(r.reason, es)}</td>
-                      <td className="right num">{r.count}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
       <div className="grid-2 mb-lg">
         <div className="card">
           <div className="card-header">
@@ -573,7 +518,7 @@ export function ReportsView({
         <div className="card-footer meta">{dict.activityFoot}</div>
       </div>
 
-      <div className="card">
+      <div className="card mb-lg">
         <div className="card-header">
           <h3>{dict.queueTitle}</h3>
         </div>
@@ -639,6 +584,64 @@ export function ReportsView({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Last on purpose (owner decision 2026-10-21): discard reasons explain WHY the
+          pipeline leaks, which is worth keeping, but it is a secondary signal and sat
+          directly under the KPIs. Do not promote it back up without asking. */}
+      <div className="card">
+        <div className="card-header">
+          <h3>{dict.discardReasonsTitle}</h3>
+        </div>
+        <div className="card-body">
+          {discardTotal === 0 ? (
+            <div className="empty">
+              <div className="empty-icon">
+                <InfoIcon className="icon icon-lg" />
+              </div>
+              <p>{dict.discardReasonsEmpty}</p>
+              <details className="mt-lg">
+                <summary className="soft small">{dict.discardReferenceSummary}</summary>
+                <div className="bar-track mt-md" role="img" aria-label={dict.discardReferenceAriaLabel}>
+                  {DISCARD_REFERENCE_BAR.map((r) => (
+                    <span key={r.reason} className={r.barClass} style={{ width: `${r.widthPct}%` }} />
+                  ))}
+                </div>
+                <div className="legend">
+                  {DISCARD_REFERENCE_BAR.map((r) => (
+                    <span key={r.reason}>
+                      <i className={r.barClass} />
+                      {discardReasonLabel(r.reason, es)} {r.count}
+                    </span>
+                  ))}
+                </div>
+                <p className="meta mt-md">
+                  {dict.discardReferenceRemainingPrefix}{" "}
+                  {DISCARD_REFERENCE_REMAINING.map((r) => `${discardReasonLabel(r.reason, es)} ${r.count}`).join(" · ")}.
+                </p>
+              </details>
+            </div>
+          ) : (
+            <table className="data compact">
+              <thead>
+                <tr>
+                  <th>{dict.discardReasonsReason}</th>
+                  <th className="right">{dict.discardReasonsCount}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {discardRows
+                  .filter((r) => r.count > 0)
+                  .map((r) => (
+                    <tr key={r.reason}>
+                      <td>{discardReasonLabel(r.reason, es)}</td>
+                      <td className="right num">{r.count}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </main>
   );
