@@ -8,7 +8,7 @@ import { mapUsageRow, personalCapLines, type RawUsageRow } from "../../src/lib/l
 import { en } from "../../src/lib/i18n/dictionaries/en";
 import { es } from "../../src/lib/i18n/dictionaries/es";
 
-const RAW: RawUsageRow = { ur_bd_id: "b1", ur_name: "Ana", ur_email: "ana@bd.example", ur_role: "bd", ur_enabled: true, ur_created_at: "2026-10-01T00:00:00Z", ur_charged: "24", ur_pending: "0", ur_emails: "11", ur_phones: "0", ur_rejections: "0", ur_last_use: null, ur_toggle_by: null, ur_toggle_at: null, ur_personal_cap: null };
+const RAW: RawUsageRow = { ur_bd_id: "b1", ur_name: "Ana", ur_email: "ana@bd.example", ur_role: "bd", ur_enabled: true, ur_created_at: "2026-10-01T00:00:00Z", ur_charged: "24", ur_pending: "0", ur_emails: "11", ur_phones: "0", ur_rejections: "0", ur_last_use: null, ur_toggle_by: null, ur_toggle_at: null, ur_personal_cap: null, ur_today_credits: 0 };
 
 test("a BD with no personal cap maps to null, and a cap arrives as a number whichever way the driver sends it", () => {
   assert.equal(mapUsageRow(RAW).personalDailyCap, null);

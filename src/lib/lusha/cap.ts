@@ -31,6 +31,22 @@ export const CREDITS_PER_CONTACT = SEARCH_COST + 1;
 /** How many whole contacts fit in `credits`: 12 credits is 6 contacts, 11 is 5 (half a contact is not a contact). */
 export const contactsWithinCredits = (credits: number): number => Math.floor(credits / CREDITS_PER_CONTACT);
 
+/** The largest personal daily cap an admin can set, in credits. Above any sane day (the team rail is 60), below a typo. */
+export const MAX_PERSONAL_DAILY_CAP = 999;
+
+export type PersonalCapParse = { ok: true; cap: number | null } | { ok: false };
+
+/**
+ * Validates a personal cap before it reaches the database. Fails closed: only `null` (no personal cap) or an integer from 0 (blocked)
+ * to MAX_PERSONAL_DAILY_CAP passes. `null` and `0` are different values and neither is ever turned into the other; a string, NaN,
+ * a fraction or anything out of range is refused rather than coerced.
+ */
+export function parsePersonalDailyCap(raw: unknown): PersonalCapParse {
+  if (raw === null) return { ok: true, cap: null };
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0 || raw > MAX_PERSONAL_DAILY_CAP) return { ok: false };
+  return { ok: true, cap: raw === 0 ? 0 : raw }; // -0 is 0
+}
+
 export type CapSource = "default" | "env" | "invalid";
 
 export interface CapResolution {

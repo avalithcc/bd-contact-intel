@@ -26,6 +26,9 @@ const ADMIN_PAGE = `${ADMIN}page.tsx`;
 const ADMIN_ACTIONS = `${ADMIN}actions.ts`;
 // lusha-reveals-drilldown: the "Revelados" card is a client component that only ever sees the library's TYPES.
 const ADMIN_REVEALS_CARD = `${ADMIN}RevealsKpiCard.tsx`;
+// lusha-cap-editor: the cap dialog is a client component too; it gets the credits-per-contact figure, the rail and today's spend as props.
+const ADMIN_CAP_EDITOR = `${ADMIN}LushaCapEditor.tsx`;
+const CAP_TEXT = "src/lib/credits/capText.ts"; // outside src/lib/lusha so the client may import it at runtime
 const LIBRARY_DIR = "src/lib/lusha/";
 const CONFIG = `${LIBRARY_DIR}config.ts`;
 
@@ -87,6 +90,14 @@ test("outside the library, only the actions, the record page, the list (a read-o
   assert.deepEqual(clientRuntime, []);
   // Type-only importers: the dialogs and the two components that pass the view down.
   assert.deepEqual(importers(LIB, outside, true).filter((f) => !importers(LIB).includes(f)), [PANE, ROW, REVEAL_UI, ADMIN_REVEALS_CARD].sort());
+});
+
+test("the cap editor ships no library code to the browser: nothing from src/lib/lusha at runtime, in it or in the helper it shares with the table", () => {
+  assert.ok(isClient(ADMIN_CAP_EDITOR));
+  for (const f of [ADMIN_CAP_EDITOR, CAP_TEXT]) {
+    assert.deepEqual(imports(read(f)).filter((i) => LIB.test(i.path) && !i.typeOnly), [], f);
+  }
+  assert.ok(imports(read(ADMIN_CAP_EDITOR)).some((i) => i.path === "@/lib/credits/capText"), "the live contacts text comes from the shared helper");
 });
 
 test("the API key is read in one place, by server code, and is never public", () => {

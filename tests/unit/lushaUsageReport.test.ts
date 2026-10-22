@@ -47,6 +47,7 @@ const raw = (over: Partial<RawUsageRow> = {}): RawUsageRow => ({
   ur_toggle_by: null,
   ur_toggle_at: null,
   ur_personal_cap: null,
+  ur_today_credits: 0,
   ...over,
 });
 
