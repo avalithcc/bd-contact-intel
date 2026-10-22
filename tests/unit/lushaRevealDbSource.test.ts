@@ -17,7 +17,16 @@ test("the cap is read from the ledger only, never from /v3/account/usage", () =>
 });
 
 // The spend read is a builder (creditSpendQuery) plus the thin reader around it; the compiled SQL is pinned by lushaCreditSpendQuery.test.ts.
-const spendBody = () => code.slice(code.indexOf("const CREDITS = sql.raw"), code.indexOf("export type ReserveResult"));
+// "A credit spent" and "inside a window" live in spendSql.ts (shared with the admin report's per-BD today), so the definitions are read from there.
+const fragments = readFileSync("src/lib/lusha/spendSql.ts", "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+const spendBody = () => fragments + code.slice(code.indexOf("type SpendRow"), code.indexOf("export type ReserveResult"));
+
+test("the admin report counts today with the shared fragments, never a second copy of the credit expression or the window", () => {
+  const admin = readFileSync("src/lib/lusha/adminDb.ts", "utf8");
+  assert.doesNotMatch(admin, /coalesce\(credits_charged, credits_reserved\)/);
+  assert.match(admin, /sum\(\$\{CREDITS\}\)/);
+  assert.match(admin, /\$\{inWindow\(artDayWindow\(now\)\)\}/);
+});
 
 test("the spend sums count coalesce(credits_charged, credits_reserved), never a plain sum(credits_charged), and say it exactly once", () => {
   const body = spendBody();

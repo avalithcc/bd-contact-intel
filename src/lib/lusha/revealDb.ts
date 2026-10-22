@@ -10,6 +10,7 @@ import { activity, company, duplicateCandidate, lushaReveal, person, personPrope
 import { linkedinProfileHref } from "@/lib/contacts/linkedinProfile";
 import { isLushaEnabled } from "./adminDb";
 import { artDayWindow, lushaCycleWindow, planReservation, type CapName, type LushaLimits } from "./cap";
+import { CREDITS, inWindow } from "./spendSql";
 import { pickEmail, pickPhone, pickPhones } from "./parse";
 import type { CanRevealEntry, LushaField } from "./pricing";
 import { planRevealedEmailWrite, planRevealedPhonesWrite } from "./revealPlan";
@@ -36,10 +37,8 @@ export interface CreditSpend {
 
 type SpendRow = { spent_today: string | number | null; spent_cycle: string | number | null; spent_actor_today: string | number | null; personal_cap: string | number | null };
 
-// ONE definition of "a credit spent" and ONE of "today", shared by the team's day sum and the actor's day sum. The actor's sum is the
-// team's plus a predicate, never a second copy: if the two ever diverged, the caps would stop agreeing about what a day is.
-const CREDITS = sql.raw("coalesce(credits_charged, credits_reserved)");
-const inWindow = (w: { start: Date; end: Date }) => sql`at >= ${w.start.toISOString()}::timestamptz and at < ${w.end.toISOString()}::timestamptz`;
+// "A credit spent" and "inside a window" are defined once, in spendSql.ts, shared by the team's day sum, the actor's day sum and the
+// admin report's per-BD today. The actor's sum is the team's plus a predicate, never a second copy.
 
 /**
  * Exported (not executed) so a test can compile it. Credits today and in the billing cycle for the team, and for the acting BD the
