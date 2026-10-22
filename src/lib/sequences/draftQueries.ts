@@ -135,7 +135,7 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const generated = await deps.generate(input, 0);
   if (!generated.ok || !generated.subject || !generated.body) throw new Error(`generation failed: ${generated.ok ? "empty output" : generated.errorKey}`);
   const token = await deps.issueToken({ sequenceMemberId: memberId, email: r.email as string });
-  const draft = composeDraft({ subject: generated.subject, body: generated.body }, audience.address, buildUnsubscribeUrl(deps.siteUrl, token));
+  const draft = composeDraft({ subject: generated.subject, body: generated.body }, audience.address, audience.language, buildUnsubscribeUrl(deps.siteUrl, token));
   if (!draft) throw new Error("no footer for an address that has an audience");
 
   return db.transaction(async (tx) => {

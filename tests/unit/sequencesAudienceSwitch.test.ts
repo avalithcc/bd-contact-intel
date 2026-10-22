@@ -34,7 +34,7 @@ function draftOf(over: Partial<ComplianceAudienceInputs>) {
   const audience = resolveComplianceAudience(inputs(over));
   if (!audience) return null;
   const prompt = buildSequenceDraftInput(ARGS, audience);
-  const draft = composeDraft({ subject: "Hi", body: "Hello there." }, audience.address, URL_OK);
+  const draft = composeDraft({ subject: "Hi", body: "Hello there." }, audience.address, audience.language, URL_OK);
   assert.ok(prompt && draft);
   return { language: prompt.language, body: draft.body, address: audience.address };
 }
@@ -95,7 +95,7 @@ test("a Cuban contact is HELD at every gate: no draft input, no roster add, no s
     { suppressionRules: [], existingPersonIds: new Set(), activeCountByCompany: new Map() },
   );
   assert.deepEqual(roster.rejected, [{ personId: "cu", reason: "unmapped_market" }], "add guard");
-  const footed = composeDraft({ subject: "s", body: "b" }, "miami", URL_OK)!.body;
+  const footed = composeDraft({ subject: "s", body: "b" }, "miami", "en", URL_OK)!.body;
   const facts: PreSendFacts = {
     step: 1, memberState: "approved", draftApproved: true, merged: false, email: "a@b.test", hasClientStatus: false,
     address: (audience as ComplianceAudience | null)?.address ?? null, body: footed, accountStatus: "connected", activeClaim: null, repliedAt: null,
@@ -105,7 +105,7 @@ test("a Cuban contact is HELD at every gate: no draft input, no roster add, no s
 });
 
 test("pre-send re-checks the body against the recomputed address: a Miami body does not pass for Mar del Plata", () => {
-  const miamiBody = composeDraft({ subject: "s", body: "b" }, "miami", URL_OK)!.body;
+  const miamiBody = composeDraft({ subject: "s", body: "b" }, "miami", "en", URL_OK)!.body;
   assert.equal(bodyHasFooter(miamiBody, COMPLIANCE_CONFIG, "miami"), true);
   assert.equal(bodyHasFooter(miamiBody, COMPLIANCE_CONFIG, "mdp"), false);
   assert.equal(footerRemovedOnSave(miamiBody, "mdp"), true);

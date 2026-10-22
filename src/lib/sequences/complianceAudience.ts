@@ -54,9 +54,11 @@ export function fromPostings(markets: readonly (string | null)[] | null | undefi
 }
 
 export type ComplianceAddress = "mdp" | "miami";
+/** The languages a compliance audience can resolve to. A subset of MessageLanguage: "pt" is never emitted here. */
+export type AudienceLanguage = Extract<MessageLanguage, "es" | "en">;
 export interface ComplianceAudience {
   readonly address: ComplianceAddress;
-  readonly language: MessageLanguage;
+  readonly language: AudienceLanguage;
 }
 
 /**

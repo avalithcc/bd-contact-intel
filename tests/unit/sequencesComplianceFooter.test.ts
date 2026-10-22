@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { COMPLIANCE_CONFIG, type ComplianceConfig } from "../../src/lib/sequences/config";
+import { COMPLIANCE_CONFIG, OPT_OUT_TEXT, type ComplianceConfig } from "../../src/lib/sequences/config";
 import { appendFooter, bodyHasFooter, buildFooter } from "../../src/lib/sequences/complianceFooter";
 
 const URL = "https://example.test/unsubscribe/abc123";
@@ -14,8 +14,8 @@ test("config holds the confirmed address for miami and mdp, and nothing else", (
 });
 
 test("the miami address is the Hallandale one, the mdp address the Mar del Plata one", () => {
-  const us = buildFooter(COMPLIANCE_CONFIG, "miami", URL);
-  const latam = buildFooter(COMPLIANCE_CONFIG, "mdp", URL);
+  const us = buildFooter(COMPLIANCE_CONFIG, "miami", "en", URL);
+  const latam = buildFooter(COMPLIANCE_CONFIG, "mdp", "en", URL);
   assert.equal(us.status, "ok");
   assert.equal(latam.status, "ok");
   if (us.status === "ok") assert.ok(us.text.includes(US) && !us.text.includes("Mar del Plata"));
@@ -23,25 +23,25 @@ test("the miami address is the Hallandale one, the mdp address the Mar del Plata
 });
 
 test("the footer carries the opt-out text, the per-recipient link, and the reply path", () => {
-  const footer = buildFooter(COMPLIANCE_CONFIG, "miami", URL);
+  const footer = buildFooter(COMPLIANCE_CONFIG, "miami", "en", URL);
   assert.equal(footer.status, "ok");
   if (footer.status !== "ok") return;
-  assert.ok(footer.text.includes(COMPLIANCE_CONFIG.miami!.optOutText));
+  assert.ok(footer.text.includes(OPT_OUT_TEXT.en));
   assert.ok(footer.text.includes(URL));
   assert.match(footer.text, /reply/i);
 });
 
 test("an address with no entry is explicitly unmapped: no default address, ever", () => {
   const none = "other" as never;
-  assert.deepEqual(buildFooter(COMPLIANCE_CONFIG, none, URL), { status: "unmapped", address: none });
-  assert.deepEqual(appendFooter("Hi", COMPLIANCE_CONFIG, none, URL), { status: "unmapped", address: none });
-  assert.equal(bodyHasFooter(`Hi\n${US}\n${COMPLIANCE_CONFIG.miami!.optOutText}`, COMPLIANCE_CONFIG, none), false);
+  assert.deepEqual(buildFooter(COMPLIANCE_CONFIG, none, "en", URL), { status: "unmapped", address: none });
+  assert.deepEqual(appendFooter("Hi", COMPLIANCE_CONFIG, none, "en", URL), { status: "unmapped", address: none });
+  assert.equal(bodyHasFooter(`Hi\n${US}\n${OPT_OUT_TEXT.en}`, COMPLIANCE_CONFIG, none), false);
 });
 
 test("model output with no address or opt-out still ends up with the footer", () => {
   const generated = "Hi Jane,\n\nWe help teams hire.\n\nCristian";
   assert.equal(bodyHasFooter(generated, COMPLIANCE_CONFIG, "miami"), false);
-  const result = appendFooter(generated, COMPLIANCE_CONFIG, "miami", URL);
+  const result = appendFooter(generated, COMPLIANCE_CONFIG, "miami", "en", URL);
   assert.equal(result.status, "ok");
   if (result.status !== "ok") return;
   assert.ok(result.body.startsWith(generated));
@@ -49,8 +49,8 @@ test("model output with no address or opt-out still ends up with the footer", ()
 });
 
 test("the reminder body gets the same footer as step 1", () => {
-  const step1 = appendFooter("First email", COMPLIANCE_CONFIG, "mdp", URL);
-  const reminder = appendFooter("Just following up", COMPLIANCE_CONFIG, "mdp", URL);
+  const step1 = appendFooter("First email", COMPLIANCE_CONFIG, "mdp", "en", URL);
+  const reminder = appendFooter("Just following up", COMPLIANCE_CONFIG, "mdp", "en", URL);
   assert.equal(step1.status, "ok");
   assert.equal(reminder.status, "ok");
   if (step1.status !== "ok" || reminder.status !== "ok") return;
@@ -58,15 +58,15 @@ test("the reminder body gets the same footer as step 1", () => {
 });
 
 test("a body where the BD deleted the address fails the check", () => {
-  const result = appendFooter("Hi", COMPLIANCE_CONFIG, "miami", URL);
+  const result = appendFooter("Hi", COMPLIANCE_CONFIG, "miami", "en", URL);
   assert.equal(result.status, "ok");
   if (result.status !== "ok") return;
   assert.equal(bodyHasFooter(result.body.replace(US, ""), COMPLIANCE_CONFIG, "miami"), false);
-  assert.equal(bodyHasFooter(result.body.replace(COMPLIANCE_CONFIG.miami!.optOutText, ""), COMPLIANCE_CONFIG, "miami"), false);
+  assert.equal(bodyHasFooter(result.body.replace(OPT_OUT_TEXT.en, ""), COMPLIANCE_CONFIG, "miami"), false);
 });
 
 test("the wrong address does not satisfy the check", () => {
-  const latamBody = appendFooter("Hi", COMPLIANCE_CONFIG, "mdp", URL);
+  const latamBody = appendFooter("Hi", COMPLIANCE_CONFIG, "mdp", "en", URL);
   assert.equal(latamBody.status, "ok");
   if (latamBody.status !== "ok") return;
   assert.equal(bodyHasFooter(latamBody.body, COMPLIANCE_CONFIG, "miami"), false);
@@ -77,7 +77,7 @@ test("changing a configured address changes the footer with no other edit", () =
     ...COMPLIANCE_CONFIG,
     miami: { ...COMPLIANCE_CONFIG.miami!, postalAddress: "Avalith Corporation, 1 New St, Miami, FL 33101, USA" },
   };
-  const footer = buildFooter(changed, "miami", URL);
+  const footer = buildFooter(changed, "miami", "en", URL);
   assert.equal(footer.status, "ok");
   if (footer.status !== "ok") return;
   assert.ok(footer.text.includes("1 New St"));
@@ -88,20 +88,20 @@ import { splitFooter } from "../../src/lib/sequences/complianceFooter";
 
 test("splitFooter cuts a body built by appendFooter at its footer, for both addresses", () => {
   for (const address of ["mdp", "miami"] as const) {
-    const built = appendFooter("Hello Jane,\n\nShort note.", COMPLIANCE_CONFIG, address, URL);
+    const built = appendFooter("Hello Jane,\n\nShort note.", COMPLIANCE_CONFIG, address, "en", URL);
     assert.equal(built.status, "ok");
     if (built.status !== "ok") return;
     const parts = splitFooter(built.body, COMPLIANCE_CONFIG);
     assert.ok(parts, address);
     assert.equal(parts.message, "Hello Jane,\n\nShort note.\n\n");
-    const footer = buildFooter(COMPLIANCE_CONFIG, address, URL);
+    const footer = buildFooter(COMPLIANCE_CONFIG, address, "en", URL);
     assert.equal(footer.status === "ok" && parts.footer, footer.status === "ok" && footer.text);
     assert.equal(parts.message + parts.footer, built.body, "the two halves reassemble the body exactly");
   }
 });
 
 test("splitFooter keys on the dashes AND the configured address: a bare `--` in the message never splits", () => {
-  const built = appendFooter("Line one\n--\nLine two, after a rule", COMPLIANCE_CONFIG, "mdp", URL);
+  const built = appendFooter("Line one\n--\nLine two, after a rule", COMPLIANCE_CONFIG, "mdp", "en", URL);
   assert.equal(built.status, "ok");
   if (built.status !== "ok") return;
   const parts = splitFooter(built.body, COMPLIANCE_CONFIG);

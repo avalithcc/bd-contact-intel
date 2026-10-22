@@ -22,7 +22,7 @@ let n = 0;
 function candidate(over: Partial<ReleaseCandidate> = {}): ReleaseCandidate {
   n += 1;
   const url = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
-  const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", url);
+  const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", "en", url);
   return {
     id: `m-${String(n).padStart(3, "0")}`, accountId: "acc-1", sequenceId: "seq-1", dailyCap: 5, step: 1,
     dueAt: new Date(NINE_AM.getTime() + n * 1000), approvedAt: new Date("2026-10-14T20:00:00Z"),

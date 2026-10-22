@@ -3,7 +3,7 @@
  * model. The footer is attached HERE, by the system, after the model has finished: the model is never asked for an
  * address or an opt-out line, so no prompt rule can be skipped, and the BD approves the exact text that will be sent.
  */
-import type { ComplianceAddress } from "@/lib/sequences/complianceAudience";
+import type { AudienceLanguage, ComplianceAddress } from "@/lib/sequences/complianceAudience";
 import { appendFooter, bodyHasFooter } from "@/lib/sequences/complianceFooter";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
 
@@ -12,9 +12,9 @@ export interface GeneratedEmail {
   body: string;
 }
 
-/** The generated email with the address's footer appended unmodified; null when the address has no config entry. */
-export function composeDraft(generated: GeneratedEmail, address: ComplianceAddress, unsubscribeUrl: string): GeneratedEmail | null {
-  const result = appendFooter(generated.body, COMPLIANCE_CONFIG, address, unsubscribeUrl);
+/** The generated email with the footer (address's postal address, language's opt-out sentence) appended unmodified; null when the address has no config entry. */
+export function composeDraft(generated: GeneratedEmail, address: ComplianceAddress, language: AudienceLanguage, unsubscribeUrl: string): GeneratedEmail | null {
+  const result = appendFooter(generated.body, COMPLIANCE_CONFIG, address, language, unsubscribeUrl);
   return result.status === "ok" ? { subject: generated.subject, body: result.body } : null;
 }
 

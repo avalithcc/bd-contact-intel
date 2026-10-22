@@ -6,34 +6,46 @@
  * Keyed by the ADDRESS the recipient's audience resolves to (resolveComplianceAudience in complianceAudience.ts):
  * "mdp" for Argentina, "miami" for every other located country. The key is mandatory, not a default. A contact with no
  * audience (no location signal, or an embargoed jurisdiction) has NO address: the system refuses to send rather than pick
- * one, because a wrong country's address is still a compliance failure. Do not add a fallback here. The keys are about the
- * postal address only; the language is the audience's other field and is not decided in this file.
+ * one, because a wrong country's address is still a compliance failure. Do not add a fallback here. The keys of
+ * COMPLIANCE_CONFIG are about the postal address only. The opt-out sentence is the audience's OTHER field: it is keyed by
+ * LANGUAGE in OPT_OUT_TEXT below, because the two are independent (a Spanish email can carry the Miami address).
  *
  * `Ste G` is confirmed against the primary Florida record (search.sunbiz.org, document P18000083350). Commercial
  * aggregators report `Ste K`; they are wrong and are not a source for this field.
  */
-import type { ComplianceAddress } from "./complianceAudience";
+import type { AudienceLanguage, ComplianceAddress } from "./complianceAudience";
 
 export interface AddressComplianceEntry {
   /** One line, exactly as it must appear in the message. */
   readonly postalAddress: string;
-  /** The opt-out instruction. The per-recipient link is appended after it by the footer builder. */
-  readonly optOutText: string;
 }
 
 export type ComplianceConfig = Readonly<Partial<Record<ComplianceAddress, AddressComplianceEntry>>>;
 
-const OPT_OUT_TEXT =
-  "If you would rather not receive further emails from us, use the link below or simply reply with \"unsubscribe\".";
+/**
+ * The opt-out instruction, keyed by the audience's language. The per-recipient link is appended after it by the footer
+ * builder. The keys are AudienceLanguage (es | en) on purpose: that is all the compliance audience ever resolves to
+ * (audienceOfCountry, fromPostingBucket). MessageLanguage also has "pt", but that belongs to the one-off message dialog,
+ * which has no footer; a "pt" entry here would be unreachable.
+ *
+ * Each sentence names the word a recipient can reply with ("unsubscribe", "baja"), and that word MUST be one the advisory
+ * detector recognises (PHRASES in optOutPhrases.ts), or we would tell people to do something the system ignores. The
+ * detector also strips every sentence here before matching (ALL_OPT_OUT_TEXTS), so quoting our footer never raises a prompt.
+ */
+export const OPT_OUT_TEXT: Readonly<Record<AudienceLanguage, string>> = {
+  en: "If you would rather not receive further emails from us, use the link below or simply reply with \"unsubscribe\".",
+  es: "Si prefieres no recibir más correos nuestros, usa el enlace de abajo o simplemente responde a este mensaje con la palabra \"baja\".",
+};
+
+/** Every configured sentence in every language: what the send gate accepts and what the detector strips. */
+export const ALL_OPT_OUT_TEXTS: readonly string[] = Object.values(OPT_OUT_TEXT);
 
 export const COMPLIANCE_CONFIG: ComplianceConfig = {
   miami: {
     postalAddress: "Avalith Corporation, 470 Ansin Blvd Ste G, Hallandale, FL 33009, USA",
-    optOutText: OPT_OUT_TEXT,
   },
   mdp: {
     postalAddress: "Avalith, Formosa 2531, B7600 Mar del Plata, Buenos Aires, Argentina",
-    optOutText: OPT_OUT_TEXT,
   },
 };
 
