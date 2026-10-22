@@ -40,6 +40,26 @@ for (const channel of CHANNELS) {
   }
 }
 
+// The call length is a FACT the owner chose (15 minutes), not copy, so it must be the SAME number everywhere the prompt
+// mentions one — rule and exemplar alike, in every language. This is the test that was missing on 2026-10-22: the
+// exemplar was changed to 15 while the closing-ask RULE still said "~20 minutes", and 11 of 11 regenerated drafts asked
+// for 20, because the model follows a rule and is told the exemplar is "tone example only, do not copy verbatim". The
+// register test below could not catch it: it pins /20 minutos/, the SPANISH spelling, while the rules are written in
+// English. So match the unit in BOTH languages, and report whatever wrong figure is found instead of guessing which one.
+const DURATION = /(\d+)[\s-]?minut(?:e|o)s?/gi;
+
+for (const channel of CHANNELS) {
+  for (const language of LANGUAGES) {
+    for (const purpose of channel === "email" ? (["first", "reminder"] as const) : (["first"] as const)) {
+      test(`every call length the ${channel}/${language}/${purpose} prompt mentions is 15 minutes`, () => {
+        const { system } = buildOutreachMessagePrompt({ ...BASE, channel, language, purpose });
+        const wrong = [...system.matchAll(DURATION)].map((m) => m[1]).filter((n) => n !== "15");
+        assert.deepEqual(wrong, [], `the prompt asks for ${wrong.join(", ")} minutes somewhere instead of 15`);
+      });
+    }
+  }
+}
+
 test("the Spanish email exemplar uses the owner-approved call to action verbatim", () => {
   const { system } = buildOutreachMessagePrompt({ ...BASE, channel: "email", language: "es" });
   assert.ok(system.includes("Tendrás 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?"));
