@@ -6,16 +6,20 @@
  *   byte for byte, so a BD without a signature sends exactly what was sent before this existed.
  * - Signature: HTML. Message and footer are escaped like composeEmailBody escapes, EXCEPT the per-recipient unsubscribe
  *   URL, which stays a real `<a href>` (it is the legal opt-out; escaping it into dead text would defeat it).
- * - Footer not found (the BD edited it away): the signature goes at the very end and the text is not rewritten. A footer
- *   is never synthesised here.
+ * - Footer not recognised (the BD edited it beyond a few dashes or blank lines; splitFooter): the signature goes at the very
+ *   end and the text is not rewritten. A footer is never synthesised here. In that case the signature can follow the link.
  *
- * `link` is read from the RAW stored body by the caller's own extraction, so it is the same token the List-Unsubscribe
- * header names.
+ * ONE link, ONE variable. The unsubscribe link is extracted here, from the footer splitFooter identified (the whole body
+ * when there is none), and returned alongside the content. The caller builds the List-Unsubscribe header from that same
+ * `link` and the anchor below is built from it too, so the header and the visible link cannot name different tokens. This
+ * also fixes a pre-existing header bug: extraction used to take the FIRST match in the body, so a body holding two links
+ * (an older footer pasted mid-message) named the wrong token in the header even before signatures existed.
  */
 import type { MessageContent } from "@/lib/gmail/rawMessage";
 import { escapeHtml } from "@/lib/signature/compose";
 import { sanitizeSignatureHtml } from "@/lib/signature/sanitize";
 import { splitFooter } from "./complianceFooter";
+import { extractUnsubscribeUrl } from "./complianceGate";
 import type { ComplianceConfig } from "./config";
 
 function lines(text: string, link: string | null): string {
@@ -25,10 +29,18 @@ function lines(text: string, link: string | null): string {
   return text.split(link).map(escape).join(anchor);
 }
 
-export function composeReleaseBody(body: string, signatureHtml: string | null | undefined, link: string | null, config: ComplianceConfig): MessageContent {
-  const signature = signatureHtml ? sanitizeSignatureHtml(signatureHtml) : "";
-  if (signature === "") return { body };
+export function composeReleaseBody(
+  body: string,
+  signatureHtml: string | null | undefined,
+  config: ComplianceConfig,
+): { link: string | null; content: MessageContent } {
   const parts = splitFooter(body, config);
-  if (!parts) return { bodyHtml: `<div>${lines(body, link)}</div><br><div>${signature}</div>` };
-  return { bodyHtml: `<div>${lines(parts.message.trimEnd(), link)}</div><br><div>${signature}</div><br><div>${lines(parts.footer, link)}</div>` };
+  const link = (parts && extractUnsubscribeUrl(parts.footer)) || extractUnsubscribeUrl(body);
+  const signature = signatureHtml ? sanitizeSignatureHtml(signatureHtml) : "";
+  if (signature === "") return { link, content: { body } };
+  if (!parts) return { link, content: { bodyHtml: `<div>${lines(body, link)}</div><br><div>${signature}</div>` } };
+  return {
+    link,
+    content: { bodyHtml: `<div>${lines(parts.message.trimEnd(), link)}</div><br><div>${signature}</div><br><div>${lines(parts.footer, link)}</div>` },
+  };
 }

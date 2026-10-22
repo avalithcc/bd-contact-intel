@@ -126,3 +126,31 @@ test("composeEmailBody (scheduled and one-off email) is unchanged in both shapes
     bodyHtml: `<div>a &lt; b<br>line</div><br><div>${sanitizeSignatureHtml(SIGNATURE)}</div>`,
   });
 });
+
+test("two different tokens in one body: header, anchor and the real footer's token are the SAME one, and the stale one is not a link", () => {
+  const STALE = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
+  assert.notEqual(STALE, URL_OK);
+  const stored = bodyFor("miami", `Hello,\nold footer pasted by mistake: ${STALE}\nBye`);
+  assert.ok(stored.indexOf(STALE) < stored.indexOf(URL_OK), "the stale link comes FIRST, the case the first-match extraction got wrong");
+  for (const signatureHtml of [SIGNATURE, null]) {
+    const m = buildReleaseMessage(facts({ body: stored, signatureHtml }));
+    assert.equal(m.extraHeaders[0], `List-Unsubscribe: <${URL_OK}>, <mailto:sender@mailbox.test?subject=unsubscribe>`);
+    if (signatureHtml === null) continue;
+    const anchors = [...html(m).matchAll(/<a href="([^"]+)">/g)].map((x) => x[1]).filter((u) => u.includes("/api/unsubscribe"));
+    assert.deepEqual(anchors, [URL_OK]);
+    assert.ok(html(m).includes(STALE), "the stale text is kept, never rewritten");
+  }
+});
+
+test("a hand-edited footer marker still splits, so the signature stays ABOVE the footer", () => {
+  const addr = COMPLIANCE_CONFIG.miami!.postalAddress;
+  const tail = `${addr}\n\n${COMPLIANCE_CONFIG.miami!.optOutText}\n${URL_OK}`;
+  for (const marker of ["-- \n", "--\n\n", "---\n", "--\r\n"]) {
+    const stored = `Hello Jane,\n\nShort note.\n\n${marker}${tail}`;
+    assert.ok(splitFooter(stored, COMPLIANCE_CONFIG), JSON.stringify(marker));
+    const h = html(buildReleaseMessage(facts({ body: stored, signatureHtml: SIGNATURE })));
+    const sig = h.indexOf(sanitizeSignatureHtml(SIGNATURE));
+    assert.ok(h.indexOf("Short note.") < sig && sig < h.indexOf(addr) && sig < h.indexOf(`<a href="${URL_OK}"`), JSON.stringify(marker));
+  }
+  assert.equal(splitFooter("Hi\n--\nJane\nSome Street 1", COMPLIANCE_CONFIG), null, "a bare dashes line without the address still never splits");
+});

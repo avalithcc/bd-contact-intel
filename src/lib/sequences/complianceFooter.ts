@@ -44,8 +44,9 @@ export function bodyHasFooter(body: string, config: ComplianceConfig, address: C
 }
 
 /**
- * Cuts a stored body into the BD's message and the compliance footer. Keys on the dashes line IMMEDIATELY followed by an
- * exact configured postal address, never on a bare `--`: a message can legitimately contain `--` on its own line, and
+ * Cuts a stored body into the BD's message and the compliance footer. Keys on a dashes line (two or more dashes, optional
+ * trailing blanks, optional blank lines: the realistic hand edits) followed by an exact configured postal address, never on
+ * a bare `--`: a message can legitimately contain `--` on its own line, and
  * splitting there would cut the email in the wrong place. The LAST such marker wins, and `message + footer` is always
  * the body unchanged. Null when no footer is present (the BD edited it away): the caller then leaves the text alone.
  */
@@ -53,7 +54,7 @@ export function splitFooter(body: string, config: ComplianceConfig): { message: 
   let cut = -1;
   for (const entry of Object.values(config)) {
     if (!entry) continue;
-    const marker = new RegExp(`(?:^|\\n)--\\r?\\n${entry.postalAddress.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g");
+    const marker = new RegExp(`(?:^|\\n)-{2,}[ \\t]*\\r?\\n(?:[ \\t]*\\r?\\n)*${entry.postalAddress.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g");
     for (const m of body.matchAll(marker)) cut = Math.max(cut, m.index + (m[0].startsWith("\n") ? 1 : 0));
   }
   return cut < 0 ? null : { message: body.slice(0, cut), footer: body.slice(cut) };
