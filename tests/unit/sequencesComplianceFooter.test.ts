@@ -83,3 +83,34 @@ test("changing a configured address changes the footer with no other edit", () =
   assert.ok(footer.text.includes("1 New St"));
   assert.ok(!footer.text.includes("Ansin"));
 });
+
+import { splitFooter } from "../../src/lib/sequences/complianceFooter";
+
+test("splitFooter cuts a body built by appendFooter at its footer, for both addresses", () => {
+  for (const address of ["mdp", "miami"] as const) {
+    const built = appendFooter("Hello Jane,\n\nShort note.", COMPLIANCE_CONFIG, address, URL);
+    assert.equal(built.status, "ok");
+    if (built.status !== "ok") return;
+    const parts = splitFooter(built.body, COMPLIANCE_CONFIG);
+    assert.ok(parts, address);
+    assert.equal(parts.message, "Hello Jane,\n\nShort note.\n\n");
+    const footer = buildFooter(COMPLIANCE_CONFIG, address, URL);
+    assert.equal(footer.status === "ok" && parts.footer, footer.status === "ok" && footer.text);
+    assert.equal(parts.message + parts.footer, built.body, "the two halves reassemble the body exactly");
+  }
+});
+
+test("splitFooter keys on the dashes AND the configured address: a bare `--` in the message never splits", () => {
+  const built = appendFooter("Line one\n--\nLine two, after a rule", COMPLIANCE_CONFIG, "mdp", URL);
+  assert.equal(built.status, "ok");
+  if (built.status !== "ok") return;
+  const parts = splitFooter(built.body, COMPLIANCE_CONFIG);
+  assert.ok(parts);
+  assert.equal(parts.message, "Line one\n--\nLine two, after a rule\n\n");
+  assert.equal(splitFooter("Hi\n--\nJane\nSome Street 1", COMPLIANCE_CONFIG), null);
+});
+
+test("splitFooter returns null when the footer was edited away", () => {
+  assert.equal(splitFooter("Hello, no footer here", COMPLIANCE_CONFIG), null);
+  assert.equal(splitFooter(`Hello\n${LATAM}\n`, COMPLIANCE_CONFIG), null, "the address without the dashes line is not a footer");
+});

@@ -15,7 +15,7 @@
  * re-checks the step's required state, which closes the window in which a BD cancels an approval after the candidates
  * were read. A claim that stays `pending` is never resent (preSendChecks: manual_check).
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { sequenceMember } from "@/db/schema";
 import { sendGmailMessageFromAccount } from "@/lib/gmail/send";
@@ -65,7 +65,7 @@ function toCandidate(r: Row): ReleaseCandidate {
     memberState: r.state as string, draftApproved: true, repliedAt: toDate(r.replied_at), inboundReplyAt: toDate(r.inbound_reply_at), holdReason: (r.hold_reason ?? null) as HoldReason | null,
     email: (r.email ?? null) as string | null, merged: Boolean(r.merged), hasClientStatus: Boolean(r.has_client_status),
     address: resolveComplianceAudience({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] })?.address ?? null,
-    subject: r.subject as string, body: r.body as string, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
+    subject: r.subject as string, body: r.body as string, signatureHtml: (r.signature_html ?? null) as string | null, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
     lastSyncedAt: toDate(r.last_synced_at), activeClaim: (r.active_claim ?? null) as "pending" | "sent" | null, activeClaimAt: toDate(r.active_claim_at),
     step1RfcMessageId: (r.step1_rfc ?? null) as string | null, step1ThreadId: (r.step1_thread ?? null) as string | null,
   };
@@ -74,6 +74,38 @@ function toCandidate(r: Row): ReleaseCandidate {
 const dueWhere = (iso: string) => sql`d.approved_at is not null
         and ((d.step = 1 and sm.state = 'approved' and d.scheduled_for <= ${iso}::timestamptz)
           or (d.step = 2 and sm.state = 'sent' and sm.reminder_due_at <= ${iso}::timestamptz))`;
+
+/**
+ * The facts for exactly the picked (member, step) keys, in ONE statement. `bd` is one more join on the sending account's
+ * owner (a primary-key lookup per row), so the signature costs no extra round trip. Exported so the shape is pinned
+ * without a database.
+ */
+export const buildCandidateFactsQuery = (keys: SQL, iso: string, scoped: SQL) => sql`
+      select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
+             s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
+             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country, p.mobile_phone, p.phone,
+             ${companyCountrySql} as company_country,
+             coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
+                and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets,
+             exists (select 1 from company c where ${sameCompanyAs("c")} and c.client_status is not null) as has_client_status,
+             ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
+             (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,
+             (select cl.claimed_at from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim_at,
+             s1.rfc as step1_rfc, s1.thread as step1_thread, b.signature_html as signature_html
+      from (values ${keys}) as k(id, step)
+      join sequence_draft d on d.sequence_member_id = k.id and d.step = k.step
+      join sequence_member sm on sm.id = d.sequence_member_id
+      join sequence s on s.id = sm.sequence_id
+      join email_account ea on ea.id = s.email_account_id
+      left join bd b on b.id = ea.bd_id
+      join person p on p.id = sm.person_id
+      left join lateral (
+        select coalesce(cl.rfc_message_id, em.rfc_message_id) as rfc, cl.gmail_thread_id as thread
+        from sequence_send_claim cl
+        left join email_message em on em.bd_id = ea.bd_id and em.gmail_message_id = cl.gmail_message_id
+        where d.step = 2 and cl.sequence_member_id = sm.id and cl.step = 1 and cl.outcome = 'sent' limit 1
+      ) s1 on true
+      where ${dueWhere(iso)} ${scoped}`;
 
 /**
  * Approved, due-or-overdue steps: step 1 for `approved` members, the reminder for `sent` members. Two statements: a slim
@@ -114,33 +146,7 @@ export async function loadReleaseCandidates(now: Date, limit = MAX_CANDIDATES, s
   const picked = pickReleaseKeys(slimRows, now, limit);
   if (!picked.keys.length) return { candidates: [], truncated: picked.truncated || slim.length > MAX_SCAN };
   const keys = sql.join(picked.keys.map((k) => sql`(${k.id}::uuid, ${k.step}::int)`), sql`, `);
-  const rows = rowsOf<Row>(
-    await db.execute(sql`
-      select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
-             s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
-             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country, p.mobile_phone, p.phone,
-             ${companyCountrySql} as company_country,
-             coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
-                and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets,
-             exists (select 1 from company c where ${sameCompanyAs("c")} and c.client_status is not null) as has_client_status,
-             ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
-             (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,
-             (select cl.claimed_at from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim_at,
-             s1.rfc as step1_rfc, s1.thread as step1_thread
-      from (values ${keys}) as k(id, step)
-      join sequence_draft d on d.sequence_member_id = k.id and d.step = k.step
-      join sequence_member sm on sm.id = d.sequence_member_id
-      join sequence s on s.id = sm.sequence_id
-      join email_account ea on ea.id = s.email_account_id
-      join person p on p.id = sm.person_id
-      left join lateral (
-        select coalesce(cl.rfc_message_id, em.rfc_message_id) as rfc, cl.gmail_thread_id as thread
-        from sequence_send_claim cl
-        left join email_message em on em.bd_id = ea.bd_id and em.gmail_message_id = cl.gmail_message_id
-        where d.step = 2 and cl.sequence_member_id = sm.id and cl.step = 1 and cl.outcome = 'sent' limit 1
-      ) s1 on true
-      where ${dueWhere(iso)} ${scoped}`),
-  );
+  const rows = rowsOf<Row>(await db.execute(buildCandidateFactsQuery(keys, iso, scoped)));
   return { candidates: rows.map(toCandidate), truncated: picked.truncated || slim.length > MAX_SCAN };
 }
 
