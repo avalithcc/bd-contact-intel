@@ -277,9 +277,9 @@ function referenceStyleFor(isEmail: boolean, language: MessageLanguage): string 
   }
   return isEmail
     ? `Reference style (do not copy verbatim, tone example only, in English, for a FIRST email with no prior history):
-{"subject": "Senior nearshore squads for Affirm", "body": "Hi Gonzalo,\\n\\nI saw Affirm has several open senior backend roles across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. At Avalith we build squads of senior engineers in US-aligned timezones, embedded within days, to add capacity while those roles get filled — we do not compete with your hiring process.\\n\\nWould a 20-minute call next week make sense?\\n\\nCristian Civita, COO at Avalith"}`
+{"subject": "Senior nearshore squads for Affirm", "body": "Hi Gonzalo,\\n\\nI saw Affirm has several open senior backend roles across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. At Avalith we build squads of senior engineers in US-aligned timezones, embedded within days, to add capacity while those roles get filled — we do not compete with your hiring process.\\n\\nWould a 15-minute call next week make sense?\\n\\nCristian Civita, COO at Avalith"}`
     : `Reference style (do not copy verbatim, this is a tone example only, in English, for a FIRST outreach with no prior history):
-"Hi Gonzalo, how's it going? I'm Cristian Civita, COO at Avalith. I was looking at Affirm's open roles and saw you're adding a lot of senior backend people across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. Since 2011 we've been building small teams of senior engineers in US-aligned timezones, embedded within days. It's not meant to replace your hiring, just extra capacity while those roles get filled. Open to a 20-minute chat next week?"`;
+"Hi Gonzalo, how's it going? I'm Cristian Civita, COO at Avalith. I was looking at Affirm's open roles and saw you're adding a lot of senior backend people across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. Since 2011 we've been building small teams of senior engineers in US-aligned timezones, embedded within days. It's not meant to replace your hiring, just extra capacity while those roles get filled. Open to a 15-minute chat next week?"`;
 }
 
 export function buildOutreachMessagePrompt(
@@ -310,7 +310,12 @@ export function buildOutreachMessagePrompt(
     : "Goal: this DM's explicit purpose is to move the conversation off LinkedIn — get the contact's email address, or get them to agree to a short call. Never try to have the entire sales conversation inside LinkedIn DMs.";
 
   const closingAskRule = isEmail
-    ? 'Adapt the closing ask to the contact\'s seniority: if they ARE a decision-maker (leadership role), propose a specific short call (~20 minutes) next week. If they are NOT a clear decision-maker, ask for their perspective or for an intro to whoever manages engineering capacity, and still offer the short call as an option. One low-pressure ask only.'
+    // The duration lives HERE, in a rule, and must stay here: the reference style below is introduced to the model as
+    // "do not copy verbatim, tone example only", so an example cannot pin a number. 2026-10-22: the exemplar was changed
+    // to 15 minutes while this rule still said 20, and 11 of 11 regenerated drafts came out saying 20 — the model
+    // correctly followed the rule and treated the example as style. A number is a FACT the owner chose; keep it in the
+    // rules, and keep every exemplar's figure equal to it so the two can never disagree again.
+    ? 'Adapt the closing ask to the contact\'s seniority: if they ARE a decision-maker (leadership role), propose a specific short call (~15 minutes) next week. If they are NOT a clear decision-maker, ask for their perspective or for an intro to whoever manages engineering capacity, and still offer the short call as an option. One low-pressure ask only.'
     : 'Adapt the closing ask to the contact\'s seniority: if they ARE a decision-maker (leadership role), ask directly for a short call OR their email address, whichever reads more naturally. If they are NOT a clear decision-maker, ask for their perspective or an intro to whoever manages engineering capacity, and mention they can share more by email. One low-pressure ask only — but always steer toward email or a call.';
 
   const outputFormatRule = isEmail
