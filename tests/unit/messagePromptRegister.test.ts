@@ -1,0 +1,62 @@
+/**
+ * Owner decision: no informal voseo or slang in ANY outgoing prospect message, on any channel. These tests pin the
+ * invariant across every (channel x language x purpose) prompt, not one string, so a new slang phrase fails too.
+ */
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { buildOutreachMessagePrompt, type BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
+
+const BASE: BuildOutreachMessagePromptInput = {
+  contact: { firstName: "Ana", lastName: "Gomez", position: "VP Engineering", roleGroup: "eng_leadership", isLeadership: true, connectedOn: "2024-01-01" },
+  company: null,
+  history: [],
+  notes: [],
+  senderName: "Cristian Civita",
+  senderTitle: "COO de Avalith",
+  language: "es",
+  channel: "email",
+};
+
+const CHANNELS = ["email", "linkedin"] as const;
+const LANGUAGES = ["es", "en", "pt"] as const;
+
+// The rejected phrases, pinned by name.
+const REJECTED = [/te cierra/i, /te copa/i, /cómo va\?/i, /charlar/i, /rioplatense/i, /voseo/i];
+// The general rule: voseo conjugations and Argentine colloquialisms. Future-tense "-ás" (tendrás) is valid neutral Spanish, so it is not listed.
+const VOSEO_OR_SLANG =
+  /\b(vos|tenés|querés|podés|sabés|estás viendo|mirá|fijate|contame|decime|vení|dale|che|bárbaro|laburo|copa|charlemos|charlar|te cierra|cómo va)\b/i;
+
+for (const channel of CHANNELS) {
+  for (const language of LANGUAGES) {
+    for (const purpose of channel === "email" ? (["first", "reminder"] as const) : (["first"] as const)) {
+      test(`no voseo or slang in the ${channel}/${language}/${purpose} prompt`, () => {
+        const { system } = buildOutreachMessagePrompt({ ...BASE, channel, language, purpose });
+        for (const re of REJECTED) assert.doesNotMatch(system, re);
+        assert.doesNotMatch(system, VOSEO_OR_SLANG);
+      });
+    }
+  }
+}
+
+test("the Spanish email exemplar uses the owner-approved call to action verbatim", () => {
+  const { system } = buildOutreachMessagePrompt({ ...BASE, channel: "email", language: "es" });
+  assert.ok(system.includes("Tendrás 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?"));
+  assert.doesNotMatch(system, /20 minutos/);
+});
+
+test("the Spanish LinkedIn prompt is neutral, introduces the sender by name and proposes 15 minutes", () => {
+  const { system } = buildOutreachMessagePrompt({ ...BASE, channel: "linkedin", language: "es" });
+  assert.match(system, /neutral, professional Spanish/);
+  assert.match(system, /never use the opening marks "¿" or "¡"/i);
+  assert.match(system, /Soy Cristian Civita, COO de Avalith/);
+  assert.match(system, /15 minutos/);
+});
+
+test("the prompt builder is pure: the same input twice gives the same output", () => {
+  const input = { ...BASE, channel: "linkedin" as const };
+  const snapshot = JSON.stringify(input);
+  const a = buildOutreachMessagePrompt(input);
+  const b = buildOutreachMessagePrompt(input);
+  assert.deepEqual(a, b);
+  assert.equal(JSON.stringify(input), snapshot);
+});
