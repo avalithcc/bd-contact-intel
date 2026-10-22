@@ -421,6 +421,13 @@
       "when": 1794601200000,
       "tag": "0059_crm_live_company_key",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1794687600000,
+      "tag": "0060_bd_lusha_personal_cap",
+      "breakpoints": true
     }
   ]
 }
