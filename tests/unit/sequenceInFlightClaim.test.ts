@@ -11,7 +11,7 @@ import { buildUnsubscribeUrl, generateUnsubscribeToken } from "@/lib/sequences/u
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const body = (() => {
-  const r = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
+  const r = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", "en", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
   return r.status === "ok" ? r.body : "";
 })();
 const facts = (over: Partial<PreSendFacts>): PreSendFacts => ({

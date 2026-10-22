@@ -9,7 +9,7 @@ const URL_OK = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscri
 
 // Fixtures come from the real footer producer, never a hand-typed footer.
 function footed(address: "miami" | "mdp") {
-  const r = appendFooter("Hello Jane, a short note.", COMPLIANCE_CONFIG, address, URL_OK);
+  const r = appendFooter("Hello Jane, a short note.", COMPLIANCE_CONFIG, address, "en", URL_OK);
   assert.equal(r.status, "ok");
   return r.status === "ok" ? r.body : "";
 }

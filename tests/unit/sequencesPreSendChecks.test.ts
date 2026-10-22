@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { appendFooter } from "@/lib/sequences/complianceFooter";
-import { COMPLIANCE_CONFIG, SEQUENCE_SYNC_STALE_MS } from "@/lib/sequences/config";
+import { COMPLIANCE_CONFIG, OPT_OUT_TEXT, SEQUENCE_SYNC_STALE_MS } from "@/lib/sequences/config";
 import {
   evaluatePreSendChecks,
   extractUnsubscribeUrl,
@@ -15,7 +15,7 @@ const URL_OK = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscri
 
 // Fixtures come from the real footer producer, never a hand-typed footer.
 function footed(address: "miami" | "mdp" = "miami") {
-  const r = appendFooter("Hello Jane, a short note.", COMPLIANCE_CONFIG, address, URL_OK);
+  const r = appendFooter("Hello Jane, a short note.", COMPLIANCE_CONFIG, address, "en", URL_OK);
   assert.equal(r.status, "ok");
   return r.status === "ok" ? r.body : "";
 }
@@ -81,7 +81,7 @@ test("a recipient with no compliance address (no audience) is held and never sen
 test("footer: address deleted, opt-out text deleted, or the per-recipient link deleted: held", () => {
   const ok = footed();
   const noAddress = ok.replace(COMPLIANCE_CONFIG.miami!.postalAddress, "");
-  const noOptOut = ok.replace(COMPLIANCE_CONFIG.miami!.optOutText, "");
+  const noOptOut = ok.replace(OPT_OUT_TEXT.en, "");
   const noLink = ok.replace(URL_OK, "");
   for (const body of [noAddress, noOptOut, noLink]) assert.deepEqual(check(facts({ body })), held("missing_footer"));
   assert.deepEqual(check(facts({ body: footed("mdp"), address: "mdp" })), { ok: true });

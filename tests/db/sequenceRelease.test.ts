@@ -36,7 +36,7 @@ async function footedBody(country: "miami" | "mdp" = "miami") {
   const { appendFooter } = await import("@/lib/sequences/complianceFooter");
   const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
   const { buildUnsubscribeUrl, generateUnsubscribeToken } = await import("@/lib/sequences/unsubscribeToken");
-  const r = appendFooter("Hello there", COMPLIANCE_CONFIG, country, buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
+  const r = appendFooter("Hello there", COMPLIANCE_CONFIG, country, "en", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
   assert.equal(r.status, "ok");
   return r.status === "ok" ? r.body : "";
 }

@@ -12,7 +12,7 @@ const URL = "https://example.test/unsubscribe/tok";
 const generated = { subject: "Senior capacity", body: "Hi Ana,\n\nShort pitch.\n\nCristian Civita" };
 
 test("an address gets the footer appended after the body, unmodified", () => {
-  const draft = composeDraft(generated, "miami", URL)!;
+  const draft = composeDraft(generated, "miami", "en", URL)!;
   assert.ok(draft.body.startsWith(generated.body));
   assert.ok(draft.body.endsWith(URL));
   assert.equal(bodyHasFooter(draft.body, COMPLIANCE_CONFIG, "miami"), true);
@@ -20,15 +20,15 @@ test("an address gets the footer appended after the body, unmodified", () => {
 
 test("the footer is added by the system even when the model body has no address", () => {
   assert.equal(bodyHasFooter(generated.body, COMPLIANCE_CONFIG, "miami"), false);
-  assert.equal(bodyHasFooter(composeDraft(generated, "mdp", URL)!.body, COMPLIANCE_CONFIG, "mdp"), true);
+  assert.equal(bodyHasFooter(composeDraft(generated, "mdp", "en", URL)!.body, COMPLIANCE_CONFIG, "mdp"), true);
 });
 
 test("an address with no config entry has no footer to append: composeDraft yields nothing", () => {
-  assert.equal(composeDraft(generated, "nowhere" as never, URL), null);
+  assert.equal(composeDraft(generated, "nowhere" as never, "en", URL), null);
 });
 
 test("saving a body without the footer warns; keeping it does not; another address's footer does not count", () => {
-  const withFooter = composeDraft(generated, "miami", URL)!.body;
+  const withFooter = composeDraft(generated, "miami", "en", URL)!.body;
   assert.equal(footerRemovedOnSave(withFooter, "miami"), false);
   assert.equal(footerRemovedOnSave(generated.body, "miami"), true);
   assert.equal(footerRemovedOnSave(withFooter, "mdp"), true);

@@ -5,8 +5,8 @@
  *
  * An address with no config entry returns an explicit `unmapped` result. There is no default address.
  */
-import type { ComplianceAddress } from "@/lib/sequences/complianceAudience";
-import type { AddressComplianceEntry, ComplianceConfig } from "@/lib/sequences/config";
+import type { AudienceLanguage, ComplianceAddress } from "@/lib/sequences/complianceAudience";
+import { ALL_OPT_OUT_TEXTS, OPT_OUT_TEXT, type AddressComplianceEntry, type ComplianceConfig } from "@/lib/sequences/config";
 
 export type FooterResult = { status: "ok"; text: string } | { status: "unmapped"; address: ComplianceAddress };
 export type AppendResult = { status: "ok"; body: string } | { status: "unmapped"; address: ComplianceAddress };
@@ -15,10 +15,11 @@ function entryFor(config: ComplianceConfig, address: ComplianceAddress): Address
   return Object.hasOwn(config, address) ? (config[address] ?? null) : null;
 }
 
-export function buildFooter(config: ComplianceConfig, address: ComplianceAddress, unsubscribeUrl: string): FooterResult {
+/** The address comes from the ADDRESS key, the opt-out sentence from the LANGUAGE key: two fields of one audience. */
+export function buildFooter(config: ComplianceConfig, address: ComplianceAddress, language: AudienceLanguage, unsubscribeUrl: string): FooterResult {
   const entry = entryFor(config, address);
   if (!entry) return { status: "unmapped", address };
-  return { status: "ok", text: `--\n${entry.postalAddress}\n\n${entry.optOutText}\n${unsubscribeUrl}` };
+  return { status: "ok", text: `--\n${entry.postalAddress}\n\n${OPT_OUT_TEXT[language]}\n${unsubscribeUrl}` };
 }
 
 /** The generated body, then a blank line, then the footer. Used for step 1 and for the reminder. */
@@ -26,21 +27,28 @@ export function appendFooter(
   body: string,
   config: ComplianceConfig,
   address: ComplianceAddress,
+  language: AudienceLanguage,
   unsubscribeUrl: string,
 ): AppendResult {
-  const footer = buildFooter(config, address, unsubscribeUrl);
+  const footer = buildFooter(config, address, language, unsubscribeUrl);
   if (footer.status === "unmapped") return footer;
   return { status: "ok", body: `${body.trimEnd()}\n\n${footer.text}` };
 }
 
 /**
- * Send gate on the FINAL body (after any BD edit): true only when the address's configured address and opt-out text are
- * both still present. False for an address with no entry. The per-recipient link is not checked here: it varies per member.
+ * Send gate on the FINAL body (after any BD edit): true only when the address's configured postal address AND one of the
+ * configured opt-out sentences are both still present. False for an address with no entry. The per-recipient link is not
+ * checked here: it varies per member.
+ *
+ * Deliberately NOT language-dependent: it accepts a sentence in ANY configured language. Its callers (complianceGate,
+ * footerRemovedOnSave) have no language in scope, and every draft stored before the sentence was translated holds the
+ * English one; demanding the Spanish sentence for a Spanish audience would fail those drafts as `missing_footer` and they
+ * could never send. The gate's question is "does this body still carry one of OUR opt-out sentences".
  */
 export function bodyHasFooter(body: string, config: ComplianceConfig, address: ComplianceAddress): boolean {
   const entry = entryFor(config, address);
   if (!entry) return false;
-  return body.includes(entry.postalAddress) && body.includes(entry.optOutText);
+  return body.includes(entry.postalAddress) && ALL_OPT_OUT_TEXTS.some((text) => body.includes(text));
 }
 
 /**

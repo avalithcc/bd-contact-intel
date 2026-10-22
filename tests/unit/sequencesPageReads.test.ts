@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { groupListRows, replyPhrases, toMembership, toPickerContact, type ListDbRow, type PickerDbRow } from "@/lib/sequences/pageReads";
 import { listView } from "@/lib/sequences/listView";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
-import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
+import { COMPLIANCE_CONFIG, OPT_OUT_TEXT } from "@/lib/sequences/config";
 import { pickerView, toggleOne } from "@/lib/sequences/pickerView";
 import { t } from "@/lib/i18n/dictionaries";
 
@@ -119,7 +119,7 @@ test("replyPhrases raises the prompt on any reply, keeps the first phrase per me
 });
 
 test("our own footer quoted back in a reply does not raise the prompt", () => {
-  const footer = COMPLIANCE_CONFIG.miami!.optOutText;
+  const footer = OPT_OUT_TEXT.en;
   assert.deepEqual(replyPhrases([{ member_id: "m1", body_text: `Interesting, tell me more.\n\n${footer}` }]), {});
 });
 

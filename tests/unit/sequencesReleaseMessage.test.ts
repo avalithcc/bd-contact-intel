@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { appendFooter } from "@/lib/sequences/complianceFooter";
-import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
+import { COMPLIANCE_CONFIG, OPT_OUT_TEXT } from "@/lib/sequences/config";
 import { buildReleaseMessage, type ReleaseMessageFacts } from "@/lib/sequences/releaseMessage";
 import { buildUnsubscribeUrl, generateUnsubscribeToken } from "@/lib/sequences/unsubscribeToken";
 
 const URL_OK = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
-const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", URL_OK);
+const footed = appendFooter("Hello", COMPLIANCE_CONFIG, "miami", "en", URL_OK);
 const body = footed.status === "ok" ? footed.body : "";
 
 const facts = (over: Partial<ReleaseMessageFacts> = {}): ReleaseMessageFacts => ({
@@ -44,7 +44,7 @@ import { composeEmailBody } from "@/lib/signature/compose";
 
 const SIGNATURE = '<table><tr><td><b>Jane Doe</b><br>BD Lead<br><a href="https://avalith.net">avalith.net</a></td></tr></table>';
 const bodyFor = (address: "mdp" | "miami", text = "Hello Jane,\n\nShort <note> & more.") => {
-  const r = appendFooter(text, COMPLIANCE_CONFIG, address, URL_OK);
+  const r = appendFooter(text, COMPLIANCE_CONFIG, address, "en", URL_OK);
   assert.equal(r.status, "ok");
   return r.status === "ok" ? r.body : "";
 };
@@ -154,7 +154,7 @@ test("two different tokens in one body: header, anchor and the real footer's tok
 
 test("a hand-edited footer marker still splits, so the signature stays ABOVE the footer", () => {
   const addr = COMPLIANCE_CONFIG.miami!.postalAddress;
-  const tail = `${addr}\n\n${COMPLIANCE_CONFIG.miami!.optOutText}\n${URL_OK}`;
+  const tail = `${addr}\n\n${OPT_OUT_TEXT.en}\n${URL_OK}`;
   for (const marker of ["-- \n", "--\n\n", "---\n", "--\r\n"]) {
     const stored = `Hello Jane,\n\nShort note.\n\n${marker}${tail}`;
     assert.ok(splitFooter(stored, COMPLIANCE_CONFIG), JSON.stringify(marker));
