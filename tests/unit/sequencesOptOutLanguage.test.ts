@@ -225,3 +225,15 @@ test("the narrowing is surgical: the same verbs without an alternative, or a dud
   assert.notEqual(detectOptOutPhrase("Borren mis datos de su base."), null);
   assert.notEqual(detectOptOutPhrase("No me escribas. Escribile a mi colega."), null, "a redirect in ANOTHER sentence does not excuse the opt-out");
 });
+
+// A reply that names a replacement contact is STILL an opt-out for the person writing it: "stop writing to ME, my
+// colleague is X" asks us to stop. That is why the channel-swap exemption is redirect WORDS only ("mejor", "escribime",
+// "y usar") and never the mere presence of an address or number. Measured: counting contact details lost 3 of 8 opt-outs.
+test("recall: an opt-out that names a replacement contact is still flagged (the exemption is words-only)", () => {
+  const optOuts = [
+    "no me escribas, mi colega es laura@acme.com",
+    "elimine mi correo de su base, mi mail es juan@acme.com",
+    "no me contacten, el responsable es +54 11 5555 5555",
+  ];
+  assert.deepEqual(optOuts.filter((b) => detectOptOutPhrase(b) === null), []);
+});

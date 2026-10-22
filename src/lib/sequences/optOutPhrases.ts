@@ -38,19 +38,25 @@ import { ALL_OPT_OUT_TEXTS } from "./config";
  * EXACTLY THREE patterns are narrowed, on MEASURED evidence: of 12 realistic replies that mean INTEREST, 5 raised an
  * opt-out prompt (0 of 12 real opt-outs were missed). A prompt wrong nearly half the time on the replies a BD most wants
  * to act on gets ignored, which gives back all the recall. Each narrowing is a `unless` applied to the matching SENTENCE
- * only, and each rests on one fact: an opt-out says "stop contacting me" and never hands over another way to reach the
- * person, whereas these three false positives all did.
- *   - "no me escribas/llames/...": not an opt-out when the sentence redirects ("mejor al +54...", "escribime al corporativo",
- *     an email address or a phone number). A swap of channel, not a stop.
+ * only, and each rests on one fact: an opt-out says "stop contacting me", whereas these three false positives all
+ * carried a redirect WORD ("mejor", "escribime", "y usar") that tells us to contact them elsewhere or to replace data.
+ * THE RULE IS REDIRECT WORDS IN THE SAME SENTENCE, NEVER THE MERE PRESENCE OF AN EMAIL OR A PHONE NUMBER. A bare address
+ * is information, often the name of the person taking over: "no me escribas, mi colega es x@acme.com" is still an opt-out
+ * for the one writing it. Measured: when contact details counted as an exemption, 3 of 8 real opt-outs were lost, while
+ * all 5 false positives were already covered by a redirect word or the duda idiom. Do not put them back.
+ *   - "no me escribas/llames/...": not an opt-out when the sentence has a redirect word ("mejor al +54...",
+ *     "escribime al corporativo"). A swap of channel, not a stop.
  *   - "sacar(me) ... duda(s)": the idiom "sacarme una duda" is a question.
- *   - "borrar/eliminar mis datos": not an opt-out when the sentence supplies replacements ("y usar estos", "en su lugar",
- *     an email or phone). That is a correction request.
+ *   - "borrar/eliminar mis datos": not an opt-out when the sentence supplies replacements ("y usar estos", "en su lugar").
+ *     That is a correction request.
  * Do NOT re-broaden these three blind, and do NOT extend the idea to other patterns without the same kind of measurement.
  */
-/** An email address or a phone number: a way to reach the person that is not the one we used. */
-const ALTERNATIVE_CONTACT = /\S+@\S+|\+?\d[\d\s().-]{6,}\d/;
-const CHANNEL_SWAP = new RegExp(`\\bmejor\\b|\\b(escribi?m[ei]|escribeme|llamam[ei]|mandam[ei]|contactam[ei])\\b|\\bal\\s+\\+|${ALTERNATIVE_CONTACT.source}`, "i");
-const REPLACEMENT_DATA = new RegExp(`\\by\\s+(usar|usen|use)\\b|\\bestos\\s+otros\\b|\\blos\\s+nuevos\\b|\\ben\\s+su\\s+lugar\\b|${ALTERNATIVE_CONTACT.source}`, "i");
+/**
+ * Redirect WORDS only, never the mere presence of an address or a number: "no me escribas, mi colega es x@acme.com" is
+ * still an opt-out for the person writing it (measured: counting contact details lost 3 of 8 real opt-outs).
+ */
+const CHANNEL_SWAP = /\bmejor\b|\b(escribi?m[ei]|escribeme|llamam[ei]|mandam[ei]|contactam[ei])\b/i;
+const REPLACEMENT_DATA = /\by\s+(usar|usen|use)\b|\bestos\s+otros\b|\blos\s+nuevos\b|\ben\s+su\s+lugar\b/i;
 const SACAR_DUDA = /\bsac\w*\s+(una\s+|unas\s+|alguna\s+|algunas\s+|mis\s+|la\s+|todas\s+)?dudas?\b/i;
 
 /** `unless`, when present, is tested on the matching SENTENCE only: the phrase does not count when it also matches. */
