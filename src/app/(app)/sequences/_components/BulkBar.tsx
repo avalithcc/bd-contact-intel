@@ -17,7 +17,7 @@ import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendC
  * "Aprobar y enviar ahora los N" is the shared split button (one choice for all N); before the BD confirms, a warning says how many
  * leave now and how many wait because of the account's daily cap.
  */
-export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date }) {
+export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, generating = false }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; generating?: boolean }) {
   const v = bulkBarView(selection);
   if (!v.visible) return null;
   const one = v.selected === 1;
@@ -34,7 +34,8 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           small
           labels={send.labels}
           primaryLabel={fill(one ? l.bulkApproveNowOne : l.bulkApproveNow, n)}
-          disabled={!v.approveEnabled}
+          disabled={!v.approveEnabled || generating}
+          title={generating ? l.generateBulkWaitTitle : undefined}
           busy={send.busy}
           error={send.error}
           schedule={approvalSchedule(send, recipients, "bulk", v.selected)}

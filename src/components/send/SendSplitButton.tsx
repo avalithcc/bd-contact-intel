@@ -29,6 +29,7 @@ export function SendSplitButton({
   small = false,
   stackAdvice = false,
   disabled = false,
+  title,
   busy = false,
   placement = "up",
   schedule,
@@ -43,6 +44,8 @@ export function SendSplitButton({
   /** Puts the send-time warning under the button instead of beside it: for a card's actions column. */
   stackAdvice?: boolean;
   disabled?: boolean;
+  /** Why the control is disabled; shown on the group because a disabled button shows no tooltip in some browsers. */
+  title?: string;
   busy?: boolean;
   placement?: "up" | "down";
   schedule: ScheduleConfig;
@@ -126,7 +129,7 @@ export function SendSplitButton({
     <span className="foot-anchor" style={stackAdvice ? { flexDirection: "column-reverse", alignItems: "flex-end", gap: "var(--space-2xs)" } : undefined} ref={rootRef} onKeyDown={onKeyDown} data-busy={flight.kind ? "true" : undefined}>
       {nowAdvice && !popOpen && <SendAdviceChip labels={l} advice={nowAdvice} />}
       <span className="anchor-split">
-        <span className="btn-group split-btn" role="group" aria-label={l.groupLabel} aria-busy={working ? "true" : undefined}>
+        <span className="btn-group split-btn" role="group" title={disabled ? title : undefined} aria-label={l.groupLabel} aria-busy={working ? "true" : undefined}>
           <button type="button" className={`btn btn-primary${size}`} disabled={disabled || working} onClick={sendNow}>
             {flight.kind ? <span className="spinner" aria-hidden="true" /> : <SendIcon className="icon" />}
             {primaryText}

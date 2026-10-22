@@ -1,5 +1,6 @@
 import { isReadOnlyView } from "@/lib/sequences/readOnly";
 import { fill } from "@/lib/sequences/viewText";
+import { generationLock } from "@/lib/sequences/generationLock";
 import { EyeIcon } from "@/components/icons";
 import { sequenceStats } from "@/lib/sequences/stats";
 import type { ReactNode } from "react";
@@ -28,13 +29,17 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, 
   // An admin reads another BD's Sequence (audited): the cards must not word its approvals as the reader's own.
   const readOnly = isReadOnlyView(viewerBdId, detail.ownerBdId);
   const ownView = !readOnly;
+  const lock = generationLock(generatingId, detail.members, labels.unnamed);
   const stats = sequenceStats(detail.members.map((m) => ({ state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null })));
   return (
     <>
       {readOnly && (
         <div className="alert alert-neutral mb-lg" role="note"><EyeIcon className="icon" /><div><span className="title">{fill(labels.readOnlyTitle, { owner: detail.ownerName })}</span> {labels.readOnlyBody}</div></div>
       )}
-      <SequenceHeader name={detail.name} memberCount={stats.total} readyCount={stats.toReview} labels={labels} onAction={onAction} readOnly={readOnly ? { ownerName: detail.ownerName, fromAddress: detail.fromAddress } : null} />
+      <SequenceHeader name={detail.name} memberCount={stats.total} readyCount={stats.toReview} labels={labels} onAction={onAction} readOnly={readOnly ? { ownerName: detail.ownerName, fromAddress: detail.fromAddress } : null} generating={lock.bulkApproveDisabled} />
+      {lock.active && (
+        <div className="alert alert-info mb-lg" role="status"><span className="spinner-standalone" aria-hidden="true" /><div><strong>{fill(labels.generatingBannerTitle, { name: lock.generatingName ?? "" })}</strong> {labels.generatingBannerBody} <span className="meta">{labels.generatingBannerFail}</span></div></div>
+      )}
       {stats.view === "live" && <StatCards stats={stats} now={now} labels={labels} />}
       {stats.view !== "empty" && <ProgressLine stats={stats} finished={stats.view === "finished"} labels={labels} />}
       {stats.view !== "finished" && <CadenceCard schedule={detail.schedule} labels={labels} onAction={onAction} readOnly={readOnly} />}
@@ -43,7 +48,7 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, 
       <h2 className={stats.view !== "live" ? "mt-2xl mb-lg" : "mb-lg"}>{labels.membersTitle}</h2>
       {!readOnly && bulk}
       <div className="stack">
-        {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} readOnly={readOnly} optOutPhrase={optOutPhrases[m.memberId] ?? null} generating={generatingId === m.memberId} send={send} selection={!readOnly && selected && onToggle ? { selected: selected.has(m.memberId), onToggle: () => onToggle(m.memberId) } : undefined} />)}
+        {detail.members.map((m) => <MemberCard key={m.memberId} member={m} now={now} labels={labels} onAction={onAction} ownView={ownView} readOnly={readOnly} optOutPhrase={optOutPhrases[m.memberId] ?? null} generation={lock} send={send} selection={!readOnly && selected && onToggle ? { selected: selected.has(m.memberId), onToggle: () => onToggle(m.memberId) } : undefined} />)}
       </div>
     </>
   );

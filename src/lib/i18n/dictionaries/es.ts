@@ -3419,6 +3419,12 @@ export const es: typeof en = {
     introTail: "Enviada desde tu cuenta de Gmail y registrada en la ficha de cada contacto.",
     editSequence: "Editar secuencia",
     generating: "Generando…",
+    // Shown while a draft is being generated (sequence-generating-lock): the banner and the reasons a control is locked.
+    generatingBannerTitle: "Generando el borrador de {name}.",
+    generatingBannerBody: "Tarda unos 10-15 segundos. Podés seguir leyendo los borradores que ya están listos; lo que no vas a poder es pedir otro borrador hasta que este termine.",
+    generatingBannerFail: "Si falla, te avisamos y el contacto queda como estaba.",
+    generateWaitTitle: "Esperá a que termine el borrador de {name}",
+    generateBulkWaitTitle: "Esperá a que termine el borrador en curso",
     approveReady: "Aprobar los {n} listos",
     approveReadyOne: "Aprobar el listo",
     statReview: "Borradores por revisar",

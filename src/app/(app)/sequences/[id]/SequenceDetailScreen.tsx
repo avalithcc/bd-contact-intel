@@ -12,6 +12,7 @@ import type { SendChoice } from "@/lib/sequences/sendMoment";
 import { releaseToast, sendRecipients, type ReleaseToast } from "@/lib/sequences/sendUi";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
+import { generationLock } from "@/lib/sequences/generationLock";
 import { isReadOnlyAction, isReadOnlyView } from "@/lib/sequences/readOnly";
 import { agoText, fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import {
@@ -83,6 +84,23 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       return undefined;
     } finally {
       setBusy(false);
+    }
+  }
+  /**
+   * Runs one draft generation or regeneration with `generatingId` set, which locks every other generate affordance and shows
+   * the banner (generationLock.ts). It deliberately does NOT raise `busy`: that flag disables the send controls of EVERY card,
+   * and approving another contact's draft is allowed while this one is written. A thrown error is the generic failure and
+   * the id is always cleared, so the banner disappears on success AND on failure.
+   */
+  async function whileGenerating<T>(memberId: string, work: () => Promise<T>): Promise<T | undefined> {
+    setGeneratingId(memberId);
+    try {
+      return await work();
+    } catch {
+      fail();
+      return undefined;
+    } finally {
+      setGeneratingId(null);
     }
   }
   const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setError(null); setSendError(null); };
@@ -170,16 +188,14 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
    * shown; if the server reports an edit again, the dialog opens again instead of looping silently.
    */
   async function regenerateOne(memberId: string, confirmed: Record<string, number> = {}) {
-    const r = await guarded(() => regenerateSequenceDrafts(detail.id, [memberId], confirmed));
+    const r = await whileGenerating(memberId, () => regenerateSequenceDrafts(detail.id, [memberId], confirmed));
     if (r?.ok && r.skippedEdited[0]) setRegen({ skipped: r.skippedEdited[0], step: 1, review: false });
     return reportBatch(r, l.toastRegenerated, l.toastRegeneratedMany);
   }
 
-  /** One card, one draft: the button is disabled and reads "Generando…" until this member's own call returns. */
+  /** One draft at a time: this card reads "Generando…" and every other generate control waits until the call returns. */
   async function generateOne(memberId: string) {
-    setGeneratingId(memberId);
-    const r = await guarded(() => generateMemberDraft(detail.id, memberId));
-    setGeneratingId(null);
+    const r = await whileGenerating(memberId, () => generateMemberDraft(detail.id, memberId));
     if (r?.ok && r.generated.length === 0 && r.failed.length === 0) showToast(l.toastGeneratedNone, "success");
     await reportBatch(r, l.toastGeneratedOne, l.toastGeneratedOne);
   }
@@ -238,7 +254,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     }
     if (a.type === "regenerate") {
       const confirmed = a.confirmedEdits ?? {};
-      const r = await guarded(() => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed)), setError);
+      const r = await guarded(() => whileGenerating(a.memberId, () => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed))), setError);
       if (!r) return;
       if (r.ok && r.skippedEdited[0]) return setRegen({ skipped: r.skippedEdited[0], step: a.step, review: true });
       if (r.ok && r.generated.length > 0) { showToast(l.toastRegenerated, "success"); closeDialogs(); } else setError(l.actionFailed);
@@ -320,7 +336,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
         generatingId={generatingId} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
         bulk={readOnly ? null : <BulkBar selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} />}
       />
-      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} error={error} send={{ ...send, error }} />
+      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={generationLock(generatingId, detail.members, l.unnamed).active} error={error} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
       {regen && (

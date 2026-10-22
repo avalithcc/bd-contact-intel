@@ -22,6 +22,8 @@ const ROOT = join(__dirname, "..", "..");
 const APPROVED = join(ROOT, "openspec/changes/crm-hubspot-ux/mockups/styles.css");
 // The send-now-or-schedule mockup brings its own classes (split button, schedule popover) in an inline <style>; they were promoted to design-system.css.
 const SEND_MOCKUP = join(ROOT, "openspec/changes/send-now-or-schedule/mockups/enviar-o-programar.html");
+// The persistent "Generando…" banner reuses the standalone spinner the email-sync mockup defined (promoted to design-system.css).
+const SPINNER_MOCKUP = join(ROOT, "openspec/changes/email-sync/mockups/email-sync.html");
 const inlineStyle = (file: string) => (readFileSync(file, "utf8").match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "");
 // Both are imported globally by src/app/layout.tsx; a CSS module (page.module.css) is scoped and does not count.
 const SHIPPED = [join(ROOT, "src/app/design-system.css"), join(ROOT, "src/app/globals.css")];
@@ -124,7 +126,7 @@ test("the fixture renders every card kind, so the class check below is not vacuo
 
 for (const [name, paths] of [["approved mockup styles.css", [APPROVED]], ["shipped global CSS (design-system.css + globals.css)", SHIPPED]] as const) {
   test(`every class the Sequence components use exists in the ${name}`, () => {
-    const known = classesInStylesheet(paths.map((p) => readFileSync(p, "utf8")).join("\n") + (paths === SHIPPED ? "" : inlineStyle(SEND_MOCKUP)));
+    const known = classesInStylesheet(paths.map((p) => readFileSync(p, "utf8")).join("\n") + (paths === SHIPPED ? "" : inlineStyle(SEND_MOCKUP) + inlineStyle(SPINNER_MOCKUP)));
     const used = classesInSources();
     for (const html of Object.values(STATES)) for (const c of renderedClasses(html)) used.add(c);
     assert.ok(used.size > 20, `expected a realistic number of classes, got ${used.size}`);
