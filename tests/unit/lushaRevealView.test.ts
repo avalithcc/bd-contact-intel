@@ -16,11 +16,11 @@ const LUSHA = { name: "Julian Marchetti", company: "Aumenta GT", domain: "www.au
 const row = (over: Partial<LedgerRow>): LedgerRow => ({ id: "r", searchId: "s1", at: new Date("2026-10-14T15:00:00Z"), field: "search", state: "settled", outcome: null, value: null, payload: {}, ...over });
 const SEARCH = row({ id: "s1", outcome: "matched", payload: { identity: LUSHA, canReveal: [{ field: "emails", credits: 1 }, { field: "phones", credits: 5 }] } });
 const build = (rows: LatestRows, over: { person?: Partial<ViewPerson>; spent?: number; config?: LushaConfigResult; enabled?: boolean } = {}) =>
-  buildLushaView({ config: over.config ?? ON, enabled: over.enabled ?? true, rows, spentToday: over.spent ?? 0, spentCycle: over.spent ?? 0, dailyCap: 12, monthlyCap: 400, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: { ...EMPTY, ...over.person }, crm: CRM, companyHref: "/companies/aument", formatDay: () => "14 oct" })!;
+  buildLushaView({ config: over.config ?? ON, enabled: over.enabled ?? true, rows, spentToday: over.spent ?? 0, spentCycle: over.spent ?? 0, dailyCap: 12, monthlyCap: 400, actorSpentToday: 0, personalCap: null, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: { ...EMPTY, ...over.person }, crm: CRM, companyHref: "/companies/aument", formatDay: () => "14 oct" })!;
 const ctl = (v: ReturnType<typeof build>, f: "emails" | "phones") => v[f].control && [v[f].control!.kind, v[f].control!.price, v[f].control!.disabled];
 
 test("outside production nothing is built at all", () => {
-  assert.equal(buildLushaView({ config: { ok: false, reason: "not_production" }, enabled: true, rows: {}, spentToday: 0, spentCycle: 0, dailyCap: 12, monthlyCap: 400, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "" }), null);
+  assert.equal(buildLushaView({ config: { ok: false, reason: "not_production" }, enabled: true, rows: {}, spentToday: 0, spentCycle: 0, dailyCap: 12, monthlyCap: 400, actorSpentToday: 0, personalCap: null, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "" }), null);
 });
 
 test("state 10: without the key both controls are disabled, unpriced, and only the email row names the variable", () => {
@@ -213,8 +213,8 @@ test("a second Lusha number the Contact no longer holds, or never got, is not ma
 });
 
 test("an exhausted cycle disables the controls, says it is the monthly cap and when it renews; the daily rail stays 'capped'", () => {
-  const monthly = buildLushaView({ config: ON, enabled: true, rows: { search: SEARCH }, spentToday: 1, spentCycle: 399, dailyCap: 60, monthlyCap: 400, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "21 nov" })!;
+  const monthly = buildLushaView({ config: ON, enabled: true, rows: { search: SEARCH }, spentToday: 1, spentCycle: 399, dailyCap: 60, monthlyCap: 400, actorSpentToday: 0, personalCap: null, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "21 nov" })!;
   assert.deepEqual([ctl(monthly, "phones"), monthly.phones.note, monthly.emails.note, monthly.cycleResetsOn], [["reveal", 5, true], "capped_monthly", null, "21 nov"]);
-  const daily = buildLushaView({ config: ON, enabled: true, rows: { search: SEARCH }, spentToday: 58, spentCycle: 100, dailyCap: 60, monthlyCap: 400, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "21 nov" })!;
+  const daily = buildLushaView({ config: ON, enabled: true, rows: { search: SEARCH }, spentToday: 58, spentCycle: 100, dailyCap: 60, monthlyCap: 400, actorSpentToday: 0, personalCap: null, cycleEnd: new Date("2026-11-21T03:00:00.000Z"), person: EMPTY, crm: CRM, companyHref: null, formatDay: () => "21 nov" })!;
   assert.deepEqual([daily.phones.note, daily.emails.note], ["capped", null]);
 });

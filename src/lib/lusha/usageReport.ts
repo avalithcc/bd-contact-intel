@@ -2,6 +2,7 @@
 // No DB here (usageReportDb queries, adminDb.ts). Raw `sql` rows arrive with strings for bigint aggregates and timestamps.
 
 import { parseDbTimestamp } from "@/lib/db/timestamp";
+import { contactsWithinCredits } from "./cap";
 import { addDaysToDateString, argentinaCalendarDate, argentinaInstantBoundary } from "@/lib/tasks/argentinaDate";
 
 export const REPORT_PERIODS = ["week", "month", "quarter"] as const;
@@ -60,6 +61,7 @@ export interface RawUsageRow {
   ur_last_use: Stamp | null;
   ur_toggle_by: string | null;
   ur_toggle_at: Stamp | null;
+  ur_personal_cap: number | string | null;
 }
 
 export interface UsageRow {
@@ -81,6 +83,8 @@ export interface UsageRow {
   /** Who last flipped the switch, and when. */
   toggledByName: string | null;
   toggledAt: Date | null;
+  /** This BD's own daily cap in CREDITS (drizzle/0060): null = none, 0 = blocked. Not a contact count: see CREDITS_PER_CONTACT. */
+  personalDailyCap: number | null;
 }
 
 const date = (v: Stamp | null): Date | null => (v === null ? null : parseDbTimestamp(v));
@@ -101,6 +105,7 @@ export function mapUsageRow(r: RawUsageRow): UsageRow {
     lastUseAt: date(r.ur_last_use),
     toggledByName: r.ur_toggle_by,
     toggledAt: date(r.ur_toggle_at),
+    personalDailyCap: r.ur_personal_cap === null ? null : Number(r.ur_personal_cap),
   };
 }
 
@@ -130,3 +135,25 @@ export const isNewBd = (r: Pick<UsageRow, "lushaEnabled" | "toggledAt" | "create
   !r.lushaEnabled && r.toggledAt === null && now.getTime() - r.createdAt.getTime() < NEW_BD_DAYS * 86_400_000;
 
 export const shareOf = (credits: number, total: number): number => (total > 0 ? Math.round((credits / total) * 100) : 0);
+
+interface PersonalCapCopy {
+  personalCap: string;
+  personalCapOne: string;
+  personalContacts: string;
+  personalContactsOne: string;
+  personalContactsNone: string;
+  personalContactsBlocked: string;
+}
+
+/**
+ * The two halves of the "Tope propio" line: the cap in credits, and what it buys in contacts. A credit cap is shown with its contacts
+ * equivalent every time (CREDITS_PER_CONTACT), or "12" reads as 12 contacts when it is 6.
+ */
+export function personalCapLines(credits: number, d: PersonalCapCopy): { headline: string; contacts: string } {
+  const n = contactsWithinCredits(credits);
+  return {
+    headline: credits === 1 ? d.personalCapOne : d.personalCap.replace("{cap}", String(credits)),
+    // 0 is the kill switch, not a small allowance: the admin must read it as blocked.
+    contacts: credits === 0 ? d.personalContactsBlocked : n === 0 ? d.personalContactsNone : n === 1 ? d.personalContactsOne : d.personalContacts.replace("{n}", String(n)),
+  };
+}

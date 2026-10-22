@@ -95,7 +95,7 @@ test("cycle window: start 28 in February", () => {
   assert.deepEqual(cycle("2027-02-27T12:00:00.000Z", 28), ["2027-01-28T03:00:00.000Z", "2027-02-28T03:00:00.000Z"]);
 });
 
-const caps = { dailyCap: 60, monthlyCap: 400 };
+const caps = { dailyCap: 60, monthlyCap: 400, actorSpentToday: 0, personalCap: null };
 
 test("both caps pass: allowed, remaining is the tighter of the two", () => {
   assert.deepEqual(evaluateCaps({ spentToday: 10, spentCycle: 390 - 340, ...caps, expected: 5 }), { allowed: true, remaining: 50 });
@@ -141,6 +141,6 @@ test("planReservation: passes only when it fits under both", () => {
 });
 
 test("planReservation: a kill-switch monthly cap of 0 refuses everything", () => {
-  const r = planReservation({ field: "emails", canReveal: PRICES, spentToday: 0, spentCycle: 0, dailyCap: 60, monthlyCap: 0 });
+  const r = planReservation({ field: "emails", canReveal: PRICES, spentToday: 0, spentCycle: 0, dailyCap: 60, monthlyCap: 0, actorSpentToday: 0, personalCap: null });
   assert.deepEqual(r, { ok: false, reason: "cap_exceeded", cap: "monthly", remaining: 0 });
 });

@@ -53,7 +53,7 @@ export type RevealState =
   | { kind: "rejected"; retryCost: number }
   | { kind: "blocked" }
   | { kind: "revealed"; value: string | null }
-  | { kind: "capped"; /** Which cap refused: the daily one resets tomorrow, the monthly one on the cycle date. */ cap: CapName; remaining: number; needed: number };
+  | { kind: "capped"; /** Which cap refused: the daily and personal ones reset tomorrow, the monthly one on the cycle date. */ cap: CapName; remaining: number; needed: number };
 
 /**
  * How old a `reserved` row must be before it is definitively stranded. A reservation is only ever settled by the function

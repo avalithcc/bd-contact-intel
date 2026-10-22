@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tope propio por BD · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions. NOT in crm-hubspot-ux/mockups/styles.css.
+   All of them already EXIST in the app (src/app/design-system.css, shipped with
+   reports-bd-filter-drilldown and reports-kpi-drilldown); they are repeated here
+   only because the mockup stylesheet predates them. Nothing below is new CSS. */
+
+/* src/app/design-system.css:782-789 */
+.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; color: var(--color-ink); }
+.stat-clickable:hover, .stat-clickable:focus-visible, .stat-clickable.is-hover { border-color: var(--color-accent-strong); }
+.stat-clickable { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }
+
+/* src/app/design-system.css (reports-kpi-drilldown): the wider drill-down dialog. */
+.dialog.xwide { width: min(960px, 94vw); }
+/* Mockup-only: lets a static dialog sit on a visible overlay. */
+
+/* Exists in the app (globals.css) but not in the mockup stylesheet. */
+.mb-md { margin-bottom: var(--space-md); }
+
+/* Mockup-only scaffolding: simulates the overlay behind a static dialog. */
+.stage { background: var(--color-overlay); border-radius: var(--radius-md); padding: var(--space-2xl); display: flex; justify-content: center; align-items: flex-start; }
+.stage .dialog { max-height: none; }
+.stage .dialog-body.scroll { max-height: 320px; overflow-y: auto; }
+.cell-sub { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+<a class="nav-item" href="../../outreach-sequences/mockups/secuencias-lista.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Secuencias<span class="pill-count">2</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>Lusha por BD</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="#">Administración</a><span class="sep">/</span><a href="#">Lusha por BD</a></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a5">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">BD</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Cambio <span class="mono">lusha-per-bd-cap</span>, pedido del dueño: limitar los créditos de Lusha de una BD en particular. Hoy los dos topes son <strong>globales</strong> (<span class="mono">cap.ts</span>) y lo único por persona es el interruptor on/off; el diseño original de <a href="../../lusha-per-bd/mockups/lusha-por-bd.html">lusha-per-bd</a> lo dejó así a propósito, anotando que un tope por BD se podría sumar después sin deshacer nada. Esto es ese agregado: un tercer tope, propio de cada BD, que se evalúa junto a los dos globales. Los nombres de BD son los reales porque la decisión es sobre personas concretas; los correos son inventados. Reutiliza <span class="mono">.locked</span>, <span class="mono">.alert.alert-warn</span> y el botón deshabilitado con <span class="mono">title</span> de <a href="../../lusha-reveal/mockups/lusha-reveal.html">lusha-reveal.html</a>. Vista de escritorio únicamente.
+<p class="mt-md"><strong>Decisiones a aprobar</strong></p>
+<ol>
+<li><strong>Un contacto cuesta 2 créditos, no 1.</strong> Revelar un correo son dos cobros: la búsqueda (1) y el revelado (1). Y la búsqueda <strong>se cobra aunque no coincida</strong>. Medido en producción sobre el consumo real de Macarena: el 20 oct, 5 correos = 10 créditos; el 19 oct, 5 correos = 11 créditos, porque una búsqueda no encontró nada. Por eso el tope se guarda en créditos —la única unidad que la factura entiende— pero <strong>se muestra siempre con su equivalencia en contactos</strong>. Sin eso, «12» se lee como 12 contactos y son 6.</li>
+<li><strong>Macarena arranca en 12 créditos por día ≈ 6 contactos.</strong> Decidido por el dueño el 22 oct 2026, sabiendo la aritmética: su ritmo medido era 5 contactos por día, así que es un techo que la frena si acelera, no un recorte de lo que ya hacía.</li>
+<li><strong>El tope es por día de Argentina, y cuenta los mismos créditos que el freno global.</strong> La misma ventana y la misma suma (<span class="mono">coalesce(credits_charged, credits_reserved)</span> sobre <span class="mono">at</span>), para que no existan dos definiciones de «hoy» ni de «crédito gastado». Entran las búsquedas y las reservas que fallaron, igual que hoy.</li>
+<li><strong>Nulo significa «sin tope propio».</strong> Sólo quien tenga un número lleva tope; el resto sigue exactamente como hoy, con los dos globales. Un BD nuevo nace sin tope propio: el permiso se otorga a propósito (ya decidido), el tope se pone a propósito también.</li>
+<li><strong>Los tres topes se evalúan juntos y el mensaje nombra al que bloqueó, en este orden: mensual → propio → diario global.</strong> El mensual va primero porque se renueva más tarde: decir «se restablece mañana» sería falso. El propio va antes que el diario global porque es el único sobre el que ella puede hacer algo —pedirle a un administrador que lo suba— mientras que el global es del equipo. <strong>Consecuencia que esta decisión crea:</strong> si el propio y el global diario bloquean el mismo día, el mensaje nombra el propio, así que su texto no puede afirmar que al equipo le queda cupo. Por eso dice «el tope es tuyo, no del equipo» y no «al equipo todavía le queda»: lo primero es verdad siempre, lo segundo puede ser mentira. No se agregó lógica para caer al mensaje del equipo cuando también está agotado, porque el freno global es 60 y el equipo gastó 39 en toda su historia: es un caso que hoy no puede ocurrir, y una rama sin caso es una rama sin probar.</li>
+<li><strong>El mensaje le habla a ella, nunca «al equipo».</strong> El copy de hoy dice «el equipo ya usó 11 de 12 créditos». Reusar esa frase para un tope propio sería mentirle: el equipo tiene cupo, la que no tiene es ella. Secciones 2 y 3.</li>
+<li><strong>Editarlo desde la pantalla queda para un cambio siguiente (abierta).</strong> Este cambio pone el valor y lo <strong>muestra</strong>; el editor necesita confirmación y fila de auditoría, como ya tiene el interruptor, y es lo que lo vuelve un cambio aparte. <strong>Recomiendo</strong> partirlo así: con un equipo de tres BD el número se toca una vez por trimestre, y un tope que se puede cambiar sin registrar quién lo cambió es peor que no tenerlo.</li>
+</ol>
+<a href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas del sistema aprobado</a></div><span class="tag tag-scope">En alcance: lusha-per-bd-cap</span></div>
+
+<h2 class="mb-lg">1 · El tope, visible en «Lusha por BD»</h2>
+<p class="meta mb-lg">Va en la columna «Lusha», debajo del interruptor, con el mismo <span class="mono">.meta</span> que ya usa esa celda para «por Cristian Civita, 8 oct». Sin componente nuevo. Quien no tiene tope propio no muestra nada: la ausencia de línea ya dice que sólo le aplican los globales.</p>
+<div class="table-wrap"><table class="data">
+<thead><tr><th>BD</th><th>Lusha</th><th class="sorted">Créditos cobrados <span class="sort">↓</span></th><th>Revelados</th><th>Último uso</th></tr></thead>
+<tbody>
+<tr>
+<td><div class="owner-chip"><span class="avatar avatar-sm a3">MD</span><span class="strong">Macarena Dávila</span></div><div class="meta">macarena.davila@bd.example</div></td>
+<td><div class="stack-sm"><label class="check"><input type="checkbox" checked aria-label="Lusha habilitado para Macarena Dávila"> Habilitado</label><div class="meta"><strong>Tope propio: 12 créditos por día</strong> · unos 6 contactos</div></div></td>
+<td><div class="stack-sm"><div class="nowrap"><span class="num strong">24</span> <span class="meta">créditos · 62 %</span></div><div class="bar-track" style="width:140px" role="img" aria-label="62 % de los créditos del período"><span class="bar-info" style="width:62%"></span></div></div></td>
+<td class="nowrap"><span class="num strong">11</span><div class="meta">11 correos</div></td>
+<td class="nowrap"><span class="soft">21 oct 2026</span><div class="meta">ayer</div></td>
+</tr>
+<tr>
+<td><div class="owner-chip"><span class="avatar avatar-sm a1">MM</span><span class="strong">Mariel Meza</span></div><div class="meta">mariel.meza@bd.example</div></td>
+<td><label class="check"><input type="checkbox" checked aria-label="Lusha habilitado para Mariel Meza"> Habilitado</label></td>
+<td><div class="stack-sm"><div class="nowrap"><span class="num strong">13</span> <span class="meta">créditos · 33 %</span></div><div class="bar-track" style="width:140px" role="img" aria-label="33 % de los créditos del período"><span class="bar-info" style="width:33%"></span></div></div></td>
+<td class="nowrap"><span class="num strong">2</span><div class="meta">2 correos</div></td>
+<td class="nowrap"><span class="soft">21 oct 2026</span><div class="meta">ayer</div></td>
+</tr>
+<tr>
+<td><div class="owner-chip"><span class="avatar avatar-sm a5">CC</span><span class="strong">Cristian Civita</span></div><div class="meta">cristian.civita@bd.example · administrador</div></td>
+<td><label class="check"><input type="checkbox" checked aria-label="Lusha habilitado para Cristian Civita"> Habilitado</label></td>
+<td><div class="nowrap"><span class="num strong">2</span> <span class="meta">créditos · 5 %</span></div></td>
+<td class="nowrap"><span class="num strong">1</span><div class="meta">1 correo</div></td>
+<td class="nowrap"><span class="soft">14 oct 2026</span><div class="meta">hace 8 días</div></td>
+</tr>
+<tr>
+<td><div class="owner-chip"><span class="avatar avatar-sm a2">EM</span><span class="strong">Emmanuel Monserrat</span></div><div class="meta">emmanuel.monserrat@bd.example</div></td>
+<td><label class="check"><input type="checkbox" checked aria-label="Lusha habilitado para Emmanuel Monserrat"> Habilitado</label></td>
+<td><span class="num strong">0</span> <span class="meta">créditos</span></td>
+<td class="nowrap"><span class="num strong">0</span></td>
+<td class="nowrap"><span class="soft">Nunca</span></td>
+</tr>
+</tbody>
+</table>
+<div class="table-footer"><span>4 BD · incluye a los que no tienen tope propio</span><span>Período: octubre 2026 · ordenado por créditos cobrados</span></div></div>
+<p class="meta mt-md">El subtítulo de la pantalla sigue diciendo que el límite mensual de 400 y el freno diario de 60 son del equipo. El tope propio no los reemplaza: se suma, y gana el más chico de los tres.</p>
+
+<h2 class="mt-2xl mb-lg">2 · Lo que ve Macarena cuando gastó sus 12</h2>
+<p class="meta mb-lg">Ficha de contacto vista por ella, con 12 de 12 créditos usados hoy. Mismo <span class="mono">.locked</span> y mismo botón deshabilitado con <span class="mono">title</span> que el estado «límite diario del equipo» que ya existe. Lo único distinto —y es el punto— es <strong>de quién habla el texto</strong>: de ella, no del equipo, y le dice a quién pedirle más. El lápiz de edición sigue disponible: cargar un dato a mano no cuesta créditos.</p>
+<div class="split">
+<aside class="record-left" aria-label="Datos">
+<div class="record-identity">
+<span class="avatar avatar-lg a2">MO</span>
+<div><h1>Marta Olivera</h1><p class="headline">Directora de Ingeniería en <a href="../../crm-hubspot-ux/mockups/company-record.html">Nodo Labs</a></p></div>
+<div class="row wrap"><span class="badge badge-contacted">Contactado</span></div>
+</div>
+<div class="section-title">Sobre este contacto</div>
+<dl class="props">
+<div class="prop derived"><dt>Estado</dt><dd><span class="badge badge-contacted">Contactado</span></dd></div>
+<div class="prop"><dt>Correo electrónico</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm" disabled title="Alcanzaste tu tope propio"><span class="badge badge-outline no-dot">Lusha</span>Buscar correo · ~2 créditos</button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Alcanzaste tu tope propio de Lusha: 12 de 12 créditos hoy. Se restablece mañana. El tope es tuyo, no del equipo: si necesitás más hoy, pedíselo a un administrador.</span></div></div>
+<div class="prop"><dt>Teléfono</dt><dd>—<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd><dd class="row"><button type="button" class="btn btn-secondary btn-sm" disabled title="Alcanzaste tu tope propio"><span class="badge badge-outline no-dot">Lusha</span>Buscar teléfono · ~6 créditos</button></dd><div class="locked"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Tu tope propio de Lusha está agotado. Se restablece mañana.</span></div></div>
+<div class="prop"><dt>Cargo</dt><dd>Directora de Ingeniería<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></dd></div>
+</dl>
+</aside>
+<div class="stack">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Por qué el texto aclara que al equipo le queda.</strong> Si dice sólo «se alcanzó el límite de créditos», ella va a pensar que el CRM está roto o que la cuenta se quedó sin saldo, y lo va a reportar. Nombrar que el tope es propio convierte un error aparente en una regla entendible, con una salida concreta.</div></div>
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Corregido: a 11 de 12 todavía puede buscar.</strong> La versión anterior de esta nota decía que quedaba bloqueada con un crédito sin usar. Es falso, y el código tiene razón: el tope se evalúa <strong>por paso</strong>, y la búsqueda cuesta 1 crédito, no 2. Con 11 usados la búsqueda entra, queda en 12 de 12, y lo que se bloquea es el <strong>revelado</strong>. La coincidencia no se pierde —queda guardada— así que lo revela al día siguiente sin volver a pagar la búsqueda. La consecuencia real, que conviene saber: un día puede terminar con un crédito gastado en una búsqueda cuyo revelado espera hasta mañana. Es el mismo comportamiento que ya tiene el freno global del equipo. <strong>No se cambió la conducta del producto para que coincida con el dibujo:</strong> hacer que la búsqueda reserve además el precio estimado del campo es una decisión aparte y no entra en este cambio.</div></div>
+<div class="captions mb-lg"><div><span class="tag tag-scope">Nuevo</span> aviso de tope propio (<span class="mono">.locked</span>), un texto por fila</div></div>
+</div>
+</div>
+
+<h2 class="mt-2xl mb-lg">3 · Si lo intenta igual</h2>
+<p class="meta mb-lg">El servidor rechaza antes de llamar a Lusha, así que no hay cobro. Mismo <span class="mono">.alert.alert-warn</span> que el freno global, con el texto en primera persona y los números reales.</p>
+<div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-own-cap">
+<div class="dialog-header"><h2 id="dlg-own-cap">Buscar correo en Lusha</h2><span class="badge badge-outline no-dot">Lusha</span><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body"><div class="alert alert-warn" role="alert"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">Alcanzaste tu tope propio de Lusha</div>Ya usaste 12 de 12 créditos de tu tope de hoy y este paso no entra en lo que te queda. No se llamó a Lusha ni se cobró nada. Se restablece mañana. Si necesitás más hoy, pedíselo a un administrador.</div></div></div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+<p class="meta mt-lg">Los otros dos mensajes no cambian. Si el que bloquea es el mensual del equipo sigue diciendo «el equipo ya usó… se renuevan el {fecha}», y si es el freno diario global sigue diciendo «el equipo». Son tres textos distintos porque son tres causas distintas, y confundirlas manda a la persona a pedir lo que no sirve.</p>
+</main>
+</div></div>
+</body>
+</html>

@@ -35,6 +35,12 @@ export const bd = pgTable("bd", {
   // BD that existed to true. Only an admin changes it (/admin/lusha), and every change writes an audit_log row. Admins are
   // not exempt. Disabling stops NEW reveals only: past reveals and consumption stay.
   lushaEnabled: boolean("lusha_enabled").notNull().default(false),
+  // This BD's own Lusha ceiling, in CREDITS per Argentina day (drizzle/0060). NULL = no personal cap: only the global monthly and daily
+  // caps apply, exactly as before. 0 is a real value and means "blocked", never "no cap". It counts the same credits as the global
+  // daily cap (coalesce(credits_charged, credits_reserved) over the ART day). NOT a contact count: revealing one email costs 2 credits
+  // (a search row plus the emails row, and the search is charged even when it finds nothing), so 12 is about 6 contacts. Read and
+  // enforced inside the reservation transaction (revealDb.ts); there is no editor yet, the value is set by hand.
+  lushaPersonalDailyCreditCap: integer("lusha_personal_daily_credit_cap"),
   // When this BD was last seen using the CRM (drizzle/0048). Written by getCurrentBd, throttled (src/lib/auth/lastSeenPolicy.ts, written by lastSeenDb.ts).
   // The migration backfilled every BD that existed to now(); a BD created later stays NULL until the first visit, and the
   // reminder planner reads coalesce(last_seen_at, created_at).

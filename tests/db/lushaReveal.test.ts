@@ -19,6 +19,7 @@ const OPEN_LIMITS = { dailyCap: 1_000_000, monthlyCap: 1_000_000, cycleStartDay:
 /** Credits in the Argentina day of `now`: the daily half of getCreditSpend. */
 const dailySpend = async (now?: Date) => (await (await import("@/lib/lusha/revealDb")).getCreditSpend(now)).today;
 let bdId: string;
+const extraBdIds: string[] = [];
 const personIds: string[] = [];
 
 async function mkPerson(name: string, over: Record<string, unknown> = {}) {
@@ -65,7 +66,7 @@ after(async () => {
   const { inArray, eq } = await import("drizzle-orm");
   await db.delete(auditLog).where(inArray(auditLog.personId, personIds));
   await db.delete(person).where(inArray(person.id, personIds)); // cascades ledger, activity, history, candidates, merge events
-  await db.delete(bd).where(eq(bd.id, bdId));
+  await db.delete(bd).where(inArray(bd.id, [bdId, ...extraBdIds]));
 });
 
 test("two concurrent reserve() on the same (person, field) leave exactly one row: a double click is busy", async () => {
@@ -763,5 +764,47 @@ test("getCreditSpend answers the day and the billing cycle in one read, and a re
   assert.deepEqual(refused, { ok: false, reason: "cap_exceeded", cap: "monthly", remaining: 0 });
   const ok = await reserve({ personId: p.id, field: "search", actorBdId: bdId, limits: { ...OPEN_LIMITS, monthlyCap: before.cycle + 1 } });
   assert.equal(ok.ok, true);
-  assert.deepEqual(await getCreditSpend(), { today: before.today + 1, cycle: before.cycle + 1 });
+  // The reserve moved BOTH sums by exactly one. Compared key by key because the read also carries the acting BD's own figures.
+  const after = await getCreditSpend();
+  assert.deepEqual([after.today, after.cycle], [before.today + 1, before.cycle + 1]);
+  assert.deepEqual([after.actorToday, after.personalCap], [0, null], "with no actor given, there is no actor spend and no personal cap");
+});
+
+test("personal cap through reserve: refused as 'personal' while the team is under both global caps, and another BD's rows never count toward hers", async () => {
+  const { db } = await import("@/db");
+  const { bd } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { getCreditSpend, reserve, settleSearch } = await import("@/lib/lusha/revealDb");
+  const mk = async (tag: string, cap: number | null) => {
+    const [b] = await db.insert(bd).values({ name: `ZZ ${tag}`, email: `zz-${tag}-${run}@example.test`, lushaEnabled: true, lushaPersonalDailyCreditCap: cap }).returning();
+    extraBdIds.push(b.id);
+    return b.id;
+  };
+  const hers = await mk("capped", 2);
+  const other = await mk("uncapped", null);
+  const p = await mkPerson("personalcap");
+  /** One settled search charged 1 credit, so the row is real ledger spend and the person is free for the next reserve. */
+  const spend = async (actor: string, limits = OPEN_LIMITS) => {
+    const r = await reserve({ personId: p.id, field: "search", actorBdId: actor, limits });
+    if (r.ok) await settleSearch({ reservationId: r.reservationId, outcome: "no_match", creditsCharged: 1, payload: {} });
+    return r;
+  };
+
+  for (let i = 0; i < 5; i++) assert.equal((await spend(other)).ok, true);
+  const afterOther = await getCreditSpend(new Date(), 1, undefined, hers);
+  assert.deepEqual([afterOther.actorToday, afterOther.personalCap], [0, 2], "the other BD's 5 credits are not hers");
+
+  assert.equal((await spend(hers)).ok, true, "she starts at 0 of 2 although the team already spent 5 today");
+  assert.equal((await spend(hers)).ok, true);
+  assert.deepEqual(await spend(hers), { ok: false, reason: "cap_exceeded", cap: "personal", remaining: 0 });
+  assert.equal((await getCreditSpend(new Date(), 1, undefined, hers)).actorToday, 2);
+
+  const teamRoom = await getCreditSpend();
+  assert.ok(teamRoom.today + 1 <= OPEN_LIMITS.dailyCap && teamRoom.cycle + 1 <= OPEN_LIMITS.monthlyCap, "the team is far under both global caps, so only hers refused");
+  assert.equal((await spend(other)).ok, true, "the uncapped BD is not affected by her cap");
+
+  await db.update(bd).set({ lushaPersonalDailyCreditCap: 0 }).where(eq(bd.id, hers));
+  assert.deepEqual(await spend(hers), { ok: false, reason: "cap_exceeded", cap: "personal", remaining: 0 }, "0 blocks");
+  await db.update(bd).set({ lushaPersonalDailyCreditCap: null }).where(eq(bd.id, hers));
+  assert.equal((await spend(hers)).ok, true, "NULL means no personal cap");
 });

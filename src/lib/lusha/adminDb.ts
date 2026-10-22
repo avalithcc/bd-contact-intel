@@ -72,7 +72,7 @@ export function buildUsageReportQuery(window: { start: Date; end: Date }): SQL {
       order by a.target_bd_id, a.at desc
     )
     select b.id::text as ur_bd_id, b.name as ur_name, b.email as ur_email, b.role as ur_role, b.lusha_enabled as ur_enabled,
-      b.created_at as ur_created_at,
+      b.created_at as ur_created_at, b.lusha_personal_daily_credit_cap as ur_personal_cap,
       coalesce(s.ur_charged, 0) as ur_charged, coalesce(s.ur_pending, 0) as ur_pending,
       coalesce(s.ur_emails, 0) as ur_emails, coalesce(s.ur_phones, 0) as ur_phones,
       coalesce(r.ur_n, 0) as ur_rejections, l.ur_at as ur_last_use, t.ur_who as ur_toggle_by, t.ur_at as ur_toggle_at

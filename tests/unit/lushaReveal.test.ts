@@ -60,7 +60,7 @@ function fake(over: Partial<RevealPorts> & { rows?: LatestRows; subject?: Subjec
     assertEditable: rec("assertEditable", undefined),
     loadSubject: rec("loadSubject", over.subject === undefined ? SUBJECT : over.subject),
     getRevealState: rec("getRevealState", over.rows ?? {}),
-    getSpend: rec("getSpend", { today: over.spent ?? 0, cycle: over.spent ?? 0 }),
+    getSpend: rec("getSpend", { today: over.spent ?? 0, cycle: over.spent ?? 0, actorToday: 0, personalCap: null }),
     reserve: rec("reserve", { ok: true as const, reservationId: "res-1", credits: 1, searchId: "s1" }),
     settleSearch: rec("settleSearch", true),
     settleReveal: rec("settleReveal", { outcome: "revealed" as const, value: "x@example.invalid", written: "email" as const, duplicate: null, writeFailed: false }),
@@ -481,7 +481,7 @@ test("when reserve() itself reaped the row it refuses, and that maps to the outc
 });
 
 test("a refusal by the monthly cap reaches the BD as its own reason, from the state and from the reservation", async () => {
-  const state = fake({ rows: WITH_SEARCH, spent: 0, getSpend: async () => ({ today: 0, cycle: 400 }) });
+  const state = fake({ rows: WITH_SEARCH, spent: 0, getSpend: async () => ({ today: 0, cycle: 400, actorToday: 0, personalCap: null }) });
   const r = await revealLushaField(input(), state.p);
   assert.deepEqual([r.ok, !r.ok && r.reason, !r.ok && r.remaining], [false, "lusha_monthly_cap_reached", 0]);
   const over = fake({ rows: WITH_SEARCH, reserve: async () => ({ ok: false, reason: "cap_exceeded", cap: "monthly", remaining: 2 }) });
