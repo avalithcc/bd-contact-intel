@@ -114,6 +114,7 @@ export type ContactActionErrorReason =
   | "lusha_outcome_unknown"
   | "lusha_cap_reached"
   | "lusha_monthly_cap_reached"
+  | "lusha_personal_cap_reached"
   | "lusha_busy"
   | "lusha_not_eligible"
   | "lusha_insufficient_data"

@@ -324,8 +324,9 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     const lushaConfig = getLushaConfig();
     const limits = getLushaLimits();
     const now = new Date();
-    // One query for the day's AND the cycle's spend (getCreditSpend), beside the reveal state.
-    const [rows, spent] = lushaConfig.ok ? await Promise.all([getRevealState(record.person.id), getCreditSpend(now, limits.cycleStartDay)]) : [{}, { today: 0, cycle: 0 }];
+    // One query for the day's AND the cycle's spend (getCreditSpend), beside the reveal state. It also answers THIS BD's own day and personal
+    // cap, so the third cap costs no round trip.
+    const [rows, spent] = lushaConfig.ok ? await Promise.all([getRevealState(record.person.id), getCreditSpend(now, limits.cycleStartDay, undefined, me.id)]) : [{}, { today: 0, cycle: 0, actorToday: 0, personalCap: null }];
     lusha = buildLushaView({
       config: lushaConfig,
       enabled: me.lushaEnabled, // the viewing BD's switch, already on the row getCurrentBd loaded: no extra read
@@ -334,6 +335,8 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
       spentCycle: spent.cycle,
       dailyCap: limits.dailyCap,
       monthlyCap: limits.monthlyCap,
+      actorSpentToday: spent.actorToday,
+      personalCap: spent.personalCap,
       cycleEnd: lushaCycleWindow(now, limits.cycleStartDay).end,
       person: record.person,
       crm: { name, company: companyDisplayName, domain: companyRow?.domain ?? null, linkedin: linkedinProfileHref(record.person.profileKey) },

@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getLushaLimits, lushaCycleWindow } from "@/lib/lusha/cap";
 import { getLushaUsageReport } from "@/lib/lusha/adminDb";
 import { getCreditSpend } from "@/lib/lusha/revealDb";
-import { REPORT_PERIODS, isNewBd, parseReportPeriod, periodWindow, shareOf, summarizeUsage } from "@/lib/lusha/usageReport";
+import { REPORT_PERIODS, isNewBd, parseReportPeriod, periodWindow, personalCapLines, shareOf, summarizeUsage } from "@/lib/lusha/usageReport";
 import { formatArgentinaDayMonth, formatArgentinaDayMonthYear, relativeTime } from "@/lib/i18n/format";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { LushaSwitch } from "./LushaSwitch";
@@ -165,6 +165,11 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
                     <div className="stack-sm">
                       <LushaSwitch bdId={r.bdId} name={r.name} enabled={r.lushaEnabled} labels={switchLabels(r.name)} />
                       {!r.lushaEnabled && (r.toggledByName && r.toggledAt ? <div className="meta">{fill(d.toggledBy, { name: r.toggledByName, date: formatArgentinaDayMonth(r.toggledAt) })}</div> : isNew ? <div className="meta">{d.newDefault}</div> : null)}
+                      {r.personalDailyCap !== null && (
+                        <div className="meta">
+                          <strong>{personalCapLines(r.personalDailyCap, d).headline}</strong> · {personalCapLines(r.personalDailyCap, d).contacts}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td>

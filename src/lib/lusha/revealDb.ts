@@ -3,7 +3,7 @@
 // OUTSIDE any transaction and never under the lock. The cap is read from this ledger only, never from
 // Lusha's eventually consistent /v3/account/usage.
 
-import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activity, company, duplicateCandidate, lushaReveal, person, personPropertyHistory } from "@/db/schema";
@@ -28,26 +28,50 @@ export interface CreditSpend {
   today: number;
   /** Credits in the Lusha billing cycle containing `now` (today included). */
   cycle: number;
+  /** Credits the ACTING BD alone spent in that same Argentina day (0 when no actor was given). */
+  actorToday: number;
+  /** The acting BD's own daily cap: null = none (also when no actor was given); 0 = blocked. NaN = unreadable, which fails closed. */
+  personalCap: number | null;
 }
 
-type SpendRow = { spent_today: string | number | null; spent_cycle: string | number | null };
+type SpendRow = { spent_today: string | number | null; spent_cycle: string | number | null; spent_actor_today: string | number | null; personal_cap: string | number | null };
+
+// ONE definition of "a credit spent" and ONE of "today", shared by the team's day sum and the actor's day sum. The actor's sum is the
+// team's plus a predicate, never a second copy: if the two ever diverged, the caps would stop agreeing about what a day is.
+const CREDITS = sql.raw("coalesce(credits_charged, credits_reserved)");
+const inWindow = (w: { start: Date; end: Date }) => sql`at >= ${w.start.toISOString()}::timestamptz and at < ${w.end.toISOString()}::timestamptz`;
+
+/**
+ * Exported (not executed) so a test can compile it. Credits today and in the billing cycle for the team, and for the acting BD the
+ * credits it spent today plus its personal cap, in ONE statement: the cycle window contains the day window (both start at an ART
+ * midnight), so a single scan of the cycle's rows answers every sum with FILTER, and the cap is a one-row primary-key subquery.
+ */
+export function creditSpendQuery(now: Date, cycleStartDay: number, actorBdId: string | null): SQL {
+  const day = inWindow(artDayWindow(now));
+  return sql`
+    select
+      coalesce(sum(${CREDITS}) filter (where ${day}), 0) as spent_today,
+      coalesce(sum(${CREDITS}), 0) as spent_cycle,
+      coalesce(sum(${CREDITS}) filter (where ${day} and actor_bd_id = ${actorBdId}::uuid), 0) as spent_actor_today,
+      (select b.lusha_personal_daily_credit_cap from bd b where b.id = ${actorBdId}::uuid) as personal_cap
+    from lusha_reveal
+    where ${inWindow(lushaCycleWindow(now, cycleStartDay))}`;
+}
+
+/** postgres-js returns the bigint sums as strings; evaluateCaps refuses anything that is not an integer, so convert here. */
+export function mapCreditSpend(row: SpendRow | undefined): CreditSpend {
+  return { today: Number(row?.spent_today), cycle: Number(row?.spent_cycle), actorToday: Number(row?.spent_actor_today), personalCap: row?.personal_cap == null ? null : Number(row.personal_cap) };
+}
 
 /**
  * Credits spent today and in the billing cycle, in ONE round trip: charged where known, else the reserved amount (failed /
- * unknown rows keep counting, D8). The cycle window contains the day window (both start at an ART midnight), so a single scan
- * of the cycle's rows answers both with FILTER. Never Lusha's usage endpoint: this ledger is the only source.
+ * unknown rows keep counting, D8). With `actorBdId` the same read also answers that BD's own day and personal cap, so a caller that
+ * already reads the spend (the contact page, reserve inside its lock) gains the third cap with no extra round trip. Never Lusha's
+ * usage endpoint: this ledger is the only source.
  */
-export async function getCreditSpend(now: Date = new Date(), cycleStartDay: number = 1, reader: Pick<typeof db, "execute"> = db): Promise<CreditSpend> {
-  const day = artDayWindow(now);
-  const cycle = lushaCycleWindow(now, cycleStartDay);
-  const rows = (await reader.execute(sql`
-    select
-      coalesce(sum(coalesce(credits_charged, credits_reserved)) filter (where at >= ${day.start.toISOString()}::timestamptz and at < ${day.end.toISOString()}::timestamptz), 0) as spent_today,
-      coalesce(sum(coalesce(credits_charged, credits_reserved)), 0) as spent_cycle
-    from lusha_reveal
-    where at >= ${cycle.start.toISOString()}::timestamptz and at < ${cycle.end.toISOString()}::timestamptz`)) as unknown as SpendRow[];
-  // postgres-js returns the bigint sums as strings; evaluateCaps refuses anything that is not an integer, so convert here.
-  return { today: Number(rows[0]?.spent_today), cycle: Number(rows[0]?.spent_cycle) };
+export async function getCreditSpend(now: Date = new Date(), cycleStartDay: number = 1, reader: Pick<typeof db, "execute"> = db, actorBdId: string | null = null): Promise<CreditSpend> {
+  const rows = (await reader.execute(creditSpendQuery(now, cycleStartDay, actorBdId))) as unknown as SpendRow[];
+  return mapCreditSpend(rows[0]);
 }
 
 export type ReserveResult =
@@ -56,7 +80,7 @@ export type ReserveResult =
   | { ok: false; reason: "busy" | "outcome_unknown" | "not_enabled" | "no_search" | "no_price_list" | "not_revealable" | "merged" | "not_found" | "already_revealed" };
 
 /**
- * ONE short transaction: advisory lock, the day's and cycle's spend, a fresh read of the latest search row (price and
+ * ONE short transaction: advisory lock, the day's, cycle's and actor's spend with its personal cap, a fresh read of the latest search row (price and
  * staleness: it may have been rejected meanwhile), then the claim insert. `busy` = an in-flight row exists.
  */
 export async function reserve(
@@ -95,7 +119,9 @@ export async function reserve(
     if (owner.mergedIntoId) return { ok: false, reason: "merged" };
     if (owner.owned) return { ok: false, reason: "already_revealed" };
     if (input.field !== "search" && owner.unknown) return { ok: false, reason: "outcome_unknown" };
-    const spent = await getCreditSpend(now, input.limits.cycleStartDay, tx);
+    // The actor's own day AND personal cap come from this same statement, inside the lock: no value is passed in from outside the
+    // transaction, so a cap lowered meanwhile and a reveal that just landed are both seen (no TOCTOU window).
+    const spent = await getCreditSpend(now, input.limits.cycleStartDay, tx, input.actorBdId);
     let search: { id: string; lushaContactId: string | null; payload: unknown } | null = null;
     if (input.field !== "search") {
       const [s] = await tx
@@ -109,7 +135,7 @@ export async function reserve(
       search = s;
     }
     const list = (search?.payload as { canReveal?: CanRevealEntry[] } | null)?.canReveal ?? null;
-    const plan = planReservation({ field: input.field, canReveal: list, spentToday: spent.today, spentCycle: spent.cycle, dailyCap: input.limits.dailyCap, monthlyCap: input.limits.monthlyCap });
+    const plan = planReservation({ field: input.field, canReveal: list, spentToday: spent.today, spentCycle: spent.cycle, dailyCap: input.limits.dailyCap, monthlyCap: input.limits.monthlyCap, actorSpentToday: spent.actorToday, personalCap: spent.personalCap });
     if (!plan.ok) return plan;
     const [row] = await tx
       .insert(lushaReveal)

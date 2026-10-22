@@ -16,19 +16,24 @@ test("the cap is read from the ledger only, never from /v3/account/usage", () =>
   assert.doesNotMatch(code, /account\/usage|getAccountUsage|usage/i);
 });
 
-test("the spend sums count coalesce(credits_charged, credits_reserved), never a plain sum(credits_charged)", () => {
-  const body = code.slice(code.indexOf("export async function getCreditSpend"), code.indexOf("export type ReserveResult"));
-  assert.equal(body.match(/sum\(coalesce\(credits_charged, credits_reserved\)\)/g)?.length, 2, "the day and the cycle");
+// The spend read is a builder (creditSpendQuery) plus the thin reader around it; the compiled SQL is pinned by lushaCreditSpendQuery.test.ts.
+const spendBody = () => code.slice(code.indexOf("const CREDITS = sql.raw"), code.indexOf("export type ReserveResult"));
+
+test("the spend sums count coalesce(credits_charged, credits_reserved), never a plain sum(credits_charged), and say it exactly once", () => {
+  const body = spendBody();
+  assert.equal(body.match(/coalesce\(credits_charged, credits_reserved\)/g)?.length, 1, "one definition of a credit spent, shared by every sum");
+  assert.equal(body.match(/sum\(\$\{CREDITS\}\)/g)?.length, 3, "the team's day, the cycle and the actor's day");
   assert.doesNotMatch(body, /sum\(credits_charged\)/);
-  assert.match(body, /Number\(rows\[0\]\?\.spent_today\)/);
-  assert.match(body, /Number\(rows\[0\]\?\.spent_cycle\)/);
+  assert.match(body, /Number\(row\?\.spent_today\)/);
+  assert.match(body, /Number\(row\?\.spent_cycle\)/);
+  assert.match(body, /Number\(row\?\.spent_actor_today\)/);
 });
 
-test("the day and the cycle spend come from ONE statement (one round trip), with ISO-cast parameters, never a JS Date", () => {
-  const body = code.slice(code.indexOf("export async function getCreditSpend"), code.indexOf("export type ReserveResult"));
+test("the spend comes from ONE statement (one round trip), with ISO-cast parameters, never a JS Date", () => {
+  const body = spendBody();
   assert.equal(body.match(/\.execute\(/g)?.length, 1);
-  assert.doesNotMatch(body, /\$\{(day|cycle)\.(start|end)\}/, "a Date in a raw sql template is rejected by postgres-js");
-  assert.equal(body.match(/\.toISOString\(\)\}::timestamptz/g)?.length, 4);
+  assert.doesNotMatch(body, /\$\{(day|cycle|w)\.(start|end)\}/, "a Date in a raw sql template is rejected by postgres-js");
+  assert.equal(body.match(/\.toISOString\(\)\}::timestamptz/g)?.length, 2, "the window predicate is written once and reused for the day and the cycle");
 });
 
 test("reserve takes the advisory lock before it reads the spend, and claims on the in-flight partial index", () => {
@@ -36,6 +41,13 @@ test("reserve takes the advisory lock before it reads the spend, and claims on t
   assert.ok(reserveBody.indexOf("pg_advisory_xact_lock") >= 0);
   assert.ok(reserveBody.indexOf("pg_advisory_xact_lock") < reserveBody.indexOf("getCreditSpend("));
   assert.match(reserveBody, /onConflictDoNothing\(\{ target: \[lushaReveal\.personId, lushaReveal\.field\], where: sql`state = 'reserved'`/);
+});
+
+test("reserve reads the spend INSIDE the lock: the transaction handle and the acting BD are passed to getCreditSpend", () => {
+  const body = code.slice(code.indexOf("export async function reserve"), code.indexOf("const inFlight"));
+  // `reader` and `actorBdId` are adjacent positional parameters and tsc cannot tell a dropped `tx` from a deliberate default:
+  // without `tx` the read leaves the advisory-locked transaction and two reservations can both pass the cap.
+  assert.match(body, /getCreditSpend\(now, input\.limits\.cycleStartDay, tx, input\.actorBdId\)/);
 });
 
 test("reserve share-locks the person row and checks for an already revealed value inside the lock", () => {

@@ -1,6 +1,7 @@
-// Global Lusha credit ceilings, in credits, defined in exactly one place: a MONTHLY cap tied to the Lusha billing
-// cycle (the budget) and a DAILY cap (a runaway rail). A reservation must pass BOTH. Pure: callers pass the credits
-// already spent (summed from our own ledger, never from Lusha's eventually-consistent usage endpoint).
+// Lusha credit ceilings, in credits, defined in exactly one place: a MONTHLY cap tied to the Lusha billing cycle (the
+// budget), a DAILY cap (a runaway rail), both global, and an optional PERSONAL daily cap for one BD. A reservation must
+// pass every cap that applies. Pure: callers pass the credits already spent (summed from our own ledger, never from
+// Lusha's eventually-consistent usage endpoint).
 
 import { addDaysToDateString, argentinaCalendarDate, argentinaInstantBoundary } from "@/lib/tasks/argentinaDate";
 import { SEARCH_COST, expectedCost, type CanRevealEntry, type LushaField } from "./pricing";
@@ -18,6 +19,17 @@ export const DEFAULT_MONTHLY_CREDIT_CAP = 400;
  * not exist. Every other value in this module fails closed; this one must too.
  */
 export const DEFAULT_CYCLE_START_DAY = 1;
+
+/**
+ * What one contact costs, in credits: revealing an email charges a `search` row (SEARCH_COST) plus the `emails` row (1), and the
+ * search is charged even when it finds nothing. Measured read-only against production for Macarena's real days: 20 Oct = 5 emails /
+ * 10 credits, 19 Oct = 5 emails / 11 credits (one search missed), 18 Oct = 1 email / 3 credits. A credit cap is therefore NOT a contact
+ * count, and every place that shows one shows this equivalence too, so "12" is never read as 12 contacts.
+ */
+export const CREDITS_PER_CONTACT = SEARCH_COST + 1;
+
+/** How many whole contacts fit in `credits`: 12 credits is 6 contacts, 11 is 5 (half a contact is not a contact). */
+export const contactsWithinCredits = (credits: number): number => Math.floor(credits / CREDITS_PER_CONTACT);
 
 export type CapSource = "default" | "env" | "invalid";
 
@@ -135,27 +147,42 @@ export interface CapsInput {
   spentCycle: number;
   dailyCap: number;
   monthlyCap: number;
+  /** What the ACTING BD alone spent in the same Argentina day and in the same credits as `spentToday`. */
+  actorSpentToday: number;
+  /**
+   * The acting BD's own daily ceiling. `null` is the ONLY value that means "no personal cap" and then neither this nor
+   * `actorSpentToday` is read. `0` is a real cap (blocked). Anything else that is not a non-negative safe integer, `undefined`
+   * included, fails closed: a cap that cannot be read must not be an open door.
+   */
+  personalCap: number | null;
   expected: number;
 }
 
-export type CapName = "daily" | "monthly";
+export type CapName = "daily" | "monthly" | "personal";
 
 export type CapsDecision =
-  | { allowed: true; /** Credits left before this action under the tighter of the two caps. */ remaining: number }
+  | { allowed: true; /** Credits left before this action under the tightest cap that applies. */ remaining: number }
   | { allowed: false; blockedBy: CapName; /** Credits left under the cap that blocked. */ remaining: number };
 
 /**
- * Allowed only when the action fits under the daily cap AND the monthly cap, and says which one refused. When both
- * refuse, the monthly one is named: it resets later, so "resets tomorrow" would be false. Any input that is not a
- * non-negative safe integer is refused with nothing remaining, attributed to the monthly cap (the conservative message).
+ * Allowed only when the action fits under the monthly cap, the BD's personal cap (when it has one) AND the global daily cap,
+ * and says which one refused. When several refuse the order is monthly, then personal, then daily. That order is a decision,
+ * not an accident:
+ *  - monthly first, because it resets latest: naming a cap that resets tomorrow while the monthly one is also out would be false;
+ *  - personal before the global daily, because it is the only one the BD can act on (ask an admin to raise it), while the global
+ *    daily one belongs to the team.
+ * Any input that is not a non-negative safe integer is refused with nothing remaining. For the team inputs that is attributed to
+ * the monthly cap (the conservative message); for the personal cap it is attributed to the personal one, the one an admin fixes.
  */
-export function evaluateCaps({ spentToday, spentCycle, dailyCap, monthlyCap, expected }: CapsInput): CapsDecision {
+export function evaluateCaps({ spentToday, spentCycle, dailyCap, monthlyCap, actorSpentToday, personalCap, expected }: CapsInput): CapsDecision {
   if (![spentToday, spentCycle, dailyCap, monthlyCap, expected].every(isCredits)) return { allowed: false, blockedBy: "monthly", remaining: 0 };
   const monthly = evaluateCap({ spentToday: spentCycle, cap: monthlyCap, expected });
   if (!monthly.allowed) return { allowed: false, blockedBy: "monthly", remaining: monthly.remaining };
+  const personal = personalCap === null ? null : evaluateCap({ spentToday: actorSpentToday, cap: personalCap, expected });
+  if (personal && !personal.allowed) return { allowed: false, blockedBy: "personal", remaining: personal.remaining };
   const daily = evaluateCap({ spentToday, cap: dailyCap, expected });
   if (!daily.allowed) return { allowed: false, blockedBy: "daily", remaining: daily.remaining };
-  return { allowed: true, remaining: Math.min(daily.remaining, monthly.remaining) };
+  return { allowed: true, remaining: Math.min(daily.remaining, monthly.remaining, personal ? personal.remaining : Number.POSITIVE_INFINITY) };
 }
 
 /**
@@ -190,7 +217,7 @@ export function lushaCycleWindow(now: Date, startDay: number): { start: Date; en
 
 export type Reservation =
   | { ok: true; credits: number }
-  | { ok: false; reason: "cap_exceeded"; /** Which cap refused: the daily one resets tomorrow, the monthly one on the cycle date. */ cap: CapName; remaining: number }
+  | { ok: false; reason: "cap_exceeded"; /** Which cap refused: the daily and personal ones reset tomorrow, the monthly one on the cycle date. */ cap: CapName; remaining: number }
   | { ok: false; reason: "no_price_list" | "not_revealable" };
 
 /**
@@ -198,10 +225,10 @@ export type Reservation =
  * transaction as the reservation. A price of 0 still reserves one credit, so a stale or free-looking
  * price can never bypass the caps (nor the cap-0 kill switch); the settle reconciles to what Lusha billed.
  */
-export function planReservation(input: { field: LushaField; canReveal: readonly CanRevealEntry[] | null | undefined; spentToday: number; spentCycle: number; dailyCap: number; monthlyCap: number }): Reservation {
+export function planReservation(input: { field: LushaField; canReveal: readonly CanRevealEntry[] | null | undefined; spentToday: number; spentCycle: number; dailyCap: number; monthlyCap: number; actorSpentToday: number; personalCap: number | null }): Reservation {
   const price = expectedCost(input.field, input.canReveal);
   if (!price.ok) return price;
   const credits = Math.max(SEARCH_COST, price.credits);
-  const decision = evaluateCaps({ spentToday: input.spentToday, spentCycle: input.spentCycle, dailyCap: input.dailyCap, monthlyCap: input.monthlyCap, expected: credits });
+  const decision = evaluateCaps({ spentToday: input.spentToday, spentCycle: input.spentCycle, dailyCap: input.dailyCap, monthlyCap: input.monthlyCap, actorSpentToday: input.actorSpentToday, personalCap: input.personalCap, expected: credits });
   return decision.allowed ? { ok: true, credits } : { ok: false, reason: "cap_exceeded", cap: decision.blockedBy, remaining: decision.remaining };
 }

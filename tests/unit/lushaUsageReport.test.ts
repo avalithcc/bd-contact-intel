@@ -46,6 +46,7 @@ const raw = (over: Partial<RawUsageRow> = {}): RawUsageRow => ({
   ur_last_use: "2026-10-15 12:00:00.5+00",
   ur_toggle_by: null,
   ur_toggle_at: null,
+  ur_personal_cap: null,
   ...over,
 });
 

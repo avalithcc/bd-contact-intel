@@ -37,7 +37,8 @@ export interface RevealPorts {
   assertEditable(personId: string): Promise<void>;
   loadSubject(personId: string): Promise<Subject | null>;
   getRevealState(personId: string): Promise<LatestRows>;
-  getSpend(): Promise<CreditSpend>;
+  /** The team's day and cycle, plus this BD's own day and personal cap, in one read. */
+  getSpend(actorBdId: string): Promise<CreditSpend>;
   reserve(input: { personId: string; field: "search" | RevealField; actorBdId: string; limits: LushaLimits }): Promise<ReserveResult>;
   settleSearch(input: { reservationId: string; outcome: "matched" | "no_match" | "compliance_restricted"; creditsCharged: number | null; lushaContactId?: string | null; payload: unknown }): Promise<boolean>;
   settleReveal(input: { reservationId: string; actorBdId: string; field: RevealField; emails?: unknown; phones?: unknown; creditsCharged: number | null; compliance?: boolean }): Promise<RevealSettlement | null>;
@@ -89,10 +90,10 @@ function eligible(s: Subject, field: RevealField): boolean {
 }
 
 /** The spend read plus the configured limits, in the shape the cap rules take. */
-export const capStateOf = (spent: CreditSpend, limits: LushaLimits) => ({ spentToday: spent.today, spentCycle: spent.cycle, dailyCap: limits.dailyCap, monthlyCap: limits.monthlyCap });
+export const capStateOf = (spent: CreditSpend, limits: LushaLimits) => ({ spentToday: spent.today, spentCycle: spent.cycle, dailyCap: limits.dailyCap, monthlyCap: limits.monthlyCap, actorSpentToday: spent.actorToday, personalCap: spent.personalCap });
 
 /** The BD-facing reason for a refused cap: the copy differs (tomorrow vs the cycle date). */
-const capReason = (cap: CapName) => (cap === "monthly" ? "lusha_monthly_cap_reached" : "lusha_cap_reached");
+const capReason = (cap: CapName) => (cap === "monthly" ? "lusha_monthly_cap_reached" : cap === "personal" ? "lusha_personal_cap_reached" : "lusha_cap_reached");
 
 type Prepared = { subject: Subject; rows: LatestRows; state: ReturnType<typeof resolveRevealState> };
 
@@ -103,7 +104,7 @@ async function prepare(personId: string, field: RevealField, actorBdId: string, 
   await p.assertEditable(personId); // a merged or missing Contact is refused here, before anything is read or reserved
   const subject = await p.loadSubject(personId);
   if (!subject || !eligible(subject, field)) return no("lusha_not_eligible");
-  const [rows, spent] = await Promise.all([p.getRevealState(personId), p.getSpend()]);
+  const [rows, spent] = await Promise.all([p.getRevealState(personId), p.getSpend(actorBdId)]);
   return { subject, rows, state: resolveRevealState(field, rows, capStateOf(spent, p.limits), p.config) };
 }
 

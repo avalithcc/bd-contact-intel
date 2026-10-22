@@ -12,7 +12,7 @@ import { isOutcomeUnknown, resolveRevealState, type LatestRows, type RevealState
 /** Shown before any search exists, labelled "~"; the real price comes from the search's own canReveal list afterwards. */
 const ESTIMATED_FIELD_PRICE = { emails: 1, phones: 5 } as const;
 
-export type LushaNote = "no_value" | "no_match" | "rejected" | "blocked" | "already_held" | "outcome_unknown" | "not_revealable" | "write_failed" | "capped" | "capped_monthly" | "unconfigured" | "not_enabled";
+export type LushaNote = "no_value" | "no_match" | "rejected" | "blocked" | "already_held" | "outcome_unknown" | "not_revealable" | "write_failed" | "capped" | "capped_monthly" | "capped_personal" | "capped_personal_zero" | "unconfigured" | "not_enabled";
 export type LushaField = "emails" | "phones";
 
 export interface LushaFieldView {
@@ -45,6 +45,9 @@ export interface LushaView {
   dailyCap: number;
   spentCycle: number;
   monthlyCap: number;
+  /** What the viewing BD alone spent today, and their own daily cap in credits (null = none; 0 = blocked). */
+  actorSpentToday: number;
+  personalCap: number | null;
   /** The day the cycle's credits come back, already formatted ("21 nov"). */
   cycleResetsOn: string;
 }
@@ -66,6 +69,8 @@ export function buildLushaView(i: {
   spentCycle: number;
   dailyCap: number;
   monthlyCap: number;
+  actorSpentToday: number;
+  personalCap: number | null;
   /** End of the billing cycle containing now (lushaCycleWindow().end): when the monthly credits are replenished. */
   cycleEnd: Date;
   person: ViewPerson;
@@ -85,7 +90,7 @@ export function buildLushaView(i: {
     const otherRow = rows[field === "emails" ? "phones" : "emails"];
     const confirmed = tied(otherRow) && otherRow?.outcome === "revealed";
     const out: LushaFieldView = { control: null, note: null, hint: null, confirmed, revealed: null, twin: own?.twin ?? null };
-    const live = resolveRevealState(field, rows, { spentToday: i.spentToday, spentCycle: i.spentCycle, dailyCap: i.dailyCap, monthlyCap: i.monthlyCap }, i.config);
+    const live = resolveRevealState(field, rows, { spentToday: i.spentToday, spentCycle: i.spentCycle, dailyCap: i.dailyCap, monthlyCap: i.monthlyCap, actorSpentToday: i.actorSpentToday, personalCap: i.personalCap }, i.config);
 
     // A paid value parked by a failed settle (state failed, payload keeps it): apply it for free, never buy it again.
     if (live.kind !== "revealed" && own?.state === "failed" && own.errorCode === "settle_failed") {
@@ -110,7 +115,7 @@ export function buildLushaView(i: {
     if (!i.enabled) return { ...out, twin: null, note: "not_enabled" };
 
     // A capped action keeps its priced control, disabled: describe what is open without the cap, then close it.
-    const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, spentCycle: 0, dailyCap: Number.MAX_SAFE_INTEGER, monthlyCap: Number.MAX_SAFE_INTEGER }, i.config) : live;
+    const open: RevealState = live.kind === "capped" ? resolveRevealState(field, rows, { spentToday: 0, spentCycle: 0, dailyCap: Number.MAX_SAFE_INTEGER, monthlyCap: Number.MAX_SAFE_INTEGER, actorSpentToday: 0, personalCap: null }, i.config) : live;
     const unknownOutcome = open.kind === "revealable" && isOutcomeUnknown(own);
     const control = (kind: "search" | "reveal" | "research", price: number | null) => ({ kind, price, disabled: live.kind === "capped" || !i.config.ok });
     switch (open.kind) {
@@ -146,7 +151,7 @@ export function buildLushaView(i: {
         break;
     }
     if (live.kind === "capped") {
-      out.note = live.cap === "monthly" ? "capped_monthly" : "capped";
+      out.note = live.cap === "monthly" ? "capped_monthly" : live.cap === "personal" ? (i.personalCap === 0 ? "capped_personal_zero" : "capped_personal") : "capped";
       out.hint = null;
     }
     return out;
@@ -169,6 +174,8 @@ export function buildLushaView(i: {
     dailyCap: i.dailyCap,
     spentCycle: i.spentCycle,
     monthlyCap: i.monthlyCap,
+    actorSpentToday: i.actorSpentToday,
+    personalCap: i.personalCap,
     cycleResetsOn: i.formatDay(i.cycleEnd),
   };
 }

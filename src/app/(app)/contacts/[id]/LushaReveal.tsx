@@ -21,7 +21,7 @@ type Step = { kind: "cost" } | { kind: "identity"; match: IdentityFields; price:
 
 const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ""));
 const rich = (t: string) => t.split("**").map((s, i) => (i % 2 ? <strong key={i}>{s}</strong> : s));
-const TITLE: Partial<Record<ContactActionErrorReason, keyof ContactRecordLabels>> = { lusha_cap_reached: "lushaTitleCapReached", lusha_monthly_cap_reached: "lushaTitleMonthlyCapReached", lusha_no_credits: "lushaTitleNoCredits", lusha_rate_limited: "lushaTitleRateLimited", lusha_protected: "lushaTitleProtected" };
+const TITLE: Partial<Record<ContactActionErrorReason, keyof ContactRecordLabels>> = { lusha_cap_reached: "lushaTitleCapReached", lusha_monthly_cap_reached: "lushaTitleMonthlyCapReached", lusha_personal_cap_reached: "lushaTitlePersonalCapReached", lusha_no_credits: "lushaTitleNoCredits", lusha_rate_limited: "lushaTitleRateLimited", lusha_protected: "lushaTitleProtected" };
 const DANGER: ContactActionErrorReason[] = ["lusha_no_credits", "lusha_protected", "lusha_outcome_unknown", "lusha_unreadable"];
 const LushaBadge = ({ l }: { l: ContactRecordLabels }) => <span className="badge badge-outline no-dot">{l.lushaBadge}</span>;
 
@@ -75,6 +75,10 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
       write_failed: l.lushaNoteWriteFailed,
       capped: fill(l.lushaNoteCapped, { spent: view.spentToday, cap: view.dailyCap }),
       capped_monthly: fill(l.lushaNoteCappedMonthly, { spent: view.spentCycle, cap: view.monthlyCap, date: view.cycleResetsOn }),
+      // First person, because the cap is hers and not the team's. As drawn: the email row says why and who to ask, the phone row repeats it shorter.
+      // A cap of 0 is a standing block, so it promises no "tomorrow" and prints no "0 of 0".
+      capped_personal_zero: field === "emails" ? l.lushaNoteCappedPersonalZero : l.lushaNoteCappedPersonalZeroShort,
+      capped_personal: field === "emails" ? fill(l.lushaNoteCappedPersonal, { spent: view.actorSpentToday, cap: view.personalCap ?? 0 }) : l.lushaNoteCappedPersonalShort,
       unconfigured: l.lushaNoteUnconfigured,
       // As drawn: the email row says who to ask, the phone row repeats it shorter.
       not_enabled: field === "emails" ? l.lushaNoteNotEnabled : l.lushaNoteNotEnabledShort,
@@ -150,9 +154,10 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
   );
 
   const alert = (e: Failure) => {
-    const tk = TITLE[e.reason];
-    const monthly = e.reason === "lusha_monthly_cap_reached";
-    const body = fill(contactActionErrorMessage(l, e.reason), monthly ? { spent: view.spentCycle, cap: view.monthlyCap, date: view.cycleResetsOn } : { spent: view.spentToday, cap: view.dailyCap });
+    const personalZero = e.reason === "lusha_personal_cap_reached" && view.personalCap === 0;
+    const tk = personalZero ? "lushaTitlePersonalCapZero" : TITLE[e.reason];
+    const figures: Record<string, string | number> = e.reason === "lusha_monthly_cap_reached" ? { spent: view.spentCycle, cap: view.monthlyCap, date: view.cycleResetsOn } : e.reason === "lusha_personal_cap_reached" ? { spent: view.actorSpentToday, cap: view.personalCap ?? 0 } : { spent: view.spentToday, cap: view.dailyCap };
+    const body = personalZero ? l.errorLushaPersonalCapZero : fill(contactActionErrorMessage(l, e.reason), figures);
     return (
       <div className={`alert ${DANGER.includes(e.reason) ? "alert-danger" : "alert-warn"}`} role="alert">
         {e.reason === "lusha_protected" ? <LockIcon className="icon" /> : <WarningIcon className="icon" />}
@@ -316,7 +321,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
   const [dupBefore, dupAfter] = l.lushaDuplicateWhy.split("{name}");
   const isOwnRow = column !== "mobilePhone";
   // The mockup draws the disabled control first and its reason under it (states 7, 10); every other reason sits above the control.
-  const noteLast = f.note === "capped" || f.note === "unconfigured";
+  const noteLast = f.note === "capped" || f.note === "capped_personal" || f.note === "capped_personal_zero" || f.note === "unconfigured";
   const notice = f.note && (
     <div className="locked">
       <LockIcon className="icon" />
@@ -328,7 +333,7 @@ export function LushaRow({ personId, field, column, fieldLabel, view, labels: l 
       {isOwnRow && !noteLast && notice}
       {isOwnRow && c && (
         <dd className="row">
-          <button type="button" className="btn btn-secondary btn-sm" disabled={c.disabled} title={c.disabled ? (f.note === "capped" ? l.lushaTitleCap : f.note === "capped_monthly" ? l.lushaTitleCapMonthly : l.lushaTitleUnconfigured) : undefined} onClick={onControl}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={c.disabled} title={c.disabled ? (f.note === "capped" ? l.lushaTitleCap : f.note === "capped_monthly" ? l.lushaTitleCapMonthly : f.note === "capped_personal" ? l.lushaTitlePersonalCap : f.note === "capped_personal_zero" ? l.lushaTitlePersonalCapZero : l.lushaTitleUnconfigured) : undefined} onClick={onControl}>
             <LushaBadge l={l} />
             {label}
           </button>
