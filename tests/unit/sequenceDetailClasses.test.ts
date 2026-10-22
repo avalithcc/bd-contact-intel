@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { es } from "@/lib/i18n/dictionaries/es";
 import type { DetailMember, SequenceDetail } from "@/lib/sequences/detailQueries";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
-import { SEND } from "./sendContextFixture";
+import { IDLE_LOCK, SEND } from "./sendContextFixture";
 
 // tsx compiles .tsx with the classic JSX runtime here (tsconfig says "preserve" for Next), which needs `React` in scope.
 // The component is therefore required AFTER the global is set; a static import would be hoisted above it.
@@ -83,7 +83,7 @@ const ALL_KINDS: DetailMember[] = [
 
 const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s", name: "Synthetic sequence", ownerBdId: "o", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
 const render = (members: DetailMember[], viewerBdId = "o") =>
-  renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId, send: SEND }));
+  renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId, send: SEND, lock: IDLE_LOCK }));
 
 function renderedClasses(html: string): Set<string> {
   const out = new Set<string>();

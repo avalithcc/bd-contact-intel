@@ -4,14 +4,14 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
-import { SEND } from "./sendContextFixture";
+import { IDLE_LOCK, SEND } from "./sendContextFixture";
 
 (globalThis as { React?: unknown }).React = React;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { BulkBar } = require("@/app/(app)/sequences/_components/BulkBar") as typeof import("@/app/(app)/sequences/_components/BulkBar");
 
 const rows = (...reviewed: boolean[]) => reviewed.map((r, i) => ({ id: `m${i + 1}`, reviewed: r }));
-const render = (selection: ReturnType<typeof rows>) => renderToStaticMarkup(createElement(BulkBar, { selection, labels: es.sequences, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: new Date("2026-10-15T14:00:00Z") }));
+const render = (selection: ReturnType<typeof rows>) => renderToStaticMarkup(createElement(BulkBar, { selection, labels: es.sequences, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: new Date("2026-10-15T14:00:00Z"), lock: IDLE_LOCK }));
 
 test("view model: 1 of 3 reviewed disables approve, 3 of 3 enables it", () => {
   assert.deepEqual(bulkBarView(rows(true, false, false)), { visible: true, selected: 3, reviewed: 1, approveEnabled: false, allReviewed: false, ids: ["m1", "m2", "m3"] });

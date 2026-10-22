@@ -12,7 +12,7 @@ import { slotOf } from "@/lib/sendSchedule/time";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
-import { generationLock, type GenerationLock } from "@/lib/sequences/generationLock";
+import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { mapMemberCard, type CardActionId, type CardKind, type CardView } from "@/lib/sequences/memberCard";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import { clockLabel, whenLabel } from "@/lib/scheduledEmail/view";
@@ -147,7 +147,7 @@ function Actions({ card, m, l, onAction, generation, send, now, moment }: { card
 /** `selection` makes a draft card selectable for the bulk bar (the spec's "selecting rows"); a card in any other state has nothing to select. */
 export type CardSelection = { selected: boolean; onToggle: () => void };
 
-export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation?: GenerationLock; send: SequenceSendContext }) {
+export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation: GenerationLock; send: SequenceSendContext }) {
   const moment = m.state === "approved" && m.draft ? approvedMoment(m.draft, send.schedule, now) : null;
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode }, now, readOnly);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -175,7 +175,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
-        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation ?? generationLock(null, [], l.unnamed)} send={send} now={now} moment={moment} />
+        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} />
       </div>
       {!readOnly && showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">

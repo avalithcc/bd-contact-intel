@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { SendRecipient } from "@/lib/sendSchedule/advice";
+import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { capOutlook } from "@/lib/sequences/sendMoment";
 import type { GateRow } from "@/lib/sequences/bulkApprovalGate";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
@@ -17,7 +18,7 @@ import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendC
  * "Aprobar y enviar ahora los N" is the shared split button (one choice for all N); before the BD confirms, a warning says how many
  * leave now and how many wait because of the account's daily cap.
  */
-export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, generating = false }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; generating?: boolean }) {
+export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, lock }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; lock: GenerationLock }) {
   const v = bulkBarView(selection);
   if (!v.visible) return null;
   const one = v.selected === 1;
@@ -34,8 +35,8 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           small
           labels={send.labels}
           primaryLabel={fill(one ? l.bulkApproveNowOne : l.bulkApproveNow, n)}
-          disabled={!v.approveEnabled || generating}
-          title={generating ? l.generateBulkWaitTitle : undefined}
+          disabled={!v.approveEnabled || lock.bulkApproveDisabled}
+          title={lock.bulkApproveDisabled ? l.generateBulkWaitTitle : undefined}
           busy={send.busy}
           error={send.error}
           schedule={approvalSchedule(send, recipients, "bulk", v.selected)}

@@ -92,12 +92,12 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
    * and approving another contact's draft is allowed while this one is written. A thrown error is the generic failure and
    * the id is always cleared, so the banner disappears on success AND on failure.
    */
-  async function whileGenerating<T>(memberId: string, work: () => Promise<T>): Promise<T | undefined> {
+  async function whileGenerating<T>(memberId: string, work: () => Promise<T>, onError: (message: string) => void = fail): Promise<T | undefined> {
     setGeneratingId(memberId);
     try {
       return await work();
     } catch {
-      fail();
+      onError(l.actionFailed);
       return undefined;
     } finally {
       setGeneratingId(null);
@@ -254,7 +254,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     }
     if (a.type === "regenerate") {
       const confirmed = a.confirmedEdits ?? {};
-      const r = await guarded(() => whileGenerating(a.memberId, () => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed))), setError);
+      const r = await guarded(() => whileGenerating(a.memberId, () => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed)), setError), setError);
       if (!r) return;
       if (r.ok && r.skippedEdited[0]) return setRegen({ skipped: r.skippedEdited[0], step: a.step, review: true });
       if (r.ok && r.generated.length > 0) { showToast(l.toastRegenerated, "success"); closeDialogs(); } else setError(l.actionFailed);
@@ -325,6 +325,8 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
   const optOutMember = optOutId ? member(optOutId) : null;
   // What this screen can count: the live members of THIS Sequence that share the address. The dialog words it as "acá ves".
   const optOutLive = optOutMember ? detail.members.filter((m) => m.state !== "discarded" && m.email?.trim().toLowerCase() === optOutMember.email?.trim().toLowerCase()).length : 0;
+  // Computed once: the cards, the banner, the bulk bar and the dialog all read this one value.
+  const lock = generationLock(generatingId, detail.members, l.unnamed);
   const rows = gateRows(detail.members, selected);
   const send: SequenceSendContext = { labels: sendLabels, schedule: detail.schedule, busy, error: sendError };
   const selectedMembers = detail.members.filter((m) => selected.includes(m.memberId));
@@ -333,10 +335,10 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     <>
       <SequenceDetailView
         detail={detail} labels={l} send={send} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
-        generatingId={generatingId} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
-        bulk={readOnly ? null : <BulkBar selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} />}
+        lock={lock} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
+        bulk={readOnly ? undefined : (g) => <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} />}
       />
-      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={generationLock(generatingId, detail.members, l.unnamed).active} error={error} send={{ ...send, error }} />
+      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} error={error} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
       {regen && (

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { contactContextView, optOutErrorKey, showOptOutPrompt, type ContactMembership } from "@/lib/sequences/contactContext";
-import { SEND } from "./sendContextFixture";
+import { IDLE_LOCK, SEND } from "./sendContextFixture";
 
 (globalThis as { React?: unknown }).React = React;
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -91,7 +91,7 @@ test("the dialog states the scope BEFORE confirming: every Sequence, every BD, t
 
 test("a replied card shows the prompt only when a phrase was detected, and the prompt does not suppress by itself", () => {
   const m = { memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "replied", holdReason: null, firstName: "Test1", lastName: "Person", jobTitle: "Lead", company: "Acme", companyKey: "acme", email: "p1@example.test", emailVerified: true, openIt: 0, florida: false, leadership: false, lastContactAt: null, repliedAt: hours(2), sentAt: hours(50), reminderDueAt: null, discardedAt: null, discardReason: null, draft: null, reminderDraft: null } as const;
-  const card = (phrase: string | null | undefined) => renderToStaticMarkup(createElement(MemberCard, { member: { ...m }, now: NOW, labels: es.sequences, onAction: () => {}, ownView: true, optOutPhrase: phrase, send: SEND }));
+  const card = (phrase: string | null | undefined) => renderToStaticMarkup(createElement(MemberCard, { member: { ...m }, now: NOW, labels: es.sequences, onAction: () => {}, ownView: true, optOutPhrase: phrase, send: SEND, generation: IDLE_LOCK }));
   assert.ok(card("unsubscribe").includes("unsubscribe") && card("unsubscribe").includes("No contactar") && card("unsubscribe").includes("no se suprime"));
   assert.ok(!card(null).includes("No contactar") && !card(undefined).includes("No contactar"));
 });

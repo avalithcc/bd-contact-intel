@@ -34,8 +34,14 @@ function member(i: number, over: Partial<DetailMember>): DetailMember {
 const MEMBERS = [member(1, {}), member(2, {}), member(3, {}), member(4, { draft }), member(5, { draft }), member(6, { draft })];
 const detail: SequenceDetail = { id: "seq-1", name: "Test sequence", ownerBdId: "bd-1", ownerName: "Owner", fromAddress: "owner@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members: MEMBERS };
 
+// The bulk slot as the Screen fills it: a render function that is handed the lock and mounts the real BulkBar with it.
+// Selecting only reviewed drafts means the bar is otherwise enabled, so a disabled button can only come from the lock.
+const SELECTION = [{ id: "m4", reviewed: true }, { id: "m5", reviewed: true }];
+const bulkSlot = (lock: import("@/lib/sequences/generationLock").GenerationLock) =>
+  createElement(BulkBar, { selection: SELECTION, labels: L, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: NOW, lock });
+
 const renderView = (generatingId: string | null) =>
-  renderToStaticMarkup(createElement(SequenceDetailView, { detail, labels: L, send: SEND, now: NOW, onAction: () => {}, viewerBdId: "bd-1", generatingId }));
+  renderToStaticMarkup(createElement(SequenceDetailView, { detail, labels: L, send: SEND, now: NOW, onAction: () => {}, viewerBdId: "bd-1", lock: generationLock(generatingId, MEMBERS, L.unnamed), bulk: bulkSlot }));
 
 type Btn = { text: string; disabled: boolean; title: string | null };
 const buttons = (html: string): Btn[] =>
@@ -109,13 +115,14 @@ test("the header's approve-ready button is locked while generating", () => {
   assert.ok(named(renderView("m1"), L.approveReady.replace("{n}", "3")).every((b) => b.disabled));
 });
 
-test("the bulk bar's approve is disabled while generating, even for a fully reviewed selection", () => {
-  const rows = [{ id: "m4", reviewed: true }, { id: "m5", reviewed: true }];
-  const bar = (generating: boolean) => renderToStaticMarkup(createElement(BulkBar, { selection: rows, labels: L, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: NOW, generating }));
-  const approve = (html: string) => buttons(html).find((b) => b.text.startsWith("Aprobar y enviar ahora"));
-  assert.equal(approve(bar(false))?.disabled, false);
-  assert.equal(approve(bar(true))?.disabled, true);
-  assert.ok(bar(true).includes(L.generateBulkWaitTitle));
+test("the bulk bar rendered inside the view is locked exactly while a generation is in flight", () => {
+  const approve = (html: string) => buttons(html).find((b) => b.text.startsWith("Aprobar y enviar ahora los 2"));
+  assert.equal(approve(renderView(null))?.disabled, false);
+  for (const m of MEMBERS) {
+    const html = renderView(m.memberId);
+    assert.equal(approve(html)?.disabled, true, `bulk approve enabled while ${m.memberId} generates`);
+    assert.ok(html.includes(L.generateBulkWaitTitle));
+  }
 });
 
 test("generationLock: every member is locked out of generating exactly when some member generates", () => {

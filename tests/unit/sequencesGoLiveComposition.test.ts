@@ -6,7 +6,7 @@ import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import type { DetailDraft, DetailMember, SequenceDetail } from "@/lib/sequences/detailQueries";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
-import { SEND } from "./sendContextFixture";
+import { IDLE_LOCK, SEND } from "./sendContextFixture";
 
 (globalThis as { React?: unknown }).React = React;
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -40,7 +40,7 @@ test("known signals render as chips, an empty list says none, and an unknown lis
 // --- bulk selection on the detail screen -------------------------------------------------------------------------
 
 const view = (members: DetailMember[], selected?: Set<string>) =>
-  renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId: "bd1", send: SEND, selected, onToggle: selected ? () => {} : undefined, bulk: createElement("div", { id: "bulk-slot" }) }));
+  renderToStaticMarkup(createElement(SequenceDetailView, { detail: detail(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId: "bd1", send: SEND, lock: IDLE_LOCK, selected, onToggle: selected ? () => {} : undefined, bulk: () => createElement("div", { id: "bulk-slot" }) }));
 
 test("only draft cards get a selection checkbox, and the bulk slot sits between the heading and the cards", () => {
   const html = view([member("1"), member("2", { state: "approved", draft: draft({ approvedAt: NOW, scheduledFor: NOW }) }), member("3", { state: "sent", sentAt: NOW })], new Set(["1"]));
