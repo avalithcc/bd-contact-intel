@@ -19,7 +19,14 @@ test("the action authenticates as an admin before it validates anything or write
   assert.ok(body.indexOf("await requireAdmin()") < body.indexOf("isUuid("));
   assert.ok(body.indexOf("await requireAdmin()") < body.indexOf("await setLushaEnabled("));
   assert.match(ACTIONS, /^"use server";/);
-  assert.deepEqual([...ACTIONS.matchAll(/export async function (\w+)/g)].map((m) => m[1]), ["setLushaEnabledAction"]);
+  assert.deepEqual([...ACTIONS.matchAll(/export async function (\w+)/g)].map((m) => m[1]), ["setLushaEnabledAction", "getRevealsDrilldownAction"]);
+});
+
+test("the reveals drill-down action is admin-gated first and takes a period name, never a caller-supplied range", () => {
+  const body = ACTIONS.slice(ACTIONS.indexOf("export async function getRevealsDrilldownAction"));
+  assert.ok(body.indexOf("await requireAdmin()") > 0 && body.indexOf("await requireAdmin()") < body.indexOf("getRevealsDrilldown("));
+  assert.match(body, /getRevealsDrilldownAction\(period: string\)/);
+  assert.match(body, /catch \(err\) \{\s*unstable_rethrow\(err\);/);
 });
 
 test("the page is admin-gated and 404s for a BD, before it reads anything", () => {

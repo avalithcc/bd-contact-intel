@@ -11,6 +11,7 @@ import { REPORT_PERIODS, isNewBd, parseReportPeriod, periodWindow, shareOf, summ
 import { formatArgentinaDayMonth, formatArgentinaDayMonthYear, relativeTime } from "@/lib/i18n/format";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { LushaSwitch } from "./LushaSwitch";
+import { RevealsKpiCard } from "./RevealsKpiCard";
 
 export const dynamic = "force-dynamic";
 
@@ -89,11 +90,33 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
           <div className="value">{totals.chargedCredits}</div>
           <div className="foot">{[fill(d.statChargedFoot, range), totals.pendingCredits > 0 && fill(d.statChargedPending, { n: totals.pendingCredits })].filter(Boolean).join(" · ")}</div>
         </div>
-        <div className="stat info">
-          <div className="label">{d.statReveals}</div>
-          <div className="value">{totals.reveals}</div>
-          <div className="foot">{fill(d.statRevealsFoot, { emails: totals.emails, phones: totals.phones })}</div>
-        </div>
+        <RevealsKpiCard
+          value={totals.reveals}
+          foot={fill(d.statRevealsFoot, { emails: totals.emails, phones: totals.phones })}
+          period={period}
+          subtitle={fill(totals.reveals === 1 ? d.revealsDialogSubtitleOne : d.revealsDialogSubtitle, { n: totals.reveals, ...range })}
+          locale={locale}
+          labels={{
+            statReveals: d.statReveals,
+            revealsDialogTitle: d.revealsDialogTitle,
+            revealsColContact: d.revealsColContact,
+            revealsColField: d.revealsColField,
+            revealsColActor: d.revealsColActor,
+            revealsColWhen: d.revealsColWhen,
+            revealsColCredits: d.revealsColCredits,
+            revealsFieldEmail: d.revealsFieldEmail,
+            revealsFieldPhone: d.revealsFieldPhone,
+            revealsCreditsPending: d.revealsCreditsPending,
+            revealsFootnote: d.revealsFootnote,
+            revealsEmpty: d.revealsEmpty,
+            close: d.close,
+            dialogLoading: d.dialogLoading,
+            dialogError: d.dialogError,
+            dialogTruncated: d.dialogTruncated,
+            numberLocale: d.numberLocale,
+            unnamed: dict.contact.unnamed,
+          }}
+        />
         <div className="stat success">
           <div className="label">{d.statEnabled}</div>
           <div className="value">

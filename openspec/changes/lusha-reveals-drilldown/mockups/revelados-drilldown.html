@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lusha por BD · detalle de revelados · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions. NOT in crm-hubspot-ux/mockups/styles.css.
+   All of them already EXIST in the app (src/app/design-system.css, shipped with
+   reports-bd-filter-drilldown and reports-kpi-drilldown); they are repeated here
+   only because the mockup stylesheet predates them. Nothing below is new CSS. */
+
+/* src/app/design-system.css:782-789 */
+.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; color: var(--color-ink); }
+.stat-clickable:hover, .stat-clickable:focus-visible, .stat-clickable.is-hover { border-color: var(--color-accent-strong); }
+.stat-clickable { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }
+
+/* src/app/design-system.css (reports-kpi-drilldown): the wider drill-down dialog. */
+.dialog.xwide { width: min(960px, 94vw); }
+
+/* Exists in the app (globals.css) but not in the mockup stylesheet. */
+.mb-md { margin-bottom: var(--space-md); }
+
+/* Mockup-only scaffolding: simulates the overlay behind a static dialog. */
+.stage { background: var(--color-overlay); border-radius: var(--radius-md); padding: var(--space-2xl); display: flex; justify-content: center; align-items: flex-start; }
+.stage .dialog { max-height: none; }
+.stage .dialog-body.scroll { max-height: 320px; overflow-y: auto; }
+.cell-sub { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+<a class="nav-item" href="../../outreach-sequences/mockups/secuencias-lista.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Secuencias<span class="pill-count">2</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>Lusha por BD</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="#">Administración</a><span class="sep">/</span><a href="#">Lusha por BD</a></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a5">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">BD</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Cambio <span class="mono">lusha-reveals-drilldown</span>, pedido del dueño: en «Lusha por BD», al hacer clic en la tarjeta <strong>«Revelados»</strong> se abre la lista de cuáles fueron y quién los hizo. No hay pantalla nueva ni CSS nuevo: reusa tal cual el patrón que ya está en producción en <a href="../../reports-kpi-drilldown/mockups/reports-kpi-drilldown.html">Reportes</a> (<span class="mono">button.stat.stat-clickable</span> → <span class="mono">KpiDrilldownCard</span> + <span class="mono">Dialog</span> con la lista cargada a demanda recién al abrir). Tampoco necesita datos nuevos: cada revelado ya guarda su contacto, su campo, su valor, quién lo hizo y cuántos créditos cobró (<span class="mono">lusha_reveal</span>). Nombres, correos (<span class="mono">.example</span>) y cifras inventados. Vista de escritorio únicamente.
+<p class="mt-md"><strong>Decisiones a aprobar</strong></p>
+<ol>
+<li><strong>La lista muestra exactamente lo que cuenta el número, y nada más.</strong> Son los revelados cobrados y efectivos del período, con los tres mismos filtros que usa el número (<span class="mono">state = 'settled'</span>, <span class="mono">outcome = 'revealed'</span> y <span class="mono">actor_bd_id is not null</span>), del más nuevo al más viejo. Las coincidencias rechazadas y los intentos sin valor <strong>no</strong> entran acá: tienen su propia columna en la tabla de abajo y meterlos rompería la promesa de que el diálogo explica ese 47.</li>
+<li><strong>Se muestra el dato comprado (abierta).</strong> A) Se muestra el correo/teléfono revelado. B) Sólo se dice «Correo» o «Teléfono». <strong>Recomiendo A:</strong> el crédito se gastó para conseguir ese valor, es una pantalla sólo para administradores, y el dato ya está visible en la ficha del contacto para todo el equipo. Esconderlo acá no protege nada y obliga a abrir seis fichas para entender una factura.</li>
+<li><strong>Sólo «Revelados» se vuelve clickeable</strong>, las otras tres tarjetas quedan como están. «Créditos cobrados» incluye créditos de búsqueda que no son un revelado y pediría otra lista; «BD con Lusha habilitado» es una lista de personas que ya es la tabla de abajo; «Ciclo» usa otra ventana de tiempo (la de facturación, no la del período elegido). Cada una es su propio pedido si algún día hace falta.</li>
+<li><strong>El selector de período manda.</strong> La lista usa la misma ventana que el número: si cambiás a «Semana», el número y la lista cambian juntos. Es lo que ya hace Reportes.</li>
+<li><strong>Cada fila lleva a la ficha del contacto.</strong> Es el motivo del pedido: ver cuáles son, no sólo cuántos.</li>
+<li><strong>Con 0 revelados la tarjeta no es clickeable</strong> y se dibuja como una tarjeta común, sin manito ni borde de hover (sección 3). Ya es el comportamiento de <span class="mono">KpiDrilldownCard</span>: no hay nada adentro, así que no debe parecer que sí.</li>
+</ol>
+<a href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas del sistema aprobado</a></div><span class="tag tag-scope">En alcance: lusha-reveals-drilldown</span></div>
+
+<h2 class="mb-lg">1 · La tarjeta «Revelados», ahora clickeable</h2>
+<p class="meta mb-lg">Las cuatro tarjetas de siempre, con el mismo tamaño y el mismo tono. «Revelados» es la única que cambia: pasa de <span class="mono">div.stat.info</span> a <span class="mono">button.stat.info.stat-clickable</span>. No lleva ningún indicio visual hasta el hover, donde el borde pasa a rojo de marca; acá se muestra con el cursor encima para que se vea la diferencia.</p>
+<div class="grid-4 mb-lg">
+<div class="stat accent"><div class="label">Créditos cobrados en octubre</div><div class="value">130</div><div class="foot">del 1 al 22 de octubre de 2026</div></div>
+<button type="button" class="stat info stat-clickable is-hover"><div class="label">Revelados</div><div class="value">47</div><div class="foot">39 correos · 8 teléfonos</div></button>
+<div class="stat success"><div class="label">BD con Lusha habilitado</div><div class="value">4 <span class="meta">de 6</span></div><div class="foot">1 deshabilitado por un administrador, 1 nuevo</div></div>
+<div class="stat neutral"><div class="label">Ciclo de facturación</div><div class="value">130 <span class="meta">de 400</span></div><div class="foot">se restablece el 1 de noviembre</div></div>
+</div>
+
+<h2 class="mt-2xl mb-lg">2 · El diálogo: cuáles fueron y quién los hizo</h2>
+<p class="meta mb-lg">Se abre al hacer clic. La lista se pide al servidor <strong>recién al abrir</strong>, nunca en la carga de la pantalla, así que esto no le agrega una consulta a «Lusha por BD». Mismo diálogo que los tres de Reportes: <span class="mono">table.data.compact</span>, ancho <span class="mono">xwide</span>, cuerpo con scroll propio. Del más nuevo al más viejo.</p>
+<div class="stage"><div class="dialog wide xwide" role="dialog" aria-modal="true" aria-labelledby="dlg-rev">
+<div class="dialog-header"><h2 id="dlg-rev">Revelados</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body scroll">
+<p class="meta mb-md">47 datos revelados con créditos de Lusha entre el 1 y el 22 de octubre de 2026.</p>
+<table class="data compact">
+<thead><tr><th>Contacto</th><th>Dato revelado</th><th>Lo reveló</th><th>Cuándo</th><th class="right">Créditos</th></tr></thead>
+<tbody>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Marta Olivera</a><span class="cell-sub">Nodo Labs</span></td>
+<td><span class="badge badge-outline no-dot">Correo</span><span class="cell-sub mono">marta.olivera@nodolabs.example</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a1">LF</span>Lucía Ferrán</div></td>
+<td class="nowrap"><span class="soft">22 oct 2026</span><span class="cell-sub">hace 2 horas</span></td>
+<td class="right"><span class="num">1</span></td>
+</tr>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Ramiro Bustos</a><span class="cell-sub">Brisa Pagos</span></td>
+<td><span class="badge badge-outline no-dot">Teléfono</span><span class="cell-sub mono">+54 9 11 5555 0134</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a1">LF</span>Lucía Ferrán</div></td>
+<td class="nowrap"><span class="soft">22 oct 2026</span><span class="cell-sub">hace 3 horas</span></td>
+<td class="right"><span class="num">2</span></td>
+</tr>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Ramiro Bustos</a><span class="cell-sub">Brisa Pagos</span></td>
+<td><span class="badge badge-outline no-dot">Correo</span><span class="cell-sub mono">ramiro.bustos@brisapagos.example</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a1">LF</span>Lucía Ferrán</div></td>
+<td class="nowrap"><span class="soft">21 oct 2026</span><span class="cell-sub">ayer</span></td>
+<td class="right"><span class="num">1</span></td>
+</tr>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Verónica Lastra</a><span class="cell-sub">Pampa Retail</span></td>
+<td><span class="badge badge-outline no-dot">Correo</span><span class="cell-sub mono">v.lastra@pamparetail.example</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a5">CC</span>Cristian Civita</div></td>
+<td class="nowrap"><span class="soft">21 oct 2026</span><span class="cell-sub">ayer</span></td>
+<td class="right"><span class="num">1</span></td>
+</tr>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Diego Alterio</a><span class="cell-sub">Sur Logística</span></td>
+<td><span class="badge badge-outline no-dot">Teléfono</span><span class="cell-sub mono">+54 9 341 444 0988</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a3">AS</span>Ana Belén Soria</div></td>
+<td class="nowrap"><span class="soft">17 oct 2026</span><span class="cell-sub">hace 5 días</span></td>
+<td class="right"><span class="num">2</span></td>
+</tr>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Paula Duarte</a><span class="cell-sub">Andina Tech</span></td>
+<td><span class="badge badge-outline no-dot">Correo</span><span class="cell-sub mono">paula.duarte@andinatech.example</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a2">TQ</span>Tomás Quiroga</div></td>
+<td class="nowrap"><span class="soft">16 oct 2026</span><span class="cell-sub">hace 6 días</span></td>
+<td class="right"><span class="num">1</span></td>
+</tr>
+<tr>
+<td><a href="../../crm-hubspot-ux/mockups/contact-record.html">Celeste Arrúa</a><span class="cell-sub">Litoral Agro</span></td>
+<td><span class="badge badge-outline no-dot">Teléfono</span><span class="cell-sub mono">+54 9 362 433 7712</span></td>
+<td><div class="owner-chip"><span class="avatar avatar-sm a3">AS</span>Ana Belén Soria</div></td>
+<td class="nowrap"><span class="soft">7 oct 2026</span><span class="cell-sub">hace 15 días</span></td>
+<td class="right"><span class="soft">pendiente</span></td>
+</tr>
+</tbody>
+</table>
+<p class="meta mt-md">«Créditos» es lo que Lusha efectivamente cobró por ese revelado. <strong>«Pendiente»</strong> es un revelado que salió bien pero cuyo cobro Lusha todavía no confirmó: cuenta igual contra el tope, así que se muestra y no se esconde.</p>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cerrar</button></div>
+</div></div>
+<p class="meta mt-lg">La fila de Celeste Arrúa dice <strong>«pendiente»</strong> a propósito: es un revelado que salió bien pero cuyo cobro Lusha todavía no confirmó (<span class="mono">credits_charged</span> en nulo). Hoy no hay ninguno —medido contra producción el 22 oct 2026: 14 revelados en total, 0 sin cobro—, pero el ledger lo permite y sin etiqueta sería una celda vacía.</p>
+<p class="meta mt-md"><strong>Lo que no se dibuja, y por qué.</strong> No hay fila «BD eliminado». El número de arriba sólo cuenta revelados con un BD vivo (<span class="mono">getLushaUsageReport</span> filtra <span class="mono">actor_bd_id is not null</span>), así que la lista tiene que filtrar igual: una fila huérfana haría que el diálogo muestre más filas que el número que dice explicar. Que el gasto de un BD borrado desaparezca del reporte es discutible, pero ya es así hoy, hay 0 filas en ese estado, y arreglarlo es otro cambio y no éste.</p>
+<p class="meta mt-md"><strong>Diferencias aceptadas contra lo implementado.</strong> El diálogo real es el componente compartido del CRM, el mismo de los tres drill-downs de Reportes, así que su encabezado va sin insignia «Lusha» (ponerla obligaría a tocar un componente compartido por un adorno, y acá tampoco la dibujo para que el mockup no prometa algo que no existe). Por el mismo motivo el tiempo relativo tiene granularidad de día —dice «hace 3 días», no «hace 2 horas»— y la fecha del subtítulo sale «1 oct 2026», el mismo formato que ya usa el pie de la tarjeta. En las tres gana el sistema de diseño y no el dibujo.</p>
+
+<h2 class="mt-2xl mb-lg">3 · Sin revelados en el período: la tarjeta no es clickeable</h2>
+<p class="meta mb-lg">Con el número en 0 no hay nada para abrir, así que la tarjeta vuelve a ser un <span class="mono">div.stat</span> común: sin manito, sin borde de hover y sin foco de teclado. Es el comportamiento que ya tiene <span class="mono">KpiDrilldownCard</span> en Reportes.</p>
+<div class="grid-4 mb-lg">
+<div class="stat accent"><div class="label">Créditos cobrados en la semana</div><div class="value">0</div><div class="foot">del 20 al 22 de octubre de 2026</div></div>
+<div class="stat info"><div class="label">Revelados</div><div class="value">0</div><div class="foot">sin revelados en el período</div></div>
+<div class="stat success"><div class="label">BD con Lusha habilitado</div><div class="value">4 <span class="meta">de 6</span></div><div class="foot">1 deshabilitado por un administrador, 1 nuevo</div></div>
+<div class="stat neutral"><div class="label">Ciclo de facturación</div><div class="value">130 <span class="meta">de 400</span></div><div class="foot">se restablece el 1 de noviembre</div></div>
+</div>
+<p class="meta">Si el número está en 1 o más y la lista llegara vacía (sólo pasa si alguien reveló y se deshizo entre la carga y el clic), el diálogo lo dice en texto en vez de mostrar una tabla sin filas. El tope de 500 filas del diálogo compartido sigue valiendo y avisa cuando corta, aunque con 400 créditos por ciclo no se puede llegar.</p>
+</main>
+</div></div>
+</body>
+</html>

@@ -24,6 +24,8 @@ const LIST = `${CONTACTS}page.tsx`;
 const ADMIN = "src/app/(app)/admin/lusha/";
 const ADMIN_PAGE = `${ADMIN}page.tsx`;
 const ADMIN_ACTIONS = `${ADMIN}actions.ts`;
+// lusha-reveals-drilldown: the "Revelados" card is a client component that only ever sees the library's TYPES.
+const ADMIN_REVEALS_CARD = `${ADMIN}RevealsKpiCard.tsx`;
 const LIBRARY_DIR = "src/lib/lusha/";
 const CONFIG = `${LIBRARY_DIR}config.ts`;
 
@@ -84,7 +86,7 @@ test("outside the library, only the actions, the record page, the list (a read-o
   const clientRuntime = importers(LIB, outside.filter(isClient));
   assert.deepEqual(clientRuntime, []);
   // Type-only importers: the dialogs and the two components that pass the view down.
-  assert.deepEqual(importers(LIB, outside, true).filter((f) => !importers(LIB).includes(f)), [PANE, ROW, REVEAL_UI].sort());
+  assert.deepEqual(importers(LIB, outside, true).filter((f) => !importers(LIB).includes(f)), [PANE, ROW, REVEAL_UI, ADMIN_REVEALS_CARD].sort());
 });
 
 test("the API key is read in one place, by server code, and is never public", () => {
