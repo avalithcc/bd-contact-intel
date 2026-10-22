@@ -20,8 +20,10 @@ const BASE: BuildOutreachMessagePromptInput = {
 const CHANNELS = ["email", "linkedin"] as const;
 const LANGUAGES = ["es", "en", "pt"] as const;
 
-// The rejected phrases, pinned by name.
-const REJECTED = [/te cierra/i, /te copa/i, /cómo va\?/i, /charlar/i, /rioplatense/i, /voseo/i];
+// Two DISTINCT failure modes live here, so extend the right list: REJECTED pins regional vocabulary and informal register
+// by PHRASE (match the phrase, never the bare word: "chicos" can be fine in another sense), and VOSEO_OR_SLANG below
+// covers voseo conjugation and Argentine colloquialisms.
+const REJECTED = [/te cierra/i, /te copa/i, /cómo va\?/i, /charlar/i, /rioplatense/i, /voseo/i, /equipos chicos/i, /bastante gente/i];
 // The general rule: voseo conjugations and Argentine colloquialisms. Future-tense "-ás" (tendrás) is valid neutral Spanish, so it is not listed.
 const VOSEO_OR_SLANG =
   /\b(vos|tenés|querés|podés|sabés|estás viendo|mirá|fijate|contame|decime|vení|dale|che|bárbaro|laburo|copa|charlemos|charlar|te cierra|cómo va)\b/i;
