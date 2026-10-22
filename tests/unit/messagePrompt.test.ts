@@ -48,10 +48,11 @@ test("email in Spanish uses neutral professional Spanish, not Rioplatense slang"
   assert.doesNotMatch(system, /Rioplatense/i);
 });
 
-test("linkedin channel in Spanish keeps the existing Rioplatense tone", () => {
+test("linkedin channel in Spanish is neutral professional Spanish (owner reversed the Rioplatense DM voice)", () => {
   const { system } = buildOutreachMessagePrompt({ ...BASE, channel: "linkedin", language: "es" });
-  assert.match(system, /Rioplatense/i);
-  assert.match(system, /voseo/i);
+  assert.doesNotMatch(system, /Rioplatense/i);
+  assert.doesNotMatch(system, /voseo/i);
+  assert.match(system, /neutral, professional Spanish/);
 });
 
 test("linkedin channel's explicit goal is to get an email or book a call, never the full conversation", () => {

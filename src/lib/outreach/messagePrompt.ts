@@ -248,18 +248,15 @@ function summarizeHiring(company: OutreachMessageCompany | null): string {
  * string building, called from the "use server" action in
  * src/app/outreach/actions.ts so it stays independently testable.
  */
-// Tone/register instruction for rule 2 (Language and tone) — the ONLY place
-// where "channel" changes the LANGUAGE rule itself: LinkedIn Spanish keeps
-// the existing Rioplatense DM voice (owner-approved reference style below);
-// every other combination (email in any language, or non-Spanish LinkedIn)
-// is neutral/professional — see the language contract in the change
-// description ("Neutral professional Spanish for email. The Rioplatense
-// casual tone is only for the LinkedIn DM, where it already exists.").
+// Tone/register instruction for rule 2 (Language and tone). Spanish is neutral, professional Spanish on EVERY channel:
+// no voseo, no regionalisms, no slang in any outgoing prospect message. This replaces the earlier decision that kept a
+// Rioplatense voice for LinkedIn DMs; the owner reversed it ("es muy muy informal eso. NO lo quiero en ningun correo
+// saliente"). The channel still matters for the opening-marks rule below, which is about sounding like a real chat
+// message, not about register.
 function languageInstruction(channel: OutreachChannel, language: MessageLanguage): string {
   if (language === "es") {
-    return channel === "linkedin"
-      ? 'Write in Spanish, Rioplatense tone (voseo is fine, e.g. "vos", "cómo va?", "te copa"), since the sender and the contact are both Argentine. Keep it natural and informal but professional — a peer writing to a peer, not a cold sales pitch. Write like a real LinkedIn chat message: never use the opening marks "¿" or "¡" — only the closing "?" and "!".'
-      : 'Write in neutral, professional Spanish: standard verb forms, no casual regionalisms or slang, no colloquial contractions. Warm and direct, a peer writing to a peer — never a cold sales pitch. Never use the opening marks "¿" or "¡" — only the closing "?" and "!".';
+    return 'Write in neutral, professional Spanish: standard verb forms, no casual regionalisms or slang, no colloquial contractions. Warm and direct, a peer writing to a peer — never a cold sales pitch. Never use the opening marks "¿" or "¡" — only the closing "?" and "!".'
+      + (channel === "linkedin" ? " Write like a real LinkedIn chat message: short and natural, but still professional." : "");
   }
   if (language === "pt") {
     return "Write in natural, professional Portuguese, warm but not overly casual — a peer writing to a peer, not a cold sales pitch.";
@@ -274,9 +271,9 @@ function referenceStyleFor(isEmail: boolean, language: MessageLanguage): string 
   if (language === "es") {
     return isEmail
       ? `Reference style (do not copy verbatim, tone example only, in Spanish, for a FIRST email with no prior history):
-{"subject": "Squads senior nearshore para Affirm", "body": "Hola Gonzalo,\\n\\nVi que Affirm tiene varias búsquedas abiertas de backend senior en Card, Fraud, Identity y Payments, casi todas remotas en US y Europa. En Avalith armamos squads de ingenieros senior en timezone alineado a US, integrados en días, para dar capacidad extra mientras se cubren esos roles — no competimos con el proceso de contratación.\\n\\nTe cierra una llamada de 20 minutos la semana que viene para ver si tiene sentido?\\n\\nCristian Civita, COO de Avalith"}`
+{"subject": "Squads senior nearshore para Affirm", "body": "Hola Gonzalo,\\n\\nVi que Affirm tiene varias búsquedas abiertas de backend senior en Card, Fraud, Identity y Payments, casi todas remotas en US y Europa. En Avalith armamos squads de ingenieros senior en timezone alineado a US, integrados en días, para dar capacidad extra mientras se cubren esos roles — no competimos con el proceso de contratación.\\n\\nTendrás 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?\\n\\nCristian Civita, COO de Avalith"}`
       : `Reference style (do not copy verbatim, this is a tone example only, in Spanish, for a FIRST outreach with no prior history):
-"Hola Gonzalo, cómo va? Soy Cristian Civita, COO de Avalith. Estuve mirando las búsquedas de Affirm y vi que están sumando bastante gente senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos chicos de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. Te copa charlar 20 minutos la semana que viene?"`;
+"Hola Gonzalo, un gusto saludarte. Soy Cristian Civita, COO de Avalith. Estuve mirando las búsquedas de Affirm y vi que están sumando varias personas senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos pequeños de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. Tendrás 15 minutos la semana próxima para conversar?"`;
   }
   return isEmail
     ? `Reference style (do not copy verbatim, tone example only, in English, for a FIRST email with no prior history):
