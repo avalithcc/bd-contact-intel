@@ -183,6 +183,45 @@ test("recall: how people actually write an opt-out request (Spanish), accented o
   for (const body of bodies) assert.notEqual(detectOptOutPhrase(body), null, body);
 });
 
-test("recall stays broad on purpose: a harmless 'no me escribas a este mail' prompts (advisory, a BD dismisses it)", () => {
-  assert.notEqual(detectOptOutPhrase("No me escribas a este mail, escribime al otro"), null);
+test("recall stays broad on purpose everywhere else: an unqualified 'no me llames, no es el momento' prompts (advisory)", () => {
+  assert.notEqual(detectOptOutPhrase("No me llames, no es el momento"), null);
+});
+
+test("measured: 12 real opt-outs are all flagged (recall must not move)", () => {
+  const optOuts = [
+    "no me escribas", "no me contacten", "dejen de escribirme", "No quiero mas correos", "Basta de correos", "quitenme",
+    "retirenme de la lista", "elimine mi correo de su base", "no quiero seguir recibiendo correos", "baja", "darme de baja", "desuscribirme",
+  ];
+  const missed = optOuts.filter((b) => detectOptOutPhrase(b) === null);
+  assert.deepEqual(missed, []);
+});
+
+// MEASURED false positives, not hypotheticals: of 12 realistic replies that mean INTEREST, the first five raised an
+// opt-out prompt before the three channel-swap / idiom / correction patterns were narrowed. The last seven were already
+// quiet and must stay quiet. A swap ("write me HERE instead") always supplies an alternative; a real opt-out never does.
+test("measured: replies that mean interest do NOT raise an opt-out prompt", () => {
+  const interested = [
+    "Hola Cristian, me interesa. Quiero sacarme una duda sobre los perfiles.",
+    "Gracias! Antes de avanzar quiero sacarme una duda.",
+    "Dale, hablemos. No me llames a este numero, mejor al +54 9 11 5555 5555.",
+    "Me interesa pero no me escribas a este mail, escribime al corporativo.",
+    "Podrias borrar mis datos del formulario viejo y usar estos?",
+    // the seven that were already quiet (synthetic stand-ins of the same kind)
+    "Me interesa, cuando podemos hablar?",
+    "Gracias por escribirme, tenemos una busqueda abierta de dos developers.",
+    "Mandame mas detalles de los perfiles y las tarifas.",
+    "Estoy de vacaciones hasta el lunes, te escribo cuando vuelva.",
+    "Pasame tu calendario y coordinamos una llamada.",
+    "Interesante propuesta, lo comparto con el equipo.",
+    "Podemos hablar el jueves a las 15?",
+  ];
+  const noisy = interested.filter((b) => detectOptOutPhrase(b) !== null);
+  assert.deepEqual(noisy, []);
+});
+
+test("the narrowing is surgical: the same verbs without an alternative, or a duda-less sacar, still prompt", () => {
+  assert.notEqual(detectOptOutPhrase("No me llames mas por favor"), null);
+  assert.notEqual(detectOptOutPhrase("Sacame de la lista, tengo una duda de por que me escriben"), null);
+  assert.notEqual(detectOptOutPhrase("Borren mis datos de su base."), null);
+  assert.notEqual(detectOptOutPhrase("No me escribas. Escribile a mi colega."), null, "a redirect in ANOTHER sentence does not excuse the opt-out");
 });
