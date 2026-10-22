@@ -1,10 +1,12 @@
 // DB side of lusha-per-bd: the switch (read for enforcement, written only by an admin, audited in the same transaction) and the
 // per-BD consumption report. The report needs no storage of its own: every reveal is a lusha_reveal row with its actor.
 
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, bd } from "@/db/schema";
 import { assertAdminRole } from "@/lib/auth/adminRole";
+import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
+import { buildRevealDrilldownRows, type RevealDrilldownRawRow, type RevealDrilldownRow } from "./revealsDrilldown";
 import { mapUsageRow, type RawUsageRow, type UsageRow } from "./usageReport";
 
 export const LUSHA_AUDIT_ACTIONS = { enable: "bd_lusha_enable", disable: "bd_lusha_disable" } as const;
@@ -38,9 +40,15 @@ export async function setLushaEnabled(input: { actor: { id: string; role: string
  * rejections by rejected_at; last use is all-time. Charged = credits_charged only; pending = reserved and never charged.
  */
 export async function getLushaUsageReport(window: { start: Date; end: Date }): Promise<UsageRow[]> {
+  const rows = (await db.execute(buildUsageReportQuery(window))) as unknown as RawUsageRow[];
+  return Array.from(rows, mapUsageRow);
+}
+
+/** Exported (not executed) so tests can compile it: the "Revelados" drill-down must keep the same filters as ur_spend below. */
+export function buildUsageReportQuery(window: { start: Date; end: Date }): SQL {
   const start = window.start.toISOString();
   const end = window.end.toISOString();
-  const rows = (await db.execute(sql`
+  return sql`
     with ur_spend as (
       select actor_bd_id as ur_bd,
         coalesce(sum(credits_charged), 0) as ur_charged,
@@ -74,6 +82,37 @@ export async function getLushaUsageReport(window: { start: Date; end: Date }): P
     left join ur_last l on l.ur_bd = b.id
     left join ur_toggle t on t.ur_bd = b.id
     order by coalesce(s.ur_charged, 0) desc, b.name
-  `)) as unknown as RawUsageRow[];
-  return Array.from(rows, mapUsageRow);
+  `;
+}
+
+/**
+ * The reveals behind the "Revelados" KPI, newest first. INVARIANT: this list has exactly as many rows as the KPI number
+ * (ur_emails + ur_phones of getLushaUsageReport), so it applies the same five filters: field in (emails, phones), settled,
+ * revealed, inside the window, and a live actor. The actor filter is the INNER JOIN on bd: ur_spend drops actor_bd_id is null
+ * (a deleted BD's reveals are counted by nobody), so a LEFT JOIN "to not lose rows" would make the dialog show more rows than
+ * the number it explains. Production on 2026-10-22: 14 revealed rows, 0 with a null actor, value or credits_charged.
+ * Rejected matches and value-less attempts are deliberately absent: they have their own column in the report.
+ */
+export function buildRevealsDrilldownQuery(window: { start: Date; end: Date }): SQL {
+  const start = window.start.toISOString();
+  const end = window.end.toISOString();
+  return sql`
+    select r.id::text as rd_reveal_id, r.person_id::text as rd_person_id,
+      trim(concat_ws(' ', p.first_name, p.last_name)) as rd_person_name, p.company as rd_company,
+      r.field as rd_field, r.value as rd_value, b.id::text as rd_actor_bd_id, b.name as rd_actor_bd_name,
+      r.at as rd_at, r.credits_charged as rd_credits_charged
+    from lusha_reveal r
+    join bd b on b.id = r.actor_bd_id
+    join person p on p.id = r.person_id
+    where r.field in ('emails', 'phones') and r.state = 'settled' and r.outcome = 'revealed'
+      and r.at >= ${start}::timestamptz and r.at < ${end}::timestamptz
+    order by r.at desc, r.id
+    limit ${DRILLDOWN_ROW_LIMIT}
+  `;
+}
+
+/** Read on demand when the dialog opens (never in the page's own load). One query. */
+export async function getRevealsDrilldown(window: { start: Date; end: Date }): Promise<RevealDrilldownRow[]> {
+  const rows = (await db.execute(buildRevealsDrilldownQuery(window))) as unknown as RevealDrilldownRawRow[];
+  return buildRevealDrilldownRows(Array.from(rows));
 }
