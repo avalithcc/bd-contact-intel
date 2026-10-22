@@ -33,7 +33,33 @@ test("the admin line shows the credits AND the contacts they buy, computed from 
     assert.notEqual(zero.contacts, personalCapLines(1, d).contacts, "and not as a very small allowance");
     assert.doesNotMatch(zero.contacts, /habilit|enabled|switch/i);
   }
-  assert.deepEqual(personalCapLines(12, es.lushaAdmin), { headline: "Tope propio: 12 créditos por día", contacts: "unos 6 contactos" });
+  assert.deepEqual(personalCapLines(12, es.lushaAdmin), { headline: "Tope: 12 créditos/día", contacts: "~6 contactos" });
+});
+
+// The line shares one narrow table cell with the switch above it and an edit pencil beside it, and the
+// owner reported the pencil wrapping to its own row (2026-10-22) when the copy was 49 characters. The
+// cap moved to 39, so the bound is the REASON the copy is short, which a golden string alone does not
+// say. It does not check pixels: a longer word in a future locale can still wrap, and a narrower
+// column would too. It only stops this copy from silently growing back.
+const CAP_LINE_BUDGET = 42;
+
+test("the admin cap line stays short enough that the edit pencil keeps its row", () => {
+  for (const [locale, d] of [["es", es.lushaAdmin], ["en", en.lushaAdmin]] as const) {
+    for (let credits = 0; credits <= 999; credits += 1) {
+      const { headline, contacts } = personalCapLines(credits, d);
+      const rendered = `${headline} · ${contacts}`;
+      assert.ok(rendered.length <= CAP_LINE_BUDGET, `${locale} at ${credits} credits: ${rendered.length} chars > ${CAP_LINE_BUDGET} (${rendered})`);
+    }
+  }
+});
+
+test("the approximation survives shortening: the contacts figure never claims to be exact", () => {
+  // A contact costs 2 credits when the reveal is an email; a phone costs more, so the figure is an
+  // estimate. "unos"/"about" carried that and was dropped for length, so "~" has to carry it now.
+  for (const d of [es.lushaAdmin, en.lushaAdmin]) {
+    assert.match(personalCapLines(12, d).contacts, /^~/, "a plural contacts figure is hedged");
+    assert.match(personalCapLines(30, d).contacts, /^~/);
+  }
 });
 
 test("the usage report selects the personal cap from bd, outside the ur_spend CTE the drill-down is compared against", async () => {
